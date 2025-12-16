@@ -4,8 +4,10 @@ let isRecording = false;
 
 // Listen for recording state changes from background
 chrome.runtime.onMessage.addListener((message) => {
+    console.log("[Content] Received message:", message);
     if (message.type === 'RECORDING_STATUS_CHANGED') {
         isRecording = message.isRecording;
+        console.log("[Content] isRecording updated to:", isRecording);
     }
 });
 
@@ -13,18 +15,25 @@ chrome.runtime.onMessage.addListener((message) => {
 chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {
     if (chrome.runtime.lastError) {
         // Background might not be ready or we are orphaned
+        console.log("[Content] Setup error or orphaned:", chrome.runtime.lastError.message);
         return;
     }
+    console.log("[Content] Initial recording state:", response);
     if (response?.isRecording) {
         isRecording = true;
     }
 });
 
 document.addEventListener('click', (event) => {
-    if (!isRecording) return;
+    if (!isRecording) {
+        console.log("[Content] Click ignored (not recording)");
+        return;
+    }
 
     const target = event.target as HTMLElement;
     const rect = target.getBoundingClientRect();
+
+    console.log("[Content] Capture CLICK on:", target.tagName);
 
     const metadata = {
         timestamp: Date.now(),

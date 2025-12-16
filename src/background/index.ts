@@ -26,8 +26,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_RECORDING_STATE') {
         sendResponse({ isRecording });
     } else if (message.type === 'CLICK_EVENT') {
+        console.log("[Background] Received CLICK_EVENT", message.payload);
         if (isRecording) {
             clickEvents.push(message.payload);
+            console.log("[Background] Stored event. Total events:", clickEvents.length);
             // Optionally back up to storage periodically
             chrome.storage.local.set({ currentSessionEvents: clickEvents });
         }
@@ -66,7 +68,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 await chrome.runtime.sendMessage({
                     type: 'START_RECORDING_OFFSCREEN',
                     streamId,
-                    data: message
+                    data: { ...message, hasAudio: message.hasAudio, hasCamera: message.hasCamera }
                 });
 
                 isRecording = true;
@@ -74,12 +76,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 chrome.storage.local.set({ currentSessionEvents: [] });
 
                 // Notify content script safely
-                chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true })
-                    .catch(() => {
-                        // Content script might not be injected (e.g. restricted page or stale tab)
-                        // We continue recording without metadata in this case.
-                        console.warn("Could not reach content script. Metadata capture disabled for this session.");
-                    });
+                // Notify content script safely
+                console.log("[Background] Sending RECORDING_STATUS_CHANGED=true to tab", tabId);
+
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true });
+                    console.log("[Background] Message sent successfully.");
+                } catch (err: any) {
+                    console.log("[Background] Message failed. Attempting injection...", err.message);
+
+                    try {
+                        // Inject the content script manually
+                        // Note: 'files' path is relative to the extension root
+                        await chrome.scripting.executeScript({
+                            target: { tabId },
+                            files: ['src/content/index.ts']
+                        });
+                        console.log("[Background] Injection successful. Retrying message...");
+
+                        // Give it a moment to initialize listeners
+                        await new Promise(r => setTimeout(r, 200));
+
+                        await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true });
+                        console.log("[Background] Retry message sent successfully.");
+                    } catch (injectErr: any) {
+                        console.warn("Could not inject content script. Page might be restricted (e.g. chrome:// URL).", injectErr.message);
+                    }
+                }
 
                 sendResponse({ success: true });
             } catch (err: any) {
@@ -105,6 +128,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
 
         // Save final metadata state
+        console.log("[Background] Saving final metadata:", clickEvents.length, "events");
         chrome.storage.local.set({ recordingMetadata: clickEvents });
 
         sendResponse({ success: true });
