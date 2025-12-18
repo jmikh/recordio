@@ -148,7 +148,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 logger.log("[Background] Sending RECORDING_STATUS_CHANGED=true to tab", tabId);
 
                 try {
-                    await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true });
+                    await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: Date.now() });
                     logger.log("[Background] Message sent successfully.");
                 } catch (err: any) {
                     logger.log("[Background] Message failed. Attempting injection...", err.message);
@@ -165,7 +165,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         // Give it a moment to initialize listeners
                         await new Promise(r => setTimeout(r, 200));
 
-                        await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true });
+                        await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: Date.now() });
                         logger.log("[Background] Retry message sent successfully.");
                     } catch (injectErr: any) {
                         logger.warn("Could not inject content script. Page might be restricted (e.g. chrome:// URL).", injectErr.message);

@@ -17,7 +17,7 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
     muted = true
 }, ref) => {
     // We need some store values for sizing, but schedule comes from hook
-    const { recordingStartTime, outputVideoSize, inputVideoSize, paddingPercentage } = useEditorStore();
+    const { outputVideoSize, inputVideoSize, paddingPercentage } = useEditorStore();
     const internalVideoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameRef = useRef<number>(0);
@@ -68,7 +68,7 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
 
         // 2. Draw Zoom Box Overlay (Debugging/Visualization)
         const currentMs = video.currentTime * 1000;
-        const absTime = recordingStartTime + currentMs;
+        const absTime = currentMs;
 
         // Find Active Keyframe
         let activeKeyframe: ZoomKeyframe | null = null;

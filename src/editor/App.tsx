@@ -29,7 +29,7 @@ function Editor() {
     const {
         videoUrl,
         metadata,
-        recordingStartTime,
+
         segments,
         currentTime,
         isPlaying,
@@ -292,7 +292,7 @@ function Editor() {
                     <div className="flex-1 flex flex-col overflow-hidden border-t border-[#333]">
                         <ZoomInspector
                             schedule={schedule}
-                            currentTime={recordingStartTime + currentTime}
+                            currentTime={currentTime}
                         />
                     </div>
                 </div>

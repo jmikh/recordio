@@ -10,33 +10,42 @@ logger.log("[Recordo] Content script loaded");
 
 let isRecording = false;
 
+// Event Capture State
+let lastMouseX = 0;
+let lastMouseY = 0;
+let lastMouseTime = 0;
+let recordingStartTime = 0;
+const MOUSE_POLL_INTERVAL = 500;
+
 // Listen for recording state changes from background
 chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
     logger.log("[Content] Received message:", message);
     if (message.type === 'RECORDING_STATUS_CHANGED') {
         isRecording = message.isRecording;
-        logger.log("[Content] isRecording updated to:", isRecording);
+        if (isRecording && message.startTime) {
+            recordingStartTime = message.startTime;
+        }
+        logger.log("[Content] isRecording updated to:", isRecording, "Start:", recordingStartTime);
     }
 });
 
 // Also check initial state safely
 chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {
+    // ... (existing code, assumes background might not have sent start time in GET_RECORDING_STATE yet? 
+    // Actually GET_RECORDING_STATE response in background doesn't include timestamp. 
+    // I should probably update background GET_RECORDING_STATE response too, but for now lets rely on the explicit start message or default)
     if (chrome.runtime.lastError) {
-        // Background might not be ready or we are orphaned
         logger.log("[Content] Setup error or orphaned:", chrome.runtime.lastError.message);
         return;
     }
     logger.log("[Content] Initial recording state:", response);
     if (response && response.isRecording) {
         isRecording = true;
+        // If we missed the start message, we might lack recordingStartTime. 
+        // Ideally background stores it.
     }
 });
 
-// Event Capture State
-let lastMouseX = 0;
-let lastMouseY = 0;
-let lastMouseTime = 0;
-const MOUSE_POLL_INTERVAL = 500;
 
 const captureOptions = { capture: true };
 
@@ -153,6 +162,15 @@ function sendMessageToBackground(type: string, payload: any) {
         if (keysToScale.includes(key) && typeof scaledPayload[key] === 'number') {
             scaledPayload[key] *= dpr;
         }
+    }
+
+    // Adjust timestamp to be relative to recording start
+    if (recordingStartTime > 0 && typeof scaledPayload.timestamp === 'number') {
+        const absoluteTs = scaledPayload.timestamp;
+        scaledPayload.timestamp = Math.max(0, absoluteTs - recordingStartTime);
+        scaledPayload.recordingStart = recordingStartTime;
+        // Keep absolute too just in case
+        scaledPayload.absoluteTimestamp = absoluteTs;
     }
 
     chrome.runtime.sendMessage({ type, payload: scaledPayload }).catch(() => {
