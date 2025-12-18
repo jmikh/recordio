@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { PlayerCanvas } from './PlayerCanvas';
-import { logger } from '../utils/logger';
 import { useEditorStore, type Metadata } from './store';
-import { Timeline } from './Timeline';
+import { Timeline } from './timeline/Timeline';
 import { EventInspector } from './EventInspector';
-import { ZoomInspector } from './ZoomInspector';
-import { virtualToSourceTime } from './utils';
-import { type ZoomEvent } from '../lib/zoom';
-import { useZoomSchedule } from './useZoomSchedule';
+import { useProject } from '../hooks/useProject';
+import { ProjectImpl } from '../core/project/Project';
+import { TimelineImpl } from '../core/timeline/Timeline';
+import { TrackImpl } from '../core/timeline/Track';
+import { ClipImpl } from '../core/timeline/Clip';
+import type { Source } from '../core/types';
+import type { ZoomEvent } from '../lib/zoom';
 
 
 
@@ -17,33 +19,68 @@ function Editor() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const [containerSize, setContainerSize] = useState({ width: 800, height: 450 });
-    const schedule = useZoomSchedule();
 
-    const onVideoLoaded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-        const w = e.currentTarget.videoWidth;
-        const h = e.currentTarget.videoHeight;
-        setInputVideoSize({ width: w, height: h });
-    };
+    const {
+        project,
+        loadProject,
+        currentTimeMs,
+        isPlaying: projectIsPlaying,
+        setCurrentTime: setProjectTime
+    } = useProject();
 
     // Store State
     const {
         videoUrl,
         metadata,
-
-        segments,
-        currentTime,
-        isPlaying,
         setVideoUrl,
         setMetadata,
         setRecordingStartTime,
-        initSegments,
-        setCurrentTime,
-        setIsPlaying,
-        // paddingPercentage, // Removed unused
         outputVideoSize,
         inputVideoSize,
         setInputVideoSize
     } = useEditorStore();
+
+    const onVideoLoaded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+        console.log('Video loaded');
+        const video = e.currentTarget;
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        setInputVideoSize({ width: w, height: h });
+
+        // Initialize Project if empty
+        if (project.timeline.tracks.length === 0 && videoUrl) {
+            const durationMs = (video.duration && video.duration !== Infinity) ? video.duration * 1000 : 10000;
+            const sourceId = 'source-main';
+
+            const source: Source = {
+                id: sourceId,
+                type: 'video',
+                url: videoUrl,
+                durationMs: durationMs,
+                width: w,
+                height: h,
+                hasAudio: true
+            };
+
+            let newProject = ProjectImpl.addSource(project, source);
+
+            // Create Track
+            let track = TrackImpl.create('Main Video', 'video');
+
+            // Create Clip covering entire duration
+            const clip = ClipImpl.create(sourceId, 0, durationMs, 0);
+
+            track = TrackImpl.addClip(track, clip);
+
+            // Add Track to Timeline
+            const newTimeline = TimelineImpl.addTrack(newProject.timeline, track);
+
+            newProject = { ...newProject, timeline: newTimeline };
+
+            loadProject(newProject);
+            console.log('Project Initialized with Video Source', newProject);
+        }
+    };
 
     // Data Loading
     useEffect(() => {
@@ -70,83 +107,81 @@ function Editor() {
                     if (result.width && result.height) {
                         setInputVideoSize({ width: result.width, height: result.height });
                     }
-
-                    if (result.duration && result.duration > 0 && result.duration !== Infinity) {
-                        initSegments(result.duration);
-                    }
                 }
             };
         };
     }, []);
 
-    useEffect(() => {
-        logger.log("Segments updated:", segments);
-    }, [segments]);
-
-    // Virtual Player Logic
+    // Playback Loop & Video Sync
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        const targetSourceTime = virtualToSourceTime(currentTime, segments);
-
-        if (targetSourceTime !== null) {
-            const diff = Math.abs((video.currentTime * 1000) - targetSourceTime);
-            if (diff > 100) {
-                video.currentTime = targetSourceTime / 1000;
-            }
-        }
-
-        if (isPlaying && video.paused) {
-            video.play().catch(console.error);
-        } else if (!isPlaying && !video.paused) {
-            video.pause();
-        }
-
-    }, [currentTime, isPlaying, segments]);
-
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !isPlaying) return;
-
         let rAFId: number;
+        let lastTime = performance.now();
 
         const loop = () => {
-            const currentSourceMs = video.currentTime * 1000;
-            let foundSeg = false;
-            for (const seg of segments) {
-                if (currentSourceMs >= seg.sourceStart && currentSourceMs < seg.sourceEnd) {
-                    const offset = currentSourceMs - seg.sourceStart;
-                    let virtualStartOfSeg = 0;
-                    for (const s of segments) {
-                        if (s.id === seg.id) break;
-                        virtualStartOfSeg += (s.sourceEnd - s.sourceStart);
-                    }
-                    setCurrentTime(virtualStartOfSeg + offset);
-                    foundSeg = true;
-                    break;
-                }
-            }
+            const now = performance.now();
+            const delta = now - lastTime;
+            lastTime = now;
 
-            if (!foundSeg && segments.length > 0) {
-                const nextSeg = segments.find((s: any) => s.sourceStart > currentSourceMs);
-                if (nextSeg) {
-                    video.currentTime = nextSeg.sourceStart / 1000;
+            if (projectIsPlaying) {
+                const newTime = currentTimeMs + delta;
+                setProjectTime(newTime);
+
+                // Sync Video Element
+                const renderState = ProjectImpl.getRenderState(project, newTime);
+
+                // Assume first track is main video for now
+                // Find visible clip in render tracks
+                const trackState = renderState.tracks.find(t => t.clip);
+
+                if (trackState && trackState.clip) {
+                    const targetSourceTime = trackState.clip.sourceTimeMs / 1000;
+
+                    if (Math.abs(video.currentTime - targetSourceTime) > 0.1) {
+                        video.currentTime = targetSourceTime;
+                    }
+                    if (video.paused) {
+                        video.play().catch(console.error);
+                    }
                 } else {
-                    const lastSeg = segments[segments.length - 1];
-                    if (currentSourceMs > lastSeg.sourceEnd) {
-                        setIsPlaying(false);
-                        return;
+                    // Gap
+                    if (!video.paused) video.pause();
+                }
+            } else {
+                // Paused state: Sync playhead to video if scrubbing happened externally?
+                // Or ensure video frame matches playhead?
+                const renderState = ProjectImpl.getRenderState(project, currentTimeMs);
+                const trackState = renderState.tracks.find(t => t.clip);
+                if (trackState && trackState.clip) {
+                    const targetSourceTime = trackState.clip.sourceTimeMs / 1000;
+                    if (Math.abs(video.currentTime - targetSourceTime) > 0.1) {
+                        video.currentTime = targetSourceTime;
                     }
                 }
+                if (!video.paused) video.pause();
             }
 
             rAFId = requestAnimationFrame(loop);
         };
 
-        loop();
+        if (projectIsPlaying) {
+            lastTime = performance.now();
+        }
+
+        rAFId = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(rAFId);
-    }, [isPlaying, segments]);
+    }, [projectIsPlaying, project, currentTimeMs]); // Dependency on currentTimeMs might cause 60fps re-bind?
+
+    // Optimization: Don't depend on currentTimeMs in effect dependency if possible.
+    // But we need the initial value. 
+    // Actually, setting state inside loop is fine, but reading it?
+    // We should use a ref for local accumulating time to avoid effect re-run loop?
+    // Yes.
+
+    // Better Loop Implementation:
+
 
     // Handle Resize for Centering
     useEffect(() => {
@@ -289,16 +324,10 @@ function Editor() {
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <EventInspector metadata={metadata as unknown as ZoomEvent[]} />
                     </div>
-                    <div className="flex-1 flex flex-col overflow-hidden border-t border-[#333]">
-                        <ZoomInspector
-                            schedule={schedule}
-                            currentTime={currentTime}
-                        />
-                    </div>
                 </div>
             </div>
 
-            <div id="timeline-container" className="h-64 border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e]">
+            <div id="timeline-container" className="h-64 border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e] flex flex-col">
                 <Timeline />
             </div>
         </div>

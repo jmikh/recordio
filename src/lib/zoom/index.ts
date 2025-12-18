@@ -111,9 +111,6 @@ export function calculateZoomSchedule(
         } else if (newBox.y > mappingConfig.outputVideoSize.height - newBox.height) {
             newBox.y = mappingConfig.outputVideoSize.height - newBox.height;
         }
-        console.log('Event', evt);
-        console.log('Zoom Box', newBox);
-        console.log('Input Video Size', mappingConfig.inputVideoSize);
 
         schedule.push({
             timestamp: evt.timestamp,

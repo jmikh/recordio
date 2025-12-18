@@ -1,9 +1,8 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react';
-import { useEditorStore } from './store';
-import { getTotalDuration } from './utils';
-import { TimelineRuler } from './timeline/TimelineRuler';
-import { TimelineTrackVideo } from './timeline/TimelineTrackVideo';
-import { TimelineTrackZoom } from './timeline/TimelineTrackZoom';
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useProject } from '../../hooks/useProject';
+import { TimelineRuler } from './TimelineRuler';
+import { TimelineTrackVideo } from './TimelineTrackVideo';
+import type { Clip } from '../../core/types';
 
 // Constants
 const MIN_PIXELS_PER_SEC = 10;
@@ -12,39 +11,52 @@ const TRACK_HEIGHT = 40;
 
 export function Timeline() {
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Legacy store for UI state (zoom/pixelsPerSec could move to store but keeping local for now if preferred)
+    // Actually using store for isPlaying/currentTime since App.tsx might still drive it separately?
+    // Plan said "Subsribe to useProject".
+    // useProject has currentTimeMs and isPlaying.
     const {
-        segments,
-        metadata,
-        currentTime,
-        recordingStartTime,
-        splitSegment,
-        setCurrentTime,
+        project,
+        currentTimeMs,
         isPlaying,
+        setCurrentTime,
         setIsPlaying,
-        updateSegment
-    } = useEditorStore();
+        splitAt,
+        updateClip
+    } = useProject();
 
     // Zoom Level (Timeline Scale)
     const [pixelsPerSec, setPixelsPerSec] = useState(100);
 
-    const totalDuration = useMemo(() => getTotalDuration(segments), [segments]);
+    // TODO: Calculate total duration dynamically or from project
+    // Project duration might not be updated automatically by core yet?
+    // Let's calculate max end time of all clips.
+    const totalDuration = useMemo(() => {
+        let max = 10000; // Default min duration
+        project.timeline.tracks.forEach(t => {
+            t.clips.forEach(c => {
+                const end = userClipEnd(c);
+                if (end > max) max = end;
+            });
+        });
+        return max;
+    }, [project]);
+
     const totalWidth = (totalDuration / 1000) * pixelsPerSec;
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [isCTIScrubbing, setIsCTIScrubbing] = useState(false);
 
-    // Timeline tracks dragging logic is handled by store actions (updateSegment), 
-    // but the drag interaction state originates here or in tracks.
-    // The Tracks components emit onDragStart. We need to handle the drag listeners here or pass the handler.
-    // The previous implementation had dragging state local to Timeline.
-    // We should lift the state or handle it here.
-    // Since TimelineTrackVideo calls onDragStart, we need the handler here.
-
+    // Dragging State
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragType, setDragType] = useState<'left' | 'right' | null>(null);
     const [dragStartX, setDragStartX] = useState(0);
-    const [dragStartVal, setDragStartVal] = useState(0); // This was sourceStart/End
+
+    // Snapshot of clip BEFORE drag starts, to calculate deltas correctly
+    // We store the COPY of the clip to avoid reference issues.
+    const [initialClipState, setInitialClipState] = useState<Clip | null>(null);
 
     // --- Mouse Handlers ---
 
@@ -68,8 +80,6 @@ export function Timeline() {
     }, [isCTIScrubbing, pixelsPerSec, totalDuration, setCurrentTime]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Only start scrubbing if accessing the background/ruler area, not clips
-        // But clips stop propagation, so this should be fine.
         setIsCTIScrubbing(true);
         const time = getTimeFromEvent(e);
         setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
@@ -85,40 +95,72 @@ export function Timeline() {
     };
 
     // --- Dragging Logic for Trimming ---
-    // This effect handles global mouse move/up when dragging a handle
-    React.useEffect(() => {
-        if (!draggingId || !dragType) return;
+    useEffect(() => {
+        if (!draggingId || !dragType || !initialClipState) return;
 
         const handleGlobalMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - dragStartX;
             const deltaMs = (deltaX / pixelsPerSec) * 1000;
+            const clip = initialClipState;
 
-            // We need to know the original segment to apply constraints
-            // But updateSegment handles logic if we pass raw new values? 
-            // The store's updateSegment takes (id, newStart, newEnd).
-            // We need to calculate new values based on delta.
+            // Find the track for this clip (expensive lookup but safe)
+            const track = project.timeline.tracks.find(t => t.clips.some(c => c.id === clip.id));
+            if (!track) return;
 
-            // Re-find segment to get current constraints? 
-            // Or we just calculate new potential value.
-
-            const segment = segments.find(s => s.id === draggingId);
-            if (!segment) return;
+            let newClip = { ...clip };
 
             if (dragType === 'left') {
-                const newStart = Math.max(0, dragStartVal + deltaMs);
-                // Ensure start < end
-                if (newStart < segment.sourceEnd) {
-                    updateSegment(draggingId, newStart, segment.sourceEnd);
-                }
+                // Moving Start: Affects timelineIn AND sourceIn
+                // Delta is additive. 
+                // Ex: Drag right (+100ms). Start moves later.
+                // sourceIn increases by delta * speed.
+
+                // Constraints:
+                // 1. Cannot move past end (timelineIn < timelineOut)
+                // 2. Cannot move before 0 (timelineIn >= 0)
+                // 3. sourceIn cannot exceed sourceOut
+                // 4. sourceIn cannot be < 0
+
+                const proposedTimelineIn = Math.max(0, clip.timelineInMs + deltaMs);
+                const timelineDelta = proposedTimelineIn - clip.timelineInMs;
+                const sourceDelta = timelineDelta * clip.speed; // if speed 2x, 1s timeline = 2s source
+
+                const proposedSourceIn = clip.sourceInMs + sourceDelta;
+
+                // Check invalid duration
+                if (proposedSourceIn >= clip.sourceOutMs) return;
+
+                newClip.timelineInMs = proposedTimelineIn;
+                newClip.sourceInMs = proposedSourceIn;
+
             } else {
-                const newEnd = Math.max(segment.sourceStart, dragStartVal + deltaMs);
-                updateSegment(draggingId, segment.sourceStart, newEnd);
+                // Moving End: Affects sourceOut only (timelineIn constant)
+                // Ex: Drag right (+100ms). Duration increases.
+                // sourceOut increases.
+
+                // Timeline delta is what we see. Source delta derived.
+                const sourceDelta = deltaMs * clip.speed;
+                const proposedSourceOut = clip.sourceOutMs + sourceDelta;
+
+                // Check invalid duration (sourceIn < sourceOut)
+                if (proposedSourceOut <= clip.sourceInMs) return;
+
+                // Check Max Source Duration? (Source constraints not strictly enforced here but should be)
+                // Assuming we can extend infinitely for now or relying on validation to fail/clamp?
+                // Ideally we clamp to source media duration.
+                // Assuming infinite source for now or user responsibility.
+
+                newClip.sourceOutMs = proposedSourceOut;
             }
+
+            // Dispatch Update
+            updateClip(track.id, newClip);
         };
 
         const handleGlobalMouseUp = () => {
             setDraggingId(null);
             setDragType(null);
+            setInitialClipState(null);
         };
 
         window.addEventListener('mousemove', handleGlobalMouseMove);
@@ -128,18 +170,31 @@ export function Timeline() {
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [draggingId, dragType, dragStartX, dragStartVal, pixelsPerSec, segments, updateSegment]);
+    }, [draggingId, dragType, dragStartX, initialClipState, pixelsPerSec, project, updateClip]);
 
-    const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right', val: number) => {
+    const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right') => {
         e.preventDefault();
         e.stopPropagation();
-        setDraggingId(id);
-        setDragType(type);
-        setDragStartX(e.clientX);
-        setDragStartVal(val);
+
+        // Find the clip object
+        let foundClip: Clip | null = null;
+        for (const t of project.timeline.tracks) {
+            const c = t.clips.find(c => c.id === id);
+            if (c) {
+                foundClip = c;
+                break;
+            }
+        }
+
+        if (foundClip) {
+            setDraggingId(id);
+            setDragType(type);
+            setDragStartX(e.clientX);
+            setInitialClipState(foundClip);
+        }
     };
 
-    // --- Format Helper for Toolbar ---
+    // --- Format Helper ---
     const formatFullTime = (ms: number) => {
         const s = Math.floor(ms / 1000);
         const m = Math.floor(s / 60);
@@ -148,16 +203,9 @@ export function Timeline() {
         return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}.${dec}`;
     };
 
-    // Calculate segments layout for Video Track
-    const virtualSegments = useMemo(() => {
-        let currentVirtual = 0;
-        return segments.map(seg => {
-            const duration = seg.sourceEnd - seg.sourceStart;
-            const start = currentVirtual;
-            currentVirtual += duration;
-            return { ...seg, virtualStart: start, virtualEnd: currentVirtual, duration };
-        });
-    }, [segments]);
+    // Find video tracks (assume all are video type for now or filter)
+    // We want to render them.
+    const videoTracks = project.timeline.tracks.filter(t => t.type === 'video');
 
     return (
         <div className="flex flex-col h-full bg-[#1e1e1e] select-none text-white font-sans">
@@ -165,7 +213,7 @@ export function Timeline() {
             <div className="h-10 flex items-center px-2 bg-[#252526] border-b border-[#333] shrink-0 justify-between">
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => splitSegment(currentTime)}
+                        onClick={() => splitAt(currentTimeMs)}
                         className="flex items-center gap-1 px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs font-medium transition-colors"
                     >
                         ✂️ Split
@@ -178,7 +226,7 @@ export function Timeline() {
                         {isPlaying ? '⏸' : '▶️'}
                     </button>
                     <div className="font-mono text-xs text-gray-400 w-32 text-center">
-                        {formatFullTime(currentTime)} / {formatFullTime(totalDuration)}
+                        {formatFullTime(currentTimeMs)} / {formatFullTime(totalDuration)}
                     </div>
                 </div>
 
@@ -212,22 +260,15 @@ export function Timeline() {
                     {/* Tracks Container */}
                     <div className="py-2 flex flex-col gap-1">
 
-                        {/* Video Track */}
-                        <TimelineTrackVideo
-                            virtualSegments={virtualSegments}
-                            pixelsPerSec={pixelsPerSec}
-                            trackHeight={TRACK_HEIGHT}
-                            onDragStart={handleDragStart}
-                        />
-
-                        {/* Zoom Track */}
-                        <TimelineTrackZoom
-                            metadata={metadata}
-                            segments={segments}
-                            pixelsPerSec={pixelsPerSec}
-                            trackHeight={TRACK_HEIGHT}
-                            recordingStartTime={recordingStartTime}
-                        />
+                        {videoTracks.map(track => (
+                            <TimelineTrackVideo
+                                key={track.id}
+                                clips={track.clips}
+                                pixelsPerSec={pixelsPerSec}
+                                trackHeight={TRACK_HEIGHT}
+                                onDragStart={handleDragStart}
+                            />
+                        ))}
                     </div>
 
                     {/* Hover Line */}
@@ -241,7 +282,7 @@ export function Timeline() {
                     {/* CTI */}
                     <div
                         className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-30 pointer-events-none"
-                        style={{ left: `${(currentTime / 1000) * pixelsPerSec}px` }}
+                        style={{ left: `${(currentTimeMs / 1000) * pixelsPerSec}px` }}
                     >
                         <div className="absolute -top-1 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[8px] border-t-red-500"></div>
                     </div>
@@ -249,4 +290,9 @@ export function Timeline() {
             </div>
         </div>
     );
+}
+
+// Helper
+function userClipEnd(c: Clip) {
+    return c.timelineInMs + (c.sourceOutMs - c.sourceInMs) / c.speed;
 }

@@ -1,8 +1,8 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useEditorStore } from './store';
-import { useZoomSchedule } from './useZoomSchedule';
-import { type ZoomKeyframe } from '../lib/zoom';
 import { VideoMappingConfig } from '../lib/zoom/videoMappingConfig';
+import { useProject } from '../hooks/useProject';
+import { ProjectImpl } from '../core/project/Project';
 
 interface PlayerCanvasProps {
     src: string;
@@ -18,6 +18,32 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
 }, ref) => {
     // We need some store values for sizing, but schedule comes from hook
     const { outputVideoSize, inputVideoSize, paddingPercentage } = useEditorStore();
+    const { project, currentTimeMs, setCurrentTime } = useProject();
+
+    // Resolve what to show
+    let renderState;
+    try {
+        renderState = ProjectImpl.getRenderState(project, currentTimeMs);
+    } catch (e) {
+        console.error('[PlayerCanvas] Error getting render state:', e);
+        // Fallback to empty state
+        renderState = { timeMs: currentTimeMs, tracks: [] };
+    }
+
+    // For now, let's assume Track 1 is the "Video" track we want to show.
+    // In reality, we might mix multiple tracks.
+    // Let's find the first track with a valid clip.
+    const activeTrackItem = renderState.tracks.find(t => t.clip);
+    const activeClip = activeTrackItem?.clip;
+
+    // DEBUG LOGS (State updates)
+    useEffect(() => {
+        if (!activeClip && project.sources && Object.keys(project.sources).length > 0) {
+            // Warn if no active clip but we have sources (potential issue)
+            // console.warn('[PlayerCanvas] No active clip at time:', currentTimeMs);
+        }
+    }, [currentTimeMs, activeClip, project.sources]);
+
     const internalVideoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameRef = useRef<number>(0);
@@ -25,7 +51,9 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
     // Expose the internal video element to the parent
     useImperativeHandle(ref, () => internalVideoRef.current as HTMLVideoElement);
 
-    const schedule = useZoomSchedule();
+    useEffect(() => {
+        console.log('[PlayerCanvas] Mounted. Src:', src);
+    }, [src]);
 
     // Metadata handler wrapper
     const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -36,68 +64,68 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
         if (canvasRef.current) {
             canvasRef.current.width = outputVideoSize.width;
             canvasRef.current.height = outputVideoSize.height;
+
+            // Force draw initial frame
+            const video = e.currentTarget;
+            drawVideo(video, canvasRef.current);
         }
         startRenderLoop();
     };
 
+    // ------------------------------------------------------------------------
+    // RENDER LOOP ARCHITECTURE
+    // ------------------------------------------------------------------------
+    // To ensure 60fps performance and avoid React render-cycle lag, we use
+    // an imperative render loop via requestAnimationFrame.
+    //
+    // CRITICAL: We fetch the latest state directly from the zustand stores
+    // (useProject.getState()) inside the loop. This avoids "stale closure"
+    // issues where the loop would otherwise be stuck using the state
+    // captured at component mount.
+    // ------------------------------------------------------------------------
+
     const drawVideo = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
         const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.log('No canvas context');
+        if (!ctx) return;
+
+        // 1. Fetch Fresh State (Bypass React Closures)
+        const { project, currentTimeMs } = useProject.getState();
+        const { inputVideoSize, outputVideoSize, paddingPercentage } = useEditorStore.getState();
+
+        if (!inputVideoSize) return;
+
+        // 2. Resolve Active Clip
+        let activeClip = null;
+        try {
+            const renderState = ProjectImpl.getRenderState(project, currentTimeMs);
+            const activeTrackItem = renderState.tracks.find(t => t.clip);
+            activeClip = activeTrackItem?.clip;
+        } catch { /* ignore render errors to prevent crash loop */ }
+
+        // 3. Clear Screen if No Active Clip
+        if (!activeClip) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             return;
         }
 
-        if (!inputVideoSize) {
-            return;
+        // 4. Sync Video Element to Virtual Timeline
+        const desiredTime = activeClip.sourceTimeMs / 1000;
+        if (Math.abs(video.currentTime - desiredTime) > 0.1) {
+            video.currentTime = desiredTime;
         }
 
-        const cw = canvas.width;
-        const ch = canvas.height;
-
+        // 5. Calculate Draw Dimensions
         const config = new VideoMappingConfig(
             inputVideoSize,
             outputVideoSize,
             paddingPercentage
         );
 
-        ctx.clearRect(0, 0, cw, ch);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. Draw Video Frame (Cropped/Zoomed)
+        // 6. Draw the Frame
         const { x, y, width, height } = config.projectedBox;
         ctx.drawImage(video, x, y, width, height);
-
-        // 2. Draw Zoom Box Overlay (Debugging/Visualization)
-        const currentMs = video.currentTime * 1000;
-        const absTime = currentMs;
-
-        // Find Active Keyframe
-        let activeKeyframe: ZoomKeyframe | null = null;
-        for (let i = schedule.length - 1; i >= 0; i--) {
-            if (absTime >= schedule[i].timestamp) {
-                activeKeyframe = schedule[i];
-                break;
-            }
-        }
-
-        if (activeKeyframe) {
-            const durationSinceKeyframe = absTime - activeKeyframe.timestamp;
-            // Transient Visualization: Only show for 1 second after the keyframe timestamp
-            if (durationSinceKeyframe <= 1000) {
-                console.log('Active Keyframe', activeKeyframe);
-                const { zoomBox } = activeKeyframe;
-
-                ctx.strokeStyle = 'red';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(zoomBox.x, zoomBox.y, zoomBox.width, zoomBox.height);
-
-                // Label
-                ctx.fillStyle = 'green';
-                ctx.fillRect(zoomBox.x, zoomBox.y, 60, 15);
-                ctx.fillStyle = 'black';
-                ctx.font = 'bold 10px Arial';
-                ctx.fillText('Zoom Box', zoomBox.x + 2, zoomBox.y + 11);
-            }
-        }
     };
 
     const startRenderLoop = () => {
@@ -106,6 +134,9 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
                 const video = internalVideoRef.current;
                 if (!video.paused && !video.ended) {
                     drawVideo(video, canvasRef.current);
+
+                    // Update UI time (throttle this if performance issues arise)
+                    setCurrentTime(video.currentTime * 1000);
                 }
             }
             animationFrameRef.current = requestAnimationFrame(render);
@@ -156,9 +187,21 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
     }, []);
 
 
+    // Polling draw to ensure we catch frame updates when paused (e.g. after seek)
+    // This is a safety net for when 'seeked' events might be missed or debounced.
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const video = internalVideoRef.current;
+            if (video && video.paused && canvasRef.current) {
+                drawVideo(video, canvasRef.current);
+            }
+        }, 200); // Reduced frequency
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <>
-            {/* Hidden Video Element - Source */}
+            {/* Hidden Video Source */}
             <video
                 ref={internalVideoRef}
                 src={src}
@@ -168,11 +211,11 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
                 playsInline
             />
 
-            {/* Canvas - Render Target */}
+            {/* Render Target */}
             <canvas
                 ref={canvasRef}
                 style={{
-                    backgroundColor: 'blue',
+                    backgroundColor: '#000', // Standard Black Background
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     width: '100%',
                     height: '100%',

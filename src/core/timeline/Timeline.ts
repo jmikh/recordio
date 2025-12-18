@@ -1,9 +1,16 @@
 
-import { Timeline, Track, TimeMs, ID, Clip } from '../types';
+import type { Timeline, Track, TimeMs, ID, Clip } from '../types';
 import { TrackImpl } from './Track';
 import { ClipImpl } from './Clip';
 
+/**
+ * Functional logic for Timeline operations.
+ * Orchestrates multiple Tracks.
+ */
 export class TimelineImpl {
+    /**
+     * Creates a new empty Timeline.
+     */
     static create(): Timeline {
         return {
             id: crypto.randomUUID(),
@@ -12,6 +19,9 @@ export class TimelineImpl {
         };
     }
 
+    /**
+     * Adds a track to the timeline.
+     */
     static addTrack(timeline: Timeline, track: Track): Timeline {
         return {
             ...timeline,
@@ -21,14 +31,19 @@ export class TimelineImpl {
 
     /**
      * The Master Split Function.
-     * Splits all tracks at the given time.
-     * HONORS LINK GROUPS:
-     * If a clip on Track A is hit, and it has a linkGroupId, 
-     * we must ALSO split any other clips with that same groupId on other tracks,
      * Splits tracks at the given time.
      * 
-     * @param targetTrackId Optional. If provided, ONLY this track (and its linked peers) will be split.
-     *                      If omitted, ALL tracks with clips under the playhead will be split ("Razor All").
+     * HONORS LINK GROUPS:
+     * If a clip on Track A is hit, and it has a linkGroupId, 
+     * we must ALSO split any other clips with that same groupId on other tracks.
+     * 
+     * @param timeline - The timeline to operate on.
+     * @param timeMs - The time at which to split.
+     * @param targetTrackId - Optional. 
+     *      If provided, ONLY this track (and its linked peers) will be split.
+     *      If omitted, ALL tracks with clips under the playhead will be split ("Razor All").
+     * 
+     * @returns A new Timeline instance.
      */
     static splitAt(timeline: Timeline, timeMs: TimeMs, targetTrackId?: ID): Timeline {
         // 1. Identify valid hits
@@ -95,6 +110,22 @@ export class TimelineImpl {
                 return TrackImpl.splitAt(track, timeMs);
             }
 
+            return track;
+        });
+
+        return {
+            ...timeline,
+            tracks: newTracks
+        };
+    }
+    /**
+     * Updates a clip on a specific track.
+     */
+    static updateClip(timeline: Timeline, trackId: ID, updatedClip: Clip): Timeline {
+        const newTracks = timeline.tracks.map(track => {
+            if (track.id === trackId) {
+                return TrackImpl.updateClip(track, updatedClip);
+            }
             return track;
         });
 

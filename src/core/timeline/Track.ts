@@ -1,8 +1,14 @@
-
-import { Track, Clip, TimeMs } from '../types';
+import type { Track, Clip, TimeMs } from '../types';
 import { ClipImpl } from './Clip';
 
+/**
+ * Functional logic for Track operations.
+ * Manage clips within a single track channel.
+ */
 export class TrackImpl {
+    /**
+     * Creates a new Track with default settings.
+     */
     static create(name: string, type: Track['type'] = 'video'): Track {
         return {
             id: crypto.randomUUID(),
@@ -17,28 +23,18 @@ export class TrackImpl {
     }
 
     /**
-     * Adds a clip to the track, maintaining order and ensuring NO OVERLAPS.
-     * Throws if overlap detected.
+     * Adds a clip to the track, maintaining sorted order (by timelineIn).
+     * Enforces NO OVERLAPS rule. Use `checkOverlap` to verify before calling if needed,
+     * though this method internally validates as well.
+     * 
+     * @returns A new Track instance with the clip added.
+     * @throws Error if the new clip overlaps with any existing clip.
      */
     static addClip(track: Track, clip: Clip): Track {
         // Simple O(N) check for now. Can optimize with binary search later.
         const newTrack = { ...track, clips: [...track.clips] };
 
-        // Find insertion point
-        // We want to sort by timelineInMs
-        newTrack.clips.sort((a, b) => a.timelineInMs - b.timelineInMs);
-
-        // Validate overlaps
-        for (let i = 0; i < newTrack.clips.length; i++) {
-            const current = newTrack.clips[i];
-            const next = newTrack.clips[i + 1];
-
-            // Check overlap with new clip (if we were simply pushing it, but we are doing a full re-validation here strictly speaking)
-            // But let's actually just check the *candidate* clip against existing ones before adding?
-            // The 'immutable' style suggests returning a new object.
-        }
-
-        // Better approach: Check collision of `clip` against all `track.clips`.
+        // Validate overlap against all existing clips
         for (const existing of track.clips) {
             if (TrackImpl.checkOverlap(existing, clip)) {
                 throw new Error(`Clip overlaps with existing clip ${existing.id}`);
@@ -52,6 +48,10 @@ export class TrackImpl {
         return newTrack;
     }
 
+    /**
+     * Checks if two clips overlap in time.
+     * @private
+     */
     private static checkOverlap(a: Clip, b: Clip): boolean {
         const aStart = a.timelineInMs;
         const aEnd = ClipImpl.getTimelineOut(a);
@@ -62,6 +62,10 @@ export class TrackImpl {
         return (aStart < bEnd) && (bStart < aEnd);
     }
 
+    /**
+     * Finds a clip at a specific timeline time.
+     * @returns The clip if found, or null.
+     */
     static findClipAtTime(track: Track, timeMs: TimeMs): Clip | null {
         // Linear search is fine for small N
         return track.clips.find(clip => ClipImpl.containsTime(clip, timeMs)) || null;
@@ -69,7 +73,9 @@ export class TrackImpl {
 
     /**
      * Splits a clip in the track at the given time.
-     * Returns new Track state.
+     * Finds the clip under the playhead, splits it, and replaces it with two new segments.
+     * 
+     * @returns A new Track instance with the split clips. Returns original track if no clip found at time.
      */
     static splitAt(track: Track, timeMs: TimeMs): Track {
         const targetClip = TrackImpl.findClipAtTime(track, timeMs);
@@ -89,5 +95,26 @@ export class TrackImpl {
             ...track,
             clips: newClips
         };
+    }
+    /**
+     * Updates a clip in the track.
+     * Replaces the clip with the same ID.
+     * Validates overlaps.
+     */
+    static updateClip(track: Track, updatedClip: Clip): Track {
+        // Remove existing clip
+        const filteredClips = track.clips.filter(c => c.id !== updatedClip.id);
+
+        // Re-use addClip logic to validate and insert
+        // Temporarily create track state without the old clip
+        const tempTrack = { ...track, clips: filteredClips };
+
+        try {
+            return TrackImpl.addClip(tempTrack, updatedClip);
+        } catch (e) {
+            // If overlap fails, we might want to return original track or throw?
+            // Throwing allows UI to reject the drop.
+            throw e;
+        }
     }
 }

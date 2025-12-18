@@ -1,9 +1,20 @@
 
-import { Clip, ID, TimeMs } from '../types';
+import type { Clip, TimeMs } from '../types';
 
+/**
+ * Functional logic for Clip operations.
+ * Pure functions: (state) => newState.
+ */
 export class ClipImpl {
     /**
      * Creates a new Clip with validation.
+     * Ensures sourceIn < sourceOut.
+     * 
+     * @param sourceId - ID of the source media
+     * @param sourceInMs - Start time in source (ms)
+     * @param sourceOutMs - End time in source (ms)
+     * @param timelineInMs - Start time in timeline (ms)
+     * @param options - Optional override for properties like speed, linkGroupId
      */
     static create(
         sourceId: string,
@@ -29,18 +40,31 @@ export class ClipImpl {
         };
     }
 
+    /**
+     * Calculates the duration of the clip on the timeline in milliseconds.
+     * Accounts for playback speed.
+     * Duration = (SourceOut - SourceIn) / Speed
+     */
     static getDuration(clip: Clip): TimeMs {
         return (clip.sourceOutMs - clip.sourceInMs) / clip.speed;
     }
 
+    /**
+     * Calculates the end time of the clip on the timeline.
+     */
     static getTimelineOut(clip: Clip): TimeMs {
         return clip.timelineInMs + ClipImpl.getDuration(clip);
     }
 
     /**
      * Splits a clip at a specific TIMELINE time.
-     * Returns 2 new clips.
+     * Returns 2 new clips (Left and Right).
+     * The original clip is meant to be replaced by these two.
+     * 
      * Throws if split time is outside clip bounds.
+     * 
+     * @param clip - The clip to split
+     * @param splitTimeMs - The point on the timeline to split at
      */
     static split(clip: Clip, splitTimeMs: TimeMs): [Clip, Clip] {
         const start = clip.timelineInMs;
@@ -74,7 +98,8 @@ export class ClipImpl {
     }
 
     /**
-     * Checks if a timeline time falls within this clip.
+     * Checks if a specific timeline time point falls within the clip's duration.
+     * Inclusive of start, exclusive of end.
      */
     static containsTime(clip: Clip, timeMs: TimeMs): boolean {
         return timeMs >= clip.timelineInMs && timeMs < ClipImpl.getTimelineOut(clip);

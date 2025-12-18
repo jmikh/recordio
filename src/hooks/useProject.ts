@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { Project, Timeline, ID, Track, Clip, TimeMs } from '../core/types';
+import type { Project, ID, TimeMs } from '../core/types';
 import { ProjectImpl } from '../core/project/Project';
 import { TimelineImpl } from '../core/timeline/Timeline';
 
@@ -12,6 +12,8 @@ interface ProjectState {
 
     // Timeline Actions
     splitAt: (timeMs: TimeMs, trackId?: ID) => void;
+    updateClip: (trackId: ID, clip: import('../core/types').Clip) => void;
+
 
     // Playback State (Local to the hook/store, not part of the persistent project really)
     isPlaying: boolean;
@@ -21,7 +23,7 @@ interface ProjectState {
     setCurrentTime: (timeMs: TimeMs) => void;
 }
 
-export const useProject = create<ProjectState>((set, get) => ({
+export const useProject = create<ProjectState>((set) => ({
     // Initialize with a default empty project
     project: ProjectImpl.create('Untitled Project'),
 
@@ -40,6 +42,23 @@ export const useProject = create<ProjectState>((set, get) => ({
             }
         };
     }),
+
+    updateClip: (trackId, clip) => set((state) => {
+        try {
+            const newTimeline = TimelineImpl.updateClip(state.project.timeline, trackId, clip);
+            return {
+                project: {
+                    ...state.project,
+                    timeline: newTimeline,
+                    updatedAt: new Date()
+                }
+            };
+        } catch (e) {
+            console.error("Failed to update clip:", e);
+            return state;
+        }
+    }),
+
 
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setCurrentTime: (currentTimeMs) => set({ currentTimeMs }),
