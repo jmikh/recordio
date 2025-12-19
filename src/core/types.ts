@@ -119,6 +119,11 @@ export interface Track {
      */
     cameraMotions: CameraMotion[];
 
+    /**
+     * List of mouse effects (clicks, drags) derived from events.
+     */
+    mouseEffects?: MouseEffect[];
+
     // State
     muted: boolean;
     locked: boolean;
@@ -208,6 +213,36 @@ export interface CameraMotion {
     };
 
     easing: EasingType;
+}
+
+// ==========================================
+// MOUSE EFFECTS
+// ==========================================
+
+export type MouseEffectType = 'click' | 'drag';
+
+/**
+ * Represents a visual mouse action derived from raw events.
+ */
+export interface MouseEffect {
+    id: ID;
+    type: MouseEffectType;
+
+    /** Start playing this effect */
+    timeInMs: TimeMs;
+    /** Stop playing this effect */
+    timeOutMs: TimeMs;
+
+    // Data for Rendering
+    start: Point;
+    end?: Point;
+
+    /** 
+     * For Drags: The actual path of the mouse during the drag.
+     * Contains sampled points with timestamps relative to the start of the effect? 
+     * Or absolute timestamps? Absolute is easier for lookup.
+     */
+    path?: { timestamp: number; x: number; y: number }[];
 }
 
 // ==========================================

@@ -3,6 +3,7 @@ import { useProject } from '../../hooks/useProject';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackVideo } from './TimelineTrackVideo';
 import { TimelineTrackCameraMotions } from './TimelineTrackCameraMotions';
+import { TimelineTrackMouseEffects } from './TimelineTrackMouseEffects';
 import type { Clip } from '../../core/types';
 
 // Constants
@@ -272,6 +273,12 @@ export function Timeline() {
                                 {track.cameraMotions && track.cameraMotions.length > 0 && (
                                     <TimelineTrackCameraMotions
                                         motions={track.cameraMotions}
+                                        pixelsPerSec={pixelsPerSec}
+                                    />
+                                )}
+                                {track.mouseEffects && track.mouseEffects.length > 0 && (
+                                    <TimelineTrackMouseEffects
+                                        effects={track.mouseEffects}
                                         pixelsPerSec={pixelsPerSec}
                                     />
                                 )}

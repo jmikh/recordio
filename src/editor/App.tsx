@@ -12,6 +12,7 @@ import { ClipImpl } from '../core/timeline/clip';
 import type { Source } from '../core/types';
 import type { UserEvent } from '../core/types';
 import { calculateZoomSchedule, VideoMappingConfig } from '../core/effects/cameraMotion';
+import { generateMouseEffects } from '../core/effects/mouseEffects';
 import { type ZoomConfig } from '../core/types';
 
 
@@ -96,6 +97,10 @@ function Editor() {
                 console.log("Generated Motions:", motions.length);
 
                 track.cameraMotions = motions;
+
+                // 3. Generate Mouse Effects
+                const mouseEffects = generateMouseEffects(metadata, durationMs);
+                track.mouseEffects = mouseEffects;
             }
 
             // Create Clip covering entire duration

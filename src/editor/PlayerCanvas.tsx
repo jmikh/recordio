@@ -2,6 +2,7 @@ import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useEditorStore } from './store';
 import { VideoMappingConfig } from '../core/effects/videoMappingConfig';
 import { getCameraStateAtTime } from '../core/effects/cameraMotion';
+import { drawMouseEffects } from '../core/effects/mouseEffects';
 import { useProject } from '../hooks/useProject';
 import { ProjectImpl } from '../core/project/project';
 
@@ -116,9 +117,10 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
 
         if (!freshInputSize) return;
 
-        // 2. Resolve Active Clip & Track
+        // 2. Resolve Active Clip & Track & Mouse Effects
         let activeClip = null;
         let activeTrackMotions = null;
+        let activeTrackMouseEffects = null;
         try {
             const renderState = ProjectImpl.getRenderState(project, currentTimeMs);
             const activeTrackItem = renderState.tracks.find(t => t.clip);
@@ -128,6 +130,7 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
             if (activeTrackItem) {
                 const fullTrack = project.timeline.tracks.find(t => t.id === activeTrackItem.trackId);
                 activeTrackMotions = fullTrack?.cameraMotions;
+                activeTrackMouseEffects = fullTrack?.mouseEffects;
             }
         } catch { /* ignore render errors to prevent crash loop */ }
 
@@ -197,6 +200,38 @@ export const PlayerCanvas = forwardRef<HTMLVideoElement, PlayerCanvasProps>(({
                 video,
                 sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height,
                 x, y, width, height
+            );
+        }
+
+        // 8. Draw Mouse Effects (Overlay)
+        // Only draw if we have effects and are not in pure debug mode (or maybe allow it in debug too?)
+        // Let's allow it, but we need correct coordinate mapping.
+        if (activeTrackMouseEffects && activeTrackMouseEffects.length > 0) {
+            // Define Destination Rect (Canvas Draw Area)
+            // If debug mode 'visualize', dest is the centered box containing full video.
+            // If debug mode 'active', dest is the centered box containing ZOOMED video.
+
+            // Fortunately `getCameraStateAtTime` returns `sourceRect`.
+            // And `config.projectedBox` returns the layout on canvas `destRect` (x,y,w,h).
+            // BUT:
+            // In 'visualize' mode: 'sourceRect' used for drawing is FULL rect? No. 
+            // In 'visualize' mode logic:
+            //   ctx.drawImage(video, x, y, width, height); -> Input is Full Frame. 
+            //   So effective "sourceRect" for the projection of mouse events is the FULL frame {0,0,w,h}.
+            // In 'active' mode:
+            //   ctx.drawImage(video, sourceRect...) -> Input is Zoomed Frame.
+            //   So effective "sourceRect" is `sourceRect`.
+
+            const effectiveSourceRect = (debugCameraMode === 'visualize')
+                ? { x: 0, y: 0, width: freshInputSize.width, height: freshInputSize.height }
+                : sourceRect;
+
+            drawMouseEffects(
+                ctx,
+                activeTrackMouseEffects,
+                currentTimeMs,
+                effectiveSourceRect,
+                { x, y, width, height } // destRect (projectedBox)
             );
         }
     };
