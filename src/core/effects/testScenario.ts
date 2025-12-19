@@ -1,4 +1,4 @@
-import { calculateZoomSchedule, VideoMappingConfig } from './zoomPan';
+import { calculateZoomSchedule, VideoMappingConfig } from './cameraMotion';
 import type { ZoomConfig, UserEvent } from '../types';
 
 function assertStrictEqual(a: any, b: any, msg?: string) {

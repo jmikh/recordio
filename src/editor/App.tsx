@@ -11,7 +11,7 @@ import { TrackImpl } from '../core/timeline/track';
 import { ClipImpl } from '../core/timeline/clip';
 import type { Source } from '../core/types';
 import type { UserEvent } from '../core/types';
-import { calculateZoomSchedule, VideoMappingConfig } from '../core/effects/zoomPan';
+import { calculateZoomSchedule, VideoMappingConfig } from '../core/effects/cameraMotion';
 import { type ZoomConfig } from '../core/types';
 
 
