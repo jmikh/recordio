@@ -26,7 +26,6 @@ function Editor() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const [containerSize, setContainerSize] = useState({ width: 800, height: 450 });
-    const [debugCameraMode, setDebugCameraMode] = useState<'active' | 'visualize'>('active');
 
     // -- Project State --
     const project = useProjectData();
@@ -246,10 +245,7 @@ function Editor() {
                                 onMouseMove={handleMouseMove}
                                 onMouseLeave={handleMouseLeave}
                             >
-                                <PlayerCanvas
-                                    className="w-full h-full"
-                                    debugCameraMode={debugCameraMode}
-                                />
+                                <PlayerCanvas />
 
                                 {/* All event markers (faint) */}
                                 {/* metadata logic moved to tracks, removing manual overlay map if any */}
@@ -285,13 +281,6 @@ function Editor() {
                             onClick={() => console.log(project)}
                         >
                             Log Project Struct
-                        </button>
-                        <div className="h-2" />
-                        <button
-                            className={`w-full px-2 py-1 rounded text-white ${debugCameraMode === 'visualize' ? 'bg-green-600' : 'bg-gray-600'}`}
-                            onClick={() => setDebugCameraMode(prev => prev === 'active' ? 'visualize' : 'active')}
-                        >
-                            {debugCameraMode === 'visualize' ? 'Debug: Show Rect' : 'Debug: Active Camera'}
                         </button>
                     </div>
                     <div className="flex-1 flex flex-col overflow-hidden">

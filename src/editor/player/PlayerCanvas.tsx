@@ -1,4 +1,4 @@
-import { useRef, useEffect, useImperativeHandle } from 'react';
+import { useRef, useEffect } from 'react';
 // import { useEditorStore } from '../store'; // Unused now
 import { ViewTransform } from '../../core/effects/viewTransform';
 import { getCameraStateAtTime } from '../../core/effects/cameraMotion';
@@ -9,20 +9,7 @@ import { ProjectImpl } from '../../core/project/project';
 
 
 
-export const PlayerCanvas = ({
-    className,
-    muted = true,
-    debugCameraMode = 'active',
-    ref
-}: {
-    className?: string; // Standardize 
-    muted?: boolean;
-    debugCameraMode?: 'active' | 'visualize';
-    ref?: React.Ref<HTMLVideoElement>;
-    // Legacy props (ignoring them now, but keeping in interface if needed to avoid TS errors in App.tsx before refactor)
-    src?: string;
-    onLoadedMetadata?: (e: any) => void;
-}) => {
+export const PlayerCanvas = () => {
     const project = useProjectData();
     const updateSource = useProjectStore(s => s.updateSource);
 
@@ -38,12 +25,12 @@ export const PlayerCanvas = ({
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
 
-    // Expose the "Main" video element to the parent if needed (Legacy support)
+    // Expose the "Main" video element to the parent if needed
     // We'll expose the video of the first active track if possible, or undefined.
-    useImperativeHandle(ref, () => {
-        const firstSourceId = Object.keys(sources)[0];
-        return internalVideoRefs.current[firstSourceId];
-    });
+    // useImperativeHandle(ref, () => {
+    //     const firstSourceId = Object.keys(sources)[0];
+    //     return internalVideoRefs.current[firstSourceId];
+    // });
 
     // ------------------------------------------------------------------------
     // RENDER LOOP
@@ -136,16 +123,13 @@ export const PlayerCanvas = ({
             const config = new ViewTransform(inputSize, outputSize, paddingPercentage);
 
             // Camera Internal
-            const track = project.timeline.mainTrack; // Legacy assumption
+            const track = project.timeline.mainTrack;
             const cameraMotions = track?.cameraMotions || [];
 
             const cameraWindow = getCameraStateAtTime(cameraMotions, currentTimeMs, outputSize);
 
-            // Debug vs Active
-            const effectiveCamera = (debugCameraMode === 'visualize')
-                ? { x: 0, y: 0, width: outputSize.width, height: outputSize.height }
-                : cameraWindow;
-
+            // Active Camera Mode (Always Active)
+            const effectiveCamera = cameraWindow;
             const renderRects = config.resolveRenderRects(effectiveCamera);
 
             if (renderRects) {
@@ -157,11 +141,11 @@ export const PlayerCanvas = ({
             }
 
             // Visual Debug Overlays
-            if (debugCameraMode === 'visualize') {
-                ctx.strokeStyle = '#00ff00';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(cameraWindow.x, cameraWindow.y, cameraWindow.width, cameraWindow.height);
-            }
+            // if (debugCameraMode === 'visualize') {
+            //     ctx.strokeStyle = '#00ff00';
+            //     ctx.lineWidth = 4;
+            //     ctx.strokeRect(cameraWindow.x, cameraWindow.y, cameraWindow.width, cameraWindow.height);
+            // }
 
             // Mouse Effects
             if (track.mouseEffects) {
@@ -169,43 +153,7 @@ export const PlayerCanvas = ({
             }
         }
     };
-    // Wait, 'loop' function is redefined on every render.
-    // We need a ref to the loop function or a stable architecture.
-    // Better: Moving user logic outside or using `useCallback`.
-    // Actually, `loop` reads `usePlaybackStore.getState()` so it doesn't need closure scope for data.
-    // It DOES need `gameLoopActive`.
 
-    // Refactored Loop for Stability:
-    useEffect(() => {
-        const tick = (time: number) => {
-            // 1. Logic
-            const pbState = usePlaybackStore.getState();
-            if (pbState.isPlaying) {
-                // Delta Time Calculation
-                // We need a ref for 'lastTime' that persists across re-renders
-                // Managed in component scope `lastTimeRef`.
-                if (lastTimeRef.current === 0) lastTimeRef.current = time;
-                const delta = time - lastTimeRef.current;
-
-                // Cap delta to prevent huge jumps if tab was backgrounded
-                const safeDelta = Math.min(delta, 100);
-
-                usePlaybackStore.getState().setCurrentTime(pbState.currentTimeMs + safeDelta);
-                lastTimeRef.current = time;
-            } else {
-                lastTimeRef.current = 0;
-            }
-
-            // 2. Render
-            renderPipeline();
-
-            // 3. Next
-            animationFrameRef.current = requestAnimationFrame(tick);
-        };
-
-        animationFrameRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(animationFrameRef.current);
-    }, []); // Run once!
 
 
     // Canvas Sizing
@@ -247,7 +195,7 @@ export const PlayerCanvas = ({
                             }}
                             src={source.url}
                             onLoadedMetadata={(e) => handleMetadata(source.id, e)}
-                            muted={muted}
+                            muted={true}
                             playsInline
                             crossOrigin="anonymous"
                         />
@@ -258,7 +206,7 @@ export const PlayerCanvas = ({
             {/* Render Target */}
             <canvas
                 ref={canvasRef}
-                className={className}
+                className="w-full h-full"
                 style={{
                     backgroundColor: '#000',
                     width: '100%',
