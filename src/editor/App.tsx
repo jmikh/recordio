@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { PlayerCanvas } from './PlayerCanvas';
+import { PlayerCanvas } from './player/PlayerCanvas';
 import { useEditorStore } from './store';
 import { Timeline } from './timeline/Timeline';
 import { EventInspector } from './EventInspector';

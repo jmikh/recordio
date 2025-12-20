@@ -1,10 +1,10 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useEditorStore } from './store';
-import { ViewTransform } from '../core/effects/viewTransform';
-import { getCameraStateAtTime } from '../core/effects/cameraMotion';
-import { drawMouseEffects } from './painters/mousePainter';
-import { useProject } from '../hooks/useProject';
-import { ProjectImpl } from '../core/project/project';
+import { useEditorStore } from '../store';
+import { ViewTransform } from '../../core/effects/viewTransform';
+import { getCameraStateAtTime } from '../../core/effects/cameraMotion';
+import { drawMouseEffects } from './mousePainter';
+import { useProject } from '../../hooks/useProject';
+import { ProjectImpl } from '../../core/project/project';
 
 interface PlayerCanvasProps {
     src: string;
