@@ -1,15 +1,6 @@
-import type { Size, Point } from '../types';
+import type { Size, Point, Rect } from '../types';
 
-/**
- * Represents a rectangle with position and dimensions.
- * Use consistent with Rect type in other files.
- */
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+
 
 export class ViewTransform {
     inputVideoSize: Size;

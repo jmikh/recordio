@@ -1,4 +1,4 @@
-import type { ClickEvent, ZoomConfig, UserEvent, CameraMotion, Size, MouseEvent } from '../types';
+import type { ClickEvent, ZoomConfig, UserEvent, CameraMotion, Size, MouseEvent, Rect } from '../types';
 import { ViewTransform } from './viewTransform';
 
 // export * from './types'; // Removed as types are now in core
@@ -114,7 +114,7 @@ export function findHoverBlocks(
 
 export function calculateZoomSchedule(
     config: ZoomConfig,
-    mappingConfig: ViewTransform, // Kept for signature compatibility
+    viewTransform: ViewTransform, // Kept for signature compatibility
     events: UserEvent[]
 ): CameraMotion[] {
     const motions: CameraMotion[] = [];
@@ -133,8 +133,8 @@ export function calculateZoomSchedule(
     // Zoom 2x = Half Output Size (centered).
     const zoomLevel = config.zoomIntensity;
 
-    const targetWidth = mappingConfig.outputVideoSize.width / zoomLevel;
-    const targetHeight = mappingConfig.outputVideoSize.height / zoomLevel;
+    const cameraWidth = viewTransform.outputVideoSize.width / zoomLevel;
+    const cameraHeight = viewTransform.outputVideoSize.height / zoomLevel;
 
     // Default duration for a zoom "scene" around a click
     const ZOOM_HOLD_DURATION = config.zoomDuration || 2000;
@@ -144,31 +144,31 @@ export function calculateZoomSchedule(
         const evt = clickEvents[i];
 
         // 1. Map Click to Output Space
-        const clickOutput = mappingConfig.inputToOutput({ x: evt.x, y: evt.y });
+        const clickOutput = viewTransform.inputToOutput({ x: evt.x, y: evt.y });
 
         // 2. Center CameraWindow on Click
-        let targetX = clickOutput.x - targetWidth / 2;
-        let targetY = clickOutput.y - targetHeight / 2;
+        let cameraX = clickOutput.x - cameraWidth / 2;
+        let cameraY = clickOutput.y - cameraHeight / 2;
 
         // 3. Clamp to Output Space Edges
         // The CameraWindow must stay within the Output Canvas (0,0 -> OutputW, OutputH)
         // (Unless zoomLevel < 1, which implies window > output, then we adjust differently...
         // assuming zoom >= 1 for now).
 
-        const maxX = mappingConfig.outputVideoSize.width - targetWidth;
-        const maxY = mappingConfig.outputVideoSize.height - targetHeight;
+        const maxX = viewTransform.outputVideoSize.width - cameraWidth;
+        const maxY = viewTransform.outputVideoSize.height - cameraHeight;
 
-        if (targetX < 0) targetX = 0;
-        else if (targetX > maxX) targetX = maxX;
+        if (cameraX < 0) cameraX = 0;
+        else if (cameraX > maxX) cameraX = maxX;
 
-        if (targetY < 0) targetY = 0;
-        else if (targetY > maxY) targetY = maxY;
+        if (cameraY < 0) cameraY = 0;
+        else if (cameraY > maxY) cameraY = maxY;
 
-        const newBox: Rect = {
-            x: targetX,
-            y: targetY,
-            width: targetWidth,
-            height: targetHeight
+        const newCameraWindow: Rect = {
+            x: cameraX,
+            y: cameraY,
+            width: cameraWidth,
+            height: cameraHeight
         };
 
         // Timing Logic
@@ -181,7 +181,7 @@ export function calculateZoomSchedule(
             id: crypto.randomUUID(),
             timeInMs: timeIn,
             timeOutMs: arrivalTime,
-            target: newBox,
+            cameraWindow: newCameraWindow,
             easing: 'ease_in_out'
         });
 
@@ -195,8 +195,8 @@ export function calculateZoomSchedule(
             // Zoom OUT to full view (Output Space)
             const fullView: Rect = {
                 x: 0, y: 0,
-                width: mappingConfig.outputVideoSize.width,
-                height: mappingConfig.outputVideoSize.height
+                width: viewTransform.outputVideoSize.width,
+                height: viewTransform.outputVideoSize.height
             };
 
             const zoomOutStart = Math.max(arrivalTime + 1000, arrivalTime + 500);
@@ -206,7 +206,7 @@ export function calculateZoomSchedule(
                 id: crypto.randomUUID(),
                 timeInMs: zoomOutStart,
                 timeOutMs: zoomOutEnd,
-                target: fullView,
+                cameraWindow: fullView,
                 easing: 'ease_in_out'
             });
         }
@@ -219,12 +219,7 @@ export function calculateZoomSchedule(
 // Runtime Execution / Interpolation
 // ============================================================================
 
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+
 
 /*
  * Calculates the current CameraWindow (in Output Space)
@@ -252,7 +247,7 @@ export function getCameraStateAtTime(
     // After last motion
     const lastMotion = sortedMotions[sortedMotions.length - 1];
     if (timeMs >= lastMotion.timeOutMs) {
-        return lastMotion.target;
+        return lastMotion.cameraWindow;
     }
 
     // Find the relevant motion segment
@@ -263,7 +258,7 @@ export function getCameraStateAtTime(
         if (timeMs >= curr.timeInMs && timeMs < curr.timeOutMs) {
             let startRect = fullRect;
             if (i > 0) {
-                startRect = sortedMotions[i - 1].target;
+                startRect = sortedMotions[i - 1].cameraWindow;
             }
 
             const duration = curr.timeOutMs - curr.timeInMs;
@@ -272,14 +267,14 @@ export function getCameraStateAtTime(
 
             const easedProgress = applyEasing(progress, curr.easing);
 
-            return interpolateRect(startRect, curr.target, easedProgress);
+            return interpolateRect(startRect, curr.cameraWindow, easedProgress);
         }
 
         // Case: Between motions (Holding previous target)
         if (i < sortedMotions.length - 1) {
             const next = sortedMotions[i + 1];
             if (timeMs >= curr.timeOutMs && timeMs < next.timeInMs) {
-                return curr.target;
+                return curr.cameraWindow;
             }
         }
     }

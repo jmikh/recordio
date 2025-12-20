@@ -75,7 +75,7 @@ const MotionBlock: React.FC<MotionBlockProps> = ({ motion, left, width }) => {
                     <div className="font-bold mb-1">Camera Motion</div>
                     <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-gray-300">
                         <span>Target:</span>
-                        <span>{Math.round(motion.target.x)}, {Math.round(motion.target.y)} (w:{Math.round(motion.target.width)})</span>
+                        <span>{Math.round(motion.cameraWindow.x)}, {Math.round(motion.cameraWindow.y)} (w:{Math.round(motion.cameraWindow.width)})</span>
 
                         <span>Time:</span>
                         <span>{(motion.timeInMs / 1000).toFixed(1)}s - {(motion.timeOutMs / 1000).toFixed(1)}s</span>

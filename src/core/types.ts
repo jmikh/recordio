@@ -16,6 +16,13 @@ export interface Size {
     height: number;
 }
 
+export interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 // ==========================================
 // PROJECT
 // ==========================================
@@ -205,12 +212,7 @@ export interface CameraMotion {
     timeOutMs: TimeMs;
 
     /** The target viewport (camera frame) in source coordinates */
-    target: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-    };
+    cameraWindow: Rect;
 
     easing: EasingType;
 }

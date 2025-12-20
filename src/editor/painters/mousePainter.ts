@@ -1,5 +1,5 @@
-import type { MouseEffect, Point } from '../../core/types';
-import type { ViewTransform, Rect } from '../../core/effects/viewTransform';
+import type { MouseEffect, Point, Rect } from '../../core/types';
+import type { ViewTransform } from '../../core/effects/viewTransform';
 
 /**
  * Draws simpler "circle" mouse effects for the editor.
