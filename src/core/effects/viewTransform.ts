@@ -38,13 +38,6 @@ export class ViewTransform {
         );
 
         // Calculate dimensions of the content in Output Space
-        // Note: Logic in previous code was: input / scale.
-        // If scale = input / output... then input / (input/output) = output.
-        // Let's re-verify the "Scale" definition from previous code.
-        // Previous: scale = Math.max(inputW / outputW_padded, inputH / outputH_padded)
-        // If input is huge (2000) and output is small (1000), scale is 2.
-        // Projected size = input / scale = 2000 / 2 = 1000. Correct.
-
         const projectedWidth = this.inputVideoSize.width / scale;
         const projectedHeight = this.inputVideoSize.height / scale;
 

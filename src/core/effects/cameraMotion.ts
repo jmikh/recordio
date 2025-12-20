@@ -226,7 +226,7 @@ export interface Rect {
     height: number;
 }
 
-/**
+/*
  * Calculates the current CameraWindow (in Output Space)
  * based on the list of motions and the current time.
  */
@@ -235,30 +235,21 @@ export function getCameraStateAtTime(
     timeMs: number,
     fullSize: Size
 ): Rect {
-    // 0. Base Case: Full View (Output Space)
     const fullRect: Rect = { x: 0, y: 0, width: fullSize.width, height: fullSize.height };
 
     if (!motions || motions.length === 0) {
         return fullRect;
     }
 
-    // 1. Sort motions by time just in case
-    // (Ideally they are already sorted, but safety first)
+    // Ensure motions are sorted
     const sortedMotions = [...motions].sort((a, b) => a.timeInMs - b.timeInMs);
 
-    // 2. Find where we are
-    // Possibilities:
-    // A. Before first motion -> Full View
-    // B. Inside a motion (Interpolating)
-    // C. Between motions (Holding previous target)
-    // D. After last motion (Holding last target)
-
-    // A. Before first
+    // Before first motion
     if (timeMs < sortedMotions[0].timeInMs) {
         return fullRect;
     }
 
-    // D. After last
+    // After last motion
     const lastMotion = sortedMotions[sortedMotions.length - 1];
     if (timeMs >= lastMotion.timeOutMs) {
         return lastMotion.target;
@@ -268,13 +259,8 @@ export function getCameraStateAtTime(
     for (let i = 0; i < sortedMotions.length; i++) {
         const curr = sortedMotions[i];
 
-        // B. Inside this motion
+        // Case: Inside a motion (Interpolating)
         if (timeMs >= curr.timeInMs && timeMs < curr.timeOutMs) {
-            // Determine "Start State" for this interpolation.
-            // If it's the first motion, start from Full View.
-            // If it's a subsequent motion, start from the previous motion's target.
-            // NOTE: This assumes continuous or hold-state. If there's a gap, we hold the previous state.
-
             let startRect = fullRect;
             if (i > 0) {
                 startRect = sortedMotions[i - 1].target;
@@ -289,17 +275,16 @@ export function getCameraStateAtTime(
             return interpolateRect(startRect, curr.target, easedProgress);
         }
 
-        // C. Between this motion and the next
+        // Case: Between motions (Holding previous target)
         if (i < sortedMotions.length - 1) {
             const next = sortedMotions[i + 1];
             if (timeMs >= curr.timeOutMs && timeMs < next.timeInMs) {
-                // We are in a "Hold" state after 'curr' finished, waiting for 'next' to start.
                 return curr.target;
             }
         }
     }
 
-    return fullRect; // Should not reach here
+    return fullRect;
 }
 
 function applyEasing(t: number, type: CameraMotion['easing']): number {
