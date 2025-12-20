@@ -144,9 +144,35 @@ export const PlayerCanvas = () => {
             // A. Sync Video Time
             const desiredTimeS = clip.sourceTimeMs / 1000;
 
-            // Only sync if significant drift or separate state
-            if (Math.abs(video.currentTime - desiredTimeS) > 0.1) {
-                video.currentTime = desiredTimeS;
+            // Resolve speed from original clip (or default to 1)
+            const originalClip = project.timeline.mainTrack?.clips.find(c => c.id === clip.id);
+            const speed = originalClip?.speed || 1;
+
+            if (playback.isPlaying) {
+                // Ensure native playback for smoothness
+                if (video.paused) {
+                    video.play().catch(() => { });
+                }
+
+                if (Math.abs(video.playbackRate - speed) > 0.01) {
+                    video.playbackRate = speed;
+                }
+
+                // Loose sync: only correct if drift is noticeable (> 0.2s)
+                // This allows the browser's audio/video clock to drive smooth renders
+                if (Math.abs(video.currentTime - desiredTimeS) > 0.2) {
+                    video.currentTime = desiredTimeS;
+                }
+            } else {
+                // Should be paused
+                if (!video.paused) {
+                    video.pause();
+                }
+
+                // Strict sync when scrubbing/paused
+                if (Math.abs(video.currentTime - desiredTimeS) > 0.001) {
+                    video.currentTime = desiredTimeS;
+                }
             }
 
             // B. Draw
