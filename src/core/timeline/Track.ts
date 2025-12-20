@@ -1,4 +1,4 @@
-import type { Track, Clip, TimeMs } from '../types';
+import type { Track, MainTrack, Clip, TimeMs } from '../types';
 import { ClipImpl } from './clip';
 
 /**
@@ -7,7 +7,7 @@ import { ClipImpl } from './clip';
  */
 export class TrackImpl {
     /**
-     * Creates a new Track with default settings.
+     * Creates a new generic Track.
      */
     static create(name: string, type: Track['type'] = 'video'): Track {
         return {
@@ -15,17 +15,29 @@ export class TrackImpl {
             type,
             name,
             clips: [],
-            cameraMotions: [],
             muted: false,
             locked: false,
-            visible: true,
+            visible: true
+        };
+    }
+
+    /**
+     * Creates a new Main Track with effects and display settings.
+     */
+    static createMainTrack(name: string = "Main Track"): MainTrack {
+        return {
+            ...TrackImpl.create(name, 'video'),
+            // Explicitly cast type if needed, but 'video' is compatible
+            // MainTrack specific:
+            cameraMotions: [],
+            mouseEffects: [],
             displaySettings: {
                 mode: 'fullscreen',
-                maxZoom: 1.0,
+                maxZoom: 2.0,
                 backgroundColor: '#000000',
                 padding: 0
             }
-        };
+        } as MainTrack;
     }
 
     /**

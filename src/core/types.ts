@@ -41,9 +41,6 @@ export interface Project {
     /** Global output settings for rendering */
     outputSettings: OutputSettings;
 
-    /** Global display settings (defaults) */
-    displaySettings: DisplaySettings;
-
     /**
      * Map of all Source assets used in the project.
      * Keyed by Source ID for O(1) lookup.
@@ -97,7 +94,7 @@ export interface Source {
 export interface Timeline {
     id: ID;
     /** The main track containing clips */
-    mainTrack: Track;
+    mainTrack: MainTrack;
     /** Total duration of the timeline */
     durationMs: TimeMs;
 }
@@ -107,8 +104,9 @@ export interface Timeline {
 // ==========================================
 
 /**
- * A container for Clips and Effects.
- * Tracks enable compositing and mixing.
+ * A container for Clips.
+ * Base Track interface for generic operations.
+ * All clips on a track must be non-overlapping.
  */
 export interface Track {
     id: ID;
@@ -123,6 +121,17 @@ export interface Track {
      */
     clips: Clip[];
 
+    // State
+    muted: boolean;
+    locked: boolean;
+    visible: boolean;
+}
+
+/**
+ * Main Track containing specialized effects and settings.
+ * Only one Main Track exists per project usually (for the main screen recording).
+ */
+export interface MainTrack extends Track {
     /** 
      * List of camera motions (zoom/pan) applied to this track.
      * These define "camera" movement over time.
@@ -133,11 +142,6 @@ export interface Track {
      * List of mouse effects (clicks, drags) derived from events.
      */
     mouseEffects?: MouseEffect[];
-
-    // State
-    muted: boolean;
-    locked: boolean;
-    visible: boolean;
 
     /** Visual settings for how the clip is rendered */
     displaySettings: DisplaySettings;

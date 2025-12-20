@@ -29,9 +29,15 @@ export const useProjectStore = create<ProjectState>()(
             setMaxZoom: (maxZoom) => set((state) => ({
                 project: {
                     ...state.project,
-                    displaySettings: {
-                        ...state.project.displaySettings,
-                        maxZoom
+                    timeline: {
+                        ...state.project.timeline,
+                        mainTrack: {
+                            ...state.project.timeline.mainTrack,
+                            displaySettings: {
+                                ...state.project.timeline.mainTrack.displaySettings,
+                                maxZoom
+                            }
+                        }
                     },
                     updatedAt: new Date()
                 }
@@ -80,7 +86,7 @@ export const useProjectStore = create<ProjectState>()(
 // Explicit strongly typed selectors to prevent re-renders
 
 export const useProjectData = () => useProjectStore(s => s.project);
-export const useMaxZoom = () => useProjectStore(s => s.project.displaySettings.maxZoom);
-export const useProjectDisplaySettings = () => useProjectStore(s => s.project.displaySettings);
+export const useMaxZoom = () => useProjectStore(s => s.project.timeline.mainTrack.displaySettings.maxZoom);
+export const useProjectDisplaySettings = () => useProjectStore(s => s.project.timeline.mainTrack.displaySettings);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
 export const useProjectSources = () => useProjectStore(s => s.project.sources);

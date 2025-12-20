@@ -39,12 +39,6 @@ export class ProjectImpl {
             outputSettings: {
                 size: { width: 3840, height: 2160 },
                 frameRate: 30
-            },
-            displaySettings: {
-                mode: 'fullscreen',
-                maxZoom: 2.0,
-                backgroundColor: '#000000',
-                padding: 0.1
             }
         };
     }

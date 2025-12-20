@@ -25,21 +25,6 @@ export const PlayerCanvas = () => {
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
 
-    // Expose the "Main" video element to the parent if needed
-    // We'll expose the video of the first active track if possible, or undefined.
-    // useImperativeHandle(ref, () => {
-    //     const firstSourceId = Object.keys(sources)[0];
-    //     return internalVideoRefs.current[firstSourceId];
-    // });
-
-    // ------------------------------------------------------------------------
-    // RENDER LOOP
-    // ------------------------------------------------------------------------
-
-    // ------------------------------------------------------------------------
-    // RENDER LOOP
-    // ------------------------------------------------------------------------
-
     // Single Effect to manage the Loop for the lifetime of the component
     useEffect(() => {
         const tick = (time: number) => {
@@ -126,6 +111,11 @@ export const PlayerCanvas = () => {
             const track = project.timeline.mainTrack;
             const cameraMotions = track?.cameraMotions || [];
 
+            // Debug Zoom
+            if (Math.random() < 0.01) {
+                // console.log('Zoom Debug:', { hasTrack: !!track, motions: cameraMotions.length, ct: currentTimeMs });
+            }
+
             const cameraWindow = getCameraStateAtTime(cameraMotions, currentTimeMs, outputSize);
 
             // Active Camera Mode (Always Active)
@@ -140,14 +130,6 @@ export const PlayerCanvas = () => {
                 );
             }
 
-            // Visual Debug Overlays
-            // if (debugCameraMode === 'visualize') {
-            //     ctx.strokeStyle = '#00ff00';
-            //     ctx.lineWidth = 4;
-            //     ctx.strokeRect(cameraWindow.x, cameraWindow.y, cameraWindow.width, cameraWindow.height);
-            // }
-
-            // Mouse Effects
             if (track.mouseEffects) {
                 drawMouseEffects(ctx, track.mouseEffects, currentTimeMs, effectiveCamera, config);
             }

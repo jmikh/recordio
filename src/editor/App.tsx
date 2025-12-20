@@ -12,12 +12,10 @@ import { ProjectImpl } from '../core/project/project';
 // import { TimelineImpl } from '../core/timeline/timeline'; // Unused
 import { TrackImpl } from '../core/timeline/track';
 import { ClipImpl } from '../core/timeline/clip';
-import type { Source } from '../core/types';
-// import type { UserEvent } from '../core/types';
+import type { Source, MainTrack, ZoomConfig } from '../core/types';
 import { ViewTransform } from '../core/effects/viewTransform';
 import { calculateZoomSchedule } from '../core/effects/cameraMotion';
 import { generateMouseEffects } from '../core/effects/mouseEffects';
-import { type ZoomConfig } from '../core/types';
 
 
 
@@ -83,8 +81,12 @@ function Editor() {
                 if (source.size.width > 0 && source.durationMs > 0) {
                     console.log('Source Ready, Creating Default Track/Clip', source.id);
 
+
+
+                    // ... (in useEffect)
+
                     // Create defaults
-                    let track = TrackImpl.create('Main Video', 'video');
+                    let track = TrackImpl.createMainTrack('Main Video');
 
                     // 1. Generate Camera Motions from Metadata
                     if (source.events && source.events.length > 0) {
@@ -103,10 +105,13 @@ function Editor() {
                     }
 
                     const clip = ClipImpl.create(source.id, 0, source.durationMs, 0);
-                    track = TrackImpl.addClip(track, clip);
+                    // Add clip returns generic Track, we need to cast back to MainTrack or assume safe for now
+                    // Since addClip only modifies clips array, it's safe to cast if we started with MainTrack and spread props
+                    // But TrackImpl.addClip spreads existing props... so:
+                    const trackWithClip = TrackImpl.addClip(track, clip) as MainTrack;
 
                     // Update Project
-                    const newTimeline = { ...proj.timeline, mainTrack: track };
+                    const newTimeline = { ...proj.timeline, mainTrack: trackWithClip };
                     loadProject({ ...proj, timeline: newTimeline });
                 }
             }
