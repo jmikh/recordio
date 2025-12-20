@@ -12,7 +12,7 @@ import { ProjectImpl } from '../core/project/project';
 // import { TimelineImpl } from '../core/timeline/timeline'; // Unused
 import { TrackImpl } from '../core/timeline/track';
 import { ClipImpl } from '../core/timeline/clip';
-import type { Source, MainTrack, ZoomConfig } from '../core/types';
+import type { Source, MainTrack } from '../core/types';
 import { ViewTransform } from '../core/effects/viewTransform';
 import { calculateZoomSchedule } from '../core/effects/cameraMotion';
 import { generateMouseEffects } from '../core/effects/mouseEffects';
@@ -90,17 +90,12 @@ function Editor() {
 
                     // 1. Generate Camera Motions from Metadata
                     if (source.events && source.events.length > 0) {
-                        const zoomConfig: ZoomConfig = {
-                            zoomIntensity: maxZoom,
-                            zoomDuration: 2000,
-                            zoomOffset: -500
-                        };
-                        const videoMappingConfig = new ViewTransform(
+                        const viewTransform = new ViewTransform(
                             source.size,
                             proj.outputSettings.size,
-                            0
+                            track.displaySettings.padding
                         );
-                        track.cameraMotions = calculateZoomSchedule(zoomConfig, videoMappingConfig, source.events);
+                        track.cameraMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
                         track.mouseEffects = generateMouseEffects(source.events, source.durationMs);
                     }
 

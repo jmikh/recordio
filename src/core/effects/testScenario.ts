@@ -1,5 +1,5 @@
 import { calculateZoomSchedule, ViewTransform } from './cameraMotion';
-import type { ZoomConfig, UserEvent } from '../types';
+import type { UserEvent } from '../types';
 
 function assertStrictEqual(a: any, b: any, msg?: string) {
     if (a !== b) {
@@ -47,14 +47,8 @@ function runTest(scenarioName: string) {
         0 // Padding irrelevant for Source Calculation
     );
 
-    const config: ZoomConfig = {
-        zoomIntensity: zoom,
-        zoomDuration: 0,
-        zoomOffset: 0
-    };
-
     console.log("Running Zoom Schedule Calculation...");
-    const schedule = calculateZoomSchedule(config, mappingConfig, events);
+    const schedule = calculateZoomSchedule(zoom, mappingConfig, events);
 
     console.log("--- Generated Schedule ---");
     schedule.forEach((k, i) => {

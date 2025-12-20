@@ -1,4 +1,4 @@
-import type { ClickEvent, ZoomConfig, UserEvent, CameraMotion, Size, MouseEvent, Rect } from '../types';
+import type { ClickEvent, UserEvent, CameraMotion, Size, MouseEvent, Rect } from '../types';
 import { ViewTransform } from './viewTransform';
 
 // export * from './types'; // Removed as types are now in core
@@ -113,7 +113,7 @@ export function findHoverBlocks(
 }
 
 export function calculateZoomSchedule(
-    config: ZoomConfig,
+    maxZoom: number,
     viewTransform: ViewTransform, // Kept for signature compatibility
     events: UserEvent[]
 ): CameraMotion[] {
@@ -131,14 +131,14 @@ export function calculateZoomSchedule(
     // 2. Prepare for Zoom Level Calculation (Output Space)
     // Zoom 1x = Full Output Size.
     // Zoom 2x = Half Output Size (centered).
-    const zoomLevel = config.zoomIntensity;
+    const zoomLevel = maxZoom;
 
     const cameraWidth = viewTransform.outputVideoSize.width / zoomLevel;
     const cameraHeight = viewTransform.outputVideoSize.height / zoomLevel;
 
     // Default duration for a zoom "scene" around a click
-    const ZOOM_HOLD_DURATION = config.zoomDuration || 2000;
-    const ZOOM_TRANSITION_DURATION = config.zoomOffset ? Math.abs(config.zoomOffset) : 500;
+    const ZOOM_HOLD_DURATION = 2000;
+    const ZOOM_TRANSITION_DURATION = 500;
 
     for (let i = 0; i < clickEvents.length; i++) {
         const evt = clickEvents[i];
