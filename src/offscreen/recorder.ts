@@ -46,6 +46,13 @@ chrome.runtime.onMessage.addListener(async (message) => {
             });
             activeStreams.push(screenStream);
 
+            // MONITOR SYSTEM AUDIO: Connect tab audio to speakers so user can hear it
+            if (screenStream.getAudioTracks().length > 0) {
+                if (!audioContext) audioContext = new AudioContext();
+                const sysSource = audioContext.createMediaStreamSource(screenStream);
+                sysSource.connect(audioContext.destination);
+            }
+
             // 2. Get Microphone Audio if requested
             let micStream: MediaStream | null = null;
             if (hasAudio) {
