@@ -48,12 +48,15 @@ export async function loadSessionData(): Promise<SessionData> {
 
                 getScreen.onsuccess = () => {
                     const blobData = getScreen.result;
+                    let currentSessionId: string | null = null;
+
                     if (blobData) {
                         result.videoUrl = URL.createObjectURL(blobData.blob);
                         if (blobData.startTime) result.recordingStartTime = blobData.startTime;
                         else if (blobData.timestamp) result.recordingStartTime = blobData.timestamp;
 
                         if (blobData.duration) result.recordingDuration = blobData.duration;
+                        if (blobData.sessionId) currentSessionId = blobData.sessionId;
                     }
 
                     // Get Camera
@@ -61,7 +64,22 @@ export async function loadSessionData(): Promise<SessionData> {
                     getCamera.onsuccess = () => {
                         const camData = getCamera.result;
                         if (camData) {
-                            result.cameraUrl = URL.createObjectURL(camData.blob);
+                            // Validate Session ID Match
+                            if (currentSessionId && camData.sessionId === currentSessionId) {
+                                result.cameraUrl = URL.createObjectURL(camData.blob);
+                            } else if (!currentSessionId) {
+                                // Fallback for legacy recordings (optional, or just ignore)
+                                // If we want to be strict: do not load.
+                                // If strict:
+                                // result.cameraUrl = null; 
+
+                                // But for now, let's be strict if we expect IDs.
+                                // If no ID on screen, maybe it's old recording? 
+                                // Let's check matching start times as fallback if IDs missing?
+                                if (camData.startTime === result.recordingStartTime) {
+                                    result.cameraUrl = URL.createObjectURL(camData.blob);
+                                }
+                            }
                         }
                         resolve();
                     };

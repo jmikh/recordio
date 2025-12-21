@@ -9,6 +9,7 @@ let audioContext: AudioContext | null = null;
 // Keep track of streams to stop them later
 let activeStreams: MediaStream[] = [];
 let startTime = 0;
+let sessionId: string | null = null;
 
 // Notify background that we are ready
 chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
@@ -134,6 +135,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
         }
     } else if (message.type === 'START_RECORDING') {
         startTime = Date.now();
+        sessionId = crypto.randomUUID();
         if (screenRecorder && screenRecorder.state === 'inactive') screenRecorder.start();
         if (cameraRecorder && cameraRecorder.state === 'inactive') cameraRecorder.start();
 
@@ -190,13 +192,13 @@ async function stopRecording() {
         const blob = new Blob(screenData, { type: 'video/webm' });
         // Get dimensions from tracks if possible, else 1920x1080 default
         // We will just store simple blob for now.
-        await saveToIndexedDB('latest', blob, startTime, duration);
+        await saveToIndexedDB('latest', blob, startTime, duration, sessionId);
     }
 
     // Save Camera
     if (cameraData.length > 0) {
         const blob = new Blob(cameraData, { type: 'video/webm' });
-        await saveToIndexedDB('latest-camera', blob, startTime, duration);
+        await saveToIndexedDB('latest-camera', blob, startTime, duration, sessionId);
     }
 
     // 3. Cleanup & Notify
@@ -207,7 +209,7 @@ async function stopRecording() {
     chrome.runtime.sendMessage({ type: 'OPEN_EDITOR', url: 'src/editor/index.html' });
 }
 
-async function saveToIndexedDB(key: string, blob: Blob, startTime: number, duration: number) {
+async function saveToIndexedDB(key: string, blob: Blob, startTime: number, duration: number, sessionId: string | null) {
     return new Promise<void>((resolve, reject) => {
         const request = indexedDB.open('RecordoDB', 1);
 
@@ -231,7 +233,8 @@ async function saveToIndexedDB(key: string, blob: Blob, startTime: number, durat
                 blob: blob,
                 duration: duration,
                 startTime: startTime,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                sessionId: sessionId
             };
 
             const putRequest = store.put(recording);

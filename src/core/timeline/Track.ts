@@ -49,6 +49,7 @@ export class TrackImpl {
      * @throws Error if the new clip overlaps with any existing clip.
      */
     static addClip(track: Track, clip: Clip): Track {
+        console.log("adding a clip")
         // Simple O(N) check for now. Can optimize with binary search later.
         const newTrack = { ...track, clips: [...track.clips] };
 
