@@ -55,17 +55,17 @@ export class ViewTransform {
 
     /**
      * Calculates the source and destination rectangles for rendering the video 
-     * based on the current CameraWindow (Output Space View).
+     * based on the current Viewport (Output Space View).
      * 
-     * @param cameraWindow The current visible window in Output Space.
+     * @param viewport The current visible window in Output Space.
      */
-    resolveRenderRects(cameraWindow: Rect): { sourceRect: Rect, destRect: Rect } | null {
-        // 1. Find Intersection of CameraWindow and ContentRect
-        // This is the part of the Content visible in the Camera
-        const intersection = getIntersection(cameraWindow, this.contentRect);
+    resolveRenderRects(viewport: Rect): { sourceRect: Rect, destRect: Rect } | null {
+        // 1. Find Intersection of Viewport and ContentRect
+        // This is the part of the Content visible in the Viewport
+        const intersection = getIntersection(viewport, this.contentRect);
 
         if (!intersection) {
-            return null; // Camera is looking entirely at padding/background
+            return null; // Viewport is looking entirely at padding/background
         }
 
         // 2. Calculate sourceRect (Input Space)
@@ -76,13 +76,13 @@ export class ViewTransform {
         const srcH = (intersection.height / this.contentRect.height) * this.inputVideoSize.height;
 
         // 3. Calculate destRect (Canvas/Screen Drawing Coordinates)
-        // Map the visible intersection relative to the Camera Window
-        // Scaling factor: Output Size / Camera Window Size
-        const scaleX = this.outputVideoSize.width / cameraWindow.width;
-        const scaleY = this.outputVideoSize.height / cameraWindow.height;
+        // Map the visible intersection relative to the Viewport
+        // Scaling factor: Output Size / Viewport Size
+        const scaleX = this.outputVideoSize.width / viewport.width;
+        const scaleY = this.outputVideoSize.height / viewport.height;
 
-        const dstX = (intersection.x - cameraWindow.x) * scaleX;
-        const dstY = (intersection.y - cameraWindow.y) * scaleY;
+        const dstX = (intersection.x - viewport.x) * scaleX;
+        const dstY = (intersection.y - viewport.y) * scaleY;
         const dstW = intersection.width * scaleX;
         const dstH = intersection.height * scaleY;
 
@@ -95,18 +95,18 @@ export class ViewTransform {
     /**
      * Maps a point from Input Space -> Screen Coordinates (pixels on the final canvas).
      */
-    projectToScreen(point: Point, cameraWindow: Rect): Point {
+    projectToScreen(point: Point, viewport: Rect): Point {
         // 1. Input -> Output Space
         const outputPoint = this.inputToOutput(point);
 
-        // 2. Output Space -> Screen (Relative to CameraWindow)
+        // 2. Output Space -> Screen (Relative to Viewport)
         // (p - cam.x) * scale
-        const scaleX = this.outputVideoSize.width / cameraWindow.width;
-        const scaleY = this.outputVideoSize.height / cameraWindow.height;
+        const scaleX = this.outputVideoSize.width / viewport.width;
+        const scaleY = this.outputVideoSize.height / viewport.height;
 
         return {
-            x: (outputPoint.x - cameraWindow.x) * scaleX,
-            y: (outputPoint.y - cameraWindow.y) * scaleY
+            x: (outputPoint.x - viewport.x) * scaleX,
+            y: (outputPoint.y - viewport.y) * scaleY
         };
     }
 }

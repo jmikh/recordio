@@ -4,7 +4,7 @@ import { useProjectStore, useProjectTimeline } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackVideo } from './TimelineTrackVideo';
-import { TimelineTrackCameraMotions } from './TimelineTrackCameraMotions';
+import { TimelineTrackViewportMotions } from './TimelineTrackViewportMotions';
 import { TimelineTrackMouseEffects } from './TimelineTrackMouseEffects';
 import type { Clip } from '../../core/types';
 
@@ -271,9 +271,9 @@ export function Timeline() {
                                         trackHeight={TRACK_HEIGHT}
                                         onDragStart={handleDragStart}
                                     />
-                                    {track.cameraMotions && track.cameraMotions.length > 0 && (
-                                        <TimelineTrackCameraMotions
-                                            motions={track.cameraMotions}
+                                    {track.viewportMotions && track.viewportMotions.length > 0 && (
+                                        <TimelineTrackViewportMotions
+                                            motions={track.viewportMotions}
                                             pixelsPerSec={pixelsPerSec}
                                         />
                                     )}

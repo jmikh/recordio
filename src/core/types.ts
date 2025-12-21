@@ -138,10 +138,10 @@ export interface Track {
  */
 export interface MainTrack extends Track {
     /** 
-     * List of camera motions (zoom/pan) applied to this track.
-     * These define "camera" movement over time.
+     * List of viewport motions (zoom/pan) applied to this track.
+     * These define "viewport" movement over time.
      */
-    cameraMotions: CameraMotion[];
+    viewportMotions: ViewportMotion[];
 
     /**
      * List of mouse effects (clicks, drags) derived from events.
@@ -199,25 +199,25 @@ export interface DisplaySettings {
 }
 
 // ==========================================
-// CAMERA MOTIONS
+// VIEWPORT MOTIONS
 // ==========================================
 
 export type EasingType = 'linear' | 'ease_in' | 'ease_out' | 'ease_in_out';
 
 /**
- * Defines a camera movement/state over time.
- * "Camera Motion" model: The camera moves from its previous state to the 'target' state
+ * Defines a viewport movement/state over time.
+ * "Viewport Motion" model: The viewport moves from its previous state to the 'target' state
  * starting at 'timeInMs' and arriving at 'timeOutMs'.
  */
-export interface CameraMotion {
+export interface ViewportMotion {
     id: ID;
     /** Start of the zoom/pan interpolation */
     timeInMs: TimeMs;
     /** End of the zoom/pan interpolation (arrival at target) */
     timeOutMs: TimeMs;
 
-    /** The target viewport (camera frame) in source coordinates */
-    cameraWindow: Rect;
+    /** The target viewport (visible frame) in source coordinates */
+    viewport: Rect;
 
     easing: EasingType;
 }

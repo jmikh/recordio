@@ -15,7 +15,7 @@ import { TrackImpl } from '../core/timeline/track';
 import { ClipImpl } from '../core/timeline/clip';
 import type { Source, MainTrack } from '../core/types';
 import { ViewTransform } from '../core/effects/viewTransform';
-import { calculateZoomSchedule } from '../core/effects/cameraMotion';
+import { calculateZoomSchedule } from '../core/effects/viewportMotion';
 import { generateMouseEffects } from '../core/effects/mouseEffects';
 
 
@@ -108,7 +108,7 @@ function Editor() {
                         proj.outputSettings.size,
                         track.displaySettings.padding
                     );
-                    track.cameraMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
+                    track.viewportMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
                     track.mouseEffects = generateMouseEffects(source.events, source.durationMs);
                 }
 

@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 // import { useEditorStore } from '../store'; // Unused now
 import { ViewTransform } from '../../core/effects/viewTransform';
-import { getCameraStateAtTime } from '../../core/effects/cameraMotion';
+import { getViewportStateAtTime } from '../../core/effects/viewportMotion';
 import { drawMouseEffects } from './mousePainter';
 import { drawBackground } from './backgroundPainter';
 import { drawWebcam } from './webcamPainter';
@@ -138,13 +138,13 @@ export const PlayerCanvas = () => {
                 if (!inputSize) continue;
 
                 if (isMainTrack) {
-                    // MAIN TRACK RENDERING (Camera Motion)
+                    // MAIN TRACK RENDERING (Viewport Motion)
                     const config = new ViewTransform(inputSize, outputSize, paddingPercentage);
                     const track = project.timeline.mainTrack;
-                    const cameraMotions = track?.cameraMotions || [];
-                    const cameraWindow = getCameraStateAtTime(cameraMotions, currentTimeMs, outputSize); // Use global zoom logic
+                    const viewportMotions = track?.viewportMotions || [];
+                    const effectiveViewport = getViewportStateAtTime(viewportMotions, currentTimeMs, outputSize); // Use global zoom logic
 
-                    const renderRects = config.resolveRenderRects(cameraWindow);
+                    const renderRects = config.resolveRenderRects(effectiveViewport);
 
                     if (renderRects) {
                         ctx.drawImage(
@@ -155,7 +155,7 @@ export const PlayerCanvas = () => {
                     }
 
                     if (track.mouseEffects) {
-                        drawMouseEffects(ctx, track.mouseEffects, currentTimeMs, cameraWindow, config);
+                        drawMouseEffects(ctx, track.mouseEffects, currentTimeMs, effectiveViewport, config);
                     }
                 } else {
                     // OVERLAY TRACK RENDERING (PIP)

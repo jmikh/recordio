@@ -1,4 +1,4 @@
-import { calculateZoomSchedule, ViewTransform } from './cameraMotion';
+import { calculateZoomSchedule, ViewTransform } from './viewportMotion';
 import type { UserEvent } from '../types';
 
 function assertStrictEqual(a: any, b: any, msg?: string) {
@@ -53,7 +53,7 @@ function runTest(scenarioName: string) {
     console.log("--- Generated Schedule ---");
     schedule.forEach((k, i) => {
         console.log(`Motion #${i}: timeOut=${k.timeOutMs}`);
-        console.log(`  Target: x=${k.cameraWindow.x}, y=${k.cameraWindow.y}, w=${k.cameraWindow.width}, h=${k.cameraWindow.height}`);
+        console.log(`  Target: x=${k.viewport.x}, y=${k.viewport.y}, w=${k.viewport.width}, h=${k.viewport.height}`);
     });
 
     console.log("--- Running Assertions ---");
@@ -71,27 +71,27 @@ function runTest(scenarioName: string) {
 
     // Verify Sizes
     for (let i = 0; i < 3; i++) {
-        assert.strictEqual(schedule[i].cameraWindow.width, expectedSize, `M${i} Width incorrect`);
-        assert.strictEqual(schedule[i].cameraWindow.height, expectedSize, `M${i} Height incorrect`);
+        assert.strictEqual(schedule[i].viewport.width, expectedSize, `M${i} Width incorrect`);
+        assert.strictEqual(schedule[i].viewport.height, expectedSize, `M${i} Height incorrect`);
     }
 
     // Motion 0: Click (0,0) Input -> (0,0) Output
     // Box Center (0,0). TopLeft (-250, -250). Clamped to (0,0).
-    assert.strictEqual(schedule[0].cameraWindow.x, 0, "M0 X incorrect");
-    assert.strictEqual(schedule[0].cameraWindow.y, 0, "M0 Y incorrect");
+    assert.strictEqual(schedule[0].viewport.x, 0, "M0 X incorrect");
+    assert.strictEqual(schedule[0].viewport.y, 0, "M0 Y incorrect");
 
     // Motion 1: Click (1000, 1000) Input -> (500, 500) Output
     // Box Center (500,500). TopLeft (250, 250).
     // Right Edge = 250 + 500 = 750 <= 1000. Valid.
-    assert.strictEqual(schedule[1].cameraWindow.x, 250, "M1 X incorrect");
-    assert.strictEqual(schedule[1].cameraWindow.y, 250, "M1 Y incorrect");
+    assert.strictEqual(schedule[1].viewport.x, 250, "M1 X incorrect");
+    assert.strictEqual(schedule[1].viewport.y, 250, "M1 Y incorrect");
 
     // Motion 2: Click (2000, 2000) Input -> (1000, 1000) Output
     // Box Center (1000,1000). TopLeft (750, 750).
     // Box MaxX = 1000 - 500 = 500.
     // Clamped X = 500.
-    assert.strictEqual(schedule[2].cameraWindow.x, 500, "M2 X incorrect");
-    assert.strictEqual(schedule[2].cameraWindow.y, 500, "M2 Y incorrect");
+    assert.strictEqual(schedule[2].viewport.x, 500, "M2 X incorrect");
+    assert.strictEqual(schedule[2].viewport.y, 500, "M2 Y incorrect");
 
     console.log(`✅ Scenario '${scenarioName}' Passed!`);
 }

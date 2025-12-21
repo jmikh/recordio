@@ -1,14 +1,11 @@
-import type { ClickEvent, UserEvent, CameraMotion, Size, MouseEvent, Rect } from '../types';
+import type { ClickEvent, UserEvent, ViewportMotion, Size, MouseEvent, Rect } from '../types';
 import { ViewTransform } from './viewTransform';
 
-// export * from './types'; // Removed as types are now in core
 export * from './viewTransform';
 
 // ============================================================================
 // Core Abstractions
 // ============================================================================
-
-// Box interface removed
 
 export interface HoverBlock {
     startTime: number;
@@ -116,8 +113,8 @@ export function calculateZoomSchedule(
     maxZoom: number,
     viewTransform: ViewTransform, // Kept for signature compatibility
     events: UserEvent[]
-): CameraMotion[] {
-    const motions: CameraMotion[] = [];
+): ViewportMotion[] {
+    const motions: ViewportMotion[] = [];
 
     // 1. Identify all Click Events and sort them.
     const clickEvents = events
@@ -133,8 +130,8 @@ export function calculateZoomSchedule(
     // Zoom 2x = Half Output Size (centered).
     const zoomLevel = maxZoom;
 
-    const cameraWidth = viewTransform.outputVideoSize.width / zoomLevel;
-    const cameraHeight = viewTransform.outputVideoSize.height / zoomLevel;
+    const targetWidth = viewTransform.outputVideoSize.width / zoomLevel;
+    const targetHeight = viewTransform.outputVideoSize.height / zoomLevel;
 
     // Default duration for a zoom "scene" around a click
     const ZOOM_HOLD_DURATION = 2000;
@@ -146,29 +143,27 @@ export function calculateZoomSchedule(
         // 1. Map Click to Output Space
         const clickOutput = viewTransform.inputToOutput({ x: evt.x, y: evt.y });
 
-        // 2. Center CameraWindow on Click
-        let cameraX = clickOutput.x - cameraWidth / 2;
-        let cameraY = clickOutput.y - cameraHeight / 2;
+        // 2. Center Viewport on Click
+        let viewportX = clickOutput.x - targetWidth / 2;
+        let viewportY = clickOutput.y - targetHeight / 2;
 
         // 3. Clamp to Output Space Edges
-        // The CameraWindow must stay within the Output Canvas (0,0 -> OutputW, OutputH)
-        // (Unless zoomLevel < 1, which implies window > output, then we adjust differently...
-        // assuming zoom >= 1 for now).
+        // The Viewport must stay within the Output Canvas (0,0 -> OutputW, OutputH)
 
-        const maxX = viewTransform.outputVideoSize.width - cameraWidth;
-        const maxY = viewTransform.outputVideoSize.height - cameraHeight;
+        const maxX = viewTransform.outputVideoSize.width - targetWidth;
+        const maxY = viewTransform.outputVideoSize.height - targetHeight;
 
-        if (cameraX < 0) cameraX = 0;
-        else if (cameraX > maxX) cameraX = maxX;
+        if (viewportX < 0) viewportX = 0;
+        else if (viewportX > maxX) viewportX = maxX;
 
-        if (cameraY < 0) cameraY = 0;
-        else if (cameraY > maxY) cameraY = maxY;
+        if (viewportY < 0) viewportY = 0;
+        else if (viewportY > maxY) viewportY = maxY;
 
-        const newCameraWindow: Rect = {
-            x: cameraX,
-            y: cameraY,
-            width: cameraWidth,
-            height: cameraHeight
+        const newViewport: Rect = {
+            x: viewportX,
+            y: viewportY,
+            width: targetWidth,
+            height: targetHeight
         };
 
         // Timing Logic
@@ -181,7 +176,7 @@ export function calculateZoomSchedule(
             id: crypto.randomUUID(),
             timeInMs: timeIn,
             timeOutMs: arrivalTime,
-            cameraWindow: newCameraWindow,
+            viewport: newViewport,
             easing: 'ease_in_out'
         });
 
@@ -206,7 +201,7 @@ export function calculateZoomSchedule(
                 id: crypto.randomUUID(),
                 timeInMs: zoomOutStart,
                 timeOutMs: zoomOutEnd,
-                cameraWindow: fullView,
+                viewport: fullView,
                 easing: 'ease_in_out'
             });
         }
@@ -220,11 +215,11 @@ export function calculateZoomSchedule(
 // ============================================================================
 
 /*
- * Calculates the current CameraWindow (in Output Space)
+ * Calculates the current Viewport (in Output Space)
  * based on the list of motions and the current time.
  */
-export function getCameraStateAtTime(
-    motions: CameraMotion[],
+export function getViewportStateAtTime(
+    motions: ViewportMotion[],
     timeMs: number,
     fullSize: Size
 ): Rect {
@@ -245,7 +240,7 @@ export function getCameraStateAtTime(
     // After last motion
     const lastMotion = sortedMotions[sortedMotions.length - 1];
     if (timeMs >= lastMotion.timeOutMs) {
-        return lastMotion.cameraWindow;
+        return lastMotion.viewport;
     }
 
     // Find the relevant motion segment
@@ -256,7 +251,7 @@ export function getCameraStateAtTime(
         if (timeMs >= curr.timeInMs && timeMs < curr.timeOutMs) {
             let startRect = fullRect;
             if (i > 0) {
-                startRect = sortedMotions[i - 1].cameraWindow;
+                startRect = sortedMotions[i - 1].viewport;
             }
 
             const duration = curr.timeOutMs - curr.timeInMs;
@@ -265,14 +260,14 @@ export function getCameraStateAtTime(
 
             const easedProgress = applyEasing(progress, curr.easing);
 
-            return interpolateRect(startRect, curr.cameraWindow, easedProgress);
+            return interpolateRect(startRect, curr.viewport, easedProgress);
         }
 
         // Case: Between motions (Holding previous target)
         if (i < sortedMotions.length - 1) {
             const next = sortedMotions[i + 1];
             if (timeMs >= curr.timeOutMs && timeMs < next.timeInMs) {
-                return curr.cameraWindow;
+                return curr.viewport;
             }
         }
     }
@@ -280,7 +275,7 @@ export function getCameraStateAtTime(
     return fullRect;
 }
 
-function applyEasing(t: number, type: CameraMotion['easing']): number {
+function applyEasing(t: number, type: ViewportMotion['easing']): number {
     switch (type) {
         case 'ease_in':
             return t * t;

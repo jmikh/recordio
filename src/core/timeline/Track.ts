@@ -29,7 +29,7 @@ export class TrackImpl {
             ...TrackImpl.create(name, 'video'),
             // Explicitly cast type if needed, but 'video' is compatible
             // MainTrack specific:
-            cameraMotions: [],
+            viewportMotions: [],
             mouseEffects: [],
             displaySettings: {
                 mode: 'fullscreen',

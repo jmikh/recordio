@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { UserEvent, Size } from '../core/types';
-import { findHoverBlocks } from '../core/effects/cameraMotion';
+import { findHoverBlocks } from '../core/effects/viewportMotion';
 
 interface HoverInspectorProps {
     events: UserEvent[];
