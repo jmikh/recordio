@@ -1,4 +1,4 @@
-import type { MouseEffect, Point, Rect } from '../../core/types';
+import type { MouseEffect, Point, Rect, TimestampedPoint } from '../../core/types';
 import type { ViewTransform } from '../../core/effects/viewTransform';
 
 /**
@@ -62,7 +62,7 @@ export function drawMouseEffects(
     }
 }
 
-function getPointAtTime(path: { timestamp: number; x: number; y: number }[], time: number): Point {
+function getPointAtTime(path: TimestampedPoint[], time: number): Point {
     // Find segment [p1, p2] where p1.t <= time <= p2.t
     if (path.length === 0) return { x: 0, y: 0 };
     if (time <= path[0].timestamp) return { x: path[0].x, y: path[0].y };

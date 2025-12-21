@@ -16,12 +16,7 @@ export interface Size {
     height: number;
 }
 
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+export interface Rect extends Point, Size { }
 
 // ==========================================
 // PROJECT
@@ -249,7 +244,7 @@ export interface MouseEffect {
      * Contains sampled points with timestamps relative to the start of the effect? 
      * Or absolute timestamps? Absolute is easier for lookup.
      */
-    path?: { timestamp: number; x: number; y: number }[];
+    path?: TimestampedPoint[];
 }
 
 // ==========================================
@@ -259,21 +254,21 @@ export interface MouseEffect {
 export interface Point { x: number; y: number; }
 // Size is already defined above
 
+export interface TimestampedPoint extends Point {
+    timestamp: number;
+}
+
 export interface BaseEvent {
     timestamp: number;
 }
 
-export interface ClickEvent extends BaseEvent {
+export interface ClickEvent extends BaseEvent, Point {
     type: 'click';
-    x: number;
-    y: number;
     tagName?: string;
 }
 
-export interface MouseEvent extends BaseEvent {
+export interface MouseEvent extends BaseEvent, Point {
     type: 'mouse';
-    x: number;
-    y: number;
 }
 
 export interface UrlEvent extends BaseEvent {
@@ -292,22 +287,16 @@ export interface KeystrokeEvent extends BaseEvent {
     tagName?: string;
 }
 
-export interface MouseDownEvent extends BaseEvent {
+export interface MouseDownEvent extends BaseEvent, Point {
     type: 'mousedown';
-    x: number;
-    y: number;
 }
 
-export interface MouseUpEvent extends BaseEvent {
+export interface MouseUpEvent extends BaseEvent, Point {
     type: 'mouseup';
-    x: number;
-    y: number;
 }
 
-export interface HoverEvent extends BaseEvent {
+export interface HoverEvent extends BaseEvent, Point {
     type: 'hover';
-    x: number;
-    y: number;
     endTime: number;
 }
 

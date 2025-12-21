@@ -11,12 +11,23 @@ let activeStreams: MediaStream[] = [];
 let startTime = 0;
 let sessionId: string | null = null;
 
+import type { Size } from '../core/types';
+
 // Notify background that we are ready
 chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
 
 chrome.runtime.onMessage.addListener(async (message) => {
     if (message.type === 'PREPARE_RECORDING') {
-        const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions } } = message;
+        const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions } } = message as {
+            streamId: string;
+            data: {
+                hasAudio: boolean;
+                hasCamera: boolean;
+                audioDeviceId?: string;
+                videoDeviceId?: string;
+                dimensions?: Size;
+            };
+        };
 
         try {
             cleanup(); // Ensure clean state

@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import type { Size } from '../core/types';
 
 // Prevent duplicate injection
 if ((window as any).hasRecordoInjected) {
@@ -94,7 +95,7 @@ function sendMouseEvent(type: 'MOUSEDOWN' | 'MOUSEUP', e?: MouseEvent) {
     const x = e ? e.clientX : 0;
     const y = e ? e.clientY : 0;
 
-    let elementMeta = {};
+    let elementMeta: Partial<Size> = {};
     if (e && e.target instanceof Element) {
         const rect = e.target.getBoundingClientRect();
         elementMeta = {
@@ -127,7 +128,7 @@ document.addEventListener('pointerdown', (e) => {
     // Buffer the mousedown event
     const x = e.clientX;
     const y = e.clientY;
-    let elementMeta = {};
+    let elementMeta: Partial<Size> = {};
     if (e.target instanceof Element) {
         const rect = e.target.getBoundingClientRect();
         elementMeta = {
