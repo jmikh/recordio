@@ -98,6 +98,8 @@ export interface Timeline {
     id: ID;
     /** The main track containing clips */
     mainTrack: MainTrack;
+    /** Optional overlay track (e.g. For Camera bubble) */
+    overlayTrack?: Track;
     /** Total duration of the timeline */
     durationMs: TimeMs;
 }

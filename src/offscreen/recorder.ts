@@ -1,9 +1,14 @@
-let recorder: MediaRecorder | null = null;
-let data: BlobPart[] = [];
+let screenRecorder: MediaRecorder | null = null;
+let cameraRecorder: MediaRecorder | null = null;
+
+let screenData: BlobPart[] = [];
+let cameraData: BlobPart[] = [];
+
 let audioContext: AudioContext | null = null;
-let mixedDest: MediaStreamAudioDestinationNode | null = null;
-let mixedStream: MediaStream | null = null;
-let animationFrameId: number | null = null;
+
+// Keep track of streams to stop them later
+let activeStreams: MediaStream[] = [];
+let startTime = 0;
 
 // Notify background that we are ready
 chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
@@ -13,6 +18,8 @@ chrome.runtime.onMessage.addListener(async (message) => {
         const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions } } = message;
 
         try {
+            cleanup(); // Ensure clean state
+
             // 1. Get Screen Stream (Video + System Audio)
             const videoConstraints: any = {
                 mandatory: {
@@ -37,165 +44,160 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 } as any,
                 video: videoConstraints
             });
+            activeStreams.push(screenStream);
 
-            // 2. Prepare for mixing
-            const tracks: MediaStreamTrack[] = [];
-            audioContext = new AudioContext();
-            mixedDest = audioContext.createMediaStreamDestination();
-
-            // Add system audio to mix if present
-            if (screenStream.getAudioTracks().length > 0) {
-                const systemSource = audioContext.createMediaStreamSource(screenStream);
-                systemSource.connect(mixedDest);
-            }
-
-            // 3. Get Microphone Audio if requested
+            // 2. Get Microphone Audio if requested
             let micStream: MediaStream | null = null;
             if (hasAudio) {
                 const audioConstraints = audioDeviceId
                     ? { deviceId: { exact: audioDeviceId } }
                     : true;
-
                 micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-                const micSource = audioContext.createMediaStreamSource(micStream);
-                micSource.connect(mixedDest);
+                activeStreams.push(micStream);
             }
 
-            // 4. Get Webcam Video if requested and set up canvas for compositing
-            let cameraStream: MediaStream | null = null;
-            let canvasStream: MediaStream | null = null;
+            // 3. Prepare Recorders
+            startTime = Date.now();
 
             if (hasCamera) {
-                const videoConstraints = videoDeviceId
+                // --- DUAL RECORDING MODE ---
+
+                // A. Camera Stream setup
+                const camVideoConstraints = videoDeviceId
                     ? { deviceId: { exact: videoDeviceId } }
                     : true;
+                const rawCameraStream = await navigator.mediaDevices.getUserMedia({ video: camVideoConstraints });
+                activeStreams.push(rawCameraStream);
 
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+                // Mix Camera Video + Mic Audio
+                const cameraTracks = [...rawCameraStream.getVideoTracks()];
+                if (micStream) {
+                    cameraTracks.push(...micStream.getAudioTracks());
+                }
+                const cameraFinalStream = new MediaStream(cameraTracks);
 
-                const canvas = document.createElement('canvas');
-                // alpha: false helps with color accuracy (no premultiply) and performance
-                const ctx = canvas.getContext('2d', { alpha: false });
-                if (!ctx) throw new Error("Could not get canvas context");
+                // B. Screen Stream setup (Screen Video + System Audio)
+                // We use screenStream directly.
 
-                const screenVideoTrack = screenStream.getVideoTracks()[0];
-                const { width, height } = screenVideoTrack.getSettings();
-                // TODO: figureout how to deal with that error. (analytics?)
-                canvas.width = width || 1920;
-                canvas.height = height || 1080;
+                // Initialize Recorders
+                screenRecorder = new MediaRecorder(screenStream, { mimeType: 'video/webm;codecs=vp9' });
+                cameraRecorder = new MediaRecorder(cameraFinalStream, { mimeType: 'video/webm;codecs=vp9' });
 
-                const screenVideoElement = document.createElement('video');
-                screenVideoElement.srcObject = screenStream;
-                screenVideoElement.muted = true; // Avoid feedback
-                await screenVideoElement.play();
+                screenData = [];
+                cameraData = [];
 
-                const cameraVideoElement = document.createElement('video');
-                cameraVideoElement.srcObject = cameraStream;
-                cameraVideoElement.muted = true;
-                await cameraVideoElement.play();
+                // Event Handlers
+                screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
+                cameraRecorder.ondataavailable = (e) => { if (e.data.size > 0) cameraData.push(e.data); };
 
-                const draw = () => {
-                    ctx.drawImage(screenVideoElement, 0, 0, canvas.width, canvas.height);
+                // Stop Handler - We handle stopping manually via message but hook onstop for debugging if needed
 
-                    // Draw webcam in bottom right corner
-                    const camWidth = canvas.width * 0.2; // 20% width
-                    const camHeight = (camWidth / cameraVideoElement.videoWidth) * cameraVideoElement.videoHeight || camWidth * 0.75;
-                    const padding = 20;
+                screenRecorder.start();
+                cameraRecorder.start();
 
-                    const camX = canvas.width - camWidth - padding;
-                    const camY = canvas.height - camHeight - padding;
-
-                    ctx.save();
-
-                    // Draw Border
-                    ctx.drawImage(cameraVideoElement, camX, camY, camWidth, camHeight);
-
-                    ctx.strokeStyle = "white";
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(camX, camY, camWidth, camHeight);
-
-                    ctx.restore();
-
-                    animationFrameId = requestAnimationFrame(draw);
-                };
-                draw();
-
-                canvasStream = canvas.captureStream(60); // 60 FPS
-                tracks.push(canvasStream.getVideoTracks()[0]);
             } else {
-                tracks.push(screenStream.getVideoTracks()[0]);
+                // --- SINGLE RECORDING MODE (Screen + Mic + System) ---
+
+                // Need to mix Mic + System Audio if both exist
+                let finalScreenStream = screenStream;
+
+                if (micStream) {
+                    audioContext = new AudioContext();
+                    const dest = audioContext.createMediaStreamDestination();
+
+                    if (screenStream.getAudioTracks().length > 0) {
+                        const sysSource = audioContext.createMediaStreamSource(screenStream);
+                        sysSource.connect(dest);
+                    }
+
+                    const micSource = audioContext.createMediaStreamSource(micStream);
+                    micSource.connect(dest);
+
+                    const mixedTracks = [
+                        ...screenStream.getVideoTracks(),
+                        dest.stream.getAudioTracks()[0] // Mixed Audio
+                    ];
+                    finalScreenStream = new MediaStream(mixedTracks);
+                }
+
+                screenRecorder = new MediaRecorder(finalScreenStream, { mimeType: 'video/webm;codecs=vp9' });
+                screenData = [];
+                screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
+                screenRecorder.start();
             }
 
-            // Add mixed audio track
-            tracks.push(mixedDest.stream.getAudioTracks()[0]);
-
-            mixedStream = new MediaStream(tracks);
-
-            recorder = new MediaRecorder(mixedStream, { mimeType: 'video/webm;codecs=vp9' });
-            data = [];
-
-            let startTime = 0;
-
-            recorder.onstart = () => {
-                startTime = Date.now();
-            };
-
-            recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    data.push(event.data);
-                }
-            };
-
-            recorder.onstop = async () => {
-                const blob = new Blob(data, { type: 'video/webm' });
-                const duration = Date.now() - startTime;
-
-                if (animationFrameId) cancelAnimationFrame(animationFrameId);
-                audioContext?.close();
-
-                // Determine final dimensions
-                let width = 1920;
-                let height = 1080;
-
-                // If we used a canvas (camera mode), use canvas dims
-                if (canvasStream) {
-                    const settings = mixedStream?.getVideoTracks()[0]?.getSettings();
-                    if (settings?.width && settings?.height) {
-                        width = settings.width;
-                        height = settings.height;
-                    }
-                } else {
-                    // No camera, simple screen stream
-                    const settings = screenStream.getVideoTracks()[0]?.getSettings();
-                    if (settings?.width && settings?.height) {
-                        width = settings.width;
-                        height = settings.height;
-                    }
-                }
-
-                // Stop all source streams
-                screenStream.getTracks().forEach(t => t.stop());
-                micStream?.getTracks().forEach(t => t.stop());
-                cameraStream?.getTracks().forEach(t => t.stop());
-                mixedStream?.getTracks().forEach(t => t.stop());
-
-                await saveToIndexedDB(blob, duration, startTime, width, height);
-                chrome.runtime.sendMessage({ type: 'OPEN_EDITOR', url: 'src/editor/index.html' });
-            };
-
-            recorder.start();
         } catch (err) {
             console.error("Offscreen recording error:", err);
+            cleanup();
         }
     } else if (message.type === 'STOP_RECORDING_OFFSCREEN') {
-        if (recorder && recorder.state !== 'inactive') {
-            recorder.stop();
-        }
+        stopRecording();
     } else if (message.type === 'PING_OFFSCREEN') {
         return Promise.resolve("PONG");
     }
 });
 
-async function saveToIndexedDB(blob: Blob, duration: number, startTime: number, width: number, height: number) {
+function cleanup() {
+    activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    activeStreams = [];
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    screenRecorder = null;
+    cameraRecorder = null;
+    // Do not clear data here, we need to save it first
+}
+
+async function stopRecording() {
+    // 1. Stop Recorders
+    const promises = [];
+
+    if (screenRecorder && screenRecorder.state !== 'inactive') {
+        promises.push(new Promise<void>(resolve => {
+            if (!screenRecorder) return resolve();
+            screenRecorder.onstop = () => resolve();
+            screenRecorder.stop();
+        }));
+    }
+
+    if (cameraRecorder && cameraRecorder.state !== 'inactive') {
+        promises.push(new Promise<void>(resolve => {
+            if (!cameraRecorder) return resolve();
+            cameraRecorder.onstop = () => resolve();
+            cameraRecorder.stop();
+        }));
+    }
+
+    await Promise.all(promises);
+
+    // 2. Save Data
+    const now = Date.now();
+    const duration = now - startTime;
+
+    // Save Screen
+    if (screenData.length > 0) {
+        const blob = new Blob(screenData, { type: 'video/webm' });
+        // Get dimensions from tracks if possible, else 1920x1080 default
+        // We will just store simple blob for now.
+        await saveToIndexedDB('latest', blob, startTime, duration);
+    }
+
+    // Save Camera
+    if (cameraData.length > 0) {
+        const blob = new Blob(cameraData, { type: 'video/webm' });
+        await saveToIndexedDB('latest-camera', blob, startTime, duration);
+    }
+
+    // 3. Cleanup & Notify
+    screenData = [];
+    cameraData = [];
+    cleanup();
+
+    chrome.runtime.sendMessage({ type: 'OPEN_EDITOR', url: 'src/editor/index.html' });
+}
+
+async function saveToIndexedDB(key: string, blob: Blob, startTime: number, duration: number) {
     return new Promise<void>((resolve, reject) => {
         const request = indexedDB.open('RecordoDB', 1);
 
@@ -211,22 +213,21 @@ async function saveToIndexedDB(blob: Blob, duration: number, startTime: number, 
             const transaction = db.transaction(['recordings'], 'readwrite');
             const store = transaction.objectStore('recordings');
 
+            // Find width/height? Complex to decode blob here. 
+            // We'll let the editor figure it out from the blob URL.
+
             const recording = {
-                id: 'latest',
+                id: key,
                 blob: blob,
                 duration: duration,
                 startTime: startTime,
-                timestamp: Date.now(),
-                width: width,
-                height: height
+                timestamp: Date.now()
             };
 
             const putRequest = store.put(recording);
-
             putRequest.onsuccess = () => resolve();
             putRequest.onerror = () => reject(putRequest.error);
         };
-
         request.onerror = () => reject(request.error);
     });
 }

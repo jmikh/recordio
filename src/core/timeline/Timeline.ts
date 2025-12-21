@@ -19,7 +19,7 @@ export class TimelineImpl {
     }
 
     /**
-     * Splits clips on the main track at the given time.
+     * Splits clips on ALL tracks at the given time.
      * 
      * @param timeline - The timeline to operate on.
      * @param timeMs - The time at which to split.
@@ -27,36 +27,44 @@ export class TimelineImpl {
      * @returns A new Timeline instance.
      */
     static splitAt(timeline: Timeline, timeMs: TimeMs): Timeline {
-        const track = timeline.mainTrack;
+        const updates: Partial<Timeline> = {};
 
-        if (track.locked || !track.visible) return timeline;
-
-        // Check if there is a clip at this time
-        const clip = TrackImpl.findClipAtTime(track, timeMs);
-        if (!clip) {
-            return timeline;
+        // 1. Split Main Track
+        if (!timeline.mainTrack.locked && timeline.mainTrack.visible) {
+            const clip = TrackImpl.findClipAtTime(timeline.mainTrack, timeMs);
+            if (clip) {
+                updates.mainTrack = TrackImpl.splitAt(timeline.mainTrack, timeMs) as MainTrack;
+            }
         }
 
-        // Perform split on the main track
-        // We cast back to MainTrack because splitAt only affects clips, preserving other props
-        const newTrack = TrackImpl.splitAt(track, timeMs) as MainTrack;
+        // 2. Split Overlay Track
+        if (timeline.overlayTrack && !timeline.overlayTrack.locked && timeline.overlayTrack.visible) {
+            const clip = TrackImpl.findClipAtTime(timeline.overlayTrack, timeMs);
+            if (clip) {
+                updates.overlayTrack = TrackImpl.splitAt(timeline.overlayTrack, timeMs);
+            }
+        }
 
         return {
             ...timeline,
-            mainTrack: newTrack
+            ...updates
         };
     }
 
     /**
-     * Updates a clip on the main track.
+     * Updates a clip on the specified track.
      */
-    static updateClip(timeline: Timeline, _trackId: ID, updatedClip: Clip): Timeline {
-        // We ignore trackId as we only have mainTrack now
-        const newTrack = TrackImpl.updateClip(timeline.mainTrack, updatedClip) as MainTrack;
+    static updateClip(timeline: Timeline, trackId: ID, updatedClip: Clip): Timeline {
+        if (trackId === timeline.mainTrack.id) {
+            const newTrack = TrackImpl.updateClip(timeline.mainTrack, updatedClip) as MainTrack;
+            return { ...timeline, mainTrack: newTrack };
+        }
 
-        return {
-            ...timeline,
-            mainTrack: newTrack
-        };
+        if (timeline.overlayTrack && trackId === timeline.overlayTrack.id) {
+            const newTrack = TrackImpl.updateClip(timeline.overlayTrack, updatedClip);
+            return { ...timeline, overlayTrack: newTrack };
+        }
+
+        return timeline;
     }
 }

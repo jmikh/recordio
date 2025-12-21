@@ -2,6 +2,7 @@ import type { UserEvent } from '../../core/types';
 
 export interface SessionData {
     videoUrl: string | null;
+    cameraUrl: string | null;
     metadata: UserEvent[];
     recordingStartTime?: number;
 }
@@ -9,6 +10,7 @@ export interface SessionData {
 export async function loadSessionData(): Promise<SessionData> {
     const result: SessionData = {
         videoUrl: null,
+        cameraUrl: null,
         metadata: []
     };
 
@@ -22,31 +24,49 @@ export async function loadSessionData(): Promise<SessionData> {
         console.warn('Failed to load metadata from chrome storage:', e);
     }
 
-    // 2. Load Blob from IndexedDB
+    // 2. Load Blobs from IndexedDB
     try {
-        const blobData = await new Promise<any>((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             const request = indexedDB.open('RecordoDB', 1);
             request.onerror = () => reject('IDB Open Failed');
             request.onsuccess = (event: any) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('recordings')) {
-                    resolve(null);
+                    resolve();
                     return;
                 }
                 const transaction = db.transaction(['recordings'], 'readonly');
                 const store = transaction.objectStore('recordings');
-                const getRequest = store.get('latest');
-                getRequest.onsuccess = () => resolve(getRequest.result);
-                getRequest.onerror = () => reject('IDB Get Failed');
+
+                // Get Screen
+                const getScreen = store.get('latest');
+
+                getScreen.onsuccess = () => {
+                    const blobData = getScreen.result;
+                    if (blobData) {
+                        result.videoUrl = URL.createObjectURL(blobData.blob);
+                        if (blobData.startTime) result.recordingStartTime = blobData.startTime;
+                        else if (blobData.timestamp) result.recordingStartTime = blobData.timestamp;
+                    }
+
+                    // Get Camera
+                    const getCamera = store.get('latest-camera');
+                    getCamera.onsuccess = () => {
+                        const camData = getCamera.result;
+                        if (camData) {
+                            result.cameraUrl = URL.createObjectURL(camData.blob);
+                        }
+                        resolve();
+                    };
+                    getCamera.onerror = () => {
+                        // No camera or error, just resolve
+                        resolve();
+                    };
+                };
+
+                getScreen.onerror = () => reject('IDB Get Screen Failed');
             };
         });
-
-        if (blobData) {
-            const blob = blobData.blob;
-            result.videoUrl = URL.createObjectURL(blob);
-            if (blobData.startTime) result.recordingStartTime = blobData.startTime;
-            else if (blobData.timestamp) result.recordingStartTime = blobData.timestamp;
-        }
     } catch (e) {
         console.warn('Failed to load video from IndexedDB:', e);
     }

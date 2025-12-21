@@ -1,5 +1,5 @@
 
-import type { Project, ID, TimeMs, Source } from '../types';
+import type { Project, ID, TimeMs, Source, Track } from '../types';
 import { TimelineImpl } from '../timeline/timeline';
 import { TrackImpl } from '../timeline/track';
 
@@ -93,30 +93,33 @@ export class ProjectImpl {
             tracks: []
         };
 
-        const track = project.timeline.mainTrack; // Single track
+        const tracksToCheck: Track[] = [project.timeline.mainTrack];
+        if (project.timeline.overlayTrack) tracksToCheck.push(project.timeline.overlayTrack);
 
-        if (!track.muted && track.visible) {
-            // Find clip at time
-            const clip = TrackImpl.findClipAtTime(track, timeMs);
+        for (const track of tracksToCheck) {
+            if (!track.muted && track.visible) {
+                // Find clip at time
+                const clip = TrackImpl.findClipAtTime(track, timeMs);
 
-            if (clip) {
-                const source = project.sources[clip.sourceId];
-                if (source) {
-                    // Calculate Source Time
-                    const offset = (timeMs - clip.timelineInMs) * clip.speed;
-                    const sourceTimeMs = clip.sourceInMs + offset;
+                if (clip) {
+                    const source = project.sources[clip.sourceId];
+                    if (source) {
+                        // Calculate Source Time
+                        const offset = (timeMs - clip.timelineInMs) * clip.speed;
+                        const sourceTimeMs = clip.sourceInMs + offset;
 
-                    result.tracks.push({
-                        trackId: track.id,
-                        clip: {
-                            id: clip.id,
-                            source,
-                            sourceTimeMs
-                        }
-                    });
+                        result.tracks.push({
+                            trackId: track.id,
+                            clip: {
+                                id: clip.id,
+                                source,
+                                sourceTimeMs
+                            }
+                        });
+                    }
+                } else {
+                    result.tracks.push({ trackId: track.id });
                 }
-            } else {
-                result.tracks.push({ trackId: track.id });
             }
         }
 

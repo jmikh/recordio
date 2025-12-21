@@ -36,83 +36,123 @@ function Editor() {
         loadSessionData().then(data => {
             if (data.videoUrl && data.recordingStartTime) {
                 // Initialize Project if needed
-                // For now, we just ensure a backing store source exists.
-                // In a robust app, we'd check if specific ID exists.
+                const screenSourceId = `source-${data.recordingStartTime}-screen`;
+                const cameraSourceId = `source-${data.recordingStartTime}-camera`;
 
-                const sourceId = `source-${data.recordingStartTime}`;
                 const currentProject = useProjectStore.getState().project;
 
-                if (!currentProject.sources[sourceId]) {
-                    console.log('Initializing Project for Source:', sourceId);
+                let startProject = currentProject;
+                let isNew = false;
 
-                    let newProject = ProjectImpl.create('Recording ' + (new Date(data.recordingStartTime).toLocaleTimeString()));
+                if (!startProject.sources[screenSourceId]) {
+                    console.log('Initializing Project for Session:', data.recordingStartTime);
+                    startProject = ProjectImpl.create('Recording ' + (new Date(data.recordingStartTime).toLocaleTimeString()));
+                    isNew = true;
+                }
 
-                    // We don't know duration/size yet, PlayerCanvas will update it later.
-                    // We create a "Skeleton" source.
+                // Add Screen Source
+                if (!startProject.sources[screenSourceId]) {
                     const source: Source = {
-                        id: sourceId,
+                        id: screenSourceId,
                         type: 'video',
                         url: data.videoUrl,
-                        durationMs: 0, // Unknown
-                        size: { width: 0, height: 0 }, // Unknown
+                        durationMs: 0,
+                        size: { width: 0, height: 0 },
                         hasAudio: true,
                         events: data.metadata || []
                     };
+                    startProject = ProjectImpl.addSource(startProject, source);
+                }
 
-                    newProject = ProjectImpl.addSource(newProject, source);
-                    loadProject(newProject);
+                // Add Camera Source
+                if (data.cameraUrl && !startProject.sources[cameraSourceId]) {
+                    const source: Source = {
+                        id: cameraSourceId,
+                        type: 'video',
+                        url: data.cameraUrl,
+                        durationMs: 0,
+                        size: { width: 0, height: 0 },
+                        hasAudio: true // Camera usually has the Mic
+                    };
+                    startProject = ProjectImpl.addSource(startProject, source);
+                }
+
+                if (isNew || startProject !== currentProject) {
+                    loadProject(startProject);
                 }
             }
         });
     }, []);
 
-    // Reactive Project Initialization: Create Tracks once Source is ready
-    // We watch for a source that has valid dimensions but is not yet in a track.
+    // Reactive Project Initialization: Create Tracks once Sources are ready
     useEffect(() => {
         const proj = useProjectStore.getState().project;
         const mainTrack = proj.timeline.mainTrack;
+        const overlayTrack = proj.timeline.overlayTrack;
 
-        // If we have no clips but we do have a valid source...
-        // (Simplified logic: assumes 1 source = 1 track project for now)
-        if (mainTrack.clips.length === 0) {
-            const sourceIds = Object.keys(proj.sources);
-            if (sourceIds.length > 0) {
-                const source = proj.sources[sourceIds[0]];
-                // Wait for metadata load (size > 0)
-                if (source.size.width > 0 && source.durationMs > 0) {
-                    console.log('Source Ready, Creating Default Track/Clip', source.id);
+        const screenSourceId = Object.keys(proj.sources).find(id => id.includes('screen'));
+        const cameraSourceId = Object.keys(proj.sources).find(id => id.includes('camera'));
 
+        // 1. Initialize Main Track (Screen)
+        if (mainTrack.clips.length === 0 && screenSourceId) {
+            const source = proj.sources[screenSourceId];
+            if (source.size.width > 0 && source.durationMs > 0) {
+                console.log('Screen Source Ready, Creating Main Track');
 
+                let track = TrackImpl.createMainTrack('Screen Recording');
 
-                    // ... (in useEffect)
-
-                    // Create defaults
-                    let track = TrackImpl.createMainTrack('Main Video');
-
-                    // 1. Generate Camera Motions from Metadata
-                    if (source.events && source.events.length > 0) {
-                        const viewTransform = new ViewTransform(
-                            source.size,
-                            proj.outputSettings.size,
-                            track.displaySettings.padding
-                        );
-                        track.cameraMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
-                        track.mouseEffects = generateMouseEffects(source.events, source.durationMs);
-                    }
-
-                    const clip = ClipImpl.create(source.id, 0, source.durationMs, 0);
-                    // Add clip returns generic Track, we need to cast back to MainTrack or assume safe for now
-                    // Since addClip only modifies clips array, it's safe to cast if we started with MainTrack and spread props
-                    // But TrackImpl.addClip spreads existing props... so:
-                    const trackWithClip = TrackImpl.addClip(track, clip) as MainTrack;
-
-                    // Update Project
-                    const newTimeline = { ...proj.timeline, mainTrack: trackWithClip };
-                    loadProject({ ...proj, timeline: newTimeline });
+                // Generate Metadata Effects
+                if (source.events && source.events.length > 0) {
+                    const viewTransform = new ViewTransform(
+                        source.size,
+                        proj.outputSettings.size,
+                        track.displaySettings.padding
+                    );
+                    track.cameraMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
+                    track.mouseEffects = generateMouseEffects(source.events, source.durationMs);
                 }
+
+                const clip = ClipImpl.create(source.id, 0, source.durationMs, 0);
+                const trackWithClip = TrackImpl.addClip(track, clip) as MainTrack;
+
+                const newTimeline = { ...proj.timeline, mainTrack: trackWithClip };
+                loadProject({ ...proj, timeline: newTimeline });
+                // Return to avoid race conditions, let effect re-run
+                return;
             }
         }
-    }, [project.sources, project.outputSettings]); // React to source updates
+
+        // 2. Initialize Overlay Track (Camera)
+        // Only if we have a camera source and no overlay track (or empty overlay track)
+        if (cameraSourceId && (!overlayTrack || overlayTrack.clips.length === 0)) {
+            const source = proj.sources[cameraSourceId];
+            // Wait for metadata
+            if (source.size.width > 0 && source.durationMs > 0) {
+                console.log('Camera Source Ready, Creating Overlay Track');
+
+                let track = overlayTrack;
+                if (!track) {
+                    track = {
+                        id: crypto.randomUUID(),
+                        type: 'overlay', // or 'video'
+                        name: 'Camera',
+                        clips: [],
+                        muted: false,
+                        locked: false,
+                        visible: true
+                    };
+                }
+
+                // Create Clip
+                // Usually camera starts at 0.
+                const clip = ClipImpl.create(source.id, 0, source.durationMs, 0);
+                const trackWithClip = TrackImpl.addClip(track, clip);
+
+                const newTimeline = { ...proj.timeline, overlayTrack: trackWithClip };
+                loadProject({ ...proj, timeline: newTimeline });
+            }
+        }
+    }, [project.sources, project.outputSettings, project.timeline]);
 
 
     // Handle Resize for Centering

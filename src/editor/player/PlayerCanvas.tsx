@@ -4,6 +4,7 @@ import { ViewTransform } from '../../core/effects/viewTransform';
 import { getCameraStateAtTime } from '../../core/effects/cameraMotion';
 import { drawMouseEffects } from './mousePainter';
 import { drawBackground } from './backgroundPainter';
+import { drawWebcam } from './webcamPainter';
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { ProjectImpl } from '../../core/project/project';
@@ -88,83 +89,78 @@ export const PlayerCanvas = () => {
             renderState = ProjectImpl.getRenderState(project, currentTimeMs);
         } catch { return; }
 
-        // Find active clip(s)
-        const trackItem = renderState.tracks.find(t => t.clip);
-        if (!trackItem || !trackItem.clip) return;
+        // Iterate all tracks in order (Main first, then Overlay)
+        for (const trackItem of renderState.tracks) {
+            if (!trackItem.clip) continue;
 
-        const clip = trackItem.clip;
-        const sourceId = clip.source.id;
-        const video = internalVideoRefs.current[sourceId];
+            const clip = trackItem.clip;
+            const sourceId = clip.source.id;
+            const video = internalVideoRefs.current[sourceId];
+            const isMainTrack = trackItem.trackId === project.timeline.mainTrack.id;
 
-        if (video) {
-            // A. Sync Video Time
-            const desiredTimeS = clip.sourceTimeMs / 1000;
+            if (video) {
+                // A. Sync Video Time
+                const desiredTimeS = clip.sourceTimeMs / 1000;
+                // Resolve speed
+                // Ideally we find the specific clip object in the track, but clip.speed might be on the clip object in trackItem? 
+                // Wait, ProjectImpl.getRenderState puts 'clip' (which is the object from standard definition) into renderState?
+                // Yes, the clip object inside renderState has 'id', 'source', 'sourceTimeMs'. 
+                // It does NOT have 'speed' directly unless ProjectImpl included it.
+                // ProjectImpl spreads properties? No, it constructs a new object.
+                // We should update ProjectImpl to include speed OR look it up.
+                // Looking up is expensive in loop.
+                // Let's assume for now speed is 1 or look it up efficiently?
+                // Actually `clip` in `trackItem` has `.id`. We can find it in the project tracks.
 
-            // Resolve speed from original clip (or default to 1)
-            const originalClip = project.timeline.mainTrack?.clips.find(c => c.id === clip.id);
-            const speed = originalClip?.speed || 1;
+                // Fast lookup:
+                let originalClip = null;
+                if (isMainTrack) {
+                    originalClip = project.timeline.mainTrack.clips.find(c => c.id === clip.id);
+                } else if (project.timeline.overlayTrack && trackItem.trackId === project.timeline.overlayTrack.id) {
+                    originalClip = project.timeline.overlayTrack.clips.find(c => c.id === clip.id);
+                }
+                const speed = originalClip?.speed || 1;
 
-            if (playback.isPlaying) {
-                // Ensure native playback for smoothness
-                if (video.paused) {
-                    video.play().catch(() => { });
+                if (playback.isPlaying) {
+                    if (video.paused) video.play().catch(() => { });
+                    if (Math.abs(video.playbackRate - speed) > 0.01) video.playbackRate = speed;
+                    if (Math.abs(video.currentTime - desiredTimeS) > 0.2) video.currentTime = desiredTimeS;
+                } else {
+                    if (!video.paused) video.pause();
+                    if (Math.abs(video.currentTime - desiredTimeS) > 0.001) video.currentTime = desiredTimeS;
                 }
 
-                if (Math.abs(video.playbackRate - speed) > 0.01) {
-                    video.playbackRate = speed;
+                // B. Draw
+                const inputSize = video.videoWidth && video.videoHeight
+                    ? { width: video.videoWidth, height: video.videoHeight }
+                    : clip.source.size;
+
+                if (!inputSize) continue;
+
+                if (isMainTrack) {
+                    // MAIN TRACK RENDERING (Camera Motion)
+                    const config = new ViewTransform(inputSize, outputSize, paddingPercentage);
+                    const track = project.timeline.mainTrack;
+                    const cameraMotions = track?.cameraMotions || [];
+                    const cameraWindow = getCameraStateAtTime(cameraMotions, currentTimeMs, outputSize); // Use global zoom logic
+
+                    const renderRects = config.resolveRenderRects(cameraWindow);
+
+                    if (renderRects) {
+                        ctx.drawImage(
+                            video,
+                            renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
+                            renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
+                        );
+                    }
+
+                    if (track.mouseEffects) {
+                        drawMouseEffects(ctx, track.mouseEffects, currentTimeMs, cameraWindow, config);
+                    }
+                } else {
+                    // OVERLAY TRACK RENDERING (PIP)
+                    drawWebcam(ctx, video, outputSize, inputSize);
                 }
-
-                // Loose sync: only correct if drift is noticeable (> 0.2s)
-                // This allows the browser's audio/video clock to drive smooth renders
-                if (Math.abs(video.currentTime - desiredTimeS) > 0.2) {
-                    video.currentTime = desiredTimeS;
-                }
-            } else {
-                // Should be paused
-                if (!video.paused) {
-                    video.pause();
-                }
-
-                // Strict sync when scrubbing/paused
-                if (Math.abs(video.currentTime - desiredTimeS) > 0.001) {
-                    video.currentTime = desiredTimeS;
-                }
-            }
-
-            // B. Draw
-            const inputSize = video.videoWidth && video.videoHeight
-                ? { width: video.videoWidth, height: video.videoHeight }
-                : clip.source.size;
-
-            if (!inputSize) return;
-
-            const config = new ViewTransform(inputSize, outputSize, paddingPercentage);
-
-            // Camera Internal
-            const track = project.timeline.mainTrack;
-            const cameraMotions = track?.cameraMotions || [];
-
-            // Debug Zoom
-            if (Math.random() < 0.01) {
-                // console.log('Zoom Debug:', { hasTrack: !!track, motions: cameraMotions.length, ct: currentTimeMs });
-            }
-
-            const cameraWindow = getCameraStateAtTime(cameraMotions, currentTimeMs, outputSize);
-
-            // Active Camera Mode (Always Active)
-            const effectiveCamera = cameraWindow;
-            const renderRects = config.resolveRenderRects(effectiveCamera);
-
-            if (renderRects) {
-                ctx.drawImage(
-                    video,
-                    renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
-                    renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
-                );
-            }
-
-            if (track.mouseEffects) {
-                drawMouseEffects(ctx, track.mouseEffects, currentTimeMs, effectiveCamera, config);
             }
         }
     };
