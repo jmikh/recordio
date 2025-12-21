@@ -14,7 +14,7 @@ let startTime = 0;
 chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
 
 chrome.runtime.onMessage.addListener(async (message) => {
-    if (message.type === 'START_RECORDING_OFFSCREEN') {
+    if (message.type === 'PREPARE_RECORDING') {
         const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions } } = message;
 
         try {
@@ -64,8 +64,6 @@ chrome.runtime.onMessage.addListener(async (message) => {
             }
 
             // 3. Prepare Recorders
-            startTime = Date.now();
-
             if (hasCamera) {
                 // --- DUAL RECORDING MODE ---
 
@@ -97,11 +95,6 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
                 cameraRecorder.ondataavailable = (e) => { if (e.data.size > 0) cameraData.push(e.data); };
 
-                // Stop Handler - We handle stopping manually via message but hook onstop for debugging if needed
-
-                screenRecorder.start();
-                cameraRecorder.start();
-
             } else {
                 // --- SINGLE RECORDING MODE (Screen + Mic + System) ---
 
@@ -130,13 +123,23 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 screenRecorder = new MediaRecorder(finalScreenStream, { mimeType: 'video/webm;codecs=vp9' });
                 screenData = [];
                 screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
-                screenRecorder.start();
             }
+
+            // NOTIFY READY
+            chrome.runtime.sendMessage({ type: 'RECORDING_PREPARED' });
 
         } catch (err) {
             console.error("Offscreen recording error:", err);
             cleanup();
         }
+    } else if (message.type === 'START_RECORDING') {
+        startTime = Date.now();
+        if (screenRecorder && screenRecorder.state === 'inactive') screenRecorder.start();
+        if (cameraRecorder && cameraRecorder.state === 'inactive') cameraRecorder.start();
+
+        // Ack
+        chrome.runtime.sendMessage({ type: 'RECORDING_STARTED', startTime });
+
     } else if (message.type === 'STOP_RECORDING_OFFSCREEN') {
         stopRecording();
     } else if (message.type === 'PING_OFFSCREEN') {

@@ -26,8 +26,47 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
             recordingStartTime = message.startTime;
         }
         logger.log("[Content] isRecording updated to:", isRecording, "Start:", recordingStartTime);
+    } else if (message.type === 'SHOW_COUNTDOWN') {
+        startCountdown();
     }
 });
+
+function startCountdown() {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+    overlay.style.zIndex = '2147483647'; // Max z-index
+    overlay.style.color = 'white';
+    overlay.style.fontSize = '120px';
+    overlay.style.fontWeight = 'bold';
+    overlay.style.fontFamily = 'sans-serif';
+    overlay.style.pointerEvents = 'none'; // Click through? Maybe block clicks? Better block.
+    // overlay.style.pointerEvents = 'auto'; 
+
+    document.body.appendChild(overlay);
+
+    let count = 3;
+    overlay.innerText = count.toString();
+
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            overlay.innerText = count.toString();
+        } else {
+            clearInterval(interval);
+            overlay.remove();
+            // Send finish timestamp
+            chrome.runtime.sendMessage({ type: 'COUNTDOWN_FINISHED', timestamp: Date.now() });
+        }
+    }, 1000);
+}
 
 // Also check initial state safely
 chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {

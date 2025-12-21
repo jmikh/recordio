@@ -130,8 +130,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 }
 
 
+                // 1. Prepare Recording (Start Streams, paused)
+                logger.log("[Background] Preparing Recording Streams...");
+
+                const preparePromise = new Promise<void>((resolve, reject) => {
+                    const listener = (msg: any) => {
+                        if (msg.type === 'RECORDING_PREPARED') {
+                            chrome.runtime.onMessage.removeListener(listener);
+                            resolve();
+                        }
+                    };
+                    chrome.runtime.onMessage.addListener(listener);
+                    setTimeout(() => {
+                        chrome.runtime.onMessage.removeListener(listener);
+                        reject(new Error("Timeout waiting for streams to prepare"));
+                    }, 5000);
+                });
+
                 await chrome.runtime.sendMessage({
-                    type: 'START_RECORDING_OFFSCREEN',
+                    type: 'PREPARE_RECORDING',
                     streamId,
                     data: {
                         ...message,
@@ -141,15 +158,55 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     }
                 });
 
+                await preparePromise;
+                logger.log("[Background] Streams Prepared.");
+
+                // 2. Trigger Countdown & Wait for Sync Timestamp
+                logger.log("[Background] Triggering Countdown...");
+
+                let syncTimestamp = Date.now(); // Fallback
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: 'SHOW_COUNTDOWN' });
+
+                    // Wait for finish
+                    syncTimestamp = await new Promise<number>((resolve, _reject) => {
+                        const timeout = setTimeout(() => {
+                            chrome.runtime.onMessage.removeListener(listener);
+                            logger.warn("[Background] Countdown timed out, using fallback.");
+                            resolve(Date.now());
+                        }, 5000); // 3s countdown + buffer
+
+                        const listener = (msg: any, _sender: any) => {
+                            if (msg.type === 'COUNTDOWN_FINISHED') {
+                                clearTimeout(timeout);
+                                chrome.runtime.onMessage.removeListener(listener);
+                                resolve(msg.timestamp);
+                            }
+                        };
+                        chrome.runtime.onMessage.addListener(listener);
+                    });
+                    logger.log("[Background] Countdown finished at:", syncTimestamp);
+                } catch (e) {
+                    logger.warn("[Background] Failed to run countdown UI:", e);
+                }
+
+                // 3. Start Actual Recording (MediaRecorder.start)
+                await chrome.runtime.sendMessage({ type: 'START_RECORDING' });
+
                 state.isRecording = true;
                 state.events = []; // Reset events
-                chrome.storage.local.set({ currentSessionEvents: [] });
+
+                // Store Sync Timestamp (optional now, but good for debug)
+                chrome.storage.local.set({
+                    currentSessionEvents: [],
+                    recordingSyncTimestamp: syncTimestamp
+                });
 
                 // Notify content script safely
                 logger.log("[Background] Sending RECORDING_STATUS_CHANGED=true to tab", tabId);
 
                 try {
-                    await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: Date.now() });
+                    await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: syncTimestamp });
                     logger.log("[Background] Message sent successfully.");
                 } catch (err: any) {
                     logger.log("[Background] Message failed. Attempting injection...", err.message);
@@ -166,7 +223,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         // Give it a moment to initialize listeners
                         await new Promise(r => setTimeout(r, 200));
 
-                        await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: Date.now() });
+                        await chrome.tabs.sendMessage(tabId, { type: 'RECORDING_STATUS_CHANGED', isRecording: true, startTime: syncTimestamp });
                         logger.log("[Background] Retry message sent successfully.");
                     } catch (injectErr: any) {
                         logger.warn("Could not inject content script. Page might be restricted (e.g. chrome:// URL).", injectErr.message);

@@ -5,6 +5,8 @@ export interface SessionData {
     cameraUrl: string | null;
     metadata: UserEvent[];
     recordingStartTime?: number;
+    recordingDuration?: number;
+    recordingSyncTimestamp?: number; // Checkpoint when countdown finished
 }
 
 export async function loadSessionData(): Promise<SessionData> {
@@ -16,9 +18,12 @@ export async function loadSessionData(): Promise<SessionData> {
 
     // 1. Load Metadata from Chrome Storage
     try {
-        const storage = await chrome.storage.local.get(['recordingMetadata']);
+        const storage = await chrome.storage.local.get(['recordingMetadata', 'recordingSyncTimestamp']);
         if (storage.recordingMetadata) {
             result.metadata = storage.recordingMetadata as UserEvent[];
+        }
+        if (storage.recordingSyncTimestamp && typeof storage.recordingSyncTimestamp === 'number') {
+            result.recordingSyncTimestamp = storage.recordingSyncTimestamp;
         }
     } catch (e) {
         console.warn('Failed to load metadata from chrome storage:', e);
@@ -47,6 +52,8 @@ export async function loadSessionData(): Promise<SessionData> {
                         result.videoUrl = URL.createObjectURL(blobData.blob);
                         if (blobData.startTime) result.recordingStartTime = blobData.startTime;
                         else if (blobData.timestamp) result.recordingStartTime = blobData.timestamp;
+
+                        if (blobData.duration) result.recordingDuration = blobData.duration;
                     }
 
                     // Get Camera

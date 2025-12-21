@@ -43,6 +43,7 @@ function Editor() {
 
                 let startProject = currentProject;
                 let isNew = false;
+                let projectUpdated = false;
 
                 if (!startProject.sources[screenSourceId]) {
                     console.log('Initializing Project for Session:', data.recordingStartTime);
@@ -56,12 +57,13 @@ function Editor() {
                         id: screenSourceId,
                         type: 'video',
                         url: data.videoUrl,
-                        durationMs: 0,
+                        durationMs: data.recordingDuration || 0,
                         size: { width: 0, height: 0 },
                         hasAudio: true,
                         events: data.metadata || []
                     };
                     startProject = ProjectImpl.addSource(startProject, source);
+                    projectUpdated = true;
                 }
 
                 // Add Camera Source
@@ -70,14 +72,15 @@ function Editor() {
                         id: cameraSourceId,
                         type: 'video',
                         url: data.cameraUrl,
-                        durationMs: 0,
+                        durationMs: data.recordingDuration || 0,
                         size: { width: 0, height: 0 },
                         hasAudio: true // Camera usually has the Mic
                     };
                     startProject = ProjectImpl.addSource(startProject, source);
+                    projectUpdated = true;
                 }
 
-                if (isNew || startProject !== currentProject) {
+                if (isNew || startProject !== currentProject || projectUpdated) {
                     loadProject(startProject);
                 }
             }
@@ -144,7 +147,6 @@ function Editor() {
                 }
 
                 // Create Clip
-                // Usually camera starts at 0.
                 // Link with Main Track (Screen)
                 const linkGroupId = screenSourceId;
                 const clip = ClipImpl.create(source.id, 0, source.durationMs, 0, { linkGroupId });
