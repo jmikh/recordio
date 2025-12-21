@@ -104,6 +104,8 @@ function Editor() {
 
                 let track = TrackImpl.createMainTrack('Screen Recording');
 
+                const clip = ClipImpl.create(source.id, 0, source.durationMs, 0, { linkGroupId: source.id });
+
                 // Generate Metadata Effects
                 if (source.events && source.events.length > 0) {
                     const viewTransform = new ViewTransform(
@@ -111,11 +113,10 @@ function Editor() {
                         proj.outputSettings.size,
                         track.displaySettings.padding
                     );
-                    track.viewportMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events);
-                    track.mouseEffects = generateMouseEffects(source.events, source.durationMs);
+                    track.viewportMotions = calculateZoomSchedule(maxZoom, viewTransform, source.events, [clip]);
+                    track.mouseEffects = generateMouseEffects(source.events, [clip]);
                 }
 
-                const clip = ClipImpl.create(source.id, 0, source.durationMs, 0, { linkGroupId: source.id });
                 const trackWithClip = TrackImpl.addClip(track, clip) as MainTrack;
 
                 const newTimeline = { ...proj.timeline, mainTrack: trackWithClip };

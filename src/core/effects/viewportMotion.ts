@@ -1,7 +1,8 @@
-import type { ClickEvent, UserEvent, ViewportMotion, Size, MouseEvent, Rect } from '../types';
-import { ViewTransform } from './viewTransform';
+import type { UserEvent, ViewportMotion, Size, MouseEvent, Rect, Clip } from '../types.ts';
+import { ViewTransform } from './viewTransform.ts';
+import { mapEventsToTimeline } from './timeMapper.ts';
 
-export * from './viewTransform';
+export * from './viewTransform.ts';
 
 // ============================================================================
 // Core Abstractions
@@ -112,16 +113,15 @@ export function findHoverBlocks(
 export function calculateZoomSchedule(
     maxZoom: number,
     viewTransform: ViewTransform, // Kept for signature compatibility
-    events: UserEvent[]
+    events: UserEvent[],
+    clips: Clip[]
 ): ViewportMotion[] {
     const motions: ViewportMotion[] = [];
 
-    // 1. Identify all Click Events and sort them.
-    const clickEvents = events
-        .filter((e): e is ClickEvent => e.type === 'click')
-        .sort((a, b) => a.timestamp - b.timestamp);
+    // 1. Filter & Map Click Events to Output Time
+    const mappedEvents = mapEventsToTimeline(events, clips);
 
-    if (clickEvents.length === 0) {
+    if (mappedEvents.length === 0) {
         return motions;
     }
 
@@ -137,8 +137,10 @@ export function calculateZoomSchedule(
     const ZOOM_HOLD_DURATION = 2000;
     const ZOOM_TRANSITION_DURATION = 500;
 
-    for (let i = 0; i < clickEvents.length; i++) {
-        const evt = clickEvents[i];
+    for (let i = 0; i < mappedEvents.length; i++) {
+        const { outputTime, originalEvent: evt } = mappedEvents[i];
+
+        if (evt.type !== 'click') continue;
 
         // 1. Map Click to Output Space
         const clickOutput = viewTransform.inputToOutput({ x: evt.x, y: evt.y });
@@ -166,11 +168,11 @@ export function calculateZoomSchedule(
             height: targetHeight
         };
 
-        // Timing Logic
-        const timeIn = Math.max(0, evt.timestamp - ZOOM_TRANSITION_DURATION);
+        // Timing Logic (All in Output Time / Timeline Time)
+        const timeIn = Math.max(0, outputTime - ZOOM_TRANSITION_DURATION);
 
         // We arrive at target exactly at click time
-        const arrivalTime = evt.timestamp;
+        const arrivalTime = outputTime;
 
         motions.push({
             id: crypto.randomUUID(),
@@ -181,10 +183,10 @@ export function calculateZoomSchedule(
         });
 
         // Hold the zoom
-        const nextEvt = clickEvents[i + 1];
+        const nextMapped = mappedEvents[i + 1];
         const holdUntil = arrivalTime + ZOOM_HOLD_DURATION;
 
-        if (nextEvt && nextEvt.timestamp < holdUntil + ZOOM_TRANSITION_DURATION * 2) {
+        if (nextMapped && nextMapped.outputTime < holdUntil + ZOOM_TRANSITION_DURATION * 2) {
             // Stay zoomed
         } else {
             // Zoom out to full view

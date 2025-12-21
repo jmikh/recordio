@@ -31,21 +31,14 @@ export function drawMouseEffects(
             // Project Center (Input -> Screen)
             const center = config.projectToScreen(effect.start, viewport);
 
-            // Draw Ripple
-            const maxRadius = 40; // px
+            // Draw Expanding Gray Circle
+            const maxRadius = 60; // px
             const currentRadius = maxRadius * progress;
-            const opacity = 1 - progress;
+            const opacity = 0.5 * (1 - progress); // Start at 0.5 opacity and fade out
 
             ctx.beginPath();
             ctx.arc(center.x, center.y, currentRadius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 200, 0, ${opacity})`;
-            ctx.lineWidth = 4;
-            ctx.stroke();
-
-            // Inner dot
-            ctx.beginPath();
-            ctx.arc(center.x, center.y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 200, 0, ${opacity})`;
+            ctx.fillStyle = `rgba(128, 128, 128, ${opacity})`;
             ctx.fill();
         }
         else if (effect.type === 'drag') {
@@ -57,14 +50,11 @@ export function drawMouseEffects(
                 // Project
                 const screenPoint = config.projectToScreen(currentPoint, viewport);
 
-                // Draw Cursor Representative
+                // Draw Cursor Representative (Gray Circle, same as click max)
                 ctx.beginPath();
-                ctx.arc(screenPoint.x, screenPoint.y, 8, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 150, 255, 0.8)';
+                ctx.arc(screenPoint.x, screenPoint.y, 60, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
                 ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
-                ctx.stroke();
 
                 // Optional: Draw Trail?
             }

@@ -3,6 +3,9 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Project, ID } from '../../core/types';
 import { ProjectImpl } from '../../core/project/project';
 import { TimelineImpl } from '../../core/timeline/timeline';
+import { calculateZoomSchedule, ViewTransform } from '../../core/effects/viewportMotion';
+import { generateMouseEffects } from '../../core/effects/mouseEffects';
+import type { ViewportMotion, MouseEffect } from '../../core/types';
 
 interface ProjectState {
     project: Project;
@@ -57,13 +60,17 @@ export const useProjectStore = create<ProjectState>()(
             updateClip: (trackId, clip) => set((state) => {
                 try {
                     const newTimeline = TimelineImpl.updateClip(state.project.timeline, trackId, clip);
-                    return {
-                        project: {
-                            ...state.project,
-                            timeline: newTimeline,
-                            updatedAt: new Date()
-                        }
+                    let newProject = {
+                        ...state.project,
+                        timeline: newTimeline,
+                        updatedAt: new Date()
                     };
+
+                    // Recalculate effects because modifying clip boundaries (trimming/moving)
+                    // changes which source events are visible and where they appear on the timeline.
+                    newProject = recalculateTrackEffects(newProject);
+
+                    return { project: newProject };
                 } catch (e) {
                     console.error("Failed to update clip:", e);
                     return state;
@@ -98,3 +105,68 @@ export const useMaxZoom = () => useProjectStore(s => s.project.timeline.mainTrac
 export const useProjectDisplaySettings = () => useProjectStore(s => s.project.timeline.mainTrack.displaySettings);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
 export const useProjectSources = () => useProjectStore(s => s.project.sources);
+
+/**
+ * Recalculates zoom and mouse effects for the Main Track based on current clips.
+ * Should be called whenever clips are split, removed, or updated (trimmed/moved).
+ */
+function recalculateTrackEffects(project: Project): Project {
+    const mainTrack = project.timeline.mainTrack;
+    const clips = mainTrack.clips;
+
+    // 1. Collect unique Sources used in this track
+    const sourceIds = new Set(clips.map(c => c.sourceId));
+
+    let allMotions: ViewportMotion[] = [];
+    let allMouseEffects: MouseEffect[] = [];
+
+    // 2. For each source, calculate effects restricted to the clips using that source
+    for (const sourceId of sourceIds) {
+        const source = project.sources[sourceId];
+        if (!source || !source.events || source.events.length === 0) continue;
+
+        // Get clips for this source
+        const sourceClips = clips.filter(c => c.sourceId === sourceId);
+
+        // Reconstruct ViewTransform (needed for Zoom Schedule)
+        // We assume track padding settings are constant for now
+        const viewTransform = new ViewTransform(
+            source.size,
+            project.outputSettings.size,
+            mainTrack.displaySettings.padding
+        );
+
+        // Calculate Effects
+        const motions = calculateZoomSchedule(
+            mainTrack.displaySettings.maxZoom,
+            viewTransform,
+            source.events,
+            sourceClips
+        );
+
+        const mouseEffects = generateMouseEffects(
+            source.events,
+            sourceClips
+        );
+
+        allMotions = allMotions.concat(motions);
+        allMouseEffects = allMouseEffects.concat(mouseEffects);
+    }
+
+    // 3. Sort Combined Effects by Time
+    allMotions.sort((a, b) => a.timeInMs - b.timeInMs);
+    allMouseEffects.sort((a, b) => a.timeInMs - b.timeInMs);
+
+    // 4. Update Project with new effects
+    return {
+        ...project,
+        timeline: {
+            ...project.timeline,
+            mainTrack: {
+                ...mainTrack,
+                viewportMotions: allMotions,
+                mouseEffects: allMouseEffects
+            }
+        }
+    };
+}
