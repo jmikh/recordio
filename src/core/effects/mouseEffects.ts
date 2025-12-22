@@ -13,7 +13,7 @@ export function generateRecordingEvents(
     clickEvents.push(...events.filter(e => e.type === 'click') as ClickEvent[]);
 
     // 2. Identify Drags (mousedown -> moves -> mouseup)
-    let activeDrag: Partial<DragEvent> | null = null;
+    let activeDrag: DragEvent | null = null;
 
     // Events are assumed to be sorted by timestamp
     // If not, we should sort them? Assuming sorted from source.
@@ -27,34 +27,23 @@ export function generateRecordingEvents(
             activeDrag = {
                 timestamp: evt.timestamp,
                 type: 'drag',
-                start: { x: evt.x, y: evt.y },
                 path: [{ timestamp: evt.timestamp, x: evt.x, y: evt.y }]
             };
         } else if (evt.type === 'mouse' && activeDrag) {
             // Mouse move during drag
-            if (activeDrag.path) {
-                activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
-            }
+            activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
         } else if (evt.type === 'mouseup' && activeDrag) {
             // End Drag
-            activeDrag.end = { x: evt.x, y: evt.y };
-            if (activeDrag.path) {
-                activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
-            }
-            dragEvents.push(activeDrag as DragEvent);
+            activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
+            dragEvents.push(activeDrag);
             activeDrag = null;
         }
     }
 
     // Close any trailing drag
     if (activeDrag) {
-        if (activeDrag.path && activeDrag.path.length > 0) {
-            const last = activeDrag.path[activeDrag.path.length - 1];
-            activeDrag.end = { x: last.x, y: last.y };
-        } else {
-            activeDrag.end = activeDrag.start;
-        }
-        dragEvents.push(activeDrag as DragEvent);
+        // activeDrag.path is initialized on creation
+        dragEvents.push(activeDrag);
     }
 
     return { clickEvents, dragEvents };

@@ -157,10 +157,7 @@ export interface ViewportMotion {
  */
 export interface DragEvent extends BaseEvent {
     type: 'drag';
-    // Add properties relevant to drag if needed, for now keeping it minimal or similar to MouseEffect
-    path?: TimestampedPoint[];
-    start: Point;
-    end: Point;
+    path: TimestampedPoint[];
 }
 
 // ==========================================

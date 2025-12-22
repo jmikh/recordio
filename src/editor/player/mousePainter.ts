@@ -52,7 +52,7 @@ export function drawMouseEffects(
     // Let's assume drag starts at event.timestamp and ends at last point timestamp.
 
     for (const drag of dragEvents) {
-        if (!drag.path || drag.path.length === 0) continue;
+        if (drag.path.length === 0) continue;
 
         const endTimestamp = drag.path[drag.path.length - 1].timestamp;
 
