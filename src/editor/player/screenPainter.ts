@@ -26,12 +26,16 @@ export function drawScreen(
 
     const paddingPercentage = 0; // Configurable?
 
-    // 1. Calculate Viewport (Source Space)
+    // 1. Calculate Viewport (Output Space)
     const config = new ViewTransform(inputSize, outputSize, paddingPercentage);
     const viewportMotions = recording.viewportMotions || [];
 
-    // Calculate the effective viewport at the current playback time
-    const effectiveViewport = getViewportStateAtTime(viewportMotions, sourceTimeMs, outputSize);
+    // Calculate effective viewport using output time (gapless time)
+    // We assume renderState has been augmented with outputTimeMs
+    const outputTimeMs = (renderState as any).outputTimeMs || 0;
+
+    // Calculate the effective viewport at the current playback time (Output Time)
+    const effectiveViewport = getViewportStateAtTime(viewportMotions, outputTimeMs, outputSize);
 
     // 2. Resolve render rectangles (Source -> Dest)
     const renderRects = config.resolveRenderRects(effectiveViewport);

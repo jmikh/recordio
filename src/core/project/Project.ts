@@ -1,6 +1,7 @@
 
 import type { Project, ID, TimeMs, Source, Recording } from '../types';
 import { TimelineImpl } from '../timeline/Timeline';
+import { mapTimelineToOutputTime } from '../effects/timeMapper';
 
 /**
  * Represents the resolved state of the timeline at a specific point in time.
@@ -10,6 +11,9 @@ export interface RenderState {
     timeMs: TimeMs;
     /** Whether the current time falls within an output window */
     isActive: boolean;
+
+    /** The calculated output time (gapless video time) */
+    outputTimeMs: TimeMs;
 
     /** The calculated source time */
     sourceTimeMs: TimeMs;
@@ -100,16 +104,19 @@ export class ProjectImpl {
 
         // 2. Calculate Source Time
         // Source Time = Timeline Time - Recording Offset (Source 0 is at offset)
-        // Note: This calculates source time even if not in window, which is useful for "preview" or scrubbing blank space.
         const sourceTimeMs = timeMs - recording.timelineOffsetMs;
 
-        // 3. Resolve Sources
+        // 3. Calculate Output Time (for effects)
+        const outputTimeMs = mapTimelineToOutputTime(timeMs, outputWindows);
+
+        // 4. Resolve Sources
         const screenSource = sources[recording.screenSourceId];
         const cameraSource = recording.cameraSourceId ? sources[recording.cameraSourceId] : undefined;
 
         return {
             timeMs,
             isActive,
+            outputTimeMs,
             sourceTimeMs,
             recording,
             screenSource,

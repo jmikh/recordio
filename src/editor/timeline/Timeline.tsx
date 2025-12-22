@@ -3,6 +3,7 @@ import { useProjectStore, useProjectTimeline } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import type { OutputWindow } from '../../core/types';
+import { mapOutputToTimelineTime } from '../../core/effects/timeMapper';
 
 // Constants
 const MIN_PIXELS_PER_SEC = 10;
@@ -303,14 +304,17 @@ export function Timeline() {
                         <div className="w-full relative bg-[#252526]" style={{ height: TRACK_HEIGHT }}>
                             <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none">MOTION</div>
                             {recording.viewportMotions?.map((m, i) => {
-                                // Motion times are Source Time. Must add Offset to get Timeline Time.
-                                const startMs = (m.endTimeMs - m.durationMs) + timelineOffset;
-                                const endMs = m.endTimeMs + timelineOffset;
+                                // Motions are stored in Output Time. mapOutputToTimelineTime gives us the end time in timeline space.
+                                const timelineEndMs = mapOutputToTimelineTime(m.endTimeMs, timeline.outputWindows);
+                                const timelineStartMs = mapOutputToTimelineTime(m.endTimeMs - m.durationMs, timeline.outputWindows);
 
-                                const left = (startMs / 1000) * pixelsPerSec;
-                                const width = ((endMs - startMs) / 1000) * pixelsPerSec;
+                                // Check if mapped times are valid (visible)
+                                if (timelineEndMs === -1 || timelineStartMs === -1) return null;
 
-                                if (endMs < 0) return null;
+                                const left = (timelineStartMs / 1000) * pixelsPerSec;
+                                const width = ((timelineEndMs - timelineStartMs) / 1000) * pixelsPerSec;
+
+                                if (width <= 0) return null;
 
                                 return (
                                     <div

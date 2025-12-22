@@ -13,7 +13,7 @@ import { ProjectImpl } from '../core/project/Project';
 // import { TimelineImpl } from '../core/timeline/Timeline'; // Unused
 // import { TrackImpl } from '../core/timeline/Track'; // REMOVED
 // import { ClipImpl } from '../core/timeline/Clip'; // REMOVED
-import type { Source } from '../core/types';
+import type { Source, OutputWindow } from '../core/types';
 import { ViewTransform } from '../core/effects/viewTransform';
 import { calculateZoomSchedule } from '../core/effects/viewportMotion';
 import { generateRecordingEvents } from '../core/effects/mouseEffects';
@@ -29,7 +29,6 @@ function Editor() {
     // -- Project State --
     const project = useProjectData();
     const loadProject = useProjectStore(s => s.loadProject);
-    // const maxZoom = 2.0; // Hardcode or default since usage was removed from store
 
     // Load Session & Initialize Project
     useEffect(() => {
@@ -121,17 +120,35 @@ function Editor() {
                 dragEvents = extracted.dragEvents;
             }
 
+            // 2. Prepare Output Windows (if none exist, create default for calculation & store)
+            let currentWindows = timeline.outputWindows;
+            let defaultWindowToAdd: OutputWindow | null = null;
+
+            if (currentWindows.length === 0 && source.durationMs > 0) {
+                const newWindow = {
+                    id: crypto.randomUUID(),
+                    startMs: 0,
+                    endMs: source.durationMs
+                };
+                currentWindows = [newWindow];
+                defaultWindowToAdd = newWindow;
+            }
+
             // Update Recording
             // ViewportMotions: Calculate Zoom Schedule
             let viewportMotions: any[] = [];
 
-            // We need the view transform to calculate target viewports
-            // We need the view transform to calculate target viewports
-
             if (source.size && proj.zoom.auto) {
+                console.log('[AppDebug] Calculating Zoom Schedule. Events:', source.events?.length);
                 const transform = new ViewTransform(source.size, proj.outputSettings.size, 0);
                 // Use source.events (raw) which contains clicks/moves
-                viewportMotions = calculateZoomSchedule(proj.zoom.maxZoom, transform, source.events || []);
+                viewportMotions = calculateZoomSchedule(
+                    proj.zoom.maxZoom,
+                    transform,
+                    source.events || [],
+                    currentWindows,
+                    timeline.recording.timelineOffsetMs
+                );
             }
 
             state.updateRecording({
@@ -141,14 +158,9 @@ function Editor() {
                 viewportMotions
             });
 
-            // 2. Add Default Output Window if none
-            if (timeline.outputWindows.length === 0 && source.durationMs > 0) {
-                state.addOutputWindow({
-                    id: crypto.randomUUID(),
-                    startMs: 0,
-                    endMs: source.durationMs
-                });
-
+            // Persist the default window if we created one
+            if (defaultWindowToAdd) {
+                state.addOutputWindow(defaultWindowToAdd);
                 // Also update timeline total duration to match source
                 state.updateTimeline({ durationMs: source.durationMs });
             }

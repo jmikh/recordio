@@ -1,4 +1,4 @@
-import type { UserEvent, ViewportMotion, Size, MouseEvent, Rect, ClickEvent, HoverEvent } from '../types.ts';
+import type { UserEvent, ViewportMotion, Size, MouseEvent, Rect } from '../types.ts';
 import { ViewTransform } from './viewTransform.ts';
 
 export * from './viewTransform.ts';
@@ -95,23 +95,62 @@ export function findHoverEvents(
     return hoverEvents;
 }
 
+// Re-export time mapper for convenience if needed, or import directly
+import { mapSourceToOutputTime } from './timeMapper';
+import type { OutputWindow } from '../types';
+
 export function calculateZoomSchedule(
     maxZoom: number,
     viewTransform: ViewTransform,
-    events: UserEvent[]
+    events: UserEvent[],
+    outputWindows: OutputWindow[],
+    timelineOffsetMs: number
 ): ViewportMotion[] {
     const motions: ViewportMotion[] = [];
 
     if (events.length === 0) return motions;
 
-    // 1. Detect Hovers in Source Space
-    const hoverEvents = findHoverEvents(events, viewTransform.inputVideoSize);
+    // 1. Filter & Map ALL events to Output Time first
+    // This ensures that hover detection and zoom scheduling happen on the "final cut"
+    type MappedEvent = UserEvent & {
+        originalTimestamp: number;
+        // timestamp is already in UserEvent, but we are updating it.
+    };
 
-    // 2. Merge Clicks and Hovers
+    // 1. Filter & Map ALL events to Output Time first
+    // This ensures that hover detection and zoom scheduling happen on the "final cut"
+    const mappedEvents: MappedEvent[] = [];
+
+    console.log('[ZoomDebug] Raw events:', events.length);
+    console.log('[ZoomDebug] Windows:', outputWindows);
+    console.log('[ZoomDebug] Offset:', timelineOffsetMs);
+
+    for (const evt of events) {
+        const outputTime = mapSourceToOutputTime(evt.timestamp, outputWindows, timelineOffsetMs);
+        if (outputTime !== -1) {
+            // Clone and update timestamp to Output Time
+            // We preserve originalTimestamp just in case, though not strictly needed for logic
+            const mapped = { ...evt, timestamp: outputTime, originalTimestamp: evt.timestamp };
+            mappedEvents.push(mapped);
+        }
+    }
+
+    // Sort by Output Time
+    mappedEvents.sort((a, b) => a.timestamp - b.timestamp);
+
+    // 2. Detect Hovers in Output Space
+    // Now that events are in continuous Output Time, findHoverEvents will correctly 
+    // detect hovers even across cuts if the mouse position is stable.
+    const hoverEvents = findHoverEvents(mappedEvents as UserEvent[], viewTransform.inputVideoSize);
+
+    // 3. Merge Clicks and Hovers
+    // Both are now already in Output Time.
     const relevantEvents = [
-        ...events.filter(e => e.type === 'click'),
+        ...mappedEvents.filter((e: any) => e.type === 'click'),
         ...hoverEvents
-    ].sort((a, b) => a.timestamp - b.timestamp);
+    ].sort((a: any, b: any) => a.timestamp - b.timestamp);
+
+    console.log('[ZoomDebug] Relevant events (Output Time):', relevantEvents.length);
 
     const zoomLevel = maxZoom;
     const targetWidth = viewTransform.outputVideoSize.width / zoomLevel;
@@ -121,7 +160,8 @@ export function calculateZoomSchedule(
     const ZOOM_TRANSITION_DURATION = 500;
 
     for (let i = 0; i < relevantEvents.length; i++) {
-        const evt = relevantEvents[i] as (ClickEvent | HoverEvent); // Safe cast given logic above
+        const evt = relevantEvents[i] as any; // Cast to access x/y safely
+        const arrivalTime = evt.timestamp; // Already Output Time
 
         // Map Click to Output Space (Viewport)
         const clickOutput = viewTransform.inputToOutput({ x: evt.x, y: evt.y });
@@ -146,10 +186,6 @@ export function calculateZoomSchedule(
             height: targetHeight
         };
 
-        // Determine Arrival Time (Source Time)
-        // We want to arrive at the target exactly when the event happens
-        const arrivalTime = evt.timestamp;
-
         motions.push({
             endTimeMs: arrivalTime,
             durationMs: ZOOM_TRANSITION_DURATION,
@@ -157,16 +193,12 @@ export function calculateZoomSchedule(
         });
 
         // Hold and Zoom Out Logic
-        // Check if next event is close
+        // Check if next event is close (in Output Time)
         const nextEvt = relevantEvents[i + 1];
         const holdUntil = arrivalTime + ZOOM_HOLD_DURATION;
 
-        if (nextEvt && nextEvt.timestamp < holdUntil + ZOOM_TRANSITION_DURATION * 2) {
-            // Stay zoomed (the next loop iteration will handle moving to next target)
-            // But we might need a bridge motion?
-            // "ViewportMotion" model implies transition TO a state.
-            // If we are at State A at T1. Next motion is State B at T2.
-            // Logic in getViewportStateAtTime handles holding A until B starts?
+        if (nextEvt && (nextEvt as any).timestamp < holdUntil + ZOOM_TRANSITION_DURATION * 2) {
+            // Stay zoomed
         } else {
             // Zoom out to full view
             const fullView: Rect = {
@@ -195,7 +227,7 @@ export function calculateZoomSchedule(
 
 export function getViewportStateAtTime(
     motions: ViewportMotion[],
-    sourceTimeMs: number,
+    outputTimeMs: number,
     fullSize: Size
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: fullSize.width, height: fullSize.height };
@@ -217,12 +249,12 @@ export function getViewportStateAtTime(
     for (const motion of sortedMotions) {
         const startTime = motion.endTimeMs - motion.durationMs;
 
-        if (sourceTimeMs >= startTime && sourceTimeMs <= motion.endTimeMs) {
+        if (outputTimeMs >= startTime && outputTimeMs <= motion.endTimeMs) {
             // Inside transition
-            const progress = (sourceTimeMs - startTime) / motion.durationMs;
+            const progress = (outputTimeMs - startTime) / motion.durationMs;
             const eased = applyEasing(progress); // Assuming linear or simple ease
             return interpolateRect(currentRect, motion.rect, eased);
-        } else if (sourceTimeMs < startTime) {
+        } else if (outputTimeMs < startTime) {
             // Before this motion starts. 
             // We are holding 'currentRect' (result of previous iteration).
             return currentRect;

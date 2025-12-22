@@ -146,7 +146,7 @@ export interface Recording {
 // ==========================================
 
 export interface ViewportMotion {
-    /** End time in SOURCE time. */
+    /** End time in OUTPUT time (gapless). */
     endTimeMs: TimeMs;
     durationMs: TimeMs;
     rect: Rect;
