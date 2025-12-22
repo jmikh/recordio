@@ -103,51 +103,34 @@ export const PlayerCanvas = () => {
             return;
         }
 
-        if (!renderState.isActive || !renderState.screenSource) {
+        if (!renderState.isActive) {
             // Not in an output window or no source, showing background only
+            // TODO [MUST FIX]: we should show the screens even if no output window. we might just need to skip all the zooming logic? figure it out later
             return;
         }
 
-        renderScreenLayer(ctx, renderState, playback.isPlaying, outputSize);
-        renderWebcamLayer(ctx, renderState, playback.isPlaying, outputSize);
-    };
-
-    const renderScreenLayer = (
-        ctx: CanvasRenderingContext2D,
-        renderState: any,
-        isPlaying: boolean,
-        outputSize: any
-    ) => {
-        const source = renderState.screenSource;
-        if (!source) return;
-
-        const video = internalVideoRefs.current[source.id];
-        if (video) {
-            syncVideo(video, renderState.sourceTimeMs / 1000, isPlaying);
-            drawScreen(ctx, video, renderState, outputSize);
+        // Render Screen Layer
+        if (renderState.screenSource) {
+            const source = renderState.screenSource;
+            const video = internalVideoRefs.current[source.id];
+            if (video) {
+                syncVideo(video, renderState.sourceTimeMs / 1000, playback.isPlaying);
+                drawScreen(ctx, video, renderState, outputSize);
+            } else {
+                console.error(`[PlayerCanvas] Missing video element for screen source: ${source.id}`);
+            }
         }
-    };
 
-    const renderWebcamLayer = (
-        ctx: CanvasRenderingContext2D,
-        renderState: any,
-        isPlaying: boolean,
-        outputSize: any
-    ) => {
-        const source = renderState.cameraSource;
-        if (!source) return;
-
-        const video = internalVideoRefs.current[source.id];
-        if (video) {
-            // Camera syncs to same time as screen source
-            syncVideo(video, renderState.sourceTimeMs / 1000, isPlaying);
-
-            const inputSize = video.videoWidth && video.videoHeight
-                ? { width: video.videoWidth, height: video.videoHeight }
-                : source.size;
-
-            if (inputSize) {
-                drawWebcam(ctx, video, outputSize, inputSize);
+        // Render Webcam Layer
+        if (renderState.cameraSource) {
+            const source = renderState.cameraSource;
+            const video = internalVideoRefs.current[source.id];
+            if (video) {
+                // Camera syncs to same time as screen source
+                syncVideo(video, renderState.sourceTimeMs / 1000, playback.isPlaying);
+                drawWebcam(ctx, video, outputSize, source.size);
+            } else {
+                console.error(`[PlayerCanvas] Missing video element for webcam source: ${source.id}`);
             }
         }
     };
