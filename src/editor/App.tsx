@@ -17,7 +17,7 @@ import type { Source, OutputWindow } from '../core/types';
 import { ViewMapper } from '../core/effects/viewMapper';
 import { calculateZoomSchedule } from '../core/effects/viewportMotion';
 import { calculateDragEvents } from '../core/effects/dragEffects';
-import type { ClickEvent } from '../core/types';
+import type { ClickEvent, KeyboardEvent } from '../core/types';
 
 
 
@@ -114,12 +114,16 @@ function Editor() {
             // Extract Events
             let clickEvents: ClickEvent[] = [];
             let dragEvents: any[] = [];
+            let keyboardEvents: any[] = [];
 
             if (source.events && source.events.length > 0) {
                 // Manually filter clicks
                 clickEvents = source.events.filter(e => e.type === 'click') as ClickEvent[];
                 // Refactored drag calculation
                 dragEvents = calculateDragEvents(source.events);
+                // Filter keyboard events
+                // @ts-ignore
+                keyboardEvents = source.events.filter(e => e.type === 'keydown') as KeyboardEvent[];
             }
 
             // 2. Prepare Output Windows (if none exist, create default for calculation & store)
@@ -157,6 +161,7 @@ function Editor() {
                 screenSourceId,
                 clickEvents,
                 dragEvents,
+                keyboardEvents,
                 viewportMotions
             });
 

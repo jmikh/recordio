@@ -365,6 +365,21 @@ export function Timeline() {
                                     />
                                 );
                             })}
+
+                            {/* Keyboard Events */}
+                            {recording.keyboardEvents?.map((k, i) => {
+                                const timeMs = k.timestamp + timelineOffset;
+                                const left = (timeMs / 1000) * pixelsPerSec;
+                                // Simple marker for now
+                                return (
+                                    <div
+                                        key={`k-${i}`}
+                                        className="absolute top-6 w-2 h-2 rounded-sm bg-cyan-500 hover:scale-125 transition-transform"
+                                        style={{ left: `${left}px` }}
+                                        title={`Key: ${k.key} at ${formatFullTime(timeMs)}`}
+                                    />
+                                );
+                            })}
                         </div>
 
                     </div>

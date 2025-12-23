@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { drawScreen } from './screenPainter';
 import { drawBackground } from './backgroundPainter';
 import { drawWebcam } from './webcamPainter';
+import { drawKeyboardOverlay } from './keyboardPainter';
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { ProjectImpl } from '../../core/project/Project';
@@ -132,6 +133,16 @@ export const PlayerCanvas = () => {
             } else {
                 console.error(`[PlayerCanvas] Missing video element for webcam source: ${source.id}`);
             }
+        }
+
+        // Render Keyboard Overlay
+        if (renderState.recording && renderState.recording.keyboardEvents) {
+            drawKeyboardOverlay(
+                ctx,
+                renderState.recording.keyboardEvents,
+                renderState.sourceTimeMs,
+                outputSize
+            );
         }
     };
 

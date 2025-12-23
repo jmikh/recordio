@@ -136,6 +136,7 @@ export interface Recording {
 
     clickEvents: ClickEvent[];
     dragEvents: DragEvent[];
+    keyboardEvents: KeyboardEvent[];
 
     viewportMotions: ViewportMotion[];
 }
@@ -189,7 +190,7 @@ export interface UrlEvent extends BaseEvent {
     url: string;
 }
 
-export interface KeystrokeEvent extends BaseEvent {
+export interface KeyboardEvent extends BaseEvent {
     type: 'keydown';
     key: string;
     code: string;
@@ -213,7 +214,7 @@ export interface HoverEvent extends BaseEvent, Point {
     endTime: number;
 }
 
-export type UserEvent = ClickEvent | MouseEvent | UrlEvent | KeystrokeEvent | MouseDownEvent | MouseUpEvent | HoverEvent;
+export type UserEvent = ClickEvent | MouseEvent | UrlEvent | KeyboardEvent | MouseDownEvent | MouseUpEvent | HoverEvent;
 
 export type BackgroundType = 'solid' | 'image';
 

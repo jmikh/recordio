@@ -17,6 +17,7 @@ export class TimelineImpl {
                 screenSourceId: defaultScreenSourceId,
                 clickEvents: [],
                 dragEvents: [],
+                keyboardEvents: [],
                 viewportMotions: []
             }
         };
