@@ -214,7 +214,7 @@ export interface HoverEvent extends BaseEvent, Point {
     endTime: number;
 }
 
-export type UserEvent = ClickEvent | MouseEvent | UrlEvent | KeyboardEvent | MouseDownEvent | MouseUpEvent | HoverEvent;
+export type UserEvent = ClickEvent | MouseEvent | UrlEvent | KeyboardEvent | MouseDownEvent | MouseUpEvent | HoverEvent | DragEvent;
 
 export type BackgroundType = 'solid' | 'image';
 

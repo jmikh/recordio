@@ -9,7 +9,7 @@ let audioContext: AudioContext | null = null;
 // Keep track of streams to stop them later
 let activeStreams: MediaStream[] = [];
 let startTime = 0;
-let sessionId: string | null = null;
+let projectId: string | null = null;
 
 import type { Size } from '../core/types';
 
@@ -146,7 +146,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
         }
     } else if (message.type === 'START_RECORDING') {
         startTime = Date.now();
-        sessionId = crypto.randomUUID();
+        projectId = crypto.randomUUID();
         if (screenRecorder && screenRecorder.state === 'inactive') screenRecorder.start();
         if (cameraRecorder && cameraRecorder.state === 'inactive') cameraRecorder.start();
 
@@ -221,18 +221,38 @@ async function stopRecording() {
     const now = Date.now();
     const duration = now - startTime;
 
+    if (!projectId) projectId = crypto.randomUUID();
+
     // Save Screen
     if (screenData.length > 0) {
         const blob = new Blob(screenData, { type: 'video/webm' });
-        // Get dimensions from tracks if possible, else 1920x1080 default
-        // We will just store simple blob for now.
-        await saveToIndexedDB('latest', blob, startTime, duration, sessionId, screenDimensions);
+        const blobId = `rec-${projectId}-screen`;
+        const sourceId = `src-${projectId}-screen`;
+
+        // Save Blob
+        await saveToIndexedDB('recording', blobId, blob, duration, projectId, screenDimensions);
+
+        // Save Source Metadata
+        // Note: Events are currently empty here. They might be populated by the Editor from chrome.storage
+        const source = {
+            id: sourceId,
+            type: 'video',
+            url: `recordo-blob://${blobId}`, // Virtual / Placeholder
+            durationMs: duration,
+            size: screenDimensions || { width: 1920, height: 1080 },
+            hasAudio: true,
+            events: [],
+            createdAt: now
+        };
+        await saveToIndexedDB('source', sourceId, source, duration, projectId);
     }
 
     // Save Camera
     if (cameraData.length > 0) {
         const blob = new Blob(cameraData, { type: 'video/webm' });
-        await saveToIndexedDB('latest-camera', blob, startTime, duration, sessionId, cameraDimensions);
+        const blobId = `rec-${projectId}-camera`;
+        // TODO: Save Camera Source/Events if needed
+        await saveToIndexedDB('recording', blobId, blob, duration, projectId, cameraDimensions);
     }
 
     // 3. Cleanup & Notify
@@ -240,43 +260,56 @@ async function stopRecording() {
     cameraData = [];
     cleanup();
 
-    chrome.runtime.sendMessage({ type: 'OPEN_EDITOR', url: 'src/editor/index.html' });
+    chrome.runtime.sendMessage({ type: 'OPEN_EDITOR', url: `src/editor/index.html?projectId=${projectId}` });
 }
 
 async function saveToIndexedDB(
-    key: string,
-    blob: Blob,
-    startTime: number,
+    type: 'recording' | 'source',
+    id: string,
+    data: any,
     duration: number,
-    sessionId: string | null,
+    projectId: string | null,
     dimensions?: Size
 ) {
     return new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open('RecordoDB', 1);
+        const request = indexedDB.open('RecordoDB', 2); // Version 2
 
         request.onupgradeneeded = (event: any) => {
             const db = event.target.result;
             if (!db.objectStoreNames.contains('recordings')) {
                 db.createObjectStore('recordings', { keyPath: 'id' });
             }
+            if (!db.objectStoreNames.contains('sources')) {
+                db.createObjectStore('sources', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('projects')) {
+                db.createObjectStore('projects', { keyPath: 'id' });
+            }
         };
 
         request.onsuccess = (event: any) => {
             const db = event.target.result;
-            const transaction = db.transaction(['recordings'], 'readwrite');
-            const store = transaction.objectStore('recordings');
+            const txName = type === 'recording' ? 'recordings' : 'sources';
+            const transaction = db.transaction([txName], 'readwrite');
+            const store = transaction.objectStore(txName);
 
-            const recording = {
-                id: key,
-                blob: blob,
-                duration: duration,
-                startTime: startTime,
-                timestamp: Date.now(),
-                sessionId: sessionId,
-                dimensions: dimensions
-            };
+            let item;
+            if (type === 'recording') {
+                item = {
+                    id: id,
+                    blob: data,
+                    // Legacy/Additional metadata kept in blob entry just in case
+                    duration: duration,
+                    startTime: startTime,
+                    timestamp: Date.now(),
+                    sessionId: projectId,
+                    dimensions: dimensions
+                };
+            } else {
+                item = data;
+            }
 
-            const putRequest = store.put(recording);
+            const putRequest = store.put(item);
             putRequest.onsuccess = () => resolve();
             putRequest.onerror = () => reject(putRequest.error);
         };

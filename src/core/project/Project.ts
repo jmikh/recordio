@@ -59,6 +59,72 @@ export class ProjectImpl {
     }
 
     /**
+     * Creates a new Project initialized from a recorded Source.
+     * Copies the source events into the timeline's recording.
+     */
+    /**
+     * Creates a new Project initialized from specific sources.
+     * Takes a mandatory screen source and an optional camera source.
+     */
+    static createFromSource(projectId: ID, screenSource: Source, cameraSource?: Source): Project {
+        const project = this.create("Recording - " + new Date().toLocaleString());
+        project.id = projectId; // Override random ID with specific projectId
+
+        // Add Screen Source
+        let projectWithSource = this.addSource(project, screenSource);
+
+        // Add Camera Source if present
+        if (cameraSource) {
+            projectWithSource = this.addSource(projectWithSource, cameraSource);
+        }
+
+        // Use Screen Recording Duration as the Project Duration
+        const durationMs = screenSource.durationMs;
+
+        // Setup the recording in the timeline
+        // We populate the Recording with events from the SCREEN source (primary interaction)
+
+        const recording: Recording = {
+            timelineOffsetMs: 0,
+            screenSourceId: screenSource.id,
+            cameraSourceId: cameraSource?.id,
+
+            // Map UserEvent[] to specific event arrays
+            clickEvents: [],
+            dragEvents: [],
+            keyboardEvents: [],
+            viewportMotions: []
+        };
+
+        if (screenSource.events) {
+            screenSource.events.forEach(e => {
+                if (e.type === 'click') recording.clickEvents.push(e as any);
+                else if (e.type === 'drag') recording.dragEvents.push(e as any);
+                else if (e.type === 'keydown') recording.keyboardEvents.push(e as any);
+            });
+        }
+
+        // Update timeline with this recording
+        const updatedTimeline = {
+            ...projectWithSource.timeline,
+            recording: recording,
+            durationMs: durationMs,
+            // Create a default output window covering the whole duration
+            outputWindows: [{
+                id: crypto.randomUUID(),
+                startMs: 0,
+                endMs: durationMs
+            }]
+        };
+
+        return {
+            ...projectWithSource,
+            createdAt: new Date(),
+            timeline: updatedTimeline
+        };
+    }
+
+    /**
      * Adds a media source to the project library.
      */
     static addSource(project: Project, source: Source): Project {
@@ -67,25 +133,6 @@ export class ProjectImpl {
             sources: {
                 ...project.sources,
                 [source.id]: source
-            }
-        };
-    }
-
-    /**
-     * Updates an existing media source with partial data (e.g. adding duration after load).
-     */
-    static updateSource(project: Project, sourceId: ID, updates: Partial<Source>): Project {
-        const existing = project.sources[sourceId];
-        if (!existing) return project;
-
-        return {
-            ...project,
-            sources: {
-                ...project.sources,
-                [sourceId]: {
-                    ...existing,
-                    ...updates
-                }
             }
         };
     }

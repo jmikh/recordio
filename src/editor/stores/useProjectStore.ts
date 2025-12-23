@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { Project, ID, Recording, OutputWindow } from '../../core/types';
 import { ProjectImpl } from '../../core/project/Project';
+import { ProjectLibrary } from '../../core/project/ProjectLibrary';
 
 interface ProjectState {
     project: Project;
+    isSaving: boolean;
 
     // Actions
     loadProject: (project: Project) => void;
+    saveProject: () => Promise<void>;
 
     // Timeline Actions
     updateRecording: (updates: Partial<Recording>) => void;
@@ -15,104 +18,108 @@ interface ProjectState {
     addOutputWindow: (window: OutputWindow) => void;
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
     removeOutputWindow: (id: ID) => void;
-    updateSource: (sourceId: ID, updates: Partial<import('../../core/types').Source>) => void;
 }
 
 export const useProjectStore = create<ProjectState>()(
-    persist(
-        (set) => ({
-            // Initialize with a default empty project
-            project: ProjectImpl.create('Untitled Project'),
+    subscribeWithSelector((set, get) => ({
+        // Initialize with a default empty project
+        // This will likely be overwritten immediately by App.tsx logic loading from IDB
+        project: ProjectImpl.create('Untitled Project'),
+        isSaving: false,
 
-            loadProject: (project) => set({ project }),
+        loadProject: (project) => set({ project }),
 
-            updateRecording: (updates) => set((state) => ({
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            ...updates
-                        }
-                    },
-                    updatedAt: new Date()
-                }
-            })),
-
-            updateTimeline: (updates: Partial<import('../../core/types').Timeline>) => set((state) => ({
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        ...updates
-                    },
-                    updatedAt: new Date()
-                }
-            })),
-
-            addOutputWindow: (window) => set((state) => ({
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        outputWindows: [...state.project.timeline.outputWindows, window].sort((a, b) => a.startMs - b.startMs)
-                    },
-                    updatedAt: new Date()
-                }
-            })),
-
-            updateOutputWindow: (id, updates) => set((state) => ({
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        outputWindows: state.project.timeline.outputWindows
-                            .map(w => w.id === id ? { ...w, ...updates } : w)
-                            .sort((a, b) => a.startMs - b.startMs)
-                    },
-                    updatedAt: new Date()
-                }
-            })),
-
-            removeOutputWindow: (id) => set((state) => ({
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        outputWindows: state.project.timeline.outputWindows.filter(w => w.id !== id)
-                    },
-                    updatedAt: new Date()
-                }
-            })),
-
-            updateSource: (sourceId, updates) => set((state) => ({
-                project: ProjectImpl.updateSource(state.project, sourceId, updates)
-            })),
-        }),
-        {
-            name: 'recordo-project-storage',
-            storage: createJSONStorage(() => localStorage),
-            partialize: (state) => ({ project: state.project }),
-            onRehydrateStorage: () => (state) => {
-                if (state && state.project) {
-                    // Migration: If background is missing
-                    if (!state.project.background) {
-                        state.project.background = {
-                            type: 'solid',
-                            color: '#1e1e1e'
-                        };
-                    }
-                    // Migration: If recording is missing (legacy state), reset project
-                    if (!state.project.timeline.recording) {
-                        console.warn('Refactor Update: Resetting legacy project state.');
-                        state.project = ProjectImpl.create('New Project');
-                    }
-                }
+        saveProject: async () => {
+            set({ isSaving: true });
+            try {
+                await ProjectLibrary.saveProject(get().project);
+            } catch (e) {
+                console.error("Failed to save project:", e);
+            } finally {
+                set({ isSaving: false });
             }
-        }
-    )
+        },
+
+        updateRecording: (updates) => set((state) => ({
+            project: {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    recording: {
+                        ...state.project.timeline.recording,
+                        ...updates
+                    }
+                },
+                updatedAt: new Date()
+            }
+        })),
+
+        updateTimeline: (updates: Partial<import('../../core/types').Timeline>) => set((state) => ({
+            project: {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    ...updates
+                },
+                updatedAt: new Date()
+            }
+        })),
+
+        addOutputWindow: (window) => set((state) => ({
+            project: {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    outputWindows: [...state.project.timeline.outputWindows, window].sort((a, b) => a.startMs - b.startMs)
+                },
+                updatedAt: new Date()
+            }
+        })),
+
+        updateOutputWindow: (id, updates) => set((state) => ({
+            project: {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    outputWindows: state.project.timeline.outputWindows
+                        .map(w => w.id === id ? { ...w, ...updates } : w)
+                        .sort((a, b) => a.startMs - b.startMs)
+                },
+                updatedAt: new Date()
+            }
+        })),
+
+        removeOutputWindow: (id) => set((state) => ({
+            project: {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    outputWindows: state.project.timeline.outputWindows.filter(w => w.id !== id)
+                },
+                updatedAt: new Date()
+            }
+        })),
+
+
+    }))
 );
+
+// --- Auto-Save Subscription ---
+// We subscribe to the 'project' slice and trigger save.
+// In a real app, we should debounce this.
+let saveTimeout: any = null;
+useProjectStore.subscribe(
+    (state) => state.project,
+    (project) => {
+        // Debounce save (e.g., 2 seconds)
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            console.log('[AutoSave] Saving project...');
+            ProjectLibrary.saveProject(project).catch(console.error);
+        }, 2000);
+    }
+);
+
 
 // --- Selectors ---
 
