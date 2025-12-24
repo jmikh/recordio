@@ -96,7 +96,7 @@ export function findHoverEvents(
 }
 
 // Re-export time mapper for convenience if needed, or import directly
-import { mapSourceToOutputTime } from './timeMapper';
+import { mapSourceToOutputTime, mapOutputToSourceTime } from './timeMapper';
 import type { OutputWindow } from '../types';
 
 export function calculateZoomSchedule(
@@ -108,18 +108,12 @@ export function calculateZoomSchedule(
 ): ViewportMotion[] {
     const motions: ViewportMotion[] = [];
 
+
+
     if (events.length === 0) return motions;
 
-    // 1. Filter & Map ALL events to Output Time first
-    // This ensures that hover detection and zoom scheduling happen on the "final cut"
-    type MappedEvent = UserEvent & {
-        originalTimestamp: number;
-        // timestamp is already in UserEvent, but we are updating it.
-    };
-
-    // 1. Filter & Map ALL events to Output Time first
-    // This ensures that hover detection and zoom scheduling happen on the "final cut"
-    const mappedEvents: MappedEvent[] = [];
+    // Filter & map ALL events to Output Time first to ensure that hover detection and zoom scheduling happen on the "final cut"
+    const mappedEvents: UserEvent[] = [];
 
     console.log('[ZoomDebug] Raw events:', events.length);
     console.log('[ZoomDebug] Windows:', outputWindows);
@@ -127,25 +121,19 @@ export function calculateZoomSchedule(
 
     for (const evt of events) {
         const outputTime = mapSourceToOutputTime(evt.timestamp, outputWindows, timelineOffsetMs);
-        if (outputTime !== -1 && outputTime > 2000) {
-            // don't zoom until 2 seconds in
-            // Clone and update timestamp to Output Time
-            // We preserve originalTimestamp just in case, though not strictly needed for logic
-            const mapped = { ...evt, timestamp: outputTime, originalTimestamp: evt.timestamp };
+        if (outputTime !== -1 && outputTime > 1500) {
+            // don't zoom until 1.5 seconds in
+            const mapped = { ...evt, timestamp: outputTime };
             mappedEvents.push(mapped);
         }
     }
 
-    // Sort by Output Time
-    mappedEvents.sort((a, b) => a.timestamp - b.timestamp);
-
-    // 2. Detect Hovers in Output Space
+    // Detect Hovers in Output Space
     // Now that events are in continuous Output Time, findHoverEvents will correctly 
     // detect hovers even across cuts if the mouse position is stable.
     const hoverEvents = findHoverEvents(mappedEvents as UserEvent[], viewMapper.inputVideoSize);
 
-    // 3. Merge Clicks and Hovers
-    // Both are now already in Output Time.
+    // Merge Clicks and Hovers
     const relevantEvents = [
         ...mappedEvents.filter((e: any) => e.type === 'click'),
         ...hoverEvents
@@ -161,7 +149,11 @@ export function calculateZoomSchedule(
 
     for (let i = 0; i < relevantEvents.length; i++) {
         const evt = relevantEvents[i] as any; // Cast to access x/y safely
-        const arrivalTime = evt.timestamp; // Already Output Time
+        let arrivalTime = evt.timestamp; // Already Output Time
+        if (evt.type == EventType.CLICK) {
+            // We want to arrive at click location before the zoom transition is over.
+            arrivalTime -= 500;
+        }
 
         // Map Click to Output Space (Viewport)
         const centerOutput = viewMapper.inputToOutput({ x: evt.x, y: evt.y });
@@ -187,6 +179,7 @@ export function calculateZoomSchedule(
         };
 
         const lastMotion = motions.length > 0 ? motions[motions.length - 1] : null;
+        const lastMotionOutputTime = motionOutputTimes.length > 0 ? motionOutputTimes[motionOutputTimes.length - 1] : 0;
         let duration = ZOOM_TRANSITION_DURATION;
 
         if (lastMotion) {
@@ -204,68 +197,76 @@ export function calculateZoomSchedule(
             }
 
             // Check if we have enough time for a full transition
-            const availableTime = arrivalTime - lastMotion.endTimeMs;
+            // Note: We use Output Time for conflict detection to ensure visual smoothness
+            const availableTime = arrivalTime - lastMotionOutputTime;
             if (availableTime < ZOOM_TRANSITION_DURATION) {
                 // Shorten duration to avoid overlap
                 duration = Math.max(0, availableTime);
             }
         }
 
-        motions.push({
-            endTimeMs: arrivalTime,
-            durationMs: duration,
-            rect: newViewport
-        });
+        const sourceEndTime = mapOutputToSourceTime(arrivalTime, outputWindows, timelineOffsetMs);
+        if (sourceEndTime !== -1) {
+            motions.push({
+                sourceEndTimeMs: sourceEndTime,
+                durationMs: duration,
+                rect: newViewport
+            });
+            motionOutputTimes.push(arrivalTime);
+        }
     }
 
     return motions;
 }
+// Local scope tracking for duration calc
+const motionOutputTimes: number[] = [];
 
 // ============================================================================
-// Runtime Execution / Interpolation (Source Space)
+// Runtime Execution / Interpolation (Output Space)
 // ============================================================================
+
 
 export function getViewportStateAtTime(
     motions: ViewportMotion[],
     outputTimeMs: number,
-    fullSize: Size
+    outputSize: Size,
+    outputWindows: OutputWindow[],
+    timelineOffsetMs: number
 ): Rect {
-    const fullRect: Rect = { x: 0, y: 0, width: fullSize.width, height: fullSize.height };
+    const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     if (!motions || motions.length === 0) {
         return fullRect;
     }
 
-    // Motions are stored by endTime. Sort just in case.
-    const sortedMotions = [...motions].sort((a, b) => a.endTimeMs - b.endTimeMs);
-
-    // 1. Find the active motion or the last completed motion
-    // A motion defines the state at 'endTimeMs'.
-    // Between (endTimeMs - duration) and endTimeMs, we interpolate.
-    // Before that, we hold the previous motion's end state.
-
     let currentRect = fullRect;
 
-    for (const motion of sortedMotions) {
-        const startTime = motion.endTimeMs - motion.durationMs;
+    // TODO: handle zoom overlaps here when allow users to add zooms they might overlap and we don't want to jump. easy way if multiple zooms overlap select the later one.
+    for (const motion of motions) {
+        const motionOutputTime = mapSourceToOutputTime(motion.sourceEndTimeMs, outputWindows, timelineOffsetMs);
 
-        if (outputTimeMs >= startTime && outputTimeMs <= motion.endTimeMs) {
-            // Inside transition
-            const progress = (outputTimeMs - startTime) / motion.durationMs;
-            const eased = applyEasing(progress); // Assuming linear or simple ease
-            return interpolateRect(currentRect, motion.rect, eased);
-        } else if (outputTimeMs < startTime) {
-            // Before this motion starts. 
-            // We are holding 'currentRect' (result of previous iteration).
-            return currentRect;
+        if (motionOutputTime !== -1) {
+            // Motion End is Visible
+            const startTime = motionOutputTime - motion.durationMs;
+
+            if (outputTimeMs >= startTime && outputTimeMs <= motionOutputTime) {
+                // Inside transition (Smooth interpolation in Output Time)
+                const progress = (outputTimeMs - startTime) / motion.durationMs;
+                const eased = applyEasing(progress);
+                return interpolateRect(currentRect, motion.rect, eased);
+            } else if (outputTimeMs < startTime) {
+                // Not reached this transition yet
+                // Since we are processing in order, we stop and return the current state
+                return currentRect;
+            }
+            // Else: We passed this transition. Update currentRect.
+            currentRect = motion.rect;
+
+        } else {
+            continue;
         }
-
-        // We passed this motion. It strictly applied.
-        // Update currentRect to be this motion's target.
-        currentRect = motion.rect;
     }
 
-    // If we passed all motions, we hold the last one
     return currentRect;
 }
 

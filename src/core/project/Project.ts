@@ -1,4 +1,4 @@
-import { EventType, type MouseEvent, type Project, type Recording, type Source, type UserEvent, type ID, type TimeMs } from '../types';
+import { EventType, type MouseEvent, type Project, type Recording, type Source, type UserEvent, type ID, type TimeMs, type OutputWindow } from '../types';
 import { TimelineImpl } from '../timeline/Timeline';
 import { mapTimelineToOutputTime } from '../effects/timeMapper';
 import { calculateZoomSchedule, ViewMapper } from '../effects/viewportMotion';
@@ -24,6 +24,10 @@ export interface RenderState {
     /** Resolved Source objects */
     screenSource?: Source;
     cameraSource?: Source; // Future proofing
+
+    // Context for effects mapping
+    outputWindows: OutputWindow[];
+    timelineOffsetMs: TimeMs;
 }
 
 /**
@@ -188,7 +192,9 @@ export class ProjectImpl {
             sourceTimeMs,
             recording,
             screenSource,
-            cameraSource
+            cameraSource,
+            outputWindows,
+            timelineOffsetMs: recording.timelineOffsetMs
         };
     }
 }

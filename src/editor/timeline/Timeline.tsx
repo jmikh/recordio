@@ -3,7 +3,7 @@ import { useProjectStore, useProjectTimeline } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import type { OutputWindow } from '../../core/types';
-import { mapOutputToTimelineTime } from '../../core/effects/timeMapper';
+
 
 // Constants
 const MIN_PIXELS_PER_SEC = 10;
@@ -304,9 +304,10 @@ export function Timeline() {
                         <div className="w-full relative bg-[#252526]" style={{ height: TRACK_HEIGHT }}>
                             <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none">MOTION</div>
                             {recording.viewportMotions?.map((m, i) => {
-                                // Motions are stored in Output Time. mapOutputToTimelineTime gives us the end time in timeline space.
-                                const timelineEndMs = mapOutputToTimelineTime(m.endTimeMs, timeline.outputWindows);
-                                const timelineStartMs = mapOutputToTimelineTime(m.endTimeMs - m.durationMs, timeline.outputWindows);
+                                // Motions are stored in Source Time.
+                                // Timeline Time = Source Time + Offset
+                                const timelineEndMs = m.sourceEndTimeMs + timelineOffset;
+                                const timelineStartMs = timelineEndMs - m.durationMs;
 
                                 // Check if mapped times are valid (visible)
                                 if (timelineEndMs === -1 || timelineStartMs === -1) return null;

@@ -64,6 +64,20 @@ export function mapSourceToOutputTime(
 }
 
 /**
+ * Maps an Output Time back to Source Time.
+ * Returns -1 if mapped time is invalid.
+ */
+export function mapOutputToSourceTime(
+    outputTimeMs: number,
+    windows: OutputWindow[],
+    timelineOffsetMs: number
+): number {
+    const timelineTime = mapOutputToTimelineTime(outputTimeMs, windows);
+    if (timelineTime === -1) return -1;
+    return timelineTime - timelineOffsetMs;
+}
+
+/**
  * Gets the total duration of the output video.
  */
 export function getOutputDuration(windows: OutputWindow[]): number {

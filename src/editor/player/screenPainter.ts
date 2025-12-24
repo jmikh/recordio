@@ -34,10 +34,17 @@ export function drawScreen(
 
     // Calculate effective viewport using output time (gapless time)
     // We assume renderState has been augmented with outputTimeMs
-    const outputTimeMs = (renderState as any).outputTimeMs || 0;
+    const outputTimeMs = renderState.outputTimeMs || 0;
 
     // Calculate the effective viewport at the current playback time (Output Time)
-    const effectiveViewport = getViewportStateAtTime(viewportMotions, outputTimeMs, outputSize);
+    // We pass the context (windows/offset) so the function can map Source->Output internally
+    const effectiveViewport = getViewportStateAtTime(
+        viewportMotions,
+        outputTimeMs,
+        outputSize,
+        renderState.outputWindows,
+        renderState.timelineOffsetMs
+    );
 
     // 2. Resolve render rectangles (Source -> Dest)
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
