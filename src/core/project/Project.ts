@@ -1,7 +1,8 @@
 
-import type { Project, ID, TimeMs, Source, Recording } from '../types';
+import type { Project, ID, TimeMs, Source, Recording, UserEvent } from '../types';
 import { TimelineImpl } from '../timeline/Timeline';
 import { mapTimelineToOutputTime } from '../effects/timeMapper';
+import { calculateZoomSchedule, ViewMapper } from '../effects/viewportMotion';
 
 /**
  * Represents the resolved state of the timeline at a specific point in time.
@@ -53,7 +54,7 @@ export class ProjectImpl {
             background: {
                 type: 'solid',
                 color: '#1e1e1e',
-                padding: 0.05
+                padding: 0.03
             }
         };
     }
@@ -81,6 +82,29 @@ export class ProjectImpl {
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
 
+        // Default Output Window
+        const outputWindows = [{
+            id: crypto.randomUUID(),
+            startMs: 0,
+            endMs: durationMs
+        }];
+
+        // Calculate Zoom Schedule
+        // We need a ViewMapper instance
+        const viewMapper = new ViewMapper(
+            screenSource.size,
+            project.outputSettings.size,
+            project.background.padding || 0.03
+        );
+
+        const viewportMotions = calculateZoomSchedule(
+            project.zoom.maxZoom,
+            viewMapper,
+            screenSource.events as UserEvent[] || [],
+            outputWindows,
+            0 // timelineOffsetMs
+        );
+
         // Setup the recording in the timeline
         // We populate the Recording with events from the SCREEN source (primary interaction)
 
@@ -93,7 +117,7 @@ export class ProjectImpl {
             clickEvents: [],
             dragEvents: [],
             keyboardEvents: [],
-            viewportMotions: []
+            viewportMotions: viewportMotions
         };
 
         if (screenSource.events) {
@@ -110,11 +134,7 @@ export class ProjectImpl {
             recording: recording,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
-            outputWindows: [{
-                id: crypto.randomUUID(),
-                startMs: 0,
-                endMs: durationMs
-            }]
+            outputWindows: outputWindows
         };
 
         return {

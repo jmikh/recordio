@@ -3,8 +3,7 @@ import { PlayerCanvas } from './player/PlayerCanvas';
 import { BackgroundPanel } from './BackgroundPanel';
 import { useProjectStore, useProjectData } from './stores/useProjectStore';
 import { Timeline } from './timeline/Timeline';
-import { EventInspector } from './EventInspector';
-import { HoverInspector } from './HoverInspector';
+
 import { ProjectLibrary } from '../core/project/ProjectLibrary';
 
 
@@ -65,9 +64,6 @@ function Editor() {
     // Derived UI State
     const hasActiveProject = Object.keys(project.sources).length > 0;
     const outputVideoSize = project?.outputSettings.size;
-    // TODO: support multi-source better
-    const firstSource = Object.values(project.sources || {})[0];
-    const inputVideoSize = firstSource?.size || null;
 
     // Calculate Rendered Rect (for overlay positioning)
     let renderedStyle = {};
@@ -147,11 +143,8 @@ function Editor() {
                         <div className="text-[10px] text-gray-500">ID: {project.id}</div>
                     </div>
                     <div className="flex-1 flex flex-col overflow-hidden">
-                        <div className="flex-1 flex flex-col overflow-hidden min-h-0 border-b border-[#333]">
-                            <EventInspector metadata={inputVideoSize && firstSource ? firstSource.events || [] : []} />
-                        </div>
-                        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                            <HoverInspector events={inputVideoSize && firstSource ? firstSource.events || [] : []} inputSize={inputVideoSize || { width: 1920, height: 1080 }} />
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            {/* Inspectors Removed */}
                         </div>
                     </div>
                 </div>
