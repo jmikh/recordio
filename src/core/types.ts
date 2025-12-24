@@ -134,7 +134,7 @@ export interface Recording {
     screenSourceId: ID;
     cameraSourceId?: ID;
 
-    clickEvents: ClickEvent[];
+    clickEvents: MouseEvent[];
     dragEvents: DragEvent[];
     keyboardEvents: KeyboardEvent[];
 
@@ -157,7 +157,7 @@ export interface ViewportMotion {
  * Represents a drag action.
  */
 export interface DragEvent extends BaseEvent {
-    type: 'drag';
+    type: typeof EventType.MOUSEDRAG;
     path: TimestampedPoint[];
 }
 
@@ -168,6 +168,21 @@ export interface DragEvent extends BaseEvent {
 export interface Point { x: number; y: number; }
 // Size is already defined above
 
+// Size is already defined above
+
+export const EventType = {
+    CLICK: 'click',
+    MOUSEPOS: 'mousepos',
+    URLCHANGE: 'urlchange',
+    KEYDOWN: 'keydown',
+    MOUSEDOWN: 'mousedown',
+    MOUSEUP: 'mouseup',
+    HOVER: 'hover',
+    MOUSEDRAG: 'mousedrag'
+} as const;
+
+export type EventType = typeof EventType[keyof typeof EventType];
+
 export interface TimestampedPoint extends Point {
     timestamp: number;
 }
@@ -176,22 +191,17 @@ export interface BaseEvent {
     timestamp: number;
 }
 
-export interface ClickEvent extends BaseEvent, Point {
-    type: 'click';
-    tagName?: string;
-}
-
 export interface MouseEvent extends BaseEvent, Point {
-    type: 'mouse';
+    type: typeof EventType.CLICK | typeof EventType.MOUSEPOS | typeof EventType.MOUSEDOWN | typeof EventType.MOUSEUP;
 }
 
 export interface UrlEvent extends BaseEvent {
-    type: 'url';
+    type: typeof EventType.URLCHANGE;
     url: string;
 }
 
 export interface KeyboardEvent extends BaseEvent {
-    type: 'keydown';
+    type: typeof EventType.KEYDOWN;
     key: string;
     code: string;
     ctrlKey: boolean;
@@ -201,20 +211,12 @@ export interface KeyboardEvent extends BaseEvent {
     tagName?: string;
 }
 
-export interface MouseDownEvent extends BaseEvent, Point {
-    type: 'mousedown';
-}
-
-export interface MouseUpEvent extends BaseEvent, Point {
-    type: 'mouseup';
-}
-
 export interface HoverEvent extends BaseEvent, Point {
-    type: 'hover';
+    type: typeof EventType.HOVER;
     endTime: number;
 }
 
-export type UserEvent = ClickEvent | MouseEvent | UrlEvent | KeyboardEvent | MouseDownEvent | MouseUpEvent | HoverEvent | DragEvent;
+export type UserEvent = MouseEvent | UrlEvent | KeyboardEvent | HoverEvent | DragEvent;
 
 export type BackgroundType = 'solid' | 'image';
 

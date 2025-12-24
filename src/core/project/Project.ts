@@ -1,5 +1,4 @@
-
-import type { Project, ID, TimeMs, Source, Recording, UserEvent } from '../types';
+import { EventType, type MouseEvent, type Project, type Recording, type Source, type UserEvent, type ID, type TimeMs } from '../types';
 import { TimelineImpl } from '../timeline/Timeline';
 import { mapTimelineToOutputTime } from '../effects/timeMapper';
 import { calculateZoomSchedule, ViewMapper } from '../effects/viewportMotion';
@@ -122,9 +121,10 @@ export class ProjectImpl {
 
         if (screenSource.events) {
             screenSource.events.forEach(e => {
-                if (e.type === 'click') recording.clickEvents.push(e as any);
-                else if (e.type === 'drag') recording.dragEvents.push(e as any);
-                else if (e.type === 'keydown') recording.keyboardEvents.push(e as any);
+                if (e.type === EventType.CLICK) recording.clickEvents.push(e as MouseEvent);
+                else if (e.type === EventType.KEYDOWN) recording.keyboardEvents.push(e as any);
+                // @ts-ignore
+                else if (e.type === EventType.MOUSEDRAG) recording.dragEvents.push(e as any);
             });
         }
 

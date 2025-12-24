@@ -1,4 +1,4 @@
-import type { UserEvent, ViewportMotion, Size, MouseEvent, Rect } from '../types.ts';
+import { type UserEvent, type ViewportMotion, type Size, type MouseEvent, type Rect, EventType } from '../types';
 import { ViewMapper } from './viewMapper.ts';
 
 export * from './viewMapper.ts';
@@ -77,7 +77,7 @@ export function findHoverEvents(
     };
 
     for (const evt of events) {
-        if (evt.type === 'mouse') {
+        if (evt.type === EventType.MOUSEPOS) {
             currentSegment.push(evt as MouseEvent);
         } else if ((evt as any).type === 'click' || (evt as any).type === 'url') {
             if (currentSegment.length > 0) {

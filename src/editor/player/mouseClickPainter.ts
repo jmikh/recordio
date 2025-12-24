@@ -1,19 +1,19 @@
-import type { ClickEvent, Rect } from '../../core/types';
+import type { MouseEvent, Rect } from '../../core/types';
 import type { ViewMapper } from '../../core/effects/viewMapper';
 
 /**
  * Draws click effects.
  *
  * @param ctx 2D Canvas Context
- * @param clickEvents List of click events
- * @param sourceTimeMs Current Source Time
+ * @param events List of click events
+ * @param currentTime Current Source Time
  * @param viewport Current Viewport (Output Space)
  * @param viewMapper Transformation Wrapper
  */
-export function drawClickEffects(
+export function paintMouseClicks(
     ctx: CanvasRenderingContext2D,
-    clickEvents: ClickEvent[],
-    sourceTimeMs: number,
+    events: MouseEvent[],
+    currentTime: number,
     viewport: Rect,
     viewMapper: ViewMapper
 ) {
@@ -25,9 +25,9 @@ export function drawClickEffects(
     const zoomScale = viewMapper.getZoomScale(viewport);
 
     // Optimisation: We could binary search if sorted, but linear fits for small event counts
-    for (const click of clickEvents) {
-        if (sourceTimeMs >= click.timestamp && sourceTimeMs <= click.timestamp + CLICK_DURATION) {
-            const elapsed = sourceTimeMs - click.timestamp;
+    for (const click of events) {
+        if (currentTime >= click.timestamp && currentTime <= click.timestamp + CLICK_DURATION) {
+            const elapsed = currentTime - click.timestamp;
             const progress = elapsed / CLICK_DURATION;
 
             // Project Center (Input -> Screen)

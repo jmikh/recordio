@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import type { Size } from '../core/types';
+import { type Size, EventType } from '../core/types';
 
 // Prevent duplicate injection
 if ((window as any).hasRecordoInjected) {
@@ -158,13 +158,13 @@ document.addEventListener('pointerup', (e) => {
             // Synthesize CLICK
             // We use the timestamp of the MOUSE DOWN for consistency with where the action started?
             // User requested: "send the click event with timestamp of mouse down"
-            sendMessageToBackground('CLICK', {
+            sendMessageToBackground(EventType.CLICK, {
                 ...bufferedMouseDown.event,
                 timestamp: bufferedMouseDown.timestamp
             });
         } else {
             // Send split events: stored MOUSE DOWN then MOUSE UP
-            sendMessageToBackground('MOUSEDOWN', {
+            sendMessageToBackground(EventType.MOUSEDOWN, {
                 ...bufferedMouseDown.event,
                 timestamp: bufferedMouseDown.timestamp
             });
@@ -182,7 +182,7 @@ document.addEventListener('pointerup', (e) => {
 
 // Helper to safely send messages
 function sendMessageToBackground(type: string, payload: any) {
-    if (type != "MOUSE_POS") {
+    if (type != EventType.MOUSEPOS) {
         console.log("[Content] Sending message:", type, payload);
     }
 
@@ -226,7 +226,7 @@ setInterval(() => {
     if (now - lastMouseTime >= MOUSE_POLL_INTERVAL) {
         lastMouseTime = now;
 
-        sendMessageToBackground('MOUSE_POS', {
+        sendMessageToBackground(EventType.MOUSEPOS, {
             timestamp: now,
             x: lastMouseX,
             y: lastMouseY,
@@ -236,7 +236,7 @@ setInterval(() => {
 
 // URL Capture
 function sendUrlEvent() {
-    sendMessageToBackground('URL_CHANGE', {
+    sendMessageToBackground(EventType.URLCHANGE, {
         timestamp: Date.now(),
         url: window.location.href,
     });
@@ -303,7 +303,12 @@ window.addEventListener('keydown', (e) => {
     // console.log(`[Content] Keydown: ${e.key} | Input=${isInput} | Mod=${isModifier} | Capture=${shouldCapture}`);
 
     if (shouldCapture) {
-        sendMessageToBackground('KEYDOWN', {
+        // Exclude password inputs for privacy
+        if (target && target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'password') {
+            return;
+        }
+
+        sendMessageToBackground(EventType.KEYDOWN, {
             timestamp: Date.now(),
             key: e.key,
             code: e.code,

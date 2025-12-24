@@ -3,7 +3,7 @@ import type { Size } from '../../core/types';
 import type { RenderState } from '../../core/project/Project';
 import { ViewMapper } from '../../core/effects/viewMapper';
 import { getViewportStateAtTime } from '../../core/effects/viewportMotion';
-import { drawClickEffects } from './mouseClickPainter';
+import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
 
 /**
@@ -52,7 +52,7 @@ export function drawScreen(
 
     // 3. Draw Mouse Effects Overlay
     if (recording.clickEvents) {
-        drawClickEffects(ctx, recording.clickEvents, sourceTimeMs, effectiveViewport, viewMapper);
+        paintMouseClicks(ctx, recording.clickEvents, sourceTimeMs, effectiveViewport, viewMapper);
     }
     if (recording.dragEvents) {
         drawDragEffects(ctx, recording.dragEvents, sourceTimeMs, effectiveViewport, viewMapper);

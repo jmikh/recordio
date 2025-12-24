@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import type { Size, UserEvent, DragEvent } from '../core/types';
+import { type Size, type UserEvent, type DragEvent, EventType } from '../core/types';
 
 logger.log("Background service worker running");
 
@@ -53,26 +53,17 @@ chrome.runtime.onInstalled.addListener(async () => {
 // Event Listener
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // 1. Event Capture
-    if (['MOUSE_POS', 'URL_CHANGE', 'KEYDOWN', 'MOUSEDOWN', 'MOUSEUP', 'DOM_MUTATION', 'CLICK'].includes(message.type)) {
+    if (Object.values(EventType).includes(message.type.toLowerCase() as any)) {
         if (state.isRecording) {
             // Append event type to payload for easy storage
-            const eventWithMeta = { ...message.payload, type: message.type.toLowerCase().replace('_event', '') };
+            const eventType = message.type.toLowerCase();
+            const eventWithMeta = { ...message.payload, type: eventType };
 
             // Map event names to our internal schema:
             // CLICK_EVENT -> 'click' (done above by replace)
-            // MOUSE_POS -> 'mouse_pos' -> 'mouse'
-            // URL_CHANGE -> 'url_change' -> 'url'
             // KEYDOWN -> 'keydown'
-            // DOM_MUTATION -> 'dom_mutation' -> 'mutation'
-
-            if (eventWithMeta.type === 'mouse_pos') eventWithMeta.type = 'mouse';
-            if (eventWithMeta.type === 'url_change') eventWithMeta.type = 'url';
-            if (eventWithMeta.type === 'dom_mutation') eventWithMeta.type = 'mutation';
 
             state.events.push(eventWithMeta);
-
-            // Optionally back up to storage periodically
-            chrome.storage.local.set({ currentSessionEvents: state.events });
         }
         return true;
     } else if (message.type === 'GET_RECORDING_STATE') {
@@ -272,20 +263,20 @@ function calculateDragEvents(events: UserEvent[]): DragEvent[] {
     let activeDrag: DragEvent | null = null;
 
     for (const evt of events) {
-        if (evt.type === 'mousedown') {
+        if (evt.type === EventType.MOUSEDOWN) {
             if (activeDrag) {
                 // Unexpected mousedown while dragging? Ignore or reset?
                 continue;
             }
             activeDrag = {
                 timestamp: evt.timestamp,
-                type: 'drag',
+                type: EventType.MOUSEDRAG,
                 path: [{ timestamp: evt.timestamp, x: evt.x, y: evt.y }]
             };
-        } else if (evt.type === 'mouse' && activeDrag) {
+        } else if (evt.type === EventType.MOUSEPOS && activeDrag) {
             // Mouse move during drag
             activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
-        } else if (evt.type === 'mouseup' && activeDrag) {
+        } else if (evt.type === EventType.MOUSEUP && activeDrag) {
             // End Drag
             activeDrag.path.push({ timestamp: evt.timestamp, x: evt.x, y: evt.y });
             dragEvents.push(activeDrag);
