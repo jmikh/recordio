@@ -154,49 +154,29 @@ export function calculateZoomSchedule(
     const outputTimeEvents = recalculateOutputTimeEvents(events, outputWindows, timelineOffsetMs);
     if (!outputTimeEvents) return [];
 
-    // 2. Find Hovers (using Output Time events)
-    // Coordinates are still in Input Space, so we pass inputVideoSize for box sizing.
+    // 2. Find Hovers 
     const outputHovers = findHoverEvents(outputTimeEvents, viewMapper.inputVideoSize);
 
-    // 3. Merge Clicks and Hovers
+    // 3. Merge Clicks, Hovers, and Scrolls
     const relevantEvents = [
         ...(outputTimeEvents.mouseClicks || []),
+        ...(outputTimeEvents.scrolls || []),
         ...outputHovers
     ].sort((a: any, b: any) => a.timestamp - b.timestamp);
 
 
-    const zoomLevel = maxZoom;
-    const targetWidth = viewMapper.outputVideoSize.width / zoomLevel;
-    const targetHeight = viewMapper.outputVideoSize.height / zoomLevel;
-
+    const defaultZoomLevel = maxZoom;
     const ZOOM_TRANSITION_DURATION = 750;
 
+    // Track local scope for duration smoothing
+    const motionOutputTimes: number[] = [];
+
     for (let i = 0; i < relevantEvents.length; i++) {
-        const evt = relevantEvents[i] as any; // Cast to access x/y safely
-        let arrivalTime = evt.timestamp; // Already Output Time
+        const evt = relevantEvents[i] as any;
+        const arrivalTime = evt.timestamp;
 
-        // Map Click to Output Space (Viewport)
-        const centerOutput = viewMapper.inputToOutput({ x: evt.x, y: evt.y });
-
-        // Center Viewport
-        let viewportX = centerOutput.x - targetWidth / 2;
-        let viewportY = centerOutput.y - targetHeight / 2;
-
-        const maxX = viewMapper.outputVideoSize.width - targetWidth;
-        const maxY = viewMapper.outputVideoSize.height - targetHeight;
-
-        if (viewportX < 0) viewportX = 0;
-        else if (viewportX > maxX) viewportX = maxX;
-
-        if (viewportY < 0) viewportY = 0;
-        else if (viewportY > maxY) viewportY = maxY;
-
-        const newViewport: Rect = {
-            x: viewportX,
-            y: viewportY,
-            width: targetWidth,
-            height: targetHeight
-        };
+        // Calculate Target Viewport State
+        const newViewport = createTargetViewport(evt, viewMapper, defaultZoomLevel);
 
         const lastMotion = motions.length > 0 ? motions[motions.length - 1] : null;
         const lastMotionOutputTime = motionOutputTimes.length > 0 ? motionOutputTimes[motionOutputTimes.length - 1] : 0;
@@ -204,23 +184,25 @@ export function calculateZoomSchedule(
 
         if (lastMotion) {
             // Optimization: If the new center is very close to the last center, don't move.
-            // "Close enough" = within 25% of width in delta x and within 25% in height in delta y.
             const lastRect = lastMotion.rect;
             const lastCenterX = lastRect.x + lastRect.width / 2;
             const lastCenterY = lastRect.y + lastRect.height / 2;
 
-            const dx = Math.abs(centerOutput.x - lastCenterX);
-            const dy = Math.abs(centerOutput.y - lastCenterY);
+            const currentCenterX = newViewport.x + newViewport.width / 2;
+            const currentCenterY = newViewport.y + newViewport.height / 2;
 
+            const dx = Math.abs(currentCenterX - lastCenterX);
+            const dy = Math.abs(currentCenterY - lastCenterY);
+
+            // Skip if move is negligible (unless it's a scroll event which might need precise framing? 
+            // - keeping optimization for now to reduce jitter)
             if (dx < lastRect.width * 0.25 && dy < lastRect.height * 0.25) {
                 continue;
             }
 
             // Check if we have enough time for a full transition
-            // Note: We use Output Time for conflict detection to ensure visual smoothness
             const availableTime = arrivalTime - lastMotionOutputTime;
             if (availableTime < ZOOM_TRANSITION_DURATION) {
-                // Shorten duration to avoid overlap
                 duration = Math.max(0, availableTime);
             }
         }
@@ -238,8 +220,85 @@ export function calculateZoomSchedule(
 
     return motions;
 }
-// Local scope tracking for duration calc
-const motionOutputTimes: number[] = [];
+
+function createTargetViewport(evt: any, viewMapper: ViewMapper, defaultZoomLevel: number): Rect {
+    let targetWidth: number;
+    let targetHeight: number;
+    let centerX: number;
+    let centerY: number;
+
+    const outputSize = viewMapper.outputVideoSize;
+
+    if (evt.type === 'scroll') {
+        // --- SCROLL ZOOM LOGIC ---
+        // 1. Calculate Target Width from Bounding Box (in Output Space)
+        // We map the width scalar.
+        const p1 = viewMapper.inputToOutput({ x: 0, y: 0 });
+        const p2 = viewMapper.inputToOutput({ x: evt.boundingBox.width, y: 0 });
+        const boxWidthOutput = Math.abs(p2.x - p1.x); // Assumes linear scaling
+
+        targetWidth = boxWidthOutput;
+
+        // Clamp Width:
+        // Must not be larger than video width
+        if (targetWidth > outputSize.width) targetWidth = outputSize.width;
+        // Optionally enforce min width if box is tiny? 
+        // User said "exactly the width or target width if width is smaller" -> implies strict fit.
+
+        // Aspect Ratio is fixed to Output Video
+        const aspectRatio = outputSize.width / outputSize.height;
+        targetHeight = targetWidth / aspectRatio;
+
+        // 2. Calculate Center (Horizontal: Box Center, Vertical: Mouse Position)
+        const inputBoxCenterX = evt.boundingBox.x + evt.boundingBox.width / 2;
+        // Use evt.y (mouseY mapped to Point.y)
+        const inputMouseY = evt.y;
+
+        const centerOutput = viewMapper.inputToOutput({ x: inputBoxCenterX, y: inputMouseY });
+        centerX = centerOutput.x;
+        centerY = centerOutput.y;
+
+    } else {
+        // --- STANDARD ZOOM LOGIC (Click/Hover) ---
+        targetWidth = outputSize.width / defaultZoomLevel;
+        targetHeight = outputSize.height / defaultZoomLevel;
+
+        const centerOutput = viewMapper.inputToOutput({ x: evt.x, y: evt.y });
+        centerX = centerOutput.x;
+        centerY = centerOutput.y;
+    }
+
+    // 3. Construct Viewport & Apply Constraints
+    let viewportX = centerX - targetWidth / 2;
+    let viewportY = centerY - targetHeight / 2;
+
+    const maxX = outputSize.width - targetWidth;
+    // const maxY = outputSize.height - targetHeight; // Not used for Y clamping in Scroll mode
+
+    // Horizontal Clamping: Strict
+    if (viewportX < 0) viewportX = 0;
+    else if (viewportX > maxX) viewportX = maxX;
+
+    // Vertical Clamping:
+    // Only apply strict clamping for Non-Scroll events? 
+    // User said "vertically can go out of bounds" for Scroll.
+    // Existing logic clamped everything.
+    // I will RELAX vertical clamping for SCROLL events only.
+    if (evt.type !== 'scroll') {
+        const maxY = outputSize.height - targetHeight;
+        if (viewportY < 0) viewportY = 0;
+        else if (viewportY > maxY) viewportY = maxY;
+    }
+    // For Scroll, we leave viewportY as is (can be negative or > maxY).
+
+    return {
+        x: viewportX,
+        y: viewportY,
+        width: targetWidth,
+        height: targetHeight
+    };
+}
+
 
 // ============================================================================
 // Runtime Execution / Interpolation (Output Space)

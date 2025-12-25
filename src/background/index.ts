@@ -74,14 +74,7 @@ function categorizeEvents(events: any[]): UserEvents {
                 categorized.drags.push(e as DragEvent);
                 break;
             case EventType.SCROLL:
-                {
-                    const { x, y, width, height, isNested, ...rest } = e as any;
-                    categorized.scrolls.push({
-                        ...rest,
-                        type: EventType.SCROLL,
-                        boundingBox: { x, y, width, height }
-                    });
-                }
+                categorized.scrolls.push(e as any);
                 break;
             default:
                 // Ignore unknown types

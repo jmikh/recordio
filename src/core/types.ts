@@ -229,7 +229,7 @@ export interface HoverEvent extends BaseEvent, Point {
 }
 
 
-export interface ScrollEvent extends BaseEvent {
+export interface ScrollEvent extends BaseEvent, Point {
     type: typeof EventType.SCROLL;
     boundingBox: Rect;
 }
