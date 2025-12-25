@@ -18,13 +18,25 @@ export const PlayerCanvas = () => {
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
 
+
     // Background Image Ref
     const bgRef = useRef<HTMLImageElement>(null);
 
     // Single Effect to manage the Loop for the lifetime of the component
     useEffect(() => {
+        let frameCount = 0;
+        let lastFpsTime = 0;
+
         const tick = (time: number) => {
             const pbState = usePlaybackStore.getState();
+
+            // FPS Counter
+            frameCount++;
+            if (time - lastFpsTime >= 1000) {
+                console.log(`[PlayerCanvas] tick FPS: ${frameCount}`);
+                frameCount = 0;
+                lastFpsTime = time;
+            }
 
             if (pbState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -74,6 +86,7 @@ export const PlayerCanvas = () => {
 
     // Render Pipeline
     const renderPipeline = () => {
+
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;

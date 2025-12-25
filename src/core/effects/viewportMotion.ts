@@ -1,4 +1,4 @@
-import { type UserEvent, type UserEvents, type ViewportMotion, type Size, type MouseEvent, type Rect } from '../types';
+import { type UserEvent, type UserEvents, type ViewportMotion, type Size, type Rect } from '../types';
 import { ViewMapper } from './viewMapper';
 
 export * from './viewMapper';
@@ -19,8 +19,8 @@ function findHoverEvents(
     events: UserEvents,
     inputSize: Size
 ): UserEvent[] {
-    const boxSize = Math.max(inputSize.width, inputSize.height) * 0.1;
-    const minDuration = 1000;
+    const hoverBoxSize = Math.max(inputSize.width, inputSize.height) * 0.1;
+    const hoverMinDurationMs = 1000;
 
     const hoverEvents: UserEvent[] = [];
 
@@ -29,82 +29,80 @@ function findHoverEvents(
         ...(events.scrolls || []).map(e => e.timestamp)
     ].sort((a, b) => a - b);
 
-    const processSegment = (segment: MouseEvent[]) => {
-        let i = 0;
-        let boundaryIdx = 0;
+    let i = 0;
+    let boundaryIdx = 0;
 
-        while (i < segment.length) {
-            // Fast-forward disruption index to be relevant for current start time
-            while (
-                boundaryIdx < boundaries.length &&
-                boundaries[boundaryIdx] <= segment[i].timestamp
-            ) {
-                boundaryIdx++;
+    while (i < events.mousePositions.length) {
+        // Fast-forward disruption index to be relevant for current start time
+        while (
+            boundaryIdx < boundaries.length &&
+            boundaries[boundaryIdx] <= events.mousePositions[i].timestamp
+        ) {
+            boundaryIdx++;
+        }
+
+        // The next disruption that could interrupt a hover starting at segment[i]
+        const nextBoundaryTime = (boundaryIdx < boundaries.length)
+            ? boundaries[boundaryIdx]
+            : Number.POSITIVE_INFINITY;
+
+        if (events.mousePositions[i].timestamp + hoverMinDurationMs >= nextBoundaryTime) {
+            i++;
+            continue;
+        }
+
+        let j = i;
+        let minX = events.mousePositions[i].x;
+        let maxX = events.mousePositions[i].x;
+        let minY = events.mousePositions[i].y;
+        let maxY = events.mousePositions[i].y;
+
+        while (j < events.mousePositions.length) {
+            const p = events.mousePositions[j]; // p is MouseEvent
+            if (p.timestamp >= nextBoundaryTime) {
+                break;
             }
 
-            // The next disruption that could interrupt a hover starting at segment[i]
-            const nextBoundaryTime = (boundaryIdx < boundaries.length)
-                ? boundaries[boundaryIdx]
-                : Number.POSITIVE_INFINITY;
+            const newMinX = Math.min(minX, p.x);
+            const newMaxX = Math.max(maxX, p.x);
+            const newMinY = Math.min(minY, p.y);
+            const newMaxY = Math.max(maxY, p.y);
 
-            let j = i;
-            let minX = segment[i].x;
-            let maxX = segment[i].x;
-            let minY = segment[i].y;
-            let maxY = segment[i].y;
-
-            while (j < segment.length) {
-                const p = segment[j]; // p is MouseEvent
-                if (p.timestamp >= nextBoundaryTime) {
-                    break;
-                }
-
-                const newMinX = Math.min(minX, p.x);
-                const newMaxX = Math.max(maxX, p.x);
-                const newMinY = Math.min(minY, p.y);
-                const newMaxY = Math.max(maxY, p.y);
-
-                if ((newMaxX - newMinX) <= boxSize && (newMaxY - newMinY) <= boxSize) {
-                    minX = newMinX;
-                    maxX = newMaxX;
-                    minY = newMinY;
-                    maxY = newMaxY;
-                    j++;
-                } else {
-                    break;
-                }
+            if ((newMaxX - newMinX) <= hoverBoxSize && (newMaxY - newMinY) <= hoverBoxSize) {
+                minX = newMinX;
+                maxX = newMaxX;
+                minY = newMinY;
+                maxY = newMaxY;
+                j++;
+            } else {
+                break;
             }
+        }
 
-            if (j > i) {
-                const startEvent = segment[i];
-                const endEvent = segment[j - 1];
-                const duration = endEvent.timestamp - startEvent.timestamp;
+        if (j > i) {
+            const startEvent = events.mousePositions[i];
+            const endEvent = events.mousePositions[j - 1];
+            const duration = endEvent.timestamp - startEvent.timestamp;
 
-                if (duration >= minDuration) {
-                    const points = segment.slice(i, j);
-                    const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-                    const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+            if (duration >= hoverMinDurationMs) {
+                const points = events.mousePositions.slice(i, j);
+                const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+                const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
 
-                    hoverEvents.push({
-                        type: 'hover',
-                        timestamp: startEvent.timestamp, // Source Time
-                        x: centerX,
-                        y: centerY,
-                        endTime: endEvent.timestamp
-                    } as UserEvent);
-                    i = j;
-                } else {
-                    i++;
-                }
+                hoverEvents.push({
+                    type: 'hover',
+                    timestamp: startEvent.timestamp, // Source Time
+                    x: centerX,
+                    y: centerY,
+                    endTime: endEvent.timestamp
+                } as UserEvent);
+                i = j;
             } else {
                 i++;
             }
+        } else {
+            i++;
         }
-    };
-
-    // Use mousePositions from UserEvents
-    if (events.mousePositions) {
-        processSegment(events.mousePositions);
     }
 
     return hoverEvents;
@@ -149,6 +147,7 @@ export function calculateZoomSchedule(
     outputWindows: OutputWindow[],
     timelineOffsetMs: number
 ): ViewportMotion[] {
+    console.log('[ZoomDebug] calculateZoomSchedule');
     const motions: ViewportMotion[] = [];
 
     // 1. Map all events to Output Time
@@ -165,13 +164,12 @@ export function calculateZoomSchedule(
         ...outputHovers
     ].sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-    // console.log('[ZoomDebug] Relevant events (Output Time):', relevantEvents.length);
 
     const zoomLevel = maxZoom;
     const targetWidth = viewMapper.outputVideoSize.width / zoomLevel;
     const targetHeight = viewMapper.outputVideoSize.height / zoomLevel;
 
-    const ZOOM_TRANSITION_DURATION = 500;
+    const ZOOM_TRANSITION_DURATION = 750;
 
     for (let i = 0; i < relevantEvents.length; i++) {
         const evt = relevantEvents[i] as any; // Cast to access x/y safely
