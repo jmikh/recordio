@@ -342,8 +342,6 @@ window.addEventListener('scroll', (e) => {
     let y = 0;
     let width = window.innerWidth;
     let height = window.innerHeight;
-    let isNested = false;
-
     if (e.target instanceof Element) {
         // It's a nested element scroll
         const rect = e.target.getBoundingClientRect();
@@ -351,7 +349,6 @@ window.addEventListener('scroll', (e) => {
         y = rect.top;
         width = rect.width;
         height = rect.height;
-        isNested = true;
     }
 
 
@@ -361,6 +358,5 @@ window.addEventListener('scroll', (e) => {
         y,
         width,
         height,
-        isNested,
     });
 }, true); // Use capture to detect nested scrolls (which don't bubble)

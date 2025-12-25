@@ -1,4 +1,3 @@
-import { logger } from '../utils/logger';
 import { type Size, EventType, type UserEvents, type MouseEvent, type KeyboardEvent, type DragEvent } from '../core/types';
 
 logger.log("Background service worker running");
@@ -55,7 +54,8 @@ function categorizeEvents(events: any[]): UserEvents {
         mouseClicks: [],
         mousePositions: [],
         keyboardEvents: [],
-        drags: []
+        drags: [],
+        scrolls: []
     };
 
     for (const e of events) {
@@ -71,6 +71,16 @@ function categorizeEvents(events: any[]): UserEvents {
                 break;
             case EventType.MOUSEDRAG:
                 categorized.drags.push(e as DragEvent);
+                break;
+            case EventType.SCROLL:
+                {
+                    const { x, y, width, height, isNested, ...rest } = e as any;
+                    categorized.scrolls.push({
+                        ...rest,
+                        type: EventType.SCROLL,
+                        boundingBox: { x, y, width, height }
+                    });
+                }
                 break;
             default:
                 // Ignore unknown types

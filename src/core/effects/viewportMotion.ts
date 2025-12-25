@@ -124,6 +124,18 @@ export function calculateZoomSchedule(
         }
     }
 
+    // Process Scrolls (just map them for now, use logic later)
+    if (events.scrolls) {
+        for (const evt of events.scrolls) {
+            const outputTime = mapSourceToOutputTime(evt.timestamp, outputWindows, timelineOffsetMs);
+            if (outputTime !== -1 && outputTime > 1500) {
+                // For now, treat scroll as a "point of interest" similar to click?
+                // or just ignore. The user request said: "it should then add a full zoom, if it is not nested it should fit around the bounding box"
+                // for now just wiring.
+            }
+        }
+    }
+
     // Merge Clicks and Hovers
     const relevantEvents = [
         ...mappedClicks,
@@ -141,10 +153,6 @@ export function calculateZoomSchedule(
     for (let i = 0; i < relevantEvents.length; i++) {
         const evt = relevantEvents[i] as any; // Cast to access x/y safely
         let arrivalTime = evt.timestamp; // Already Output Time
-        if (evt.type == EventType.CLICK) {
-            // We want to arrive at click location before the zoom transition is over.
-            arrivalTime -= 500;
-        }
 
         // Map Click to Output Space (Viewport)
         const centerOutput = viewMapper.inputToOutput({ x: evt.x, y: evt.y });

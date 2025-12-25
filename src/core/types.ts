@@ -102,6 +102,7 @@ export interface UserEvents {
     mousePositions: MouseEvent[]; // mousepos
     keyboardEvents: KeyboardEvent[];
     drags: DragEvent[];
+    scrolls: ScrollEvent[];
 }
 
 
@@ -188,7 +189,8 @@ export const EventType = {
     URLCHANGE: 'urlchange',
     KEYDOWN: 'keydown',
     HOVER: 'hover',
-    MOUSEDRAG: 'mousedrag'
+    MOUSEDRAG: 'mousedrag',
+    SCROLL: 'scroll'
 } as const;
 
 export type EventType = typeof EventType[keyof typeof EventType];
@@ -226,7 +228,13 @@ export interface HoverEvent extends BaseEvent, Point {
     endTime: number;
 }
 
-export type UserEvent = MouseEvent | UrlEvent | KeyboardEvent | HoverEvent | DragEvent;
+
+export interface ScrollEvent extends BaseEvent {
+    type: typeof EventType.SCROLL;
+    boundingBox: Rect;
+}
+
+export type UserEvent = MouseEvent | UrlEvent | KeyboardEvent | HoverEvent | DragEvent | ScrollEvent;
 
 export type BackgroundType = 'solid' | 'image';
 
