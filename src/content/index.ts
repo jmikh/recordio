@@ -12,6 +12,12 @@ logger.log("[Recordo] Content script loaded");
 let isRecording = false;
 
 // Event Capture State
+function getRelativeTime() {
+    if (!isRecording || recordingStartTime === 0) return Date.now();
+    return Math.max(0, Date.now() - recordingStartTime);
+}
+
+// Event Capture State
 let lastMousePos: MousePositionEvent = {
     type: EventType.MOUSEPOS,
     timestamp: 0,
@@ -115,7 +121,7 @@ document.addEventListener('mousemove', (e) => {
     const scaled = dprScalePoint({ x: e.clientX, y: e.clientY });
     lastMousePos = {
         type: EventType.MOUSEPOS,
-        timestamp: Date.now(),
+        timestamp: getRelativeTime(),
         mousePos: scaled
     };
 }, captureOptions);
@@ -143,7 +149,7 @@ document.addEventListener('pointerdown', (e) => {
     // Scale now!
     const scaledPos = dprScalePoint({ x, y });
 
-    const now = Date.now();
+    const now = getRelativeTime();
     bufferedMouseDown = {
         event: {
             mousePos: scaledPos,
@@ -167,7 +173,7 @@ document.addEventListener('pointerup', (e) => {
     if (!bufferedMouseDown) {
         return;
     }
-    const now = Date.now();
+    const now = getRelativeTime();
     const diff = now - bufferedMouseDown.timestamp;
 
     // Current posiiton (scaled)
@@ -196,7 +202,8 @@ document.addEventListener('pointerup', (e) => {
             type: EventType.MOUSEDRAG,
             timestamp: bufferedMouseDown.timestamp, // Start time
             mousePos: bufferedMouseDown.event.mousePos,
-            path: dragPath // Already scaled
+            path: dragPath, // Already scaled
+            endTime: now
         });
     }
 
@@ -207,10 +214,6 @@ document.addEventListener('pointerup', (e) => {
 
 // Helper to safely send messages
 function sendMessageToBackground(type: string, payload: any) {
-    if (type != EventType.MOUSEPOS) {
-        console.log("[Content] Sending message:", type, payload);
-    }
-
     if (!chrome.runtime?.id) {
         // Extension context invalidated (e.g. extension reloaded). 
         // Stop doing work to avoid errors.
@@ -218,18 +221,7 @@ function sendMessageToBackground(type: string, payload: any) {
         return;
     }
 
-    const scaledPayload = { ...payload };
-
-    // Adjust timestamp to be relative to recording start
-    if (recordingStartTime > 0 && typeof scaledPayload.timestamp === 'number') {
-        const absoluteTs = scaledPayload.timestamp;
-        scaledPayload.timestamp = Math.max(0, absoluteTs - recordingStartTime);
-        scaledPayload.recordingStart = recordingStartTime;
-        // Keep absolute too just in case
-        scaledPayload.absoluteTimestamp = absoluteTs;
-    }
-
-    chrome.runtime.sendMessage({ type, payload: scaledPayload }).catch(() => {
+    chrome.runtime.sendMessage({ type, payload }).catch(() => {
         // Ignore connection errors
     });
 }
@@ -239,9 +231,12 @@ setInterval(() => {
     if (!chrome.runtime?.id) return; // Stop polling if invalidated
     if (!isRecording) return;
 
-    const now = Date.now();
-    if (now - lastMouseTime >= MOUSE_POLL_INTERVAL) {
-        lastMouseTime = now;
+    const now = getRelativeTime();
+    // Use Date.now() for interval check to avoid issues if recordingStartTime changes? 
+    // Actually if we just use Date.now() for consistent interval check it's safer.
+    const realNow = Date.now();
+    if (realNow - lastMouseTime >= MOUSE_POLL_INTERVAL) {
+        lastMouseTime = realNow;
 
         sendMessageToBackground(EventType.MOUSEPOS, {
             ...lastMousePos,
@@ -263,7 +258,7 @@ setInterval(() => {
 function sendUrlEvent() {
     if (!isRecording) return;
     sendMessageToBackground(EventType.URLCHANGE, {
-        timestamp: Date.now(),
+        timestamp: getRelativeTime(),
         mousePos: lastMousePos.mousePos, // Use last known pos
         url: window.location.href,
     });
@@ -337,7 +332,7 @@ window.addEventListener('keydown', (e) => {
         }
 
         sendMessageToBackground(EventType.KEYDOWN, {
-            timestamp: Date.now(),
+            timestamp: getRelativeTime(),
             mousePos: lastMousePos.mousePos, // Attach last known position
             key: e.key,
             code: e.code,
@@ -357,16 +352,18 @@ let lastScrollTime = 0;
 window.addEventListener('scroll', (e) => {
     if (!isRecording) return;
     // console.log("Scrolling"); 
-    const now = Date.now();
-    if (now - lastScrollTime < 500) {
-        lastScrollTime = now;
-        return; // 500ms throttle
+    const now = getRelativeTime();
+    const realNow = Date.now();
+
+    if (realNow - lastScrollTime < 100) {
+        lastScrollTime = realNow;
+        return;
     }
-    lastScrollTime = now;
+    lastScrollTime = realNow;
 
     if (!chrome.runtime?.id) return;
 
-    let boundingBox : Rect = {
+    let boundingBox: Rect = {
         x: 0,
         y: 0,
         width: window.innerWidth,
@@ -385,6 +382,6 @@ window.addEventListener('scroll', (e) => {
     sendMessageToBackground('SCROLL', {
         timestamp: now,
         mousePos: lastMousePos.mousePos,
-        boundingBox : dprScaleRect(boundingBox)
+        boundingBox: dprScaleRect(boundingBox)
     });
 }, true); // Use capture to detect nested scrolls (which don't bubble)

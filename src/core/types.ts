@@ -172,6 +172,7 @@ export interface ViewportMotion {
 export interface DragEvent extends BaseEvent {
     type: typeof EventType.MOUSEDRAG;
     path: MousePositionEvent[];
+    endTime: number;
 }
 
 // ==========================================

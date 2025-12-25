@@ -341,11 +341,14 @@ export function Timeline() {
 
                             {/* Drags */}
                             {userEvents?.drags?.map((d, i) => {
-                                // Assuming drag starts at d.timestamp and ends at last path point
+                                // Assuming drag starts at d.timestamp.
+                                // Use explicit endTime if available, else standard fallback
                                 const startMs = d.timestamp + timelineOffset;
-                                const endMs = (d.path && d.path.length > 0)
-                                    ? d.path[d.path.length - 1].timestamp + timelineOffset
-                                    : startMs + 500; // fallback duration
+                                const endMs = (d.endTime !== undefined)
+                                    ? d.endTime + timelineOffset
+                                    : (d.path && d.path.length > 0)
+                                        ? d.path[d.path.length - 1].timestamp + timelineOffset
+                                        : startMs + 500; // fallback duration
 
                                 const left = (startMs / 1000) * pixelsPerSec;
                                 const width = ((endMs - startMs) / 1000) * pixelsPerSec;
