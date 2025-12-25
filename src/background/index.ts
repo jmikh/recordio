@@ -1,4 +1,5 @@
 import { type Size, EventType, type UserEvents, type MouseEvent, type KeyboardEvent, type DragEvent } from '../core/types';
+import { logger } from '../utils/logger';
 
 logger.log("Background service worker running");
 
