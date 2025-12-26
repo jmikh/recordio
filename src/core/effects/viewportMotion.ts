@@ -135,6 +135,7 @@ const recalculateOutputTimeEvents = (
         keyboardEvents: mapFn(sourceEvents.keyboardEvents),
         drags: mapFn(sourceEvents.drags),
         scrolls: mapFn(sourceEvents.scrolls),
+        typingEvents: mapFn(sourceEvents.typingEvents),
     };
 };
 

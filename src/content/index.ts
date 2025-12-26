@@ -17,6 +17,14 @@ function getRelativeTime() {
     return Math.max(0, Date.now() - recordingStartTime);
 }
 
+function getDeepActiveElement(): Element | null {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+        el = el.shadowRoot.activeElement;
+    }
+    return el;
+}
+
 // Event Capture State
 let lastMousePos: MousePositionEvent = {
     type: EventType.MOUSEPOS,
@@ -24,7 +32,18 @@ let lastMousePos: MousePositionEvent = {
     mousePos: { x: 0, y: 0 }
 };
 let lastMouseTime = 0;
+let lastMouseMoveTime = 0;
+let lastKeystrokeTime = 0;
 let recordingStartTime = 0;
+
+interface TypingSession {
+    startTime: number;
+    targetRect: Rect;
+    element: HTMLElement;
+}
+
+let currentTypingSession: TypingSession | null = null;
+
 const MOUSE_POLL_INTERVAL = 100;
 
 // Listen for recording state changes from background
@@ -118,6 +137,7 @@ function dprScaleRect(rect: { x: number, y: number, width: number, height: numbe
 
 document.addEventListener('mousemove', (e) => {
     if (!isRecording) return;
+    lastMouseMoveTime = Date.now();
     const scaled = dprScalePoint({ x: e.clientX, y: e.clientY });
     lastMousePos = {
         type: EventType.MOUSEPOS,
@@ -252,7 +272,104 @@ setInterval(() => {
             });
         }
     }
+
 }, MOUSE_POLL_INTERVAL);
+
+setInterval(() => {
+    if (!chrome.runtime?.id) return;
+    if (!isRecording) return;
+
+    // Check for Typing Event
+    const realNow = Date.now();
+    const now = getRelativeTime();
+
+    const activeEl = getDeepActiveElement() as HTMLElement;
+    const isEditable = activeEl && isEditableElement(activeEl);
+
+    let isTypingActive = false;
+
+    if (isEditable) {
+        const isTyping = (realNow - lastKeystrokeTime) < 1000;
+        const isStationary = (realNow - lastMouseMoveTime) > 500;
+
+        if (isTyping) {
+            isTypingActive = true;
+        } else if (isStationary) {
+            // Checks if mouse is stationary and it is close to the input box then the user is probably typing but maybe pausing between typing.
+            const rect = activeEl.getBoundingClientRect();
+
+            const dpr = window.devicePixelRatio || 1;
+            const scaledRect = dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+            const mouseX = lastMousePos.mousePos.x;
+            const mouseY = lastMousePos.mousePos.y;
+
+            const threshold = 100 * dpr;
+
+            // Simple distance to box check
+            // If inside, distance is 0.
+            const closestX = Math.max(scaledRect.x, Math.min(mouseX, scaledRect.x + scaledRect.width));
+            const closestY = Math.max(scaledRect.y, Math.min(mouseY, scaledRect.y + scaledRect.height));
+
+            const dx = mouseX - closestX;
+            const dy = mouseY - closestY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist <= threshold) {
+                isTypingActive = true;
+            }
+        }
+
+        // Session Logic
+        if (currentTypingSession) {
+            // If session is active, check if we should end it
+            // End if:
+            // 1. Not typing active anymore
+            // 2. Active element changed (or lost focus)
+
+            let shouldEnd = false;
+            if (!isTypingActive) {
+                shouldEnd = true;
+            } else if (activeEl !== currentTypingSession.element) {
+                shouldEnd = true;
+            }
+
+            if (shouldEnd) {
+                // Dispatch Event
+                const eventStartTime = currentTypingSession.startTime;
+                // Use current 'now' as endTime
+                sendMessageToBackground(EventType.TYPING, {
+                    type: EventType.TYPING,
+                    timestamp: eventStartTime,
+                    mousePos: lastMousePos.mousePos,
+                    targetRect: currentTypingSession.targetRect,
+                    endTime: now
+                });
+                currentTypingSession = null;
+            } else {
+                // Still active
+            }
+        } else {
+            // No session active. Should we start one?
+            if (isTypingActive && isEditable) {
+                const rect = activeEl.getBoundingClientRect();
+                const scaledRect = dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+
+                let startTime = now;
+                if ((realNow - lastKeystrokeTime) < 1000) {
+                    if (recordingStartTime > 0) {
+                        startTime = Math.max(0, lastKeystrokeTime - recordingStartTime);
+                    }
+                }
+
+                currentTypingSession = {
+                    startTime: startTime,
+                    targetRect: scaledRect,
+                    element: activeEl
+                };
+            }
+        }
+    }
+}, 400);
 
 // URL Capture
 function sendUrlEvent() {
@@ -320,6 +437,10 @@ window.addEventListener('keydown', (e) => {
     // User asked for "modifier key strokes... and definitely dont want... letter being input"
     // We include navigation keys if needed, but for now lets stick to "Special" functional keys.
     const isSpecial = ['Enter', 'Tab', 'Escape', 'Backspace', 'Delete'].includes(e.key);
+
+    if (isInput) {
+        lastKeystrokeTime = Date.now();
+    }
 
     const shouldCapture = !isInput || (isInput && (isModifier || isSpecial));
 
@@ -439,3 +560,39 @@ window.addEventListener('scroll', (e) => {
         boundingBox: dprScaleRect(boundingBox)
     });
 }, true); // Use capture to detect nested scrolls (which don't bubble)
+
+// Focus/Blur Capture
+function isEditableElement(target: HTMLElement): boolean {
+    const tagName = target.tagName;
+    const isContentEditable = target.isContentEditable;
+
+    let isInput = isContentEditable || tagName === 'TEXTAREA';
+    if (tagName === 'INPUT') {
+        const type = (target as HTMLInputElement).type;
+        const nonTextInputs = ['checkbox', 'radio', 'button', 'image', 'submit', 'reset', 'range', 'color'];
+        if (!nonTextInputs.includes(type)) {
+            isInput = true;
+        }
+    }
+    return isInput;
+}
+
+// TODO: remove before shipping.
+window.addEventListener('focusin', (e) => {
+    const path = e.composedPath();
+    const deepTarget = (path[0] || e.target) as HTMLElement;
+    const rect = deepTarget.getBoundingClientRect();
+    const isEditable = isEditableElement(deepTarget);
+
+    if (isEditable) {
+        logger.log(`[Recordo] TEXT INPUT Focus In:`, {
+            target: deepTarget,
+            rect,
+        });
+    } else {
+        logger.log(`[Recordo] NON-TEXT INPUT Focus In:`, {
+            target: deepTarget,
+            rect,
+        });
+    }
+});

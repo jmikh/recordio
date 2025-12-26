@@ -1,4 +1,20 @@
 - optimize scroll recording  only need to fetch effective content area once per URL
+- scroll recording might be reporting last timestamp of the scroll
 - add zoom based on URL change (should proably start zooming out after the url change)
 - test perfomance with large videos (specially zoom calculations)
 - text box bounds should be take into account when in focus
+- use viewport-must and viewport-preferred in zoom calculations. if viewport-must all fit in last viewport then don't change it, if not then use viewport-preferred. Scroll > Click > Editing > Hover.
+i 
+- deactivate logger in production
+-IMPORTNAT: events stop recording on url change because it misses the start recording message. shoud send to background ask for recording state and start time. 
+
+
+
+
+
+text input
+==========
+
+
+focus in : sometimes submit button is outside the text input area and want to make sure not to miss it in zooom paning the camera to follow the mouse. so critera of when to zoom in based on text input area should factor in typing and whether mouse is moving or not.
+text: write 

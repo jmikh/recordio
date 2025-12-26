@@ -1,4 +1,4 @@
-import { type Size, EventType, type UserEvents, type MouseClickEvent, type MousePositionEvent, type KeyboardEvent, type DragEvent } from '../core/types';
+import { type Size, EventType, type UserEvents, type MouseClickEvent, type MousePositionEvent, type KeyboardEvent, type DragEvent, type TypingEvent } from '../core/types';
 import { logger } from '../utils/logger';
 
 logger.log("Background service worker running");
@@ -56,7 +56,8 @@ function categorizeEvents(events: any[]): UserEvents {
         mousePositions: [],
         keyboardEvents: [],
         drags: [],
-        scrolls: []
+        scrolls: [],
+        typingEvents: []
     };
 
     for (const e of events) {
@@ -75,6 +76,9 @@ function categorizeEvents(events: any[]): UserEvents {
                 break;
             case EventType.SCROLL:
                 categorized.scrolls.push(e as any);
+                break;
+            case EventType.TYPING:
+                categorized.typingEvents.push(e as TypingEvent);
                 break;
             default:
                 // Ignore unknown types

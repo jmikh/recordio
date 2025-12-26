@@ -28,6 +28,7 @@ function Editor() {
 
     // -- Project State --
     const project = useProjectData();
+    const userEvents = useProjectStore(s => s.userEvents);
     const loadProject = useProjectStore(s => s.loadProject);
     const isSaving = useProjectStore(s => s.isSaving);
     const undo = useProjectHistory(state => state.undo);
@@ -225,6 +226,12 @@ function Editor() {
                             onClick={() => console.log(project)}
                         >
                             Log Project
+                        </button>
+                        <button
+                            className="mt-2 px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded cursor-pointer"
+                            onClick={() => console.log(userEvents)}
+                        >
+                            Log User Events
                         </button>
                     </div>
                     {/* Debug Buttons Removed */}
