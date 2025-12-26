@@ -1,2 +1,4 @@
-- looks like user events are being recorded before the recording starts which leads to early zoom
-- keyboard events "cmd + c" when in input field are omitted. needs fixing.
+- optimize scroll recording  only need to fetch effective content area once per URL
+- add zoom based on URL change (should proably start zooming out after the url change)
+- test perfomance with large videos (specially zoom calculations)
+- text box bounds should be take into account when in focus

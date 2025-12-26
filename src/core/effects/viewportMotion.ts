@@ -108,7 +108,7 @@ function findHoverEvents(
 }
 
 // Re-export time mapper for convenience if needed, or import directly
-import { mapSourceToOutputTime, mapOutputToSourceTime } from './timeMapper';
+import { mapSourceToOutputTime, mapOutputToSourceTime, getOutputDuration } from './timeMapper';
 import type { OutputWindow } from '../types';
 
 
@@ -164,7 +164,7 @@ export function calculateZoomSchedule(
 
 
     const minViewportWidth = viewMapper.outputVideoSize.width / maxZoom;
-    const ZOOM_TRANSITION_DURATION = 750;
+    const ZOOM_TRANSITION_DURATION = 500;
 
     // Track local scope for duration smoothing
     const motionOutputTimes: number[] = [];
@@ -181,7 +181,7 @@ export function calculateZoomSchedule(
         const newViewport = createTargetViewport(evt, viewMapper, minViewportWidth);
         console.log('[ZoomDebug] Event', evt, ' New Viewport', newViewport);
 
-        if (evt.type == EventType.SCROLL) {
+        if (evt.type === EventType.SCROLL) {
             noZoomInUntilMs = evt.timestamp + 2000;
             console.log('[ZoomDebug] No Zoom In Until', noZoomInUntilMs);
         }
@@ -237,6 +237,30 @@ export function calculateZoomSchedule(
             motionOutputTimes.push(arrivalTime);
         }
     }
+
+    // Force zoom out at the end
+    const lastWindow = outputWindows[outputWindows.length - 1];
+    const totalOutputDuration = getOutputDuration(outputWindows);
+
+    const zoomoutBufferMs = 1000;
+    const zoomOutStartTime = Math.max(0, totalOutputDuration - ZOOM_TRANSITION_DURATION - zoomoutBufferMs);
+
+    if (motions.length > 0) {
+        const lastMotionEndTime = motionOutputTimes[motionOutputTimes.length - 1];
+        if (lastMotionEndTime > zoomOutStartTime) {
+            motions.pop();
+            motionOutputTimes.pop();
+        }
+        const finalSourceEndTime = lastWindow.endMs - timelineOffsetMs - zoomoutBufferMs;
+
+        motions.push({
+            sourceEndTimeMs: finalSourceEndTime,
+            durationMs: ZOOM_TRANSITION_DURATION,
+            rect: { x: 0, y: 0, width: viewMapper.outputVideoSize.width, height: viewMapper.outputVideoSize.height },
+            reason: 'end_zoomout'
+        });
+    }
+
 
     return motions;
 }
