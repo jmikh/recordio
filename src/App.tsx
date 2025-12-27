@@ -5,6 +5,7 @@ import { MSG, type RecordingStateResponse } from './shared/messages';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'tab' | 'window'>('tab');
 
   // Device Lists
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -96,6 +97,7 @@ function App() {
       chrome.runtime.sendMessage({
         type: MSG.START_RECORDING,
         tabId: tab.id,
+        recordingMode,
         hasAudio: isAudioEnabled,
         hasCamera: isVideoEnabled,
         audioDeviceId: selectedAudioId,
@@ -129,6 +131,22 @@ function App() {
 
         {!isRecording ? (
           <div className="flex flex-col items-center w-full gap-6">
+
+            {/* Mode Selection */}
+            <div className="flex bg-slate-800 p-1 rounded-lg w-full">
+              <button
+                onClick={() => setRecordingMode('tab')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${recordingMode === 'tab' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Current Tab
+              </button>
+              <button
+                onClick={() => setRecordingMode('window')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${recordingMode === 'window' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Window
+              </button>
+            </div>
 
             {/* Audio Controls */}
             <div className="w-full">

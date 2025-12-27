@@ -8,7 +8,9 @@
         "offscreen",
         "storage",
         "activeTab",
-        "scripting"
+        "scripting",
+        "desktopCapture",
+        "tabs"
     ],
     "host_permissions": [
         "<all_urls>"

@@ -3,7 +3,7 @@ import type { ID, Project, SourceMetadata } from '../types';
 import { ProjectImpl } from './Project';
 
 const DB_NAME = 'RecordoDB';
-const DB_VERSION = 2; // Incrementing to support new stores
+const DB_VERSION = 1;
 
 export class ProjectLibrary {
     private static dbPromise: Promise<IDBDatabase> | null = null;

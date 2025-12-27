@@ -40,7 +40,8 @@ export type MessageMap = {
     // --- User Actions (Popup -> Background) ---
     [MSG.START_RECORDING]: {
         req: {
-            tabId: number;
+            tabId?: number; // Optional in window mode (implied active)
+            recordingMode: 'tab' | 'window';
             hasAudio: boolean;
             hasCamera: boolean;
             audioDeviceId?: string;

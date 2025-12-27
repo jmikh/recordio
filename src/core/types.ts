@@ -222,6 +222,7 @@ export interface MousePositionEvent extends BaseEvent {
 export interface UrlChangeEvent extends BaseEvent {
     type: typeof EventType.URLCHANGE;
     url: string;
+    title?: string;
 }
 
 export interface KeyboardEvent extends BaseEvent {

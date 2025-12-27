@@ -20,7 +20,7 @@ chrome.runtime.sendMessage({ type: MSG.OFFSCREEN_READY });
 
 chrome.runtime.onMessage.addListener(async (message) => {
     if (message.type === MSG.PREPARE_RECORDING) {
-        const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions } } = message as {
+        const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions, recordingMode } } = message as {
             streamId: string;
             data: {
                 hasAudio: boolean;
@@ -28,6 +28,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 audioDeviceId?: string;
                 videoDeviceId?: string;
                 dimensions?: Size;
+                recordingMode: 'tab' | 'window';
             };
         };
 
@@ -35,9 +36,11 @@ chrome.runtime.onMessage.addListener(async (message) => {
             cleanup(); // Ensure clean state
 
             // 1. Get Screen Stream (Video + System Audio)
+            const source = recordingMode === 'window' ? 'desktop' : 'tab';
+
             const videoConstraints: any = {
                 mandatory: {
-                    chromeMediaSource: 'tab',
+                    chromeMediaSource: source,
                     chromeMediaSourceId: streamId
                 }
             };
@@ -49,15 +52,30 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 videoConstraints.mandatory.maxHeight = dimensions.height;
             }
 
-            const screenStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    mandatory: {
-                        chromeMediaSource: 'tab',
-                        chromeMediaSourceId: streamId
-                    }
-                } as any,
-                video: videoConstraints
-            });
+            let screenStream;
+            try {
+                screenStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        mandatory: {
+                            chromeMediaSource: source,
+                            chromeMediaSourceId: streamId
+                        }
+                    } as any,
+                    video: videoConstraints
+                });
+            } catch (err: any) {
+                console.warn(`[Offscreen] Failed to get screen stream with audio. Name: ${err.name}, Message: ${err.message}`, err);
+                try {
+                    // Fallback: Video only (System audio might not be available or user unchecked it)
+                    screenStream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: videoConstraints
+                    });
+                } catch (err2: any) {
+                    console.error(`[Offscreen] Failed video-only fallback. Name: ${err2.name}, Message: ${err2.message}`, err2);
+                    throw err2;
+                }
+            }
             activeStreams.push(screenStream);
 
             // MONITOR SYSTEM AUDIO: Connect tab audio to speakers so user can hear it
@@ -294,7 +312,7 @@ async function saveToIndexedDB(
     dimensions?: Size
 ) {
     return new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open('RecordoDB', 2); // Version 2
+        const request = indexedDB.open('RecordoDB', 1); // Version 1 
 
         request.onupgradeneeded = (event: any) => {
             const db = event.target.result;
