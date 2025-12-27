@@ -1,11 +1,19 @@
 import { logger } from '../utils/logger';
 import { type Size, EventType, type MousePositionEvent, type Rect } from '../core/types';
 
-// Prevent duplicate injection
-if ((window as any).hasRecordoInjected) {
-    throw new Error("Recordo content script already injected");
-}
-(window as any).hasRecordoInjected = true;
+// Cleanup mechanism:
+// When a new version of the script loads, it dispatches 'recordo-cleanup' to tell 
+// any old orphaned instances to stop working.
+const cleanupEvent = new Event('recordo-cleanup');
+window.dispatchEvent(cleanupEvent);
+
+// Listen for the NEXT cleanup event (future injection) to stop THIS instance
+window.addEventListener('recordo-cleanup', () => {
+    logger.log("[Recordo] Cleaning up old content script instance.");
+    isRecording = false; // Stop processing
+    // We could remove listeners here if we stored them to variables, 
+    // but setting isRecording=false and checking runtime.id effectively kills it.
+}, { once: true });
 
 logger.log("[Recordo] Content script loaded");
 

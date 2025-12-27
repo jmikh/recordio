@@ -6,26 +6,25 @@ logger.log("Background service worker running");
 
 interface BackgroundState {
     isRecording: boolean;
+    recordingTabId: number | null;
     startTime: number;
     events: any[];
 }
 
 const state: BackgroundState = {
     isRecording: false,
+    recordingTabId: null,
     startTime: 0,
     events: []
 };
 
 // Hydrate state on startup (in case service worker woke up)
-chrome.storage.local.get(['recordingSyncTimestamp', 'isRecording'], (result: { recordingSyncTimestamp?: number, isRecording?: boolean }) => {
-    if (result.recordingSyncTimestamp) {
-        state.startTime = result.recordingSyncTimestamp;
-        // If we have a start time, and likely were recording
-        if (result.isRecording) {
-            state.isRecording = result.isRecording;
-        }
-    }
-});
+// We only really care about events or metadata that might be needed after a crash/restart strictly for recovery?
+// But for active recording state (streams), those die on restart anyway, so restoring 'isRecording=true' is actually correct ONLY if SW woke up but runtime didn't restart.
+// However, since we use offscreen document for recording, the SW lifecycle is less critical for the stream itself?
+// Actually, offscreen doc dies if extension reloads.
+// So let's NOT restore 'isRecording' blindly.
+
 
 // Ensure offscreen document exists
 async function setupOffscreenDocument(path: string) {
@@ -45,20 +44,29 @@ async function setupOffscreenDocument(path: string) {
 }
 
 // On Install/Update: Inject content script into existing tabs
+// Import the content script path via Vite's special ?script suffix logic
+// This ensures we get the compiled .js output path (e.g. assets/content.js) instead of the .ts source
+import contentScriptPath from '../content/index.ts?script';
+
+// On Install/Update: Inject content script into existing tabs
 chrome.runtime.onInstalled.addListener(async () => {
     console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
-    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    // Query ALL tabs (host_permissions should allow us to access them now)
+    const tabs = await chrome.tabs.query({});
+    console.log(`[Background] Found ${tabs.length} tabs to check.`, tabs);
+
     for (const tab of tabs) {
-        if (tab.id) {
+        if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("about:")) {
             try {
+                // Check if already injected? No easy way, just re-inject.
                 await chrome.scripting.executeScript({
                     target: { tabId: tab.id },
-                    files: ['src/content/index.ts']
+                    files: [contentScriptPath]
                 });
-                console.log(`[Background] Injected into tab ${tab.id}`);
-            } catch (err) {
+                console.log(`[Background] Injected into tab ${tab.id} (${tab.url})`);
+            } catch (err: any) {
                 // Ignore errors (e.g. restricted pages)
-                // console.warn(`[Background] Failed to inject into tab ${tab.id}`, err);
+                console.warn(`[Background] Failed to inject into tab ${tab.id} (${tab.url})`, err.message);
             }
         }
     }
@@ -110,7 +118,8 @@ function categorizeEvents(events: any[]): UserEvents {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // 1. Event Capture
     if (Object.values(EventType).includes(message.type.toLowerCase() as any)) {
-        if (state.isRecording) {
+        // Only accept events from the tab we are currently recording
+        if (state.isRecording && _sender.tab && _sender.tab.id === state.recordingTabId) {
             // Append event type to payload for easy storage
             const eventType = message.type.toLowerCase();
             const eventWithMeta = { ...message.payload, type: eventType };
@@ -123,8 +132,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
         return true;
     } else if (message.type === 'GET_RECORDING_STATE') {
+        let isRecording = state.isRecording;
+
+        // "Robust" Logic:
+        // 1. If sender has a tab (Content Script), check if it matches the recording tab.
+        // 2. Else (Popup), return global state.
+
+        const targetTabId = _sender.tab?.id;
+
+        if (targetTabId) {
+            isRecording = state.isRecording && targetTabId === state.recordingTabId;
+        }
+        console.log("[Background] GET_RECORDING_STATE", { isRecording, startTime: state.startTime });
+
         const responseState = {
-            isRecording: state.isRecording,
+            isRecording: isRecording,
             startTime: state.startTime
         };
         sendResponse(responseState);
@@ -246,14 +268,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 await chrome.runtime.sendMessage({ type: 'START_RECORDING' });
 
                 state.isRecording = true;
+                state.recordingTabId = tabId;
                 state.startTime = syncTimestamp;
                 state.events = []; // Reset events
 
                 // Store Sync Timestamp (optional now, but good for debug)
+                // We DO NOT store isRecording=true here anymore to avoid stale state on reload.
                 chrome.storage.local.set({
                     currentSessionEvents: [],
                     recordingSyncTimestamp: syncTimestamp,
-                    isRecording: true
+                    // isRecording: true, // REMOVED
+                    // recordingTabId: tabId // REMOVED
                 });
 
                 // Notify content script safely
@@ -305,9 +330,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             events: userEvents // Send categorized object instead of raw array
         });
         state.isRecording = false;
+        state.recordingTabId = null;
 
         // Clear persistence
-        chrome.storage.local.remove(['recordingSyncTimestamp', 'isRecording']);
+        chrome.storage.local.remove(['recordingSyncTimestamp']);
 
         sendResponse({ success: true });
     } else if (message.type === 'OPEN_EDITOR') {
