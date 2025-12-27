@@ -1,4 +1,4 @@
-import { type UserEvents, type ViewportMotion, type Size, type Rect } from '../types';
+import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType } from '../types';
 import { ViewMapper } from './viewMapper';
 
 export * from './viewMapper';
@@ -38,23 +38,43 @@ const recalculateOutputTimeEvents = (
         keyboardEvents: mapFn(sourceEvents.keyboardEvents),
         drags: mapFn(sourceEvents.drags),
         scrolls: mapFn(sourceEvents.scrolls),
-        typingEvents: mapFn(sourceEvents.typingEvents),
+        typingEvents: (sourceEvents.typingEvents || []).map(e => {
+            const timelineTime = e.timestamp + timelineOffsetMs;
+            let acc = 0;
+            let startWin = null;
+            let startWinAcc = 0;
+
+            // Find start window
+            for (const w of outputWindows) {
+                if (timelineTime >= w.startMs && timelineTime < w.endMs) {
+                    startWin = w;
+                    startWinAcc = acc;
+                    break;
+                }
+                acc += (w.endMs - w.startMs);
+            }
+
+            if (!startWin) return null; // Start is not visible
+
+            const mappedTime = startWinAcc + (timelineTime - startWin.startMs);
+            let mappedEndTime = mappedTime;
+
+            if (e.endTime) {
+                const timelineEnd = e.endTime + timelineOffsetMs;
+                // Clamp end time to the end of the current window to ensure validity
+                // This handles cases where typing extends into a cut/trim.
+                const relevantEnd = Math.min(timelineEnd, startWin.endMs);
+                mappedEndTime = startWinAcc + (relevantEnd - startWin.startMs);
+            }
+
+            return { ...e, timestamp: mappedTime, endTime: mappedEndTime };
+        }).filter(e => e !== null) as any[],
         urlChanges: mapFn(sourceEvents.urlChanges), // Add this
     };
 };
 
 export function calculateZoomSchedule(
     maxZoom: number,
-    viewMapper: ViewMapper,
-    events: UserEvents,
-    outputWindows: OutputWindow[],
-    timelineOffsetMs: number
-): ViewportMotion[] {
-    return calculateZoomSchedule2(maxZoom, viewMapper, events, outputWindows, timelineOffsetMs);
-}
-
-export function calculateZoomSchedule2(
-    _maxZoom: number,
     viewMapper: ViewMapper,
     events: UserEvents,
     outputWindows: OutputWindow[],
@@ -140,7 +160,7 @@ export function calculateZoomSchedule2(
                 mousePosIdx = validHoverEndIdx + 1;
 
                 return {
-                    type: 'hover',
+                    type: EventType.HOVER,
                     timestamp: startP.timestamp,
                     endTime: endP.timestamp,
                     mousePos: { x: centerX, y: centerY }
@@ -162,7 +182,6 @@ export function calculateZoomSchedule2(
     const motions: ViewportMotion[] = [];
     const outputVideoSize = viewMapper.outputVideoSize;
     let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
-    const maxZoom = _maxZoom; // Use User Argument
 
     const processEvent = (evt: any, isHover: boolean) => {
         const mustSeeRect = getMustSeeRect(evt, maxZoom, viewMapper);
@@ -180,21 +199,9 @@ export function calculateZoomSchedule2(
             if (!mustSeeFits) {
                 shouldGenerateMotion = true;
             }
-        } else {
-            // Explicit Event (Click, Scroll, Typing, UrlChange)
-
-            // SPECIAL CASE: URL Change implies a full reset. Always generate motion if not matching.
-            if (evt.type === 'urlchange') {
-                // If not already at full view (which is targetViewport for urlchange), we should zoom out.
-                // Actually, logic below handles "mustSeeFits" and "sizeChanged".
-                // For URL Change, mustSee is full rect. 
-                // If last Viewport is NOT full rect, mustSeeFits will be false (or sizeChanged true).
-                // So we can stick to standard logic.
-                shouldGenerateMotion = true;
-            } else if (!mustSeeFits || sizeChanged) {
-                // "if mustsee rect doesnt fit entirely in lastviewport or new viewport is not same size as last viewport , then add a viewportMotion"
-                shouldGenerateMotion = true;
-            }
+        } else if (!mustSeeFits || sizeChanged) {
+            // "if mustsee rect doesnt fit entirely in lastviewport or new viewport is not same size as last viewport , then add a viewportMotion"
+            shouldGenerateMotion = true;
         }
 
         if (shouldGenerateMotion) {
@@ -258,7 +265,12 @@ export function calculateZoomSchedule2(
             explicitIdx++;
 
             // Advance mousePosIdx to be at least past this event to avoid scanning ancient history
-            while (mousePosIdx < mousePositions.length && mousePositions[mousePosIdx].timestamp <= nextExplicit.timestamp) {
+            let advanceUntil = nextExplicit.timestamp;
+            if (nextExplicit.type === EventType.TYPING && (nextExplicit as any).endTime) {
+                advanceUntil = (nextExplicit as any).endTime;
+            }
+
+            while (mousePosIdx < mousePositions.length && mousePositions[mousePosIdx].timestamp <= advanceUntil) {
                 mousePosIdx++;
             }
         } else {
@@ -309,7 +321,7 @@ export function getMustSeeRect(
     let centerX = 0;
     let centerY = 0;
 
-    if (evt.type === 'typing' || evt.type === 'scroll') {
+    if (evt.type === EventType.TYPING || evt.type === EventType.SCROLL) {
         const targetRect = evt.targetRect || { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
         const mappedTargetRect = viewMapper.inputToOutputRect(targetRect);
 
@@ -333,7 +345,7 @@ export function getMustSeeRect(
             centerY = mouseOut.y;
         }
 
-    } else if (evt.type === 'urlchange') {
+    } else if (evt.type === EventType.URLCHANGE) {
         // URL Change -> Full View
         targetWidth = outputSize.width;
         targetHeight = outputSize.height;

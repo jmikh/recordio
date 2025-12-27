@@ -55,6 +55,9 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
             recordingStartTime = message.startTime;
         }
         logger.log("[Content] isRecording updated to:", isRecording, "Start:", recordingStartTime);
+        if (isRecording) {
+            sendUrlEvent('status_change');
+        }
     } else if (message.type === 'SHOW_COUNTDOWN') {
         startCountdown();
     }
@@ -112,6 +115,7 @@ chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {
         if (response.startTime) {
             recordingStartTime = response.startTime;
         }
+        sendUrlEvent('init_state');
     }
 });
 
@@ -373,8 +377,9 @@ setInterval(() => {
 }, 400);
 
 // URL Capture
-function sendUrlEvent() {
+function sendUrlEvent(source?: string) {
     if (!isRecording) return;
+    logger.log(`[Recordo] URL Change Detected via ${source || 'unknown'}: ${window.location.href}`);
     sendMessageToBackground(EventType.URLCHANGE, {
         timestamp: getRelativeTime(),
         mousePos: lastMousePos.mousePos, // Use last known pos
@@ -382,8 +387,8 @@ function sendUrlEvent() {
     });
 }
 
-window.addEventListener('popstate', sendUrlEvent);
-window.addEventListener('hashchange', sendUrlEvent);
+window.addEventListener('popstate', () => sendUrlEvent('popstate'));
+window.addEventListener('hashchange', () => sendUrlEvent('hashchange'));
 // Initial load
 sendUrlEvent();
 
@@ -555,7 +560,7 @@ window.addEventListener('scroll', (e) => {
     }
 
 
-    sendMessageToBackground('SCROLL', {
+    sendMessageToBackground(EventType.SCROLL, {
         timestamp: now,
         mousePos: lastMousePos.mousePos,
         targetRect: dprScaleRect(targetRect)

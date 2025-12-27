@@ -81,7 +81,7 @@ export const useProjectStore = create<ProjectState>()(
                         } catch (e) {
                             console.error(`Failed to load events for source ${screenSourceId}`, e);
                             // Initialize empty if failed to avoid crashes
-                            events = { mouseClicks: [], keyboardEvents: [], mousePositions: [], drags: [], scrolls: [], typingEvents: [] };
+                            events = { mouseClicks: [], keyboardEvents: [], mousePositions: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [] };
                         }
                     }
 
