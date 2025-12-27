@@ -1,10 +1,6 @@
 - optimize scroll recording  only need to fetch effective content area once per URL
-- scroll recording might be reporting last timestamp of the scroll
-- [x] add zoom based on URL change (should proably start zooming out after the url change)
+- scroll recording might be reporting last timestamp of the scroll (mild)
+- send typing event and reset it if mouse down or scroll are detected
 - test perfomance with large videos (specially zoom calculations)
-- [x] text box bounds should be take into account when in focus
-- [x] use viewport-must and viewport-preferred in zoom calculations. if viewport-must all fit in last viewport then don't change it, if not then use viewport-preferred. Scroll > Click > Editing > Hover.
-i 
 - deactivate logger in production
-[x] events stop recording on url change because it misses the start recording message. shoud send to background ask for recording state and start time. 
 
