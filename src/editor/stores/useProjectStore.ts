@@ -5,6 +5,7 @@ import type { Project, ID, Recording, OutputWindow, UserEvents, ViewportMotion, 
 import { ProjectImpl } from '../../core/project/Project';
 import { ProjectLibrary } from '../../core/project/ProjectLibrary';
 import { calculateZoomSchedule, ViewMapper } from '../../core/effects/viewportMotion';
+import { TimeMapper } from '../../core/effects/timeMapper';
 
 interface ProjectState {
     project: Project;
@@ -47,12 +48,13 @@ const recalculateAutoZooms = (project: Project, events: UserEvents | null): View
         project.settings.padding
     );
 
+    const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
+
     return calculateZoomSchedule(
         project.settings.maxZoom,
         viewMapper,
         events,
-        project.timeline.outputWindows,
-        project.timeline.recording.timelineOffsetMs
+        timeMapper
     );
 };
 

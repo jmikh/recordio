@@ -2,7 +2,7 @@ import type { UserEvents, Project, TimeMs } from '../../core/types';
 import { ViewMapper } from '../../core/effects/viewMapper';
 import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
-import { mapTimelineToOutputTime } from '../../core/effects/timeMapper';
+import { TimeMapper } from '../../core/effects/timeMapper';
 import { getViewportStateAtTime } from '../../core/effects/viewportMotion';
 
 /**
@@ -23,11 +23,14 @@ export function drawScreen(
     const screenSource = sources[recording.screenSourceId];
     if (!screenSource) return;
 
+    // Initialize TimeMapper
+    const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
+
     // 2. Calculate Times
     // Source Time: time relative to the video file
     const sourceTimeMs = currentTimeMs - recording.timelineOffsetMs;
     // Output Time: time relative to the gapless output video
-    const outputTimeMs = mapTimelineToOutputTime(currentTimeMs, outputWindows);
+    const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
 
     // 3. Resolve Viewport
     const viewportMotions = recording.viewportMotions || [];
@@ -35,8 +38,7 @@ export function drawScreen(
         viewportMotions,
         outputTimeMs, // Use Output Time for Viewport motion (smoothness)
         project.settings.outputSize,
-        outputWindows,
-        recording.timelineOffsetMs
+        timeMapper
     );
 
     // Use video dimensions if available, otherwise source metadata

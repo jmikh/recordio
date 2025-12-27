@@ -1,6 +1,7 @@
 import { type Project, type SourceMetadata, type UserEvents, type Recording, type ID } from '../types';
 import { TimelineImpl } from '../timeline/Timeline';
 import { calculateZoomSchedule, ViewMapper } from '../effects/viewportMotion';
+import { TimeMapper } from '../effects/timeMapper';
 
 
 
@@ -75,12 +76,13 @@ export class ProjectImpl {
             project.settings.padding || 0.03
         );
 
+        const timeMapper = new TimeMapper(0, outputWindows);
+
         const viewportMotions = calculateZoomSchedule(
             project.settings.maxZoom,
             viewMapper,
             screenEvents,
-            outputWindows,
-            0 // timelineOffsetMs
+            timeMapper
         );
 
         const recording: Recording = {
@@ -119,6 +121,3 @@ export class ProjectImpl {
         };
     }
 }
-
-
-

@@ -1,5 +1,6 @@
 import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType } from '../types';
 import { ViewMapper } from './viewMapper';
+import { TimeMapper } from './timeMapper';
 
 export * from './viewMapper';
 
@@ -10,22 +11,17 @@ export * from './viewMapper';
 
 const HoverMinDurationMs = 1000;
 
-// Re-export time mapper for convenience if needed, or import directly
-import { mapSourceToOutputTime, mapOutputToSourceTime, getOutputDuration } from './timeMapper';
-import type { OutputWindow } from '../types';
-
 
 // Helper: Recalculate Output Time Events
 const recalculateOutputTimeEvents = (
     sourceEvents: UserEvents | null,
-    outputWindows: OutputWindow[],
-    timelineOffsetMs: number
+    timeMapper: TimeMapper
 ): UserEvents | null => {
     if (!sourceEvents) return null;
     const mapFn = (events: any[]) => {
         return (events || [])
             .map(e => {
-                const mappedTime = mapSourceToOutputTime(e.timestamp, outputWindows, timelineOffsetMs);
+                const mappedTime = timeMapper.mapSourceToOutputTime(e.timestamp);
                 if (mappedTime === -1) return null;
                 return { ...e, timestamp: mappedTime };
             })
@@ -39,37 +35,12 @@ const recalculateOutputTimeEvents = (
         drags: mapFn(sourceEvents.drags),
         scrolls: mapFn(sourceEvents.scrolls),
         typingEvents: (sourceEvents.typingEvents || []).map(e => {
-            const timelineTime = e.timestamp + timelineOffsetMs;
-            let acc = 0;
-            let startWin = null;
-            let startWinAcc = 0;
+            const mappedRange = timeMapper.mapSourceRangeToOutputRange(e.timestamp, e.endTime);
+            if (!mappedRange) return null;
 
-            // Find start window
-            for (const w of outputWindows) {
-                if (timelineTime >= w.startMs && timelineTime < w.endMs) {
-                    startWin = w;
-                    startWinAcc = acc;
-                    break;
-                }
-                acc += (w.endMs - w.startMs);
-            }
-
-            if (!startWin) return null; // Start is not visible
-
-            const mappedTime = startWinAcc + (timelineTime - startWin.startMs);
-            let mappedEndTime = mappedTime;
-
-            if (e.endTime) {
-                const timelineEnd = e.endTime + timelineOffsetMs;
-                // Clamp end time to the end of the current window to ensure validity
-                // This handles cases where typing extends into a cut/trim.
-                const relevantEnd = Math.min(timelineEnd, startWin.endMs);
-                mappedEndTime = startWinAcc + (relevantEnd - startWin.startMs);
-            }
-
-            return { ...e, timestamp: mappedTime, endTime: mappedEndTime };
+            return { ...e, timestamp: mappedRange.start, endTime: mappedRange.end };
         }).filter(e => e !== null) as any[],
-        urlChanges: mapFn(sourceEvents.urlChanges), // Add this
+        urlChanges: mapFn(sourceEvents.urlChanges),
     };
 };
 
@@ -77,16 +48,14 @@ export function calculateZoomSchedule(
     maxZoom: number,
     viewMapper: ViewMapper,
     events: UserEvents,
-    outputWindows: OutputWindow[],
-    timelineOffsetMs: number
+    timeMapper: TimeMapper
 ): ViewportMotion[] {
     console.log('[ZoomDebug] calculateZoomSchedule2');
 
     // 1. Map all events to Output Time
-    const outputTimeEvents = recalculateOutputTimeEvents(events, outputWindows, timelineOffsetMs);
+    const outputTimeEvents = recalculateOutputTimeEvents(events, timeMapper);
     if (!outputTimeEvents) return [];
 
-    // 2. Prepare Explicit Events
     // 2. Prepare Explicit Events
     const explicitEvents = [
         ...(outputTimeEvents.mouseClicks || []),
@@ -205,7 +174,7 @@ export function calculateZoomSchedule(
         }
 
         if (shouldGenerateMotion) {
-            const sourceEndTime = mapOutputToSourceTime(evt.timestamp, outputWindows, timelineOffsetMs);
+            const sourceEndTime = timeMapper.mapOutputToSourceTime(evt.timestamp);
             if (sourceEndTime !== -1) {
                 motions.push({
                     sourceEndTimeMs: sourceEndTime,
@@ -221,7 +190,7 @@ export function calculateZoomSchedule(
 
     const ZOOM_TRANSITION_DURATION = 500;
     const IGNORE_EVENTS_BUFFER = 3000;
-    const totalOutputDuration = getOutputDuration(outputWindows);
+    const totalOutputDuration = timeMapper.getOutputDuration();
     const zoomOutStartTime = Math.max(0, totalOutputDuration - IGNORE_EVENTS_BUFFER);
 
 
@@ -289,7 +258,7 @@ export function calculateZoomSchedule(
         // Duration: ZOOM_TRANSITION_DURATION
         // End (Output Time): zoomOutStartTime + ZOOM_TRANSITION_DURATION
         const zoomOutEndTime = zoomOutStartTime + ZOOM_TRANSITION_DURATION;
-        const sourceEndTime = mapOutputToSourceTime(zoomOutEndTime, outputWindows, timelineOffsetMs);
+        const sourceEndTime = timeMapper.mapOutputToSourceTime(zoomOutEndTime);
 
         if (sourceEndTime !== -1) {
             motions.push({
@@ -439,15 +408,14 @@ export function getViewportStateAtTime(
     motions: ViewportMotion[],
     outputTimeMs: number,
     outputSize: Size,
-    outputWindows: OutputWindow[],
-    timelineOffsetMs: number
+    timeMapper: TimeMapper
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // 1. Prepare valid motions with computed start/end times in Output Space
     const validMotions = motions
         .map(m => {
-            const end = mapSourceToOutputTime(m.sourceEndTimeMs, outputWindows, timelineOffsetMs);
+            const end = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
             if (end === -1) return null;
             return {
                 ...m,
@@ -514,7 +482,3 @@ function interpolateRect(from: Rect, to: Rect, t: number): Rect {
         height: from.height + (to.height - from.height) * t,
     };
 }
-
-
-
-
