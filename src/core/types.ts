@@ -21,6 +21,7 @@ export interface Size {
     height: number;
 }
 
+// The rect point represents the top-left corner.
 export interface Rect extends Point, Size { }
 
 // ==========================================
@@ -255,12 +256,3 @@ export interface TypingEvent extends BaseEvent {
 export type UserEvent = MouseClickEvent | MousePositionEvent | UrlChangeEvent | KeyboardEvent | HoverEvent | DragEvent | ScrollEvent | TypingEvent;
 
 export type BackgroundType = 'solid' | 'image';
-
-export interface BackgroundSettings {
-    type: BackgroundType;
-    color?: string; // Hex code, e.g. #FFFFFF
-    imageUrl?: string; // Path to image (e.g. /assets/backgrounds/foo.jpg)
-    /** Scale padding percentage (0 to 0.5) */
-    padding: number;
-}
-
