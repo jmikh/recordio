@@ -15,6 +15,8 @@ export const MSG = {
     OFFSCREEN_READY: 'OFFSCREEN_READY',         // Offscreen tells Background it's loaded
     PREPARE_RECORDING: 'PREPARE_RECORDING',     // Background -> Offscreen: Init streams
     RECORDING_PREPARED: 'RECORDING_PREPARED',   // Offscreen -> Background: Streams ready
+    RECORDING_FAILED: 'RECORDING_FAILED',       // Offscreen -> Background: Streams failed
+    CALIBRATION_DIMENSIONS: 'CALIBRATION_DIMENSIONS', // Calibration Page -> Background: Report dimensions
     RECORDING_STARTED: 'RECORDING_STARTED',     // Background -> Offscreen: Start MediaRecorder
     STOP_RECORDING_OFFSCREEN: 'STOP_RECORDING_OFFSCREEN', // Background -> Offscreen: Stop & Save
     OPEN_EDITOR: 'OPEN_EDITOR',                 // Offscreen -> Background: Open editor tab
@@ -24,6 +26,8 @@ export const MSG = {
     COUNTDOWN_FINISHED: 'COUNTDOWN_FINISHED',   // Content -> Background: Countdown done
     RECORDING_STATUS_CHANGED: 'RECORDING_STATUS_CHANGED', // Background -> Content: Update state
 
+    // --- Logging ---
+    LOG_MESSAGE: 'LOG_MESSAGE',                 // Offscreen -> Background: Forward logs
 } as const;
 
 export type MessageName = typeof MSG[keyof typeof MSG];
@@ -84,6 +88,14 @@ export type MessageMap = {
         req: {};
         res: void;
     };
+    [MSG.RECORDING_FAILED]: {
+        req: { error: string };
+        res: void;
+    };
+    [MSG.CALIBRATION_DIMENSIONS]: {
+        req: { dimensions: import('../core/types').Size };
+        res: void;
+    };
     [MSG.RECORDING_STARTED]: {
         req: { startTime: number };
         res: void;
@@ -108,6 +120,10 @@ export type MessageMap = {
     };
     [MSG.RECORDING_STATUS_CHANGED]: {
         req: { isRecording: boolean; startTime: number };
+        res: void;
+    };
+    [MSG.LOG_MESSAGE]: {
+        req: { level: 'log' | 'warn' | 'error', args: any[] };
         res: void;
     };
 };

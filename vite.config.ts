@@ -17,7 +17,8 @@ export default defineConfig(({ mode }) => ({
       input: {
         editor: resolve(__dirname, 'src/editor/index.html'),
         offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
-        permissions: resolve(__dirname, 'src/permissions/permissions.html')
+        permissions: resolve(__dirname, 'src/permissions/permissions.html'),
+        calibration: resolve(__dirname, 'src/calibration/index.html')
       },
       output: {},
     },

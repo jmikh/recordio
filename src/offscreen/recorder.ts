@@ -10,101 +10,180 @@ let audioContext: AudioContext | null = null;
 let activeStreams: MediaStream[] = [];
 let startTime = 0;
 let projectId: string | null = null;
+let calibrationOffset: number | null = null;
+let currentRecordingMode: 'tab' | 'window' | null = null;
 
 import type { Size, SourceMetadata, UserEvents } from '../core/types';
 import { MSG } from '../shared/messages';
+import { checkWindowCalibration, remapUserEvents } from './calibration-logic';
 
 
 // Notify background that we are ready
 chrome.runtime.sendMessage({ type: MSG.OFFSCREEN_READY });
 
-chrome.runtime.onMessage.addListener(async (message) => {
+// Forward logs to background
+function forwardLogs() {
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = (...args) => {
+        originalLog(...args); // Keep local logging
+        chrome.runtime.sendMessage({ type: MSG.LOG_MESSAGE, level: 'log', args });
+    };
+
+    console.warn = (...args) => {
+        originalWarn(...args);
+        chrome.runtime.sendMessage({ type: MSG.LOG_MESSAGE, level: 'warn', args });
+    };
+
+    console.error = (...args) => {
+        originalError(...args);
+        chrome.runtime.sendMessage({ type: MSG.LOG_MESSAGE, level: 'error', args });
+    };
+}
+forwardLogs();
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // Dispatch logic
     if (message.type === MSG.PREPARE_RECORDING) {
-        const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, dimensions, recordingMode } } = message as {
-            streamId: string;
-            data: {
-                hasAudio: boolean;
-                hasCamera: boolean;
-                audioDeviceId?: string;
-                videoDeviceId?: string;
-                dimensions?: Size;
-                recordingMode: 'tab' | 'window';
-            };
+        handlePrepare(message);
+        return true;
+    } else if (message.type === MSG.RECORDING_STARTED) {
+        handleRecordingStarted(message);
+        return true;
+    } else if (message.type === MSG.STOP_RECORDING_OFFSCREEN) {
+        const events = message.events || [];
+        stopRecording(events);
+        return true;
+    } else if (message.type === MSG.PING_OFFSCREEN) {
+        sendResponse("PONG");
+    }
+    // Return false/undefined for unhandled messages (like START_RECORDING which is for BG)
+});
+
+// Helper functions to keep listener clean and avoid async wrapper for non-async parts
+async function handlePrepare(message: any) {
+    console.log("[Recorder] Received PREPARE_RECORDING", message);
+    const { streamId, data: { hasAudio, hasCamera, audioDeviceId, videoDeviceId, recordingMode, dimensions } } = message;
+
+    const targetDimensions = dimensions || null;
+
+    try {
+        cleanup(); // Ensure clean state
+        currentRecordingMode = recordingMode;
+
+        // 1. Get Screen Stream (Video + System Audio)
+        const source = recordingMode === 'window' ? 'desktop' : 'tab';
+        console.log(`[Recorder] Requesting User Media. Source: ${source}, StreamId: ${streamId}`);
+
+        const videoConstraints: any = {
+            mandatory: {
+                chromeMediaSource: source,
+                chromeMediaSourceId: streamId
+            }
         };
 
+        if (targetDimensions && recordingMode === 'tab') {
+            videoConstraints.mandatory.maxWidth = targetDimensions.width;
+            videoConstraints.mandatory.maxHeight = targetDimensions.height;
+            videoConstraints.mandatory.minWidth = targetDimensions.width;
+            videoConstraints.mandatory.minHeight = targetDimensions.height;
+        }
+
+        console.log("[Recorder] Video Constraints:", JSON.stringify(videoConstraints, null, 2));
+
+        let screenStream;
         try {
-            cleanup(); // Ensure clean state
-
-            // 1. Get Screen Stream (Video + System Audio)
-            const source = recordingMode === 'window' ? 'desktop' : 'tab';
-
-            const videoConstraints: any = {
-                mandatory: {
-                    chromeMediaSource: source,
-                    chromeMediaSourceId: streamId
-                }
-            };
-
-            if (dimensions) {
-                videoConstraints.mandatory.minWidth = dimensions.width;
-                videoConstraints.mandatory.minHeight = dimensions.height;
-                videoConstraints.mandatory.maxWidth = dimensions.width;
-                videoConstraints.mandatory.maxHeight = dimensions.height;
-            }
-
-            let screenStream;
+            screenStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    mandatory: {
+                        chromeMediaSource: source,
+                        chromeMediaSourceId: streamId
+                    }
+                } as any,
+                video: videoConstraints
+            });
+            console.log("[Recorder] Got Screen Stream (Audio+Video)", screenStream.id);
+        } catch (err: any) {
+            console.warn(`[Offscreen] Failed to get screen stream with audio. Name: ${err.name}, Message: ${err.message}`, err);
             try {
+                // Fallback: Video only (System audio might not be available or user unchecked it)
                 screenStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        mandatory: {
-                            chromeMediaSource: source,
-                            chromeMediaSourceId: streamId
-                        }
-                    } as any,
+                    audio: false,
                     video: videoConstraints
                 });
-            } catch (err: any) {
-                console.warn(`[Offscreen] Failed to get screen stream with audio. Name: ${err.name}, Message: ${err.message}`, err);
+                console.log("[Recorder] Got Screen Stream (Video Only)", screenStream.id);
+            } catch (err2: any) {
+                console.error(`[Offscreen] Failed video-only fallback. Name: ${err2.name}, Message: ${err2.message}`, err2);
+                throw err2;
+            }
+        }
+        activeStreams.push(screenStream);
+
+        // --- CALIBRATION & CAPTURE ---
+        if (recordingMode === 'window' && targetDimensions) {
+            console.log("[Recorder] Starting Calibration Check...");
+            (async () => {
                 try {
-                    // Fallback: Video only (System audio might not be available or user unchecked it)
-                    screenStream = await navigator.mediaDevices.getUserMedia({
-                        audio: false,
-                        video: videoConstraints
-                    });
-                } catch (err2: any) {
-                    console.error(`[Offscreen] Failed video-only fallback. Name: ${err2.name}, Message: ${err2.message}`, err2);
-                    throw err2;
+                    const result = await checkWindowCalibration(
+                        screenStream,
+                        targetDimensions,
+                        window.devicePixelRatio || 1
+                    );
+                    console.log("[Recorder] Calibration Result:", result);
+
+                    if (result && result.success) {
+                        calibrationOffset = result.yOffset;
+                        chrome.runtime.sendMessage({
+                            type: 'CALIBRATION_COMPLETE',
+                            calibration: result
+                        });
+                    } else {
+                        console.log("[Calibration] Failed to detect markers.");
+                    }
+                } catch (calErr) {
+                    console.error("[Recorder] Calibration error:", calErr);
                 }
-            }
-            activeStreams.push(screenStream);
+            })();
+        }
 
-            // MONITOR SYSTEM AUDIO: Connect tab audio to speakers so user can hear it
-            if (screenStream.getAudioTracks().length > 0) {
-                if (!audioContext) audioContext = new AudioContext();
-                const sysSource = audioContext.createMediaStreamSource(screenStream);
-                sysSource.connect(audioContext.destination);
-            }
+        // MONITOR SYSTEM AUDIO: Connect tab audio to speakers so user can hear it
+        if (screenStream.getAudioTracks().length > 0) {
+            if (!audioContext) audioContext = new AudioContext();
+            const sysSource = audioContext.createMediaStreamSource(screenStream);
+            sysSource.connect(audioContext.destination);
+        }
 
-            // 2. Get Microphone Audio if requested
-            let micStream: MediaStream | null = null;
-            if (hasAudio) {
+        // 2. Get Microphone Audio if requested
+        let micStream: MediaStream | null = null;
+        if (hasAudio) {
+            console.log("[Recorder] Requesting Mic Stream...");
+            try {
                 const audioConstraints = audioDeviceId
                     ? { deviceId: { exact: audioDeviceId } }
                     : true;
                 micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
                 activeStreams.push(micStream);
+                console.log("[Recorder] Got Mic Stream", micStream.id);
+            } catch (micErr) {
+                console.warn("[Recorder] Failed to get microphone", micErr);
             }
+        }
 
-            // 3. Prepare Recorders
-            if (hasCamera) {
-                // --- DUAL RECORDING MODE ---
+        // 3. Prepare Recorders
+        if (hasCamera) {
+            console.log("[Recorder] Requesting Camera Stream...");
+            // --- DUAL RECORDING MODE ---
 
-                // A. Camera Stream setup
+            // A. Camera Stream setup
+            try {
                 const camVideoConstraints = videoDeviceId
                     ? { deviceId: { exact: videoDeviceId } }
                     : true;
                 const rawCameraStream = await navigator.mediaDevices.getUserMedia({ video: camVideoConstraints });
                 activeStreams.push(rawCameraStream);
+                console.log("[Recorder] Got Camera Stream", rawCameraStream.id);
 
                 // Mix Camera Video + Mic Audio
                 const cameraTracks = [...rawCameraStream.getVideoTracks()];
@@ -126,60 +205,63 @@ chrome.runtime.onMessage.addListener(async (message) => {
                 // Event Handlers
                 screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
                 cameraRecorder.ondataavailable = (e) => { if (e.data.size > 0) cameraData.push(e.data); };
-
-            } else {
-                // --- SINGLE RECORDING MODE (Screen + Mic + System) ---
-
-                // Need to mix Mic + System Audio if both exist
-                let finalScreenStream = screenStream;
-
-                if (micStream) {
-                    audioContext = new AudioContext();
-                    const dest = audioContext.createMediaStreamDestination();
-
-                    if (screenStream.getAudioTracks().length > 0) {
-                        const sysSource = audioContext.createMediaStreamSource(screenStream);
-                        sysSource.connect(dest);
-                    }
-
-                    const micSource = audioContext.createMediaStreamSource(micStream);
-                    micSource.connect(dest);
-
-                    const mixedTracks = [
-                        ...screenStream.getVideoTracks(),
-                        dest.stream.getAudioTracks()[0] // Mixed Audio
-                    ];
-                    finalScreenStream = new MediaStream(mixedTracks);
-                }
-
-                screenRecorder = new MediaRecorder(finalScreenStream, { mimeType: 'video/webm;codecs=vp9' });
-                screenData = [];
-                screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
+            } catch (camErr) {
+                console.error("[Recorder] Camera setup failed", camErr);
             }
 
-            // NOTIFY READY
-            chrome.runtime.sendMessage({ type: MSG.RECORDING_PREPARED });
+        } else {
+            // --- SINGLE RECORDING MODE (Screen + Mic + System) ---
 
-        } catch (err) {
-            console.error("Offscreen recording error:", err);
-            cleanup();
+            // Need to mix Mic + System Audio if both exist
+            let finalScreenStream = screenStream;
+
+            if (micStream) {
+                audioContext = new AudioContext();
+                const dest = audioContext.createMediaStreamDestination();
+
+                if (screenStream.getAudioTracks().length > 0) {
+                    const sysSource = audioContext.createMediaStreamSource(screenStream);
+                    sysSource.connect(dest);
+                }
+
+                const micSource = audioContext.createMediaStreamSource(micStream);
+                micSource.connect(dest);
+
+                const mixedTracks = [
+                    ...screenStream.getVideoTracks(),
+                    dest.stream.getAudioTracks()[0] // Mixed Audio
+                ];
+                finalScreenStream = new MediaStream(mixedTracks);
+            }
+
+            screenRecorder = new MediaRecorder(finalScreenStream, { mimeType: 'video/webm;codecs=vp9' });
+            screenData = [];
+            screenRecorder.ondataavailable = (e) => { if (e.data.size > 0) screenData.push(e.data); };
         }
-    } else if (message.type === MSG.RECORDING_STARTED) {
-        startTime = Date.now();
-        projectId = crypto.randomUUID();
-        if (screenRecorder && screenRecorder.state === 'inactive') screenRecorder.start();
-        if (cameraRecorder && cameraRecorder.state === 'inactive') cameraRecorder.start();
 
-        // Ack
-        chrome.runtime.sendMessage({ type: MSG.RECORDING_STARTED, startTime });
+        // NOTIFY READY
+        console.log("[Recorder] Sending RECORDING_PREPARED");
+        chrome.runtime.sendMessage({ type: MSG.RECORDING_PREPARED });
 
-    } else if (message.type === MSG.STOP_RECORDING_OFFSCREEN) {
-        const events = message.events || [];
-        stopRecording(events);
-    } else if (message.type === MSG.PING_OFFSCREEN) {
-        return Promise.resolve("PONG");
+    } catch (err: any) {
+        console.error("Offscreen recording error:", err);
+        chrome.runtime.sendMessage({
+            type: MSG.RECORDING_FAILED,
+            error: err.message || "Unknown offscreen error"
+        });
+        cleanup();
     }
-});
+}
+
+async function handleRecordingStarted(_message: any) {
+    startTime = Date.now();
+    projectId = crypto.randomUUID();
+    if (screenRecorder && screenRecorder.state === 'inactive') screenRecorder.start();
+    if (cameraRecorder && cameraRecorder.state === 'inactive') cameraRecorder.start();
+
+    // Ack
+    chrome.runtime.sendMessage({ type: MSG.RECORDING_STARTED, startTime });
+}
 
 function cleanup() {
     activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
@@ -190,6 +272,8 @@ function cleanup() {
     }
     screenRecorder = null;
     cameraRecorder = null;
+    calibrationOffset = null;
+    currentRecordingMode = null;
     // Do not clear data here, we need to save it first
 }
 
@@ -199,12 +283,16 @@ async function stopRecording(events: UserEvents) {
 
     // Capture dimensions before stopping
     let screenDimensions: Size | undefined;
+    console.log("screen dimensions:", screenDimensions);
+    console.log("screen recorder:", screenRecorder);
     if (screenRecorder && screenRecorder.stream) {
         const videoTrack = screenRecorder.stream.getVideoTracks()[0];
+        console.log("video track:", videoTrack);
         if (videoTrack) {
             const settings = videoTrack.getSettings();
             if (settings.width && settings.height) {
                 screenDimensions = { width: settings.width, height: settings.height };
+                console.log("screen dimensions:", screenDimensions);
             }
         }
     }
@@ -254,18 +342,45 @@ async function stopRecording(events: UserEvents) {
         // Save Video Blob
         await saveToIndexedDB('recording', blobId, blob, duration, projectId, screenDimensions);
 
+        // Process Events: Remap if needed
+        let finalEvents = events;
+
+        console.log('[Recorder] Processing events for storage', {
+            mode: currentRecordingMode,
+            calibrationOffset,
+            eventCount: events.mouseClicks.length + events.mousePositions.length // simple proxy for count
+        });
+
+        if (currentRecordingMode === 'window' && calibrationOffset !== null) {
+            console.log('[Recorder] Remapping events with offset:', calibrationOffset);
+            finalEvents = remapUserEvents(events, calibrationOffset);
+        } else if (currentRecordingMode !== 'tab') {
+            console.warn('[Recorder] Discarding events: Window mode active but no calibration offset found.');
+            finalEvents = {
+                mouseClicks: [],
+                mousePositions: [],
+                keyboardEvents: [],
+                drags: [],
+                scrolls: [],
+                typingEvents: [],
+                urlChanges: []
+            };
+        } else {
+            console.log('[Recorder] Saving raw events (Tab mode).');
+        }
         // Save Events Blob
-        const eventsBlob = new Blob([JSON.stringify(events)], { type: 'application/json' });
+        const eventsBlob = new Blob([JSON.stringify(finalEvents)], { type: 'application/json' });
         await saveToIndexedDB('recording', eventsBlobId, eventsBlob, duration, projectId);
 
         // Save Source Metadata
+        console.log("screen dimensions in metdata:", screenDimensions);
         const source: SourceMetadata = {
             id: sourceId,
             type: 'video',
             url: `recordo-blob://${blobId}`,
             eventsUrl: `recordo-blob://${eventsBlobId}`,
             durationMs: duration,
-            size: screenDimensions || { width: 1920, height: 1080 },
+            size: screenDimensions as Size,
             hasAudio: true,
             createdAt: now
         };
