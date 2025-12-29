@@ -47,6 +47,7 @@ export class ContentRecorder {
     public stop() {
         if (!this.isRecording) return;
         this.isRecording = false;
+        this.flushPendingTypingSession();
         this.removeListeners();
         this.stopPolling();
         logger.log("[ContentRecorder] Stopped capturing events.");
@@ -227,7 +228,7 @@ export class ContentRecorder {
         const isModifier = e.ctrlKey || e.metaKey || e.altKey;
         const isSpecial = ['Enter', 'Tab', 'Escape', 'Backspace', 'Delete'].includes(e.key);
 
-        if (isInput) this.lastKeystrokeTime = Date.now();
+        if (isInput) this.lastKeystrokeTime = this.getRelativeTime();
 
         const shouldCapture = !isInput || (isInput && (isModifier || isSpecial));
 
@@ -312,9 +313,8 @@ export class ContentRecorder {
     private pollTyping = () => {
         if (!this.isActive()) return;
 
-        const realNow = Date.now();
         const now = this.getRelativeTime();
-        const activeEl = document.activeElement as HTMLElement; // Simplified active element check
+        const activeEl = document.activeElement as HTMLElement;
 
         // Check if editable
         const tagName = activeEl?.tagName;
@@ -326,12 +326,8 @@ export class ContentRecorder {
             if (!nonTextInputs.includes(type)) isEditable = true;
         }
 
-        if (!activeEl || !isEditable) return;
-
-        let isTypingActive = false;
-        const isTyping = (realNow - this.lastKeystrokeTime) < 1000;
-
-        if (isTyping) isTypingActive = true;
+        const isTyping = (now - this.lastKeystrokeTime) < 1000;
+        const isTypingActive = isTyping && isEditable;
 
         if (this.currentTypingSession) {
             if (!isTypingActive || activeEl !== this.currentTypingSession.element) {
@@ -344,7 +340,7 @@ export class ContentRecorder {
                 });
                 this.currentTypingSession = null;
             }
-        } else if (isTypingActive) {
+        } else if (isTypingActive && activeEl) {
             // Start Session
             const rect = activeEl.getBoundingClientRect();
             this.currentTypingSession = {
@@ -352,6 +348,19 @@ export class ContentRecorder {
                 targetRect: this.dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }),
                 element: activeEl
             };
+        }
+    }
+
+    private flushPendingTypingSession() {
+        if (this.currentTypingSession) {
+            const now = this.getRelativeTime();
+            this.sendMessage(EventType.TYPING, {
+                timestamp: this.currentTypingSession.startTime,
+                mousePos: this.lastMousePos.mousePos,
+                targetRect: this.currentTypingSession.targetRect,
+                endTime: now
+            });
+            this.currentTypingSession = null;
         }
     }
 }
