@@ -290,13 +290,6 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
 // --- Main Listener ---
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    // Strict Filter: Only handle messages intended for background
-    // Removed target check as it is part of the refactor
-
-
-    logger.log(`[Background] RECEIVED from ${(_sender.tab ? `Tab ${_sender.tab.id}` : _sender.id)}:`, message);
-
-    // Ensure state is loaded
     (async () => {
         await ensureState();
         if (!currentState) return; // Should be set by ensureState
@@ -316,8 +309,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 handleGetRecordingState(_sender, sendResponse);
                 break;
 
+
+
             case MSG_TYPES.PING_OFFSCREEN:
-                // sendResponse("PONG");
+                sendResponse("PONG");
                 break;
         }
     })();

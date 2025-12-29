@@ -1,6 +1,6 @@
 
 import type { ID, Project, SourceMetadata } from '../types';
-import { ProjectImpl } from './Project';
+
 
 const DB_NAME = 'RecordoDB';
 const DB_VERSION = 1;
@@ -47,12 +47,10 @@ export class ProjectLibrary {
     }
 
     /**
-     * initializes a project for a given ID.
-     * 1. Checks if Project exists. If yes, loads it.
-     * 2. If no, checks if Source exists (from recording). If yes, creates new Project.
-     * 3. Else throws error.
+     * Loads a project by ID.
+     * Throws error if not found.
      */
-    static async initProject(projectId: ID): Promise<Project> {
+    static async loadProjectOrFail(projectId: ID): Promise<Project> {
         // 1. Try to load existing project
         const existingProject = await this.loadProject(projectId);
         if (existingProject) {
@@ -60,33 +58,7 @@ export class ProjectLibrary {
             return existingProject;
         }
 
-        // 2. Try to load sources (implying a new recording just finished)
-        // We look for both screen and camera sources based on convention
-        const screenSourceId = `src-${projectId}-screen`;
-        const cameraSourceId = `src-${projectId}-camera`;
-
-        const screenSource = await this.loadSource(screenSourceId);
-        const cameraSource = await this.loadSource(cameraSourceId);
-
-
-
-        if (screenSource) {
-            console.log(`[ProjectLibrary] Found screen source for project ${projectId}.`);
-
-            // Fetch initial events for ViewportMotion calculation
-            let screenEvents: any = { mouseClicks: [], keyboardEvents: [], mousePositions: [], drags: [] };
-            if (screenSource.eventsUrl) {
-                try {
-                    screenEvents = await this.loadEvents(screenSource.eventsUrl);
-                } catch (e) {
-                    console.error("Failed to load initial events for project creation", e);
-                }
-            }
-
-            return ProjectImpl.createFromSource(projectId, screenSource, screenEvents, cameraSource);
-        }
-
-        throw new Error(`Project ${projectId} not found and no matching source found.`);
+        throw new Error(`Project ${projectId} not found.`);
     }
 
     /**

@@ -1,7 +1,7 @@
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectLibrary } from '../core/project/ProjectLibrary';
 import { ProjectImpl } from '../core/project/Project';
-import type { UserEvents, Size, SourceMetadata } from '../core/types';
+import { EventType, type UserEvents, type Size, type SourceMetadata } from '../core/types';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
@@ -159,15 +159,16 @@ export class VideoRecorder {
         // Categorize on the fly
         const e = event; // Incoming event payload
         switch (e.type) {
-            case 'click': this.events.mouseClicks.push(e); break;
-            case 'mousemove': this.events.mousePositions.push(e); break;
-            case 'keydown': this.events.keyboardEvents.push(e); break;
-            case 'drag': this.events.drags.push(e); break;
-            case 'scroll': this.events.scrolls.push(e); break;
-            case 'input': this.events.typingEvents.push(e); break;
-            case 'urlchange': this.events.urlChanges.push(e); break;
+            case EventType.CLICK: this.events.mouseClicks.push(e); break;
+            case EventType.MOUSEPOS: this.events.mousePositions.push(e); break;
+            case EventType.KEYDOWN: this.events.keyboardEvents.push(e); break;
+            case EventType.MOUSEDRAG: this.events.drags.push(e); break;
+            case EventType.SCROLL: this.events.scrolls.push(e); break;
+            case EventType.TYPING: this.events.typingEvents.push(e); break;
+            case EventType.URLCHANGE: this.events.urlChanges.push(e); break;
             default:
-                // Try legacy mapping or ignore
+                // Unrecognized event type
+                console.warn('[VideoRecorder] Unrecognized event type:', e.type);
                 break;
         }
     }

@@ -54,7 +54,7 @@ function Editor() {
             }
             try {
                 console.log('Initializing Project:', projectId);
-                const loadedProject = await ProjectLibrary.initProject(projectId);
+                const loadedProject = await ProjectLibrary.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
