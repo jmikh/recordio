@@ -1,34 +1,53 @@
 
-import { type Size, EventType, type UserEvents, type MouseClickEvent, type MousePositionEvent, type KeyboardEvent, type DragEvent, type TypingEvent, type UrlChangeEvent } from '../core/types';
+import { type Size, EventType } from '../core/types';
 import { logger } from '../utils/logger';
-import { MSG } from '../shared/messages';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
 logger.log("Background service worker running");
 
-interface BackgroundState {
-    isRecording: boolean;
-    recordingTabId: number | null;
-    recordingWindowId: number | null;
-    recordingMode: 'tab' | 'window';
-    recorderEnvironmentId: number | null;
-    startTime: number;
-    events: any[];
-    activeCalibrationDimensions: Size | null;
-}
+// --- State Management ---
 
-const state: BackgroundState = {
+// Default state if storage is empty
+const DEFAULT_STATE: RecordingState = {
     isRecording: false,
     recordingTabId: null,
-    recordingWindowId: null,
-    recordingMode: 'tab',
     recorderEnvironmentId: null,
     startTime: 0,
-    events: [],
-    activeCalibrationDimensions: null
+    currentSessionId: null,
+    mode: null
 };
 
+let currentState: RecordingState | null = null;
 
-// Ensure offscreen document exists
+async function ensureState() {
+    if (currentState) return; // Already loaded
+
+    try {
+        const result = await chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE);
+        if (result[STORAGE_KEYS.RECORDING_STATE]) {
+            currentState = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState;
+            logger.log("State restored from storage:", currentState);
+        } else {
+            currentState = { ...DEFAULT_STATE };
+            logger.log("No stored state found, using defaults.");
+        }
+    } catch (e) {
+        logger.error("Failed to restore state:", e);
+        // Fallback to defaults on error to allow extension to function
+        currentState = { ...DEFAULT_STATE };
+    }
+}
+
+async function saveState(newState: Partial<RecordingState>) {
+    // Ensure we have a base state before merging (should be covered by ensureState usage)
+    if (!currentState) currentState = { ...DEFAULT_STATE };
+
+    currentState = { ...currentState, ...newState };
+    await chrome.storage.session.set({ [STORAGE_KEYS.RECORDING_STATE]: currentState });
+}
+
+// --- Offscreen Setup ---
+
 async function setupOffscreenDocument(path: string) {
     const existingContexts = await chrome.runtime.getContexts({
         contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
@@ -56,9 +75,9 @@ async function setupOffscreenDocument(path: string) {
 }
 
 async function waitForOffscreen() {
-    for (let i = 0; i < 20; i++) { // Try for 2 seconds (100ms * 20)
+    for (let i = 0; i < 20; i++) { // Try for 2 seconds
         try {
-            const response = await chrome.runtime.sendMessage({ type: MSG.PING_OFFSCREEN });
+            const response = await sendMessage('offscreen', MSG_TYPES.PING_OFFSCREEN, {}, { sessionId: 'init' });
             if (response === 'PONG') return;
         } catch (e) {
             // Context not ready
@@ -68,16 +87,13 @@ async function waitForOffscreen() {
     throw new Error("Offscreen document failed to initialize");
 }
 
-// On Install/Update: Inject content script into existing tabs
-// Import the content script path via Vite's special ?script suffix logic
+// --- Content Script Injection ---
+
 import contentScriptPath from '../content/index.ts?script';
 
-// On Install/Update: Inject content script into existing tabs
 chrome.runtime.onInstalled.addListener(async () => {
     console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
     const tabs = await chrome.tabs.query({});
-    console.log(`[Background] Found ${tabs.length} tabs to check.`, tabs);
-
     for (const tab of tabs) {
         if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("about:")) {
             try {
@@ -85,401 +101,294 @@ chrome.runtime.onInstalled.addListener(async () => {
                     target: { tabId: tab.id },
                     files: [contentScriptPath]
                 });
-                console.log(`[Background] Injected into tab ${tab.id} (${tab.url})`);
             } catch (err: any) {
-                console.warn(`[Background] Failed to inject into tab ${tab.id} (${tab.url})`, err.message);
+                console.warn(`[background] Failed to inject into tab ${tab.id}`, err.message);
             }
         }
     }
 });
 
-// Track Active Tab Changes for Window Recording
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    if (state.isRecording && state.recordingMode === 'window' && state.recordingWindowId === activeInfo.windowId) {
-        logger.log("[Background] Active tab changed in recorded window:", activeInfo.tabId);
+// --- Event Helpers ---
 
-        // Notify old tab it's no longer 'active' for recording purposes (optional, if we want to stop it sending events)
-        if (state.recordingTabId && state.recordingTabId !== activeInfo.tabId) {
-            try {
-                // We're just updating our internal pointer. Content scripts send events blindly, we filter them here.
-                // But we should probably tell the new tab it's being recorded so it gets the overlay/status?
-                // Actually, in window mode, all tabs might need to know?
-                // For now, let's just update our pointer.
-            } catch (e) { }
-        }
 
-        state.recordingTabId = activeInfo.tabId;
+// --- Message Sending Helper ---
 
-        // Fetch Tab Info to get URL
-        try {
-            const tab = await chrome.tabs.get(activeInfo.tabId);
-            if (tab.url) {
-                // Synthesize URL Change Event
-                const urlEvent: UrlChangeEvent = {
-                    type: EventType.URLCHANGE,
-                    timestamp: Date.now() - state.startTime,
-                    url: tab.url,
-                    title: tab.title || '',
-                    mousePos: { x: 0, y: 0 }
-                };
-                state.events.push(urlEvent);
-                logger.log("[Background] Synthesized URLCHANGE for new tab:", tab.url);
-            }
-
-            // Notify the new tab that it is now "active" and recorded (so it can show UI if needed)
-            // In a perfect world we broadcast to all tabs in window, but focusing on the active one is efficient.
-            chrome.tabs.sendMessage(activeInfo.tabId, {
-                type: MSG.RECORDING_STATUS_CHANGED,
-                isRecording: true,
-                startTime: state.startTime
-            }).catch(() => {
-                // If it fails, maybe inject?
-                // For now, assuming content script is everywhere.
-            });
-
-        } catch (e) {
-            logger.error("[Background] Failed to handle tab switch:", e);
-        }
-    }
-});
-
-function categorizeEvents(events: any[]): UserEvents {
-    const categorized: UserEvents = {
-        mouseClicks: [],
-        mousePositions: [],
-        keyboardEvents: [],
-        drags: [],
-        scrolls: [],
-        typingEvents: [],
-        urlChanges: []
-    };
-
-    for (const e of events) {
-        switch (e.type) {
-            case EventType.CLICK:
-                categorized.mouseClicks.push(e as MouseClickEvent);
-                break;
-            case EventType.MOUSEPOS:
-                categorized.mousePositions.push(e as MousePositionEvent);
-                break;
-            case EventType.KEYDOWN:
-                categorized.keyboardEvents.push(e as KeyboardEvent);
-                break;
-            case EventType.MOUSEDRAG:
-                categorized.drags.push(e as DragEvent);
-                break;
-            case EventType.SCROLL:
-                categorized.scrolls.push(e as any);
-                break;
-            case EventType.TYPING:
-                categorized.typingEvents.push(e as TypingEvent);
-                break;
-            case EventType.URLCHANGE:
-                categorized.urlChanges.push(e as UrlChangeEvent);
-                break;
-            default:
-                break;
-        }
-    }
-    return categorized;
+function shouldLogMessage(type: string): boolean {
+    if (type === MSG_TYPES.CAPTURE_USER_EVENT) return false;
+    if (type === MSG_TYPES.PING_OFFSCREEN) return false;
+    // Legacy event types match EventType enum values in lowercase or mixed
+    const eventTypes = Object.values(EventType).map(t => t.toLowerCase());
+    if (eventTypes.includes(type.toLowerCase())) return false;
+    return true;
 }
 
-// Event Listener
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    // Logging Middleware
-    const isUserEvent = Object.values(EventType).includes(message.type.toLowerCase() as any);
-    if (!isUserEvent && message.type !== 'PING_OFFSCREEN') { // Also ignore PINGs to avoid noise
-        const senderInfo = _sender.tab ? `Tab:${_sender.tab.id}` : 'Popup/Ext';
-        logger.log(`[Background] RX ${message.type} from ${senderInfo}`, message);
+// Unified Helper: Send message
+async function sendMessage(target: 'offscreen' | 'content', type: string, payload: any = {}, options?: { sessionId?: string, specificTabId?: number }) {
+    const finalMessage: BaseMessage = {
+        type,
+        source: 'background',
+        target,
+        sessionId: options?.sessionId || currentState?.currentSessionId || 'unknown',
+        timestamp: Date.now(),
+        payload
+    };
+
+    if (shouldLogMessage(finalMessage.type)) {
+        const destination = target === 'content'
+            ? `Content (Tab: ${options?.specificTabId ? options.specificTabId : 'Broadcast'})`
+            : 'Offscreen';
+        logger.log(`[Background] SENT to ${destination}:`, finalMessage);
     }
 
-    // 1. Event Capture
-    if (isUserEvent) {
-        // ... (existing logic)
-        // Logic: Accept events if:
-        // 1. We are recording.
-        // 2. The sender is a tab.
-        // 3. The sender tab matches our 'recordingTabId'.
-        if (state.isRecording && _sender.tab && _sender.tab.id === state.recordingTabId) {
-            const eventType = message.type.toLowerCase();
-            const eventWithMeta = { ...message.payload, type: eventType };
-            state.events.push(eventWithMeta);
-        }
-        return true;
-    } else if (message.type === MSG.GET_RECORDING_STATE) {
-        let isRecording = state.isRecording;
-
-        // If query comes from a Content Script (tab), strictly check if *that* tab is the recording one.
-        // This ensures the overlay only shows on the recorded tab.
-        if (_sender.tab?.id) {
-            const targetTabId = _sender.tab.id;
-            // If in Window mode, we mostly care if it's the active tab that we are tracking
-            if (state.recordingMode === 'window') {
-                // Logic: Only the active tab in the recorded window gets the 'REC' status/overlay
-                isRecording = state.isRecording && targetTabId === state.recordingTabId;
-            } else {
-                isRecording = state.isRecording && targetTabId === state.recordingTabId;
+    if (target === 'offscreen') {
+        return chrome.runtime.sendMessage(finalMessage);
+    } else {
+        // Content logic
+        if (options?.specificTabId) {
+            await chrome.tabs.sendMessage(options.specificTabId, finalMessage).catch(() => { });
+        } else if (currentState?.recordingTabId) {
+            await chrome.tabs.sendMessage(currentState.recordingTabId, finalMessage).catch(() => { });
+        } else {
+            const tabs = await chrome.tabs.query({});
+            for (const tab of tabs) {
+                if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("about:")) {
+                    chrome.tabs.sendMessage(tab.id, finalMessage).catch(() => { });
+                }
             }
         }
-        // If query comes from Popup (no tab), return global state (isRecording)
+    }
+}
 
-        const responseState = {
-            isRecording: isRecording,
-            startTime: state.startTime
+// --- Message Handlers ---
+
+async function handleStartRecording(message: any, sendResponse: Function) {
+    try {
+        const { tabId } = message;
+
+        // 1. Setup Offscreen
+        await setupOffscreenDocument('src/offscreen/offscreen.html');
+
+        // 2. Get Media Stream ID (Tab Mode Only)
+        let streamId = message.streamId; // if provided
+        if (!streamId && tabId) {
+            streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+        }
+        if (!streamId) throw new Error("Failed to get stream ID");
+
+        // 3. Wait for Offscreen
+        await waitForOffscreen();
+
+        // 4. Get Dimensions
+        let dimensions: Size | null = null;
+        try {
+            const result = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => ({
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    dpr: window.devicePixelRatio
+                })
+            });
+            if (result?.[0]?.result) {
+                const { width, height, dpr } = result[0].result;
+                dimensions = { width: Math.round(width * dpr), height: Math.round(height * dpr) };
+            }
+        } catch (e) {
+            logger.warn("Failed to get dims via script injection", e);
+        }
+
+        if (!dimensions) throw new Error("Could not retrieve tab dimensions.");
+
+        // 5. Generate Session & Config
+        const sessionId = crypto.randomUUID();
+        const config: RecordingConfig = {
+            hasAudio: message.hasAudio !== false,
+            hasCamera: message.hasCamera === true,
+            streamId: streamId,
+            tabViewportSize: dimensions,
+            audioDeviceId: message.audioDeviceId,
+            videoDeviceId: message.videoDeviceId
         };
-        // logger.log("[Background] Sending GET_RECORDING_STATE response", responseState); 
-        sendResponse(responseState);
 
-    } else if (message.type === MSG.START_RECORDING) {
-        const { tabId, recordingMode } = message;
+        // --- NEW FLOW: Prepare -> Countdown -> Start ---
 
-        (async () => {
-            try {
-                let recorderTabId: number | null = null;
+        // A. Send PREPARE to Content (starts Countdown)
+        // If tabId is provided (Tab Mode), we send to it specifically via helper logic or explicit arg.
+        // The original code checked `if (tabId)`, which implies we only do this in Tab Mode or if we know the tab.
+        if (tabId) {
+            // Use helper with explicit tabId
+            await sendMessage('content', MSG_TYPES.PREPARE_RECORDING, {}, { sessionId, specificTabId: tabId });
 
-                // 1. Setup Recording Environment
-                // Window Mode -> Needs a real tab for desktopCapture permissions
-                // Tab Mode -> Can use invisible offscreen document
-                if (recordingMode === 'window') {
-                    const tab = await chrome.tabs.create({
-                        url: 'src/calibration/index.html',
-                        active: true, // Must be active for user to see the picker
-                        index: 0
-                    });
-                    if (tab.id) recorderTabId = tab.id;
-                } else {
-                    await setupOffscreenDocument('src/offscreen/offscreen.html');
-                }
-
-
-                let streamId;
-                if (recordingMode === 'window') {
-                    // Window Recording: requires targetting the recorder tab
-                    if (!recorderTabId) throw new Error("Failed to create recorder tab");
-
-                    // Wait for tab to be fully loaded
-                    await new Promise<void>((resolve) => {
-                        const listener = (uTabId: number, changeInfo: any) => {
-                            if (uTabId === recorderTabId && changeInfo.status === 'complete') {
-                                chrome.tabs.onUpdated.removeListener(listener);
-                                resolve();
-                            }
-                        };
-                        chrome.tabs.onUpdated.addListener(listener);
-                        // Check if already loaded
-                        chrome.tabs.get(recorderTabId, (t) => {
-                            if (t && t.status === 'complete') {
-                                chrome.tabs.onUpdated.removeListener(listener);
-                                resolve();
-                            }
-                        });
-                        // Safety timeout
-                        setTimeout(() => {
-                            chrome.tabs.onUpdated.removeListener(listener);
-                            resolve();
-                        }, 5000);
-                    });
-
-                    let targetTab = undefined;
-                    try {
-                        targetTab = await chrome.tabs.get(recorderTabId);
-                        logger.log("[Background] Recorder tab ready for picker:", targetTab);
-                    } catch (e) {
-                        logger.error("[Background] Failed to get recorder tab", e);
+            // Wait for RECORDING_READY from Content
+            await new Promise<void>((resolve, reject) => {
+                const readyListener = (msg: any) => {
+                    if (msg.type === MSG_TYPES.RECORDING_READY) {
+                        chrome.runtime.onMessage.removeListener(readyListener);
+                        resolve();
                     }
+                };
+                chrome.runtime.onMessage.addListener(readyListener);
+                setTimeout(() => {
+                    chrome.runtime.onMessage.removeListener(readyListener);
+                    reject(new Error("Timeout waiting for countdown"));
+                }, 5000);
+            });
+        }
 
-                    streamId = await new Promise<string>((resolve, reject) => {
-                        chrome.desktopCapture.chooseDesktopMedia(['window', 'screen'], targetTab, (id) => {
-                            if (!id) return reject(new Error("User cancelled selection"));
-                            resolve(id);
-                        });
-                    });
 
-                } else {
-                    // Tab Recording
-                    streamId = await chrome.tabCapture.getMediaStreamId({
-                        targetTabId: tabId
-                    });
+        // B. Send START to Offscreen (VideoRecorder)
+        const preparePromise = new Promise<void>((resolve, reject) => {
+            const listener = (msg: any) => {
+                if (msg.type === MSG_TYPES.RECORDING_STARTED) {
+                    chrome.runtime.onMessage.removeListener(listener);
+                    resolve();
+                } else if (msg.type === MSG_TYPES.ERROR_OCCURRED) {
+                    chrome.runtime.onMessage.removeListener(listener);
+                    reject(new Error(msg.payload?.error || msg.error || "Recording failed to start"));
                 }
-
-                if (!streamId) throw new Error("Failed to get stream ID");
-
-
-                // Prepare Recorder (Wait for PING)
-                // Both Tab and Offscreen listen to runtime messages, so this logic is shared.
-                await waitForOffscreen();
-
-
-                // Get Dimensions (of the start tab)
-                let dimensions: Size | null = null;
-                try {
-                    const tId = tabId;
-                    if (tId) {
-                        const result = await chrome.scripting.executeScript({
-                            target: { tabId: tId },
-                            func: () => ({
-                                width: window.innerWidth,
-                                height: window.innerHeight,
-                                dpr: window.devicePixelRatio
-                            })
-                        });
-                        if (result && result[0] && result[0].result) {
-                            const { width, height, dpr } = result[0].result;
-                            dimensions = { width: Math.round(width * dpr), height: Math.round(height * dpr) };
-                        }
-                    }
-                } catch (e: any) {
-                    logger.warn("Failed to get dims via script injection", e);
-                }
-
-                if (!dimensions && state.activeCalibrationDimensions) {
-                    console.log("[Background] Using reported calibration dimensions fallback");
-                    dimensions = state.activeCalibrationDimensions;
-                }
-
-                if (!dimensions) {
-                    throw new Error("Could not retrieve tab dimensions. Cannot start recording.");
-                }
-
-
-                // Prepare Message
-                const preparePromise = new Promise<void>((resolve, reject) => {
-                    const listener = (msg: any) => {
-                        if (msg.type === MSG.RECORDING_PREPARED) {
-                            chrome.runtime.onMessage.removeListener(listener);
-                            resolve();
-                        } else if (msg.type === MSG.RECORDING_FAILED) {
-                            chrome.runtime.onMessage.removeListener(listener);
-                            reject(new Error(msg.error || "Recording preparation failed"));
-                        }
-                    };
-                    chrome.runtime.onMessage.addListener(listener);
-                    setTimeout(() => {
-                        chrome.runtime.onMessage.removeListener(listener);
-                        reject(new Error("Timeout waiting for streams to prepare"));
-                    }, 5000);
-                });
-
-                console.log("[Background] Sending PREPARE_RECORDING", { streamId, recordingMode, dimensions });
-                await chrome.runtime.sendMessage({
-                    type: MSG.PREPARE_RECORDING,
-                    streamId,
-                    data: {
-                        ...message,
-                        hasAudio: message.hasAudio,
-                        hasCamera: message.hasCamera,
-                        dimensions,
-                        recordingMode
-                    }
-                });
-
-                await preparePromise;
-
-                // Sync/Countdown
-                let syncTimestamp = Date.now();
-                if (tabId) {
-                    try {
-                        await chrome.tabs.sendMessage(tabId, { type: MSG.SHOW_COUNTDOWN });
-                        syncTimestamp = await new Promise<number>((resolve, _reject) => {
-                            const timeout = setTimeout(() => {
-                                chrome.runtime.onMessage.removeListener(listener);
-                                resolve(Date.now());
-                            }, 5000);
-
-                            const listener = (msg: any, _sender: any) => {
-                                if (msg.type === MSG.COUNTDOWN_FINISHED) {
-                                    clearTimeout(timeout);
-                                    chrome.runtime.onMessage.removeListener(listener);
-                                    resolve(msg.timestamp);
-                                }
-                            };
-                            chrome.runtime.onMessage.addListener(listener);
-                        });
-                    } catch (e) { logger.warn("Countdown failed", e); }
-                }
-
-                // Start
-                logger.log("[Background] Sending RECORDING_STARTED");
-                await chrome.runtime.sendMessage({ type: MSG.RECORDING_STARTED });
-
-                state.isRecording = true;
-                state.recordingMode = recordingMode;
-                state.recordingTabId = tabId || null;
-                state.recorderEnvironmentId = recorderTabId;
-                state.startTime = syncTimestamp;
-                state.events = [];
-
-                if (recordingMode === 'window' && tabId) {
-                    try {
-                        const t = await chrome.tabs.get(tabId);
-                        state.recordingWindowId = t.windowId;
-                    } catch (e) { }
-                } else {
-                    state.recordingWindowId = null;
-                }
-
-                chrome.storage.local.set({
-                    currentSessionEvents: [],
-                    recordingSyncTimestamp: syncTimestamp
-                });
-
-                if (tabId) {
-                    logger.log("[Background] Sending RECORDING_STATUS_CHANGED to tab", tabId);
-                    chrome.tabs.sendMessage(tabId, { type: MSG.RECORDING_STATUS_CHANGED, isRecording: true, startTime: syncTimestamp }).catch(() => { });
-                }
-
-                sendResponse({ success: true });
-
-            } catch (err: any) {
-                logger.error("Error starting recording:", err);
-                sendResponse({ success: false, error: err.message });
-            }
-        })();
-        return true;
-
-    } else if (message.type === MSG.STOP_RECORDING) {
-        // Sort events by timestamp
-        state.events.sort((a, b) => a.timestamp - b.timestamp);
-        chrome.storage.local.set({ recordingMetadata: state.events });
-        const userEvents = categorizeEvents(state.events);
-
-        logger.log("[Background] Sending STOP_RECORDING_OFFSCREEN");
-        chrome.runtime.sendMessage({
-            type: MSG.STOP_RECORDING_OFFSCREEN,
-            events: userEvents // Send categorized object instead of raw array
+            };
+            chrome.runtime.onMessage.addListener(listener);
+            setTimeout(() => {
+                chrome.runtime.onMessage.removeListener(listener);
+                reject(new Error("Timeout waiting for recording to start"));
+            }, 5000);
         });
 
-        state.isRecording = false;
-        state.recordingTabId = null;
-        state.recordingWindowId = null;
+        await sendMessage('offscreen', MSG_TYPES.START_RECORDING, { config, mode: 'tab' }, { sessionId });
+        await preparePromise;
 
-        chrome.storage.local.remove(['recordingSyncTimestamp']);
+        // C. Send START to Content (Start Event Capture)
+        const syncTimestamp = Date.now();
+        // Send to content (Target specific tab if tabId exists)
+        await sendMessage('content', MSG_TYPES.START_RECORDING, { startTime: syncTimestamp }, { sessionId, specificTabId: tabId });
+
+
+        // 8. Update State & Persist
+        await saveState({
+            isRecording: true,
+            recordingTabId: tabId,
+            startTime: syncTimestamp,
+            currentSessionId: sessionId,
+            mode: 'tab' // or infer
+        });
+
+        // Clear previous legacy timestamps if any
+        chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
         sendResponse({ success: true });
 
-    } else if (message.type === MSG.OPEN_EDITOR) {
-        chrome.tabs.create({ url: message.url });
-
-        // Cleanup Recording Environment
-        if (state.recorderEnvironmentId) {
-            chrome.tabs.remove(state.recorderEnvironmentId).catch(() => { });
-            state.recorderEnvironmentId = null;
-        }
-        // Always try to close offscreen (no-op if specific tab was used, but harmless)
-        chrome.offscreen.closeDocument().catch(() => { });
-
-    } else if (message.type === MSG.LOG_MESSAGE) {
-        const { level, args } = message;
-        const prefix = "[Offscreen]";
-        if (level === 'error') {
-            console.error(prefix, ...args);
-        } else if (level === 'warn') {
-            console.warn(prefix, ...args);
-        } else {
-            console.log(prefix, ...args);
-        }
-    } else if (message.type === MSG.CALIBRATION_DIMENSIONS) {
-        state.activeCalibrationDimensions = message.dimensions;
-        console.log("[Background] Received calibration dimensions:", state.activeCalibrationDimensions);
+    } catch (err: any) {
+        logger.error("Error starting recording:", err);
+        sendResponse({ success: false, error: err.message });
     }
-    // Note: Do NOT return true unconditionally here.
+}
+
+async function handleStopRecording(sendResponse: Function) {
+    // No need to process events here, they are in Offscreen.
+
+    logger.log("[Background] Sending STOP_RECORDING");
+
+    if (currentState?.currentSessionId) {
+        // Stop Offscreen (Video)
+        sendMessage('offscreen', MSG_TYPES.STOP_RECORDING, {}, { sessionId: currentState.currentSessionId });
+
+        // Stop Content (Events)
+        // If we are in tab mode, state.recordingTabId is set, helper will use it.
+        // If desktop mode, it will broadcast.
+        await sendMessage('content', MSG_TYPES.STOP_RECORDING, {}, { sessionId: currentState.currentSessionId });
+    }
+
+    await saveState({
+        isRecording: false,
+        recordingTabId: null,
+        currentSessionId: null
+    });
+    chrome.storage.local.remove(['recordingSyncTimestamp']);
+
+    sendResponse({ success: true });
+}
+
+function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResponse: Function) {
+    // Ensure we send back the current state
+    if (!currentState) return sendResponse({ isRecording: false, startTime: 0 }); // Trigger fallback if ensureState failed
+
+    let isRecording = currentState.isRecording;
+    if (_sender.tab?.id) {
+        // Only report recording=true if we are recording THIS tab
+        isRecording = currentState.isRecording && _sender.tab.id === currentState.recordingTabId;
+    }
+    sendResponse({ isRecording, startTime: currentState.startTime });
+}
+
+// --- Main Listener ---
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // Strict Filter: Only handle messages intended for background
+    if (message.target !== 'background') return false;
+
+    if (shouldLogMessage(message.type)) {
+        logger.log(`[Background] RECEIVED from ${(_sender.tab ? `Tab ${_sender.tab.id}` : _sender.id)}:`, message);
+    }
+
+    // Ensure state is loaded
+    (async () => {
+        await ensureState();
+        if (!currentState) return; // Should be set by ensureState
+
+        // 1. Event Capture (Moved inside promise to ensure currentState is valid)
+        let eventPayload = null;
+        if (message.type === MSG_TYPES.CAPTURE_USER_EVENT) {
+            eventPayload = message.payload;
+        } else if (Object.values(EventType).includes(message.type.toLowerCase() as any)) {
+            // Legacy fallback
+            eventPayload = { ...message.payload, type: message.type.toLowerCase() };
+        }
+
+        if (eventPayload && _sender.tab) {
+            // Strict Validation: Must be from recording tab
+            if (currentState.isRecording && _sender.tab.id === currentState.recordingTabId) {
+                // Forward to Offscreen
+                sendMessage('offscreen', MSG_TYPES.CAPTURE_USER_EVENT, eventPayload);
+            } else {
+                // Safety Disconnect: If a tab sends events but shouldn't be recording
+                const senderTabId = _sender.tab.id;
+                if (senderTabId !== undefined) {
+                    // We might see some stray events on restart if content script is still active but state says not recording.
+                    // Only warn if we are explicitly strictly recording a DIFFERENT tab, or if we want strict silence.
+                    // reliable state is key.
+                    if (currentState.isRecording) {
+                        console.warn(`[Background] Unauthorized event from Tab ${senderTabId} (Recording Tab: ${currentState.recordingTabId}). Ignoring.`);
+                    }
+                }
+            }
+            return; // We handled it
+        }
+
+        // 2. Command Routing
+        switch (message.type) {
+            case MSG_TYPES.START_RECORDING:
+                handleStartRecording(message, sendResponse);
+                break; // Async response
+
+            case MSG_TYPES.STOP_RECORDING:
+                handleStopRecording(sendResponse);
+                break; // Async response
+
+            case MSG_TYPES.GET_RECORDING_STATE:
+                handleGetRecordingState(_sender, sendResponse);
+                break;
+
+            case MSG_TYPES.RECORDING_STOPPED:
+                // Use sessionId from message payload as state is already cleared
+                const finalSessionId = message.sessionId;
+                const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
+                chrome.tabs.create({ url: editorUrl });
+                chrome.offscreen.closeDocument().catch(() => { });
+                break;
+
+            case MSG_TYPES.PING_OFFSCREEN:
+                sendResponse("PONG");
+                break;
+        }
+    })();
+    return true; // We always return true because of the async wrapper
 });
