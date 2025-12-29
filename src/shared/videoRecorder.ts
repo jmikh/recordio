@@ -6,9 +6,10 @@ import type { UserEvents, Size, SourceMetadata } from '../core/types';
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
 export class VideoRecorder {
-    private mode: RecorderMode | null = null;
+    private mode: RecorderMode; // Not null anymore, set in constructor
     private state: RecorderState = 'idle';
-    private currentSessionId: string | null = null;
+    private currentSessionId: string;
+    private config: RecordingConfig;
 
     // Media State
     private screenRecorder: MediaRecorder | null = null;
@@ -38,14 +39,13 @@ export class VideoRecorder {
         urlChanges: []
     };
 
-    // Singleton check helper
-    private static instance: VideoRecorder | null = null;
+    // Singleton check helper - REMOVED
+    // private static instance: VideoRecorder | null = null;
 
-    constructor() {
-        if (VideoRecorder.instance) {
-            throw new Error(`VideoRecorder already instantiated. Only one instance allowed per context.`);
-        }
-        VideoRecorder.instance = this;
+    constructor(sessionId: string, config: RecordingConfig, mode: RecorderMode) {
+        this.currentSessionId = sessionId;
+        this.mode = mode;
+        this.config = config;
     }
 
 
@@ -59,47 +59,39 @@ export class VideoRecorder {
     /**
      * Starts the recording session.
      */
-    public async start(sessionId: string, config: RecordingConfig, mode: RecorderMode): Promise<void> {
+    public async start(): Promise<void> {
         if (this.state !== 'idle') {
             throw new Error(`Cannot start recording: Recorder is in ${this.state} state.`);
         }
 
-        console.log(`[VideoRecorder] Starting session ${sessionId} in ${mode} mode.`, config);
-        this.currentSessionId = sessionId;
-        this.mode = mode;
+        console.log(`[VideoRecorder] Starting session ${this.currentSessionId} in ${this.mode} mode.`, this.config);
+
         this.state = 'preparing';
         this.screenData = [];
         this.cameraData = [];
         this.activeStreams = [];
 
-        try {
-            await this.initializeStreams(config);
+        await this.initializeStreams(this.config);
 
-            if (!this.screenRecorder) {
-                throw new Error("Screen Recorder failed to initialize.");
-            }
-
-            this.screenRecorder.start(100);
-            if (this.cameraRecorder) {
-                this.cameraRecorder.start(100);
-            }
-
-            this.startTime = Date.now();
-            this.state = 'recording';
-
-            console.log(`[VideoRecorder] Recording started.`);
-
-        } catch (error: any) {
-            console.error("[VideoRecorder] Start failed:", error);
-            this.cleanup();
-            throw error;
+        if (!this.screenRecorder) {
+            throw new Error("Screen Recorder failed to initialize.");
         }
+
+        this.screenRecorder.start(100);
+        if (this.cameraRecorder) {
+            this.cameraRecorder.start(100);
+        }
+
+        this.startTime = Date.now();
+        this.state = 'recording';
+
+        console.log(`[VideoRecorder] Recording started.`);
     }
 
     /**
      * Finishes the recording session, saves the files, and creates the Project.
      */
-    public async finish(sessionId: string): Promise<{ durationMs: number }> {
+    public async finish(sessionId?: string): Promise<{ durationMs: number }> {
         this.validateSession(sessionId);
 
         if (this.state !== 'recording') {
@@ -146,11 +138,15 @@ export class VideoRecorder {
         await Promise.all(stopPromises);
 
         // Save Data
-        await this.saveRecordingData(sessionId, this.events);
+        // Use currentSessionId if not provided (should match due to validateSession)
+        const effectiveId = sessionId || this.currentSessionId;
+        if (!effectiveId) throw new Error("No session ID available to save");
+
+        await this.saveRecordingData(effectiveId, this.events);
 
         const durationMs = Date.now() - this.startTime;
 
-        this.cleanup();
+        this.releaseStreams();
         return { durationMs };
     }
 
@@ -183,7 +179,7 @@ export class VideoRecorder {
         this.validateSession(sessionId);
         console.log(`[VideoRecorder] Cancelling session ${sessionId}.`);
 
-        this.cleanup();
+        this.releaseStreams();
     }
 
 
@@ -205,25 +201,17 @@ export class VideoRecorder {
         // 3. Get Mic Stream
         let micStream: MediaStream | null = null;
         if (config.hasAudio) {
-            try {
-                const constraints = config.audioDeviceId ? { deviceId: { exact: config.audioDeviceId } } : true;
-                micStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
-                this.activeStreams.push(micStream);
-            } catch (e) {
-                console.warn("[VideoRecorder] Failed to get microphone:", e);
-            }
+            const constraints = config.audioDeviceId ? { deviceId: { exact: config.audioDeviceId } } : true;
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+            this.activeStreams.push(micStream);
         }
 
         // 4. Get Camera Stream (Dual Mode)
         let cameraStream: MediaStream | null = null;
         if (config.hasCamera) {
-            try {
-                const constraints = config.videoDeviceId ? { deviceId: { exact: config.videoDeviceId } } : true;
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: constraints });
-                this.activeStreams.push(cameraStream);
-            } catch (e) {
-                console.warn("[VideoRecorder] Failed to get camera:", e);
-            }
+            const constraints = config.videoDeviceId ? { deviceId: { exact: config.videoDeviceId } } : true;
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: constraints });
+            this.activeStreams.push(cameraStream);
         }
 
         // 5. Mix Audio & Setup Recorders
@@ -375,7 +363,7 @@ export class VideoRecorder {
 
     // --- Cleanup ---
 
-    private cleanup() {
+    private releaseStreams() {
         this.activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
         this.activeStreams = [];
 
@@ -383,21 +371,12 @@ export class VideoRecorder {
             this.audioContext.close();
             this.audioContext = null;
         }
-
-        this.screenRecorder = null;
-        this.cameraRecorder = null;
-        this.screenData = [];
-        this.cameraData = [];
-        this.currentSessionId = null;
-        this.state = 'idle';
-        this.startTime = 0;
+        this.state = 'idle'; // Reset state on release
     }
 
-    private validateSession(sessionId: string) {
-        if (sessionId !== this.currentSessionId) {
+    private validateSession(sessionId?: string) {
+        if (sessionId && sessionId !== this.currentSessionId) {
             throw new Error(`Session mismatch: Action for ${sessionId} but current is ${this.currentSessionId}`);
         }
     }
-
-
 }

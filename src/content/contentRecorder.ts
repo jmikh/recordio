@@ -122,14 +122,13 @@ export class ContentRecorder {
         if (!chrome.runtime?.id) return;
 
         // Wrap in CAPTURE_USER_EVENT structure
+        // Wrap in CAPTURE_USER_EVENT structure
         const message: BaseMessage = {
             type: MSG_TYPES.CAPTURE_USER_EVENT,
-            source: 'content',
-            target: 'background',
-            sessionId: '', // TODO: Should we pass session ID? For now background infers from tab.
-            timestamp: Date.now(),
             payload: {
                 ...payload,
+                // sessionId is inferred by background/offscreen context usually
+                timestamp: Date.now(),
                 type // Add specific event type to payload as expected by background
             }
         };

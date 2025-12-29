@@ -2,41 +2,30 @@ import type { BaseEvent } from '../core/types';
 
 export type RecorderMode = 'desktop' | 'tab';
 
-export type MessageSource = 'offscreen' | 'controller' | 'background' | 'content' | 'extension';
-export type MessageTarget = 'background' | 'offscreen' | 'controller' | 'content' | 'extension';
-
 export interface BaseMessage {
     type: string;
-    source: MessageSource;
-    target: MessageTarget;
-    sessionId: string;
-    timestamp: number;
     payload?: any;
 }
 
 // --- Message Types ---
 
 export const MSG_TYPES = {
-    // Session Management
-    START_SESSION: 'START_SESSION',             // Controller/Offscreen -> Background (Register session)
-    SESSION_STARTED: 'SESSION_STARTED',         // Background -> Controller/Offscreen (Ack)
-
     // Recording Control
-    START_RECORDING: 'START_RECORDING',         // Background -> Offscreen/Controller
-    RECORDING_STARTED: 'RECORDING_STARTED',     // Offscreen/Controller -> Background
-    STOP_RECORDING: 'STOP_RECORDING',           // Background -> Offscreen/Controller
-    RECORDING_STOPPED: 'RECORDING_STOPPED',     // Offscreen/Controller -> Background
-    CANCEL_RECORDING: 'CANCEL_RECORDING',       // Background -> Offscreen/Controller
-    RECORDING_CANCELLED: 'RECORDING_CANCELLED', // Offscreen/Controller -> Background
+    // Session Control (Extension -> Background)
+    START_SESSION: 'START_SESSION',
+    STOP_SESSION: 'STOP_SESSION',
 
-    // Status & Logs
-    STATUS_UPDATE: 'STATUS_UPDATE',             // Offscreen/Controller -> Background
-    ERROR_OCCURRED: 'ERROR_OCCURRED',           // Any -> Background
+    // Recording Control (Background -> Offscreen)
+    START_RECORDING_VIDEO: 'START_RECORDING_VIDEO',     // Background -> Offscreen
+    STOP_RECORDING_VIDEO: 'STOP_RECORDING_VIDEO',       // Background -> Offscreen
+
+    START_RECORDING_EVENTS: 'START_RECORDING_EVENTS',   // Background -> Content
+    STOP_RECORDING_EVENTS: 'STOP_RECORDING_EVENTS',     // Background -> Content
 
     // Content Script
     CAPTURE_USER_EVENT: 'CAPTURE_USER_EVENT',           // Content -> Background (User interactions)
-    PREPARE_RECORDING: 'PREPARE_RECORDING',             // Background -> Content (Start countdown/calibration)
-    RECORDING_READY: 'RECORDING_READY',                 // Content -> Background (Countdown done)
+    START_COUNTDOWN: 'START_COUNTDOWN',                 // Background -> Content (Start countdown/calibration)
+    COUNTDOWN_DONE: 'COUNTDOWN_DONE',                   // Content -> Background (Countdown done)
 
     // Coordination
     PING_OFFSCREEN: 'PING_OFFSCREEN',

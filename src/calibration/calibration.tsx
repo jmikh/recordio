@@ -31,7 +31,7 @@ const CalibrationApp = () => {
         const height = Math.round(window.innerHeight * window.devicePixelRatio);
         chrome.runtime.sendMessage({
             type: 'CALIBRATION_DIMENSIONS',
-            dimensions: { width, height }
+            payload: { dimensions: { width, height } }
         });
 
         const listener = (message: any) => {

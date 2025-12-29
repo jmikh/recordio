@@ -21,10 +21,7 @@ logger.log("[Recordo] Content script loaded. Checking recording state...");
 
 chrome.runtime.sendMessage({
     type: MSG_TYPES.GET_RECORDING_STATE,
-    source: 'content',
-    target: 'background',
-    sessionId: '',
-    timestamp: Date.now()
+    payload: {}
 }, (response) => {
     if (chrome.runtime.lastError) {
         logger.warn("[Content] Get State failed (Background not ready?)", chrome.runtime.lastError);
@@ -43,18 +40,20 @@ let currentSessionId = '';
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
     // 1. Validation
-    if (message.target !== 'content') return;
+    // 1. Validation
+    // Message targeting validation removed
+
 
     switch (message.type) {
-        case MSG_TYPES.PREPARE_RECORDING:
-            handlePrepareRecording(message);
+        case MSG_TYPES.START_COUNTDOWN:
+            handleCountdown(message);
             break;
 
-        case MSG_TYPES.START_RECORDING:
+        case MSG_TYPES.START_RECORDING_EVENTS:
             handleStartRecording(message);
             break;
 
-        case MSG_TYPES.STOP_RECORDING:
+        case MSG_TYPES.STOP_RECORDING_EVENTS:
             handleStopRecording();
             break;
     }
@@ -64,20 +63,22 @@ chrome.runtime.onMessage.addListener(handleMessage);
 
 // --- Handlers ---
 
-function handlePrepareRecording(message: BaseMessage) {
+function handleCountdown(message: BaseMessage) {
     if (isPreparing) return;
     isPreparing = true;
-    currentSessionId = message.sessionId;
+    currentSessionId = message.payload?.sessionId;
     logger.log("[Content] Preparing recording (Countdown)", currentSessionId);
     startCountdown().then(() => {
         isPreparing = false;
-        // Notify background we are ready
+        // Notify background we are ready with dimensions
         const readyMsg: BaseMessage = {
-            type: MSG_TYPES.RECORDING_READY,
-            source: 'content',
-            target: 'background',
-            sessionId: currentSessionId,
-            timestamp: Date.now()
+            type: MSG_TYPES.COUNTDOWN_DONE,
+            payload: {
+                sessionId: currentSessionId,
+                width: window.innerWidth,
+                height: window.innerHeight,
+                dpr: window.devicePixelRatio
+            }
         };
         chrome.runtime.sendMessage(readyMsg);
     });

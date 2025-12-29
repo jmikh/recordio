@@ -36,11 +36,10 @@ function App() {
     chrome.storage.onChanged.addListener(storageListener);
 
     // 3. Fallback: Query Background (Legacy/Verification)
+    // 3. Fallback: Query Background (Legacy/Verification)
     chrome.runtime.sendMessage({
       type: MSG_TYPES.GET_RECORDING_STATE,
-      source: 'extension',
-      target: 'background',
-      timestamp: Date.now()
+      payload: {}
     }, (response: any) => {
       if (response && response.isRecording) {
         setIsRecording(true);
@@ -122,37 +121,34 @@ function App() {
 
 
       chrome.runtime.sendMessage({
-        type: MSG_TYPES.START_RECORDING,
-        source: 'extension',
-        target: 'background',
-        timestamp: Date.now(),
+        type: MSG_TYPES.START_SESSION,
         tabId: tab.id,
-        // For legacy compat or new flow, we might need to adjust payload structure.
-        // Background handleStartRecording unpacks `message.hasAudio` etc from top level in original code.
-        // But `START_RECORDING` in `VideoRecorder` expects `payload.config`.
-        // Let's look at background/index.ts handleStartRecording. 
-        // It reads: const { tabId } = message; ... const config = { ...message.hasAudio ... }
-        // So for now, we keep sending flat props if background expects flat props OR update background to expect payload.
-        // Background `handleStartRecording` currently reads flat props. We will update Background too.
-        // So here in App.tsx, let's stick to what Background expects for `START_RECORDING` (initially) 
-        // OR better: we update App.tsx to send what Background WILL expect after we refactor Background.
-        // The plan said "Update sendMessage calls to use MSG_TYPES".
-        // Let's just swap types for now and keep payload same if background logic not changing deeply.
-        // BUT wait, `MSG.START_RECORDING` had: `recordingMode, hasAudio...` flat.
-        // `MSG_TYPES.START_RECORDING` is used between Background->Offscreen with `payload.config`.
-        // We are sending Popup->Background. Background handles it.
-        // Ideally we use a different type for Popup->Background or reuse START_RECORDING but we must ensure payload match.
-        // Background currently listens to `MSG.START_RECORDING` and treats it as "Request to start".
-        // Let's use `MSG_TYPES.START_RECORDING` for that too? 
-        // `MSG_TYPES` has `START_RECORDING`.
-
-        // Passing flat props for now as per existing Background implementation, 
-        // we'll update background to accepting this.
-        recordingMode,
-        hasAudio: isAudioEnabled,
-        hasCamera: isVideoEnabled,
-        audioDeviceId: selectedAudioId,
-        videoDeviceId: selectedVideoId
+        // Send flat props as Background expects them flattened for this message type currently.
+        // We will keep them top-level but extra props are okay if we cast or if we don't strictly type check against BaseMessage here.
+        // Wait, BaseMessage only has { type, payload }.
+        // So we MUST move these to payload OR cast.
+        // Background expects { tabId, ...rest } directly on message object in handleStartRecording.
+        // Wait, handleStartRecording(message) reads message.tabId.
+        // If I change this to payload, I must change background.
+        // The plan said "Update sendMessage calls". It didn't explicitly say "Update Background handleStartRecording signature" but implied it.
+        // Actually, my edit to Background `handleStartRecording` was NOT done yet. I only removed sendMessage helper.
+        // I need to check `handleStartRecording` in background/index.ts.
+        // checking background/index.ts...
+        // `async function handleStartRecording(message: any, sendResponse: Function) {`
+        // `const { tabId } = message;`
+        // So background expects them on root.
+        // BUT BaseMessage says `type` and `payload`.
+        // If I want to be strict, I should move everything to payload.
+        // And update background to read from payload.
+        // Let's do that for cleanliness.
+        payload: {
+          tabId: tab.id,
+          recordingMode,
+          hasAudio: isAudioEnabled,
+          hasCamera: isVideoEnabled,
+          audioDeviceId: selectedAudioId,
+          videoDeviceId: selectedVideoId
+        }
       }, (response: any) => {
         if (response?.success) {
           setIsRecording(true);
@@ -167,10 +163,8 @@ function App() {
 
   const stopRecording = () => {
     chrome.runtime.sendMessage({
-      type: MSG_TYPES.STOP_RECORDING,
-      source: 'extension',
-      target: 'background',
-      timestamp: Date.now()
+      type: MSG_TYPES.STOP_SESSION,
+      payload: {}
     }, (response: any) => {
       if (response?.success) {
         setIsRecording(false);
