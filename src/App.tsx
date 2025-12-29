@@ -143,7 +143,7 @@ function App() {
         // Let's do that for cleanliness.
         payload: {
           tabId: tab.id,
-          recordingMode,
+          mode: recordingMode,
           hasAudio: isAudioEnabled,
           hasCamera: isVideoEnabled,
           audioDeviceId: selectedAudioId,

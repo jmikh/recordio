@@ -2,8 +2,8 @@ import { VideoRecorder } from '../shared/videoRecorder';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig } from '../shared/messageTypes';
 
 
+
 let recorder: VideoRecorder | null = null;
-const mode = 'window';
 
 // Message Listener
 chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
@@ -11,16 +11,22 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 
     switch (msg.type) {
         case MSG_TYPES.START_RECORDING_VIDEO:
+            if (message.payload?.mode === 'tab') {
+                return false;
+            }
             handleStart(msg)
                 .then((response) => sendResponse(response))
                 .catch((e) => sendResponse({ success: false, error: e.message }));
             return true;
 
         case MSG_TYPES.STOP_RECORDING_VIDEO:
+            if (message.payload?.mode === 'tab') {
+                return false;
+            }
             handleStop(msg)
                 .then((response) => sendResponse(response))
                 .catch((e) => sendResponse({ success: false, error: e.message }));
-            return true; // Keep channel open for async response
+            return true;
 
         case MSG_TYPES.CAPTURE_USER_EVENT:
             if (msg.payload && recorder) {
@@ -39,8 +45,22 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 async function handleStart(message: BaseMessage) {
     const config: RecordingConfig = message.payload.config;
     const sessionId = message.payload.sessionId;
+    const msgMode = message.payload.mode || 'window';
 
-    recorder = new VideoRecorder(sessionId, config, mode);
+    // Determine viewport size from this window
+    const dpr = window.devicePixelRatio || 1;
+    const viewportSize = {
+        width: Math.round(window.innerWidth * dpr),
+        height: Math.round(window.innerHeight * dpr)
+    };
+
+    // Merge viewport into config
+    const fullConfig: RecordingConfig = {
+        ...config,
+        tabViewportSize: viewportSize
+    };
+
+    recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
     await recorder.start();
 

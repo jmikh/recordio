@@ -11,6 +11,9 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 
     switch (msg.type) {
         case MSG_TYPES.START_RECORDING_VIDEO:
+            if (message.payload?.mode !== 'tab') {
+                return false;
+            }
             handleStart(msg)
                 .then((response) => sendResponse(response))
                 .catch((e) => sendResponse({ success: false, error: e.message }));

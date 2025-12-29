@@ -64,6 +64,7 @@ export interface RecordingConfig {
     videoDeviceId?: string; // Camera
     tabViewportSize?: import('../core/types').Size; // Target dimensions (for window mode calibration)
     streamId?: string; // Required for tab recording
+    sourceId?: string; // For desktop capture (window/desktop mode)
 }
 
 export interface StartSessionPayload {

@@ -291,11 +291,25 @@ export class VideoRecorder {
                 }
             } as any);
         } else {
+            // Window/Desktop mode: use sourceId from chooseDesktopMedia
+            const sourceId = config.sourceId;
+            if (!sourceId) throw new Error("Source ID is required for window/desktop recording mode.");
+
             // @ts-ignore
-            return await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: true
-            });
+            return await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceId
+                    }
+                },
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceId
+                    }
+                }
+            } as any);
         }
     }
 
