@@ -2,7 +2,7 @@ import { EventType, type MousePositionEvent, type Rect, type Size } from '../cor
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { logger } from '../utils/logger';
 
-export class ContentRecorder {
+export class EventRecorder {
     private isRecording = false;
     private startTime = 0;
 
@@ -13,7 +13,7 @@ export class ContentRecorder {
         mousePos: { x: 0, y: 0 }
     };
     private lastMouseTime = 0;
-    private lastKeystrokeTime = 0;
+    private lastKeystrokeTime = -Infinity;
 
     // Typing Session State
     private currentTypingSession: { startTime: number; targetRect: Rect; element: HTMLElement } | null = null;
@@ -24,6 +24,7 @@ export class ContentRecorder {
 
     // Constants
     private readonly MOUSE_POLL_INTERVAL = 100;
+    private readonly TYPING_POLL_INTERVAL = 100;
     private readonly CLICK_THRESHOLD = 500;
     private readonly DRAG_DISTANCE_THRESHOLD = 5;
 
@@ -86,7 +87,7 @@ export class ContentRecorder {
 
     private startPolling() {
         this.mousePollInterval = setInterval(this.pollMouse, this.MOUSE_POLL_INTERVAL);
-        this.typingPollInterval = setInterval(this.pollTyping, 400);
+        this.typingPollInterval = setInterval(this.pollTyping, this.TYPING_POLL_INTERVAL);
     }
 
     private stopPolling() {

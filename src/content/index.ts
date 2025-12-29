@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
-import { ContentRecorder } from './contentRecorder';
+import { EventRecorder } from './eventRecorder';
 
 // Cleanup mechanism for previous instances
 const cleanupEvent = new Event('recordo-cleanup');
@@ -8,9 +8,9 @@ window.dispatchEvent(cleanupEvent);
 
 window.addEventListener('recordo-cleanup', () => {
     logger.log("[Recordo] Cleaning up old content script instance.");
-    if (contentRecorder) {
-        contentRecorder.stop();
-        contentRecorder = null;
+    if (eventRecorder) {
+        eventRecorder.stop();
+        eventRecorder = null;
     }
     // Remove listeners
     chrome.runtime.onMessage.removeListener(handleMessage);
@@ -33,7 +33,7 @@ chrome.runtime.sendMessage({
 });
 
 // --- State ---
-let contentRecorder: ContentRecorder | null = null;
+let eventRecorder: EventRecorder | null = null;
 let isPreparing = false;
 let currentSessionId = '';
 
@@ -100,17 +100,17 @@ function handleStartRecording(message: any) {
 
 function startRecording(startTime: number) {
     logger.log("[Content] Starting Recorder...");
-    if (contentRecorder) {
-        contentRecorder.stop();
+    if (eventRecorder) {
+        eventRecorder.stop();
     }
-    contentRecorder = new ContentRecorder(startTime);
+    eventRecorder = new EventRecorder(startTime);
 }
 
 function handleStopRecording() {
     logger.log("[Content] Stopping Recording...");
-    if (contentRecorder) {
-        contentRecorder.stop();
-        contentRecorder = null;
+    if (eventRecorder) {
+        eventRecorder.stop();
+        eventRecorder = null;
     }
 }
 

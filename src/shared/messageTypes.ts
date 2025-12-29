@@ -1,6 +1,6 @@
 import type { BaseEvent } from '../core/types';
 
-export type RecorderMode = 'desktop' | 'tab';
+export type RecorderMode = 'desktop' | 'tab' | 'window';
 
 export interface BaseMessage {
     type: string;
@@ -29,6 +29,7 @@ export const MSG_TYPES = {
 
     // Coordination
     PING_OFFSCREEN: 'PING_OFFSCREEN',
+    PING_CONTROLLER: 'PING_CONTROLLER',
     GET_RECORDING_STATE: 'GET_RECORDING_STATE',
 
     // Events (Forwarding)
