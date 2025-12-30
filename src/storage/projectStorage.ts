@@ -119,6 +119,21 @@ export class ProjectStorage {
         return projectRaw;
     }
 
+    /**
+     * Lists all projects in the DB.
+     * Returns a lightweight array of projects.
+     */
+    static async listProjects(): Promise<Project[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result as Project[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
     // ===========================================
     // SOURCE HELPER
     // ===========================================

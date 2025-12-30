@@ -38,6 +38,8 @@ export interface Project {
     name: string;
     createdAt: Date;
     updatedAt: Date;
+    /** URL (blob or remote) to project, or just a generic placeholder if undefined */
+    thumbnail?: string;
 
     /* Unified Settings */
     settings: ProjectSettings;
@@ -88,6 +90,7 @@ export interface SourceMetadata {
     /** Frames Per Second (Video only) */
     fps?: number;
     hasAudio: boolean;
+    fileSizeBytes?: number;
     createdAt?: number;
 }
 
