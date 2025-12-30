@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 
 const BACKGROUND_IMAGES = [
@@ -26,8 +26,44 @@ export const BackgroundSettings = () => {
     // Check if active source matches the custom source (or just valid custom source is active)
     const isCustom = backgroundType === 'image' && !!backgroundSourceId;
 
+    // --- Undo/Redo Batching Helpers ---
+
+    // --- Undo/Redo Batching Helpers ---
+
+    // We use a "Latch" strategy:
+    // 1. Start interaction: Mark as interacting, NOT paused yet.
+    // 2. First update: Let it pass (stores start state in history), THEN pause.
+    // 3. Subsequent updates: History is paused, intermediate states ignored.
+    // 4. End interaction: Resume history.
+
+    const isInteracting = useRef(false);
+    const hasPaused = useRef(false);
+
+    const startInteraction = useCallback(() => {
+        isInteracting.current = true;
+        hasPaused.current = false;
+        // Do NOT pause here. We need the first update to trigger a history push (saving the state BEFORE the interaction).
+    }, []);
+
+    const endInteraction = useCallback(() => {
+        if (hasPaused.current) {
+            useProjectStore.temporal.getState().resume();
+        }
+        isInteracting.current = false;
+        hasPaused.current = false;
+    }, []);
+
+    const updateWithBatching = (updates: Partial<typeof settings>) => {
+        updateSettings(updates);
+
+        if (isInteracting.current && !hasPaused.current) {
+            useProjectStore.temporal.getState().pause();
+            hasPaused.current = true;
+        }
+    };
+
     const handleColorChange = (color: string) => {
-        updateSettings({
+        updateWithBatching({
             backgroundType: 'solid',
             backgroundColor: color
         });
@@ -85,6 +121,8 @@ export const BackgroundSettings = () => {
                     <input
                         type="color"
                         value={backgroundColor}
+                        onClick={startInteraction}
+                        onBlur={endInteraction}
                         onChange={(e) => handleColorChange(e.target.value)}
                         className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent"
                     />
@@ -162,7 +200,9 @@ export const BackgroundSettings = () => {
                         max={0.25}
                         step={0.01}
                         value={settings.padding}
-                        onChange={(e) => updateSettings({ padding: parseFloat(e.target.value) })}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(e) => updateWithBatching({ padding: parseFloat(e.target.value) })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
@@ -176,7 +216,9 @@ export const BackgroundSettings = () => {
                         max={60}
                         step={1}
                         value={settings.cornerRadius || 0}
-                        onChange={(e) => updateSettings({ cornerRadius: parseInt(e.target.value) })}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(e) => updateWithBatching({ cornerRadius: parseInt(e.target.value) })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
@@ -190,7 +232,9 @@ export const BackgroundSettings = () => {
                         max={20}
                         step={1}
                         value={settings.backgroundBlur || 0}
-                        onChange={(e) => updateSettings({ backgroundBlur: parseInt(e.target.value) })}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(e) => updateWithBatching({ backgroundBlur: parseInt(e.target.value) })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
