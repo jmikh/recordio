@@ -23,7 +23,7 @@ export const drawBackground = (
             const canvasH = canvas.height;
 
             const imgRatio = imgW / imgH;
-            const canvasRatio = canvasW / canvasH;
+
 
             let drawW = canvasW;
             let drawH = canvasH;
@@ -31,27 +31,32 @@ export const drawBackground = (
             let offsetY = 0;
 
             // "Cover" Logic: Zoom to fill entire canvas without stretching
-            if (imgRatio > canvasRatio) {
-                // Image is wider than canvas (relatively) -> constrained by Height
-                // Scale image so Height matches Canvas Height
-                drawH = canvasH;
+            // If we have blur, we need to overdraw by the blur radius to avoid darkening edges
+            const blurRadius = settings.backgroundBlur || 0;
+            const safeMargin = blurRadius * 3; // 3x to be safe from any vignette
+
+            // We effectively want to cover a slightly larger rectangle
+            const targetW = canvasW + (safeMargin * 2);
+            const targetH = canvasH + (safeMargin * 2);
+            const targetRatio = targetW / targetH;
+
+            if (imgRatio > targetRatio) {
+                // Image is wider than target
+                drawH = targetH;
                 drawW = drawH * imgRatio;
-
-                // Center horizontally
-                offsetX = -(drawW - canvasW) / 2;
             } else {
-                // Image is taller/narrower -> constrained by Width
-                // Scale image so Width matches Canvas Width
-                drawW = canvasW;
+                // Image is taller/narrower than target
+                drawW = targetW;
                 drawH = drawW / imgRatio;
-
-                // Center vertically
-                offsetY = -(drawH - canvasH) / 2;
             }
 
+            // Center (relative to real canvas)
+            offsetX = (canvasW - drawW) / 2;
+            offsetY = (canvasH - drawH) / 2;
+
             // Apply Blur
-            if (settings.backgroundBlur && settings.backgroundBlur > 0) {
-                ctx.filter = `blur(${settings.backgroundBlur}px)`;
+            if (blurRadius > 0) {
+                ctx.filter = `blur(${blurRadius}px)`;
             }
 
             ctx.drawImage(bgImage, offsetX, offsetY, drawW, drawH);
