@@ -11,7 +11,7 @@ import { useProjectStore, useProjectData } from '../stores/useProjectStore';
  * If we simply pause history at the start, we miss capturing the *initial* state (0), so undoing would skip it.
  * 
  * Strategy ("The Latch"):
- * 1. `startInteraction`: MArks the start of an interaction but does NOT pause yet.
+ * 1. `startInteraction`: Marks the start of an interaction but does NOT pause yet.
  * 2. First `updateWithBatching`: Allows the update to go through to the store. This forces `zundo` to snapshot
  *    the *previous* state (the state before drag started) into the history stack.
  *    IMMEDIATELY after this first update, we pause the history.
@@ -54,13 +54,25 @@ export const useHistoryBatcher = () => {
      * Use this instead of `updateSettings` directly during the interaction.
      */
     const updateWithBatching = useCallback((updates: Partial<typeof project.settings>) => {
+        // Check if there are actual changes before applying
+        const currentSettings = useProjectStore.getState().project.settings;
+        let hasChanges = false;
+
+        for (const key in updates) {
+            const k = key as keyof typeof updates;
+            if (updates[k] !== currentSettings[k]) {
+                hasChanges = true;
+                break;
+            }
+        }
+
         updateSettings(updates);
 
-        if (isInteracting.current && !hasPaused.current) {
+        if (hasChanges && isInteracting.current && !hasPaused.current) {
             useProjectStore.temporal.getState().pause();
             hasPaused.current = true;
         }
-    }, [updateSettings, project?.settings]); // Depend on settings structure if needed, but mainly updateSettings.
+    }, [updateSettings]);
 
     return {
         startInteraction,
