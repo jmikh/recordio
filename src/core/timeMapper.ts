@@ -19,7 +19,7 @@ export class TimeMapper {
         let outputTimeAccumulator = 0;
 
         for (const win of this.windows) {
-            if (timelineTimeMs >= win.startMs && timelineTimeMs < win.endMs) {
+            if (timelineTimeMs >= win.startMs && timelineTimeMs <= win.endMs) {
                 // Inside this window
                 return outputTimeAccumulator + (timelineTimeMs - win.startMs);
             } else if (timelineTimeMs < win.startMs) {
@@ -44,7 +44,7 @@ export class TimeMapper {
 
         for (const win of this.windows) {
             const winDuration = win.endMs - win.startMs;
-            if (outputTimeMs < outputTimeAccumulator + winDuration) {
+            if (outputTimeMs <= outputTimeAccumulator + winDuration) {
                 const offsetInWindow = outputTimeMs - outputTimeAccumulator;
                 return win.startMs + offsetInWindow;
             }

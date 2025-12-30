@@ -107,7 +107,7 @@ export const PlayerCanvas = () => {
         const { recording, outputWindows } = timeline;
 
         // 1. Check if ACTIVE
-        const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs < w.endMs);
+        const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs <= w.endMs);
         if (!activeWindow) {
             // Not in output window. 
             // We might want to draw nothing, or just valid background.
@@ -195,7 +195,7 @@ export const PlayerCanvas = () => {
 
     return (
         <>
-            <div style={{ display: 'none' }}>
+            <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
                 {project.settings.backgroundType === 'image' && bgUrl && (
                     <img
                         ref={bgRef}
