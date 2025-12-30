@@ -23,7 +23,8 @@ const DEFAULT_STATE: RecordingState = {
     controllerTabId: null,
     startTime: 0,
     currentSessionId: null,
-    mode: null
+    mode: null,
+    originalTabId: null
 };
 
 let currentState: RecordingState | null = null;
@@ -197,6 +198,7 @@ async function handleStartSession(message: any, sendResponse: Function) {
         if (mode === 'tab') {
             await startTabModeSession(message.payload, sessionId);
         } else {
+            // popup now sends tabId in payload as active tab when it was opened
             await startControllerModeSession(message.payload, sessionId, mode);
         }
 
@@ -269,14 +271,15 @@ async function startTabModeSession(payload: any, sessionId: string) {
         controllerTabId: null,
         startTime: syncTimestamp,
         currentSessionId: sessionId,
-        mode: 'tab'
+        mode: 'tab',
+        originalTabId: tabId
     });
 
     chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
 }
 
-async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'desktop') {
-    const { hasAudio, hasCamera, audioDeviceId, videoDeviceId } = payload || {};
+async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'screen') {
+    const { hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabId: originalTabId } = payload || {};
 
     // 1. Open Controller Tab first (needed as target for chooseDesktopMedia in service worker)
     const controllerTabId = await openControllerTab();
@@ -287,7 +290,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     // 2. Show desktop capture picker (needs target tab when called from service worker)
     const sources = mode === 'window'
         ? ['window' as const]
-        : ['screen' as const, 'window' as const];
+        : ['screen' as const];
 
     const sourceId = await new Promise<string>((resolve, reject) => {
         chrome.desktopCapture.chooseDesktopMedia(sources, controllerTab, (streamId) => {
@@ -349,8 +352,14 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         controllerTabId: controllerTabId,
         startTime: syncTimestamp,
         currentSessionId: sessionId,
-        mode: mode
+        mode: mode,
+        originalTabId: originalTabId || null
     });
+
+    // 8. Switch back to original tab if available
+    if (originalTabId) {
+        await chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
+    }
 
 }
 
@@ -420,7 +429,8 @@ async function handleStopSession(sendResponse: Function) {
         recordedTabId: null,
         controllerTabId: null,
         currentSessionId: null,
-        mode: null
+        mode: null,
+        originalTabId: null
     });
 
     // remove those after saving state so they don't accidentally trigger another stop session
@@ -449,7 +459,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     if (!currentState || !currentState.isRecording) return;
 
     const isRecordedTab = currentState.mode === 'tab' && currentState.recordedTabId === tabId;
-    const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'desktop') && currentState.controllerTabId === tabId;
+    const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'screen') && currentState.controllerTabId === tabId;
 
     if (isRecordedTab || isControllerTab) {
         logger.log(`[Background] Detected closure of ${isRecordedTab ? 'recorded tab' : 'controller tab'}. Stopping session.`);

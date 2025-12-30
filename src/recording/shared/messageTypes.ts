@@ -10,7 +10,7 @@
 
 import type { BaseEvent } from '../../core/types';
 
-export type RecorderMode = 'desktop' | 'tab' | 'window';
+export type RecorderMode = 'screen' | 'tab' | 'window';
 
 export interface BaseMessage {
     type: string;
@@ -61,6 +61,7 @@ export interface RecordingState {
     startTime: number;
     currentSessionId: string | null;
     mode: RecorderMode | null;
+    originalTabId: number | null;
 }
 
 // --- Payloads ---

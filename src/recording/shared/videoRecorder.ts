@@ -104,14 +104,8 @@ export class VideoRecorder {
         if (this.mode === 'window') {
             const screenStream = this.activeStreams[0];
             if (screenStream) {
-                const track = screenStream.getVideoTracks()[0];
-                const settings = track?.getSettings();
-                // @ts-ignore
-                if (settings?.displaySurface === 'window') {
-                    console.log("[VideoRecorder] Detecting Window Markers...");
-                    this.detectionResult = await detectWindow(screenStream);
-                    console.log("[VideoRecorder] Detection Result:", this.detectionResult);
-                }
+                this.detectionResult = await detectWindow(screenStream);
+                console.log("[VideoRecorder] Detection isCurrentWindow:", this.detectionResult.isCurrentWindow);
             }
         }
 
@@ -330,9 +324,9 @@ export class VideoRecorder {
                 }
             } as any);
         } else {
-            // Window/Desktop mode: use sourceId from chooseDesktopMedia
+            // Window/Screen (desktop) mode: use sourceId from chooseDesktopMedia
             const sourceId = config.sourceId;
-            if (!sourceId) throw new Error("Source ID is required for window/desktop recording mode.");
+            if (!sourceId) throw new Error("Source ID is required for window/screen recording mode.");
 
             // @ts-ignore
             return await navigator.mediaDevices.getUserMedia({

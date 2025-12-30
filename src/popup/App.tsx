@@ -5,7 +5,7 @@ import { MSG_TYPES, STORAGE_KEYS } from '../recording/shared/messageTypes';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingMode, setRecordingMode] = useState<'tab' | 'window'>('tab');
+  const [recordingMode, setRecordingMode] = useState<'tab' | 'window' | 'screen'>('tab');
 
   // Device Lists
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -123,24 +123,6 @@ function App() {
       chrome.runtime.sendMessage({
         type: MSG_TYPES.START_SESSION,
         tabId: tab.id,
-        // Send flat props as Background expects them flattened for this message type currently.
-        // We will keep them top-level but extra props are okay if we cast or if we don't strictly type check against BaseMessage here.
-        // Wait, BaseMessage only has { type, payload }.
-        // So we MUST move these to payload OR cast.
-        // Background expects { tabId, ...rest } directly on message object in handleStartRecording.
-        // Wait, handleStartRecording(message) reads message.tabId.
-        // If I change this to payload, I must change background.
-        // The plan said "Update sendMessage calls". It didn't explicitly say "Update Background handleStartRecording signature" but implied it.
-        // Actually, my edit to Background `handleStartRecording` was NOT done yet. I only removed sendMessage helper.
-        // I need to check `handleStartRecording` in background/index.ts.
-        // checking background/index.ts...
-        // `async function handleStartRecording(message: any, sendResponse: Function) {`
-        // `const { tabId } = message;`
-        // So background expects them on root.
-        // BUT BaseMessage says `type` and `payload`.
-        // If I want to be strict, I should move everything to payload.
-        // And update background to read from payload.
-        // Let's do that for cleanliness.
         payload: {
           tabId: tab.id,
           mode: recordingMode,
@@ -183,18 +165,24 @@ function App() {
           <div className="flex flex-col items-center w-full gap-6">
 
             {/* Mode Selection */}
-            <div className="flex bg-slate-800 p-1 rounded-lg w-full">
+            <div className="flex bg-slate-800 p-1 rounded-lg w-full gap-1">
               <button
                 onClick={() => setRecordingMode('tab')}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${recordingMode === 'tab' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
               >
-                Current Tab
+                Tab
               </button>
               <button
                 onClick={() => setRecordingMode('window')}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${recordingMode === 'window' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 Window
+              </button>
+              <button
+                onClick={() => setRecordingMode('screen')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${recordingMode === 'screen' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Screen
               </button>
             </div>
 
