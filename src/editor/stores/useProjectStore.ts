@@ -136,49 +136,49 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                addSource: async (file, type) => {
+                addSource: async (blob, type, metadata = {}) => {
+                    const state = get();
+                    const projectId = state.project.id;
                     const uuid = crypto.randomUUID();
-                    const sourceId = `src-${uuid}`;
-                    const blobId = `rec-${uuid}`;
-                    console.log('[Action] addSource', sourceId, type);
 
-                    // 1. Save Blob
-                    await ProjectStorage.saveRecordingBlob(blobId, file);
+                    // ID Strategy: {projectId}-src-{uuid}
+                    // ID Strategy: {projectId}-rec-{uuid} (for blob)
+                    const sourceId = `${projectId}-src-${uuid}`;
+                    const blobId = `${projectId}-rec-${uuid}`;
 
-                    // 2. Create Metadata
-                    const source: import('../../core/types').SourceMetadata = {
+                    console.log(`[Store] Adding Source: ${sourceId} (${type})`);
+
+                    // 1. Save Blob (Heavy)
+                    await ProjectStorage.saveRecordingBlob(blobId, blob);
+
+                    // 2. Create Source Metadata (Light)
+                    const newSource: import('../../core/types').SourceMetadata = {
                         id: sourceId,
                         type,
-                        url: `recordo-blob://${blobId}`,
+                        url: `recordo-blob://${blobId}`, // Internal protocol
+                        createdAt: Date.now(),
+                        fileSizeBytes: blob.size,
                         durationMs: 0,
                         size: { width: 0, height: 0 },
                         hasAudio: false,
-                        createdAt: Date.now()
+                        ...metadata
                     };
 
-                    // 3. Extract dimensions if image
-                    if (type === 'image') {
-                        try {
-                            const bitmap = await createImageBitmap(file);
-                            source.size = { width: bitmap.width, height: bitmap.height };
-                            bitmap.close();
-                        } catch (e) {
-                            console.warn("Failed to read image dimensions", e);
-                        }
-                    }
+                    // 3. Save Source to DB
+                    await ProjectStorage.saveSource(newSource);
 
-                    // 4. Save Source
-                    await ProjectStorage.saveSource(source);
-
-                    // 5. Update State
-                    // - Add to immutable sources map
-                    // - Add ID to project
-                    const runtimeSource = { ...source, url: URL.createObjectURL(file) };
+                    // 4. Update Store (State)
+                    // We need to hydrate the URL for immediate playback in the session
+                    const hydratedSource = { ...newSource, url: URL.createObjectURL(blob) };
 
                     set((state) => ({
                         sources: {
                             ...state.sources,
-                            [sourceId]: runtimeSource
+                            [sourceId]: hydratedSource
+                        },
+                        project: {
+                            ...state.project,
+                            updatedAt: new Date()
                         }
                     }));
 

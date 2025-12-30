@@ -108,38 +108,43 @@ export const ProjectSettings = () => {
                             key={p.id}
                             onClick={() => handleOpen(p)}
                             className={`
-                                group relative flex items-center p-2 rounded-lg cursor-pointer transition-colors border
-                                ${isActive ? 'bg-indigo-900/30 border-indigo-500/50' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}
+                                group relative flex flex-col p-3 rounded-xl cursor-pointer transition-all border
+                                ${isActive ? 'bg-indigo-900/30 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] scale-[1.02]' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:scale-[1.01] hover:shadow-lg'}
                             `}
                         >
                             {/* Thumbnail */}
-                            <div className="w-16 h-10 bg-black rounded overflow-hidden flex-shrink-0 mr-3 border border-gray-700 relative">
+                            <div className="w-full aspect-video bg-gray-900 rounded-lg overflow-hidden flex-shrink-0 mb-3 border border-gray-700/50 relative shadow-inner">
                                 {p.thumbnail ? (
-                                    <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+                                    <img src={p.thumbnail} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    <div className="w-full h-full flex items-center justify-center text-gray-600 bg-gray-900/50">
+                                        <svg className="w-8 h-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
                                     </div>
                                 )}
+
+                                {/* Overlay gradient for text readability if we wanted text over image, but we are putting it below. 
+                                    However, let's add a subtle play icon overlay on hover if it's not active? 
+                                    Or just leave it clean. Clean is better.
+                                */}
                             </div>
 
                             {/* Info */}
-                            <div className="flex-1 min-w-0">
+                            <div className="w-full min-w-0">
                                 {isEditing ? (
-                                    <div className="flex items-center" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center mt-1" onClick={e => e.stopPropagation()}>
                                         <input
                                             type="text"
                                             value={editName}
                                             onChange={e => setEditName(e.target.value)}
-                                            className="bg-gray-900 text-white text-sm px-2 py-1 rounded border border-indigo-500 w-full focus:outline-none"
+                                            className="bg-gray-900 text-white text-sm px-2 py-1.5 rounded-md border border-indigo-500 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                                             autoFocus
                                             onKeyDown={e => e.key === 'Enter' && saveRename(e as any)}
                                         />
                                         <button
                                             onClick={saveRename}
-                                            className="ml-2 text-indigo-400 hover:text-indigo-300"
+                                            className="ml-2 p-1 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/30 rounded"
                                         >
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -147,11 +152,13 @@ export const ProjectSettings = () => {
                                         </button>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-200 truncate pr-6">{p.name}</h3>
-                                        <div className="flex items-center text-xs text-gray-500 space-x-2 mt-0.5">
-                                            <span>{new Date(p.updatedAt).toLocaleDateString()}</span>
-                                            {/* <span>• {formatBytes(0)}</span> */}
+                                    <div className="flex flex-col">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className={`text-sm font-semibold truncate pr-2 ${isActive ? 'text-white' : 'text-gray-200'}`}>{p.name}</h3>
+                                            {isActive && <span className="flex h-2 w-2 rounded-full bg-green-500 flex-shrink-0 mt-1.5 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
+                                        </div>
+                                        <div className="flex items-center text-xs text-gray-500 space-x-2 mt-1">
+                                            <span>{new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                         </div>
                                     </div>
                                 )}
@@ -159,25 +166,28 @@ export const ProjectSettings = () => {
 
                             {/* Actions (Hover) */}
                             {!isEditing && (
-                                <div className="absolute right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800/80 rounded p-1 backdrop-blur-sm">
-                                    <button
-                                        onClick={(e) => startRename(e, p)}
-                                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-                                        title="Rename"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={(e) => handleDelete(e, p)}
-                                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
-                                        title="Delete"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
+                                <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0">
+                                    <div className="flex bg-gray-900/90 backdrop-blur-md rounded-lg shadow-lg border border-gray-700/50 p-1">
+                                        <button
+                                            onClick={(e) => startRename(e, p)}
+                                            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+                                            title="Rename"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                        <div className="w-px bg-gray-700 mx-0.5 my-1"></div>
+                                        <button
+                                            onClick={(e) => handleDelete(e, p)}
+                                            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-md transition-colors"
+                                            title="Delete"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>

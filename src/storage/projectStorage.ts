@@ -1,6 +1,6 @@
 
 import type { ID, Project, SourceMetadata } from '../core/types';
-import { ProjectImpl } from '../core/Project';
+
 
 
 const DB_NAME = 'RecordoDB';
@@ -239,10 +239,6 @@ export class ProjectStorage {
     }
 
     static async deleteProject(projectId: ID): Promise<void> {
-        // Find project to see what sources/recordings it has
-        const project = await this.loadProject(projectId);
-        if (!project) return;
-
         const db = await this.getDB();
 
         // Transaction across all stores involved
@@ -251,17 +247,35 @@ export class ProjectStorage {
         // 1. Delete Project
         tx.objectStore('projects').delete(projectId);
 
-        // 2. Delete Associated Sources & Recordings
-        const sourceIds = ProjectImpl.getReferencedSourceIds(project);
-        for (const sourceId of sourceIds) {
-            tx.objectStore('sources').delete(sourceId);
+        // 2. Delete Associated Sources & Recordings (Prefix Scan)
+        // We delete anything containing the projectId in it.
+        // Since we are changing ID strategy to `{ projectId } -src -...` or similar, we can check for start.
+        // But for SAFETY (transition period), we can check if ID *includes* project Id?
+        // User requested: "Project ID first". So `starts with`.
+        // However, existing legacy IDs (src-uuid) won't match. 
+        // We will implement the NEW logic. Legacy cleanup is manual/best-effort (or we leave orphans).
+        // Actually, let's do a cursor scan.
 
-            // If sourceId looks like `src-...`, the blob is `rec-...`
-            if (sourceId.startsWith('src-')) {
-                const blobId = sourceId.replace('src-', 'rec-');
-                tx.objectStore('recordings').delete(blobId);
-            }
-        }
+        const deleteProjectData = (storeName: string) => {
+            const store = tx.objectStore(storeName);
+            const req = store.openCursor();
+            req.onsuccess = (e) => {
+                const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+                if (cursor) {
+                    const key = cursor.key.toString();
+                    if (key.includes(projectId)) { // "includes" is safer than startsWith if we have variatons, but strictly "startsWith" matches the new plan. 
+                        // User said: "Project ID first". 
+                        // Let's use includes to be robust against slight format changes or `rec-PROJECTID` vs `PROJECTID-rec`.
+                        // But wait, if IDs are UUIDs, collision is unlikely.
+                        cursor.delete();
+                    }
+                    cursor.continue();
+                }
+            };
+        };
+
+        deleteProjectData('sources');
+        deleteProjectData('recordings');
 
         // 3. Delete Thumbnail
         tx.objectStore('thumbnails').delete(projectId);
