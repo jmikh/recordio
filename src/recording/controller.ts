@@ -73,9 +73,9 @@ async function handleStart(message: BaseMessage) {
 
     recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
-    await recorder.start();
+    const detectionResult = await recorder.start();
 
-    return { success: true, startTime: Date.now() };
+    return { success: true, startTime: Date.now(), detection: detectionResult };
 }
 
 async function handleStop(message: BaseMessage) {

@@ -9,13 +9,90 @@
 // Inner: 20x20 Blue (#0000FF) centered
 // Tolerance for color matching (due to video compression)
 
-interface ValidationResult {
-    isValid: boolean;
+// Inner: 20x20 Blue (#0000FF) centered
+// Tolerance for color matching (due to video compression)
+
+// Inner: 20x20 Blue (#0000FF) centered
+// Tolerance for color matching (due to video compression)
+
+export interface WindowDetectionResult { // Renamed from CalibrationResult
+    isCurrentWindow: boolean;
     yOffset: number;
     xOffset: number; // Might have side borders
 }
 
-export async function validateRecording(blob: Blob): Promise<ValidationResult> {
+// Dete
+export async function detectWindow(stream: MediaStream): Promise<WindowDetectionResult> { // Renamed from detectCalibration
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    // Attributes to help with background execution
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+
+    const cleanup = () => {
+        video.srcObject = null;
+        video.remove();
+    };
+
+    return new Promise((resolve) => {
+        // Timeout Safety
+        const timeoutId = setTimeout(() => {
+            console.warn("[VideoValidation] Stream Validation timed out. Returning invalid.");
+            cleanup();
+            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+        }, 1500);
+
+        const extractFrame = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                if (!ctx) {
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    // Resolve invalid rather than reject
+                    return resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+                }
+
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // @ts-ignore
+                const result = findMarkers(imageData);
+
+                clearTimeout(timeoutId);
+                cleanup();
+                resolve(result);
+            } catch (e) {
+                console.error("[VideoValidation] Error extracting frame:", e);
+                clearTimeout(timeoutId);
+                cleanup();
+                resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+            }
+        };
+
+        video.onloadedmetadata = () => {
+            video.play().catch(e => console.warn("Autoplay prevented:", e));
+        };
+
+        video.onplaying = () => {
+            // Give it a small delay to ensure frame is painted
+            requestAnimationFrame(() => {
+                extractFrame(); // or wait a bit more?
+            });
+        };
+
+        video.onerror = () => {
+            clearTimeout(timeoutId);
+            cleanup();
+            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+        };
+    });
+}
+
+export async function detectWindowInBlob(blob: Blob): Promise<WindowDetectionResult> { // Renamed from detectCalibrationInBlob
     const videoUrl = URL.createObjectURL(blob);
     const video = document.createElement('video');
 
@@ -26,13 +103,17 @@ export async function validateRecording(blob: Blob): Promise<ValidationResult> {
     };
 
     return new Promise((resolve, reject) => {
+        // Timeout Safety
+        const timeoutId = setTimeout(() => {
+            console.warn("[VideoValidation] Validation timed out (background tab?). Returning invalid.");
+            cleanup();
+            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+        }, 3000); // 3 seconds timeout
+
         const extractFrame = () => {
             try {
-                // Double check readyState
                 if (video.readyState < 2) {
-                    console.warn("[VideoValidation] Video not ready on seeked, waiting...");
-                    // Just in case, try again shortly or wait for another event.
-                    // But usually seeked implies HAVE_CURRENT_DATA (2).
+                    console.warn("[VideoValidation] Video not ready on seeked.");
                 }
 
                 const canvas = document.createElement('canvas');
@@ -41,6 +122,7 @@ export async function validateRecording(blob: Blob): Promise<ValidationResult> {
                 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
                 if (!ctx) {
+                    clearTimeout(timeoutId);
                     cleanup();
                     return reject(new Error("Could not create canvas context for validation"));
                 }
@@ -48,14 +130,13 @@ export async function validateRecording(blob: Blob): Promise<ValidationResult> {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-
-
                 const result = findMarkers(imageData);
 
+                clearTimeout(timeoutId);
                 cleanup();
                 resolve(result);
             } catch (e) {
+                clearTimeout(timeoutId);
                 cleanup();
                 reject(e);
             }
@@ -66,6 +147,7 @@ export async function validateRecording(blob: Blob): Promise<ValidationResult> {
         };
 
         video.onerror = () => {
+            clearTimeout(timeoutId);
             cleanup();
             reject(new Error("Video load error"));
         };
@@ -75,12 +157,17 @@ export async function validateRecording(blob: Blob): Promise<ValidationResult> {
             video.currentTime = 0.1;
         };
 
+        // Attributes to help with background execution
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+
         video.src = videoUrl;
         video.load();
     });
 }
 
-function findMarkers(imageData: ImageData): ValidationResult {
+function findMarkers(imageData: ImageData): WindowDetectionResult {
     const width = imageData.width;
     const height = imageData.height;
     const data = imageData.data;
@@ -151,7 +238,7 @@ function findMarkers(imageData: ImageData): ValidationResult {
                             // x is the X-Offset.
 
                             return {
-                                isValid: true,
+                                isCurrentWindow: true,
                                 xOffset: x,
                                 yOffset: y
                             };
@@ -162,5 +249,5 @@ function findMarkers(imageData: ImageData): ValidationResult {
         }
     }
 
-    return { isValid: false, xOffset: 0, yOffset: 0 };
+    return { isCurrentWindow: false, xOffset: 0, yOffset: 0 };
 }

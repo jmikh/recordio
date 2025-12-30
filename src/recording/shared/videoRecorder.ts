@@ -14,12 +14,12 @@ import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectLibrary } from '../../storage/projectStorage';
 import { ProjectImpl } from '../../core/Project';
 import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
-import { validateRecording } from './videoValidation';
+import { detectWindow, type WindowDetectionResult } from './windowDetector';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
 export class VideoRecorder {
-    private mode: RecorderMode; // Not null anymore, set in constructor
+    private mode: RecorderMode;
     private state: RecorderState = 'idle';
     private currentSessionId: string;
     private config: RecordingConfig;
@@ -52,8 +52,8 @@ export class VideoRecorder {
         urlChanges: []
     };
 
-    // Singleton check helper - REMOVED
-    // private static instance: VideoRecorder | null = null;
+    // Detection Result (Window Mode)
+    private detectionResult: WindowDetectionResult | null = null;
 
     constructor(sessionId: string, config: RecordingConfig, mode: RecorderMode) {
         this.currentSessionId = sessionId;
@@ -72,7 +72,7 @@ export class VideoRecorder {
     /**
      * Starts the recording session.
      */
-    public async start(): Promise<void> {
+    public async start(): Promise<WindowDetectionResult | null> {
         if (this.state !== 'idle') {
             throw new Error(`Cannot start recording: Recorder is in ${this.state} state.`);
         }
@@ -99,6 +99,23 @@ export class VideoRecorder {
         this.state = 'recording';
 
         console.log(`[VideoRecorder] Recording started.`);
+
+        // Detect Window if Window Mode
+        if (this.mode === 'window') {
+            const screenStream = this.activeStreams[0];
+            if (screenStream) {
+                const track = screenStream.getVideoTracks()[0];
+                const settings = track?.getSettings();
+                // @ts-ignore
+                if (settings?.displaySurface === 'window') {
+                    console.log("[VideoRecorder] Detecting Window Markers...");
+                    this.detectionResult = await detectWindow(screenStream);
+                    console.log("[VideoRecorder] Detection Result:", this.detectionResult);
+                }
+            }
+        }
+
+        return this.detectionResult; // Return to controller
     }
 
     /**
@@ -152,29 +169,7 @@ export class VideoRecorder {
 
         await Promise.all(stopPromises);
 
-
         console.log("[VideoRecorder] Stopped recorders. Display Surface: ", displaySurface);
-        if (displaySurface === 'window') {
-            console.log("[VideoRecorder] Validating Window Capture...");
-            // Create temporary blob for validation
-            const tempBlob = new Blob(this.screenData, { type: 'video/webm' });
-
-            try {
-                const validation = await validateRecording(tempBlob);
-
-                if (validation.isValid) {
-                    console.log(`[VideoRecorder] Validation Success! Offsets: x=${validation.xOffset}, y=${validation.yOffset}`);
-                    // Apply Offsets to Events
-                    this.applyOffsets(validation.xOffset, validation.yOffset);
-                } else {
-                    console.warn("[VideoRecorder] Validation Failed: Content does not match controller page. Wiping events.");
-                    this.clearEvents();
-                }
-            } catch (e) {
-                console.error("[VideoRecorder] Validation Error:", e);
-                this.clearEvents();
-            }
-        }
 
         // Save Data
         // Use currentSessionId if not provided (should match due to validateSession)
@@ -194,6 +189,11 @@ export class VideoRecorder {
      */
     public addEvent(event: any) {
         if (this.state !== 'recording') return;
+
+        // Apply Offsets if Valid
+        if (this.detectionResult && this.detectionResult.isCurrentWindow) {
+            this.applyOffsetToEvent(event, this.detectionResult.xOffset, this.detectionResult.yOffset);
+        }
 
         // Categorize on the fly
         const e = event; // Incoming event payload
@@ -434,19 +434,9 @@ export class VideoRecorder {
         }
     }
 
-    private clearEvents() {
-        this.events = {
-            mouseClicks: [],
-            mousePositions: [],
-            keyboardEvents: [],
-            drags: [],
-            scrolls: [],
-            typingEvents: [],
-            urlChanges: []
-        };
-    }
 
-    private applyOffsets(xOff: number, yOff: number) {
+
+    private applyOffsetToEvent(e: any, xOff: number, yOff: number) {
         if (xOff === 0 && yOff === 0) return;
 
         const offsetPoint = (p: { x: number, y: number }) => {
@@ -459,24 +449,15 @@ export class VideoRecorder {
             r.y += yOff;
         };
 
-        const offsetBaseEvent = (e: any) => {
-            if (e.mousePos) offsetPoint(e.mousePos);
-            if (e.targetRect) offsetRect(e.targetRect);
-        };
+        if (e.mousePos) offsetPoint(e.mousePos);
+        if (e.targetRect) offsetRect(e.targetRect);
 
-        this.events.mouseClicks.forEach(offsetBaseEvent);
-        this.events.mousePositions.forEach(offsetBaseEvent);
-
-        this.events.drags.forEach(d => {
-            offsetBaseEvent(d);
-            if (d.path) {
-                d.path.forEach(p => offsetBaseEvent(p));
+        if (e.type === EventType.MOUSEDRAG) {
+            if (e.path) {
+                e.path.forEach((p: any) => { // Drag path is array of MousePositionEvent (BaseEvent)
+                    if (p.mousePos) offsetPoint(p.mousePos);
+                });
             }
-        });
-
-        this.events.scrolls.forEach(offsetBaseEvent);
-        this.events.typingEvents.forEach(offsetBaseEvent);
-        this.events.urlChanges.forEach(offsetBaseEvent);
-        this.events.keyboardEvents.forEach(offsetBaseEvent);
+        }
     }
 }

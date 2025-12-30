@@ -316,14 +316,36 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     };
 
     // 5. Send START to Controller
+    const syncTimestamp = Date.now();
     const startVideoMsg: BaseMessage = {
         type: MSG_TYPES.START_RECORDING_VIDEO,
         payload: { config, mode, sessionId }
     };
-    await chrome.runtime.sendMessage(startVideoMsg);
+    const controllerResponse = await chrome.runtime.sendMessage(startVideoMsg);
+
+    // Check Window Detection
+    if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isValid) {
+        logger.warn("[Background] Window Detection Failed. Skipping Event Recording.");
+        // We still record the video (it will just be the wrong window), but we won't record user events.
+        // Or should we abort entirely?
+        // User just said "don't capture events". So we skip step 6.
+
+        // 7. Update State (Event recording skipped)
+        await saveState({
+            isRecording: true,
+            recordingTabId: null,
+            recorderEnvironmentId: controllerTabId,
+            startTime: syncTimestamp,
+            currentSessionId: sessionId,
+            mode: mode
+        });
+
+        chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
+        return;
+    }
 
     // 6. Broadcast START_RECORDING_EVENTS to all tabs
-    const syncTimestamp = Date.now();
+    // syncTimestamp defined above
     const startEventsMsg: BaseMessage = {
         type: MSG_TYPES.START_RECORDING_EVENTS,
         payload: { startTime: syncTimestamp, sessionId }

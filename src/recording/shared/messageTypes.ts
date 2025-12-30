@@ -42,8 +42,6 @@ export const MSG_TYPES = {
     PING_CONTROLLER: 'PING_CONTROLLER',
     GET_RECORDING_STATE: 'GET_RECORDING_STATE',
 
-    // Events (Forwarding)
-    // ADD_USER_EVENT removed, reusing CAPTURE_USER_EVENT
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];
