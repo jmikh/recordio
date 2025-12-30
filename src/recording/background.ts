@@ -212,16 +212,15 @@ async function handleStartSession(message: any, sendResponse: Function) {
 }
 
 async function startTabModeSession(payload: any, sessionId: string) {
-    const { tabId, streamId: providedStreamId, hasAudio, hasCamera, audioDeviceId, videoDeviceId } = payload || {};
+    const { tabId, hasAudio, hasCamera, audioDeviceId, videoDeviceId } = payload || {};
+
+    if (!tabId) throw new Error("Tab ID is required for tab recording");
 
     // 1. Setup Offscreen
     await setupOffscreenDocument('src/recording/offscreen.html');
 
     // 2. Get Media Stream ID
-    let streamId = providedStreamId;
-    if (!streamId && tabId) {
-        streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
-    }
+    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
     if (!streamId) throw new Error("Failed to get stream ID");
 
     // 3. Wait for Offscreen
@@ -323,8 +322,22 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     };
     await chrome.runtime.sendMessage(startVideoMsg);
 
-    // 6. Update State
+    // 6. Broadcast START_RECORDING_EVENTS to all tabs
     const syncTimestamp = Date.now();
+    const startEventsMsg: BaseMessage = {
+        type: MSG_TYPES.START_RECORDING_EVENTS,
+        payload: { startTime: syncTimestamp, sessionId }
+    };
+
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+        if (tab.id) {
+            // Send and forget - some tabs might be restricted (chrome:// etc)
+            chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
+        }
+    }
+
+    // 7. Update State
     await saveState({
         isRecording: true,
         recordingTabId: null,
