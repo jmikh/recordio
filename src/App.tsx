@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { logger } from './utils/logger';
-import { MSG_TYPES, STORAGE_KEYS } from './shared/messageTypes';
+import { MSG_TYPES, STORAGE_KEYS } from './recording/shared/messageTypes';
 
 
 function App() {

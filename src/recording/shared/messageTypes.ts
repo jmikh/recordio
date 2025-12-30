@@ -1,4 +1,14 @@
-import type { BaseEvent } from '../core/types';
+/**
+ * @fileoverview Message Types and Interfaces
+ * 
+ * Defines all message type constants and interfaces for cross-context communication
+ * between the popup, background service worker, content scripts, offscreen document,
+ * and controller page.
+ * 
+ * Message flow: Popup → Background → (Offscreen|Controller) + Content
+ */
+
+import type { BaseEvent } from '../../core/types';
 
 export type RecorderMode = 'desktop' | 'tab' | 'window';
 
@@ -62,7 +72,7 @@ export interface RecordingConfig {
     hasCamera: boolean;
     audioDeviceId?: string; // Microphone
     videoDeviceId?: string; // Camera
-    tabViewportSize?: import('../core/types').Size; // Target dimensions (for window mode calibration)
+    tabViewportSize?: import('../../core/types').Size; // Target dimensions (for window mode calibration)
     streamId?: string; // Required for tab recording
     sourceId?: string; // For desktop capture (window/desktop mode)
 }

@@ -16,10 +16,10 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         editor: resolve(__dirname, 'src/editor/index.html'),
-        offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
+        offscreen: resolve(__dirname, 'src/recording/offscreen.html'),
         permissions: resolve(__dirname, 'src/permissions/permissions.html'),
         calibration: resolve(__dirname, 'src/calibration/index.html'),
-        controller: resolve(__dirname, 'src/recording-controller/index.html')
+        controller: resolve(__dirname, 'src/recording/controller.html')
       },
       output: {},
     },

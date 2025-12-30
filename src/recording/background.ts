@@ -1,7 +1,16 @@
+/**
+ * @fileoverview Background Service Worker
+ * 
+ * Orchestrates recording sessions for the Recordo extension.
+ * - Routes messages between popup, content scripts, offscreen doc, and controller
+ * - Manages session state (start/stop recording, mode selection)
+ * - Handles tab capture (tab mode) and desktop capture picker (window/desktop mode)
+ * - Persists state to chrome.storage.session for service worker restarts
+ */
 
 import { type Size } from '../core/types';
 import { logger } from '../utils/logger';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from './shared/messageTypes';
 
 logger.log("Background service worker running");
 
@@ -109,7 +118,7 @@ async function openControllerTab(): Promise<number> {
     await closeControllerTab();
 
     const tab = await chrome.tabs.create({
-        url: chrome.runtime.getURL('src/recording-controller/index.html'),
+        url: chrome.runtime.getURL('src/recording/controller.html'),
         active: true,
         pinned: true
     });
@@ -154,7 +163,7 @@ async function waitForController() {
 
 // --- Content Script Injection ---
 
-import contentScriptPath from '../content/index.ts?script';
+import contentScriptPath from './content.ts?script';
 
 chrome.runtime.onInstalled.addListener(async () => {
     console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
@@ -206,7 +215,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
     const { tabId, streamId: providedStreamId, hasAudio, hasCamera, audioDeviceId, videoDeviceId } = payload || {};
 
     // 1. Setup Offscreen
-    await setupOffscreenDocument('src/offscreen/offscreen.html');
+    await setupOffscreenDocument('src/recording/offscreen.html');
 
     // 2. Get Media Stream ID
     let streamId = providedStreamId;

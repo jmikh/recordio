@@ -1,7 +1,19 @@
+/**
+ * @fileoverview Video Recorder (MediaRecorder Wrapper)
+ * 
+ * Handles screen and camera capture using MediaRecorder API.
+ * - Manages screen stream (tab capture or desktop capture)
+ * - Optional camera stream (dual recording mode)
+ * - Audio mixing (system audio + microphone)
+ * - Saves recordings and events to ProjectLibrary
+ * 
+ * Used by both offscreen.ts (tab mode) and controller.ts (window/desktop mode).
+ */
+
 import type { RecorderMode, RecordingConfig } from './messageTypes';
-import { ProjectLibrary } from '../core/project/ProjectLibrary';
-import { ProjectImpl } from '../core/project/Project';
-import { EventType, type UserEvents, type Size, type SourceMetadata } from '../core/types';
+import { ProjectLibrary } from '../../core/project/ProjectLibrary';
+import { ProjectImpl } from '../../core/project/Project';
+import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 

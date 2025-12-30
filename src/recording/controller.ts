@@ -1,9 +1,20 @@
-import { VideoRecorder } from '../shared/videoRecorder';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig } from '../shared/messageTypes';
+/**
+ * @fileoverview Recording Controller Page for Window/Desktop Mode
+ * 
+ * Handles recording for window and desktop capture modes.
+ * Unlike tab mode (which uses offscreen.ts), this runs in a visible tab
+ * because desktop capture requires a tab context for getUserMedia with sourceId.
+ * 
+ * The background service worker opens this tab, triggers the desktop picker,
+ * then sends the sourceId here to start recording.
+ */
+
+import { VideoRecorder } from './shared/videoRecorder';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig } from './shared/messageTypes';
+
 
 
 let recorder: VideoRecorder | null = null;
-const mode = 'tab';
 
 // Message Listener
 chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
@@ -11,7 +22,7 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 
     switch (msg.type) {
         case MSG_TYPES.START_RECORDING_VIDEO:
-            if (message.payload?.mode !== 'tab') {
+            if (message.payload?.mode === 'tab') {
                 return false;
             }
             handleStart(msg)
@@ -20,10 +31,13 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
             return true;
 
         case MSG_TYPES.STOP_RECORDING_VIDEO:
+            if (message.payload?.mode === 'tab') {
+                return false;
+            }
             handleStop(msg)
                 .then((response) => sendResponse(response))
                 .catch((e) => sendResponse({ success: false, error: e.message }));
-            return true; // Keep channel open for async response
+            return true;
 
         case MSG_TYPES.CAPTURE_USER_EVENT:
             if (msg.payload && recorder) {
@@ -31,7 +45,7 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
             }
             return false;
 
-        case MSG_TYPES.PING_OFFSCREEN:
+        case MSG_TYPES.PING_CONTROLLER:
             sendResponse("PONG");
             return false;
     }
@@ -42,8 +56,22 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 async function handleStart(message: BaseMessage) {
     const config: RecordingConfig = message.payload.config;
     const sessionId = message.payload.sessionId;
+    const msgMode = message.payload.mode || 'window';
 
-    recorder = new VideoRecorder(sessionId, config, mode);
+    // Determine viewport size from this window
+    const dpr = window.devicePixelRatio || 1;
+    const viewportSize = {
+        width: Math.round(window.innerWidth * dpr),
+        height: Math.round(window.innerHeight * dpr)
+    };
+
+    // Merge viewport into config
+    const fullConfig: RecordingConfig = {
+        ...config,
+        tabViewportSize: viewportSize
+    };
+
+    recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
     await recorder.start();
 

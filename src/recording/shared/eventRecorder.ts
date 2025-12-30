@@ -1,6 +1,20 @@
-import { EventType, type MousePositionEvent, type Rect, type Size } from '../core/types';
-import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
-import { logger } from '../utils/logger';
+/**
+ * @fileoverview Event Recorder for Content Script
+ * 
+ * Captures user interaction events in recorded tabs:
+ * - Mouse: clicks, movements (polled), drags
+ * - Keyboard: keydown events (excluding password fields)
+ * - Scroll: scroll events with target element rect
+ * - Typing: typing session detection with element focus tracking
+ * - URL: pushState, replaceState, popstate, hashchange
+ * 
+ * All coordinates are scaled by devicePixelRatio for video alignment.
+ * Events are sent to background via CAPTURE_USER_EVENT messages.
+ */
+
+import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
+import { MSG_TYPES, type BaseMessage } from './messageTypes';
+import { logger } from '../../utils/logger';
 
 export class EventRecorder {
     private isRecording = false;

@@ -1,6 +1,20 @@
+/**
+ * @fileoverview Content Script for User Event Capture
+ * 
+ * Injected into recorded tabs to capture user interactions:
+ * - Mouse clicks, movements, and drags
+ * - Keyboard events (non-password fields)
+ * - Scroll events
+ * - Typing sessions
+ * - URL changes
+ * 
+ * Events are sent to the background service worker via chrome.runtime.sendMessage,
+ * which forwards them to the active recorder (offscreen or controller).
+ */
+
 import { logger } from '../utils/logger';
-import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
-import { EventRecorder } from './eventRecorder';
+import { MSG_TYPES, type BaseMessage } from './shared/messageTypes';
+import { EventRecorder } from './shared/eventRecorder';
 
 // Cleanup mechanism for previous instances
 const cleanupEvent = new Event('recordo-cleanup');
