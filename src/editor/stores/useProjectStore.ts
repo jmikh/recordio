@@ -219,6 +219,22 @@ export const useProjectStore = create<ProjectState>()(
                 updateSettings: (updates) => {
                     console.log('[Action] updateSettings', updates);
                     set((state) => {
+                        // Optimization: Check if updates actually change anything
+                        // Perform shallow comparison
+                        const currentSettings = state.project.settings;
+                        let hasChanges = false;
+                        for (const key in updates) {
+                            const val = updates[key as keyof ProjectSettings];
+                            if (val !== currentSettings[key as keyof ProjectSettings]) {
+                                hasChanges = true;
+                                break;
+                            }
+                        }
+
+                        if (!hasChanges) {
+                            return state;
+                        }
+
                         // Flat settings = simple shallow merge!
                         const nextSettings: ProjectSettings = {
                             ...state.project.settings,

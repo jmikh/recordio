@@ -1,5 +1,6 @@
-import { useRef, useCallback } from 'react';
+import { useRef } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 const BACKGROUND_IMAGES = [
     { name: 'Abstract Gradient', url: '/assets/backgrounds/abstract-gradient.jpg' },
@@ -27,40 +28,7 @@ export const BackgroundSettings = () => {
     const isCustom = backgroundType === 'image' && !!backgroundSourceId;
 
     // --- Undo/Redo Batching Helpers ---
-
-    // --- Undo/Redo Batching Helpers ---
-
-    // We use a "Latch" strategy:
-    // 1. Start interaction: Mark as interacting, NOT paused yet.
-    // 2. First update: Let it pass (stores start state in history), THEN pause.
-    // 3. Subsequent updates: History is paused, intermediate states ignored.
-    // 4. End interaction: Resume history.
-
-    const isInteracting = useRef(false);
-    const hasPaused = useRef(false);
-
-    const startInteraction = useCallback(() => {
-        isInteracting.current = true;
-        hasPaused.current = false;
-        // Do NOT pause here. We need the first update to trigger a history push (saving the state BEFORE the interaction).
-    }, []);
-
-    const endInteraction = useCallback(() => {
-        if (hasPaused.current) {
-            useProjectStore.temporal.getState().resume();
-        }
-        isInteracting.current = false;
-        hasPaused.current = false;
-    }, []);
-
-    const updateWithBatching = (updates: Partial<typeof settings>) => {
-        updateSettings(updates);
-
-        if (isInteracting.current && !hasPaused.current) {
-            useProjectStore.temporal.getState().pause();
-            hasPaused.current = true;
-        }
-    };
+    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     const handleColorChange = (color: string) => {
         updateWithBatching({
