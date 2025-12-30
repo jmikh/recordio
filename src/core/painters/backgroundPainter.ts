@@ -22,7 +22,7 @@ export const drawBackground = (
             const canvasW = canvas.width;
             const canvasH = canvas.height;
 
-            const imgRatio = imgW / imgH;
+
 
 
             let drawW = canvasW;
@@ -38,17 +38,12 @@ export const drawBackground = (
             // We effectively want to cover a slightly larger rectangle
             const targetW = canvasW + (safeMargin * 2);
             const targetH = canvasH + (safeMargin * 2);
-            const targetRatio = targetW / targetH;
 
-            if (imgRatio > targetRatio) {
-                // Image is wider than target
-                drawH = targetH;
-                drawW = drawH * imgRatio;
-            } else {
-                // Image is taller/narrower than target
-                drawW = targetW;
-                drawH = drawW / imgRatio;
-            }
+            // Calculate scale to cover the target area
+            const scale = Math.max(targetW / imgW, targetH / imgH);
+
+            drawW = imgW * scale;
+            drawH = imgH * scale;
 
             // Center (relative to real canvas)
             offsetX = (canvasW - drawW) / 2;

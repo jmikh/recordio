@@ -4,7 +4,7 @@ import type { Project, ID } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 
 export const ProjectSettings = () => {
-    const { loadProject, project: activeProject, isSaving } = useProjectStore();
+    const { project: activeProject, isSaving } = useProjectStore();
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [editingId, setEditingId] = useState<ID | null>(null);
@@ -28,13 +28,11 @@ export const ProjectSettings = () => {
         }
     };
 
-    const handleOpen = async (project: Project) => {
+    const handleOpen = (project: Project) => {
         if (project.id === activeProject.id) return;
-        try {
-            await loadProject(project);
-        } catch (e) {
-            console.error('Failed to open project:', e);
-        }
+        const url = new URL(window.location.href);
+        url.searchParams.set('projectId', project.id);
+        window.location.href = url.toString();
     };
 
     const handleDelete = async (e: React.MouseEvent, project: Project) => {
