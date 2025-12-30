@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 
 const BACKGROUND_IMAGES = [
@@ -8,76 +9,146 @@ const BACKGROUND_IMAGES = [
 export const BackgroundSettings = () => {
     const project = useProjectData();
     const updateSettings = useProjectStore(s => s.updateSettings);
+    const addSource = useProjectStore(s => s.addSource);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Defensive check
     if (!project) return null;
 
-    // Defensive: Ensure background exists (migration fallback)
-    const background = {
-        type: project.settings.backgroundType,
-        color: project.settings.backgroundColor,
-        padding: project.settings.padding,
-        imageUrl: project.settings.backgroundImageUrl
+    const { settings, sources } = project;
+    const { backgroundType, backgroundColor, backgroundImageUrl, backgroundSourceId, customBackgroundSourceId } = settings;
+
+    // Helpers to determine active state
+    const isSolid = backgroundType === 'solid';
+    const isPreset = backgroundType === 'image' && !backgroundSourceId && !!backgroundImageUrl;
+
+    // Check if active source matches the custom source (or just valid custom source is active)
+    const isCustom = backgroundType === 'image' && !!backgroundSourceId;
+
+    const handleColorChange = (color: string) => {
+        updateSettings({
+            backgroundType: 'solid',
+            backgroundColor: color
+        });
     };
 
-    const updateBackground = (updates: Partial<typeof background>) => {
-        // Map back to flat updates
-        const flatUpdates: any = {};
-        if (updates.type) flatUpdates.backgroundType = updates.type;
-        if (updates.color) flatUpdates.backgroundColor = updates.color;
-        if (updates.padding !== undefined) flatUpdates.padding = updates.padding;
-        if (updates.imageUrl !== undefined) flatUpdates.backgroundImageUrl = updates.imageUrl;
-
-        updateSettings(flatUpdates);
+    const handlePresetSelect = (url: string) => {
+        updateSettings({
+            backgroundType: 'image',
+            backgroundImageUrl: url,
+            backgroundSourceId: undefined // Clear source ID
+        });
     };
+
+    const handleCustomSelect = () => {
+        if (customBackgroundSourceId) {
+            updateSettings({
+                backgroundType: 'image',
+                backgroundSourceId: customBackgroundSourceId
+            });
+        } else {
+            fileInputRef.current?.click();
+        }
+    };
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const newSourceId = await addSource(file, 'image');
+            updateSettings({
+                backgroundType: 'image',
+                backgroundSourceId: newSourceId,
+                customBackgroundSourceId: newSourceId
+            });
+        } catch (err) {
+            console.error("Failed to upload background", err);
+        } finally {
+            // Reset input so same file can be selected again if needed
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const customSource = customBackgroundSourceId ? sources[customBackgroundSourceId] : null;
 
     return (
-        <div className="flex flex-col gap-4">
-            {/* Type Selector */}
-            <div className="flex bg-black rounded p-1">
-                <button
-                    className={`flex-1 text-xs py-1 rounded ${background.type === 'solid' ? 'bg-[#37373d] text-white' : 'hover:bg-[#37373d] text-gray-500'}`}
-                    onClick={() => updateBackground({ type: 'solid' })}
+        <div className="flex flex-col gap-6">
+            {/* 1. Solid Color */}
+            <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Solid Color</label>
+                <div
+                    className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isSolid ? 'border-blue-500 bg-[#2a2a2a]' : 'border-transparent hover:bg-[#2a2a2a]'}`}
+                    onClick={() => handleColorChange(backgroundColor)}
                 >
-                    Solid
-                </button>
-                <button
-                    className={`flex-1 text-xs py-1 rounded ${background.type === 'image' ? 'bg-[#37373d] text-white' : 'hover:bg-[#37373d] text-gray-500'}`}
-                    onClick={() => updateBackground({ type: 'image' })}
-                >
-                    Image
-                </button>
+                    <input
+                        type="color"
+                        value={backgroundColor}
+                        onChange={(e) => handleColorChange(e.target.value)}
+                        className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-gray-300">{backgroundColor}</span>
+                </div>
             </div>
 
-            {/* Content */}
-            {background.type === 'solid' ? (
-                <div>
-                    <label className="text-xs mb-1 block">Color</label>
-                    <div className="flex gap-2 items-center">
-                        <input
-                            type="color"
-                            value={background.color || '#000000'}
-                            onChange={(e) => updateBackground({ color: e.target.value })}
-                            className="w-8 h-8 rounded cursor-pointer border-0 p-0"
-                        />
-                        <span className="text-xs font-mono">{background.color}</span>
-                    </div>
-                </div>
-            ) : (
-                <div>
-                    <label className="text-xs mb-1 block">Image</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {BACKGROUND_IMAGES.map(img => (
+            {/* 2. Presets */}
+            <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Presets</label>
+                <div className="grid grid-cols-2 gap-3">
+                    {BACKGROUND_IMAGES.map(img => {
+                        const isActive = isPreset && backgroundImageUrl === img.url;
+                        return (
                             <div
                                 key={img.url}
-                                className={`cursor-pointer border-2 rounded overflow-hidden aspect-video ${background.imageUrl === img.url ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
-                                onClick={() => updateBackground({ imageUrl: img.url })}
+                                className={`cursor-pointer border-2 rounded-lg overflow-hidden aspect-video relative group transition-all ${isActive ? 'border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:border-gray-500'}`}
+                                onClick={() => handlePresetSelect(img.url)}
                             >
                                 <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
+
+            {/* 3. Custom Upload */}
+            <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Custom Upload</label>
+                <div
+                    className={`cursor-pointer border-2 rounded-lg overflow-hidden aspect-video flex items-center justify-center bg-[#1e1e1e] relative transition-all ${isCustom ? 'border-blue-500 ring-1 ring-blue-500/50' : 'border-dashed border-gray-600 hover:border-gray-400 hover:bg-[#252525]'}`}
+                    onClick={handleCustomSelect}
+                >
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleUpload}
+                    />
+
+                    {customSource ? (
+                        <div className="w-full h-full relative group">
+                            <img src={customSource.url} className="w-full h-full object-cover" />
+                            {/* Change Overlay */}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
+                                <button
+                                    className="text-xs text-white bg-white/10 px-3 py-1.5 rounded hover:bg-white/20 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        fileInputRef.current?.click();
+                                    }}
+                                >
+                                    Change Image
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-2 text-gray-500 group-hover:text-gray-300 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                            <span className="text-xs font-medium">Upload Image</span>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

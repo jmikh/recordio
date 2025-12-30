@@ -15,6 +15,7 @@ interface ProjectState {
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
+    addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
 
     // Timeline Actions
     updateRecording: (updates: Partial<Recording>) => void;
@@ -104,6 +105,56 @@ export const useProjectStore = create<ProjectState>()(
                     } finally {
                         set({ isSaving: false });
                     }
+                },
+
+                addSource: async (file, type) => {
+                    const uuid = crypto.randomUUID();
+                    const sourceId = `src-${uuid}`;
+                    const blobId = `rec-${uuid}`;
+                    console.log('[Action] addSource', sourceId, type);
+
+                    // 1. Save Blob
+                    await ProjectStorage.saveRecordingBlob(blobId, file);
+
+                    // 2. Create Metadata
+                    const source: import('../../core/types').SourceMetadata = {
+                        id: sourceId,
+                        type,
+                        url: `recordo-blob://${blobId}`,
+                        durationMs: 0,
+                        size: { width: 0, height: 0 },
+                        hasAudio: false,
+                        createdAt: Date.now()
+                    };
+
+                    // 3. Extract dimensions if image
+                    if (type === 'image') {
+                        try {
+                            const bitmap = await createImageBitmap(file);
+                            source.size = { width: bitmap.width, height: bitmap.height };
+                            bitmap.close();
+                        } catch (e) {
+                            console.warn("Failed to read image dimensions", e);
+                        }
+                    }
+
+                    // 4. Save Source
+                    await ProjectStorage.saveSource(source);
+
+                    // 5. Update State (Hydrate URL)
+                    const runtimeSource = { ...source, url: URL.createObjectURL(file) };
+
+                    set((state) => ({
+                        project: {
+                            ...state.project,
+                            sources: {
+                                ...state.project.sources,
+                                [sourceId]: runtimeSource
+                            }
+                        }
+                    }));
+
+                    return sourceId;
                 },
 
                 updateRecording: (updates) => {

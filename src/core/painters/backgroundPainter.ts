@@ -15,7 +15,7 @@ export const drawBackground = (
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     // 2. Image (Cover Mode)
-    else if (settings.backgroundType === 'image' && bgImage && settings.backgroundImageUrl) {
+    else if (settings.backgroundType === 'image' && bgImage) {
         if (bgImage.complete && bgImage.naturalWidth > 0) {
             const imgW = bgImage.naturalWidth;
             const imgH = bgImage.naturalHeight;

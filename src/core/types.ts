@@ -65,7 +65,9 @@ export interface ProjectSettings {
     backgroundType: 'solid' | 'image';
     backgroundColor: string;
     padding: number;
-    backgroundImageUrl?: string;
+    backgroundImageUrl?: string; // For presets
+    backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
+    customBackgroundSourceId?: ID; // Persists the last uploaded custom background
 }
 
 // ==========================================

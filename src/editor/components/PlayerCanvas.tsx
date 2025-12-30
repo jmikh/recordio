@@ -186,16 +186,24 @@ export const PlayerCanvas = () => {
     }, [outputVideoSize.width, outputVideoSize.height]);
 
 
+    // active background logic
+    const activeBgSourceId = project.settings.backgroundSourceId;
+    const bgUrl = activeBgSourceId && sources[activeBgSourceId]
+        ? sources[activeBgSourceId].url
+        : project.settings.backgroundImageUrl;
+
     return (
         <>
             <div style={{ display: 'none' }}>
-                {project.settings.backgroundType === 'image' && project.settings.backgroundImageUrl && (
+                {project.settings.backgroundType === 'image' && bgUrl && (
                     <img
                         ref={bgRef}
-                        src={project.settings.backgroundImageUrl}
+                        src={bgUrl}
                         className="hidden" // Just for loading
                         onLoad={() => {
                             // Trigger re-render
+                            // Force update? Or assume canvas loop picks it up?
+                            // Canvas loop picks it up on next 'tick' if image is complete
                         }}
                     />
                 )}
