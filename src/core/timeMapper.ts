@@ -1,4 +1,4 @@
-import type { OutputWindow } from '../types';
+import type { OutputWindow } from './types';
 
 export class TimeMapper {
     private readonly timelineOffsetMs: number;

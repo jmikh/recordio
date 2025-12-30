@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { PlayerCanvas } from './player/PlayerCanvas';
-import { BackgroundPanel } from './BackgroundPanel';
+import { PlayerCanvas } from './components/PlayerCanvas';
+import { BackgroundPanel } from './components/BackgroundPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
-import { Timeline } from './timeline/Timeline';
+import { Timeline } from './components/Timeline';
 
-import { ProjectLibrary } from '../core/project/ProjectLibrary';
+import { ProjectLibrary } from '../storage/projectStorage';
 
 // Icons
 const IconUndo = () => (

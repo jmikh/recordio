@@ -1,5 +1,5 @@
 
-import { useProjectStore, useProjectData } from './stores/useProjectStore';
+import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 
 const BACKGROUND_IMAGES = [
     { name: 'Abstract Gradient', url: '/assets/backgrounds/abstract-gradient.jpg' },

@@ -1,8 +1,8 @@
 import { useRef, useEffect } from 'react';
-import { drawScreen } from './screenPainter';
-import { drawBackground } from './backgroundPainter';
-import { drawWebcam } from './webcamPainter';
-import { drawKeyboardOverlay } from './keyboardPainter';
+import { drawScreen } from '../../core/painters/screenPainter';
+import { drawBackground } from '../../core/painters/backgroundPainter';
+import { drawWebcam } from '../../core/painters/webcamPainter';
+import { drawKeyboardOverlay } from '../../core/painters/keyboardPainter';
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 

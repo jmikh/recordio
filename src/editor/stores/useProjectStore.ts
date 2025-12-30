@@ -2,10 +2,10 @@ import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, Recording, OutputWindow, UserEvents, ViewportMotion, ProjectSettings } from '../../core/types';
-import { ProjectImpl } from '../../core/project/Project';
-import { ProjectLibrary } from '../../core/project/ProjectLibrary';
-import { calculateZoomSchedule, ViewMapper } from '../../core/effects/viewportMotion';
-import { TimeMapper } from '../../core/effects/timeMapper';
+import { ProjectImpl } from '../../core/Project';
+import { ProjectLibrary } from '../../storage/projectStorage';
+import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
+import { TimeMapper } from '../../core/timeMapper';
 
 interface ProjectState {
     project: Project;

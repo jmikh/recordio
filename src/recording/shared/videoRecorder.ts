@@ -11,8 +11,8 @@
  */
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
-import { ProjectLibrary } from '../../core/project/ProjectLibrary';
-import { ProjectImpl } from '../../core/project/Project';
+import { ProjectLibrary } from '../../storage/projectStorage';
+import { ProjectImpl } from '../../core/Project';
 import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';

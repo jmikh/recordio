@@ -1,4 +1,4 @@
-import type { ProjectSettings } from '../../core/types';
+import type { ProjectSettings } from '../types';
 
 /**
  * Draws the project background (solid color or image) onto the canvas.

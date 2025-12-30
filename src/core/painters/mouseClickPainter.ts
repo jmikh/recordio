@@ -1,5 +1,5 @@
-import type { MouseClickEvent, Rect } from '../../core/types';
-import type { ViewMapper } from '../../core/effects/viewMapper';
+import type { MouseClickEvent, Rect } from '../types';
+import type { ViewMapper } from '../viewMapper';
 
 /**
  * Draws click effects.

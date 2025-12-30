@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TimeMapper } from './timeMapper';
-import type { OutputWindow } from '../types';
+import type { OutputWindow } from './types';
 
 describe('TimeMapper', () => {
     it('Case 1: Simple Continuous Window', () => {

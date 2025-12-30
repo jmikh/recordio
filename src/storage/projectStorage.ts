@@ -1,5 +1,5 @@
 
-import type { ID, Project, SourceMetadata } from '../types';
+import type { ID, Project, SourceMetadata } from '../core/types';
 
 
 const DB_NAME = 'RecordoDB';

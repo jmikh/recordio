@@ -1,9 +1,9 @@
-import type { UserEvents, Project, TimeMs } from '../../core/types';
-import { ViewMapper } from '../../core/effects/viewMapper';
+import type { UserEvents, Project, TimeMs } from '../types';
+import { ViewMapper } from '../viewMapper';
 import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
-import { TimeMapper } from '../../core/effects/timeMapper';
-import { getViewportStateAtTime } from '../../core/effects/viewportMotion';
+import { TimeMapper } from '../timeMapper';
+import { getViewportStateAtTime } from '../viewportMotion';
 
 /**
  * Draws the screen recording frame.

@@ -1,9 +1,6 @@
-import { type Project, type SourceMetadata, type UserEvents, type Recording, type ID } from '../types';
-import { TimelineImpl } from '../timeline/Timeline';
-import { calculateZoomSchedule, ViewMapper } from '../effects/viewportMotion';
-import { TimeMapper } from '../effects/timeMapper';
-
-
+import { type Project, type SourceMetadata, type UserEvents, type Recording, type ID } from './types';
+import { calculateZoomSchedule, ViewMapper } from './viewportMotion';
+import { TimeMapper } from './timeMapper';
 
 /**
  * Functional logic for Project operations.
@@ -19,7 +16,16 @@ export class ProjectImpl {
             createdAt: new Date(),
             updatedAt: new Date(),
             sources: {},
-            timeline: TimelineImpl.create(''),
+            timeline: {
+                id: crypto.randomUUID(),
+                durationMs: 0,
+                outputWindows: [],
+                recording: {
+                    timelineOffsetMs: 0,
+                    screenSourceId: '',
+                    viewportMotions: []
+                }
+            },
             settings: {
                 outputSize: { width: 3840, height: 2160 },
                 frameRate: 30,

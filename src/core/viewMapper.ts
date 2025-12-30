@@ -1,4 +1,4 @@
-import type { Size, Point, Rect } from '../types.ts';
+import type { Size, Point, Rect } from './types';
 
 
 export class ViewMapper {

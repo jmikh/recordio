@@ -1,5 +1,5 @@
-import type { DragEvent, Point, Rect, MousePositionEvent } from '../../core/types';
-import type { ViewMapper } from '../../core/effects/viewMapper';
+import type { DragEvent, Point, Rect, MousePositionEvent } from '../types';
+import type { ViewMapper } from '../viewMapper';
 
 /**
  * Draws drag effects.

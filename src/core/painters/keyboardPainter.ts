@@ -1,5 +1,5 @@
 
-import type { KeyboardEvent, Size } from '../../core/types';
+import type { KeyboardEvent, Size } from '../types';
 
 /**
  * Draws keysrokes at the top of the canvas.

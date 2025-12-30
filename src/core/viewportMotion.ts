@@ -1,4 +1,4 @@
-import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType } from '../types';
+import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType } from './types';
 import { ViewMapper } from './viewMapper';
 import { TimeMapper } from './timeMapper';
 

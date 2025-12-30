@@ -1,4 +1,4 @@
-import type { Size } from '../../core/types';
+import type { Size } from '../types';
 
 /**
  * Draws the webcam overlay (Picture-in-Picture) onto the canvas.
