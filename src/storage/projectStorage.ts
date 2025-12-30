@@ -1,5 +1,6 @@
 
 import type { ID, Project, SourceMetadata } from '../core/types';
+import { ProjectImpl } from '../core/Project';
 
 
 const DB_NAME = 'RecordoDB';
@@ -115,20 +116,7 @@ export class ProjectStorage {
         if (!projectRaw) return null;
 
         // Re-hydrate sources? 
-        const hydratedSources: Record<ID, SourceMetadata> = {};
-        for (const [id, sourceStub] of Object.entries(projectRaw.sources)) {
-            const fullSource = await this.loadSource(id);
-            if (fullSource) {
-                hydratedSources[id] = fullSource;
-            } else {
-                hydratedSources[id] = sourceStub; // Fallback
-            }
-        }
-
-        return {
-            ...projectRaw,
-            sources: hydratedSources
-        };
+        return projectRaw;
     }
 
     // ===========================================
@@ -206,7 +194,8 @@ export class ProjectStorage {
 
         // 2. Delete Associated Sources & Recordings
         // For V1, we iterate the sources in the project and delete them
-        for (const sourceId of Object.keys(project.sources)) {
+        const sourceIds = ProjectImpl.getReferencedSourceIds(project);
+        for (const sourceId of sourceIds) {
             tx.objectStore('sources').delete(sourceId);
 
             // Assuming recording blob ID convention or we need to look it up

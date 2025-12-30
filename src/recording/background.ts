@@ -166,7 +166,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
-        if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("about:")) {
+        if (tab.id && tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://") || tab.url.startsWith("file://"))) {
             try {
                 await chrome.scripting.executeScript({
                     target: { tabId: tab.id },

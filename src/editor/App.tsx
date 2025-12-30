@@ -98,12 +98,13 @@ function Editor() {
 
 
     // Derived UI State
-    const hasActiveProject = Object.keys(project.sources).length > 0;
+    // Check if we have a valid screen source ID to determine if project is "active" / has content
+    const hasActiveProject = !!project.timeline.recording.screenSourceId;
     const projectOutputSize = project.settings.outputSize;
 
     // Calculate Rendered Rect (for overlay positioning)
-    let renderedStyle = {};
-    if (projectOutputSize && projectOutputSize.width > 0) {
+    let renderedStyle = { width: '100%', height: '100%' };
+    if (projectOutputSize && projectOutputSize.width > 0 && containerSize.width > 0 && containerSize.height > 0) {
         const containerAspect = containerSize.width / containerSize.height;
         const videoAspect = projectOutputSize.width / projectOutputSize.height;
 
@@ -117,8 +118,8 @@ function Editor() {
         }
 
         renderedStyle = {
-            width: rw,
-            height: rh
+            width: `${rw}px`,
+            height: `${rh}px`
         };
     }
 
@@ -233,6 +234,7 @@ function Editor() {
                         >
                             Log User Events
                         </button>
+                        {/* Debug Buttons Removed */}
                     </div>
                     {/* Debug Buttons Removed */}
                     <div className="flex-1 flex flex-col overflow-hidden">

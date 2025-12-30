@@ -42,12 +42,6 @@ export interface Project {
     /* Unified Settings */
     settings: ProjectSettings;
 
-    /**
-     * Map of all Source assets used in the project.
-     * Keyed by Source ID for O(1) lookup.
-     */
-    sources: Record<ID, SourceMetadata>;
-
     /* The main timeline containing the recording and output windows */
     timeline: Timeline;
 }

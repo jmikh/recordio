@@ -9,6 +9,7 @@ import { TimeMapper } from '../../core/timeMapper';
 
 interface ProjectState {
     project: Project;
+    sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents | null; // Single set of loaded events
     isSaving: boolean;
 
@@ -16,6 +17,7 @@ interface ProjectState {
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
+    getSource: (id: ID) => import('../../core/types').SourceMetadata;
 
     // Timeline Actions
     updateRecording: (updates: Partial<Recording>) => void;
@@ -30,13 +32,17 @@ interface ProjectState {
 }
 
 // Helper to recalculate zooms synchronously
-const recalculateAutoZooms = (project: Project, events: UserEvents | null): ViewportMotion[] => {
+const recalculateAutoZooms = (
+    project: Project,
+    sources: Record<ID, import('../../core/types').SourceMetadata>,
+    events: UserEvents | null
+): ViewportMotion[] => {
     if (!project.settings.autoZoom) {
         return project.timeline.recording.viewportMotions; // Return existing if auto is off (or empty?)
     }
 
     const screenSourceId = project.timeline.recording.screenSourceId;
-    const sourceMetadata = project.sources[screenSourceId];
+    const sourceMetadata = sources[screenSourceId];
 
     if (!sourceMetadata || !events) {
         console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
@@ -65,18 +71,35 @@ export const useProjectStore = create<ProjectState>()(
             (set, get) => ({
                 // Initialize with a default empty project
                 project: ProjectImpl.create('Untitled Project'),
+                sources: {},
                 userEvents: null,
                 isSaving: false,
 
                 loadProject: async (project) => {
                     console.log('[Action] loadProject', project.id);
-                    // 1. Set Project immediately
+
+                    // 1. Load Sources (Separately)
+                    const sourcesMap: Record<ID, import('../../core/types').SourceMetadata> = {};
+                    const sourceIds = ProjectImpl.getReferencedSourceIds(project);
+                    await Promise.all(sourceIds.map(async (id) => {
+                        const source = await ProjectStorage.loadSource(id);
+                        if (source) {
+                            sourcesMap[id] = source;
+                        } else {
+                            console.warn(`[loadProject] Source ${id} not found in DB.`);
+                        }
+                    }));
+
+                    // 2. Set Sources FIRST (so project consumers find them)
+                    set({ sources: sourcesMap });
+
+                    // 3. Set Project
                     set({ project });
 
-                    // 2. Fetch Events for the screen source
+                    // 4. Fetch Events for the screen source
                     let events: UserEvents | null = null;
                     const screenSourceId = project.timeline.recording.screenSourceId;
-                    const screenSource = project.sources[screenSourceId];
+                    const screenSource = sourcesMap[screenSourceId];
 
                     if (screenSource && screenSource.eventsUrl) {
                         try {
@@ -88,11 +111,17 @@ export const useProjectStore = create<ProjectState>()(
                         }
                     }
 
-                    // 3. Update Store
+                    // 5. Update Store with Events
                     set({ userEvents: events });
 
-                    // 4. Clear History so we can't undo into valid empty state or previous project
+                    // 6. Clear History so we can't undo into valid empty state or previous project
                     useProjectStore.temporal.getState().clear();
+                },
+
+                getSource: (id) => {
+                    const s = get().sources[id];
+                    if (!s) throw new Error(`Source with ID ${id} not found.`);
+                    return s;
                 },
 
                 saveProject: async () => {
@@ -141,16 +170,15 @@ export const useProjectStore = create<ProjectState>()(
                     // 4. Save Source
                     await ProjectStorage.saveSource(source);
 
-                    // 5. Update State (Hydrate URL)
+                    // 5. Update State
+                    // - Add to immutable sources map
+                    // - Add ID to project
                     const runtimeSource = { ...source, url: URL.createObjectURL(file) };
 
                     set((state) => ({
-                        project: {
-                            ...state.project,
-                            sources: {
-                                ...state.project.sources,
-                                [sourceId]: runtimeSource
-                            }
+                        sources: {
+                            ...state.sources,
+                            [sourceId]: runtimeSource
                         }
                     }));
 
@@ -215,7 +243,7 @@ export const useProjectStore = create<ProjectState>()(
                         const zoomChanged = updates.maxZoom !== undefined || updates.autoZoom !== undefined;
 
                         if (paddingChanged || zoomChanged) {
-                            nextMotions = recalculateAutoZooms(nextProject, state.userEvents);
+                            nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);
                         }
 
                         return {
@@ -246,7 +274,7 @@ export const useProjectStore = create<ProjectState>()(
                                 outputWindows: nextOutputWindows
                             }
                         };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.userEvents);
+                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
                         return {
                             project: {
@@ -278,7 +306,7 @@ export const useProjectStore = create<ProjectState>()(
                                 outputWindows: nextOutputWindows
                             }
                         };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.userEvents);
+                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
                         return {
                             project: {
@@ -308,7 +336,7 @@ export const useProjectStore = create<ProjectState>()(
                                 outputWindows: nextOutputWindows
                             }
                         };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.userEvents);
+                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
                         return {
                             project: {
@@ -362,7 +390,7 @@ export const useProjectStore = create<ProjectState>()(
                                 outputWindows: nextOutputWindows
                             }
                         };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.userEvents);
+                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
                         // 6. Return new state
                         return {
@@ -411,7 +439,7 @@ useProjectStore.subscribe(
 
 export const useProjectData = () => useProjectStore(s => s.project);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
-export const useProjectSources = () => useProjectStore(s => s.project.sources);
+export const useProjectSources = () => useProjectStore(s => s.sources);
 export const useRecording = () => useProjectStore(s => s.project.timeline.recording);
 export const useProjectHistory = <T,>(
     selector: (state: TemporalState<{ project: Project }>) => T

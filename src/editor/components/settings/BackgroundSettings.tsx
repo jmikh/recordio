@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 
 const BACKGROUND_IMAGES = [
     { name: 'Abstract Gradient', url: '/assets/backgrounds/abstract-gradient.jpg' },
@@ -15,7 +15,8 @@ export const BackgroundSettings = () => {
     // Defensive check
     if (!project) return null;
 
-    const { settings, sources } = project;
+    const sources = useProjectSources();
+    const { settings } = project;
     const { backgroundType, backgroundColor, backgroundImageUrl, backgroundSourceId, customBackgroundSourceId } = settings;
 
     // Helpers to determine active state

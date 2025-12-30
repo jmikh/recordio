@@ -1,4 +1,4 @@
-import type { UserEvents, Project, TimeMs } from '../types';
+import type { UserEvents, Project, TimeMs, ID, SourceMetadata } from '../types';
 import { ViewMapper } from '../viewMapper';
 import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
@@ -13,10 +13,11 @@ export function drawScreen(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     project: Project,
+    sources: Record<ID, SourceMetadata>,
     userEvents: UserEvents | null,
     currentTimeMs: TimeMs
 ) {
-    const { timeline, sources } = project;
+    const { timeline } = project;
     const { recording, outputWindows } = timeline;
 
     // 1. Resolve Data

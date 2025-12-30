@@ -15,25 +15,28 @@ export class ProjectImpl {
             name,
             createdAt: new Date(),
             updatedAt: new Date(),
-            sources: {},
+            settings: {
+                outputSize: { width: 3840, height: 2160 },
+                frameRate: 30,
+                padding: 0.02,
+                maxZoom: 1.5,
+                autoZoom: true,
+                backgroundType: 'solid',
+                backgroundColor: '#1E1E1E' // Dark Grey
+            },
             timeline: {
                 id: crypto.randomUUID(),
                 durationMs: 0,
-                outputWindows: [],
+                // We start with NO recording. 
+                // The user must create one via 'createFromSource' or potentially 'add empty'
+                // For now, let's assume a project must have a recording eventually.
+                // We'll init with empty values that need to be populated.
                 recording: {
                     timelineOffsetMs: 0,
                     screenSourceId: '',
                     viewportMotions: []
-                }
-            },
-            settings: {
-                outputSize: { width: 3840, height: 2160 },
-                frameRate: 30,
-                maxZoom: 1.8,
-                autoZoom: true,
-                backgroundType: 'solid',
-                backgroundColor: '#1e1e1e',
-                padding: 0.02
+                },
+                outputWindows: []
             }
         };
     }
@@ -55,14 +58,6 @@ export class ProjectImpl {
     ): Project {
         const project = this.create("Recording - " + new Date().toLocaleString());
         project.id = projectId; // Override random ID with specific projectId
-
-        // Add Screen Source
-        let projectWithSource = this.addSource(project, screenSource);
-
-        // Add Camera Source if present
-        if (cameraSource) {
-            projectWithSource = this.addSource(projectWithSource, cameraSource);
-        }
 
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
@@ -100,7 +95,7 @@ export class ProjectImpl {
 
         // Update timeline with this recording
         const updatedTimeline = {
-            ...projectWithSource.timeline,
+            ...project.timeline,
             recording: recording,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
@@ -108,22 +103,32 @@ export class ProjectImpl {
         };
 
         return {
-            ...projectWithSource,
+            ...project,
             createdAt: new Date(),
             timeline: updatedTimeline
         };
     }
 
     /**
-     * Adds a media source to the project library.
+     * Helper to extract all Source IDs referenced by the project.
+     * This replaces the explicit 'sourceIds' list.
      */
-    static addSource(project: Project, source: SourceMetadata): Project {
-        return {
-            ...project,
-            sources: {
-                ...project.sources,
-                [source.id]: source
-            }
-        };
+    static getReferencedSourceIds(project: Project): ID[] {
+        const ids: Set<ID> = new Set();
+
+        // 1. Timeline Sources
+        if (project.timeline.recording.screenSourceId) {
+            ids.add(project.timeline.recording.screenSourceId);
+        }
+        if (project.timeline.recording.cameraSourceId) {
+            ids.add(project.timeline.recording.cameraSourceId);
+        }
+
+        // 2. Settings Sources (e.g. Background)
+        if (project.settings.backgroundSourceId) {
+            ids.add(project.settings.backgroundSourceId);
+        }
+
+        return Array.from(ids);
     }
 }

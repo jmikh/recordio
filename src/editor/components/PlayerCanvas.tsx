@@ -3,7 +3,7 @@ import { drawScreen } from '../../core/painters/screenPainter';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWebcam } from '../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../core/painters/keyboardPainter';
-import { useProjectStore, useProjectData } from '../stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectSources } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 
 export const PlayerCanvas = () => {
@@ -11,7 +11,7 @@ export const PlayerCanvas = () => {
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
-    const sources = project?.sources || {};
+    const sources = useProjectSources();
 
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -91,7 +91,7 @@ export const PlayerCanvas = () => {
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
-        const { project, userEvents } = useProjectStore.getState();
+        const { project, userEvents, sources } = useProjectStore.getState();
         const playback = usePlaybackStore.getState();
 
         const currentTimeMs = playback.currentTimeMs;
@@ -103,7 +103,7 @@ export const PlayerCanvas = () => {
 
         drawBackground(ctx, project.settings, canvas, bgRef.current);
 
-        const { timeline, sources } = project;
+        const { timeline } = project;
         const { recording, outputWindows } = timeline;
 
         // 1. Check if ACTIVE
@@ -136,6 +136,7 @@ export const PlayerCanvas = () => {
                     ctx,
                     video,
                     project,
+                    sources,
                     userEvents,
                     currentTimeMs
                 );
