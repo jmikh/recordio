@@ -325,7 +325,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
 
     // Check Window Detection
     if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isValid) {
-        logger.warn("[Background] Window Detection Failed. Skipping Event Recording.");
+        logger.warn("[Background]");
         // We still record the video (it will just be the wrong window), but we won't record user events.
         // Or should we abort entirely?
         // User just said "don't capture events". So we skip step 6.
@@ -399,7 +399,6 @@ async function handleStopSession(sendResponse: Function) {
     logger.log("[Background] Sending STOP_RECORDING");
 
     const finalSessionId = currentState?.currentSessionId;
-    const mode = currentState?.mode;
 
     if (finalSessionId) {
         try {
@@ -411,37 +410,30 @@ async function handleStopSession(sendResponse: Function) {
             const response = await chrome.runtime.sendMessage(stopVideoMsg);
             logger.log("[Background] Recorder stop response:", response);
 
-            // Stop content script events
-            const stopEventsMsg: BaseMessage = {
-                type: MSG_TYPES.STOP_RECORDING_EVENTS,
-                payload: { sessionId: finalSessionId }
-            };
 
-            if (mode === 'tab' && currentState?.recordingTabId) {
-                // Tab mode: stop specific tab
-                chrome.tabs.sendMessage(currentState.recordingTabId, stopEventsMsg)
-            } else {
-                // Window/Desktop mode: broadcast to all tabs
-                const tabs = await chrome.tabs.query({});
-                for (const tab of tabs) {
-                    if (tab.id) {
-                        chrome.tabs.sendMessage(tab.id, stopEventsMsg)
-                    }
-                }
-            }
-
-            // Open editor
-            const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
-            chrome.tabs.create({ url: editorUrl });
-
-            // Cleanup: close offscreen or controller window based on mode
-            if (mode === 'tab') {
-                chrome.offscreen.closeDocument()
-            } else {
-                //closeControllerTab();
-            }
         } catch (e) {
-            logger.error("Error stopping recording orchestration:", e);
+            logger.error("Failed to stop video recording: ", e);
+        }
+
+        // Open editor
+        const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
+        chrome.tabs.create({ url: editorUrl });
+    }
+    // Cleanup regardless of success
+
+    chrome.offscreen.closeDocument()
+    closeControllerTab();
+
+    const stopEventsMsg: BaseMessage = {
+        type: MSG_TYPES.STOP_RECORDING_EVENTS,
+        payload: { sessionId: finalSessionId }
+    };
+
+    // broadcast to all tabs safer.
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+        if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, stopEventsMsg)
         }
     }
 
@@ -462,7 +454,7 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
     if (!currentState) return sendResponse({ isRecording: false, startTime: 0 }); // Trigger fallback if ensureState failed
 
     let isRecording = currentState.isRecording;
-    if (_sender.tab?.id) {
+    if (_sender.tab?.id && currentState.mode === 'tab') {
         // Only report recording=true if we are recording THIS tab
         isRecording = currentState.isRecording && _sender.tab.id === currentState.recordingTabId;
     }
@@ -490,8 +482,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             case MSG_TYPES.GET_RECORDING_STATE:
                 handleGetRecordingState(_sender, sendResponse);
                 break;
-
-
 
             case MSG_TYPES.PING_OFFSCREEN:
                 sendResponse("PONG");
