@@ -64,10 +64,12 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
             break;
 
         case MSG_TYPES.START_RECORDING_EVENTS:
+            console.log("[Content] Starting recording events...");
             handleStartRecording(message);
             break;
 
         case MSG_TYPES.STOP_RECORDING_EVENTS:
+            console.log("[Content] Stopping recording events...");
             handleStopRecording();
             break;
     }

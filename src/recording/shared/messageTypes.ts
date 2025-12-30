@@ -56,8 +56,8 @@ export const STORAGE_KEYS = {
 
 export interface RecordingState {
     isRecording: boolean;
-    recordingTabId: number | null;
-    recorderEnvironmentId: number | null;
+    recordedTabId: number | null;
+    controllerTabId: number | null;
     startTime: number;
     currentSessionId: string | null;
     mode: RecorderMode | null;

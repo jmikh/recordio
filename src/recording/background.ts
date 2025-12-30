@@ -19,8 +19,8 @@ logger.log("Background service worker running");
 // Default state if storage is empty
 const DEFAULT_STATE: RecordingState = {
     isRecording: false,
-    recordingTabId: null,
-    recorderEnvironmentId: null,
+    recordedTabId: null,
+    controllerTabId: null,
     startTime: 0,
     currentSessionId: null,
     mode: null
@@ -105,11 +105,7 @@ let controllerTabId: number | null = null;
 
 async function closeControllerTab() {
     if (controllerTabId) {
-        try {
-            await chrome.tabs.remove(controllerTabId);
-        } catch (e) {
-            logger.log("[Background] Failed to close controller tab (might be already gone)");
-        }
+        chrome.tabs.remove(controllerTabId).catch(() => { });
         controllerTabId = null;
     }
 }
@@ -269,8 +265,8 @@ async function startTabModeSession(payload: any, sessionId: string) {
     // 8. Update State
     await saveState({
         isRecording: true,
-        recordingTabId: tabId,
-        recorderEnvironmentId: null,
+        recordedTabId: tabId,
+        controllerTabId: null,
         startTime: syncTimestamp,
         currentSessionId: sessionId,
         mode: 'tab'
@@ -333,8 +329,8 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         // 7. Update State (Event recording skipped)
         await saveState({
             isRecording: true,
-            recordingTabId: null,
-            recorderEnvironmentId: controllerTabId,
+            recordedTabId: null,
+            controllerTabId: controllerTabId,
             startTime: syncTimestamp,
             currentSessionId: sessionId,
             mode: mode
@@ -362,8 +358,8 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     // 7. Update State
     await saveState({
         isRecording: true,
-        recordingTabId: null,
-        recorderEnvironmentId: controllerTabId,
+        recordedTabId: null,
+        controllerTabId: controllerTabId,
         startTime: syncTimestamp,
         currentSessionId: sessionId,
         mode: mode
@@ -421,8 +417,6 @@ async function handleStopSession(sendResponse: Function) {
     }
     // Cleanup regardless of success
 
-    chrome.offscreen.closeDocument()
-    closeControllerTab();
 
     const stopEventsMsg: BaseMessage = {
         type: MSG_TYPES.STOP_RECORDING_EVENTS,
@@ -439,11 +433,16 @@ async function handleStopSession(sendResponse: Function) {
 
     await saveState({
         isRecording: false,
-        recordingTabId: null,
-        recorderEnvironmentId: null,
+        recordedTabId: null,
+        controllerTabId: null,
         currentSessionId: null,
         mode: null
     });
+
+    // remove those after saving state so they don't accidentally trigger another stop session
+    chrome.offscreen.closeDocument().catch(() => { });
+    closeControllerTab();
+
     chrome.storage.local.remove(['recordingSyncTimestamp']);
 
     sendResponse({ success: true });
@@ -456,10 +455,25 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
     let isRecording = currentState.isRecording;
     if (_sender.tab?.id && currentState.mode === 'tab') {
         // Only report recording=true if we are recording THIS tab
-        isRecording = currentState.isRecording && _sender.tab.id === currentState.recordingTabId;
+        isRecording = currentState.isRecording && _sender.tab.id === currentState.recordedTabId;
     }
     sendResponse({ isRecording, startTime: currentState.startTime });
 }
+
+// --- Tab Removal Listener ---
+// Detect if the recorded tab or controller tab is closed
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+    await ensureState();
+    if (!currentState || !currentState.isRecording) return;
+
+    const isRecordedTab = currentState.mode === 'tab' && currentState.recordedTabId === tabId;
+    const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'desktop') && currentState.controllerTabId === tabId;
+
+    if (isRecordedTab || isControllerTab) {
+        logger.log(`[Background] Detected closure of ${isRecordedTab ? 'recorded tab' : 'controller tab'}. Stopping session.`);
+        handleStopSession(() => { }); // No response needed
+    }
+});
 
 // --- Main Listener ---
 
