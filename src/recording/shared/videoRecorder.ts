@@ -14,6 +14,7 @@ import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectLibrary } from '../../storage/projectStorage';
 import { ProjectImpl } from '../../core/Project';
 import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
+import { validateRecording } from './videoValidation';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
@@ -117,6 +118,7 @@ export class VideoRecorder {
         // Stop Recorders
         const stopPromises: Promise<void>[] = [];
 
+        let displaySurface: string | undefined;
         if (this.screenRecorder && this.screenRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
                 if (this.screenRecorder) {
@@ -127,6 +129,7 @@ export class VideoRecorder {
             // Capture dims
             const vt = this.screenRecorder.stream.getVideoTracks()[0];
             const set = vt?.getSettings();
+            displaySurface = set?.displaySurface;
             if (set && set.width && set.height) {
                 this.screenDimensions = { width: set.width, height: set.height };
             }
@@ -141,13 +144,37 @@ export class VideoRecorder {
             }));
             // Capture dims
             const vt = this.cameraRecorder.stream.getVideoTracks()[0];
-            const set = vt?.getSettings();
-            if (set && set.width && set.height) {
-                this.cameraDimensions = { width: set.width, height: set.height };
+            const settings = vt?.getSettings();
+            if (settings && settings.width && settings.height) {
+                this.cameraDimensions = { width: settings.width, height: settings.height };
             }
         }
 
         await Promise.all(stopPromises);
+
+
+        console.log("[VideoRecorder] Stopped recorders. Display Surface: ", displaySurface);
+        if (displaySurface === 'window') {
+            console.log("[VideoRecorder] Validating Window Capture...");
+            // Create temporary blob for validation
+            const tempBlob = new Blob(this.screenData, { type: 'video/webm' });
+
+            try {
+                const validation = await validateRecording(tempBlob);
+
+                if (validation.isValid) {
+                    console.log(`[VideoRecorder] Validation Success! Offsets: x=${validation.xOffset}, y=${validation.yOffset}`);
+                    // Apply Offsets to Events
+                    this.applyOffsets(validation.xOffset, validation.yOffset);
+                } else {
+                    console.warn("[VideoRecorder] Validation Failed: Content does not match controller page. Wiping events.");
+                    this.clearEvents();
+                }
+            } catch (e) {
+                console.error("[VideoRecorder] Validation Error:", e);
+                this.clearEvents();
+            }
+        }
 
         // Save Data
         // Use currentSessionId if not provided (should match due to validateSession)
@@ -405,5 +432,51 @@ export class VideoRecorder {
         if (sessionId && sessionId !== this.currentSessionId) {
             throw new Error(`Session mismatch: Action for ${sessionId} but current is ${this.currentSessionId}`);
         }
+    }
+
+    private clearEvents() {
+        this.events = {
+            mouseClicks: [],
+            mousePositions: [],
+            keyboardEvents: [],
+            drags: [],
+            scrolls: [],
+            typingEvents: [],
+            urlChanges: []
+        };
+    }
+
+    private applyOffsets(xOff: number, yOff: number) {
+        if (xOff === 0 && yOff === 0) return;
+
+        const offsetPoint = (p: { x: number, y: number }) => {
+            p.x += xOff;
+            p.y += yOff;
+        };
+
+        const offsetRect = (r: { x: number, y: number }) => {
+            r.x += xOff;
+            r.y += yOff;
+        };
+
+        const offsetBaseEvent = (e: any) => {
+            if (e.mousePos) offsetPoint(e.mousePos);
+            if (e.targetRect) offsetRect(e.targetRect);
+        };
+
+        this.events.mouseClicks.forEach(offsetBaseEvent);
+        this.events.mousePositions.forEach(offsetBaseEvent);
+
+        this.events.drags.forEach(d => {
+            offsetBaseEvent(d);
+            if (d.path) {
+                d.path.forEach(p => offsetBaseEvent(p));
+            }
+        });
+
+        this.events.scrolls.forEach(offsetBaseEvent);
+        this.events.typingEvents.forEach(offsetBaseEvent);
+        this.events.urlChanges.forEach(offsetBaseEvent);
+        this.events.keyboardEvents.forEach(offsetBaseEvent);
     }
 }

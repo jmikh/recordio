@@ -14,6 +14,8 @@
             margin: 0;
             background: #1a1a2e;
             color: #eee;
+            overflow: hidden;
+            /* Prevent scrollbars from markers */
         }
 
         .status {
@@ -36,10 +38,42 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* Calibration Markers */
+        .marker {
+            position: fixed;
+            width: 50px;
+            height: 50px;
+            background-color: #FF0000;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .marker-inner {
+            width: 20px;
+            height: 20px;
+            background-color: #0000FF;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Markers -->
+    <div class="marker" style="top: 0; left: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="top: 0; right: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="bottom: 0; left: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="bottom: 0; right: 0;">
+        <div class="marker-inner"></div>
+    </div>
+
     <div class="status">
         <div class="spinner"></div>
         <p>Recording in progress...</p>

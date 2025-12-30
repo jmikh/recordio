@@ -416,7 +416,7 @@ async function handleStopSession(sendResponse: Function) {
             if (mode === 'tab') {
                 chrome.offscreen.closeDocument()
             } else {
-                closeControllerTab();
+                //closeControllerTab();
             }
         } catch (e) {
             logger.error("Error stopping recording orchestration:", e);
