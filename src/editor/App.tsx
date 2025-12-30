@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { PlayerCanvas } from './components/PlayerCanvas';
-import { BackgroundPanel } from './components/BackgroundPanel';
+import { SettingsPanel } from './components/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/Timeline';
 
-import { ProjectLibrary } from '../storage/projectStorage';
+import { ProjectStorage } from '../storage/projectStorage';
 
 // Icons
 const IconUndo = () => (
@@ -54,7 +54,7 @@ function Editor() {
             }
             try {
                 console.log('Initializing Project:', projectId);
-                const loadedProject = await ProjectLibrary.loadProjectOrFail(projectId);
+                const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
@@ -190,7 +190,7 @@ function Editor() {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-                <BackgroundPanel />
+                <SettingsPanel />
                 <div
                     id="video-player-container"
                     className="flex-1 flex overflow-hidden relative items-center justify-center bg-[#1e1e1e]"

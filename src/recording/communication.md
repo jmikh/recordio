@@ -67,7 +67,7 @@ sequenceDiagram
 
     P->>B: STOP_SESSION
     B->>O: STOP_RECORDING_VIDEO
-    O->>O: Save to ProjectLibrary
+    O->>O: Save to ProjectStorage
     B->>C: STOP_RECORDING_EVENTS
     B->>B: Open editor tab
 ```
@@ -97,7 +97,7 @@ sequenceDiagram
 
     P->>B: STOP_SESSION
     B->>CT: STOP_RECORDING_VIDEO
-    CT->>CT: Save to ProjectLibrary
+    CT->>CT: Save to ProjectStorage
     B->>C: STOP_RECORDING_EVENTS (broadcast)
     B->>B: Close controller, open editor
 ```

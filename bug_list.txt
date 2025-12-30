@@ -1,6 +1,48 @@
+zoom
+====
 - optimize scroll recording  only need to fetch effective content area once per URL
 - scroll recording might be reporting last timestamp of the scroll (mild)
-- send typing event and reset it if mouse down or scroll are detected
+- flush typing event and reset it if mouse down or scroll are detected
 - test perfomance with large videos (specially zoom calculations)
+- record onmousemove events instead of mouse position (makes event storing cheaper)
+- deal with mouse going outside of the viewport in window mode
+
+
+core
+====
+- support window speed
+- GIF export
+- Confirm Peremissions dialog is working well and deal if user reject it
+- video size export options
+
+v2:
+
+- Support adding screens in the middle of the recording
+- Option to blur 
+
+
+
+UX 
+==== 
+- timeline selector that way you can delete parts of multiple windows or create GIF
+- window selector (maybe same as timeline selector) won't work for speed.
+- Product walk through
+- Collapse Windows view
+- Project Selector
+- AutoZoom options / Zoom options
+
+SETTINGS
+========
+- Projects (name(rename), delete, open, duration, thumbnail?, creation date, last modified date) total storage used. potenitally storage used alert to delete some projects to free up space.
+
+- Screen (color, background, upload your own image, padding, blur, roundness)
+- Camera (location, full size, square, circle, roundness, frame)
+- Effects (only if there is UserEvents) (mouse clicks(color, shape, size, on/off), keyboard(top, down, (on/off)), zoom, auto-zoom settings.)
+
+
+
 - deactivate logger in production
+- remove unused logs and switch everything else to logger behdind DEV/PROD flags
+
+
 

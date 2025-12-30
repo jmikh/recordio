@@ -5,7 +5,7 @@ import type { ID, Project, SourceMetadata } from '../core/types';
 const DB_NAME = 'RecordoDB';
 const DB_VERSION = 1;
 
-export class ProjectLibrary {
+export class ProjectStorage {
     private static dbPromise: Promise<IDBDatabase> | null = null;
 
     static async getDB(): Promise<IDBDatabase> {
@@ -54,7 +54,7 @@ export class ProjectLibrary {
         // 1. Try to load existing project
         const existingProject = await this.loadProject(projectId);
         if (existingProject) {
-            console.log(`[ProjectLibrary] Loaded existing project: ${projectId}`);
+            console.log(`[ProjectStorage] Loaded existing project: ${projectId}`);
             return existingProject;
         }
 

@@ -3,7 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, Recording, OutputWindow, UserEvents, ViewportMotion, ProjectSettings } from '../../core/types';
 import { ProjectImpl } from '../../core/Project';
-import { ProjectLibrary } from '../../storage/projectStorage';
+import { ProjectStorage } from '../../storage/projectStorage';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { TimeMapper } from '../../core/timeMapper';
 
@@ -79,7 +79,7 @@ export const useProjectStore = create<ProjectState>()(
 
                     if (screenSource && screenSource.eventsUrl) {
                         try {
-                            events = await ProjectLibrary.loadEvents(screenSource.eventsUrl);
+                            events = await ProjectStorage.loadEvents(screenSource.eventsUrl);
                         } catch (e) {
                             console.error(`Failed to load events for source ${screenSourceId}`, e);
                             // Initialize empty if failed to avoid crashes
@@ -98,7 +98,7 @@ export const useProjectStore = create<ProjectState>()(
                     console.log('[Action] saveProject');
                     set({ isSaving: true });
                     try {
-                        await ProjectLibrary.saveProject(get().project);
+                        await ProjectStorage.saveProject(get().project);
                     } catch (e) {
                         console.error("Failed to save project:", e);
                     } finally {
@@ -351,7 +351,7 @@ useProjectStore.subscribe(
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             console.log('[AutoSave] Saving project...');
-            ProjectLibrary.saveProject(project).catch(console.error);
+            ProjectStorage.saveProject(project).catch(console.error);
         }, 2000);
     }
 );

@@ -5,13 +5,13 @@
  * - Manages screen stream (tab capture or desktop capture)
  * - Optional camera stream (dual recording mode)
  * - Audio mixing (system audio + microphone)
- * - Saves recordings and events to ProjectLibrary
+ * - Saves recordings and events to ProjectStorage
  * 
  * Used by both offscreen.ts (tab mode) and controller.ts (window/desktop mode).
  */
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
-import { ProjectLibrary } from '../../storage/projectStorage';
+import { ProjectStorage } from '../../storage/projectStorage';
 import { ProjectImpl } from '../../core/Project';
 import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
 import { detectWindow, type WindowDetectionResult } from './windowDetector';
@@ -355,14 +355,14 @@ export class VideoRecorder {
         // 1. Save Screen Recording
         const screenBlob = new Blob(this.screenData, { type: 'video/webm' });
         const screenBlobId = `rec-${projectId}-screen`;
-        await ProjectLibrary.saveRecordingBlob(screenBlobId, screenBlob);
+        await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
         // 2. Save Events (only if present)
         let eventsBlobId: string | undefined;
         if (events) {
             const eventsBlob = new Blob([JSON.stringify(events)], { type: 'application/json' });
             eventsBlobId = `evt-${projectId}-screen`;
-            await ProjectLibrary.saveRecordingBlob(eventsBlobId, eventsBlob);
+            await ProjectStorage.saveRecordingBlob(eventsBlobId, eventsBlob);
         }
 
         // 3. Create Screen Source
@@ -376,14 +376,14 @@ export class VideoRecorder {
             hasAudio: true,
             createdAt: now
         };
-        await ProjectLibrary.saveSource(screenSource);
+        await ProjectStorage.saveSource(screenSource);
 
         // 4. Save Camera Recording (If any)
         let cameraSource: SourceMetadata | undefined;
         if (this.cameraData.length > 0) {
             const camBlob = new Blob(this.cameraData, { type: 'video/webm' });
             const camBlobId = `rec-${projectId}-camera`;
-            await ProjectLibrary.saveRecordingBlob(camBlobId, camBlob);
+            await ProjectStorage.saveRecordingBlob(camBlobId, camBlob);
 
             cameraSource = {
                 id: `src-${projectId}-camera`,
@@ -394,7 +394,7 @@ export class VideoRecorder {
                 hasAudio: false, // Audio is in screen or mixed separate, but cam stream usually just video if separate
                 createdAt: now
             };
-            await ProjectLibrary.saveSource(cameraSource);
+            await ProjectStorage.saveSource(cameraSource);
         }
 
         // 5. Create & Save Project
@@ -403,7 +403,7 @@ export class VideoRecorder {
             mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: []
         };
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
-        await ProjectLibrary.saveProject(project);
+        await ProjectStorage.saveProject(project);
 
         console.log(`[VideoRecorder] Project ${projectId} saved successfully.`);
     }
