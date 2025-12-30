@@ -18,11 +18,14 @@ export class ProjectImpl {
             settings: {
                 outputSize: { width: 3840, height: 2160 },
                 frameRate: 30,
-                padding: 0.02,
+                padding: 0.05,
                 maxZoom: 1.5,
                 autoZoom: true,
-                backgroundType: 'solid',
-                backgroundColor: '#1E1E1E' // Dark Grey
+                backgroundType: 'image',
+                backgroundImageUrl: '/assets/backgrounds/abstract-gradient.jpg',
+                backgroundColor: '#1E1E1E', // Dark Grey
+                cornerRadius: 20,
+                backgroundBlur: 8
             },
             timeline: {
                 id: crypto.randomUUID(),

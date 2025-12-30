@@ -49,7 +49,15 @@ export const drawBackground = (
                 offsetY = -(drawH - canvasH) / 2;
             }
 
+            // Apply Blur
+            if (settings.backgroundBlur && settings.backgroundBlur > 0) {
+                ctx.filter = `blur(${settings.backgroundBlur}px)`;
+            }
+
             ctx.drawImage(bgImage, offsetX, offsetY, drawW, drawH);
+
+            // Reset Filter
+            ctx.filter = 'none';
         }
     }
 };

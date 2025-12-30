@@ -150,6 +150,51 @@ export const BackgroundSettings = () => {
                     )}
                 </div>
             </div>
+
+            {/* 4. Effects */}
+            <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
+                {/* Padding */}
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
+                    <input
+                        type="range"
+                        min={0}
+                        max={0.25}
+                        step={0.01}
+                        value={settings.padding}
+                        onChange={(e) => updateSettings({ padding: parseFloat(e.target.value) })}
+                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
+
+                {/* Corner Radius */}
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Rounding</label>
+                    <input
+                        type="range"
+                        min={0}
+                        max={60}
+                        step={1}
+                        value={settings.cornerRadius || 0}
+                        onChange={(e) => updateSettings({ cornerRadius: parseInt(e.target.value) })}
+                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
+
+                {/* Blur */}
+                <div className={`flex flex-col gap-2 transition-opacity ${settings.backgroundType === 'solid' ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
+                    <input
+                        type="range"
+                        min={0}
+                        max={20}
+                        step={1}
+                        value={settings.backgroundBlur || 0}
+                        onChange={(e) => updateSettings({ backgroundBlur: parseInt(e.target.value) })}
+                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
+            </div>
         </div>
     );
 };

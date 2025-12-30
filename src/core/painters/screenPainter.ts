@@ -56,23 +56,55 @@ export function drawScreen(
     const viewMapper = new ViewMapper(inputSize, outputSize, padding);
 
     // 5. Draw Video
+    // 5. Draw Video & Effects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
     if (renderRects) {
+        ctx.save();
+
+        // Calculate Scale Factor (Canvas Pixels per Source Pixel)
+        const scale = renderRects.destRect.width / renderRects.sourceRect.width;
+
+        // Apply Corner Radius Clip (Projected to Canvas Space)
+        if (project.settings.cornerRadius && project.settings.cornerRadius > 0) {
+            // Calculate where the Top-Left of the FULL video would be on the canvas
+            const originX = renderRects.destRect.x - (renderRects.sourceRect.x * scale);
+            const originY = renderRects.destRect.y - (renderRects.sourceRect.y * scale);
+
+            // Calculate dimensions of the FULL video on the canvas
+            const projectedW = inputSize.width * scale;
+            const projectedH = inputSize.height * scale;
+
+            // Scale the radius so it stays "attached" to the video size
+            const scaledRadius = project.settings.cornerRadius * scale;
+
+            ctx.beginPath();
+            ctx.roundRect(
+                originX,
+                originY,
+                projectedW,
+                projectedH,
+                scaledRadius
+            );
+            ctx.clip();
+        }
+
         ctx.drawImage(
             video,
             renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
             renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
         );
-    }
 
-    // 6. Draw Mouse Effects Overlay
-    if (userEvents) {
-        // These painters use Source Time because events are recorded in Source Time
-        if (userEvents.mouseClicks) {
-            paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+        // 6. Draw Mouse Effects Overlay
+        if (userEvents) {
+            // These painters use Source Time because events are recorded in Source Time
+            if (userEvents.mouseClicks) {
+                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+            }
+            if (userEvents.drags) {
+                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
+            }
         }
-        if (userEvents.drags) {
-            drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
-        }
+
+        ctx.restore();
     }
 }

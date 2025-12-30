@@ -64,6 +64,10 @@ export interface ProjectSettings {
     backgroundImageUrl?: string; // For presets
     backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
     customBackgroundSourceId?: ID; // Persists the last uploaded custom background
+
+    // Effects
+    cornerRadius: number;
+    backgroundBlur: number;
 }
 
 // ==========================================
