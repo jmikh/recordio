@@ -1,7 +1,8 @@
 /**
- * @fileoverview Validation logic for recordings.
- * Checks if the recorded video contains the expected calibration markers
- * to ensure the correct window was recorded and to calculate viewport offsets.
+ * @fileoverview Window detection logic for recordings.
+ * Detects if the recorded video contains the expected calibration markers that 
+ * indicate the video was recorded from the current window. That allows us to 
+ * calculate the viewport offsets and apply them to the recorded events for auto zoom.
  */
 
 // Marker Definition
@@ -21,8 +22,8 @@ export interface WindowDetectionResult { // Renamed from CalibrationResult
     xOffset: number; // Might have side borders
 }
 
-// Dete
-export async function detectWindow(stream: MediaStream): Promise<WindowDetectionResult> { // Renamed from detectCalibration
+
+export async function detectWindow(stream: MediaStream): Promise<WindowDetectionResult> {
     const video = document.createElement('video');
     video.srcObject = stream;
     // Attributes to help with background execution
