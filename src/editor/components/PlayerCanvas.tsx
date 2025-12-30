@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { ProjectStorage } from '../../storage/projectStorage';
 import { drawScreen } from '../../core/painters/screenPainter';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWebcam } from '../../core/painters/webcamPainter';
@@ -185,6 +186,38 @@ export const PlayerCanvas = () => {
             renderPipeline();
         }
     }, [outputVideoSize.width, outputVideoSize.height]);
+
+    // Thumbnail Auto-Capture
+    // Saves a low-res screen capture to DB for the project list
+    useEffect(() => {
+        const captureThumbnail = () => {
+            const canvas = canvasRef.current;
+            if (!canvas || !project || !project.id) return;
+
+            // Only capture if content (simple check: if we have active window or just always?)
+            // We want the current view.
+
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    ProjectStorage.saveThumbnail(project.id, blob).catch(err => {
+                        console.warn('Failed to save thumbnail', err);
+                    });
+                }
+            }, 'image/jpeg', 0.5); // Low quality
+        };
+
+        // Capture initially after a short delay to ensure render
+        const initialTimer = setTimeout(captureThumbnail, 3000);
+
+        // Capture periodically (very slow, e.g. every minute or when paused?)
+        // Let's do it when pausing? Or just interval.
+        const interval = setInterval(captureThumbnail, 60000);
+
+        return () => {
+            clearTimeout(initialTimer);
+            clearInterval(interval);
+        };
+    }, [project?.id]); // Re-run if project changes
 
 
     // active background logic

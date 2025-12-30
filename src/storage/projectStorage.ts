@@ -4,7 +4,7 @@ import { ProjectImpl } from '../core/Project';
 
 
 const DB_NAME = 'RecordoDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented for schema change (thumbnails store)
 
 export class ProjectStorage {
     private static dbPromise: Promise<IDBDatabase> | null = null;
@@ -31,6 +31,11 @@ export class ProjectStorage {
                 // 3. Projects Store (Lightweight + Mutable Events)
                 if (!db.objectStoreNames.contains('projects')) {
                     db.createObjectStore('projects', { keyPath: 'id' });
+                }
+
+                // 4. Thumbnails Store (Blob storage for project previews)
+                if (!db.objectStoreNames.contains('thumbnails')) {
+                    db.createObjectStore('thumbnails', { keyPath: 'id' });
                 }
             };
 
@@ -125,11 +130,48 @@ export class ProjectStorage {
      */
     static async listProjects(): Promise<Project[]> {
         const db = await this.getDB();
-        return new Promise((resolve, reject) => {
+        const projects = await new Promise<Project[]>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.getAll();
             req.onsuccess = () => resolve(req.result as Project[]);
+            req.onerror = () => reject(req.error);
+        });
+
+        // Hydrate Thumbnails
+        // We load generic thumbnail URLs if present
+        for (const p of projects) {
+            // Check if thumbnail blob exists
+            // We do this sequentially here but could be parallelized for performance if needed
+            const thumbBlob = await this.getThumbnail(p.id);
+            if (thumbBlob) {
+                p.thumbnail = URL.createObjectURL(thumbBlob);
+            }
+        }
+
+        return projects;
+    }
+
+    static async saveThumbnail(projectId: ID, blob: Blob): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('thumbnails', 'readwrite');
+            const store = tx.objectStore('thumbnails');
+            const req = store.put({ id: projectId, blob });
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async getThumbnail(id: ID): Promise<Blob | undefined> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['thumbnails'], 'readonly'); // Ensure store name is correct
+            // Note: If store doesn't exist (old DB version), transaction will fail.
+            // But getDB() handles upgrade.
+            const store = tx.objectStore('thumbnails');
+            const req = store.get(id);
+            req.onsuccess = () => resolve(req.result?.blob);
             req.onerror = () => reject(req.error);
         });
     }
@@ -202,27 +244,17 @@ export class ProjectStorage {
         if (!project) return;
 
         const db = await this.getDB();
-        const tx = db.transaction(['projects', 'sources', 'recordings'], 'readwrite');
+
+        // Transaction across all stores involved
+        const tx = db.transaction(['projects', 'sources', 'recordings', 'thumbnails'], 'readwrite');
 
         // 1. Delete Project
         tx.objectStore('projects').delete(projectId);
 
         // 2. Delete Associated Sources & Recordings
-        // For V1, we iterate the sources in the project and delete them
         const sourceIds = ProjectImpl.getReferencedSourceIds(project);
         for (const sourceId of sourceIds) {
             tx.objectStore('sources').delete(sourceId);
-
-            // Assuming recording blob ID convention or we need to look it up
-            // In recorder.ts, we save blob with key `rec-{projectId}-screen`
-            // But we might have used different IDs.
-            // A Source URL might point to it? "blob:..." is ephemeral.
-            // We should ideally store the Blob ID in the Source or Recording metadata.
-            // For V1, let's reconstruct the probable ID or delete broadly known keys
-
-            // Current convention plan:
-            // Source ID: `src-{projectId}-screen`
-            // Blob ID: `rec-{projectId}-screen`
 
             // If sourceId looks like `src-...`, the blob is `rec-...`
             if (sourceId.startsWith('src-')) {
@@ -230,6 +262,9 @@ export class ProjectStorage {
                 tx.objectStore('recordings').delete(blobId);
             }
         }
+
+        // 3. Delete Thumbnail
+        tx.objectStore('thumbnails').delete(projectId);
 
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
