@@ -319,39 +319,26 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     };
     const controllerResponse = await chrome.runtime.sendMessage(startVideoMsg);
 
+    let recordEvents = true;
     // Check Window Detection
-    if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isValid) {
-        logger.warn("[Background]");
-        // We still record the video (it will just be the wrong window), but we won't record user events.
-        // Or should we abort entirely?
-        // User just said "don't capture events". So we skip step 6.
-
-        // 7. Update State (Event recording skipped)
-        await saveState({
-            isRecording: true,
-            recordedTabId: null,
-            controllerTabId: controllerTabId,
-            startTime: syncTimestamp,
-            currentSessionId: sessionId,
-            mode: mode
-        });
-
-        chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
-        return;
+    if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isCurrentWindow) {
+        recordEvents = false;
     }
 
-    // 6. Broadcast START_RECORDING_EVENTS to all tabs
-    // syncTimestamp defined above
-    const startEventsMsg: BaseMessage = {
-        type: MSG_TYPES.START_RECORDING_EVENTS,
-        payload: { startTime: syncTimestamp, sessionId }
-    };
+    if (recordEvents) {
+        // 6. Broadcast START_RECORDING_EVENTS to all tabs
+        // syncTimestamp defined above
+        const startEventsMsg: BaseMessage = {
+            type: MSG_TYPES.START_RECORDING_EVENTS,
+            payload: { startTime: syncTimestamp, sessionId }
+        };
 
-    const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-        if (tab.id) {
-            // Send and forget - some tabs might be restricted (chrome:// etc)
-            chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            if (tab.id) {
+                // Send and forget - some tabs might be restricted (chrome:// etc)
+                chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
+            }
         }
     }
 
@@ -365,7 +352,6 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         mode: mode
     });
 
-    chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
 }
 
 async function waitForCountdownDone(tabId: number | undefined, sessionId: string): Promise<Size | null> {
@@ -406,14 +392,12 @@ async function handleStopSession(sendResponse: Function) {
             const response = await chrome.runtime.sendMessage(stopVideoMsg);
             logger.log("[Background] Recorder stop response:", response);
 
-
+            // Open editor
+            const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
+            chrome.tabs.create({ url: editorUrl });
         } catch (e) {
             logger.error("Failed to stop video recording: ", e);
         }
-
-        // Open editor
-        const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
-        chrome.tabs.create({ url: editorUrl });
     }
     // Cleanup regardless of success
 
@@ -427,7 +411,7 @@ async function handleStopSession(sendResponse: Function) {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
         if (tab.id) {
-            chrome.tabs.sendMessage(tab.id, stopEventsMsg)
+            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { /* ignore */ });
         }
     }
 
@@ -442,8 +426,6 @@ async function handleStopSession(sendResponse: Function) {
     // remove those after saving state so they don't accidentally trigger another stop session
     chrome.offscreen.closeDocument().catch(() => { });
     closeControllerTab();
-
-    chrome.storage.local.remove(['recordingSyncTimestamp']);
 
     sendResponse({ success: true });
 }

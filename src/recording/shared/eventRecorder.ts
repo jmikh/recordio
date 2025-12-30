@@ -83,6 +83,7 @@ export class EventRecorder {
         // URL Changes
         window.addEventListener('popstate', this.handleUrlChange);
         window.addEventListener('hashchange', this.handleUrlChange);
+        window.addEventListener('pagehide', this.handlePageUnload);
 
         // Initial URL event
         this.sendUrlEvent();
@@ -97,6 +98,7 @@ export class EventRecorder {
 
         window.removeEventListener('popstate', this.handleUrlChange);
         window.removeEventListener('hashchange', this.handleUrlChange);
+        window.removeEventListener('pagehide', this.handlePageUnload);
     }
 
     private startPolling() {
@@ -290,6 +292,10 @@ export class EventRecorder {
 
     private handleUrlChange = () => {
         this.sendUrlEvent();
+    }
+
+    private handlePageUnload = () => {
+        this.flushPendingTypingSession();
     }
 
     private sendUrlEvent() {
