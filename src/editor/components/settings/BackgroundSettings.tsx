@@ -157,7 +157,18 @@ export const BackgroundSettings = () => {
                 </div>
             </div>
 
-            {/* 4. Effects */}
+            {/* 4. Frame */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
+                <div
+                    onClick={() => updateWithBatching({ deviceFrameId: settings.deviceFrameId ? undefined : 'macbook-air' })}
+                    className={`w-10 h-6 flex items-center bg-gray-700 rounded-full p-1 cursor-pointer transition-colors ${settings.deviceFrameId ? 'bg-blue-600' : ''}`}
+                >
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${settings.deviceFrameId ? 'translate-x-4' : ''}`} />
+                </div>
+            </div>
+
+            {/* 5. Effects */}
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
                 {/* Padding */}
                 <div className="flex flex-col gap-2">

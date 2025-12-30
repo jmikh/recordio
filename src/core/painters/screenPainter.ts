@@ -4,6 +4,7 @@ import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
 import { TimeMapper } from '../timeMapper';
 import { getViewportStateAtTime } from '../viewportMotion';
+import { getDeviceFrame } from '../deviceFrames';
 
 /**
  * Draws the screen recording frame.
@@ -59,6 +60,8 @@ export function drawScreen(
     // 5. Draw Video & Effects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
     if (renderRects) {
+
+
         ctx.save();
 
         // Calculate Scale Factor (Canvas Pixels per Source Pixel)
@@ -88,6 +91,8 @@ export function drawScreen(
             ctx.clip();
         }
 
+
+
         ctx.drawImage(
             video,
             renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
@@ -106,5 +111,41 @@ export function drawScreen(
         }
 
         ctx.restore();
+
+        // ============================
+        // DRAW DEVICE FRAME (Overlay)
+        // ============================
+        // Drawn AFTER restore ensures it is:
+        // 1. On Top of Video (Notch covers video)
+        // 2. Unclipped (Bezel extends outside)
+        const deviceFrame = getDeviceFrame(project.settings.deviceFrameId);
+        if (deviceFrame) {
+            // Calculate where the Top-Left and Bottom-Right of the FULL video would be on the canvas
+            const topLeft = viewMapper.projectToScreen({ x: 0, y: 0 }, effectiveViewport);
+            const bottomRight = viewMapper.projectToScreen({ x: inputSize.width, y: inputSize.height }, effectiveViewport);
+
+            const videoScreenW = bottomRight.x - topLeft.x;
+            const videoScreenH = bottomRight.y - topLeft.y;
+
+            const b = deviceFrame.borderData;
+
+            // Current Video is the "Hole". Frame expands outwards.
+            // Video W = Total W * (1 - left% - right%)
+            const frameW = videoScreenW / (1 - b.left - b.right);
+            const frameH = videoScreenH / (1 - b.top - b.bottom);
+
+            const frameX = topLeft.x - (frameW * b.left);
+            const frameY = topLeft.y - (frameH * b.top);
+
+            const img = new Image();
+            img.src = deviceFrame.imageUrl;
+
+            if (img.complete) {
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, frameX, frameY, frameW, frameH);
+            } else {
+                img.onload = () => { };
+            }
+        }
     }
 }
