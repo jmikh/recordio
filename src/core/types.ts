@@ -174,6 +174,7 @@ export interface Recording {
 // ==========================================
 
 export interface ViewportMotion {
+    id: ID;
     /** End time in SOURCE time. */
     sourceEndTimeMs: TimeMs;
     durationMs: TimeMs;

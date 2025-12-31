@@ -19,6 +19,8 @@ export function Timeline() {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
+    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
+    const editingZoomId = useProjectStore(s => s.editingZoomId);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
@@ -322,8 +324,14 @@ export function Timeline() {
                                 return (
                                     <div
                                         key={i}
-                                        className="absolute top-0 bottom-0 group"
+                                        className={`absolute top-0 bottom-0 group cursor-pointer ${editingZoomId === m.id ? 'ring-2 ring-yellow-400 z-20' : ''}`}
                                         style={{ left: `${left}px`, width: `${Math.max(width, 2)}px` }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingZoom(m.id);
+                                            // Pause playback if desired?
+                                            setIsPlaying(false);
+                                        }}
                                     >
                                         {/* Trailing Line */}
                                         <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-purple-500/40 group-hover:bg-purple-400/60 transition-colors" />

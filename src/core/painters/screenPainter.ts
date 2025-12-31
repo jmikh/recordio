@@ -1,9 +1,7 @@
-import type { UserEvents, Project, TimeMs, ID, SourceMetadata } from '../types';
+import type { UserEvents, Project, TimeMs, ID, SourceMetadata, Rect } from '../types';
 import { ViewMapper } from '../viewMapper';
 import { paintMouseClicks } from './mouseClickPainter';
 import { drawDragEffects } from './mouseDragPainter';
-import { TimeMapper } from '../timeMapper';
-import { getViewportStateAtTime } from '../viewportMotion';
 import { getDeviceFrame } from '../deviceFrames';
 
 /**
@@ -16,32 +14,20 @@ export function drawScreen(
     project: Project,
     sources: Record<ID, SourceMetadata>,
     userEvents: UserEvents | null,
-    currentTimeMs: TimeMs
+    currentTimeMs: TimeMs,
+    effectiveViewport: Rect // Injected from caller
 ) {
     const { timeline } = project;
-    const { recording, outputWindows } = timeline;
+    const { recording } = timeline;
 
     // 1. Resolve Data
     const screenSource = sources[recording.screenSourceId];
     if (!screenSource) return;
 
-    // Initialize TimeMapper
-    const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
-
     // 2. Calculate Times
     // Source Time: time relative to the video file
     const sourceTimeMs = currentTimeMs - recording.timelineOffsetMs;
-    // Output Time: time relative to the gapless output video
-    const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
-
-    // 3. Resolve Viewport
-    const viewportMotions = recording.viewportMotions || [];
-    const effectiveViewport = getViewportStateAtTime(
-        viewportMotions,
-        outputTimeMs, // Use Output Time for Viewport motion (smoothness)
-        project.settings.outputSize,
-        timeMapper
-    );
+    // Output Time logic removed as it was only for viewport calc
 
     // Use video dimensions if available, otherwise source metadata
     // Note: Video dimensions might be 0 if not loaded, fallback to metadata size

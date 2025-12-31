@@ -12,12 +12,19 @@ interface ProjectState {
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents | null; // Single set of loaded events
     isSaving: boolean;
+    editingZoomId: ID | null;
+    editingZoomInitialState: ViewportMotion | null;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
+
+    // Zoom Editing Actions
+    setEditingZoom: (id: ID | null) => void;
+    updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
+    deleteViewportMotion: (id: ID) => void;
 
     // Timeline Actions
     updateRecording: (updates: Partial<Recording>) => void;
@@ -74,6 +81,130 @@ export const useProjectStore = create<ProjectState>()(
                 sources: {},
                 userEvents: null,
                 isSaving: false,
+                editingZoomId: null, // Track active edit session
+                editingZoomInitialState: null as ViewportMotion | null, // Track initial state for history commit
+
+                setEditingZoom: (id) => {
+                    const store = useProjectStore;
+                    const state = get(); // Use if needed
+
+                    if (id) {
+                        console.log('[Action] setEditingZoom START', id);
+
+                        // 1. Capture Initial State
+                        const motion = state.project.timeline.recording.viewportMotions.find(m => m.id === id);
+                        if (motion) {
+                            set({ editingZoomInitialState: { ...motion } });
+                        }
+
+                        // 2. Pause History
+                        store.temporal.getState().pause();
+
+                    } else {
+                        console.log('[Action] setEditingZoom END (Commit)');
+                        const editingId = state.editingZoomId;
+                        const initial = state.editingZoomInitialState;
+                        const currentFunctions = get(); // Fresh getters
+
+                        if (editingId && initial) {
+                            const currentMotion = state.project.timeline.recording.viewportMotions.find(m => m.id === editingId);
+
+                            if (currentMotion) {
+                                // A. Revert to Initial (While Paused) so Zundo sees "No Change" effectively? 
+                                //    Wait, Zundo paused means it ignored the intermediate changes.
+                                //    So the "Current State" in Zundo's eyes is effectively "Unknown" or "Last Snapshot".
+                                //    If we Resume now, Zundo will take a snapshot of the *Current State* as the *New Head*?
+                                //    No, Zundo usually snapshots on *change*.
+
+                                //    If we Resume, and then Change, it diffs Current vs New.
+                                //    But "Current" is already the Moved State.
+
+                                //    So we MUST:
+                                //    1. Revert to Initial (While Paused).
+                                //    2. Resume.
+                                //    3. Set to Final.
+
+                                // Revert
+                                currentFunctions.updateViewportMotion(editingId, initial);
+
+                                // Resume
+                                store.temporal.getState().resume();
+
+                                // Apply Final (This triggers the history entry)
+                                // We need to do this in a setTimeout or just next line? Synchronous should work if Zundo subscribes synchronously.
+                                // However, we are inside a `set` or action scope.
+                                // Let's try synchronous.
+                                currentFunctions.updateViewportMotion(editingId, currentMotion);
+                            } else {
+                                store.temporal.getState().resume();
+                            }
+                        } else {
+                            store.temporal.getState().resume();
+                        }
+
+                        // Cleanup
+                        set({ editingZoomInitialState: null });
+                    }
+
+                    set({ editingZoomId: id });
+                },
+
+                updateViewportMotion: (id, updates) => {
+                    console.log('[Action] updateViewportMotion', id, updates);
+                    set(state => {
+                        const motions = state.project.timeline.recording.viewportMotions;
+                        const idx = motions.findIndex(m => m.id === id);
+                        if (idx === -1) return state;
+
+                        const nextMotions = [...motions];
+                        nextMotions[idx] = { ...nextMotions[idx], ...updates };
+
+                        // FORCE AUTO ZOOM OFF if it was on
+                        // This prevents recalc from overwriting our manual work
+                        const nextSettings = { ...state.project.settings };
+                        if (nextSettings.autoZoom) {
+                            nextSettings.autoZoom = false;
+                        }
+
+                        return {
+                            project: {
+                                ...state.project,
+                                settings: nextSettings,
+                                timeline: {
+                                    ...state.project.timeline,
+                                    recording: {
+                                        ...state.project.timeline.recording,
+                                        viewportMotions: nextMotions
+                                    }
+                                }
+                            }
+                        };
+                    });
+                },
+
+                deleteViewportMotion: (id) => {
+                    console.log('[Action] deleteViewportMotion', id);
+                    set(state => {
+                        const motions = state.project.timeline.recording.viewportMotions.filter(m => m.id !== id);
+                        return {
+                            project: {
+                                ...state.project,
+                                timeline: {
+                                    ...state.project.timeline,
+                                    recording: {
+                                        ...state.project.timeline.recording,
+                                        viewportMotions: motions
+                                    }
+                                }
+                            }
+                        };
+                    });
+                    // Also ensure we exit edit mode if we deleted the active one
+                    const currentEdit = get().editingZoomId;
+                    if (currentEdit === id) {
+                        get().setEditingZoom(null);
+                    }
+                },
 
                 loadProject: async (project) => {
                     console.log('[Action] loadProject', project.id);

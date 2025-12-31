@@ -177,6 +177,7 @@ export function calculateZoomSchedule(
             const sourceEndTime = timeMapper.mapOutputToSourceTime(evt.timestamp);
             if (sourceEndTime !== -1) {
                 motions.push({
+                    id: crypto.randomUUID(),
                     sourceEndTimeMs: sourceEndTime,
                     durationMs: 500, // Hardcoded transition duration for now?
                     rect: targetViewport,
@@ -262,6 +263,7 @@ export function calculateZoomSchedule(
 
         if (sourceEndTime !== -1) {
             motions.push({
+                id: crypto.randomUUID(),
                 sourceEndTimeMs: sourceEndTime,
                 durationMs: ZOOM_TRANSITION_DURATION,
                 rect: { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height },

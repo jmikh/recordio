@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { drawScreen } from '../../core/painters/screenPainter';
 import { drawBackground } from '../../core/painters/backgroundPainter';
@@ -6,9 +6,17 @@ import { drawWebcam } from '../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../core/painters/keyboardPainter';
 import { useProjectStore, useProjectData, useProjectSources } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
+import { TimeMapper } from '../../core/timeMapper';
+import { getViewportStateAtTime } from '../../core/viewportMotion';
+import type { Size, Rect } from '../../core/types';
+import { ZoomControl } from './ZoomControl';
 
 export const PlayerCanvas = () => {
     const project = useProjectData();
+    const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
+    const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
+    const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -30,6 +38,7 @@ export const PlayerCanvas = () => {
 
         const tick = (time: number) => {
             const pbState = usePlaybackStore.getState();
+            const { editingZoomId } = useProjectStore.getState();
 
             // FPS Counter
             frameCount++;
@@ -39,7 +48,8 @@ export const PlayerCanvas = () => {
                 lastFpsTime = time;
             }
 
-            if (pbState.isPlaying) {
+            // Only advance time if NOT editing
+            if (pbState.isPlaying && !editingZoomId) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
                 const delta = time - lastTimeRef.current;
 
@@ -92,7 +102,7 @@ export const PlayerCanvas = () => {
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
-        const { project, userEvents, sources } = useProjectStore.getState();
+        const { project, userEvents, sources, editingZoomId } = useProjectStore.getState();
         const playback = usePlaybackStore.getState();
 
         const currentTimeMs = playback.currentTimeMs;
@@ -107,9 +117,9 @@ export const PlayerCanvas = () => {
         const { timeline } = project;
         const { recording, outputWindows } = timeline;
 
-        // 1. Check if ACTIVE
+        // 1. Check if ACTIVE (unless editing)
         const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs <= w.endMs);
-        if (!activeWindow) {
+        if (!activeWindow && !editingZoomId) {
             // Not in output window. 
             // We might want to draw nothing, or just valid background.
             // Returning here means screen/camera layers are skipped.
@@ -126,28 +136,52 @@ export const PlayerCanvas = () => {
         // const activeEvents = userEventsCache[recording.screenSourceId]; // Removed
 
         // -----------------------------------------------------------
+        // VIEWPORT CALCULATION
+        // -----------------------------------------------------------
+        let effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+
+        if (editingZoomId) {
+            // EDIT MODE: Force Full View (Identity Viewport)
+            effectiveViewport = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+        } else {
+            // NORMAL MODE: Calculate Viewport from Motions
+            const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
+            const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
+            const viewportMotions = recording.viewportMotions || [];
+
+            effectiveViewport = getViewportStateAtTime(
+                viewportMotions,
+                outputTimeMs,
+                outputSize,
+                timeMapper
+            );
+        }
+
+        // -----------------------------------------------------------
 
         // Render Screen Layer
         if (screenSource) {
             const video = internalVideoRefs.current[screenSource.id];
             if (video) {
-                syncVideo(video, sourceTimeMs / 1000, playback.isPlaying);
+                syncVideo(video, sourceTimeMs / 1000, playback.isPlaying && !editingZoomId);
 
                 drawScreen(
                     ctx,
                     video,
                     project,
                     sources,
-                    userEvents,
-                    currentTimeMs
+                    // If editing, hide mouse effects (pass null)
+                    editingZoomId ? null : userEvents,
+                    currentTimeMs,
+                    effectiveViewport
                 );
             } else {
                 // If video not ready, maybe draw black rect?
             }
         }
 
-        // Render Webcam Layer
-        if (cameraSource) {
+        // Render Webcam Layer - HIDE IF EDITING
+        if (cameraSource && !editingZoomId) {
             const video = internalVideoRefs.current[cameraSource.id];
             if (video) {
                 // Camera syncs to same time as screen source
@@ -156,8 +190,8 @@ export const PlayerCanvas = () => {
             }
         }
 
-        // Render Keyboard Overlay
-        if (userEvents && userEvents.keyboardEvents) {
+        // Render Keyboard Overlay - HIDE IF EDITING
+        if (userEvents && userEvents.keyboardEvents && !editingZoomId) {
 
             drawKeyboardOverlay(
                 ctx,
@@ -219,15 +253,81 @@ export const PlayerCanvas = () => {
         };
     }, [project?.id]); // Re-run if project changes
 
-
     // active background logic
     const activeBgSourceId = project.settings.backgroundSourceId;
     const bgUrl = activeBgSourceId && sources[activeBgSourceId]
         ? sources[activeBgSourceId].url
         : project.settings.backgroundImageUrl;
 
+
+    // -----------------------------------------------------------
+    // LAYOUT & METRICS (ASPECT RATIO FIT)
+    // -----------------------------------------------------------
+    const [containerSize, setContainerSize] = useState<Size>({ width: 0, height: 0 });
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const obs = new ResizeObserver(entries => {
+            const entry = entries[0];
+            if (entry) {
+                setContainerSize({
+                    width: entry.contentRect.width,
+                    height: entry.contentRect.height
+                });
+            }
+        });
+        obs.observe(containerRef.current);
+        return () => obs.disconnect();
+    }, []);
+
+    // Calculate the "Visual" rect of the video within the container (simulating object-fit: contain)
+    const getFittedRect = (): Rect => {
+        if (containerSize.width === 0 || containerSize.height === 0) return { x: 0, y: 0, width: 0, height: 0 };
+
+        const videoRatio = outputVideoSize.width / outputVideoSize.height;
+        const containerRatio = containerSize.width / containerSize.height;
+
+        let width, height, x, y;
+
+        if (containerRatio > videoRatio) {
+            // Container is wider -> Pillarbox (fit height)
+            height = containerSize.height;
+            width = height * videoRatio;
+            y = 0;
+            x = (containerSize.width - width) / 2;
+        } else {
+            // Container is taller -> Letterbox (fit width)
+            width = containerSize.width;
+            height = width / videoRatio;
+            x = 0;
+            y = (containerSize.height - height) / 2;
+        }
+
+        return { x, y, width, height };
+    };
+
+    const fittedRect = getFittedRect();
+
+
+    // -----------------------------------------------------------
+    // EDIT INTERACTION HANDLERS
+    // -----------------------------------------------------------
+    const activeMotion = editingZoomId
+        ? project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId)
+        : null;
+
+    // Debug / Safety: Auto-exit if motion not found
+    useEffect(() => {
+        if (editingZoomId && !activeMotion) {
+            console.warn('[PlayerCanvas] Editing ID set but motion not found. Exiting.');
+            setEditingZoom(null);
+        }
+    }, [editingZoomId, activeMotion, setEditingZoom]);
+
     return (
-        <>
+        <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+            {/* INVISIBLE MEDIA LOADING LAYER */}
             <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
                 {project.settings.backgroundType === 'image' && bgUrl && (
                     <img
@@ -261,15 +361,35 @@ export const PlayerCanvas = () => {
 
             <canvas
                 ref={canvasRef}
-                className="w-full h-full"
+                className="block"
                 style={{
-                    backgroundColor: '#000',
+                    // Canvas should physically match the Fitted Rect to ensure 1:1 pixel mapping if possible,
+                    // OR just use object-fit: contain on the canvas element itself (as before).
+                    // But to align overlay, we are calculating fittedRect manually.
+                    // Let's stick to the previous 'CSS fitting' for the canvas to avoid pixelation issues on resize?
+                    // actually, we simply want the canvas to fill the fitted rect?
+                    // No, existing logic was w-full h-full object-fit contain.
+                    // If we use w-full h-full, the canvas fills the container.
+                    // Let's keep canvas w-full h-full object-fit-contain for simplicity of rendering pipeline
+                    // (which expects to draw to 1920x1080 buffer).
                     width: '100%',
                     height: '100%',
                     objectFit: 'contain'
                 }}
             />
-        </>
+
+            {/* EDIT OVERLAY */}
+            {editingZoomId && activeMotion && (
+                <ZoomControl
+                    initialRect={activeMotion.rect}
+                    videoSize={outputVideoSize}
+                    containerFittedRect={fittedRect}
+                    onCommit={(rect) => updateViewportMotion(editingZoomId, { rect })}
+                    onCancel={() => setEditingZoom(null)}
+                    onDelete={() => deleteViewportMotion(editingZoomId)}
+                />
+            )}
+        </div>
     );
 };
 

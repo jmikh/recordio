@@ -29,6 +29,7 @@ function Editor() {
     // -- Project State --
     const project = useProjectData();
     const userEvents = useProjectStore(s => s.userEvents);
+
     const loadProject = useProjectStore(s => s.loadProject);
     const isSaving = useProjectStore(s => s.isSaving);
     const undo = useProjectHistory(state => state.undo);
@@ -218,6 +219,7 @@ function Editor() {
                     </div>
                 </div>
 
+
                 <div id="debug-side-panel" className="w-80 bg-[#252526] border-l border-[#333] flex flex-col overflow-hidden text-xs text-gray-300">
                     <div className="p-2 border-b border-[#333]">
                         <h3 className="font-bold mb-2">Project: {project.name}</h3>
@@ -234,15 +236,9 @@ function Editor() {
                         >
                             Log User Events
                         </button>
-                        {/* Debug Buttons Removed */}
-                    </div>
-                    {/* Debug Buttons Removed */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <div className="flex-1 flex flex-col overflow-hidden">
-                            {/* Inspectors Removed */}
-                        </div>
                     </div>
                 </div>
+
             </div>
 
             <div id="timeline-container" className="h-64 border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e] flex flex-col">
