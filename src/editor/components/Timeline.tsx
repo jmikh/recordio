@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useProjectStore, useProjectTimeline } from '../stores/useProjectStore';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
+import { TimeMapper } from '../../core/timeMapper';
 import type { OutputWindow } from '../../core/types';
 
 
@@ -297,11 +298,20 @@ export function Timeline() {
                             <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none">MOTION</div>
                             {recording.viewportMotions?.map((m, i) => {
                                 // Motions are stored in Source Time.
-                                // Timeline Time = Source Time + Offset
-                                const timelineEndMs = m.sourceEndTimeMs + timelineOffset;
-                                const timelineStartMs = timelineEndMs - m.durationMs;
+                                // We calculate the timeline position by converting to output time (to handle duration gaps)
+                                // and then mapping back to timeline time.
 
-                                // Check if mapped times are valid (visible)
+                                const timeMapper = new TimeMapper(timelineOffset, timeline.outputWindows);
+
+                                const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
+                                if (outputEndTime === -1) return null;
+
+                                const outputStartTime = outputEndTime - m.durationMs;
+
+                                // Map back to timeline time
+                                const timelineEndMs = timeMapper.mapOutputToTimelineTime(outputEndTime);
+                                const timelineStartMs = timeMapper.mapOutputToTimelineTime(Math.max(0, outputStartTime));
+
                                 if (timelineEndMs === -1 || timelineStartMs === -1) return null;
 
                                 const left = (timelineStartMs / 1000) * pixelsPerSec;
@@ -312,10 +322,17 @@ export function Timeline() {
                                 return (
                                     <div
                                         key={i}
-                                        className="absolute top-1 bottom-1 bg-purple-900/60 border border-purple-500/50 rounded-sm"
+                                        className="absolute top-0 bottom-0 group"
                                         style={{ left: `${left}px`, width: `${Math.max(width, 2)}px` }}
                                     >
-                                        <div className="text-[9px] text-purple-200/50 px-1 truncate">{m.reason}</div>
+                                        {/* Trailing Line */}
+                                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-purple-500/40 group-hover:bg-purple-400/60 transition-colors" />
+
+                                        {/* Keyframe Dot (at end) */}
+                                        <div
+                                            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-purple-500 rounded-full border-2 border-[#252526] shadow-sm hover:scale-125 transition-transform z-10 cursor-help"
+                                            title={`Zoom: ${m.reason}`}
+                                        />
                                     </div>
                                 );
                             })}

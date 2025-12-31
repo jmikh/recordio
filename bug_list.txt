@@ -18,7 +18,7 @@ core
 v2:
 
 - Support adding screens in the middle of the recording
-- Option to blur 
+- Option to blur components.
 
 
 
@@ -35,7 +35,7 @@ SETTINGS
 ========
 - Projects (name(rename), delete, open, duration, thumbnail?, creation date, last modified date) total storage used. potenitally storage used alert to delete some projects to free up space.
 
-- Screen (color, background, upload your own image, padding, blur, roundness)
+
 - Camera (location, full size, square, circle, roundness, frame)
 - Effects (only if there is UserEvents) (mouse clicks(color, shape, size, on/off), keyboard(top, down, (on/off)), zoom, auto-zoom settings.)
 
