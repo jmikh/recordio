@@ -1,20 +1,16 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
-import type { Size, Rect } from '../../../core/types';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
-import { renderZoomEditor, ZoomOverlay } from './ZoomEditor';
+import { renderZoomEditor, ZoomEditor } from './ZoomEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { TimeMapper } from '../../../core/timeMapper';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
     const editingZoomId = useProjectStore(s => s.editingZoomId);
-    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
-    const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
-    const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -140,45 +136,7 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // LAYOUT & SIZING
     // -----------------------------------------------------------
-    const [containerSize, setContainerSize] = useState<Size>({ width: 0, height: 0 });
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!containerRef.current) return;
-        const obs = new ResizeObserver(entries => {
-            const entry = entries[0];
-            if (entry) {
-                setContainerSize({
-                    width: entry.contentRect.width,
-                    height: entry.contentRect.height
-                });
-            }
-        });
-        obs.observe(containerRef.current);
-        return () => obs.disconnect();
-    }, []);
-
-    const getFittedRect = (): Rect => {
-        if (containerSize.width === 0 || containerSize.height === 0) return { x: 0, y: 0, width: 0, height: 0 };
-        const videoRatio = outputVideoSize.width / outputVideoSize.height;
-        const containerRatio = containerSize.width / containerSize.height;
-        let width, height, x, y;
-
-        if (containerRatio > videoRatio) {
-            height = containerSize.height;
-            width = height * videoRatio;
-            y = 0;
-            x = (containerSize.width - width) / 2;
-        } else {
-            width = containerSize.width;
-            height = width / videoRatio;
-            x = 0;
-            y = (containerSize.height - height) / 2;
-        }
-        return { x, y, width, height };
-    };
-
-    const fittedRect = getFittedRect();
+    // Calculated directly via CSS aspect-ratio on the container
 
     // Canvas Resize Sync
     useEffect(() => {
@@ -215,61 +173,52 @@ export const CanvasContainer = () => {
     // RENDER
     // -----------------------------------------------------------
 
-    // Preparation for ZoomOverlay
-    const activeMotion = editingZoomId
-        ? project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId)
-        : null;
-
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
 
-            {/* HIDDEN RESOURCES LAYER */}
-            <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
-                {project.settings.backgroundType === 'image' && bgUrl && (
-                    <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin="anonymous" />
-                )}
-                {Object.values(sources).map((source) => (
-                    source.url ? (
-                        <video
-                            key={source.id}
-                            ref={el => {
-                                if (el) internalVideoRefs.current[source.id] = el;
-                                else delete internalVideoRefs.current[source.id];
-                            }}
-                            src={source.url}
-                            muted={true} // Muted for editor preview usually
-                            playsInline
-                            crossOrigin="anonymous"
-                        />
-                    ) : null
-                ))}
-            </div>
-
-            {/* MAIN CANVAS */}
-            <canvas
-                ref={canvasRef}
-                className="block"
+            {/* ASPECT RATIO WRAPPER */}
+            <div
+                className="relative"
                 style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain'
+                    aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
+                    maxHeight: '100%',
+                    maxWidth: '100%',
+                    boxShadow: '0 0 0 1px #333' // Optional: Visual border for debugging/clarity
                 }}
-            />
+            >
+                {/* HIDDEN RESOURCES LAYER */}
+                <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
+                    {project.settings.backgroundType === 'image' && bgUrl && (
+                        <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin="anonymous" />
+                    )}
+                    {Object.values(sources).map((source) => (
+                        source.url ? (
+                            <video
+                                key={source.id}
+                                ref={el => {
+                                    if (el) internalVideoRefs.current[source.id] = el;
+                                    else delete internalVideoRefs.current[source.id];
+                                }}
+                                src={source.url}
+                                muted={true} // Muted for editor preview usually
+                                playsInline
+                                crossOrigin="anonymous"
+                            />
+                        ) : null
+                    ))}
+                </div>
 
-            {/* ZOOM OVERLAY */}
-            {editingZoomId && activeMotion && (
-                <ZoomOverlay
-                    initialRect={activeMotion.rect}
-                    videoSize={outputVideoSize}
-                    containerFittedRect={fittedRect}
-                    onCommit={(rect) => updateViewportMotion(editingZoomId, { rect })}
-                    onCancel={() => setEditingZoom(null)}
-                    onDelete={() => {
-                        deleteViewportMotion(editingZoomId);
-                        setEditingZoom(null);
-                    }}
+                {/* MAIN CANVAS */}
+                <canvas
+                    ref={canvasRef}
+                    className="block w-full h-full object-contain"
                 />
-            )}
+
+                {/* ZOOM OVERLAY */}
+                {editingZoomId && (
+                    <ZoomEditor />
+                )}
+            </div>
         </div>
     );
 };

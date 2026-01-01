@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import type { Rect, Size, Project } from '../../../core/types';
-import type { ProjectState } from '../../stores/useProjectStore';
+import type { Rect, Project } from '../../../core/types';
+import { useProjectStore, type ProjectState } from '../../stores/useProjectStore';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 
@@ -20,10 +20,7 @@ export const renderZoomEditor = (
     const { project, sources } = state;
     const outputSize = project.settings.outputSize;
 
-    const { timeline } = project;
-    const { recording } = timeline;
-
-    const screenSource = sources[recording.screenSourceId];
+    const screenSource = sources[project.timeline.recording.screenSourceId];
 
     // FORCE FULL VIEWPORT (Identity) for Editing
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
@@ -55,28 +52,41 @@ export const renderZoomEditor = (
 // ------------------------------------------------------------------
 type InteractionType = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
-interface ZoomOverlayProps {
-    initialRect: Rect; // The rect from the Store (Motion.rect)
-    videoSize: Size;   // The resolution of the video (1920x1080)
-    containerFittedRect: Rect; // The visual position of the video on screen (Letterboxed)
-    onCommit: (rect: Rect) => void;
-    onCancel: () => void;
-    onDelete: () => void;
-}
+export const ZoomEditor: React.FC = () => {
+    // Connect to Store
+    const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
+    const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
+    const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);
+    const project = useProjectStore(s => s.project);
 
-export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
-    initialRect,
-    videoSize,
-    containerFittedRect,
-    onCommit,
-    onCancel,
-    onDelete
-}) => {
+    // Derived State
+    const videoSize = project.settings.outputSize;
+    const initialRect = editingZoomId
+        ? project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId)?.rect
+        : null;
+
+    if (!initialRect || !editingZoomId) return null;
+
+    // Actions
+    const onCommit = (rect: Rect) => updateViewportMotion(editingZoomId, { rect });
+    const onCancel = () => setEditingZoom(null);
+    const onDelete = () => {
+        deleteViewportMotion(editingZoomId);
+        setEditingZoom(null);
+    };
+
+    const containerRef = useRef<HTMLDivElement>(null);
     const zoomBoxRef = useRef<HTMLDivElement>(null);
     const startDragRef = useRef<{ type: InteractionType, x: number, y: number, initialRect: Rect } | null>(null);
 
     // We update this Ref during drag. On PointerUp, we flush this to the store via onCommit.
     const currentDragRectRef = useRef<Rect>(initialRect);
+
+    // Reset drag ref when selection changes
+    useEffect(() => {
+        currentDragRectRef.current = initialRect;
+    }, [initialRect]);
 
     const handlePointerDown = (e: React.PointerEvent, type: InteractionType) => {
         e.stopPropagation();
@@ -91,13 +101,16 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
-        if (!startDragRef.current || containerFittedRect.width === 0) return;
+        if (!startDragRef.current || !containerRef.current) return;
 
-        const { type, initialRect, x: startX, y: startY } = startDragRef.current;
+        const currentWidth = containerRef.current.offsetWidth;
+        if (currentWidth === 0) return;
+
+        const { type, initialRect: dragStartRect, x: startX, y: startY } = startDragRef.current;
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
 
-        const scale = videoSize.width / containerFittedRect.width;
+        const scale = videoSize.width / currentWidth;
 
         const scaledDeltaX = deltaX * scale;
         const scaledDeltaY = deltaY * scale;
@@ -106,7 +119,7 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
         const maxH = videoSize.height;
         const aspectRatio = maxW / maxH;
 
-        let newRect = { ...initialRect };
+        let newRect = { ...dragStartRect };
 
         if (type === 'move') {
             // 1. Apply Move
@@ -124,7 +137,7 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
 
         } else {
             // RESIZING
-            let proposedWidth = initialRect.width;
+            let proposedWidth = dragStartRect.width;
 
             if (type === 'se' || type === 'ne') {
                 proposedWidth += scaledDeltaX;
@@ -135,12 +148,12 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
             if (proposedWidth < 100) proposedWidth = 100;
 
             // Anchor Points
-            const bottom = initialRect.y + initialRect.height;
-            const right = initialRect.x + initialRect.width;
+            const bottom = dragStartRect.y + dragStartRect.height;
+            const right = dragStartRect.x + dragStartRect.width;
 
             if (type === 'se') {
-                const maxAvailableW = maxW - initialRect.x;
-                const maxAvailableH_asW = (maxH - initialRect.y) * aspectRatio;
+                const maxAvailableW = maxW - dragStartRect.x;
+                const maxAvailableH_asW = (maxH - dragStartRect.y) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
 
                 newRect.width = proposedWidth;
@@ -148,7 +161,7 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
 
             } else if (type === 'sw') {
                 const maxAvailableW = right;
-                const maxAvailableH_asW = (maxH - initialRect.y) * aspectRatio;
+                const maxAvailableH_asW = (maxH - dragStartRect.y) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
 
                 newRect.width = proposedWidth;
@@ -156,7 +169,7 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
                 newRect.x = right - newRect.width;
 
             } else if (type === 'ne') {
-                const maxAvailableW = maxW - initialRect.x;
+                const maxAvailableW = maxW - dragStartRect.x;
                 const maxAvailableH_asW = bottom * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
 
@@ -276,13 +289,8 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
 
     return (
         <div
-            className="absolute z-50 overflow-hidden"
-            style={{
-                left: containerFittedRect.x,
-                top: containerFittedRect.y,
-                width: containerFittedRect.width,
-                height: containerFittedRect.height,
-            }}
+            ref={containerRef}
+            className="absolute inset-0 w-full h-full z-50 overflow-hidden"
             onClick={onCancel} // Click background to exit
         >
             <div
