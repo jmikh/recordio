@@ -15,13 +15,15 @@ export function drawScreen(
     project: Project,
     sources: Record<ID, SourceMetadata>,
     effectiveViewport: Rect // Injected from caller
-): { viewMapper: ViewMapper } | null {
+): { viewMapper: ViewMapper } {
     const { timeline } = project;
     const { recording } = timeline;
 
     // 1. Resolve Data
     const screenSource = sources[recording.screenSourceId];
-    if (!screenSource) return null;
+    if (!screenSource) {
+        throw new Error(`[drawScreen] Screen source not found: ${recording.screenSourceId}`);
+    }
 
     // 2. Calculate Times
     // Source Time: time relative to the video file
@@ -34,7 +36,9 @@ export function drawScreen(
         ? { width: video.videoWidth, height: video.videoHeight }
         : screenSource.size;
 
-    if (!inputSize || inputSize.width === 0) return null;
+    if (!inputSize || inputSize.width === 0) {
+        throw new Error(`[drawScreen] Invalid inputSize for source ${screenSource.id}. Video: ${video.videoWidth}x${video.videoHeight}, Metadata: ${JSON.stringify(screenSource.size)}`);
+    }
 
     // 4. Resolve View Mapping
     const outputSize = project.settings.outputSize;

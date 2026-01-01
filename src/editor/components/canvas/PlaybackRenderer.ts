@@ -5,7 +5,7 @@ import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
 import { TimeMapper } from '../../../core/timeMapper';
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
-import type { Project } from '../../../core/types';
+import type { Project, Rect } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
 
 export interface RenderResources {
@@ -34,7 +34,6 @@ export class PlaybackRenderer {
 
         // 1. Check if ACTIVE
         const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs <= w.endMs);
-        if (!activeWindow) return;
 
         // 2. Calculate Times
         const sourceTimeMs = currentTimeMs - recording.timelineOffsetMs;
@@ -46,22 +45,33 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         // VIEWPORT CALCULATION
         // -----------------------------------------------------------
-        const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
-        const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
-        const viewportMotions = recording.viewportMotions || [];
+        let effectiveViewport: Rect;
 
-        const effectiveViewport = getViewportStateAtTime(
-            viewportMotions,
-            outputTimeMs,
-            outputSize,
-            timeMapper
-        );
+        if (activeWindow) {
+            const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
+            const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
+            const viewportMotions = recording.viewportMotions || [];
+
+            effectiveViewport = getViewportStateAtTime(
+                viewportMotions,
+                outputTimeMs,
+                outputSize,
+                timeMapper
+            );
+        } else {
+            // Fallback: Full Viewport
+            effectiveViewport = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+        }
         // -----------------------------------------------------------
 
         // Render Screen Layer
         if (screenSource) {
             const video = videoRefs[screenSource.id];
-            const result = drawScreen(
+            if (!video) {
+                throw new Error(`[PlaybackRenderer] Video element not found for source ${screenSource.id}`);
+            }
+
+            const { viewMapper } = drawScreen(
                 ctx,
                 video,
                 project,
@@ -69,18 +79,15 @@ export class PlaybackRenderer {
                 effectiveViewport
             );
 
-            if (result && userEvents) {
-                const { viewMapper } = result;
-                // Mouse Overlays (now managed here explicitly)
-                if (userEvents.mouseClicks) {
-                    paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
-                }
-                if (userEvents.drags) {
-                    drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
-                }
+            // We only add effects if it's an active window, otherwise we just show what the
+            // screen looked like at that time.
+            if (activeWindow) {
+                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
             }
-
         }
+
+
 
         // Render Webcam Layer
         if (cameraSource) {
@@ -91,7 +98,7 @@ export class PlaybackRenderer {
         }
 
         // Render Keyboard Overlay
-        if (userEvents && userEvents.keyboardEvents) {
+        if (activeWindow) {
             drawKeyboardOverlay(
                 ctx,
                 userEvents.keyboardEvents,

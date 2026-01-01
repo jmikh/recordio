@@ -7,10 +7,21 @@ import { ProjectStorage } from '../../storage/projectStorage';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { TimeMapper } from '../../core/timeMapper';
 
+const EMPTY_USER_EVENTS: UserEvents = {
+    mouseClicks: [],
+    mousePositions: [],
+    keyboardEvents: [],
+    drags: [],
+    scrolls: [],
+    typingEvents: [],
+    urlChanges: []
+};
+
+
 export interface ProjectState {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
-    userEvents: UserEvents | null; // Single set of loaded events
+    userEvents: UserEvents; // Single set of loaded events (Never null)
     isSaving: boolean;
     editingZoomId: ID | null;
     editingZoomInitialState: ViewportMotion | null;
@@ -42,7 +53,7 @@ export interface ProjectState {
 const recalculateAutoZooms = (
     project: Project,
     sources: Record<ID, import('../../core/types').SourceMetadata>,
-    events: UserEvents | null
+    events: UserEvents
 ): ViewportMotion[] => {
     if (!project.settings.autoZoom) {
         return project.timeline.recording.viewportMotions; // Return existing if auto is off (or empty?)
@@ -51,7 +62,7 @@ const recalculateAutoZooms = (
     const screenSourceId = project.timeline.recording.screenSourceId;
     const sourceMetadata = sources[screenSourceId];
 
-    if (!sourceMetadata || !events) {
+    if (!sourceMetadata) {
         console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
         return project.timeline.recording.viewportMotions;
     }
@@ -79,7 +90,7 @@ export const useProjectStore = create<ProjectState>()(
                 // Initialize with a default empty project
                 project: ProjectImpl.create('Untitled Project'),
                 sources: {},
-                userEvents: null,
+                userEvents: EMPTY_USER_EVENTS,
                 isSaving: false,
                 editingZoomId: null, // Track active edit session
                 editingZoomInitialState: null as ViewportMotion | null, // Track initial state for history commit
@@ -228,17 +239,16 @@ export const useProjectStore = create<ProjectState>()(
                     set({ project });
 
                     // 4. Fetch Events for the screen source
-                    let events: UserEvents | null = null;
+                    let events: UserEvents = EMPTY_USER_EVENTS;
                     const screenSourceId = project.timeline.recording.screenSourceId;
                     const screenSource = sourcesMap[screenSourceId];
 
                     if (screenSource && screenSource.eventsUrl) {
                         try {
-                            events = await ProjectStorage.loadEvents(screenSource.eventsUrl);
+                            const loaded = await ProjectStorage.loadEvents(screenSource.eventsUrl);
+                            if (loaded) events = loaded;
                         } catch (e) {
                             console.error(`Failed to load events for source ${screenSourceId}`, e);
-                            // Initialize empty if failed to avoid crashes
-                            events = { mouseClicks: [], keyboardEvents: [], mousePositions: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [] };
                         }
                     }
 

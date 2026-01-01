@@ -31,16 +31,19 @@ export const renderZoomEditor = (
     // Render Screen Layer
     if (screenSource) {
         const video = videoRefs[screenSource.id];
-        if (video) {
-            drawScreen(
-                ctx,
-                video,
-                project,
-                sources,
-                effectiveViewport
-            );
+        if (!video) {
+            throw new Error(`[ZoomEditor] Video element not found for source ${screenSource.id}`);
         }
+
+        drawScreen(
+            ctx,
+            video,
+            project,
+            sources,
+            effectiveViewport
+        );
     }
+
 };
 
 
@@ -210,27 +213,64 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
 
     // Handle Component
     const Handle = ({ type, cursor }: { type: InteractionType, cursor: string }) => {
-        const size = 12;
-        let style: React.CSSProperties = {
+        const size = 20; // Hit area size
+        const thickness = 2; // Border thickness
+        const length = 10; // Length of the corner arm
+
+        // Base container for hit area
+        const containerStyle: React.CSSProperties = {
             position: 'absolute',
             width: size,
             height: size,
-            backgroundColor: '#fff',
-            border: '1px solid #000',
             cursor: cursor,
-            zIndex: 10
+            zIndex: 10,
+            // Debug:
+            // backgroundColor: 'rgba(255, 0, 0, 0.2)',
         };
 
-        if (type === 'nw') { style.top = -size / 2; style.left = -size / 2; }
-        if (type === 'ne') { style.top = -size / 2; style.right = -size / 2; }
-        if (type === 'sw') { style.bottom = -size / 2; style.left = -size / 2; }
-        if (type === 'se') { style.bottom = -size / 2; style.right = -size / 2; }
+        // Inner visual element for the corner
+        const cornerStyle: React.CSSProperties = {
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderColor: '#fff',
+            borderStyle: 'solid',
+            borderWidth: 0,
+        };
+
+        const isNorth = type.includes('n');
+        const isWest = type.includes('w');
+
+        if (isNorth) {
+            containerStyle.top = -thickness;
+            cornerStyle.top = 0;
+            cornerStyle.borderTopWidth = thickness;
+        } else {
+            containerStyle.bottom = -thickness;
+            cornerStyle.bottom = 0;
+            cornerStyle.borderBottomWidth = thickness;
+        }
+
+        if (isWest) {
+            containerStyle.left = -thickness;
+            cornerStyle.left = 0;
+            cornerStyle.borderLeftWidth = thickness;
+        } else {
+            containerStyle.right = -thickness;
+            cornerStyle.right = 0;
+            cornerStyle.borderRightWidth = thickness;
+        }
+
+        cornerStyle.width = length;
+        cornerStyle.height = length;
 
         return (
             <div
-                style={style}
+                style={containerStyle}
                 onPointerDown={(e) => handlePointerDown(e, type)}
-            />
+            >
+                <div style={cornerStyle} />
+            </div>
         );
     };
 
@@ -247,13 +287,13 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
         >
             <div
                 ref={zoomBoxRef}
-                className="absolute border-2 border-yellow-400 cursor-move"
+                className="absolute cursor-move"
                 style={{
                     left: `${(initialRect.x / videoSize.width) * 100}%`,
                     top: `${(initialRect.y / videoSize.height) * 100}%`,
                     width: `${(initialRect.width / videoSize.width) * 100}%`,
                     height: `${(initialRect.height / videoSize.height) * 100}%`,
-                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)'
+                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)'
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -267,7 +307,7 @@ export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
                 <Handle type="sw" cursor="sw-resize" />
                 <Handle type="se" cursor="se-resize" />
 
-                <div className="absolute top-0 left-0 bg-yellow-400 text-black text-[10px] font-bold px-1 flex items-center gap-1">
+                <div className="absolute top-0 left-0 bg-white text-black text-[10px] font-bold px-1 flex items-center gap-1 translation-y-[-100%]">
                     <span>ZOOM</span>
                     <button
                         className="ml-1 hover:bg-yellow-600 px-1 rounded"
