@@ -255,21 +255,21 @@ export const ZoomEditor: React.FC = () => {
         const isWest = type.includes('w');
 
         if (isNorth) {
-            containerStyle.top = -thickness;
+            containerStyle.top = 0;
             cornerStyle.top = 0;
             cornerStyle.borderTopWidth = thickness;
         } else {
-            containerStyle.bottom = -thickness;
+            containerStyle.bottom = 0;
             cornerStyle.bottom = 0;
             cornerStyle.borderBottomWidth = thickness;
         }
 
         if (isWest) {
-            containerStyle.left = -thickness;
+            containerStyle.left = 0;
             cornerStyle.left = 0;
             cornerStyle.borderLeftWidth = thickness;
         } else {
-            containerStyle.right = -thickness;
+            containerStyle.right = 0;
             cornerStyle.right = 0;
             cornerStyle.borderRightWidth = thickness;
         }
