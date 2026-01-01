@@ -146,6 +146,8 @@ export const ZoomEditor: React.FC = () => {
             }
 
             if (proposedWidth < 100) proposedWidth = 100;
+            const minW = maxW / 4;
+            if (proposedWidth < minW) proposedWidth = minW;
 
             // Anchor Points
             const bottom = dragStartRect.y + dragStartRect.height;
@@ -224,6 +226,43 @@ export const ZoomEditor: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]);
 
+    // Close when clicking outside
+    // Close when clicking strictly outside the container
+    useEffect(() => {
+        const handleGlobalPointerDown = (e: PointerEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                onCancel();
+            }
+        };
+        window.addEventListener('pointerdown', handleGlobalPointerDown);
+        return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
+    }, [onCancel]);
+
+    // Click on background moves the zoom box
+    const handleContainerPointerDown = (e: React.PointerEvent) => {
+        console.log("handleContainerPointerDown", e.currentTarget, e.target);
+        if (e.target !== containerRef.current) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
+        // Center around click
+        const targetX = (offsetX / rect.width) * videoSize.width;
+        const targetY = (offsetY / rect.height) * videoSize.height;
+
+        let newX = targetX - initialRect.width / 2;
+        let newY = targetY - initialRect.height / 2;
+
+        // Clamp
+        if (newX < 0) newX = 0;
+        if (newX + initialRect.width > videoSize.width) newX = videoSize.width - initialRect.width;
+        if (newY < 0) newY = 0;
+        if (newY + initialRect.height > videoSize.height) newY = videoSize.height - initialRect.height;
+
+        onCommit({ ...initialRect, x: newX, y: newY });
+    };
+
     // Handle Component
     const Handle = ({ type, cursor }: { type: InteractionType, cursor: string }) => {
         const size = 20; // Hit area size
@@ -291,7 +330,7 @@ export const ZoomEditor: React.FC = () => {
         <div
             ref={containerRef}
             className="absolute inset-0 w-full h-full z-50 overflow-hidden"
-            onClick={onCancel} // Click background to exit
+            onPointerDown={handleContainerPointerDown}
         >
             <div
                 ref={zoomBoxRef}
@@ -301,7 +340,8 @@ export const ZoomEditor: React.FC = () => {
                     top: `${(initialRect.y / videoSize.height) * 100}%`,
                     width: `${(initialRect.width / videoSize.width) * 100}%`,
                     height: `${(initialRect.height / videoSize.height) * 100}%`,
-                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)'
+                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)'
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -315,18 +355,7 @@ export const ZoomEditor: React.FC = () => {
                 <Handle type="sw" cursor="sw-resize" />
                 <Handle type="se" cursor="se-resize" />
 
-                <div className="absolute top-0 left-0 bg-white text-black text-[10px] font-bold px-1 flex items-center gap-1 translation-y-[-100%]">
-                    <span>ZOOM</span>
-                    <button
-                        className="ml-1 hover:bg-yellow-600 px-1 rounded"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onCancel();
-                        }}
-                    >
-                        ✕
-                    </button>
-                </div>
+
             </div>
         </div>
     );
