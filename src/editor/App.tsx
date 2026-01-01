@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { PlayerCanvas } from './components/PlayerCanvas';
+import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/Timeline';
@@ -212,7 +212,7 @@ function Editor() {
                                 className="bg-blue-200"
                                 style={{ position: 'relative', ...renderedStyle }}
                             >
-                                <PlayerCanvas />
+                                <CanvasContainer />
                             </div>
                         )}
                         {isLoading && <div className="text-white">Loading Project...</div>}

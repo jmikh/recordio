@@ -7,7 +7,7 @@ import { ProjectStorage } from '../../storage/projectStorage';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { TimeMapper } from '../../core/timeMapper';
 
-interface ProjectState {
+export interface ProjectState {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents | null; // Single set of loaded events

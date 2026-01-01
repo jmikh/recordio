@@ -1,53 +1,49 @@
-import type { UserEvents, Project, TimeMs, ID, SourceMetadata, Rect } from '../types';
+import type { Project, ID, SourceMetadata, Rect } from '../types';
 import { ViewMapper } from '../viewMapper';
-import { paintMouseClicks } from './mouseClickPainter';
-import { drawDragEffects } from './mouseDragPainter';
 import { getDeviceFrame } from '../deviceFrames';
+
+// ... imports ...
 
 /**
  * Draws the screen recording frame.
- * Encapsulates logic for viewport calculation and event lookup.
+ * Encapsulates logic for viewport calculation.
+ * Returns the viewMapper used, so caller can draw overlays.
  */
 export function drawScreen(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     project: Project,
     sources: Record<ID, SourceMetadata>,
-    userEvents: UserEvents | null,
-    currentTimeMs: TimeMs,
     effectiveViewport: Rect // Injected from caller
-) {
+): { viewMapper: ViewMapper } | null {
     const { timeline } = project;
     const { recording } = timeline;
 
     // 1. Resolve Data
     const screenSource = sources[recording.screenSourceId];
-    if (!screenSource) return;
+    if (!screenSource) return null;
 
     // 2. Calculate Times
     // Source Time: time relative to the video file
-    const sourceTimeMs = currentTimeMs - recording.timelineOffsetMs;
-    // Output Time logic removed as it was only for viewport calc
+    // 2. Calculate Times
+    // Source Time removed from here as it is only needed for events now
+
 
     // Use video dimensions if available, otherwise source metadata
-    // Note: Video dimensions might be 0 if not loaded, fallback to metadata size
     const inputSize = video.videoWidth && video.videoHeight
         ? { width: video.videoWidth, height: video.videoHeight }
         : screenSource.size;
 
-    if (!inputSize || inputSize.width === 0) return;
+    if (!inputSize || inputSize.width === 0) return null;
 
     // 4. Resolve View Mapping
     const outputSize = project.settings.outputSize;
     const padding = project.settings.padding;
     const viewMapper = new ViewMapper(inputSize, outputSize, padding);
 
-    // 5. Draw Video
     // 5. Draw Video & Effects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
     if (renderRects) {
-
-
         ctx.save();
 
         // Calculate Scale Factor (Canvas Pixels per Source Pixel)
@@ -77,36 +73,19 @@ export function drawScreen(
             ctx.clip();
         }
 
-
-
         ctx.drawImage(
             video,
             renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
             renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
         );
 
-        // 6. Draw Mouse Effects Overlay
-        if (userEvents) {
-            // These painters use Source Time because events are recorded in Source Time
-            if (userEvents.mouseClicks) {
-                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
-            }
-            if (userEvents.drags) {
-                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
-            }
-        }
-
         ctx.restore();
 
         // ============================
         // DRAW DEVICE FRAME (Overlay)
         // ============================
-        // Drawn AFTER restore ensures it is:
-        // 1. On Top of Video (Notch covers video)
-        // 2. Unclipped (Bezel extends outside)
         const deviceFrame = getDeviceFrame(project.settings.deviceFrameId);
         if (deviceFrame) {
-            // Calculate where the Top-Left and Bottom-Right of the FULL video would be on the canvas
             const topLeft = viewMapper.projectToScreen({ x: 0, y: 0 }, effectiveViewport);
             const bottomRight = viewMapper.projectToScreen({ x: inputSize.width, y: inputSize.height }, effectiveViewport);
 
@@ -115,8 +94,6 @@ export function drawScreen(
 
             const b = deviceFrame.borderData;
 
-            // Current Video is the "Hole". Frame expands outwards.
-            // Video W = Total W * (1 - left% - right%)
             const frameW = videoScreenW / (1 - b.left - b.right);
             const frameH = videoScreenH / (1 - b.top - b.bottom);
 
@@ -134,4 +111,6 @@ export function drawScreen(
             }
         }
     }
+
+    return { viewMapper };
 }

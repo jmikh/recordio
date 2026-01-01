@@ -1,19 +1,67 @@
 import React, { useRef, useEffect } from 'react';
-import type { Rect, Size } from '../../core/types';
+import type { Rect, Size, Project } from '../../../core/types';
+import type { ProjectState } from '../../stores/useProjectStore';
+import type { RenderResources } from './PlaybackRenderer';
+import { drawScreen } from '../../../core/painters/screenPainter';
 
-// Define interaction types
+// ------------------------------------------------------------------
+// LOGIC: Static Render Strategy
+// ------------------------------------------------------------------
+export const renderZoomEditor = (
+    resources: RenderResources,
+    state: {
+        project: Project,
+        sources: ProjectState['sources'],
+        currentTimeMs: number, // KEYFRAME TIME
+        editingZoomId: string
+    }
+) => {
+    const { ctx, videoRefs } = resources;
+    const { project, sources } = state;
+    const outputSize = project.settings.outputSize;
+
+    const { timeline } = project;
+    const { recording } = timeline;
+
+    const screenSource = sources[recording.screenSourceId];
+
+    // FORCE FULL VIEWPORT (Identity) for Editing
+    const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+
+    // Render Screen Layer
+    if (screenSource) {
+        const video = videoRefs[screenSource.id];
+        if (video) {
+            drawScreen(
+                ctx,
+                video,
+                project,
+                sources,
+                effectiveViewport
+            );
+        }
+    }
+};
+
+
+// NOTE: Webcam and Keyboard are HIDDEN in Zoom Edit mode.
+
+
+// ------------------------------------------------------------------
+// COMPONENT: Interactive Overlay
+// ------------------------------------------------------------------
 type InteractionType = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
-interface ZoomControlProps {
-    initialRect: Rect;
-    videoSize: Size;
-    containerFittedRect: Rect;
+interface ZoomOverlayProps {
+    initialRect: Rect; // The rect from the Store (Motion.rect)
+    videoSize: Size;   // The resolution of the video (1920x1080)
+    containerFittedRect: Rect; // The visual position of the video on screen (Letterboxed)
     onCommit: (rect: Rect) => void;
     onCancel: () => void;
     onDelete: () => void;
 }
 
-export const ZoomControl: React.FC<ZoomControlProps> = ({
+export const ZoomOverlay: React.FC<ZoomOverlayProps> = ({
     initialRect,
     videoSize,
     containerFittedRect,
