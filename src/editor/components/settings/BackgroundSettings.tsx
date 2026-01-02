@@ -53,18 +53,12 @@ export const BackgroundSettings = () => {
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     // Track last active color mode to restore it when switching back from Image
-    const lastColorModeRef = useRef<'solid' | 'gradient'>('solid');
-
-    // Sync ref with current valid state (e.g. on load or undo)
-    useEffect(() => {
-        if (backgroundType === 'solid' || backgroundType === 'gradient') {
-            lastColorModeRef.current = backgroundType;
-        }
-    }, [backgroundType]);
+    // Now stored in settings.lastColorMode (persisted) instead of ref (ephemeral)
 
     const handleColorTypeChange = (type: 'solid' | 'gradient') => {
         updateSettings({
             backgroundType: type,
+            lastColorMode: type,
             // Initialize gradient if missing
             backgroundGradient: settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' }
         });
@@ -170,11 +164,27 @@ export const BackgroundSettings = () => {
         };
     }, [showColorPopover]);
 
+    // Determine intent for preview and restore
+    const lastMode = settings.lastColorMode || 'solid';
+    const showSolidPreview = isSolid || (!isColorMode && lastMode === 'solid');
+
     // Dynamic background style for the Color Card
     // User requested "two half circles" for gradient mode (hard stop), not smooth gradient
-    const colorCardStyle = isSolid
+    // Wait, the previous logic: "isColorMode && !settings.backgroundGradient" might be flawed if gradient exists.
+    // Let's stick to the simpler check: Do we want to show solid?
+    // If current is solid: YES.
+    // If current is Image: Show whatever lastMode was.
+    // If current is Gradient: NO.
+
+    const colorCardStyle: React.CSSProperties = showSolidPreview
         ? { backgroundColor: backgroundColor }
-        : { background: `linear-gradient(${getGradientAngle(settings.backgroundGradient?.direction || 'S')}deg, ${settings.backgroundGradient?.colors[0] || '#fff'} 50%, ${settings.backgroundGradient?.colors[1] || '#000'} 50%)` };
+        : {
+            backgroundImage: `linear-gradient(${getGradientAngle(settings.backgroundGradient?.direction || 'S')}deg, ${settings.backgroundGradient?.colors[0] || '#fff'} 50%, ${settings.backgroundGradient?.colors[1] || '#000'} 50%)`,
+            backgroundSize: '100% 100%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundOrigin: 'border-box'
+        };
 
     return (
         <div className="flex flex-col gap-6 relative">
@@ -213,7 +223,7 @@ export const BackgroundSettings = () => {
                         onClick={() => {
                             if (!isColorMode) {
                                 updateSettings({
-                                    backgroundType: lastColorModeRef.current
+                                    backgroundType: lastMode
                                 });
                             }
                             setShowColorPopover(!showColorPopover);

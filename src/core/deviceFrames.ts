@@ -42,8 +42,8 @@ function defineFrame(
 
 export const MACBOOK_FRAME = defineFrame(
     'macbook-air',
-    'MacBook Air',
-    '/assets/macbook.png',
+    'MacBook Silver',
+    '/assets/devices/macbook.png',
     { width: 4340, height: 2860 },
     { x: 442, y: 313, width: 3456, height: 2234 }
 );
@@ -51,15 +51,15 @@ export const MACBOOK_FRAME = defineFrame(
 export const STUDIO_DISPLAY_FRAME = defineFrame(
     'studio-display',
     'Studio Display',
-    '/assets/studio-display.png',
+    '/assets/devices/studio-display.png',
     { width: 1228, height: 944 },
     { x: 26, y: 26, width: 1176, height: 662 }
 );
 
 export const MACBOOK_DARK_FRAME = defineFrame(
     'macbook-dark',
-    'MacBook Pro (Dark)',
-    '/assets/macbook-dark.png',
+    'MacBook Air Dark',
+    '/assets/devices/macbook-dark.png',
     { width: 3220, height: 2100 },
     { x: 329, y: 217, width: 2562, height: 1666 }
 );

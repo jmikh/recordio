@@ -68,6 +68,7 @@ export interface ProjectSettings {
     backgroundImageUrl?: string; // For presets
     backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
     customBackgroundSourceId?: ID; // Persists the last uploaded custom background
+    lastColorMode?: 'solid' | 'gradient'; // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
 
     // Camera
     camera?: CameraSettings;
