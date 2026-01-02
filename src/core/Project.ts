@@ -104,7 +104,7 @@ export class ProjectImpl {
         const viewMapper = new ViewMapper(
             screenSource.size,
             project.settings.outputSize,
-            project.settings.background.padding || 0.03
+            project.settings.background.padding
         );
 
         const timeMapper = new TimeMapper(0, outputWindows);

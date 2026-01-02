@@ -59,7 +59,6 @@ export const BackgroundSettings = () => {
     const handleColorTypeChange = (type: 'solid' | 'gradient') => {
         updateSettings({
             background: {
-                ...background,
                 type,
                 lastColorMode: type
             }
@@ -69,7 +68,6 @@ export const BackgroundSettings = () => {
     const handleColorChange = (color: string) => {
         updateWithBatching({
             background: {
-                ...background,
                 color
             }
         });
@@ -81,7 +79,6 @@ export const BackgroundSettings = () => {
 
         updateWithBatching({
             background: {
-                ...background,
                 gradientColors: newColors
             }
         });
@@ -90,7 +87,6 @@ export const BackgroundSettings = () => {
     const handleDirectionChange = (direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW') => {
         updateSettings({
             background: {
-                ...background,
                 gradientDirection: direction
             }
         });
@@ -99,7 +95,6 @@ export const BackgroundSettings = () => {
     const handlePresetSelect = (url: string) => {
         updateSettings({
             background: {
-                ...background,
                 type: 'image',
                 imageUrl: url,
                 sourceId: undefined
@@ -111,7 +106,6 @@ export const BackgroundSettings = () => {
         if (customBackgroundSourceId && !isCustom) {
             updateSettings({
                 background: {
-                    ...background,
                     type: 'image',
                     sourceId: customBackgroundSourceId
                 }
@@ -129,7 +123,6 @@ export const BackgroundSettings = () => {
             const newSourceId = await addSource(file, 'image');
             updateSettings({
                 background: {
-                    ...background,
                     type: 'image',
                     sourceId: newSourceId,
                     customSourceId: newSourceId
@@ -235,7 +228,6 @@ export const BackgroundSettings = () => {
                                 if (!isColorMode) {
                                     updateSettings({
                                         background: {
-                                            ...background,
                                             type: lastMode
                                         }
                                     });
@@ -320,7 +312,6 @@ export const BackgroundSettings = () => {
                         onPointerUp={endInteraction}
                         onChange={(e) => updateWithBatching({
                             background: {
-                                ...background,
                                 padding: parseFloat(e.target.value)
                             }
                         })}
@@ -329,25 +320,26 @@ export const BackgroundSettings = () => {
                 </div>
 
                 {/* Blur */}
-                <div className={`flex flex-col gap-2 transition-opacity ${backgroundType === 'solid' ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
-                    <input
-                        type="range"
-                        min={0}
-                        max={50}
-                        step={1}
-                        value={backgroundBlur || 0}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(e) => updateWithBatching({
-                            background: {
-                                ...background,
-                                backgroundBlur: parseInt(e.target.value)
-                            }
-                        })}
-                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                </div>
+                {backgroundType === 'image' && (
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
+                        <input
+                            type="range"
+                            min={0}
+                            max={50}
+                            step={1}
+                            value={backgroundBlur || 0}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(e) => updateWithBatching({
+                                background: {
+                                    backgroundBlur: parseInt(e.target.value)
+                                }
+                            })}
+                            className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                    </div>
+                )}
             </div>
 
 
