@@ -68,6 +68,7 @@ export interface CameraSettings extends StyleSettings {
 export interface ScreenSettings extends StyleSettings {
     mode: 'device' | 'border';
     deviceFrameId?: ID;
+    crop?: Rect;
 }
 
 export interface BackgroundSettings {

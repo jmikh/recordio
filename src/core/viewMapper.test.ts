@@ -20,6 +20,7 @@ describe('ViewMapper', () => {
         const p = mapper.inputToOutputPoint({ x: 1000, y: 1000 });
         expect(p.x).toBe(500);
         expect(p.y).toBe(500);
+        expect(p.visible).toBe(true);
 
         // Resolve Render Rects (Full View)
         const fullView = { x: 0, y: 0, width: 1000, height: 1000 };
@@ -57,5 +58,43 @@ describe('ViewMapper', () => {
         expect(mapper3.contentRect.x).toBe(100);
         expect(mapper3.contentRect.y).toBe(100);
         expect(mapper3.contentRect.width).toBe(800);
+    });
+
+    it('Case 4: Cropping (Input 2000x2000, Crop 1000x1000 centered, Output 1000x1000)', () => {
+        const inputSize = { width: 2000, height: 2000 };
+        const cropRect = { x: 500, y: 500, width: 1000, height: 1000 };
+        const mapper = new ViewMapper(
+            inputSize,
+            { width: 1000, height: 1000 },
+            0,
+            cropRect
+        );
+
+        // Content Rect should based on CROP size (1000x1000) fitting into Output (1000x1000)
+        // Scale should be 1.0 (Crop Width 1000 / Output Width 1000)
+        expect(mapper.contentRect.width).toBe(1000);
+        expect(mapper.contentRect.height).toBe(1000);
+
+        // Point Inside Crop (Center of Video = 1000,1000)
+        // Relative to Crop (x=500, y=500), this point is at 500,500
+        // Mapped to Output (1000x1000), it should be at 500,500
+        const p1 = mapper.inputToOutputPoint({ x: 1000, y: 1000 });
+        expect(p1.x).toBe(500);
+        expect(p1.y).toBe(500);
+        expect(p1.visible).toBe(true);
+
+        // Point Outside Crop (0,0)
+        // Should be clamped to Crop Start (500,500) -> Output (0,0)
+        const p2 = mapper.inputToOutputPoint({ x: 0, y: 0 });
+        expect(p2.x).toBe(0);
+        expect(p2.y).toBe(0);
+        expect(p2.visible).toBe(false);
+
+        // Point Outside Crop (2000, 2000)
+        // Should be clamped to Crop End (1500, 1500) -> Output (1000, 1000)
+        const p3 = mapper.inputToOutputPoint({ x: 2000, y: 2000 });
+        expect(p3.x).toBe(1000);
+        expect(p3.y).toBe(1000);
+        expect(p3.visible).toBe(false);
     });
 });

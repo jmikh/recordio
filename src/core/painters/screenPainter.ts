@@ -66,7 +66,8 @@ export function drawScreen(
     // 3. Resolve View Mapping
     const outputSize = project.settings.outputSize;
     const padding = project.settings.background.padding;
-    const viewMapper = new ViewMapper(inputSize, outputSize, padding);
+    // Pass the crop settings to the ViewMapper
+    const viewMapper = new ViewMapper(inputSize, outputSize, padding, project.settings.screen.crop);
 
     // 4. Calculate Rects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);

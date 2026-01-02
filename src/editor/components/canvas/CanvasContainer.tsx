@@ -5,6 +5,7 @@ import { ProjectStorage } from '../../../storage/projectStorage';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { renderZoomEditor, ZoomEditor } from './ZoomEditor';
+import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { TimeMapper } from '../../../core/timeMapper';
@@ -14,6 +15,7 @@ export const CanvasContainer = () => {
     const project = useProjectData();
     const editingZoomId = useProjectStore(s => s.editingZoomId);
     const editingCamera = useProjectStore(s => s.editingCamera);
+    const editingCrop = useProjectStore(s => s.editingCrop);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -39,13 +41,13 @@ export const CanvasContainer = () => {
 
         const tick = (time: number) => {
             const pbState = usePlaybackStore.getState();
-            const { editingZoomId, project, sources, userEvents } = useProjectStore.getState();
+            const { editingZoomId, editingCrop, project, sources, userEvents } = useProjectStore.getState();
 
             // FPS Logging (Optional)
             if (time - lastFpsTime >= 1000) lastFpsTime = time;
 
             // Only advance time if NOT editing
-            if (pbState.isPlaying && !editingZoomId) {
+            if (pbState.isPlaying && !editingZoomId && !editingCrop) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
                 const delta = time - lastTimeRef.current;
                 const safeDelta = Math.min(delta, 100);
@@ -78,6 +80,8 @@ export const CanvasContainer = () => {
             if (canvas && ctx) {
                 // 1. CLEAR & BACKGROUND
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Background is irrelevant in Crop Mode? Or maybe we still show it?
+                // Actually Crop Editor renders "Full Screen Overlay", so background might be covered or visible in padding.
                 drawBackground(
                     ctx,
                     project.settings.background,
@@ -104,7 +108,7 @@ export const CanvasContainer = () => {
 
                 // 3. SYNC VIDEO
                 const sourceTimeMs = effectiveTimeMs - project.timeline.recording.timelineOffsetMs;
-                const isPlaying = pbState.isPlaying && !editingZoomId; // Only play internal video if in View Mode
+                const isPlaying = pbState.isPlaying && !editingZoomId && !editingCrop;
 
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
@@ -121,7 +125,13 @@ export const CanvasContainer = () => {
                     videoRefs: internalVideoRefs.current
                 };
 
-                if (editingZoomId) {
+                if (editingCrop) {
+                    renderCropEditor(resources, {
+                        project,
+                        sources,
+                        currentTimeMs: effectiveTimeMs
+                    });
+                } else if (editingZoomId) {
                     renderZoomEditor(resources, {
                         project,
                         sources,
@@ -149,8 +159,6 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // LAYOUT & SIZING
     // -----------------------------------------------------------
-    // Calculated directly via CSS aspect-ratio on the container
-
     // Canvas Resize Sync
     useEffect(() => {
         if (canvasRef.current && outputVideoSize) {
@@ -171,6 +179,7 @@ export const CanvasContainer = () => {
     // Thumbnail Logic
     useEffect(() => {
         const captureThumbnail = () => {
+            // ... existing thumbnail logic
             const canvas = canvasRef.current;
             if (!canvas || !project || !project.id) return;
             canvas.toBlob((blob) => {
@@ -196,7 +205,7 @@ export const CanvasContainer = () => {
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     maxHeight: '100%',
                     maxWidth: '100%',
-                    boxShadow: '0 0 0 1px #333' // Optional: Visual border for debugging/clarity
+                    boxShadow: '0 0 0 1px #333'
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}
@@ -213,7 +222,7 @@ export const CanvasContainer = () => {
                                     else delete internalVideoRefs.current[source.id];
                                 }}
                                 src={source.url}
-                                muted={true} // Muted for editor preview usually
+                                muted={true}
                                 playsInline
                                 crossOrigin="anonymous"
                             />
@@ -227,13 +236,22 @@ export const CanvasContainer = () => {
                     className="block w-full h-full object-contain"
                 />
 
+                {/* CROP OVERLAY (Highest Priority) */}
+                {editingCrop && (
+                    <CropEditor videoSize={(() => {
+                        const screenId = project.timeline.recording.screenSourceId;
+                        const v = internalVideoRefs.current[screenId];
+                        return v ? { width: v.videoWidth, height: v.videoHeight } : undefined;
+                    })()} />
+                )}
+
                 {/* ZOOM OVERLAY */}
-                {editingZoomId && (
+                {!editingCrop && editingZoomId && (
                     <ZoomEditor />
                 )}
 
                 {/* CAMERA OVERLAY */}
-                {editingCamera && (
+                {!editingCrop && editingCamera && (
                     <CameraEditor cameraRef={previewCameraSettingsRef} />
                 )}
             </div>

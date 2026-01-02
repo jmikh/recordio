@@ -1,10 +1,14 @@
 import type { Size, Point, Rect } from './types';
 
+export interface MappedPoint extends Point {
+    visible: boolean;
+}
 
 export class ViewMapper {
     inputVideoSize: Size;
     outputVideoSize: Size;
     paddingPercentage: number;
+    cropRect?: Rect;
 
     /**
      * The rectangle in Output Space where the content (video) is placed.
@@ -15,21 +19,26 @@ export class ViewMapper {
     constructor(
         inputVideoSize: Size,
         outputVideoSize: Size,
-        paddingPercentage: number
+        paddingPercentage: number,
+        cropRect?: Rect
     ) {
         this.outputVideoSize = outputVideoSize;
         this.inputVideoSize = inputVideoSize;
         this.paddingPercentage = paddingPercentage;
+        this.cropRect = cropRect;
 
-        // Calculate Scale to fit input into output (considering padding)
+        // Effective Input Size is the Crop Size if it exists, otherwise the full video size
+        const effectiveInputSize = cropRect ? { width: cropRect.width, height: cropRect.height } : inputVideoSize;
+
+        // Calculate Scale to fit effective input into output (considering padding)
         const scale = Math.max(
-            this.inputVideoSize.width / (this.outputVideoSize.width * (1 - 2 * this.paddingPercentage)),
-            this.inputVideoSize.height / (this.outputVideoSize.height * (1 - 2 * this.paddingPercentage))
+            effectiveInputSize.width / (this.outputVideoSize.width * (1 - 2 * this.paddingPercentage)),
+            effectiveInputSize.height / (this.outputVideoSize.height * (1 - 2 * this.paddingPercentage))
         );
 
         // Calculate dimensions of the content in Output Space
-        const projectedWidth = this.inputVideoSize.width / scale;
-        const projectedHeight = this.inputVideoSize.height / scale;
+        const projectedWidth = effectiveInputSize.width / scale;
+        const projectedHeight = effectiveInputSize.height / scale;
 
         const x = (this.outputVideoSize.width - projectedWidth) / 2;
         const y = (this.outputVideoSize.height - projectedHeight) / 2;
@@ -39,16 +48,38 @@ export class ViewMapper {
 
     /**
      * Maps a point from Input Space (Source Video) to Output Space (Canvas).
+     * Handles cropping by clamping to the crop area.
      */
-    inputToOutputPoint(point: Point): Point {
-        // 1. Normalize in Input Space (0..1)
-        const nx = point.x / this.inputVideoSize.width;
-        const ny = point.y / this.inputVideoSize.height;
+    inputToOutputPoint(point: Point): MappedPoint {
+        let effectiveX = point.x;
+        let effectiveY = point.y;
+        let visible = true;
 
-        // 2. Map to ContentRect in Output Space
+        const effectiveInputSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.inputVideoSize;
+        const offsetX = this.cropRect ? this.cropRect.x : 0;
+        const offsetY = this.cropRect ? this.cropRect.y : 0;
+
+        if (this.cropRect) {
+            // Check visibility using the original point
+            if (point.x < this.cropRect.x || point.x > this.cropRect.x + this.cropRect.width ||
+                point.y < this.cropRect.y || point.y > this.cropRect.y + this.cropRect.height) {
+                visible = false;
+            }
+
+            // Clamp to Crop Rect
+            effectiveX = Math.max(this.cropRect.x, Math.min(point.x, this.cropRect.x + this.cropRect.width));
+            effectiveY = Math.max(this.cropRect.y, Math.min(point.y, this.cropRect.y + this.cropRect.height));
+        }
+
+        // Normalize relative to Crop (0..1)
+        const nx = (effectiveX - offsetX) / effectiveInputSize.width;
+        const ny = (effectiveY - offsetY) / effectiveInputSize.height;
+
+        // Map to ContentRect in Output Space
         return {
             x: this.contentRect.x + nx * this.contentRect.width,
-            y: this.contentRect.y + ny * this.contentRect.height
+            y: this.contentRect.y + ny * this.contentRect.height,
+            visible
         };
     }
 
@@ -81,12 +112,21 @@ export class ViewMapper {
             return null; // Viewport is looking entirely at padding/background
         }
 
-        // 2. Calculate sourceRect (Input Space)
-        // Map intersection (Output Space) -> Input Space
-        const srcX = (intersection.x - this.contentRect.x) / this.contentRect.width * this.inputVideoSize.width;
-        const srcY = (intersection.y - this.contentRect.y) / this.contentRect.height * this.inputVideoSize.height;
-        const srcW = (intersection.width / this.contentRect.width) * this.inputVideoSize.width;
-        const srcH = (intersection.height / this.contentRect.height) * this.inputVideoSize.height;
+        const effectiveInputSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.inputVideoSize;
+        const offsetX = this.cropRect ? this.cropRect.x : 0;
+        const offsetY = this.cropRect ? this.cropRect.y : 0;
+
+        // 2. Calculate sourceRect (Relative to Effective Input Space --> Then add offset)
+        // Map intersection (Output Space) -> Relative Input Space
+        const relSrcX = (intersection.x - this.contentRect.x) / this.contentRect.width * effectiveInputSize.width;
+        const relSrcY = (intersection.y - this.contentRect.y) / this.contentRect.height * effectiveInputSize.height;
+        const srcW = (intersection.width / this.contentRect.width) * effectiveInputSize.width;
+        const srcH = (intersection.height / this.contentRect.height) * effectiveInputSize.height;
+
+        // Add Crop Offset to get actual Source Coordinates
+        const srcX = relSrcX + offsetX;
+        const srcY = relSrcY + offsetY;
+
 
         // 3. Calculate destRect (Canvas/Screen Drawing Coordinates)
         // Map the visible intersection relative to the Viewport
@@ -108,7 +148,7 @@ export class ViewMapper {
     /**
      * Maps a point from Input Space -> Screen Coordinates (pixels on the final canvas).
      */
-    projectToScreen(point: Point, viewport: Rect): Point {
+    projectToScreen(point: Point, viewport: Rect): MappedPoint {
         // 1. Input -> Output Space
         const outputPoint = this.inputToOutputPoint(point);
 
@@ -119,7 +159,8 @@ export class ViewMapper {
 
         return {
             x: (outputPoint.x - viewport.x) * scaleX,
-            y: (outputPoint.y - viewport.y) * scaleY
+            y: (outputPoint.y - viewport.y) * scaleY,
+            visible: outputPoint.visible
         };
     }
 

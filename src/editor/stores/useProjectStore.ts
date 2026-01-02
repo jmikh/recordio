@@ -26,6 +26,7 @@ export interface ProjectState {
     editingZoomId: ID | null;
     editingZoomInitialState: ViewportMotion | null;
     editingCamera: boolean;
+    editingCrop: boolean;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
@@ -33,6 +34,7 @@ export interface ProjectState {
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
     setEditingCamera: (isEditing: boolean) => void;
+    setEditingCrop: (isEditing: boolean) => void;
 
     // Zoom Editing Actions
     setEditingZoom: (id: ID | null) => void;
@@ -77,7 +79,8 @@ const recalculateAutoZooms = (
     const viewMapper = new ViewMapper(
         sourceMetadata.size,
         project.settings.outputSize,
-        project.settings.background.padding
+        project.settings.background.padding,
+        project.settings.screen.crop
     );
 
     const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
@@ -102,8 +105,10 @@ export const useProjectStore = create<ProjectState>()(
                 editingZoomId: null, // Track active edit session
                 editingZoomInitialState: null as ViewportMotion | null, // Track initial state for history commit
                 editingCamera: false,
+                editingCrop: false,
 
                 setEditingCamera: (isEditing) => set({ editingCamera: isEditing }),
+                setEditingCrop: (isEditing) => set({ editingCrop: isEditing }),
 
                 setEditingZoom: (id) => {
                     const store = useProjectStore;
