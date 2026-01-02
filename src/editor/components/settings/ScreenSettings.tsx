@@ -1,10 +1,12 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
+    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     // Ensure screen settings exist (fallback for legacy projects if not fully migrated yet)
     // Default to device mode if undefined to match old behavior
@@ -94,9 +96,11 @@ export const ScreenSettings = () => {
                         hasShadow: screenConfig.hasShadow,
                         hasGlow: screenConfig.hasGlow
                     }}
-                    onChange={(updates) => updateSettings({
+                    onChange={(updates) => updateWithBatching({
                         screen: { ...screenConfig, ...updates }
                     })}
+                    onColorPopoverOpen={startInteraction}
+                    onColorPopoverClose={endInteraction}
                     showRadius={true}
                 />
             )}

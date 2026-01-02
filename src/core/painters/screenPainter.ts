@@ -65,7 +65,7 @@ export function drawScreen(
 
     // 3. Resolve View Mapping
     const outputSize = project.settings.outputSize;
-    const padding = project.settings.padding;
+    const padding = project.settings.background.padding;
     const viewMapper = new ViewMapper(inputSize, outputSize, padding);
 
     // 4. Calculate Rects

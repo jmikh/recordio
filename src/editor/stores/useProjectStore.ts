@@ -48,8 +48,13 @@ export interface ProjectState {
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
 
     // Settings Actions
-    updateSettings: (settings: Partial<ProjectSettings>) => void;
+    updateSettings: (settings: DeepPartial<ProjectSettings>) => void;
 }
+
+// Optimization helper
+type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
 
 // Helper to recalculate zooms synchronously
 const recalculateAutoZooms = (
@@ -72,7 +77,7 @@ const recalculateAutoZooms = (
     const viewMapper = new ViewMapper(
         sourceMetadata.size,
         project.settings.outputSize,
-        project.settings.padding
+        project.settings.background.padding
     );
 
     const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
@@ -362,29 +367,36 @@ export const useProjectStore = create<ProjectState>()(
                     }));
                 },
 
-                updateSettings: (updates) => {
+                updateSettings: (updates: any) => {
                     console.log('[Action] updateSettings', updates);
                     set((state) => {
-                        // Optimization: Check if updates actually change anything
-                        // Perform shallow comparison
                         const currentSettings = state.project.settings;
-                        let hasChanges = false;
-                        for (const key in updates) {
-                            const val = updates[key as keyof ProjectSettings];
-                            if (val !== currentSettings[key as keyof ProjectSettings]) {
-                                hasChanges = true;
-                                break;
-                            }
-                        }
 
-                        if (!hasChanges) {
-                            return state;
-                        }
+                        // Deep merge known nested objects
+                        // We use the existing setting as base, and merge updates on top
+                        // This handles both "full object replacement" (if spread by caller) and "partial update"
 
-                        // Flat settings = simple shallow merge!
                         const nextSettings: ProjectSettings = {
-                            ...state.project.settings,
-                            ...updates
+                            ...currentSettings,
+                            ...updates,
+                            // Specialized deep merges for nested objects
+                            background: {
+                                ...currentSettings.background,
+                                ...(updates.background || {})
+                            },
+                            screen: {
+                                ...currentSettings.screen,
+                                ...(updates.screen || {})
+                            },
+                            camera: {
+                                ...currentSettings.camera,
+                                ...(updates.camera || {})
+                            },
+                            // OutputSize is a simple object, can be merged deeply too
+                            outputSize: {
+                                ...currentSettings.outputSize,
+                                ...(updates.outputSize || {})
+                            }
                         };
 
                         const nextProject = {
@@ -398,8 +410,9 @@ export const useProjectStore = create<ProjectState>()(
                         // 2. Padding changed
                         let nextMotions = state.project.timeline.recording.viewportMotions;
 
-                        const paddingChanged = updates.padding !== undefined &&
-                            updates.padding !== state.project.settings.padding;
+                        // Check padding inside the now-merged settings or from updates
+                        // Using merged settings is safer
+                        const paddingChanged = nextSettings.background.padding !== currentSettings.background.padding;
 
                         // Check for any zoom related changes
                         const zoomChanged = updates.maxZoom !== undefined || updates.autoZoom !== undefined;

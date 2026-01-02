@@ -79,6 +79,8 @@ export interface BackgroundSettings {
     sourceId?: string; // For 'image' type (uploaded)
     customSourceId?: string; // For 'image' type (uploaded)
     lastColorMode?: 'solid' | 'gradient'; // To remember state
+    padding: number;
+    backgroundBlur: number;
 }
 
 export interface ProjectSettings {
@@ -89,11 +91,8 @@ export interface ProjectSettings {
     maxZoom: number;
     autoZoom: boolean;
 
-    padding: number;
-
     // Background
     background: BackgroundSettings;
-    backgroundBlur: number;
 
     // Screen Content
     screen: ScreenSettings;

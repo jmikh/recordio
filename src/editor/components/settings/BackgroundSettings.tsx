@@ -39,8 +39,8 @@ export const BackgroundSettings = () => {
 
     const sources = useProjectSources();
     const { settings } = project;
-    const { background, padding, backgroundBlur } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection } = background;
+    const { background } = settings;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection, padding, backgroundBlur } = background;
 
     // Helpers to determine active state
     const isSolid = backgroundType === 'solid';
@@ -167,6 +167,7 @@ export const BackgroundSettings = () => {
             if (popoverRef.current && !popoverRef.current.contains(event.target as Node) &&
                 colorButtonRef.current && !colorButtonRef.current.contains(event.target as Node)) {
                 setShowColorPopover(false);
+                endInteraction();
             }
         };
 
@@ -239,6 +240,11 @@ export const BackgroundSettings = () => {
                                         }
                                     });
                                 }
+                                if (!showColorPopover) {
+                                    startInteraction();
+                                } else {
+                                    endInteraction();
+                                }
                                 setShowColorPopover(!showColorPopover);
                             }}
                             className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
@@ -307,12 +313,17 @@ export const BackgroundSettings = () => {
                     <input
                         type="range"
                         min={0}
-                        max={0.25}
+                        max={0.2}
                         step={0.01}
                         value={padding}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
-                        onChange={(e) => updateWithBatching({ padding: parseFloat(e.target.value) })}
+                        onChange={(e) => updateWithBatching({
+                            background: {
+                                ...background,
+                                padding: parseFloat(e.target.value)
+                            }
+                        })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
@@ -328,7 +339,12 @@ export const BackgroundSettings = () => {
                         value={backgroundBlur || 0}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
-                        onChange={(e) => updateWithBatching({ backgroundBlur: parseInt(e.target.value) })}
+                        onChange={(e) => updateWithBatching({
+                            background: {
+                                ...background,
+                                backgroundBlur: parseInt(e.target.value)
+                            }
+                        })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>

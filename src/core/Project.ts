@@ -20,8 +20,6 @@ export class ProjectImpl {
                 frameRate: 60,
                 maxZoom: 2,
                 autoZoom: true,
-                padding: 0.1,
-                backgroundBlur: 40,
 
                 screen: {
                     mode: 'device',
@@ -37,7 +35,9 @@ export class ProjectImpl {
                     type: 'gradient',
                     color: '#c7d2fe',
                     gradientColors: ['#c7d2fe', '#3a3991'],
-                    gradientDirection: 'SE'
+                    gradientDirection: 'SE',
+                    padding: 0.06,
+                    backgroundBlur: 0
                 },
 
                 camera: {
@@ -104,7 +104,7 @@ export class ProjectImpl {
         const viewMapper = new ViewMapper(
             screenSource.size,
             project.settings.outputSize,
-            project.settings.padding || 0.03
+            project.settings.background.padding || 0.03
         );
 
         const timeMapper = new TimeMapper(0, outputWindows);

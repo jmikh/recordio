@@ -15,12 +15,16 @@ interface StyleControlsProps {
     settings: StyleSettings;
     onChange: (updates: Partial<StyleSettings>) => void;
     showRadius?: boolean;
+    onColorPopoverOpen?: () => void;
+    onColorPopoverClose?: () => void;
 }
 
 export const StyleControls: React.FC<StyleControlsProps> = ({
     settings,
     onChange,
-    showRadius = true
+    showRadius = true,
+    onColorPopoverOpen,
+    onColorPopoverClose
 }) => {
     const {
         borderRadius,
@@ -35,19 +39,27 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     const popoverRef = useRef<HTMLDivElement>(null);
 
     useClickOutside(popoverRef, () => {
-        if (showColorPopover) setShowColorPopover(false);
+        if (showColorPopover) {
+            setShowColorPopover(false);
+            onColorPopoverClose?.();
+        }
     });
 
     const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
 
     const toggleColorPopover = () => {
-        if (!showColorPopover && colorButtonRef.current) {
-            const rect = colorButtonRef.current.getBoundingClientRect();
-            // Position to the left of the button by default (since panel is on right)
-            setPopoverPos({
-                top: rect.top,
-                left: rect.left - 220
-            });
+        if (!showColorPopover) {
+            if (colorButtonRef.current) {
+                const rect = colorButtonRef.current.getBoundingClientRect();
+                // Position to the left of the button by default (since panel is on right)
+                setPopoverPos({
+                    top: rect.top,
+                    left: rect.left - 220
+                });
+            }
+            onColorPopoverOpen?.();
+        } else {
+            onColorPopoverClose?.();
         }
         setShowColorPopover(!showColorPopover);
     };
@@ -114,7 +126,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                         <input
                             type="range"
                             min="0"
-                            max="100"
+                            max="200"
                             value={borderRadius}
                             onChange={(e) => onChange({ borderRadius: parseInt(e.target.value) })}
                             className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
