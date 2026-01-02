@@ -89,7 +89,10 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         if (type === 'move') {
             newSettings.x += deltaX;
             newSettings.y += deltaY;
-            // No clamping allows dragging out of bounds
+
+            // Constrain to canvas bounds
+            newSettings.x = Math.max(0, Math.min(newSettings.x, outputSize.width - newSettings.width));
+            newSettings.y = Math.max(0, Math.min(newSettings.y, outputSize.height - newSettings.height));
         } else {
             // RESIZING with Aspect Ratio maintenance
             const isSquare = startSettings.shape === 'square' || startSettings.shape === 'circle';
@@ -243,7 +246,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
                     width: `${(initialSettings.width / outputSize.width) * 100}%`,
                     height: `${(initialSettings.height / outputSize.height) * 100}%`,
                     border: '2px solid rgba(255, 255, 255, 0.5)',
-                    boxShadow: '0 0 10px rgba(0,0,0,0.3)'
                 }}
                 onPointerDown={(e) => handlePointerDown(e, 'move')}
                 onPointerMove={handlePointerMove}

@@ -14,6 +14,10 @@ export const CameraSettings = () => {
 
     const cameraConfig = project.settings.camera;
 
+    const sources = useProjectStore(s => s.sources);
+    const recording = project.timeline.recording;
+    const cameraSource = recording.cameraSourceId ? sources[recording.cameraSourceId] : null;
+
     if (!cameraConfig) {
         return (
             <div className="p-4 text-center text-gray-400">
@@ -29,13 +33,25 @@ export const CameraSettings = () => {
     const handleShapeChange = (shape: 'rect' | 'square' | 'circle') => {
         let newSettings = { ...cameraConfig, shape };
 
-        if (shape === 'square' || shape === 'circle') {
+        if (shape === 'rect') {
+            // Restore aspect ratio from source if available
+            if (cameraSource && cameraSource.size.height > 0) {
+                const ratio = cameraSource.size.width / cameraSource.size.height;
+                // Keep the current height, adjust width to match ratio
+                newSettings.width = newSettings.height * ratio;
+            }
+        } else if (shape === 'square' || shape === 'circle') {
             // Enforce 1:1 Aspect Ratio
             // We use the smaller dimension to ensure it fits within the previous area
             const size = Math.min(newSettings.width, newSettings.height);
             newSettings.width = size;
             newSettings.height = size;
         }
+
+        // Ensure we don't go out of bounds with the new size
+        const outputSize = project.settings.outputSize;
+        newSettings.x = Math.max(0, Math.min(newSettings.x, outputSize.width - newSettings.width));
+        newSettings.y = Math.max(0, Math.min(newSettings.y, outputSize.height - newSettings.height));
 
         updateSettings({ camera: newSettings });
     };

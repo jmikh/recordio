@@ -96,7 +96,13 @@ export class PlaybackRenderer {
             if (video) {
                 // Use Override (Drag) or Store (Settings) or Default
                 const cameraSettings = state.overrideCameraSettings || project.settings.camera;
-                drawWebcam(ctx, video, outputSize, cameraSource.size, cameraSettings);
+
+                if (!cameraSettings) {
+                    console.error(`[PlaybackRenderer] Missing camera settings for source ${cameraSource.id}`);
+                    throw new Error("Mandatory camera settings are missing.");
+                }
+
+                drawWebcam(ctx, video, cameraSource.size, cameraSettings);
             }
         }
 

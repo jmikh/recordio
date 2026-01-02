@@ -28,10 +28,10 @@ export class ProjectImpl {
 
                 backgroundBlur: 8,
                 camera: {
-                    width: 400,
-                    height: 300,
-                    x: 3840 - 450, // Bottom Right with padding
-                    y: 2160 - 350,
+                    width: 800,
+                    height: 600,
+                    x: 50,
+                    y: 2160 - 650,
                     shape: 'rect'
                 }
             },
