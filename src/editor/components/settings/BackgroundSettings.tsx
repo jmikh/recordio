@@ -1,10 +1,28 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { ColorSettings } from './ColorSettings';
+
+// Helper to convert N, NE, etc. to degrees
+const getGradientAngle = (dir: string) => {
+    switch (dir) {
+        case 'N': return 0;
+        case 'NE': return 45;
+        case 'E': return 90;
+        case 'SE': return 135;
+        case 'S': return 180;
+        case 'SW': return 225;
+        case 'W': return 270;
+        case 'NW': return 315;
+        default: return 180;
+    }
+};
 
 const BACKGROUND_IMAGES = [
-    { name: 'Abstract Gradient', url: '/assets/backgrounds/abstract-gradient.jpg' },
-    // Add more here if needed
+    { name: 'Background 1', url: '/assets/backgrounds/bg1.jpg' },
+    { name: 'Background 2', url: '/assets/backgrounds/bg2.jpg' },
+    { name: 'Background 3', url: '/assets/backgrounds/bg3.jpg' },
 ];
 
 export const BackgroundSettings = () => {
@@ -22,18 +40,56 @@ export const BackgroundSettings = () => {
 
     // Helpers to determine active state
     const isSolid = backgroundType === 'solid';
+    const isGradient = backgroundType === 'gradient';
+    const isColorMode = isSolid || isGradient;
+
+    // Preset active if image mode AND no source ID (implies generic url) AND url matches
     const isPreset = backgroundType === 'image' && !backgroundSourceId && !!backgroundImageUrl;
 
-    // Check if active source matches the custom source (or just valid custom source is active)
+    // Custom active if image mode AND source ID present
     const isCustom = backgroundType === 'image' && !!backgroundSourceId;
 
     // --- Undo/Redo Batching Helpers ---
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
+    // Track last active color mode to restore it when switching back from Image
+    const lastColorModeRef = useRef<'solid' | 'gradient'>('solid');
+
+    // Sync ref with current valid state (e.g. on load or undo)
+    useEffect(() => {
+        if (backgroundType === 'solid' || backgroundType === 'gradient') {
+            lastColorModeRef.current = backgroundType;
+        }
+    }, [backgroundType]);
+
+    const handleColorTypeChange = (type: 'solid' | 'gradient') => {
+        updateSettings({
+            backgroundType: type,
+            // Initialize gradient if missing
+            backgroundGradient: settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' }
+        });
+    };
+
     const handleColorChange = (color: string) => {
         updateWithBatching({
-            backgroundType: 'solid',
             backgroundColor: color
+        });
+    };
+
+    const handleGradientColorChange = (index: 0 | 1, color: string) => {
+        const current = settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' };
+        const newColors = [...current.colors] as [string, string];
+        newColors[index] = color;
+
+        updateWithBatching({
+            backgroundGradient: { ...current, colors: newColors }
+        });
+    };
+
+    const handleDirectionChange = (direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW') => {
+        const current = settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' };
+        updateSettings({
+            backgroundGradient: { ...current, direction }
         });
     };
 
@@ -41,7 +97,7 @@ export const BackgroundSettings = () => {
         updateSettings({
             backgroundType: 'image',
             backgroundImageUrl: url,
-            backgroundSourceId: undefined // Clear source ID
+            backgroundSourceId: undefined
         });
     };
 
@@ -70,45 +126,145 @@ export const BackgroundSettings = () => {
         } catch (err) {
             console.error("Failed to upload background", err);
         } finally {
-            // Reset input so same file can be selected again if needed
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
     const customSource = customBackgroundSourceId ? sources[customBackgroundSourceId] : null;
 
-    return (
-        <div className="flex flex-col gap-6">
-            {/* 1. Solid Color */}
-            <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Solid Color</label>
-                <div
-                    className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isSolid ? 'border-blue-500 bg-[#2a2a2a]' : 'border-transparent hover:bg-[#2a2a2a]'}`}
-                    onClick={() => handleColorChange(backgroundColor)}
-                >
-                    <input
-                        type="color"
-                        value={backgroundColor}
-                        onClick={startInteraction}
-                        onBlur={endInteraction}
-                        onChange={(e) => handleColorChange(e.target.value)}
-                        className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent"
-                    />
-                    <span className="text-xs font-mono text-gray-300">{backgroundColor}</span>
-                </div>
-            </div>
+    // Popover State
+    const [showColorPopover, setShowColorPopover] = useState(false);
+    const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+    const popoverRef = useRef<HTMLDivElement>(null);
+    const colorButtonRef = useRef<HTMLDivElement>(null);
 
-            {/* 2. Presets */}
-            <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Presets</label>
-                <div className="grid grid-cols-2 gap-3">
+    // Close popover on click outside or scroll
+    useEffect(() => {
+        if (showColorPopover && colorButtonRef.current) {
+            const rect = colorButtonRef.current.getBoundingClientRect();
+            // Position to the right of the button, centered vertically if possible, or just aligned top
+            // Let's try aligned top-right of the button
+            const TOP_OFFSET = -20;
+            const LEFT_OFFSET = 60; // 48px width + gap
+
+            setPopoverPos({
+                top: rect.top + window.scrollY + TOP_OFFSET,
+                left: rect.left + window.scrollX + LEFT_OFFSET
+            });
+        }
+
+        const handleClickOutside = (event: Event) => {
+            if (popoverRef.current && !popoverRef.current.contains(event.target as Node) &&
+                colorButtonRef.current && !colorButtonRef.current.contains(event.target as Node)) {
+                setShowColorPopover(false);
+            }
+        };
+
+        if (showColorPopover) {
+            document.addEventListener('mousedown', handleClickOutside);
+            window.addEventListener('scroll', handleClickOutside, true);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleClickOutside, true);
+        };
+    }, [showColorPopover]);
+
+    // Dynamic background style for the Color Card
+    // User requested "two half circles" for gradient mode (hard stop), not smooth gradient
+    const colorCardStyle = isSolid
+        ? { backgroundColor: backgroundColor }
+        : { background: `linear-gradient(${getGradientAngle(settings.backgroundGradient?.direction || 'S')}deg, ${settings.backgroundGradient?.colors[0] || '#fff'} 50%, ${settings.backgroundGradient?.colors[1] || '#000'} 50%)` };
+
+    return (
+        <div className="flex flex-col gap-6 relative">
+            {/* Popover Portal */}
+            {showColorPopover && createPortal(
+                <div
+                    ref={popoverRef}
+                    className="fixed z-[9999] shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                    style={{
+                        top: popoverPos.top,
+                        left: popoverPos.left,
+                        width: '300px'
+                    }}
+                >
+                    <ColorSettings
+                        isSolid={isSolid}
+                        isGradient={isGradient}
+                        color={backgroundColor}
+                        gradient={settings.backgroundGradient}
+                        onTypeChange={handleColorTypeChange}
+                        onColorChange={handleColorChange}
+                        onGradientColorChange={handleGradientColorChange}
+                        onDirectionChange={handleDirectionChange}
+                    />
+                </div>,
+                document.body
+            )}
+
+            {/* Main Background Grid */}
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Background</label>
+                <div className="flex flex-wrap gap-4">
+                    {/* 1. Color Card */}
+                    <div
+                        ref={colorButtonRef}
+                        onClick={() => {
+                            if (!isColorMode) {
+                                updateSettings({
+                                    backgroundType: lastColorModeRef.current
+                                });
+                            }
+                            setShowColorPopover(!showColorPopover);
+                        }}
+                        className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
+                            ? 'border-blue-500 ring-2 ring-blue-500/30'
+                            : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
+                            }`}
+                        style={colorCardStyle}
+                        title="Color / Gradient"
+                    >
+                        {/* Icon only on hover */}
+                        <div className="opacity-0 hover:opacity-100 transition-opacity bg-black/30 w-full h-full rounded-full flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                        </div>
+                    </div>
+
+                    {/* 2. Upload Card */}
+                    <div
+                        onClick={handleCustomSelect}
+                        className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
+                            ? 'border-blue-500 ring-2 ring-blue-500/30'
+                            : 'border-transparent bg-[#2a2a2a] ring-1 ring-white/10 hover:ring-white/30'
+                            }`}
+                        title="Upload Image"
+                    >
+                        {customSource ? (
+                            <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                            <svg className="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                        )}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleUpload}
+                        />
+                    </div>
+
+                    {/* 3. Presets */}
                     {BACKGROUND_IMAGES.map(img => {
                         const isActive = isPreset && backgroundImageUrl === img.url;
                         return (
                             <div
                                 key={img.url}
-                                className={`cursor-pointer border-2 rounded-lg overflow-hidden aspect-video relative group transition-all ${isActive ? 'border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:border-gray-500'}`}
+                                className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
+                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
                                 onClick={() => handlePresetSelect(img.url)}
+                                title={img.name}
                             >
                                 <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                             </div>
@@ -117,47 +273,7 @@ export const BackgroundSettings = () => {
                 </div>
             </div>
 
-            {/* 3. Custom Upload */}
-            <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Custom Upload</label>
-                <div
-                    className={`cursor-pointer border-2 rounded-lg overflow-hidden aspect-video flex items-center justify-center bg-[#1e1e1e] relative transition-all ${isCustom ? 'border-blue-500 ring-1 ring-blue-500/50' : 'border-dashed border-gray-600 hover:border-gray-400 hover:bg-[#252525]'}`}
-                    onClick={handleCustomSelect}
-                >
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleUpload}
-                    />
-
-                    {customSource ? (
-                        <div className="w-full h-full relative group">
-                            <img src={customSource.url} className="w-full h-full object-cover" />
-                            {/* Change Overlay */}
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
-                                <button
-                                    className="text-xs text-white bg-white/10 px-3 py-1.5 rounded hover:bg-white/20 transition-colors"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        fileInputRef.current?.click();
-                                    }}
-                                >
-                                    Change Image
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-2 text-gray-500 group-hover:text-gray-300 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                            <span className="text-xs font-medium">Upload Image</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* 4. Frame */}
+            {/* Frame */}
             <div className="flex items-center justify-between pt-4 border-t border-gray-700">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
                 <div
@@ -168,7 +284,7 @@ export const BackgroundSettings = () => {
                 </div>
             </div>
 
-            {/* 5. Effects */}
+            {/* Effects */}
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
                 {/* Padding */}
                 <div className="flex flex-col gap-2">

@@ -14,7 +14,32 @@ export const drawBackground = (
         ctx.fillStyle = settings.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-    // 2. Image (Cover Mode)
+    // 2. Gradient
+    else if (settings.backgroundType === 'gradient' && settings.backgroundGradient) {
+        const { colors, direction } = settings.backgroundGradient;
+        const w = canvas.width;
+        const h = canvas.height;
+        let x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+
+        switch (direction) {
+            case 'N': x0 = w / 2; y0 = h; x1 = w / 2; y1 = 0; break;
+            case 'NE': x0 = 0; y0 = h; x1 = w; y1 = 0; break;
+            case 'E': x0 = 0; y0 = h / 2; x1 = w; y1 = h / 2; break;
+            case 'SE': x0 = 0; y0 = 0; x1 = w; y1 = h; break; // Top-Left to Bottom-Right
+            case 'S': x0 = w / 2; y0 = 0; x1 = w / 2; y1 = h; break; // Top to Bottom
+            case 'SW': x0 = w; y0 = 0; x1 = 0; y1 = h; break;
+            case 'W': x0 = w; y0 = h / 2; x1 = 0; y1 = h / 2; break;
+            case 'NW': x0 = w; y0 = h; x1 = 0; y1 = 0; break;
+        }
+
+        const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+        gradient.addColorStop(0, colors[0]);
+        gradient.addColorStop(1, colors[1]);
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+    }
+    // 3. Image (Cover Mode)
     else if (settings.backgroundType === 'image' && bgImage) {
         if (bgImage.complete && bgImage.naturalWidth > 0) {
             const imgW = bgImage.naturalWidth;

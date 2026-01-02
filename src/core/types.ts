@@ -58,8 +58,12 @@ export interface ProjectSettings {
     autoZoom: boolean;
 
     // Background
-    backgroundType: 'solid' | 'image';
+    backgroundType: 'solid' | 'gradient' | 'image';
     backgroundColor: string;
+    backgroundGradient?: {
+        colors: [string, string];
+        direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+    };
     padding: number;
     backgroundImageUrl?: string; // For presets
     backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
