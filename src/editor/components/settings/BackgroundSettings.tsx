@@ -2,10 +2,10 @@ import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
+import { ScreenSettings } from './ScreenSettings';
 
 // Helper to convert N, NE, etc. to degrees
 const getGradientAngle = (dir: string) => {
@@ -39,7 +39,7 @@ export const BackgroundSettings = () => {
 
     const sources = useProjectSources();
     const { settings } = project;
-    const { background, padding, cornerRadius, backgroundBlur, deviceFrameId } = settings;
+    const { background, padding, backgroundBlur } = settings;
     const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection } = background;
 
     // Helpers to determine active state
@@ -55,9 +55,6 @@ export const BackgroundSettings = () => {
 
     // --- Undo/Redo Batching Helpers ---
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
-
-    // Track last active color mode to restore it when switching back from Image
-    // Now stored in settings.lastColorMode (persisted) instead of ref (ephemeral)
 
     const handleColorTypeChange = (type: 'solid' | 'gradient') => {
         updateSettings({
@@ -111,8 +108,6 @@ export const BackgroundSettings = () => {
     };
 
     const handleCustomSelect = () => {
-        // If we have a custom source AND we are not currently using it, just switch to it.
-        // Otherwise (if we are using it OR we don't have one), open the picker to upload/replace.
         if (customBackgroundSourceId && !isCustom) {
             updateSettings({
                 background: {
@@ -131,7 +126,6 @@ export const BackgroundSettings = () => {
         if (!file) return;
 
         try {
-
             const newSourceId = await addSource(file, 'image');
             updateSettings({
                 background: {
@@ -160,8 +154,6 @@ export const BackgroundSettings = () => {
     useEffect(() => {
         if (showColorPopover && colorButtonRef.current) {
             const rect = colorButtonRef.current.getBoundingClientRect();
-            // Position to the right of the button, centered vertically if possible, or just aligned top
-            // Let's try aligned top-right of the button
             const TOP_OFFSET = -20;
             const LEFT_OFFSET = 60; // 48px width + gap
 
@@ -191,14 +183,6 @@ export const BackgroundSettings = () => {
     // Determine intent for preview and restore
     const lastMode = background.lastColorMode || 'solid';
     const showSolidPreview = isSolid || (!isColorMode && lastMode === 'solid');
-
-    // Dynamic background style for the Color Card
-    // User requested "two half circles" for gradient mode (hard stop), not smooth gradient
-    // Wait, the previous logic: "isColorMode && !settings.backgroundGradient" might be flawed if gradient exists.
-    // Let's stick to the simpler check: Do we want to show solid?
-    // If current is solid: YES.
-    // If current is Image: Show whatever lastMode was.
-    // If current is Gradient: NO.
 
     const colorCardStyle: React.CSSProperties = showSolidPreview
         ? { backgroundColor: backgroundColor }
@@ -264,7 +248,6 @@ export const BackgroundSettings = () => {
                             style={colorCardStyle}
                             title="Color / Gradient"
                         >
-                            {/* Icon always visible */}
                             <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
                                 <IoIosColorFilter size={20} />
                             </div>
@@ -282,7 +265,6 @@ export const BackgroundSettings = () => {
                             {customSource && (
                                 <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
                             )}
-                            {/* Always show icon, but style it as overlay if image exists */}
                             <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'bg-black/20 text-white'}`}>
                                 <CiImageOn size={20} />
                             </div>
@@ -298,7 +280,6 @@ export const BackgroundSettings = () => {
 
                     {/* Row 2: Presets */}
                     <div className="flex flex-wrap gap-4">
-                        {/* 3. Presets */}
                         {BACKGROUND_IMAGES.map(img => {
                             const isActive = isPreset && backgroundImageUrl === img.url;
                             return (
@@ -318,42 +299,9 @@ export const BackgroundSettings = () => {
                 </div>
             </div>
 
-            {/* Frame */}
-            <div className="flex flex-col gap-3 pt-4 border-t border-gray-700">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
-                <div className="grid grid-cols-2 gap-2">
-                    {/* Frame Options */}
-                    {DEVICE_FRAMES.map(frame => {
-                        const isSelected = deviceFrameId === frame.id;
-                        return (
-                            <div key={frame.id} className="flex flex-col gap-1">
-                                <div
-                                    onClick={() => updateWithBatching({ deviceFrameId: isSelected ? undefined : frame.id })}
-                                    className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
-                                        ? 'border-blue-500 ring-2 ring-blue-500/30 bg-white'
-                                        : 'border-transparent ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
-                                        }`}
-                                    title={frame.name}
-                                >
-                                    <img
-                                        src={frame.imageUrl}
-                                        alt={frame.name}
-                                        className="w-full h-full object-contain p-1"
-                                    />
-                                </div>
-                                <span className={`text-[10px] uppercase tracking-wide font-medium text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
-                                    }`}>
-                                    {frame.name}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
             {/* Effects */}
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
-                {/* Padding */}
+                {/* Spacing (Padding) */}
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
                     <input
@@ -365,22 +313,6 @@ export const BackgroundSettings = () => {
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         onChange={(e) => updateWithBatching({ padding: parseFloat(e.target.value) })}
-                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                </div>
-
-                {/* Corner Radius */}
-                <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Rounding</label>
-                    <input
-                        type="range"
-                        min={0}
-                        max={250}
-                        step={1}
-                        value={cornerRadius || 0}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(e) => updateWithBatching({ cornerRadius: parseInt(e.target.value) })}
                         className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
@@ -401,6 +333,13 @@ export const BackgroundSettings = () => {
                     />
                 </div>
             </div>
-        </div>
+
+
+            {/* Separator */}
+            <div className="h-[1px] bg-gray-700 my-2"></div>
+
+            {/* Screen Settings (Embedded) */}
+            <ScreenSettings />
+        </div >
     );
 };

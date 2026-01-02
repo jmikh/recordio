@@ -1,4 +1,5 @@
 import { useProjectStore } from '../../stores/useProjectStore';
+import { StyleControls } from './StyleControls';
 
 const SHAPES = [
     { id: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
@@ -22,33 +23,24 @@ export const CameraSettings = () => {
         return (
             <div className="p-4 text-center text-gray-400">
                 <p>No camera configured for this project.</p>
-                {/* Potentially add button to "Add Camera" if not present? 
-                    For now, we assume it's set if camera source exists, 
-                    but we added defaults to Project.create so it should be there.
-                 */}
             </div>
         );
     }
 
-    const handleShapeChange = (shape: 'rect' | 'square' | 'circle') => {
-        let newSettings = { ...cameraConfig, shape };
+    const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
+        let newSettings = { ...cameraConfig, shape: newShape };
 
-        if (shape === 'rect') {
-            // Restore aspect ratio from source if available
+        if (newShape === 'rect') {
             if (cameraSource && cameraSource.size.height > 0) {
                 const ratio = cameraSource.size.width / cameraSource.size.height;
-                // Keep the current height, adjust width to match ratio
                 newSettings.width = newSettings.height * ratio;
             }
-        } else if (shape === 'square' || shape === 'circle') {
-            // Enforce 1:1 Aspect Ratio
-            // We use the smaller dimension to ensure it fits within the previous area
+        } else if (newShape === 'square' || newShape === 'circle') {
             const size = Math.min(newSettings.width, newSettings.height);
             newSettings.width = size;
             newSettings.height = size;
         }
 
-        // Ensure we don't go out of bounds with the new size
         const outputSize = project.settings.outputSize;
         newSettings.x = Math.max(0, Math.min(newSettings.x, outputSize.width - newSettings.width));
         newSettings.y = Math.max(0, Math.min(newSettings.y, outputSize.height - newSettings.height));
@@ -56,8 +48,17 @@ export const CameraSettings = () => {
         updateSettings({ camera: newSettings });
     };
 
+    const {
+        shape,
+        borderRadius = 0,
+        borderWidth = 0,
+        borderColor = '#ffffff',
+        hasShadow = false,
+        hasGlow = false
+    } = cameraConfig;
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
             <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase mb-4">Camera Overlay</h3>
 
@@ -73,24 +74,38 @@ export const CameraSettings = () => {
                     </button>
                 </div>
 
-                <div className="space-y-4">
-                    <label className="text-xs font-semibold text-gray-400">Shape</label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {SHAPES.map(shape => (
-                            <button
-                                key={shape.id}
-                                onClick={() => handleShapeChange(shape.id as any)}
-                                className={`flex flex-col items-center justify-center p-3 rounded border transition-all ${cameraConfig.shape === shape.id
-                                    ? 'bg-blue-900/30 border-blue-500 text-blue-400'
-                                    : 'bg-[#2a2a2a] border-transparent text-gray-400 hover:bg-[#333]'
-                                    }`}
-                                title={shape.label}
-                            >
-                                <div className="mb-1">{shape.icon}</div>
-                                <span className="text-[10px]">{shape.label}</span>
-                            </button>
-                        ))}
+                <div className="space-y-6">
+                    {/* Shape */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Shape</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {SHAPES.map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => handleShapeChange(s.id as any)}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${shape === s.id
+                                        ? 'bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-sm'
+                                        : 'bg-[#1a1a1a] border-gray-800 text-gray-500 hover:border-gray-700 hover:bg-[#202020]'
+                                        }`}
+                                >
+                                    {s.icon}
+                                    <span className="text-[10px] font-medium">{s.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
+
+                    <StyleControls
+                        settings={{
+                            borderRadius,
+                            borderWidth,
+                            borderColor,
+                            hasShadow,
+                            hasGlow
+                        }}
+                        onChange={(updates) => updateSettings({ camera: { ...cameraConfig, ...updates } })}
+                        showRadius={shape === 'rect' || shape === 'square'}
+                    />
                 </div>
             </div>
         </div>

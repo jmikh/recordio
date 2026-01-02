@@ -1,5 +1,10 @@
 import type { CameraSettings, Size } from '../types';
 
+const SHADOW_BLUR = 20;
+const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
+const SHADOW_OFFSET_Y = 10;
+const GLOW_BLUR = 25;
+
 /**
  * Draws the webcam overlay (Picture-in-Picture) onto the canvas.
  * 
@@ -14,20 +19,19 @@ export function drawWebcam(
     inputSize: Size,
     settings: CameraSettings
 ) {
-    let pipX, pipY, pipWidth, pipHeight, shape;
-
-    pipX = settings.x;
-    pipY = settings.y;
-    pipWidth = settings.width;
-    pipHeight = settings.height;
-    shape = settings.shape || 'rect';
+    const {
+        x, y, width, height,
+        shape = 'rect',
+        borderRadius = 0,
+        borderWidth = 0,
+        borderColor = '#ffffff',
+        hasShadow = false,
+        hasGlow = false
+    } = settings;
 
     // Calculate Crop (Object-Fit: Cover)
-    // We want to map a portion of inputSize (src) to pipWidth/Height (dst)
-    // such that the src portion fills the dst without distortion.
-
     const srcRatio = inputSize.width / inputSize.height;
-    const dstRatio = pipWidth / pipHeight;
+    const dstRatio = width / height;
 
     let sx, sy, sw, sh;
 
@@ -45,42 +49,92 @@ export function drawWebcam(
         sy = (inputSize.height - sh) / 2;
     }
 
+    // Helper to create the path based on shape
+    const definePath = () => {
+        ctx.beginPath();
+        if (shape === 'circle') {
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            const radius = Math.min(width, height) / 2;
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        } else {
+            // Rect or Square
+            if (borderRadius > 0) {
+                // Manually draw rounded rect for compatibility
+                const r = Math.min(borderRadius, width / 2, height / 2);
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + width - r, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+                ctx.lineTo(x + width, y + height - r);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+                ctx.lineTo(x + r, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+            } else {
+                ctx.rect(x, y, width, height);
+            }
+        }
+        ctx.closePath();
+    };
+
     ctx.save();
 
-    // 1. Define Clip Path
-    ctx.beginPath();
-    if (shape === 'circle') {
-        const centerX = pipX + pipWidth / 2;
-        const centerY = pipY + pipHeight / 2;
-        const radius = Math.min(pipWidth, pipHeight) / 2;
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    } else {
-        // Rect and Square use standard rect clip
-        ctx.rect(pipX, pipY, pipWidth, pipHeight);
+    // 1. Glow Pass
+    if (hasGlow) {
+        ctx.save();
+        ctx.shadowBlur = GLOW_BLUR;
+        ctx.shadowColor = borderColor;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        definePath();
+
+        ctx.fillStyle = borderColor;
+        ctx.fill();
+
+        if (borderWidth > 0) {
+            ctx.lineWidth = borderWidth;
+            ctx.strokeStyle = borderColor;
+            ctx.stroke();
+        }
+        ctx.restore();
     }
+
+    // 2. Shadow Pass
+    if (hasShadow) {
+        ctx.save();
+        ctx.shadowBlur = SHADOW_BLUR;
+        ctx.shadowColor = SHADOW_COLOR;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = SHADOW_OFFSET_Y;
+        definePath();
+
+        ctx.fillStyle = 'black';
+        ctx.fill();
+
+        if (borderWidth > 0) {
+            ctx.lineWidth = borderWidth;
+            ctx.strokeStyle = 'black'; // Color doesn't matter for shadow caster, but stroke needs color
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // 3. Content Pass
+    ctx.save();
+    definePath();
     ctx.clip();
+    // Draw Video
+    ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+    ctx.restore(); // Remove clip
 
-    // 2. Draw Video (Clipped)
-    ctx.drawImage(video, sx, sy, sw, sh, pipX, pipY, pipWidth, pipHeight);
-
-    // 3. Draw Border
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 4;
-
-    // We can just stroke the current path if we want, but let's be explicit to match previous style logic
-    // Actually, stroking the current clipped path is dangerous if the clip was complex, 
-    // but here it is simple. However, 'clip' consumes the path. We need to beginPath again.
-
-    ctx.beginPath();
-    if (shape === 'circle') {
-        const centerX = pipX + pipWidth / 2;
-        const centerY = pipY + pipHeight / 2;
-        const radius = Math.min(pipWidth, pipHeight) / 2;
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    } else {
-        ctx.rect(pipX, pipY, pipWidth, pipHeight);
+    // 4. Border Pass
+    if (borderWidth > 0) {
+        definePath();
+        ctx.lineWidth = borderWidth;
+        ctx.strokeStyle = borderColor;
+        ctx.stroke();
     }
-    ctx.stroke();
 
     ctx.restore();
 }

@@ -16,28 +16,42 @@ export class ProjectImpl {
             createdAt: new Date(),
             updatedAt: new Date(),
             settings: {
-                outputSize: { width: 3840, height: 2160 },
-                frameRate: 30,
-                padding: 0.05,
-                maxZoom: 1.5,
+                outputSize: { width: 1920, height: 1080 },
+                frameRate: 60,
+                maxZoom: 2,
                 autoZoom: true,
+                padding: 0.1,
+                backgroundBlur: 40,
+
+                screen: {
+                    mode: 'device',
+                    deviceFrameId: 'macbook-pro',
+                    borderRadius: 12, // Default if mode switched to border
+                    borderWidth: 0,
+                    borderColor: 'white',
+                    hasShadow: true,
+                    hasGlow: false
+                },
+
                 background: {
                     type: 'gradient',
-                    color: 'c7d2feE',
+                    color: '#c7d2fe',
                     gradientColors: ['#c7d2fe', '#3a3991'],
-                    gradientDirection: 'NE',
-                    imageUrl: '/assets/backgrounds/bg1.jpg',
-                    lastColorMode: 'gradient'
+                    gradientDirection: 'SE'
                 },
-                cornerRadius: 20,
 
-                backgroundBlur: 8,
                 camera: {
                     width: 800,
                     height: 600,
                     x: 50,
-                    y: 2160 - 650,
-                    shape: 'rect'
+                    y: 1080 - 650,
+                    shape: 'circle',
+                    borderRadius: 50,
+                    borderWidth: 2,
+                    borderColor: 'white',
+                    hasShadow: false,
+                    hasGlow: true
+
                 }
             },
             timeline: {

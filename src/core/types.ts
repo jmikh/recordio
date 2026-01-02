@@ -48,27 +48,25 @@ export interface Project {
     timeline: Timeline;
 }
 
-export interface ProjectSettings {
-    // Output
-    outputSize: Size;
-    frameRate: number;
+// Shared visual style properties
+export interface StyleSettings {
+    borderRadius: number;
+    borderWidth: number;
+    borderColor: string; // Used for border and glow/shadow color
+    hasShadow: boolean;
+    hasGlow: boolean;
+}
 
-    // Zoom
-    maxZoom: number;
-    autoZoom: boolean;
+export interface CameraSettings extends StyleSettings {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+    shape: 'circle' | 'rect' | 'square';
+}
 
-    // Background
-    background: BackgroundSettings;
-    padding: number;
-
-    // Camera
-    camera?: CameraSettings;
-
-    // Effects
-    cornerRadius: number;
-    backgroundBlur: number;
-
-    // Device Frame
+export interface ScreenSettings extends StyleSettings {
+    mode: 'device' | 'border';
     deviceFrameId?: ID;
 }
 
@@ -78,9 +76,30 @@ export interface BackgroundSettings {
     gradientColors: [string, string];
     gradientDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
     imageUrl?: string; // For presets
-    sourceId?: ID; // For custom uploads (overrides imageUrl if set)
-    // Persists the last uploaded custom background
-    customSourceId?: ID;
+    sourceId?: string; // For 'image' type (uploaded)
+    customSourceId?: string; // For 'image' type (uploaded)
+    lastColorMode?: 'solid' | 'gradient'; // To remember state
+}
+
+export interface ProjectSettings {
+    outputSize: Size;
+    frameRate: number;
+
+    // Zoom
+    maxZoom: number;
+    autoZoom: boolean;
+
+    padding: number;
+
+    // Background
+    background: BackgroundSettings;
+    backgroundBlur: number;
+
+    // Screen Content
+    screen: ScreenSettings;
+
+    // Camera
+    camera?: CameraSettings;
     // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
     lastColorMode?: 'solid' | 'gradient';
 }
@@ -320,4 +339,9 @@ export interface CameraSettings {
     x: number;
     y: number;
     shape: 'circle' | 'rect' | 'square';
+    borderRadius: number;
+    borderWidth: number;
+    borderColor: string;
+    hasShadow: boolean;
+    hasGlow: boolean;
 }
