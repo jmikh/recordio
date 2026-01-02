@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { ColorSettings } from './ColorSettings';
 
 // Helper to convert N, NE, etc. to degrees
@@ -284,13 +285,30 @@ export const BackgroundSettings = () => {
             </div>
 
             {/* Frame */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+            <div className="flex flex-col gap-3 pt-4 border-t border-gray-700">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
-                <div
-                    onClick={() => updateWithBatching({ deviceFrameId: settings.deviceFrameId ? undefined : 'macbook-air' })}
-                    className={`w-10 h-6 flex items-center bg-gray-700 rounded-full p-1 cursor-pointer transition-colors ${settings.deviceFrameId ? 'bg-blue-600' : ''}`}
-                >
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${settings.deviceFrameId ? 'translate-x-4' : ''}`} />
+                <div className="grid grid-cols-2 gap-2">
+                    {/* Frame Options */}
+                    {DEVICE_FRAMES.map(frame => {
+                        const isSelected = settings.deviceFrameId === frame.id;
+                        return (
+                            <div
+                                key={frame.id}
+                                onClick={() => updateWithBatching({ deviceFrameId: isSelected ? undefined : frame.id })}
+                                className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all bg-white ${isSelected
+                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    : 'border-transparent ring-1 ring-black/5 hover:ring-black/10'
+                                    }`}
+                                title={frame.name}
+                            >
+                                <img
+                                    src={frame.imageUrl}
+                                    alt={frame.name}
+                                    className="w-full h-full object-contain p-1"
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
