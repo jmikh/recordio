@@ -5,7 +5,7 @@ import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
 import { TimeMapper } from '../../../core/timeMapper';
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
-import type { Project, Rect } from '../../../core/types';
+import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
 
 export interface RenderResources {
@@ -22,7 +22,8 @@ export class PlaybackRenderer {
             project: Project,
             sources: ProjectState['sources'],
             userEvents: ProjectState['userEvents'],
-            currentTimeMs: number
+            currentTimeMs: number,
+            overrideCameraSettings?: CameraSettings
         }
     ) {
         const { ctx, videoRefs } = resources;
@@ -93,7 +94,9 @@ export class PlaybackRenderer {
         if (cameraSource) {
             const video = videoRefs[cameraSource.id];
             if (video) {
-                drawWebcam(ctx, video, outputSize, cameraSource.size);
+                // Use Override (Drag) or Store (Settings) or Default
+                const cameraSettings = state.overrideCameraSettings || project.settings.camera;
+                drawWebcam(ctx, video, outputSize, cameraSource.size, cameraSettings);
             }
         }
 

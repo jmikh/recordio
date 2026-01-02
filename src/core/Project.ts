@@ -25,7 +25,15 @@ export class ProjectImpl {
                 backgroundImageUrl: '/assets/backgrounds/abstract-gradient.jpg',
                 backgroundColor: '#1E1E1E', // Dark Grey
                 cornerRadius: 20,
-                backgroundBlur: 8
+
+                backgroundBlur: 8,
+                camera: {
+                    width: 400,
+                    height: 300,
+                    x: 3840 - 450, // Bottom Right with padding
+                    y: 2160 - 350,
+                    shape: 'rect'
+                }
             },
             timeline: {
                 id: crypto.randomUUID(),

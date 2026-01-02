@@ -65,6 +65,9 @@ export interface ProjectSettings {
     backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
     customBackgroundSourceId?: ID; // Persists the last uploaded custom background
 
+    // Camera
+    camera?: CameraSettings;
+
     // Effects
     cornerRadius: number;
     backgroundBlur: number;
@@ -300,4 +303,12 @@ export interface FrameBorderData {
     bottom: number;
     left: number;
     right: number;
+}
+
+export interface CameraSettings {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+    shape: 'circle' | 'rect' | 'square';
 }

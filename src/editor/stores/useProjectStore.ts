@@ -25,12 +25,14 @@ export interface ProjectState {
     isSaving: boolean;
     editingZoomId: ID | null;
     editingZoomInitialState: ViewportMotion | null;
+    editingCamera: boolean;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
+    setEditingCamera: (isEditing: boolean) => void;
 
     // Zoom Editing Actions
     setEditingZoom: (id: ID | null) => void;
@@ -94,6 +96,9 @@ export const useProjectStore = create<ProjectState>()(
                 isSaving: false,
                 editingZoomId: null, // Track active edit session
                 editingZoomInitialState: null as ViewportMotion | null, // Track initial state for history commit
+                editingCamera: false,
+
+                setEditingCamera: (isEditing) => set({ editingCamera: isEditing }),
 
                 setEditingZoom: (id) => {
                     const store = useProjectStore;

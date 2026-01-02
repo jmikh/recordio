@@ -5,12 +5,15 @@ import { ProjectStorage } from '../../../storage/projectStorage';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { renderZoomEditor, ZoomEditor } from './ZoomEditor';
+import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { TimeMapper } from '../../../core/timeMapper';
+import type { CameraSettings } from '../../../core/types';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
     const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const editingCamera = useProjectStore(s => s.editingCamera);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -20,6 +23,9 @@ export const CanvasContainer = () => {
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const bgRef = useRef<HTMLImageElement>(null);
+
+    // Mutable State for Dragging (60fps preview)
+    const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
 
     // Loop State
     const animationFrameRef = useRef<number>(0);
@@ -122,6 +128,7 @@ export const CanvasContainer = () => {
                         sources,
                         userEvents,
                         currentTimeMs: effectiveTimeMs,
+                        overrideCameraSettings: previewCameraSettingsRef.current || undefined
                     });
                 }
             }
@@ -217,6 +224,11 @@ export const CanvasContainer = () => {
                 {/* ZOOM OVERLAY */}
                 {editingZoomId && (
                     <ZoomEditor />
+                )}
+
+                {/* CAMERA OVERLAY */}
+                {editingCamera && (
+                    <CameraEditor cameraRef={previewCameraSettingsRef} />
                 )}
             </div>
         </div>
