@@ -31,24 +31,11 @@ export function drawSmartFrame(
     if (typeof sw !== 'number' || typeof sh !== 'number' || sw === 0 || sh === 0) return;
 
     // 0. Calculate Base Scale (Uniform Scaling Factor)
-    // We want fixed elements (corners, bezels) to scale up with the image size,
-    // but without distorting (changing aspect ratio).
-    // We use the smaller scale factor to ensure everything fits.
-    // However, usually we want to scale to FIT the destination.
-    // If the destination aspect ratio matches the source, scaleX === scaleY.
-    // If not, we pick the one that "makes sense" for fixed elements.
-    // Usually, for a frame, we want the borders to look consistent.
-    // Let's use the smaller scale to be safe (fit behavior), or average?
-    // Actually, strictly speaking, if we stretch a frame, we might want horizontal borders to scale with Width
-    // and vertical borders to scale with Height?
-    // User request: "only scale the frame to fit first side of the side, then scale the remaining using the custom scalign dimensions"
-    // Interpretation:
-    // 1. Scale the WHOLE frame uniformly until one dimension fits the destination (e.g. Width).
-    // 2. The other dimension (e.g. Height) might be too short or too long.
-    // 3. We use the scalable segments to take up that slack.
-
-    // Let's try determining scale based on the "tightest" dimension?
-    // Or simply: Min(dw/sw, dh/sh) is the "Safe" scale where aspect ratio is preserved.
+    // We determine the "Safe" scale (= Min) that ensures the source fits entirely within the destination
+    // without distortion. This scale is applied to all "fixed" (non-scalable) segments.
+    //
+    // - If scaleX < scaleY: The width fits perfectly. The height will be stretched using scalable segments.
+    // - If scaleY < scaleX: The height fits perfectly. The width will be stretched using scalable segments.
     const scaleX = dw / sw;
     const scaleY = dh / sh;
     const baseScale = Math.min(scaleX, scaleY);

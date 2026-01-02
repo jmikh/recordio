@@ -18,7 +18,7 @@ function defineFrame(
         horizontal: [
             { start: 0, end: 0.15, scalable: false },
             { start: 0.15, end: 0.3, scalable: true },
-            { start: 0.3, end: 0.7, scalable: true },
+            { start: 0.3, end: 0.7, scalable: false },
             { start: 0.7, end: 0.85, scalable: true },
             { start: 0.85, end: 1, scalable: false }
         ]
