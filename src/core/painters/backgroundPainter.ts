@@ -1,27 +1,28 @@
-import type { ProjectSettings } from '../types';
+import type { BackgroundSettings } from '../types';
 
 /**
  * Draws the project background (solid color or image) onto the canvas.
  */
 export const drawBackground = (
     ctx: CanvasRenderingContext2D,
-    settings: ProjectSettings,
+    background: BackgroundSettings,
+    blurRadius: number,
     canvas: HTMLCanvasElement,
     bgImage: HTMLImageElement | null
 ) => {
     // 1. Solid Color
-    if (settings.backgroundType === 'solid' && settings.backgroundColor) {
-        ctx.fillStyle = settings.backgroundColor;
+    if (background.type === 'solid' && background.color) {
+        ctx.fillStyle = background.color;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     // 2. Gradient
-    else if (settings.backgroundType === 'gradient' && settings.backgroundGradient) {
-        const { colors, direction } = settings.backgroundGradient;
+    else if (background.type === 'gradient') {
+        const { gradientColors, gradientDirection } = background;
         const w = canvas.width;
         const h = canvas.height;
         let x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 
-        switch (direction) {
+        switch (gradientDirection) {
             case 'N': x0 = w / 2; y0 = h; x1 = w / 2; y1 = 0; break;
             case 'NE': x0 = 0; y0 = h; x1 = w; y1 = 0; break;
             case 'E': x0 = 0; y0 = h / 2; x1 = w; y1 = h / 2; break;
@@ -33,14 +34,14 @@ export const drawBackground = (
         }
 
         const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-        gradient.addColorStop(0, colors[0]);
-        gradient.addColorStop(1, colors[1]);
+        gradient.addColorStop(0, gradientColors[0]);
+        gradient.addColorStop(1, gradientColors[1]);
 
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, w, h);
     }
     // 3. Image (Cover Mode)
-    else if (settings.backgroundType === 'image' && bgImage) {
+    else if (background.type === 'image' && bgImage) {
         if (bgImage.complete && bgImage.naturalWidth > 0) {
             const imgW = bgImage.naturalWidth;
             const imgH = bgImage.naturalHeight;
@@ -57,7 +58,6 @@ export const drawBackground = (
 
             // "Cover" Logic: Zoom to fill entire canvas without stretching
             // If we have blur, we need to overdraw by the blur radius to avoid darkening edges
-            const blurRadius = settings.backgroundBlur || 0;
             const safeMargin = blurRadius * 3; // 3x to be safe from any vignette
 
             // We effectively want to cover a slightly larger rectangle

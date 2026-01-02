@@ -39,7 +39,8 @@ export const BackgroundSettings = () => {
 
     const sources = useProjectSources();
     const { settings } = project;
-    const { backgroundType, backgroundColor, backgroundImageUrl, backgroundSourceId, customBackgroundSourceId } = settings;
+    const { background, padding, cornerRadius, backgroundBlur, deviceFrameId } = settings;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection } = background;
 
     // Helpers to determine active state
     const isSolid = backgroundType === 'solid';
@@ -60,41 +61,52 @@ export const BackgroundSettings = () => {
 
     const handleColorTypeChange = (type: 'solid' | 'gradient') => {
         updateSettings({
-            backgroundType: type,
-            lastColorMode: type,
-            // Initialize gradient if missing
-            backgroundGradient: settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' }
+            background: {
+                ...background,
+                type,
+                lastColorMode: type
+            }
         });
     };
 
     const handleColorChange = (color: string) => {
         updateWithBatching({
-            backgroundColor: color
+            background: {
+                ...background,
+                color
+            }
         });
     };
 
     const handleGradientColorChange = (index: 0 | 1, color: string) => {
-        const current = settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' };
-        const newColors = [...current.colors] as [string, string];
+        const newColors = [...gradientColors] as [string, string];
         newColors[index] = color;
 
         updateWithBatching({
-            backgroundGradient: { ...current, colors: newColors }
+            background: {
+                ...background,
+                gradientColors: newColors
+            }
         });
     };
 
     const handleDirectionChange = (direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW') => {
-        const current = settings.backgroundGradient || { colors: ['#ffffff', '#000000'], direction: 'S' };
         updateSettings({
-            backgroundGradient: { ...current, direction }
+            background: {
+                ...background,
+                gradientDirection: direction
+            }
         });
     };
 
     const handlePresetSelect = (url: string) => {
         updateSettings({
-            backgroundType: 'image',
-            backgroundImageUrl: url,
-            backgroundSourceId: undefined
+            background: {
+                ...background,
+                type: 'image',
+                imageUrl: url,
+                sourceId: undefined
+            }
         });
     };
 
@@ -103,8 +115,11 @@ export const BackgroundSettings = () => {
         // Otherwise (if we are using it OR we don't have one), open the picker to upload/replace.
         if (customBackgroundSourceId && !isCustom) {
             updateSettings({
-                backgroundType: 'image',
-                backgroundSourceId: customBackgroundSourceId
+                background: {
+                    ...background,
+                    type: 'image',
+                    sourceId: customBackgroundSourceId
+                }
             });
         } else {
             fileInputRef.current?.click();
@@ -116,11 +131,15 @@ export const BackgroundSettings = () => {
         if (!file) return;
 
         try {
+
             const newSourceId = await addSource(file, 'image');
             updateSettings({
-                backgroundType: 'image',
-                backgroundSourceId: newSourceId,
-                customBackgroundSourceId: newSourceId
+                background: {
+                    ...background,
+                    type: 'image',
+                    sourceId: newSourceId,
+                    customSourceId: newSourceId
+                }
             });
         } catch (err) {
             console.error("Failed to upload background", err);
@@ -170,7 +189,7 @@ export const BackgroundSettings = () => {
     }, [showColorPopover]);
 
     // Determine intent for preview and restore
-    const lastMode = settings.lastColorMode || 'solid';
+    const lastMode = background.lastColorMode || 'solid';
     const showSolidPreview = isSolid || (!isColorMode && lastMode === 'solid');
 
     // Dynamic background style for the Color Card
@@ -184,7 +203,7 @@ export const BackgroundSettings = () => {
     const colorCardStyle: React.CSSProperties = showSolidPreview
         ? { backgroundColor: backgroundColor }
         : {
-            backgroundImage: `linear-gradient(${getGradientAngle(settings.backgroundGradient?.direction || 'S')}deg, ${settings.backgroundGradient?.colors[0] || '#fff'} 50%, ${settings.backgroundGradient?.colors[1] || '#000'} 50%)`,
+            backgroundImage: `linear-gradient(${getGradientAngle(gradientDirection)}deg, ${gradientColors[0]} 50%, ${gradientColors[1]} 50%)`,
             backgroundSize: '100% 100%',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -208,7 +227,7 @@ export const BackgroundSettings = () => {
                         isSolid={isSolid}
                         isGradient={isGradient}
                         color={backgroundColor}
-                        gradient={settings.backgroundGradient}
+                        gradient={{ colors: gradientColors, direction: gradientDirection }}
                         onTypeChange={handleColorTypeChange}
                         onColorChange={handleColorChange}
                         onGradientColorChange={handleGradientColorChange}
@@ -230,7 +249,10 @@ export const BackgroundSettings = () => {
                             onClick={() => {
                                 if (!isColorMode) {
                                     updateSettings({
-                                        backgroundType: lastMode
+                                        background: {
+                                            ...background,
+                                            type: lastMode
+                                        }
                                     });
                                 }
                                 setShowColorPopover(!showColorPopover);
@@ -302,7 +324,7 @@ export const BackgroundSettings = () => {
                 <div className="grid grid-cols-2 gap-2">
                     {/* Frame Options */}
                     {DEVICE_FRAMES.map(frame => {
-                        const isSelected = settings.deviceFrameId === frame.id;
+                        const isSelected = deviceFrameId === frame.id;
                         return (
                             <div key={frame.id} className="flex flex-col gap-1">
                                 <div
@@ -339,7 +361,7 @@ export const BackgroundSettings = () => {
                         min={0}
                         max={0.25}
                         step={0.01}
-                        value={settings.padding}
+                        value={padding}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         onChange={(e) => updateWithBatching({ padding: parseFloat(e.target.value) })}
@@ -355,7 +377,7 @@ export const BackgroundSettings = () => {
                         min={0}
                         max={250}
                         step={1}
-                        value={settings.cornerRadius || 0}
+                        value={cornerRadius || 0}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         onChange={(e) => updateWithBatching({ cornerRadius: parseInt(e.target.value) })}
@@ -364,14 +386,14 @@ export const BackgroundSettings = () => {
                 </div>
 
                 {/* Blur */}
-                <div className={`flex flex-col gap-2 transition-opacity ${settings.backgroundType === 'solid' ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className={`flex flex-col gap-2 transition-opacity ${backgroundType === 'solid' ? 'opacity-40 pointer-events-none' : ''}`}>
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
                     <input
                         type="range"
                         min={0}
                         max={50}
                         step={1}
-                        value={settings.backgroundBlur || 0}
+                        value={backgroundBlur || 0}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         onChange={(e) => updateWithBatching({ backgroundBlur: parseInt(e.target.value) })}

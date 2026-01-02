@@ -58,17 +58,8 @@ export interface ProjectSettings {
     autoZoom: boolean;
 
     // Background
-    backgroundType: 'solid' | 'gradient' | 'image';
-    backgroundColor: string;
-    backgroundGradient?: {
-        colors: [string, string];
-        direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
-    };
+    background: BackgroundSettings;
     padding: number;
-    backgroundImageUrl?: string; // For presets
-    backgroundSourceId?: ID; // For custom uploads (overrides backgroundImageUrl if set)
-    customBackgroundSourceId?: ID; // Persists the last uploaded custom background
-    lastColorMode?: 'solid' | 'gradient'; // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
 
     // Camera
     camera?: CameraSettings;
@@ -79,6 +70,19 @@ export interface ProjectSettings {
 
     // Device Frame
     deviceFrameId?: ID;
+}
+
+export interface BackgroundSettings {
+    type: 'solid' | 'gradient' | 'image';
+    color: string;
+    gradientColors: [string, string];
+    gradientDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+    imageUrl?: string; // For presets
+    sourceId?: ID; // For custom uploads (overrides imageUrl if set)
+    // Persists the last uploaded custom background
+    customSourceId?: ID;
+    // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
+    lastColorMode?: 'solid' | 'gradient';
 }
 
 // ==========================================

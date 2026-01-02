@@ -21,9 +21,14 @@ export class ProjectImpl {
                 padding: 0.05,
                 maxZoom: 1.5,
                 autoZoom: true,
-                backgroundType: 'image',
-                backgroundImageUrl: '/assets/backgrounds/abstract-gradient.jpg',
-                backgroundColor: '#1E1E1E', // Dark Grey
+                background: {
+                    type: 'gradient',
+                    color: 'c7d2feE',
+                    gradientColors: ['#c7d2fe', '#3a3991'],
+                    gradientDirection: 'NE',
+                    imageUrl: '/assets/backgrounds/bg1.jpg',
+                    lastColorMode: 'gradient'
+                },
                 cornerRadius: 20,
 
                 backgroundBlur: 8,
@@ -136,8 +141,8 @@ export class ProjectImpl {
         }
 
         // 2. Settings Sources (e.g. Background)
-        if (project.settings.backgroundSourceId) {
-            ids.add(project.settings.backgroundSourceId);
+        if (project.settings.background.sourceId) {
+            ids.add(project.settings.background.sourceId);
         }
 
         return Array.from(ids);

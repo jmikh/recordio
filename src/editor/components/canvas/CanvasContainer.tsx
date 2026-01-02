@@ -78,7 +78,13 @@ export const CanvasContainer = () => {
             if (canvas && ctx) {
                 // 1. CLEAR & BACKGROUND
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                drawBackground(ctx, project.settings, canvas, bgRef.current);
+                drawBackground(
+                    ctx,
+                    project.settings.background,
+                    project.settings.backgroundBlur,
+                    canvas,
+                    bgRef.current
+                );
 
                 // 2. DETERMINE FRAME TIME
                 let effectiveTimeMs = pbState.currentTimeMs;
@@ -157,10 +163,10 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // RESOURCE HELPERS
     // -----------------------------------------------------------
-    const activeBgSourceId = project.settings.backgroundSourceId;
+    const activeBgSourceId = project.settings.background.sourceId;
     const bgUrl = activeBgSourceId && sources[activeBgSourceId]
         ? sources[activeBgSourceId].url
-        : project.settings.backgroundImageUrl;
+        : project.settings.background.imageUrl;
 
     // Thumbnail Logic
     useEffect(() => {
@@ -195,7 +201,7 @@ export const CanvasContainer = () => {
             >
                 {/* HIDDEN RESOURCES LAYER */}
                 <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
-                    {project.settings.backgroundType === 'image' && bgUrl && (
+                    {project.settings.background.type === 'image' && bgUrl && (
                         <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin="anonymous" />
                     )}
                     {Object.values(sources).map((source) => (
