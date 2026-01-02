@@ -253,7 +253,7 @@ export const BackgroundSettings = () => {
                             onClick={handleCustomSelect}
                             className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
                                 ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                : 'border-transparent bg-[#2a2a2a] ring-1 ring-white/10 hover:ring-white/30'
+                                : 'border-transparent bg-gray-700 ring-1 ring-white/10 hover:ring-white/30'
                                 }`}
                             title="Upload Image"
                         >
@@ -261,8 +261,8 @@ export const BackgroundSettings = () => {
                                 <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
                             )}
                             {/* Always show icon, but style it as overlay if image exists */}
-                            <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'text-gray-400'}`}>
-                                <CiImageOn size={24} />
+                            <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'bg-black/20 text-white'}`}>
+                                <CiImageOn size={20} />
                             </div>
                             <input
                                 type="file"
@@ -304,20 +304,25 @@ export const BackgroundSettings = () => {
                     {DEVICE_FRAMES.map(frame => {
                         const isSelected = settings.deviceFrameId === frame.id;
                         return (
-                            <div
-                                key={frame.id}
-                                onClick={() => updateWithBatching({ deviceFrameId: isSelected ? undefined : frame.id })}
-                                className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all bg-white ${isSelected
-                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                    : 'border-transparent ring-1 ring-black/5 hover:ring-black/10'
-                                    }`}
-                                title={frame.name}
-                            >
-                                <img
-                                    src={frame.imageUrl}
-                                    alt={frame.name}
-                                    className="w-full h-full object-contain p-1"
-                                />
+                            <div key={frame.id} className="flex flex-col gap-1">
+                                <div
+                                    onClick={() => updateWithBatching({ deviceFrameId: isSelected ? undefined : frame.id })}
+                                    className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
+                                        ? 'border-blue-500 ring-2 ring-blue-500/30 bg-white'
+                                        : 'border-transparent ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
+                                        }`}
+                                    title={frame.name}
+                                >
+                                    <img
+                                        src={frame.imageUrl}
+                                        alt={frame.name}
+                                        className="w-full h-full object-contain p-1"
+                                    />
+                                </div>
+                                <span className={`text-[10px] uppercase tracking-wide font-medium text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
+                                    }`}>
+                                    {frame.name}
+                                </span>
                             </div>
                         );
                     })}

@@ -41,8 +41,8 @@ function defineFrame(
 }
 
 export const MACBOOK_FRAME = defineFrame(
-    'macbook-air',
-    'MacBook Silver',
+    'macbook-pro',
+    'MacBook Pro',
     '/assets/devices/macbook.png',
     { width: 4340, height: 2860 },
     { x: 442, y: 313, width: 3456, height: 2234 }
@@ -57,17 +57,26 @@ export const STUDIO_DISPLAY_FRAME = defineFrame(
 );
 
 export const MACBOOK_DARK_FRAME = defineFrame(
-    'macbook-dark',
-    'MacBook Air Dark',
+    'macbook-air-dark',
+    'MacBook Air',
     '/assets/devices/macbook-dark.png',
     { width: 3220, height: 2100 },
     { x: 329, y: 217, width: 2562, height: 1666 }
 );
 
+export const IPAD_PRO_FRAME = defineFrame(
+    'ipad-pro',
+    'iPad Pro',
+    '/assets/devices/ipad.png',
+    { width: 2960, height: 2290 },
+    { x: 113, y: 120, width: 2734, height: 2050 }
+);
+
 export const DEVICE_FRAMES: DeviceFrame[] = [
     MACBOOK_FRAME,
     MACBOOK_DARK_FRAME,
-    STUDIO_DISPLAY_FRAME
+    STUDIO_DISPLAY_FRAME,
+    IPAD_PRO_FRAME
 ];
 
 export function getDeviceFrame(id: string | undefined): DeviceFrame | undefined {
