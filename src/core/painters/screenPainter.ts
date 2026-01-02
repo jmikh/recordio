@@ -1,6 +1,7 @@
 import type { Project, ID, SourceMetadata, Rect } from '../types';
 import { ViewMapper } from '../viewMapper';
 import { getDeviceFrame } from '../deviceFrames';
+import { drawSmartFrame } from './smartFramePainter';
 
 // ... imports ...
 
@@ -98,18 +99,60 @@ export function drawScreen(
 
             const b = deviceFrame.borderData;
 
-            const frameW = videoScreenW / (1 - b.left - b.right);
-            const frameH = videoScreenH / (1 - b.top - b.bottom);
+            let frameW: number, frameH: number, frameX: number, frameY: number;
 
-            const frameX = topLeft.x - (frameW * b.left);
-            const frameY = topLeft.y - (frameH * b.top);
+            if (deviceFrame.customScaling) {
+                // Smart Scaling Logic:
+                // We want the frame's SCREEN area to match the videoScreenW/H exactly.
+                // We want the frame's BEZELS to scale proportionally (preserving aspect ratio).
+
+                // 1. Calculate the dimensions of source components
+                const srcScreenW = deviceFrame.screenRect.width;
+                const srcScreenH = deviceFrame.screenRect.height;
+                const srcBezelLeft = deviceFrame.screenRect.x;
+                const srcBezelTop = deviceFrame.screenRect.y;
+                const srcBezelRight = deviceFrame.size.width - (srcBezelLeft + srcScreenW);
+                const srcBezelBottom = deviceFrame.size.height - (srcBezelTop + srcScreenH);
+
+                // 2. Calculate Scaling Factors
+                const scaleScreenW = videoScreenW / srcScreenW;
+                const scaleScreenH = videoScreenH / srcScreenH;
+
+                // 3. Determine Base Scale for Fixed Components (Bezels)
+                // We use the smaller scale to ensure bezels don't get distorted/stretched too thin
+                // if one dimension is being stretched significantly.
+                // (Matches logic in smartFramePainter)
+                const baseScale = Math.min(scaleScreenW, scaleScreenH);
+
+                // 4. Calculate Final Frame Dimensions
+                // Screen scales to fit video. Bezels scale by baseScale.
+                // Total Width = VideoWidth + ScaledBezels
+                frameW = videoScreenW + (srcBezelLeft + srcBezelRight) * baseScale;
+                frameH = videoScreenH + (srcBezelTop + srcBezelBottom) * baseScale;
+
+                // 5. Calculate Top-Left Position
+                // We start at the Video Top-Left and move BACKWARDS by the scaled left/top bezel
+                frameX = topLeft.x - (srcBezelLeft * baseScale);
+                frameY = topLeft.y - (srcBezelTop * baseScale);
+
+            } else {
+                // Standard Helper Logic (Uniform Scaling)
+                frameW = videoScreenW / (1 - b.left - b.right);
+                frameH = videoScreenH / (1 - b.top - b.bottom);
+                frameX = topLeft.x - (frameW * b.left);
+                frameY = topLeft.y - (frameH * b.top);
+            }
 
             const img = new Image();
             img.src = deviceFrame.imageUrl;
 
             if (img.complete) {
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, frameX, frameY, frameW, frameH);
+                if (deviceFrame.customScaling) {
+                    drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
+                } else {
+                    ctx.drawImage(img, frameX, frameY, frameW, frameH);
+                }
             } else {
                 img.onload = () => { };
             }

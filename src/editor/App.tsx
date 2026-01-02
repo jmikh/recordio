@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
-import { SettingsPanel } from './components/SettingsPanel';
+import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/Timeline';
 

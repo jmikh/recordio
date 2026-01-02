@@ -280,6 +280,18 @@ export interface DeviceFrame {
     // Total size of the frame image
     size: Size;
     borderData: FrameBorderData;
+    customScaling?: FrameScalingConfig;
+}
+
+export interface FrameScalingConfig {
+    vertical: SliceSegment[];
+    horizontal: SliceSegment[];
+}
+
+export interface SliceSegment {
+    start: number;
+    end: number;
+    scalable: boolean;
 }
 
 export interface FrameBorderData {
