@@ -4,6 +4,8 @@ import { useProjectStore, useProjectData, useProjectSources } from '../../stores
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { ColorSettings } from './ColorSettings';
+import { IoIosColorFilter } from "react-icons/io";
+import { CiImageOn } from "react-icons/ci";
 
 // Helper to convert N, NE, etc. to degrees
 const getGradientAngle = (dir: string) => {
@@ -97,7 +99,9 @@ export const BackgroundSettings = () => {
     };
 
     const handleCustomSelect = () => {
-        if (customBackgroundSourceId) {
+        // If we have a custom source AND we are not currently using it, just switch to it.
+        // Otherwise (if we are using it OR we don't have one), open the picker to upload/replace.
+        if (customBackgroundSourceId && !isCustom) {
             updateSettings({
                 backgroundType: 'image',
                 backgroundSourceId: customBackgroundSourceId
@@ -216,71 +220,79 @@ export const BackgroundSettings = () => {
 
             {/* Main Background Grid */}
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Background</label>
-                <div className="flex flex-wrap gap-4">
-                    {/* 1. Color Card */}
-                    <div
-                        ref={colorButtonRef}
-                        onClick={() => {
-                            if (!isColorMode) {
-                                updateSettings({
-                                    backgroundType: lastMode
-                                });
-                            }
-                            setShowColorPopover(!showColorPopover);
-                        }}
-                        className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
-                            ? 'border-blue-500 ring-2 ring-blue-500/30'
-                            : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
-                            }`}
-                        style={colorCardStyle}
-                        title="Color / Gradient"
-                    >
-                        {/* Icon only on hover */}
-                        <div className="opacity-0 hover:opacity-100 transition-opacity bg-black/30 w-full h-full rounded-full flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 block">Background</label>
+                <div className="flex flex-col gap-4">
+                    {/* Row 1: Color + Upload */}
+                    <div className="flex gap-4">
+                        {/* 1. Color Card */}
+                        <div
+                            ref={colorButtonRef}
+                            onClick={() => {
+                                if (!isColorMode) {
+                                    updateSettings({
+                                        backgroundType: lastMode
+                                    });
+                                }
+                                setShowColorPopover(!showColorPopover);
+                            }}
+                            className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
+                                ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
+                                }`}
+                            style={colorCardStyle}
+                            title="Color / Gradient"
+                        >
+                            {/* Icon always visible */}
+                            <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
+                                <IoIosColorFilter size={20} />
+                            </div>
+                        </div>
+
+                        {/* 2. Upload Card */}
+                        <div
+                            onClick={handleCustomSelect}
+                            className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
+                                ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                : 'border-transparent bg-[#2a2a2a] ring-1 ring-white/10 hover:ring-white/30'
+                                }`}
+                            title="Upload Image"
+                        >
+                            {customSource && (
+                                <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
+                            )}
+                            {/* Always show icon, but style it as overlay if image exists */}
+                            <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'text-gray-400'}`}>
+                                <CiImageOn size={24} />
+                            </div>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleUpload}
+                            />
                         </div>
                     </div>
 
-                    {/* 2. Upload Card */}
-                    <div
-                        onClick={handleCustomSelect}
-                        className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
-                            ? 'border-blue-500 ring-2 ring-blue-500/30'
-                            : 'border-transparent bg-[#2a2a2a] ring-1 ring-white/10 hover:ring-white/30'
-                            }`}
-                        title="Upload Image"
-                    >
-                        {customSource ? (
-                            <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                            <svg className="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                        )}
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="image/*"
-                            onChange={handleUpload}
-                        />
+                    {/* Row 2: Presets */}
+                    <div className="flex flex-wrap gap-4">
+                        {/* 3. Presets */}
+                        {BACKGROUND_IMAGES.map(img => {
+                            const isActive = isPreset && backgroundImageUrl === img.url;
+                            return (
+                                <div
+                                    key={img.url}
+                                    className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
+                                        ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                        : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
+                                    onClick={() => handlePresetSelect(img.url)}
+                                    title={img.name}
+                                >
+                                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                </div>
+                            );
+                        })}
                     </div>
-
-                    {/* 3. Presets */}
-                    {BACKGROUND_IMAGES.map(img => {
-                        const isActive = isPreset && backgroundImageUrl === img.url;
-                        return (
-                            <div
-                                key={img.url}
-                                className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
-                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                    : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
-                                onClick={() => handlePresetSelect(img.url)}
-                                title={img.name}
-                            >
-                                <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-                            </div>
-                        );
-                    })}
                 </div>
             </div>
 
@@ -336,7 +348,7 @@ export const BackgroundSettings = () => {
                     <input
                         type="range"
                         min={0}
-                        max={60}
+                        max={250}
                         step={1}
                         value={settings.cornerRadius || 0}
                         onPointerDown={startInteraction}
@@ -352,7 +364,7 @@ export const BackgroundSettings = () => {
                     <input
                         type="range"
                         min={0}
-                        max={20}
+                        max={50}
                         step={1}
                         value={settings.backgroundBlur || 0}
                         onPointerDown={startInteraction}
