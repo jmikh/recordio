@@ -23,7 +23,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
     const editingZoomId = useProjectStore(s => s.editingZoomId);
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
-    const setEditingCrop = useProjectStore(s => s.setEditingCrop);
     const project = useProjectStore(s => s.project);
 
     const [hoverInfo, setHoverInfo] = useState<{ timeMs: number, x: number } | null>(null);
@@ -67,7 +66,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
         addViewportMotion(newMotion);
         setEditingZoom(newMotion.id);
-        setEditingCrop(true);
     };
 
 

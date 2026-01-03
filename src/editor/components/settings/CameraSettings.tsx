@@ -1,5 +1,6 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 const SHAPES = [
     { id: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
@@ -12,6 +13,7 @@ export const CameraSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const setEditingCamera = useProjectStore(s => s.setEditingCamera);
     const editingCamera = useProjectStore(s => s.editingCamera);
+    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     const cameraConfig = project.settings.camera;
 
@@ -103,8 +105,12 @@ export const CameraSettings = () => {
                             hasShadow,
                             hasGlow
                         }}
-                        onChange={(updates) => updateSettings({ camera: { ...cameraConfig, ...updates } })}
+                        onChange={(updates) => updateWithBatching({ camera: { ...cameraConfig, ...updates } })}
                         showRadius={shape === 'rect' || shape === 'square'}
+                        onInteractionStart={startInteraction}
+                        onInteractionEnd={endInteraction}
+                        onColorPopoverOpen={startInteraction}
+                        onColorPopoverClose={endInteraction}
                     />
                 </div>
             </div>

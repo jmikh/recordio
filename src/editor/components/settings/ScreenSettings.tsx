@@ -112,6 +112,8 @@ export const ScreenSettings = () => {
                     onColorPopoverOpen={startInteraction}
                     onColorPopoverClose={endInteraction}
                     showRadius={true}
+                    onInteractionStart={startInteraction}
+                    onInteractionEnd={endInteraction}
                 />
             )}
 

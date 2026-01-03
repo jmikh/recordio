@@ -108,8 +108,16 @@ export const useProjectStore = create<ProjectState>()(
                 editingCamera: false,
                 editingCrop: false,
 
-                setEditingCamera: (isEditing) => set({ editingCamera: isEditing }),
-                setEditingCrop: (isEditing) => set({ editingCrop: isEditing }),
+                setEditingCamera: (isEditing) => set({
+                    editingCamera: isEditing,
+                    // If turning on, disable others
+                    ...(isEditing ? { editingCrop: false, editingZoomId: null, editingZoomInitialState: null } : {})
+                }),
+                setEditingCrop: (isEditing) => set({
+                    editingCrop: isEditing,
+                    // If turning on, disable others
+                    ...(isEditing ? { editingCamera: false, editingZoomId: null, editingZoomInitialState: null } : {})
+                }),
 
                 setEditingZoom: (id) => {
                     const store = useProjectStore;
@@ -126,6 +134,9 @@ export const useProjectStore = create<ProjectState>()(
 
                         // 2. Pause History
                         store.temporal.getState().pause();
+
+                        // 3. Disable other modes
+                        set({ editingCrop: false, editingCamera: false });
 
                     } else {
                         console.log('[Action] setEditingZoom END (Commit)');

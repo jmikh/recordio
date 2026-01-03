@@ -17,6 +17,8 @@ interface StyleControlsProps {
     showRadius?: boolean;
     onColorPopoverOpen?: () => void;
     onColorPopoverClose?: () => void;
+    onInteractionStart?: () => void;
+    onInteractionEnd?: () => void;
 }
 
 export const StyleControls: React.FC<StyleControlsProps> = ({
@@ -24,7 +26,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     onChange,
     showRadius = true,
     onColorPopoverOpen,
-    onColorPopoverClose
+    onColorPopoverClose,
+    onInteractionStart,
+    onInteractionEnd
 }) => {
     const {
         borderRadius,
@@ -128,6 +132,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                             min="0"
                             max="200"
                             value={borderRadius}
+                            onPointerDown={onInteractionStart}
+                            onPointerUp={onInteractionEnd}
                             onChange={(e) => onChange({ borderRadius: parseInt(e.target.value) })}
                             className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
                         />
@@ -145,6 +151,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                         min="0"
                         max="20"
                         value={borderWidth}
+                        onPointerDown={onInteractionStart}
+                        onPointerUp={onInteractionEnd}
                         onChange={(e) => onChange({ borderWidth: parseInt(e.target.value) })}
                         className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
                     />
