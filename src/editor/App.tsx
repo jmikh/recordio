@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
@@ -23,7 +23,7 @@ const IconRedo = () => (
 
 
 function Editor() {
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
     const [containerSize, setContainerSize] = useState({ width: 800, height: 450 });
 
     // -- Project State --
@@ -87,15 +87,15 @@ function Editor() {
 
     // Handle Resize for Centering
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerElement) return;
         const ro = new ResizeObserver(entries => {
             for (const entry of entries) {
                 setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
             }
         });
-        ro.observe(containerRef.current);
+        ro.observe(containerElement);
         return () => ro.disconnect();
-    }, []);
+    }, [containerElement]);
 
 
     // Derived UI State
@@ -198,7 +198,7 @@ function Editor() {
                     className="flex-1 flex overflow-hidden relative items-center justify-center bg-[#1e1e1e]"
                 >
                     <div
-                        ref={containerRef}
+                        ref={setContainerElement}
                         className="relative flex items-center justify-center shadow-2xl"
                         style={{
                             width: '100%',
