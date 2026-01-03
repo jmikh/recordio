@@ -201,7 +201,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                         {/* Label (Optional) */}
                         {width > 40 && (
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] text-purple-200/70 pointer-events-none truncate max-w-full">
-                                {m.reason}
+                                {parseFloat((project.settings.outputSize.width / m.rect.width).toFixed(1))}x
                             </div>
                         )}
                     </div>

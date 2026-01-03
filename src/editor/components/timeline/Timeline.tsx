@@ -22,11 +22,14 @@ export function Timeline() {
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
     const setEditingCrop = useProjectStore(s => s.setEditingCrop);
+    const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const editingCrop = useProjectStore(s => s.editingCrop);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
     const setIsPlaying = usePlaybackStore(s => s.setIsPlaying);
     const setCurrentTime = usePlaybackStore(s => s.setCurrentTime);
+    const setPreviewTime = usePlaybackStore(s => s.setPreviewTime);
 
     // Zoom Level (Timeline Scale)
     const [pixelsPerSec, setPixelsPerSec] = useState(100);
@@ -70,8 +73,12 @@ export function Timeline() {
 
         if (isCTIScrubbing) {
             setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
+        } else if (!isPlaying && !editingZoomId && !editingCrop) {
+            setPreviewTime(time);
+        } else {
+            setPreviewTime(null);
         }
-    }, [isCTIScrubbing, pixelsPerSec, totalDuration, setCurrentTime]);
+    }, [isCTIScrubbing, pixelsPerSec, totalDuration, setCurrentTime, setPreviewTime, isPlaying, editingZoomId, editingCrop]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setIsCTIScrubbing(true);
@@ -81,6 +88,7 @@ export function Timeline() {
 
     const handleMouseLeave = () => {
         setHoverTime(null);
+        setPreviewTime(null);
         setIsCTIScrubbing(false);
     };
 

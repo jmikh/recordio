@@ -96,6 +96,11 @@ export const CanvasContainer = () => {
                 // 2. DETERMINE FRAME TIME
                 let effectiveTimeMs = pbState.currentTimeMs;
 
+                // Implement Preview Logic
+                if (!pbState.isPlaying && !editingZoomId && !editingCrop && pbState.previewTimeMs !== null) {
+                    effectiveTimeMs = pbState.previewTimeMs;
+                }
+
                 if (editingZoomId) {
                     // Calculate Keyframe Time
                     const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
