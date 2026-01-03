@@ -18,7 +18,8 @@ export const ScreenSettings = () => {
         borderWidth: 0,
         borderColor: '#ffffff',
         hasShadow: true,
-        hasGlow: false
+        hasGlow: false,
+        padding: 0.1
     };
 
     const handleModeChange = (mode: 'device' | 'border') => {
@@ -113,6 +114,27 @@ export const ScreenSettings = () => {
                     showRadius={true}
                 />
             )}
+
+            {/* Spacing (Padding) */}
+            <div className="flex flex-col gap-2 pt-4 border-t border-gray-700">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
+                <input
+                    type="range"
+                    min={0}
+                    max={0.2}
+                    step={0.01}
+                    value={screenConfig.padding || 0}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
+                    onChange={(e) => updateWithBatching({
+                        screen: {
+                            ...screenConfig,
+                            padding: parseFloat(e.target.value)
+                        }
+                    })}
+                    className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                />
+            </div>
         </div>
     );
 };

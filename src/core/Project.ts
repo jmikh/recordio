@@ -28,7 +28,8 @@ export class ProjectImpl {
                     borderWidth: 0,
                     borderColor: 'white',
                     hasShadow: true,
-                    hasGlow: false
+                    hasGlow: false,
+                    padding: 0.06
                 },
 
                 background: {
@@ -36,7 +37,6 @@ export class ProjectImpl {
                     color: '#c7d2fe',
                     gradientColors: ['#c7d2fe', '#3a3991'],
                     gradientDirection: 'SE',
-                    padding: 0.06,
                     backgroundBlur: 0
                 },
 
@@ -104,7 +104,7 @@ export class ProjectImpl {
         const viewMapper = new ViewMapper(
             screenSource.size,
             project.settings.outputSize,
-            project.settings.background.padding
+            project.settings.screen.padding
         );
 
         const timeMapper = new TimeMapper(0, outputWindows);

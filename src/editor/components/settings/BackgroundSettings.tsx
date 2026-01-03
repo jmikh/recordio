@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
-import { ScreenSettings } from './ScreenSettings';
+// import { ScreenSettings } from './ScreenSettings';
 
 // Helper to convert N, NE, etc. to degrees
 const getGradientAngle = (dir: string) => {
@@ -40,7 +40,7 @@ export const BackgroundSettings = () => {
     const sources = useProjectSources();
     const { settings } = project;
     const { background } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection, padding, backgroundBlur } = background;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection, backgroundBlur } = background;
 
     // Helpers to determine active state
     const isSolid = backgroundType === 'solid';
@@ -299,26 +299,6 @@ export const BackgroundSettings = () => {
 
             {/* Effects */}
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
-                {/* Spacing (Padding) */}
-                <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
-                    <input
-                        type="range"
-                        min={0}
-                        max={0.2}
-                        step={0.01}
-                        value={padding}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(e) => updateWithBatching({
-                            background: {
-                                padding: parseFloat(e.target.value)
-                            }
-                        })}
-                        className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                </div>
-
                 {/* Blur */}
                 {backgroundType === 'image' && (
                     <div className="flex flex-col gap-2">
@@ -341,13 +321,6 @@ export const BackgroundSettings = () => {
                     </div>
                 )}
             </div>
-
-
-            {/* Separator */}
-            <div className="h-[1px] bg-gray-700 my-2"></div>
-
-            {/* Screen Settings (Embedded) */}
-            <ScreenSettings />
         </div >
     );
 };

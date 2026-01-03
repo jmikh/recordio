@@ -79,7 +79,7 @@ const recalculateAutoZooms = (
     const viewMapper = new ViewMapper(
         sourceMetadata.size,
         project.settings.outputSize,
-        project.settings.background.padding,
+        project.settings.screen.padding,
         project.settings.screen.crop
     );
 
@@ -417,7 +417,7 @@ export const useProjectStore = create<ProjectState>()(
 
                         // Check padding inside the now-merged settings or from updates
                         // Using merged settings is safer
-                        const paddingChanged = nextSettings.background.padding !== currentSettings.background.padding;
+                        const paddingChanged = nextSettings.screen.padding !== currentSettings.screen.padding;
 
                         // Check for any zoom related changes
                         const zoomChanged = updates.maxZoom !== undefined || updates.autoZoom !== undefined;

@@ -1,14 +1,23 @@
 import { useState } from 'react';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ProjectSettings } from './ProjectSettings';
+import { ScreenSettings } from './ScreenSettings';
 import { ZoomSettings } from './ZoomSettings';
 import { CameraSettings } from './CameraSettings';
 
-type Tab = 'project' | 'zoom' | 'background' | 'camera';
+type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera';
 
 const IconProject = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+);
+
+const IconScreen = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
 );
 
@@ -51,6 +60,13 @@ export const SettingsPanel = () => {
                     <IconProject />
                 </button>
                 <button
+                    onClick={() => setActiveTab('screen')}
+                    title="Screen Settings"
+                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'screen' ? 'bg-[#333] text-white' : ''}`}
+                >
+                    <IconScreen />
+                </button>
+                <button
                     onClick={() => setActiveTab('zoom')}
                     title="Zoom Settings"
                     className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'zoom' ? 'bg-[#333] text-white' : ''}`}
@@ -80,6 +96,7 @@ export const SettingsPanel = () => {
                 </div>
                 <div className="p-4 flex-1 overflow-y-auto text-gray-300">
                     {activeTab === 'project' && <ProjectSettings />}
+                    {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'zoom' && <ZoomSettings />}
                     {activeTab === 'background' && <BackgroundSettings />}
                     {activeTab === 'camera' && <CameraSettings />}

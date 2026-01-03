@@ -69,6 +69,7 @@ export interface ScreenSettings extends StyleSettings {
     mode: 'device' | 'border';
     deviceFrameId?: ID;
     crop?: Rect;
+    padding: number;
 }
 
 export interface BackgroundSettings {
@@ -80,7 +81,6 @@ export interface BackgroundSettings {
     sourceId?: string; // For 'image' type (uploaded)
     customSourceId?: string; // For 'image' type (uploaded)
     lastColorMode?: 'solid' | 'gradient'; // To remember state
-    padding: number;
     backgroundBlur: number;
 }
 
