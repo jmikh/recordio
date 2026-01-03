@@ -54,7 +54,17 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const timeMs = (x / pixelsPerSec) * 1000;
-        const mouseSourceTimeMs = timeMs - timelineOffset; // This is simplistic, assuming linear offset. Ideally use inverse mapping if possible, but standard here.
+        let mouseSourceTimeMs = timeMs - timelineOffset; // This is simplistic, assuming linear offset. Ideally use inverse mapping if possible, but standard here.
+
+        // Calculate Max Source Time based on last window
+        // This prevents floating point issues where we click "past" the end
+        const lastWindow = timeline.outputWindows[timeline.outputWindows.length - 1];
+        if (lastWindow) {
+            const maxSourceTime = lastWindow.endMs - timelineOffset;
+            if (mouseSourceTimeMs > maxSourceTime) {
+                mouseSourceTimeMs = maxSourceTime;
+            }
+        }
 
         if (mouseSourceTimeMs < 0) {
             setHoverInfo(null);

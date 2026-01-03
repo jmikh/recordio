@@ -10,7 +10,6 @@ import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
-import { TimeMapper } from '../../../core/timeMapper';
 import type { CameraSettings } from '../../../core/types';
 
 export const CanvasContainer = () => {
@@ -101,19 +100,6 @@ export const CanvasContainer = () => {
                     effectiveTimeMs = pbState.previewTimeMs;
                 }
 
-                if (editingZoomId) {
-                    // Calculate Keyframe Time
-                    const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
-                    if (motion) {
-                        const recording = project.timeline.recording;
-                        const timeMapper = new TimeMapper(recording.timelineOffsetMs, project.timeline.outputWindows);
-                        const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
-                        if (outputTime !== -1) {
-                            effectiveTimeMs = timeMapper.mapOutputToTimelineTime(outputTime);
-                        }
-                    }
-                }
-
                 // 3. SYNC VIDEO
                 const sourceTimeMs = effectiveTimeMs - project.timeline.recording.timelineOffsetMs;
                 const isPlaying = pbState.isPlaying && !editingZoomId && !editingCrop;
@@ -144,7 +130,6 @@ export const CanvasContainer = () => {
                     renderZoomEditor(resources, {
                         project,
                         sources,
-                        currentTimeMs: effectiveTimeMs,
                         editingZoomId
                     });
                 } else {

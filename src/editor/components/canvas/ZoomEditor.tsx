@@ -1,6 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import type { Rect, Project } from '../../../core/types';
 import { useProjectStore, type ProjectState } from '../../stores/useProjectStore';
+import { usePlaybackStore } from '../../stores/usePlaybackStore';
+import { TimeMapper } from '../../../core/timeMapper';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { BoundingBox } from './BoundingBox';
@@ -13,7 +15,6 @@ export const renderZoomEditor = (
     state: {
         project: Project,
         sources: ProjectState['sources'],
-        currentTimeMs: number, // KEYFRAME TIME
         editingZoomId: string
     }
 ) => {
@@ -52,9 +53,6 @@ export const renderZoomEditor = (
 // ------------------------------------------------------------------
 // COMPONENT: Interactive Overlay
 // ------------------------------------------------------------------
-// ------------------------------------------------------------------
-// COMPONENT: Interactive Overlay
-// ------------------------------------------------------------------
 
 export const ZoomEditor: React.FC = () => {
     // Connect to Store
@@ -63,6 +61,27 @@ export const ZoomEditor: React.FC = () => {
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
     const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);
     const project = useProjectStore(s => s.project);
+
+    // Sync Playback to Zoom End Time
+    useEffect(() => {
+        if (!editingZoomId) return;
+
+        const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
+        if (motion) {
+            const timeMapper = new TimeMapper(
+                project.timeline.recording.timelineOffsetMs,
+                project.timeline.outputWindows
+            );
+
+            const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
+            if (outputTime !== -1) {
+                const timelineTime = timeMapper.mapOutputToTimelineTime(outputTime);
+                if (timelineTime !== -1) {
+                    usePlaybackStore.getState().setCurrentTime(timelineTime);
+                }
+            }
+        }
+    }, [editingZoomId, project.timeline.recording.viewportMotions]);
 
     // Derived State
     const videoSize = project.settings.outputSize;
