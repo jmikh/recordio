@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import type { ViewportMotion } from '../../../core/types';
@@ -15,6 +15,17 @@ interface DragState {
     startX: number;
     initialSourceEndTime: number;
     initialDuration: number;
+    constraintMinTime: number; // Hard limit for (SourceEndTime - Duration) or SourceEndTime depending on op
+    constraintMaxTime: number; // Hard limit for SourceEndTime
+}
+
+interface HoverInfo {
+    timeMs: number; // Mouse time
+    x: number;
+    sourceStartTime: number;
+    sourceEndTime: number;
+    width: number;
+    isValid: boolean;
 }
 
 export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset }) => {
@@ -25,7 +36,12 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
     const project = useProjectStore(s => s.project);
 
-    const [hoverInfo, setHoverInfo] = useState<{ timeMs: number, x: number } | null>(null);
+    // Memoize TimeMapper for consistent usage
+    const timeMapper = useMemo(() => {
+        return new TimeMapper(timelineOffset, timeline.outputWindows);
+    }, [timelineOffset, timeline.outputWindows]);
+
+    const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const [dragState, setDragState] = useState<DragState | null>(null);
 
     // ------------------------------------------------------------------
@@ -38,7 +54,67 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const timeMs = (x / pixelsPerSec) * 1000;
-        setHoverInfo({ timeMs, x });
+        const mouseSourceTimeMs = timeMs - timelineOffset; // This is simplistic, assuming linear offset. Ideally use inverse mapping if possible, but standard here.
+
+        if (mouseSourceTimeMs < 0) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const motions = timeline.recording.viewportMotions || [];
+
+        // 1. Check if we are inside an existing motion
+        const isInside = motions.some(m => {
+            const start = m.sourceEndTimeMs - m.durationMs;
+            const end = m.sourceEndTimeMs;
+            return mouseSourceTimeMs > start && mouseSourceTimeMs < end;
+        });
+
+        if (isInside) {
+            setHoverInfo(null);
+            return;
+        }
+
+        // 2. Calculate Available Duration backwards (to the left)
+        // Find the closest previous motion end
+        let prevEnd = 0;
+        for (const m of motions) {
+            if (m.sourceEndTimeMs <= mouseSourceTimeMs) {
+                if (m.sourceEndTimeMs > prevEnd) {
+                    prevEnd = m.sourceEndTimeMs;
+                }
+            }
+        }
+
+        const defaultDur = project.settings.zoom.defaultDurationMs;
+        const availableDuration = mouseSourceTimeMs - prevEnd;
+
+        // Clamp duration
+        const actualDuration = Math.min(defaultDur, availableDuration);
+
+        // If duration is too small (e.g. < 50ms), maybe don't show or invalid? 
+        if (actualDuration < 50) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const sourceEndTime = mouseSourceTimeMs;
+        const sourceStartTime = mouseSourceTimeMs - actualDuration;
+
+        // Calculate visual width/position using TimeMapper to be safe with cuts
+        // (Though current logic implies simplistic Time->X, let's try to be consistent)
+        // Actually, if we use timeMs directly for X, we assume linear. 
+        // Let's use standard per-pixel logic for width for now to match other parts.
+        const width = (actualDuration / 1000) * pixelsPerSec;
+
+        setHoverInfo({
+            timeMs,
+            x,
+            sourceStartTime,
+            sourceEndTime,
+            width,
+            isValid: true
+        });
     };
 
     const handleMouseLeave = () => {
@@ -47,25 +123,21 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (dragState) return; // Ignore click if we were dragging
-        if (!hoverInfo) return;
-
-        const sourceTimeMs = hoverInfo.timeMs - timelineOffset;
-        if (sourceTimeMs < 0) return;
+        if (dragState) return;
+        if (!hoverInfo || !hoverInfo.isValid) return;
 
         // Create Motion
-        const defaultDur = project.settings.zoom.defaultDurationMs || 1500;
-
         const newMotion: ViewportMotion = {
             id: crypto.randomUUID(),
-            sourceEndTimeMs: sourceTimeMs,
-            durationMs: defaultDur,
+            sourceEndTimeMs: hoverInfo.sourceEndTime,
+            durationMs: hoverInfo.sourceEndTime - hoverInfo.sourceStartTime,
             reason: 'Manual Zoom',
-            rect: { ...project.settings.outputSize, x: 0, y: 0 } // Default to full screen
+            rect: { ...project.settings.outputSize, x: 0, y: 0 }
         };
 
         addViewportMotion(newMotion);
         setEditingZoom(newMotion.id);
+        setHoverInfo(null);
     };
 
 
@@ -75,12 +147,34 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
     const handleDragStart = (e: React.MouseEvent, type: 'move' | 'resize-left', motion: ViewportMotion) => {
         e.stopPropagation();
+
+        // Calculate Constraints
+        const motions = timeline.recording.viewportMotions || [];
+        const sortedMotions = [...motions].sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
+        const myIndex = sortedMotions.findIndex(m => m.id === motion.id);
+
+        const prevMotion = myIndex > 0 ? sortedMotions[myIndex - 1] : null;
+        const nextMotion = myIndex < sortedMotions.length - 1 ? sortedMotions[myIndex + 1] : null;
+
+        let constraintMinTime = 0;
+        let constraintMaxTime = Infinity;
+
+        if (prevMotion) {
+            constraintMinTime = prevMotion.sourceEndTimeMs;
+        }
+
+        if (nextMotion) {
+            constraintMaxTime = nextMotion.sourceEndTimeMs - nextMotion.durationMs;
+        }
+
         setDragState({
             type,
             motionId: motion.id,
             startX: e.clientX,
             initialSourceEndTime: motion.sourceEndTimeMs,
-            initialDuration: motion.durationMs
+            initialDuration: motion.durationMs,
+            constraintMinTime,
+            constraintMaxTime
         });
         setEditingZoom(motion.id);
     };
@@ -91,21 +185,43 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = (deltaX / pixelsPerSec) * 1000;
 
+        const { initialSourceEndTime, initialDuration, constraintMinTime, constraintMaxTime } = dragState;
+
         // Apply Logic
         if (dragState.type === 'move') {
-            const newEndTime = Math.max(0, dragState.initialSourceEndTime + deltaTimeMs);
+            let newEndTime = initialSourceEndTime + deltaTimeMs;
+            const newStartTime = newEndTime - initialDuration;
+
+            // Constrain Start
+            if (newStartTime < constraintMinTime) {
+                newEndTime = constraintMinTime + initialDuration;
+            }
+
+            // Constrain End
+            if (newEndTime > constraintMaxTime) {
+                newEndTime = constraintMaxTime;
+            }
+
+            // Also clamp 0
+            if ((newEndTime - initialDuration) < 0) {
+                newEndTime = initialDuration;
+            }
+
             updateViewportMotion(dragState.motionId, {
                 sourceEndTimeMs: newEndTime
             });
         } else if (dragState.type === 'resize-left') {
-            // Dragging left handle:
-            // Moving Left (negative delta) -> Duration Increases (Start time moves earlier)
-            // Moving Right (positive delta) -> Duration Decreases (Start time moves later)
-            // End Time remains FIXED.
+            let newDuration = initialDuration - deltaTimeMs;
 
-            // New Duration = Initial Duration - Delta
-            // Example: Drag left by -1 sec. Delta = -1000. New Dur = Init - (-1000) = Init + 1000. Correct.
-            const newDuration = Math.max(100, dragState.initialDuration - deltaTimeMs);
+            const MIN_DURATION = 100;
+            if (newDuration < MIN_DURATION) newDuration = MIN_DURATION;
+
+            const maxDuration = initialSourceEndTime - constraintMinTime;
+            if (newDuration > maxDuration) newDuration = maxDuration;
+
+            if (initialSourceEndTime - newDuration < 0) {
+                newDuration = initialSourceEndTime;
+            }
 
             updateViewportMotion(dragState.motionId, {
                 durationMs: newDuration
@@ -148,8 +264,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
             {/* Existing Motions */}
             {timeline.recording.viewportMotions?.map((m) => {
-                const timeMapper = new TimeMapper(timelineOffset, timeline.outputWindows);
-
                 const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
                 if (outputEndTime === -1) return null;
 
@@ -207,14 +321,18 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             })}
 
             {/* Add Zoom Indicator */}
-            {hoverInfo && !editingZoomId && !dragState && (
+            {hoverInfo && !editingZoomId && !dragState && hoverInfo.isValid && (
                 <div
-                    className="absolute top-0 bottom-0 w-[1px] bg-yellow-500/50 dashed z-0 pointer-events-none flex items-center justify-center"
-                    style={{ left: `${hoverInfo.x}px` }}
+                    className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-yellow-500/50 bg-yellow-500/10 rounded-sm flex items-center justify-center"
+                    style={{
+                        // Use calculated width (pixel based on time)
+                        // Position: right aligned to mouse X (hoverInfo.x).
+                        // Left = Right - Width
+                        left: `${hoverInfo.x - hoverInfo.width}px`,
+                        width: `${hoverInfo.width}px`
+                    }}
                 >
-                    <div className="bg-yellow-500/20 text-yellow-200 text-[9px] px-1 rounded transform -translate-y-4 whitespace-nowrap">
-                        + Add Zoom
-                    </div>
+                    <span className="text-yellow-200 text-[9px] font-medium">+ Add Zoom</span>
                 </div>
             )}
         </div>
