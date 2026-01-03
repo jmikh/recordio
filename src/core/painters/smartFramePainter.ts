@@ -1,3 +1,4 @@
+import type { DeviceFrame } from '../types';
 
 export interface SliceSegment {
     start: number; // Percent 0-1
@@ -116,5 +117,62 @@ export function drawSmartFrame(
         }
 
         currentDy += vSlice.dh;
+    }
+}
+
+/**
+ * Draws a device frame overlay around the video screen bounds.
+ * Handles positioning and scaling calculations for device frames.
+ * 
+ * @param ctx Canvas rendering context
+ * @param deviceFrame Device frame metadata including dimensions and scaling config
+ * @param videoScreenBounds The bounds of the video screen in canvas coordinates
+ */
+export function drawDeviceFrame(
+    ctx: CanvasRenderingContext2D,
+    deviceFrame: DeviceFrame,
+    videoScreenBounds: { x: number; y: number; width: number; height: number }
+): void {
+    const { x: topLeftX, y: topLeftY, width: videoScreenW, height: videoScreenH } = videoScreenBounds;
+
+    const b = deviceFrame.borderData;
+    let frameW: number, frameH: number, frameX: number, frameY: number;
+
+    if (deviceFrame.customScaling) {
+        // Custom scaling approach: Calculate scale based on screen dimensions
+        const srcScreenW = deviceFrame.screenRect.width;
+        const srcScreenH = deviceFrame.screenRect.height;
+        const srcBezelLeft = deviceFrame.screenRect.x;
+        const srcBezelTop = deviceFrame.screenRect.y;
+        const srcBezelRight = deviceFrame.size.width - (srcBezelLeft + srcScreenW);
+        const srcBezelBottom = deviceFrame.size.height - (srcBezelTop + srcScreenH);
+
+        const scaleScreenW = videoScreenW / srcScreenW;
+        const scaleScreenH = videoScreenH / srcScreenH;
+        const baseScale = Math.min(scaleScreenW, scaleScreenH);
+
+        frameW = videoScreenW + (srcBezelLeft + srcBezelRight) * baseScale;
+        frameH = videoScreenH + (srcBezelTop + srcBezelBottom) * baseScale;
+        frameX = topLeftX - (srcBezelLeft * baseScale);
+        frameY = topLeftY - (srcBezelTop * baseScale);
+    } else {
+        // Border-based sizing approach
+        frameW = videoScreenW / (1 - b.left - b.right);
+        frameH = videoScreenH / (1 - b.top - b.bottom);
+        frameX = topLeftX - (frameW * b.left);
+        frameY = topLeftY - (frameH * b.top);
+    }
+
+    const img = new Image();
+    img.src = deviceFrame.imageUrl;
+    if (img.complete) {
+        ctx.imageSmoothingQuality = 'high';
+        if (deviceFrame.customScaling) {
+            drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
+        } else {
+            ctx.drawImage(img, frameX, frameY, frameW, frameH);
+        }
+    } else {
+        img.onload = () => { };
     }
 }

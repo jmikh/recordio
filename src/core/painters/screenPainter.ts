@@ -1,7 +1,7 @@
 import type { Project, ID, SourceMetadata, Rect } from '../types';
 import { ViewMapper } from '../viewMapper';
 import { getDeviceFrame } from '../deviceFrames';
-import { drawSmartFrame } from './smartFramePainter';
+import { drawDeviceFrame } from './smartFramePainter';
 
 const SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
@@ -103,52 +103,16 @@ export function drawScreen(
             // Draw Device Frame Overlay
             const deviceFrame = getDeviceFrame(screenConfig.deviceFrameId);
             if (deviceFrame) {
-                // Calculate corners in screen space (viewport relative)
-                // Note: The viewMapper implementation needs to project relative to viewport
+                // Calculate video screen bounds in canvas coordinates
                 const topLeft = viewMapper.projectToScreen({ x: 0, y: 0 }, effectiveViewport);
                 const bottomRight = viewMapper.projectToScreen({ x: inputSize.width, y: inputSize.height }, effectiveViewport);
 
-                const videoScreenW = bottomRight.x - topLeft.x;
-                const videoScreenH = bottomRight.y - topLeft.y;
-
-                const b = deviceFrame.borderData;
-                let frameW: number, frameH: number, frameX: number, frameY: number;
-
-                if (deviceFrame.customScaling) {
-                    const srcScreenW = deviceFrame.screenRect.width;
-                    const srcScreenH = deviceFrame.screenRect.height;
-                    const srcBezelLeft = deviceFrame.screenRect.x;
-                    const srcBezelTop = deviceFrame.screenRect.y;
-                    const srcBezelRight = deviceFrame.size.width - (srcBezelLeft + srcScreenW);
-                    const srcBezelBottom = deviceFrame.size.height - (srcBezelTop + srcScreenH);
-
-                    const scaleScreenW = videoScreenW / srcScreenW;
-                    const scaleScreenH = videoScreenH / srcScreenH;
-                    const baseScale = Math.min(scaleScreenW, scaleScreenH);
-
-                    frameW = videoScreenW + (srcBezelLeft + srcBezelRight) * baseScale;
-                    frameH = videoScreenH + (srcBezelTop + srcBezelBottom) * baseScale;
-                    frameX = topLeft.x - (srcBezelLeft * baseScale);
-                    frameY = topLeft.y - (srcBezelTop * baseScale);
-                } else {
-                    frameW = videoScreenW / (1 - b.left - b.right);
-                    frameH = videoScreenH / (1 - b.top - b.bottom);
-                    frameX = topLeft.x - (frameW * b.left);
-                    frameY = topLeft.y - (frameH * b.top);
-                }
-
-                const img = new Image();
-                img.src = deviceFrame.imageUrl;
-                if (img.complete) {
-                    ctx.imageSmoothingQuality = 'high';
-                    if (deviceFrame.customScaling) {
-                        drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
-                    } else {
-                        ctx.drawImage(img, frameX, frameY, frameW, frameH);
-                    }
-                } else {
-                    img.onload = () => { };
-                }
+                drawDeviceFrame(ctx, deviceFrame, {
+                    x: topLeft.x,
+                    y: topLeft.y,
+                    width: bottomRight.x - topLeft.x,
+                    height: bottomRight.y - topLeft.y
+                });
             }
 
         } else {
