@@ -134,6 +134,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (dragState) return;
+
+        // If currently editing a zoom, a click on the background should exit edit mode
+        // instead of creating a new one (preventing accidental creation)
+        if (editingZoomId) {
+            setEditingZoom(null);
+            return;
+        }
+
         if (!hoverInfo || !hoverInfo.isValid) return;
 
         // Create Motion
@@ -268,6 +276,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={handleClick}
         >
             <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none z-10">MOTION</div>

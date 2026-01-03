@@ -5,6 +5,7 @@ import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
+import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { BoundingBox } from './BoundingBox';
 
 // ------------------------------------------------------------------
@@ -15,7 +16,8 @@ export const renderZoomEditor = (
     state: {
         project: Project,
         sources: ProjectState['sources'],
-        editingZoomId: string
+        editingZoomId: string,
+        previewZoomRect?: Rect | null
     }
 ) => {
     const { ctx, videoRefs } = resources;
@@ -40,21 +42,77 @@ export const renderZoomEditor = (
             project,
             sources,
             effectiveViewport,
-            null // Device frame not needed in zoom edit mode
+            resources.deviceFrameImg
         );
+    }
+
+    // Render Camera Layer (Relative to Zoom)
+    // 1. Get Camera Source and Settings
+    const cameraSettings = project.settings.camera;
+    const cameraSourceId = project.timeline.recording.cameraSourceId;
+    const cameraSource = cameraSourceId ? sources[cameraSourceId] : undefined;
+
+    // Only render if we have a camera source and it's enabled (implied by existence in some contexts, but let's check source)
+    if (cameraSource && cameraSettings) {
+        const video = videoRefs[cameraSource.id];
+        if (video) {
+            // 2. Determine Zoom Rect (Preview or Committed)
+            let zoomRect = state.previewZoomRect;
+            if (!zoomRect) {
+                const motion = project.timeline.recording.viewportMotions.find(m => m.id === state.editingZoomId);
+                zoomRect = motion?.rect;
+            }
+
+            if (zoomRect) {
+                // 3. Calculate Relative Position
+                // The camera is defined in absolute canvas coordinates (0..outputWidth, 0..outputHeight).
+                // We want to project it into the zoomRect.
+                //
+                // Relative X ratio = (Camera X) / (Output Width)
+                // New X = ZoomRect X + (Relative X ratio * ZoomRect Width)
+                //
+                // Scale Factor = ZoomRect Width / Output Width (assuming uniform aspect ratio zoom usually, but let's use width)
+
+                const scaleFactor = zoomRect.width / outputSize.width;
+
+                const relativeX = (cameraSettings.x / outputSize.width) * zoomRect.width;
+                const relativeY = (cameraSettings.y / outputSize.height) * zoomRect.height; // Assuming ZoomRect matches AR, otherwise this might skew position?
+                // Usually zoom rect matches aspect ratio if constrained. 
+
+                const projectedX = zoomRect.x + relativeX;
+                const projectedY = zoomRect.y + relativeY;
+                const projectedW = cameraSettings.width * scaleFactor;
+                const projectedH = cameraSettings.height * scaleFactor;
+
+                // 4. Draw Camera
+                drawWebcam(
+                    ctx,
+                    video,
+                    cameraSource.size, // Input size
+                    {
+                        ...cameraSettings,
+                        x: projectedX,
+                        y: projectedY,
+                        width: projectedW,
+                        height: projectedH,
+                    },
+                    scaleFactor // Global scale for borders/shadows
+                );
+            }
+        }
     }
 
 };
 
 
-// NOTE: Webcam and Keyboard are HIDDEN in Zoom Edit mode.
+// NOTE: Webcam and Keyboard are HIDDEN in Zoom Edit mode (except we just added manual render above).
 
 
 // ------------------------------------------------------------------
 // COMPONENT: Interactive Overlay
 // ------------------------------------------------------------------
 
-export const ZoomEditor: React.FC = () => {
+export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect | null> }> = ({ previewRectRef }) => {
     // Connect to Store
     const editingZoomId = useProjectStore(s => s.editingZoomId);
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
@@ -106,7 +164,13 @@ export const ZoomEditor: React.FC = () => {
     // Sync state if initialRect changes externally (e.g. undo/redo)
     useEffect(() => {
         setCurrentRect(initialRect);
-    }, [initialRect]);
+        if (previewRectRef) previewRectRef.current = initialRect;
+    }, [initialRect, previewRectRef]);
+
+    const handleRectChange = (newRect: Rect) => {
+        setCurrentRect(newRect);
+        if (previewRectRef) previewRectRef.current = newRect;
+    };
 
     // Key Listener
     useEffect(() => {
@@ -157,7 +221,7 @@ export const ZoomEditor: React.FC = () => {
         if (newY + initialRect.height > videoSize.height) newY = videoSize.height - initialRect.height;
 
         const newRect = { ...initialRect, x: newX, y: newY };
-        setCurrentRect(newRect);
+        handleRectChange(newRect);
         onCommit(newRect);
     };
 
@@ -171,7 +235,7 @@ export const ZoomEditor: React.FC = () => {
                 rect={currentRect}
                 canvasSize={videoSize}
                 maintainAspectRatio={true}
-                onChange={setCurrentRect}
+                onChange={handleRectChange}
                 onCommit={onCommit}
             >
                 {/* Dimming Effect: Shadow around user focus */}

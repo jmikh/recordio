@@ -17,7 +17,8 @@ export function drawWebcam(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     inputSize: Size,
-    settings: CameraSettings
+    settings: CameraSettings,
+    globalScale: number = 1
 ) {
     const {
         x, y, width, height,
@@ -49,6 +50,14 @@ export function drawWebcam(
         sy = (inputSize.height - sh) / 2;
     }
 
+    // Apply global scaling
+    // Note: x, y, width, height are already projected/scaled by the caller if needed.
+    // Here we primarily care about scaling the styles (border, shadow).
+
+    // Scale Style Properties
+    const scaledBorderWidth = borderWidth * globalScale;
+    const scaledBorderRadius = borderRadius * globalScale;
+
     // Helper to create the path based on shape
     const definePath = () => {
         ctx.beginPath();
@@ -59,9 +68,9 @@ export function drawWebcam(
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
         } else {
             // Rect or Square
-            if (borderRadius > 0) {
+            if (scaledBorderRadius > 0) {
                 // Manually draw rounded rect for compatibility
-                const r = Math.min(borderRadius, width / 2, height / 2);
+                const r = Math.min(scaledBorderRadius, width / 2, height / 2);
                 ctx.moveTo(x + r, y);
                 ctx.lineTo(x + width - r, y);
                 ctx.quadraticCurveTo(x + width, y, x + width, y + r);
@@ -83,7 +92,7 @@ export function drawWebcam(
     // 1. Glow Pass
     if (hasGlow) {
         ctx.save();
-        ctx.shadowBlur = GLOW_BLUR;
+        ctx.shadowBlur = GLOW_BLUR * globalScale;
         ctx.shadowColor = borderColor;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
@@ -92,8 +101,8 @@ export function drawWebcam(
         ctx.fillStyle = borderColor;
         ctx.fill();
 
-        if (borderWidth > 0) {
-            ctx.lineWidth = borderWidth;
+        if (scaledBorderWidth > 0) {
+            ctx.lineWidth = scaledBorderWidth;
             ctx.strokeStyle = borderColor;
             ctx.stroke();
         }
@@ -103,17 +112,17 @@ export function drawWebcam(
     // 2. Shadow Pass
     if (hasShadow) {
         ctx.save();
-        ctx.shadowBlur = SHADOW_BLUR;
+        ctx.shadowBlur = SHADOW_BLUR * globalScale;
         ctx.shadowColor = SHADOW_COLOR;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = SHADOW_OFFSET_Y;
+        ctx.shadowOffsetY = SHADOW_OFFSET_Y * globalScale;
         definePath();
 
         ctx.fillStyle = 'black';
         ctx.fill();
 
-        if (borderWidth > 0) {
-            ctx.lineWidth = borderWidth;
+        if (scaledBorderWidth > 0) {
+            ctx.lineWidth = scaledBorderWidth;
             ctx.strokeStyle = 'black'; // Color doesn't matter for shadow caster, but stroke needs color
             ctx.stroke();
         }
@@ -129,9 +138,9 @@ export function drawWebcam(
     ctx.restore(); // Remove clip
 
     // 4. Border Pass
-    if (borderWidth > 0) {
+    if (scaledBorderWidth > 0) {
         definePath();
-        ctx.lineWidth = borderWidth;
+        ctx.lineWidth = scaledBorderWidth;
         ctx.strokeStyle = borderColor;
         ctx.stroke();
     }

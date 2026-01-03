@@ -10,7 +10,7 @@ import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
-import type { CameraSettings } from '../../../core/types';
+import type { CameraSettings, Rect } from '../../../core/types';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
@@ -30,6 +30,7 @@ export const CanvasContainer = () => {
 
     // Mutable State for Dragging (60fps preview)
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
+    const previewZoomRectRef = useRef<Rect | null>(null);
 
     // Loop State
     const animationFrameRef = useRef<number>(0);
@@ -130,7 +131,8 @@ export const CanvasContainer = () => {
                     renderZoomEditor(resources, {
                         project,
                         sources,
-                        editingZoomId
+                        editingZoomId,
+                        previewZoomRect: previewZoomRectRef.current
                     });
                 } else {
                     PlaybackRenderer.render(resources, {
@@ -249,7 +251,7 @@ export const CanvasContainer = () => {
 
                 {/* ZOOM OVERLAY */}
                 {!editingCrop && editingZoomId && (
-                    <ZoomEditor />
+                    <ZoomEditor previewRectRef={previewZoomRectRef} />
                 )}
 
                 {/* CAMERA OVERLAY */}
