@@ -13,6 +13,7 @@ export interface RenderResources {
     ctx: CanvasRenderingContext2D;
     bgRef: HTMLImageElement | null;
     videoRefs: { [sourceId: string]: HTMLVideoElement };
+    deviceFrameImg: HTMLImageElement | null;
 }
 
 export class PlaybackRenderer {
@@ -77,7 +78,8 @@ export class PlaybackRenderer {
                 video,
                 project,
                 sources,
-                effectiveViewport
+                effectiveViewport,
+                resources.deviceFrameImg
             );
 
             // We only add effects if it's an active window, otherwise we just show what the

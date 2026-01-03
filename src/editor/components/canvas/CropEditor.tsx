@@ -60,7 +60,8 @@ export const renderCropEditor = (
                 video,
                 tempProject,
                 sources,
-                effectiveViewport
+                effectiveViewport,
+                null // Device frame not needed in crop edit mode
             );
         }
     }

@@ -33,7 +33,8 @@ export function drawScreen(
     video: HTMLVideoElement,
     project: Project,
     sources: Record<ID, SourceMetadata>,
-    effectiveViewport: Rect // Injected from caller
+    effectiveViewport: Rect, // Injected from caller
+    deviceFrameImg: HTMLImageElement | null // Cached device frame image
 ): { viewMapper: ViewMapper } {
     const { timeline } = project;
     const { recording } = timeline;
@@ -102,12 +103,12 @@ export function drawScreen(
 
             // Draw Device Frame Overlay
             const deviceFrame = getDeviceFrame(screenConfig.deviceFrameId);
-            if (deviceFrame) {
+            if (deviceFrame && deviceFrameImg?.complete) {
                 // Calculate video screen bounds in canvas coordinates
                 const topLeft = viewMapper.projectToScreen({ x: 0, y: 0 }, effectiveViewport);
                 const bottomRight = viewMapper.projectToScreen({ x: inputSize.width, y: inputSize.height }, effectiveViewport);
 
-                drawDeviceFrame(ctx, deviceFrame, {
+                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, {
                     x: topLeft.x,
                     y: topLeft.y,
                     width: bottomRight.x - topLeft.x,

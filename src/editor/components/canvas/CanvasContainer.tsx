@@ -8,6 +8,7 @@ import { renderZoomEditor, ZoomEditor } from './ZoomEditor';
 import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
+import { getDeviceFrame } from '../../../core/deviceFrames';
 import { TimeMapper } from '../../../core/timeMapper';
 import type { CameraSettings } from '../../../core/types';
 
@@ -25,6 +26,7 @@ export const CanvasContainer = () => {
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const bgRef = useRef<HTMLImageElement>(null);
+    const deviceFrameRef = useRef<HTMLImageElement>(null);
 
     // Mutable State for Dragging (60fps preview)
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
@@ -122,7 +124,8 @@ export const CanvasContainer = () => {
                     canvas,
                     ctx,
                     bgRef: bgRef.current,
-                    videoRefs: internalVideoRefs.current
+                    videoRefs: internalVideoRefs.current,
+                    deviceFrameImg: deviceFrameRef.current
                 };
 
                 if (editingCrop) {
@@ -176,6 +179,11 @@ export const CanvasContainer = () => {
         ? sources[activeBgSourceId].url
         : project.settings.background.imageUrl;
 
+    // Device frame URL for caching
+    const deviceFrame = project.settings.screen.mode === 'device'
+        ? getDeviceFrame(project.settings.screen.deviceFrameId)
+        : undefined;
+
     // Thumbnail Logic
     useEffect(() => {
         const captureThumbnail = () => {
@@ -212,6 +220,9 @@ export const CanvasContainer = () => {
                 <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
                     {project.settings.background.type === 'image' && bgUrl && (
                         <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin="anonymous" />
+                    )}
+                    {deviceFrame && (
+                        <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin="anonymous" />
                     )}
                     {Object.values(sources).map((source) => (
                         source.url ? (

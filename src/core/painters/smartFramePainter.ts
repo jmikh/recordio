@@ -17,7 +17,7 @@ export interface FrameScalingConfig {
  * Fixed regions maintain their source dimensions (or scale uniformly if dest is too small).
  * Scalable regions stretch to fill the remaining space.
  */
-export function drawSmartFrame(
+function drawSmartFrame(
     ctx: CanvasRenderingContext2D,
     img: HTMLImageElement | HTMLCanvasElement,
     dx: number,
@@ -126,11 +126,13 @@ export function drawSmartFrame(
  * 
  * @param ctx Canvas rendering context
  * @param deviceFrame Device frame metadata including dimensions and scaling config
+ * @param img Pre-loaded device frame image element
  * @param videoScreenBounds The bounds of the video screen in canvas coordinates
  */
 export function drawDeviceFrame(
     ctx: CanvasRenderingContext2D,
     deviceFrame: DeviceFrame,
+    img: HTMLImageElement,
     videoScreenBounds: { x: number; y: number; width: number; height: number }
 ): void {
     const { x: topLeftX, y: topLeftY, width: videoScreenW, height: videoScreenH } = videoScreenBounds;
@@ -163,16 +165,10 @@ export function drawDeviceFrame(
         frameY = topLeftY - (frameH * b.top);
     }
 
-    const img = new Image();
-    img.src = deviceFrame.imageUrl;
-    if (img.complete) {
-        ctx.imageSmoothingQuality = 'high';
-        if (deviceFrame.customScaling) {
-            drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
-        } else {
-            ctx.drawImage(img, frameX, frameY, frameW, frameH);
-        }
+    ctx.imageSmoothingQuality = 'high';
+    if (deviceFrame.customScaling) {
+        drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
     } else {
-        img.onload = () => { };
+        ctx.drawImage(img, frameX, frameY, frameW, frameH);
     }
 }

@@ -37,7 +37,8 @@ export const renderZoomEditor = (
             video,
             project,
             sources,
-            effectiveViewport
+            effectiveViewport,
+            null // Device frame not needed in zoom edit mode
         );
     }
 
