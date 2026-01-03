@@ -4,6 +4,7 @@ import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimeMapper } from '../../core/timeMapper';
 import type { OutputWindow } from '../../core/types';
+import { MdCrop } from 'react-icons/md';
 
 
 // Constants
@@ -21,6 +22,7 @@ export function Timeline() {
     const userEvents = useProjectStore(s => s.userEvents);
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
     const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const setEditingCrop = useProjectStore(s => s.setEditingCrop);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
@@ -207,6 +209,14 @@ export function Timeline() {
                         title="Split at Playhead"
                     >
                         Split
+                    </button>
+                    <button
+                        onClick={() => setEditingCrop(true)}
+                        className="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs border border-[#555] flex items-center gap-1"
+                        title="Crop Video"
+                    >
+                        <MdCrop size={14} />
+                        Crop
                     </button>
                     {/* Future: Delete button */}
                 </div>

@@ -5,6 +5,7 @@ import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/viewMapper';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
@@ -28,11 +29,21 @@ export const renderCropEditor = (
 
     // Create a temporary project that IGNORES crop settings for rendering the "Full" video
     // We want the user to see the full input video so they can select a crop region
+    // Also hide radius, borders, and frames for cleaner crop editing view
     const tempSettings = {
         ...project.settings,
+        background: {
+            ...project.settings.background,
+            padding: 0.05 // Force consistent padding during crop editing
+        },
         screen: {
             ...project.settings.screen,
-            crop: undefined // Force undefined to see full video
+            crop: undefined, // Force undefined to see full video
+            mode: 'border' as const, // Force non-device mode to hide frames
+            borderRadius: 0, // Hide rounding
+            borderWidth: 0, // Hide borders
+            hasShadow: false, // Hide shadow
+            hasGlow: false // Hide glow
         }
     };
 
@@ -96,10 +107,11 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     // We need a ViewMapper that matches what `renderCropEditor` does (Full Video -> Output)
     // So we can project the Crop Rect from Source Space -> Screen Space
+    // Use same 0.05 padding as renderCropEditor to ensure overlay aligns with rendered video
     const viewMapper = new ViewMapper(
         inputSize,
         outputSize,
-        project.settings.background.padding,
+        0.05, // Force same padding as renderCropEditor
         undefined // NO CROP for the mapper, because we are mapping onto the full view
     );
 
@@ -244,44 +256,76 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
         }
     };
 
-    // Global Close
-    useEffect(() => {
-        const handleDown = (e: PointerEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setEditingCrop(false);
-            }
-        };
-        // Add listener with delay to avoid immediate close from button click
-        const timer = setTimeout(() => window.addEventListener('pointerdown', handleDown), 100);
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('pointerdown', handleDown);
-        };
-    }, [setEditingCrop]);
+    // Close when clicking outside the canvas container
+    const canvasContainerRef = useRef<HTMLDivElement | null>(null);
 
-    // Handles
+    useEffect(() => {
+        // Store reference to the canvas container (parent of our overlay)
+        canvasContainerRef.current = containerRef.current?.parentElement as HTMLDivElement;
+    }, []);
+
+    useClickOutside(canvasContainerRef, () => {
+        setEditingCrop(false);
+    });
+
+    // L-shaped corner handles (matching ZoomEditor)
     const Handle = ({ type, cursor }: { type: InteractionType, cursor: string }) => {
-        const size = 10;
-        const style: React.CSSProperties = {
+        const size = 20; // Hit area size
+        const thickness = 2; // Border thickness
+        const length = 10; // Length of the corner arm
+
+        // Base container for hit area
+        const containerStyle: React.CSSProperties = {
             position: 'absolute',
             width: size,
             height: size,
-            backgroundColor: 'white',
-            border: '1px solid #333',
-            cursor,
-            zIndex: 10
+            cursor: cursor,
+            zIndex: 10,
         };
 
-        if (type.includes('n')) style.top = -size / 2;
-        else style.bottom = -size / 2;
-        if (type.includes('w')) style.left = -size / 2;
-        else style.right = -size / 2;
+        // Inner visual element for the corner
+        const cornerStyle: React.CSSProperties = {
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderColor: '#fff',
+            borderStyle: 'solid',
+            borderWidth: 0,
+        };
+
+        const isNorth = type.includes('n');
+        const isWest = type.includes('w');
+
+        if (isNorth) {
+            containerStyle.top = 0;
+            cornerStyle.top = 0;
+            cornerStyle.borderTopWidth = thickness;
+        } else {
+            containerStyle.bottom = 0;
+            cornerStyle.bottom = 0;
+            cornerStyle.borderBottomWidth = thickness;
+        }
+
+        if (isWest) {
+            containerStyle.left = 0;
+            cornerStyle.left = 0;
+            cornerStyle.borderLeftWidth = thickness;
+        } else {
+            containerStyle.right = 0;
+            cornerStyle.right = 0;
+            cornerStyle.borderRightWidth = thickness;
+        }
+
+        cornerStyle.width = length;
+        cornerStyle.height = length;
 
         return (
             <div
-                style={style}
+                style={containerStyle}
                 onPointerDown={(e) => handlePointerDown(e, type)}
-            />
+            >
+                <div style={cornerStyle} />
+            </div>
         );
     };
 
@@ -292,6 +336,16 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     const topPct = toPct(renderedRect.y, outputSize.height);
     const widthPct = toPct(renderedRect.width, outputSize.width);
     const heightPct = toPct(renderedRect.height, outputSize.height);
+
+    // Check if crop is centered
+    const isCentered = Math.abs(currentCrop.x - (inputSize.width - currentCrop.width) / 2) < 1 &&
+        Math.abs(currentCrop.y - (inputSize.height - currentCrop.height) / 2) < 1;
+
+    // Check if crop is full view
+    const isFullView = Math.abs(currentCrop.x) < 1 &&
+        Math.abs(currentCrop.y) < 1 &&
+        Math.abs(currentCrop.width - inputSize.width) < 1 &&
+        Math.abs(currentCrop.height - inputSize.height) < 1;
 
     return (
         <div
@@ -321,7 +375,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
             {/* Toolbar - Positioned relative to the actual Video Content (viewMapper.contentRect) */}
             <div
-                className="absolute flex gap-2 pointer-events-auto"
+                className="absolute flex gap-2 pointer-events-auto justify-center"
                 style={{
                     left: `${toPct(viewMapper.contentRect.x, outputSize.width)}%`,
                     top: `calc(${toPct(viewMapper.contentRect.y, outputSize.height)}% - 40px)`,
@@ -329,16 +383,14 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 }}
             >
                 <button
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded shadow font-bold transition-colors"
-                    onClick={(e) => { e.stopPropagation(); setEditingCrop(false); }}
-                >
-                    DONE
-                </button>
-
-                <button
-                    className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded shadow font-bold transition-colors"
+                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isCentered
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        }`}
                     onClick={(e) => {
                         e.stopPropagation();
+                        if (isCentered) return;
+
                         // Center Logic
                         const newX = (inputSize.width - currentCrop.width) / 2;
                         const newY = (inputSize.height - currentCrop.height) / 2;
@@ -347,22 +399,42 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                         // Use direct store update for immediate reliable action
                         useProjectStore.getState().updateSettings({ screen: { crop: newCrop } });
                     }}
+                    disabled={isCentered}
                 >
-                    CENTER
+                    Center
                 </button>
 
+                <button
+                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isFullView
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        }`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (isFullView) return;
 
+                        // Full View Logic
+                        const newCrop = { x: 0, y: 0, width: inputSize.width, height: inputSize.height };
+
+                        // Use direct store update for immediate reliable action
+                        useProjectStore.getState().updateSettings({ screen: { crop: newCrop } });
+                    }}
+                    disabled={isFullView}
+                >
+                    Full View
+                </button>
             </div>
 
             {/* Crop Box */}
             <div
-                className="absolute border border-white box-content cursor-move"
+                className="absolute cursor-move"
                 style={{
                     left: `${leftPct}%`,
                     top: `${topPct}%`,
                     width: `${widthPct}%`,
                     height: `${heightPct}%`,
-                    boxShadow: '0 0 0 1px rgba(0,0,0,0.5)'
+                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)'
                 }}
                 onPointerDown={(e) => handlePointerDown(e, 'move')}
             >
@@ -382,8 +454,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 <Handle type="ne" cursor="ne-resize" />
                 <Handle type="sw" cursor="sw-resize" />
                 <Handle type="se" cursor="se-resize" />
-
-
             </div>
         </div>
     );
