@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import type { Rect, Project } from '../../../core/types';
-import { useProjectStore, type ProjectState, useProjectData } from '../../stores/useProjectStore';
+import { useProjectStore, type ProjectState, useProjectData, CanvasMode } from '../../stores/useProjectStore';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -87,7 +87,7 @@ export const renderCropEditor = (
 export const CropEditor: React.FC<{ videoSize?: { width: number, height: number } }> = ({ videoSize }) => {
     // Connect to Store
     const project = useProjectData();
-    const setEditingCrop = useProjectStore(s => s.setEditingCrop);
+    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
     const sources = useProjectStore(s => s.sources);
 
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
@@ -187,7 +187,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     useClickOutside(canvasContainerRef, () => {
         endInteraction();
-        setEditingCrop(false);
+        setCanvasMode(CanvasMode.Preview);
     });
 
     // Start history batch when entering crop mode, end when leaving

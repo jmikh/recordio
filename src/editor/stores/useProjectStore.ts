@@ -18,23 +18,31 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 
+export const CanvasMode = {
+    Preview: 'preview',
+    Crop: 'crop',
+    Camera: 'camera',
+    Zoom: 'zoom'
+} as const;
+export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
+
 export interface ProjectState {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents; // Single set of loaded events (Never null)
     isSaving: boolean;
-    editingZoomId: ID | null;
+
+    // Canvas Mode State
+    canvasMode: CanvasMode;
+    activeZoomId: ID | null;
     editingZoomInitialState: ViewportMotion | null;
-    editingCamera: boolean;
-    editingCrop: boolean;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
-    setEditingCamera: (isEditing: boolean) => void;
-    setEditingCrop: (isEditing: boolean) => void;
+    setCanvasMode: (mode: CanvasMode) => void;
 
     // Zoom Editing Actions
     setEditingZoom: (id: ID | null) => void;
@@ -103,20 +111,15 @@ export const useProjectStore = create<ProjectState>()(
                 sources: {},
                 userEvents: EMPTY_USER_EVENTS,
                 isSaving: false,
-                editingZoomId: null, // Track active edit session
-                editingZoomInitialState: null as ViewportMotion | null, // Track initial state for history commit
-                editingCamera: false,
-                editingCrop: false,
 
-                setEditingCamera: (isEditing) => set({
-                    editingCamera: isEditing,
-                    // If turning on, disable others
-                    ...(isEditing ? { editingCrop: false, editingZoomId: null, editingZoomInitialState: null } : {})
-                }),
-                setEditingCrop: (isEditing) => set({
-                    editingCrop: isEditing,
-                    // If turning on, disable others
-                    ...(isEditing ? { editingCamera: false, editingZoomId: null, editingZoomInitialState: null } : {})
+                // Canvas Mode Logic
+                canvasMode: CanvasMode.Preview,
+                activeZoomId: null,
+                editingZoomInitialState: null as ViewportMotion | null,
+
+                setCanvasMode: (mode) => set({
+                    canvasMode: mode,
+                    ...(mode !== CanvasMode.Zoom ? { activeZoomId: null, editingZoomInitialState: null } : {})
                 }),
 
                 setEditingZoom: (id) => {
@@ -135,12 +138,12 @@ export const useProjectStore = create<ProjectState>()(
                         // 2. Pause History
                         store.temporal.getState().pause();
 
-                        // 3. Disable other modes
-                        set({ editingCrop: false, editingCamera: false });
+                        // 3. Set Mode
+                        set({ canvasMode: CanvasMode.Zoom, activeZoomId: id });
 
                     } else {
                         console.log('[Action] setEditingZoom END (Commit)');
-                        const editingId = state.editingZoomId;
+                        const editingId = state.activeZoomId;
                         const initial = state.editingZoomInitialState;
                         const currentFunctions = get(); // Fresh getters
 
@@ -181,10 +184,10 @@ export const useProjectStore = create<ProjectState>()(
                         }
 
                         // Cleanup
-                        set({ editingZoomInitialState: null });
+                        set({ editingZoomInitialState: null, canvasMode: CanvasMode.Preview });
                     }
 
-                    set({ editingZoomId: id });
+                    set({ activeZoomId: id });
                 },
 
                 updateViewportMotion: (id, updates) => {
@@ -271,7 +274,7 @@ export const useProjectStore = create<ProjectState>()(
                         };
                     });
                     // Also ensure we exit edit mode if we deleted the active one
-                    const currentEdit = get().editingZoomId;
+                    const currentEdit = get().activeZoomId;
                     if (currentEdit === id) {
                         get().setEditingZoom(null);
                     }

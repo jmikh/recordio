@@ -1,4 +1,4 @@
-import { useProjectStore } from '../../stores/useProjectStore';
+import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -6,7 +6,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setEditingCrop = useProjectStore(s => s.setEditingCrop);
+    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     // Ensure screen settings exist (fallback for legacy projects if not fully migrated yet)
@@ -33,7 +33,7 @@ export const ScreenSettings = () => {
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs font-bold text-gray-500 uppercase">Screen Style</h3>
                 <button
-                    onClick={() => setEditingCrop(true)}
+                    onClick={() => setCanvasMode(CanvasMode.Crop)}
                     className="text-[10px] bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors"
                 >
                     Crop Video

@@ -114,7 +114,7 @@ export const renderZoomEditor = (
 
 export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect | null> }> = ({ previewRectRef }) => {
     // Connect to Store
-    const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const editingZoomId = useProjectStore(s => s.activeZoomId);
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
     const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);

@@ -1,15 +1,11 @@
 import React, { useRef, useEffect } from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
+import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import type { CameraSettings, Rect } from '../../../core/types';
 import { BoundingBox } from './BoundingBox';
 
 // ------------------------------------------------------------------
 // COMPONENT: Camera Editor Overlay
 // ------------------------------------------------------------------
-// ------------------------------------------------------------------
-// COMPONENT: Camera Editor Overlay
-// ------------------------------------------------------------------
-
 
 interface CameraEditorProps {
     cameraRef: React.MutableRefObject<CameraSettings | null>;
@@ -17,7 +13,7 @@ interface CameraEditorProps {
 
 export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // Connect to Store
-    const setEditingCamera = useProjectStore(s => s.setEditingCamera);
+    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const project = useProjectStore(s => s.project);
 
@@ -28,7 +24,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
 
     if (!initialSettings) return null;
 
-    // Actions
     // Actions
     const onCommit = (rect: Rect) => {
         // Convert Rect back to CameraSettings format (preserving other props)
@@ -41,7 +36,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     };
 
     const onCancel = () => {
-        setEditingCamera(false);
+        setCanvasMode(CanvasMode.Preview);
         cameraRef.current = null;
     };
 
@@ -66,6 +61,17 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         cameraRef.current = newSettings; // Update canvas live preview
     };
 
+    // Close on Outside Click
+    useEffect(() => {
+        const handleOutsideClick = (e: PointerEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                onCancel();
+            }
+        };
+        window.addEventListener('pointerdown', handleOutsideClick);
+        return () => window.removeEventListener('pointerdown', handleOutsideClick);
+    }, [onCancel]);
+
     // Close on Escape
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -83,9 +89,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             {/* Background Closer */}
             <div
                 className="absolute inset-0 pointer-events-auto"
-                onPointerDown={(e) => {
-                    if (e.target === e.currentTarget) onCancel();
-                }}
             />
 
             <div className="absolute inset-0 pointer-events-none">

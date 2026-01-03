@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectSources, CanvasMode } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 
@@ -14,9 +14,8 @@ import type { CameraSettings, Rect } from '../../../core/types';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
-    const editingZoomId = useProjectStore(s => s.editingZoomId);
-    const editingCamera = useProjectStore(s => s.editingCamera);
-    const editingCrop = useProjectStore(s => s.editingCrop);
+    const canvasMode = useProjectStore(s => s.canvasMode);
+    const activeZoomId = useProjectStore(s => s.activeZoomId);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -44,13 +43,16 @@ export const CanvasContainer = () => {
 
         const tick = (time: number) => {
             const pbState = usePlaybackStore.getState();
-            const { editingZoomId, editingCrop, project, sources, userEvents } = useProjectStore.getState();
+            const { canvasMode, activeZoomId, project, sources, userEvents } = useProjectStore.getState();
 
             // FPS Logging (Optional)
             if (time - lastFpsTime >= 1000) lastFpsTime = time;
 
-            // Only advance time if NOT editing
-            if (pbState.isPlaying && !editingZoomId && !editingCrop) {
+            // Only advance time if NOT in a blocking edit mode
+            // (Crop and Zoom block playback time updates (implicit in original), Camera does not)
+            const isBlockingEdit = canvasMode === CanvasMode.Crop || canvasMode === CanvasMode.Zoom;
+
+            if (pbState.isPlaying && !isBlockingEdit) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
                 const delta = time - lastTimeRef.current;
                 const safeDelta = Math.min(delta, 100);
@@ -83,8 +85,6 @@ export const CanvasContainer = () => {
             if (canvas && ctx) {
                 // 1. CLEAR & BACKGROUND
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // Background is irrelevant in Crop Mode? Or maybe we still show it?
-                // Actually Crop Editor renders "Full Screen Overlay", so background might be covered or visible in padding.
                 drawBackground(
                     ctx,
                     project.settings.background,
@@ -97,13 +97,13 @@ export const CanvasContainer = () => {
                 let effectiveTimeMs = pbState.currentTimeMs;
 
                 // Implement Preview Logic
-                if (!pbState.isPlaying && !editingZoomId && !editingCrop && pbState.previewTimeMs !== null) {
+                if (!pbState.isPlaying && !isBlockingEdit && pbState.previewTimeMs !== null) {
                     effectiveTimeMs = pbState.previewTimeMs;
                 }
 
                 // 3. SYNC VIDEO
                 const sourceTimeMs = effectiveTimeMs - project.timeline.recording.timelineOffsetMs;
-                const isPlaying = pbState.isPlaying && !editingZoomId && !editingCrop;
+                const isPlaying = pbState.isPlaying && !isBlockingEdit;
 
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
@@ -121,20 +121,21 @@ export const CanvasContainer = () => {
                     deviceFrameImg: deviceFrameRef.current
                 };
 
-                if (editingCrop) {
+                if (canvasMode === CanvasMode.Crop) {
                     renderCropEditor(resources, {
                         project,
                         sources,
                         currentTimeMs: effectiveTimeMs
                     });
-                } else if (editingZoomId) {
+                } else if (canvasMode === CanvasMode.Zoom && activeZoomId) {
                     renderZoomEditor(resources, {
                         project,
                         sources,
-                        editingZoomId,
+                        editingZoomId: activeZoomId,
                         previewZoomRect: previewZoomRectRef.current
                     });
                 } else {
+                    // Preview OR Camera mode (Camera overlays on top, but base is playback)
                     PlaybackRenderer.render(resources, {
                         project,
                         sources,
@@ -241,7 +242,7 @@ export const CanvasContainer = () => {
                 />
 
                 {/* CROP OVERLAY (Highest Priority) */}
-                {editingCrop && (
+                {canvasMode === CanvasMode.Crop && (
                     <CropEditor videoSize={(() => {
                         const screenId = project.timeline.recording.screenSourceId;
                         const v = internalVideoRefs.current[screenId];
@@ -250,12 +251,12 @@ export const CanvasContainer = () => {
                 )}
 
                 {/* ZOOM OVERLAY */}
-                {!editingCrop && editingZoomId && (
+                {canvasMode === CanvasMode.Zoom && activeZoomId && (
                     <ZoomEditor previewRectRef={previewZoomRectRef} />
                 )}
 
                 {/* CAMERA OVERLAY */}
-                {!editingCrop && editingCamera && (
+                {canvasMode === CanvasMode.Camera && (
                     <CameraEditor cameraRef={previewCameraSettingsRef} />
                 )}
             </div>

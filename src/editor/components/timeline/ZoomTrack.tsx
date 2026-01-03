@@ -32,7 +32,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
-    const editingZoomId = useProjectStore(s => s.editingZoomId);
+    const editingZoomId = useProjectStore(s => s.activeZoomId);
     const setEditingZoom = useProjectStore(s => s.setEditingZoom);
     const project = useProjectStore(s => s.project);
 

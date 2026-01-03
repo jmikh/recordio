@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectTimeline, CanvasMode } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import type { OutputWindow } from '../../../core/types';
@@ -21,9 +21,8 @@ export function Timeline() {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
-    const setEditingCrop = useProjectStore(s => s.setEditingCrop);
-    const editingZoomId = useProjectStore(s => s.editingZoomId);
-    const editingCrop = useProjectStore(s => s.editingCrop);
+    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
+    const canvasMode = useProjectStore(s => s.canvasMode);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
@@ -71,14 +70,16 @@ export function Timeline() {
         const time = getTimeFromEvent(e);
         setHoverTime(time);
 
+        const isBlockingEdit = canvasMode === CanvasMode.Crop || canvasMode === CanvasMode.Zoom;
+
         if (isCTIScrubbing) {
             setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
-        } else if (!isPlaying && !editingZoomId && !editingCrop) {
+        } else if (!isPlaying && !isBlockingEdit) {
             setPreviewTime(time);
         } else {
             setPreviewTime(null);
         }
-    }, [isCTIScrubbing, pixelsPerSec, totalDuration, setCurrentTime, setPreviewTime, isPlaying, editingZoomId, editingCrop]);
+    }, [isCTIScrubbing, pixelsPerSec, totalDuration, setCurrentTime, setPreviewTime, isPlaying, canvasMode]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setIsCTIScrubbing(true);
@@ -218,7 +219,7 @@ export function Timeline() {
                         Split
                     </button>
                     <button
-                        onClick={() => setEditingCrop(true)}
+                        onClick={() => setCanvasMode(CanvasMode.Crop)}
                         className="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs border border-[#555] flex items-center gap-1"
                         title="Crop Video"
                     >

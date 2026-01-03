@@ -1,4 +1,4 @@
-import { useProjectStore } from '../../stores/useProjectStore';
+import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
@@ -11,8 +11,9 @@ const SHAPES = [
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setEditingCamera = useProjectStore(s => s.setEditingCamera);
-    const editingCamera = useProjectStore(s => s.editingCamera);
+    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
+    const canvasMode = useProjectStore(s => s.canvasMode);
+    const isEditingCamera = canvasMode === CanvasMode.Camera;
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
     const cameraConfig = project.settings.camera;
@@ -67,13 +68,13 @@ export const CameraSettings = () => {
 
                 <div className="flex gap-2 mb-6">
                     <button
-                        onClick={() => setEditingCamera(!editingCamera)}
-                        className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${editingCamera
+                        onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.Camera)}
+                        className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${isEditingCamera
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
                             : 'bg-[#333] text-gray-200 hover:bg-[#444]'
                             }`}
                     >
-                        {editingCamera ? 'Done Editing' : 'Edit Position & Size'}
+                        {isEditingCamera ? 'Done Editing' : 'Edit Position & Size'}
                     </button>
                 </div>
 
