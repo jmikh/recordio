@@ -318,6 +318,41 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 }}
             />
 
+            {/* Toolbar - Positioned relative to the actual Video Content (viewMapper.contentRect) */}
+            <div
+                className="absolute flex gap-2 pointer-events-auto"
+                style={{
+                    left: `${toPct(viewMapper.contentRect.x, outputSize.width)}%`,
+                    top: `calc(${toPct(viewMapper.contentRect.y, outputSize.height)}% - 40px)`,
+                    width: `${toPct(viewMapper.contentRect.width, outputSize.width)}%`,
+                }}
+            >
+                <button
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded shadow font-bold transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setEditingCrop(false); }}
+                >
+                    DONE
+                </button>
+
+                <button
+                    className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded shadow font-bold transition-colors"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // Center Logic
+                        const newX = (inputSize.width - currentCrop.width) / 2;
+                        const newY = (inputSize.height - currentCrop.height) / 2;
+                        const newCrop = { ...currentCrop, x: newX, y: newY };
+
+                        // Use direct store update for immediate reliable action
+                        useProjectStore.getState().updateSettings({ screen: { crop: newCrop } });
+                    }}
+                >
+                    CENTER
+                </button>
+
+
+            </div>
+
             {/* Crop Box */}
             <div
                 className="absolute border border-white box-content cursor-move"
@@ -347,11 +382,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 <Handle type="sw" cursor="sw-resize" />
                 <Handle type="se" cursor="se-resize" />
 
-                {/* Label / Button */}
-                <div className="absolute -top-8 left-0 bg-blue-600 text-white text-xs px-2 py-1 rounded shadow pointer-events-auto cursor-pointer font-bold"
-                    onClick={(e) => { e.stopPropagation(); setEditingCrop(false); }}>
-                    DONE
-                </div>
+
             </div>
         </div>
     );

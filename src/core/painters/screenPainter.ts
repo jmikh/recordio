@@ -77,10 +77,12 @@ export function drawScreen(
         const scale = renderRects.destRect.width / renderRects.sourceRect.width;
 
         // Calculate Project Rect (Full Video on Canvas)
-        const originX = renderRects.destRect.x - (renderRects.sourceRect.x * scale);
-        const originY = renderRects.destRect.y - (renderRects.sourceRect.y * scale);
-        const projectedW = inputSize.width * scale;
-        const projectedH = inputSize.height * scale;
+        // Calculate Project Rect (Logical Screen on Canvas)
+        const logicalScreenRect = viewMapper.getProjectedSubjectRect(effectiveViewport);
+        const originX = logicalScreenRect.x;
+        const originY = logicalScreenRect.y;
+        const projectedW = logicalScreenRect.width;
+        const projectedH = logicalScreenRect.height;
 
         const isDeviceMode = screenConfig.mode === 'device';
 

@@ -173,6 +173,34 @@ export class ViewMapper {
         // We assume uniform scaling for zoom elements, so we use width ratio.
         return this.outputVideoSize.width / viewport.width;
     }
+
+    /**
+     * Returns the projected rectangle of the "Subject" (effective input) on the screen.
+     * "Subject" is the Crop Rect if defined, otherwise the Full Input Video.
+     * This represents the area that visual elements (borders, shadows) should wrap around.
+     */
+    getProjectedSubjectRect(viewport: Rect): Rect {
+        const effectiveInputSize = this.cropRect
+            ? { width: this.cropRect.width, height: this.cropRect.height }
+            : this.inputVideoSize;
+        const offsetX = this.cropRect ? this.cropRect.x : 0;
+        const offsetY = this.cropRect ? this.cropRect.y : 0;
+
+        // Get corners in Input Space
+        const topLeftInput = { x: offsetX, y: offsetY };
+        const bottomRightInput = { x: offsetX + effectiveInputSize.width, y: offsetY + effectiveInputSize.height };
+
+        // Project to Screen Space
+        const topLeftScreen = this.projectToScreen(topLeftInput, viewport);
+        const bottomRightScreen = this.projectToScreen(bottomRightInput, viewport);
+
+        return {
+            x: topLeftScreen.x,
+            y: topLeftScreen.y,
+            width: bottomRightScreen.x - topLeftScreen.x,
+            height: bottomRightScreen.y - topLeftScreen.y
+        };
+    }
 }
 
 // Helper
