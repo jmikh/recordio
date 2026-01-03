@@ -54,7 +54,8 @@ export class ProjectImpl {
                     borderWidth: 2,
                     borderColor: 'white',
                     hasShadow: false,
-                    hasGlow: true
+                    hasGlow: true,
+                    zoom: 1
 
                 }
             },

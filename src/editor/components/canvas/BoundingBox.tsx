@@ -4,7 +4,7 @@ import type { Rect } from '../../../core/types';
 // ------------------------------------------------------------------
 // TYPES
 // ------------------------------------------------------------------
-export type InteractionType = 'move' | 'nw' | 'ne' | 'sw' | 'se';
+export type InteractionType = 'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
 
 export interface BoundingBoxProps {
     /** Current rectangle in canvas coordinates */
@@ -54,8 +54,6 @@ const Handle: React.FC<HandleProps> = ({
         cursor: cursor,
         zIndex: 10,
     };
-    // ... (skip lines)
-
 
     const cornerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -98,6 +96,90 @@ const Handle: React.FC<HandleProps> = ({
             onPointerDown={(e) => onPointerDown(e, type)}
         >
             <div style={cornerStyle} />
+        </div>
+    );
+};
+
+// ------------------------------------------------------------------
+// COMPONENT: Single Side Handle
+// ------------------------------------------------------------------
+const SideHandle: React.FC<HandleProps> = ({
+    type,
+    cursor,
+    onPointerDown
+}) => {
+    const size = 20;
+    const thickness = 2;
+    const length = 15;
+    const color = 'orange';
+
+    const containerStyle: React.CSSProperties = {
+        position: 'absolute',
+        cursor: cursor,
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    };
+
+    const barStyle: React.CSSProperties = {
+        backgroundColor: color,
+        position: 'absolute',
+    };
+
+    switch (type) {
+        case 'n':
+            containerStyle.top = -size / 2;
+            containerStyle.left = '50%';
+            containerStyle.marginLeft = -size / 2;
+            containerStyle.width = size;
+            containerStyle.height = size;
+
+            barStyle.width = length;
+            barStyle.height = thickness;
+            barStyle.top = size / 2;
+            break;
+        case 's':
+            containerStyle.bottom = -size / 2;
+            containerStyle.left = '50%';
+            containerStyle.marginLeft = -size / 2;
+            containerStyle.width = size;
+            containerStyle.height = size;
+
+            barStyle.width = length;
+            barStyle.height = thickness;
+            barStyle.bottom = size / 2;
+            break;
+        case 'w':
+            containerStyle.left = -size / 2;
+            containerStyle.top = '50%';
+            containerStyle.marginTop = -size / 2;
+            containerStyle.width = size;
+            containerStyle.height = size;
+
+            barStyle.width = thickness;
+            barStyle.height = length;
+            barStyle.left = size / 2;
+            break;
+        case 'e':
+            containerStyle.right = -size / 2;
+            containerStyle.top = '50%';
+            containerStyle.marginTop = -size / 2;
+            containerStyle.width = size;
+            containerStyle.height = size;
+
+            barStyle.width = thickness;
+            barStyle.height = length;
+            barStyle.right = size / 2;
+            break;
+    }
+
+    return (
+        <div
+            style={containerStyle}
+            onPointerDown={(e) => onPointerDown(e, type)}
+        >
+            <div style={barStyle} />
         </div>
     );
 };
@@ -230,16 +312,19 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                 }
             } else {
                 // Free-form resize (no aspect ratio)
-                if (type === 'se' || type === 'ne') {
+
+                // Horizontal logic
+                if (type === 'se' || type === 'ne' || type === 'e') {
                     newRect.width += deltaX;
-                } else { // sw, nw
+                } else if (type === 'sw' || type === 'nw' || type === 'w') {
                     newRect.width -= deltaX;
                     newRect.x += deltaX;
                 }
 
-                if (type === 'se' || type === 'sw') {
+                // Vertical logic
+                if (type === 'se' || type === 'sw' || type === 's') {
                     newRect.height += deltaY;
-                } else { // ne, nw
+                } else if (type === 'ne' || type === 'nw' || type === 'n') {
                     newRect.height -= deltaY;
                     newRect.y += deltaY;
                 }
@@ -248,12 +333,12 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                 if (newRect.width < MIN_SIZE) {
                     const diff = MIN_SIZE - newRect.width;
                     newRect.width = MIN_SIZE;
-                    if (type === 'sw' || type === 'nw') newRect.x -= diff;
+                    if (type === 'sw' || type === 'nw' || type === 'w') newRect.x -= diff;
                 }
                 if (newRect.height < MIN_SIZE) {
                     const diff = MIN_SIZE - newRect.height;
                     newRect.height = MIN_SIZE;
-                    if (type === 'ne' || type === 'nw') newRect.y -= diff;
+                    if (type === 'ne' || type === 'nw' || type === 'n') newRect.y -= diff;
                 }
 
                 // Clamp to bounds
@@ -331,6 +416,30 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                 cursor="se-resize"
                 onPointerDown={handlePointerDown}
             />
+            {!maintainAspectRatio && (
+                <>
+                    <SideHandle
+                        type="n"
+                        cursor="n-resize"
+                        onPointerDown={handlePointerDown}
+                    />
+                    <SideHandle
+                        type="s"
+                        cursor="s-resize"
+                        onPointerDown={handlePointerDown}
+                    />
+                    <SideHandle
+                        type="w"
+                        cursor="w-resize"
+                        onPointerDown={handlePointerDown}
+                    />
+                    <SideHandle
+                        type="e"
+                        cursor="e-resize"
+                        onPointerDown={handlePointerDown}
+                    />
+                </>
+            )}
         </div>
     );
 };

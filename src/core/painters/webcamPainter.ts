@@ -27,7 +27,8 @@ export function drawWebcam(
         borderWidth = 0,
         borderColor = '#ffffff',
         hasShadow = false,
-        hasGlow = false
+        hasGlow = false,
+        zoom = 1
     } = settings;
 
     // Calculate Crop (Object-Fit: Cover)
@@ -48,6 +49,16 @@ export function drawWebcam(
         sh = inputSize.width / dstRatio;
         sx = 0;
         sy = (inputSize.height - sh) / 2;
+    }
+
+    // Apply Zoom
+    if (zoom > 1) {
+        const zoomedW = sw / zoom;
+        const zoomedH = sh / zoom;
+        sx += (sw - zoomedW) / 2;
+        sy += (sh - zoomedH) / 2;
+        sw = zoomedW;
+        sh = zoomedH;
     }
 
     // Apply global scaling

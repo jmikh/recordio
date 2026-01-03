@@ -272,7 +272,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
     return (
         <div
-            className="w-full relative bg-[#252526] overflow-hidden select-none"
+            className="w-full relative bg-[#252526] select-none"
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -351,7 +351,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                         width: `${hoverInfo.width}px`
                     }}
                 >
-                    <span className="text-yellow-200 text-[9px] font-medium">+ Add Zoom</span>
+                    {/* Add Zoom Label (Above) */}
+                    <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-yellow-200/90 pointer-events-none bg-[#252526]/80 px-1 rounded">
+                        Add Zoom
+                    </div>
+
+                    {/* Right Handle */}
+                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-yellow-500/50" />
+
+                    {/* Plus Icon */}
+                    <span className="text-yellow-200 text-lg font-light leading-none">+</span>
                 </div>
             )}
         </div>

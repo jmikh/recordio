@@ -63,6 +63,7 @@ export interface CameraSettings extends StyleSettings {
     x: number;
     y: number;
     shape: 'circle' | 'rect' | 'square';
+    zoom: number;
 }
 
 export interface ScreenSettings extends StyleSettings {
@@ -349,4 +350,5 @@ export interface CameraSettings {
     borderColor: string;
     hasShadow: boolean;
     hasGlow: boolean;
+    zoom: number;
 }

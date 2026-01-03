@@ -56,7 +56,8 @@ export const CameraSettings = () => {
         borderWidth = 0,
         borderColor = '#ffffff',
         hasShadow = false,
-        hasGlow = false
+        hasGlow = false,
+        zoom = 1
     } = cameraConfig;
 
     return (
@@ -95,6 +96,25 @@ export const CameraSettings = () => {
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Zoom */}
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
+                            <span className="text-xs text-gray-500 font-mono">{zoom.toFixed(1)}x</span>
+                        </div>
+                        <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            step="0.1"
+                            value={zoom}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(e) => updateWithBatching({ camera: { ...cameraConfig, zoom: parseFloat(e.target.value) } })}
+                            className="w-full h-1.5 bg-[#333] rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+                        />
                     </div>
 
                     <StyleControls
