@@ -9,6 +9,7 @@ import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
+
 import { TimeMapper } from '../../../core/timeMapper';
 import type { CameraSettings } from '../../../core/types';
 

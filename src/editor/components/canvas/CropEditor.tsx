@@ -11,6 +11,9 @@ import { BoundingBox } from './BoundingBox';
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
 // ------------------------------------------------------------------
+
+const EDITOR_PADDING = 0.05;
+
 export const renderCropEditor = (
     resources: RenderResources,
     state: {
@@ -33,10 +36,6 @@ export const renderCropEditor = (
     // Also hide radius, borders, and frames for cleaner crop editing view
     const tempSettings = {
         ...project.settings,
-        background: {
-            ...project.settings.background,
-            padding: 0.05 // Force consistent padding during crop editing
-        },
         screen: {
             ...project.settings.screen,
             crop: undefined, // Force undefined to see full video
@@ -44,7 +43,8 @@ export const renderCropEditor = (
             borderRadius: 0, // Hide rounding
             borderWidth: 0, // Hide borders
             hasShadow: false, // Hide shadow
-            hasGlow: false // Hide glow
+            hasGlow: false, // Hide glow
+            padding: EDITOR_PADDING // Force consistent padding during crop editing
         }
     };
 
@@ -107,11 +107,11 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     // We need a ViewMapper that matches what `renderCropEditor` does (Full Video -> Output)
     // So we can project the Crop Rect from Source Space -> Screen Space
-    // Use same 0.05 padding as renderCropEditor to ensure overlay aligns with rendered video
+    // Use same padding as renderCropEditor to ensure overlay aligns with rendered video
     const viewMapper = new ViewMapper(
         inputSize,
         outputSize,
-        0.05, // Force same padding as renderCropEditor
+        EDITOR_PADDING, // Force same padding as renderCropEditor
         undefined // NO CROP for the mapper, because we are mapping onto the full view
     );
 

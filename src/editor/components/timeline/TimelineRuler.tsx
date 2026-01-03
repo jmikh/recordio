@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { formatTimeCode } from '../utils';
+import { formatTimeCode } from '../../utils';
 
 interface TimelineRulerProps {
     totalWidth: number;

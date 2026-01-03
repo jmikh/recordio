@@ -84,13 +84,18 @@ export interface BackgroundSettings {
     backgroundBlur: number;
 }
 
+export interface ZoomSettings {
+    maxZoom: number;
+    autoZoom: boolean;
+    defaultDurationMs: number;
+}
+
 export interface ProjectSettings {
     outputSize: Size;
     frameRate: number;
 
     // Zoom
-    maxZoom: number;
-    autoZoom: boolean;
+    zoom: ZoomSettings;
 
     // Background
     background: BackgroundSettings;

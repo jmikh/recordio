@@ -39,6 +39,7 @@ export interface ProjectState {
     // Zoom Editing Actions
     setEditingZoom: (id: ID | null) => void;
     updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
+    addViewportMotion: (motion: ViewportMotion) => void;
     deleteViewportMotion: (id: ID) => void;
 
     // Timeline Actions
@@ -64,7 +65,7 @@ const recalculateAutoZooms = (
     sources: Record<ID, import('../../core/types').SourceMetadata>,
     events: UserEvents
 ): ViewportMotion[] => {
-    if (!project.settings.autoZoom) {
+    if (!project.settings.zoom.autoZoom) {
         return project.timeline.recording.viewportMotions; // Return existing if auto is off (or empty?)
     }
 
@@ -86,7 +87,7 @@ const recalculateAutoZooms = (
     const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
 
     return calculateZoomSchedule(
-        project.settings.maxZoom,
+        project.settings.zoom.maxZoom,
         viewMapper,
         events,
         timeMapper
@@ -187,10 +188,10 @@ export const useProjectStore = create<ProjectState>()(
 
                         // FORCE AUTO ZOOM OFF if it was on
                         // This prevents recalc from overwriting our manual work
-                        const nextSettings = { ...state.project.settings };
-                        if (nextSettings.autoZoom) {
-                            nextSettings.autoZoom = false;
-                        }
+                        const nextSettings = {
+                            ...state.project.settings,
+                            zoom: { ...state.project.settings.zoom, autoZoom: false }
+                        };
 
                         return {
                             project: {
@@ -208,13 +209,46 @@ export const useProjectStore = create<ProjectState>()(
                     });
                 },
 
+                addViewportMotion: (motion) => {
+                    console.log('[Action] addViewportMotion', motion);
+                    set(state => {
+                        const motions = [...state.project.timeline.recording.viewportMotions, motion];
+
+                        const nextSettings = {
+                            ...state.project.settings,
+                            zoom: { ...state.project.settings.zoom, autoZoom: false }
+                        };
+
+                        return {
+                            project: {
+                                ...state.project,
+                                settings: nextSettings,
+                                timeline: {
+                                    ...state.project.timeline,
+                                    recording: {
+                                        ...state.project.timeline.recording,
+                                        viewportMotions: motions
+                                    }
+                                }
+                            }
+                        };
+                    });
+                },
+
                 deleteViewportMotion: (id) => {
                     console.log('[Action] deleteViewportMotion', id);
                     set(state => {
                         const motions = state.project.timeline.recording.viewportMotions.filter(m => m.id !== id);
+
+                        const nextSettings = {
+                            ...state.project.settings,
+                            zoom: { ...state.project.settings.zoom, autoZoom: false }
+                        };
+
                         return {
                             project: {
                                 ...state.project,
+                                settings: nextSettings,
                                 timeline: {
                                     ...state.project.timeline,
                                     recording: {
@@ -393,6 +427,10 @@ export const useProjectStore = create<ProjectState>()(
                                 ...currentSettings.screen,
                                 ...(updates.screen || {})
                             },
+                            zoom: {
+                                ...currentSettings.zoom,
+                                ...(updates.zoom || {})
+                            },
                             camera: {
                                 ...currentSettings.camera,
                                 ...(updates.camera || {})
@@ -420,7 +458,9 @@ export const useProjectStore = create<ProjectState>()(
                         const paddingChanged = nextSettings.screen.padding !== currentSettings.screen.padding;
 
                         // Check for any zoom related changes
-                        const zoomChanged = updates.maxZoom !== undefined || updates.autoZoom !== undefined;
+                        // Check for any zoom related changes
+                        const zoomUpdates = updates.zoom || {};
+                        const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.autoZoom !== undefined;
 
                         if (paddingChanged || zoomChanged) {
                             nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);

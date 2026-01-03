@@ -18,8 +18,12 @@ export class ProjectImpl {
             settings: {
                 outputSize: { width: 1920, height: 1080 },
                 frameRate: 60,
-                maxZoom: 2,
-                autoZoom: true,
+
+                zoom: {
+                    maxZoom: 2,
+                    autoZoom: true,
+                    defaultDurationMs: 1500
+                },
 
                 screen: {
                     mode: 'device',
@@ -110,7 +114,7 @@ export class ProjectImpl {
         const timeMapper = new TimeMapper(0, outputWindows);
 
         const viewportMotions = calculateZoomSchedule(
-            project.settings.maxZoom,
+            project.settings.zoom.maxZoom,
             viewMapper,
             screenEvents,
             timeMapper

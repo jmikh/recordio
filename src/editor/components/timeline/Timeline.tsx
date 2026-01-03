@@ -1,11 +1,12 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { useProjectStore, useProjectTimeline } from '../stores/useProjectStore';
-import { usePlaybackStore } from '../stores/usePlaybackStore';
+import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
-import { TimeMapper } from '../../core/timeMapper';
-import type { OutputWindow } from '../../core/types';
+import type { OutputWindow } from '../../../core/types';
 import { MdCrop } from 'react-icons/md';
 
+
+import { ZoomTrack } from './ZoomTrack';
 
 // Constants
 const MIN_PIXELS_PER_SEC = 10;
@@ -20,8 +21,6 @@ export function Timeline() {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
-    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
-    const editingZoomId = useProjectStore(s => s.editingZoomId);
     const setEditingCrop = useProjectStore(s => s.setEditingCrop);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
@@ -306,55 +305,7 @@ export function Timeline() {
                         </div>
 
                         {/* ROW 3: Viewport Motions */}
-                        <div className="w-full relative bg-[#252526]" style={{ height: TRACK_HEIGHT }}>
-                            <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none">MOTION</div>
-                            {recording.viewportMotions?.map((m, i) => {
-                                // Motions are stored in Source Time.
-                                // We calculate the timeline position by converting to output time (to handle duration gaps)
-                                // and then mapping back to timeline time.
-
-                                const timeMapper = new TimeMapper(timelineOffset, timeline.outputWindows);
-
-                                const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-                                if (outputEndTime === -1) return null;
-
-                                const outputStartTime = outputEndTime - m.durationMs;
-
-                                // Map back to timeline time
-                                const timelineEndMs = timeMapper.mapOutputToTimelineTime(outputEndTime);
-                                const timelineStartMs = timeMapper.mapOutputToTimelineTime(Math.max(0, outputStartTime));
-
-                                if (timelineEndMs === -1 || timelineStartMs === -1) return null;
-
-                                const left = (timelineStartMs / 1000) * pixelsPerSec;
-                                const width = ((timelineEndMs - timelineStartMs) / 1000) * pixelsPerSec;
-
-                                if (width <= 0) return null;
-
-                                return (
-                                    <div
-                                        key={i}
-                                        className={`absolute top-0 bottom-0 group cursor-pointer ${editingZoomId === m.id ? 'ring-2 ring-yellow-400 z-20' : ''}`}
-                                        style={{ left: `${left}px`, width: `${Math.max(width, 2)}px` }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditingZoom(m.id);
-                                            // Pause playback if desired?
-                                            setIsPlaying(false);
-                                        }}
-                                    >
-                                        {/* Trailing Line */}
-                                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-purple-500/40 group-hover:bg-purple-400/60 transition-colors" />
-
-                                        {/* Keyframe Dot (at end) */}
-                                        <div
-                                            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-purple-500 rounded-full border-2 border-[#252526] shadow-sm hover:scale-125 transition-transform z-10 cursor-help"
-                                            title={`Zoom: ${m.reason}`}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <ZoomTrack pixelsPerSec={pixelsPerSec} height={TRACK_HEIGHT} timelineOffset={timelineOffset} />
 
                         {/* ROW 4: Events (Clicks/Drags) */}
                         <div className="w-full relative bg-[#252526]" style={{ height: TRACK_HEIGHT }}>
