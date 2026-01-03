@@ -22,7 +22,7 @@ export class ProjectImpl {
                 zoom: {
                     maxZoom: 2,
                     autoZoom: true,
-                    defaultDurationMs: 1500
+                    defaultDurationMs: 600
                 },
 
                 screen: {
@@ -116,6 +116,7 @@ export class ProjectImpl {
 
         const viewportMotions = calculateZoomSchedule(
             project.settings.zoom.maxZoom,
+            project.settings.zoom.defaultDurationMs,
             viewMapper,
             screenEvents,
             timeMapper

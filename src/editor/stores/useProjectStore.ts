@@ -96,6 +96,7 @@ const recalculateAutoZooms = (
 
     return calculateZoomSchedule(
         project.settings.zoom.maxZoom,
+        project.settings.zoom.defaultDurationMs,
         viewMapper,
         events,
         timeMapper
