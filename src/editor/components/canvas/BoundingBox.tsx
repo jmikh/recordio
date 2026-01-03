@@ -299,6 +299,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         cursor: 'move',
         border: '2px solid green',
         boxSizing: 'border-box',
+        pointerEvents: 'auto', // Ensure interactive even if parent is pointer-events: none
     };
 
     return (
