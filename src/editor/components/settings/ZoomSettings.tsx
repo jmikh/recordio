@@ -7,6 +7,7 @@ export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const updateRecording = useProjectStore(s => s.updateRecording);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
+    const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
 
@@ -16,12 +17,10 @@ export const ZoomSettings = () => {
     };
 
     const handleClearZooms = () => {
-        if (confirm("Are you sure you want to clear all zooms? This will also disable Auto Zoom.")) {
-            // 1. Clear motions
-            updateRecording({ viewportMotions: [] });
-            // 2. Disable auto zoom to prevent recalc
-            updateSettings({ zoom: { autoZoom: false } });
-        }
+        // 1. Clear motions
+        updateRecording({ viewportMotions: [] });
+        // 2. Disable auto zoom to prevent recalc
+        updateSettings({ zoom: { autoZoom: false } });
     };
 
     return (
@@ -71,7 +70,13 @@ export const ZoomSettings = () => {
             <div className="pt-2">
                 <button
                     onClick={handleClearZooms}
-                    className="w-full py-2 px-4 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium transition-colors border border-red-500/20 flex items-center justify-center gap-2"
+                    disabled={viewportMotions.length === 0}
+                    className={`w-full py-2 px-4 rounded text-xs font-medium transition-colors border flex items-center justify-center gap-2
+                        ${viewportMotions.length === 0
+                            ? 'bg-gray-700/30 text-gray-500 border-transparent cursor-not-allowed' // Disabled state
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600'        // Active state (Neutral)
+                        }
+                    `}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 6h18"></path>

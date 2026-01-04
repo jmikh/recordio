@@ -20,6 +20,8 @@ export const CanvasContainer = () => {
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
     const sources = useProjectSources();
+    const isPlaying = usePlaybackStore(s => s.isPlaying);
+    const mutedSources = useProjectStore(s => s.mutedSources);
 
     // DOM Refs for Resources
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
@@ -218,8 +220,9 @@ export const CanvasContainer = () => {
                     {deviceFrame && (
                         <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin="anonymous" />
                     )}
-                    {Object.values(sources).map((source) => (
-                        source.url ? (
+                    {Object.values(sources).map((source) => {
+                        const isMuted = !isPlaying || mutedSources[source.id];
+                        return source.url ? (
                             <video
                                 key={source.id}
                                 ref={el => {
@@ -227,12 +230,12 @@ export const CanvasContainer = () => {
                                     else delete internalVideoRefs.current[source.id];
                                 }}
                                 src={source.url}
-                                muted={true}
+                                muted={isMuted}
                                 playsInline
                                 crossOrigin="anonymous"
                             />
-                        ) : null
-                    ))}
+                        ) : null;
+                    })}
                 </div>
 
                 {/* MAIN CANVAS */}

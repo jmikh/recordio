@@ -44,6 +44,10 @@ export interface ProjectState {
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
     setCanvasMode: (mode: CanvasMode) => void;
 
+    // Audio State
+    mutedSources: Record<ID, boolean>;
+    toggleSourceMute: (sourceId: ID) => void;
+
     // Zoom Editing Actions
     setEditingZoom: (id: ID | null) => void;
     updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
@@ -121,6 +125,7 @@ export const useProjectStore = create<ProjectState>()(
                 sources: {},
                 userEvents: EMPTY_USER_EVENTS,
                 isSaving: false,
+                mutedSources: {},
 
                 // Canvas Mode Logic
                 canvasMode: CanvasMode.Preview,
@@ -131,6 +136,13 @@ export const useProjectStore = create<ProjectState>()(
                     canvasMode: mode,
                     ...(mode !== CanvasMode.Zoom ? { activeZoomId: null, editingZoomInitialState: null } : {})
                 }),
+
+                toggleSourceMute: (sourceId) => set(state => ({
+                    mutedSources: {
+                        ...state.mutedSources,
+                        [sourceId]: !state.mutedSources[sourceId]
+                    }
+                })),
 
                 setEditingZoom: (id) => {
                     const store = useProjectStore;

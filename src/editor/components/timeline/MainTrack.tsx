@@ -131,7 +131,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
     return (
         <div className="w-full relative bg-[#2a2a2a]/50" style={{ height: trackHeight }}>
-            <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none sticky left-0 z-10">MAIN</div>
 
             {timeline.outputWindows.map((w, i) => {
                 const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
