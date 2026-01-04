@@ -147,24 +147,26 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         ? project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId)?.rect
         : null;
 
-    if (!initialRect || !editingZoomId) return null;
-
     // Actions
-    const onCommit = (rect: Rect) => updateViewportMotion(editingZoomId, { rect });
+    const onCommit = (rect: Rect) => editingZoomId && updateViewportMotion(editingZoomId, { rect });
     const onCancel = () => setEditingZoom(null);
     const onDelete = () => {
-        deleteViewportMotion(editingZoomId);
-        setEditingZoom(null);
+        if (editingZoomId) {
+            deleteViewportMotion(editingZoomId);
+            setEditingZoom(null);
+        }
     };
 
     const containerRef = useRef<HTMLDivElement>(null);
     // Local state to track rect *during* drag before committing
-    const [currentRect, setCurrentRect] = React.useState<Rect>(initialRect);
+    const [currentRect, setCurrentRect] = React.useState<Rect>(initialRect || { x: 0, y: 0, width: 0, height: 0 });
 
     // Sync state if initialRect changes externally (e.g. undo/redo)
     useEffect(() => {
-        setCurrentRect(initialRect);
-        if (previewRectRef) previewRectRef.current = initialRect;
+        if (initialRect) {
+            setCurrentRect(initialRect);
+            if (previewRectRef) previewRectRef.current = initialRect;
+        }
     }, [initialRect, previewRectRef]);
 
     const handleRectChange = (newRect: Rect) => {
@@ -201,7 +203,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     // Click on background moves the zoom box
     const handleContainerPointerDown = (e: React.PointerEvent) => {
         // Only trigger if clicking the container background directly
-        if (e.target !== containerRef.current) return;
+        if (e.target !== containerRef.current || !initialRect) return;
 
         const rect = containerRef.current.getBoundingClientRect();
         const offsetX = e.clientX - rect.left;
@@ -224,6 +226,8 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         handleRectChange(newRect);
         onCommit(newRect);
     };
+
+    if (!initialRect || !editingZoomId) return null;
 
     return (
         <div
