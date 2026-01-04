@@ -36,6 +36,7 @@ export interface ProjectState {
     canvasMode: CanvasMode;
     activeZoomId: ID | null;
     editingZoomInitialState: ViewportMotion | null;
+    selectedWindowId: ID | null;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
@@ -43,6 +44,7 @@ export interface ProjectState {
     addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
     setCanvasMode: (mode: CanvasMode) => void;
+    selectWindow: (id: ID | null) => void;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
@@ -131,6 +133,9 @@ export const useProjectStore = create<ProjectState>()(
                 canvasMode: CanvasMode.Preview,
                 activeZoomId: null,
                 editingZoomInitialState: null as ViewportMotion | null,
+                selectedWindowId: null,
+
+                selectWindow: (id) => set({ selectedWindowId: id }),
 
                 setCanvasMode: (mode) => set({
                     canvasMode: mode,
@@ -597,7 +602,11 @@ export const useProjectStore = create<ProjectState>()(
                         };
                         const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
+                        // Clear selection if deleted
+                        const nextSelected = state.selectedWindowId === id ? null : state.selectedWindowId;
+
                         return {
+                            selectedWindowId: nextSelected,
                             project: {
                                 ...tempProject,
                                 timeline: {

@@ -33,6 +33,8 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     trackHeight,
 }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
+    const selectWindow = useProjectStore(s => s.selectWindow);
+    const selectedWindowId = useProjectStore(s => s.selectedWindowId);
     const sources = useProjectSources();
     const [dragState, setDragState] = useState<DragState | null>(null);
 
@@ -141,6 +143,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
                 {timeline.outputWindows.map((w) => {
                     const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
+                    const isSelected = selectedWindowId === w.id;
                     const durationMs = win.endMs - win.startMs;
                     const left = currentX;
                     const width = (durationMs / 1000) * pixelsPerSec;
@@ -153,9 +156,12 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     return (
                         <div
                             key={w.id}
-                            className="absolute top-0 bottom-0 group border border-white/20 rounded-lg overflow-hidden flex flex-col hover:border-white/40 transition-colors"
+                            className={`absolute top-0 bottom-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-yellow-500 border-2' : 'border-white/20 hover:border-white/40'}`}
                             style={{ left: `${left}px`, width: `${width}px` }}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                selectWindow(w.id);
+                            }}
                             onMouseDown={(e) => handleDragStart(e, w.id, 'move')}
                         >
                             {/* Group Header */}

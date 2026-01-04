@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
+import { usePlaybackStore } from './stores/usePlaybackStore';
 import { Timeline } from './components/timeline/Timeline';
 
 import { ProjectStorage } from '../storage/projectStorage';
@@ -68,15 +69,28 @@ function Editor() {
         init();
     }, []);
 
-    // Global Key Listener for Undo/Redo
+    // Global Key Listener for Undo/Redo & Play/Pause
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if user is typing in an input
+            const activeTag = document.activeElement?.tagName.toLowerCase();
+            if (activeTag === 'input' || activeTag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable) {
+                return;
+            }
+
             if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
                 if (e.shiftKey) {
                     redo();
                 } else {
                     undo();
                 }
+                return;
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent scrolling
+                const { isPlaying, setIsPlaying } = usePlaybackStore.getState();
+                setIsPlaying(!isPlaying);
             }
         };
 

@@ -1,5 +1,5 @@
 // ... imports
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
@@ -110,6 +110,26 @@ export function Timeline() {
         updateSettings({ outputSize: { width, height } });
     };
 
+    // --- Deletion Listener ---
+    const selectedWindowId = useProjectStore(s => s.selectedWindowId);
+    const selectWindow = useProjectStore(s => s.selectWindow);
+    const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!selectedWindowId) return;
+
+            // Delete or Backspace
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                removeOutputWindow(selectedWindowId);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedWindowId, removeOutputWindow]);
+
     return (
         <div className="flex flex-col h-full bg-[#1e1e1e] select-none text-white font-sans">
             {/* 1. Toolbar */}
@@ -204,6 +224,7 @@ export function Timeline() {
                             onMouseDown={handleMouseDown}
                             onMouseLeave={handleMouseLeave}
                             onMouseUp={handleMouseUp}
+                            onClick={() => selectWindow(null)}
                         >
                             <div
                                 className="relative min-w-full"
