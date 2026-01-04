@@ -23,6 +23,8 @@ export function Timeline() {
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
     const canvasMode = useProjectStore(s => s.canvasMode);
+    const projectSettings = useProjectStore(s => s.project.settings);
+    const updateSettings = useProjectStore(s => s.updateSettings);
 
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
@@ -69,6 +71,10 @@ export function Timeline() {
         splitWindow(win.id, currentTimeMs);
     };
 
+    const handleResolutionChange = (width: number, height: number) => {
+        updateSettings({ outputSize: { width, height } });
+    };
+
     return (
         <div className="flex flex-col h-full bg-[#1e1e1e] select-none text-white font-sans">
             {/* 1. Toolbar */}
@@ -80,6 +86,8 @@ export function Timeline() {
                 onScaleChange={setPixelsPerSec}
                 currentTimeMs={timeMapper.mapTimelineToOutputTime(currentTimeMs)}
                 totalDurationMs={totalOutputDuration}
+                currentResolution={projectSettings.outputSize}
+                onResolutionChange={handleResolutionChange}
             />
 
             {/* 2. Timeline Surface (Single Scroll Container) */}
