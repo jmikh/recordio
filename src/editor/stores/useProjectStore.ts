@@ -73,34 +73,43 @@ const recalculateAutoZooms = (
     sources: Record<ID, import('../../core/types').SourceMetadata>,
     events: UserEvents
 ): ViewportMotion[] => {
-    if (!project.settings.zoom.autoZoom) {
-        return project.timeline.recording.viewportMotions; // Return existing if auto is off (or empty?)
+    // 1. If Auto Zoom is ON, regenerate completely
+    if (project.settings.zoom.autoZoom) {
+        const screenSourceId = project.timeline.recording.screenSourceId;
+        const sourceMetadata = sources[screenSourceId];
+
+        if (!sourceMetadata) {
+            console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
+            return project.timeline.recording.viewportMotions;
+        }
+
+        const viewMapper = new ViewMapper(
+            sourceMetadata.size,
+            project.settings.outputSize,
+            project.settings.screen.padding,
+            project.settings.screen.crop
+        );
+
+        const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
+
+        return calculateZoomSchedule(
+            project.settings.zoom.maxZoom,
+            project.settings.zoom.defaultDurationMs,
+            viewMapper,
+            events,
+            timeMapper
+        );
     }
 
-    const screenSourceId = project.timeline.recording.screenSourceId;
-    const sourceMetadata = sources[screenSourceId];
-
-    if (!sourceMetadata) {
-        console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
-        return project.timeline.recording.viewportMotions;
-    }
-
-    const viewMapper = new ViewMapper(
-        sourceMetadata.size,
-        project.settings.outputSize,
-        project.settings.screen.padding,
-        project.settings.screen.crop
-    );
-
+    // 2. If Auto Zoom is OFF, cleanup invalid/gap zooms
+    // We filter out any zooms whose "target time" (sourceEndTimeMs) falls into a gap in the (new) windows.
     const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
+    const currentMotions = project.timeline.recording.viewportMotions || [];
 
-    return calculateZoomSchedule(
-        project.settings.zoom.maxZoom,
-        project.settings.zoom.defaultDurationMs,
-        viewMapper,
-        events,
-        timeMapper
-    );
+    return currentMotions.filter(m => {
+        const outputTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
+        return outputTime !== -1;
+    });
 };
 
 export const useProjectStore = create<ProjectState>()(

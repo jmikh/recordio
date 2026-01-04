@@ -13,10 +13,10 @@ interface DragState {
     type: 'move' | 'resize-left';
     motionId: string;
     startX: number;
+    initialOutputTime: number; // Anchor in Output Time
     initialSourceEndTime: number;
     initialDuration: number;
-    constraintMinTime: number; // Hard limit for (SourceEndTime - Duration) or SourceEndTime depending on op
-    constraintMaxTime: number; // Hard limit for SourceEndTime
+    // Constraints can stay relative or simplified
 }
 
 interface HoverInfo {
@@ -53,20 +53,17 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const timeMs = (x / pixelsPerSec) * 1000;
-        let mouseSourceTimeMs = timeMs - timelineOffset; // This is simplistic, assuming linear offset. Ideally use inverse mapping if possible, but standard here.
 
-        // Calculate Max Source Time based on last window
-        // This prevents floating point issues where we click "past" the end
-        const lastWindow = timeline.outputWindows[timeline.outputWindows.length - 1];
-        if (lastWindow) {
-            const maxSourceTime = lastWindow.endMs - timelineOffset;
-            if (mouseSourceTimeMs > maxSourceTime) {
-                mouseSourceTimeMs = maxSourceTime;
-            }
-        }
+        // Output Time (Continuous)
+        const outputTimeMs = (x / pixelsPerSec) * 1000;
 
-        if (mouseSourceTimeMs < 0) {
+        // Map Output -> Source
+        // If we are in a gap or after end, mapOutputToSourceTime returns -1?
+        // Actually mapOutputToSourceTime handles 0..Total mapped.
+        // If x is past end, outputTimeMs > total. map returns -1.
+        let mouseSourceTimeMs = timeMapper.mapOutputToSourceTime(outputTimeMs);
+
+        if (mouseSourceTimeMs === -1) {
             setHoverInfo(null);
             return;
         }
@@ -74,6 +71,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const motions = timeline.recording.viewportMotions || [];
 
         // 1. Check if we are inside an existing motion
+        // We check using source interval
         const isInside = motions.some(m => {
             const start = m.sourceEndTimeMs - m.durationMs;
             const end = m.sourceEndTimeMs;
@@ -102,7 +100,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         // Clamp duration
         const actualDuration = Math.min(defaultDur, availableDuration);
 
-        // If duration is too small (e.g. < 50ms), maybe don't show or invalid? 
         if (actualDuration < 50) {
             setHoverInfo(null);
             return;
@@ -111,14 +108,34 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const sourceEndTime = mouseSourceTimeMs;
         const sourceStartTime = mouseSourceTimeMs - actualDuration;
 
-        // Calculate visual width/position using TimeMapper to be safe with cuts
-        // (Though current logic implies simplistic Time->X, let's try to be consistent)
-        // Actually, if we use timeMs directly for X, we assume linear. 
-        // Let's use standard per-pixel logic for width for now to match other parts.
-        const width = (actualDuration / 1000) * pixelsPerSec;
+        // Calculate visual width mapping back to Output
+        const outputEndTime = outputTimeMs;
+        // Start might map to -1 if duration spans across cut into gap.
+        // We assume contiguous for adding new zoom? Or we clamp?
+        // If we just mapped Output->Source, then `sourceEndTime` is valid.
+        // `sourceStartTime` might be in gap?
+        // Check output start
+        let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
+
+        // If start is invalid (gap), clamp to nearest window start?
+        // Since we are "adding" a zoom, maybe we just use standard width (pixels)?
+        // If the duration is truly 600ms, and it fits in the clip, fine.
+        // If it crosses a cut, it might effectively be shorter visually.
+        // Let's rely on TimeMapper mapping.
+
+        if (outputStartTime === -1) {
+            // Fallback: If map fails, it means start is not visible.
+            // We can find the window containing sourceEndTime and clamp to its start.
+            // But for Hover UI, maybe just `outputEndTime - duration` is easier visual approximation?
+            // No, `left` depends on it.
+            // Let's assume standard width for hover to avoid jitter.
+            outputStartTime = outputEndTime - actualDuration;
+        }
+
+        const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
 
         setHoverInfo({
-            timeMs,
+            timeMs: outputTimeMs,
             x,
             sourceStartTime,
             sourceEndTime,
@@ -135,8 +152,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         e.stopPropagation();
         if (dragState) return;
 
-        // If currently editing a zoom, a click on the background should exit edit mode
-        // instead of creating a new one (preventing accidental creation)
         if (editingZoomId) {
             setEditingZoom(null);
             return;
@@ -166,33 +181,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const handleDragStart = (e: React.MouseEvent, type: 'move' | 'resize-left', motion: ViewportMotion) => {
         e.stopPropagation();
 
-        // Calculate Constraints
-        const motions = timeline.recording.viewportMotions || [];
-        const sortedMotions = [...motions].sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
-        const myIndex = sortedMotions.findIndex(m => m.id === motion.id);
-
-        const prevMotion = myIndex > 0 ? sortedMotions[myIndex - 1] : null;
-        const nextMotion = myIndex < sortedMotions.length - 1 ? sortedMotions[myIndex + 1] : null;
-
-        let constraintMinTime = 0;
-        let constraintMaxTime = Infinity;
-
-        if (prevMotion) {
-            constraintMinTime = prevMotion.sourceEndTimeMs;
-        }
-
-        if (nextMotion) {
-            constraintMaxTime = nextMotion.sourceEndTimeMs - nextMotion.durationMs;
-        }
+        const outputEndTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
+        if (outputEndTime === -1) return; // Should be impossible if clicked
 
         setDragState({
             type,
             motionId: motion.id,
             startX: e.clientX,
+            initialOutputTime: outputEndTime,
             initialSourceEndTime: motion.sourceEndTimeMs,
-            initialDuration: motion.durationMs,
-            constraintMinTime,
-            constraintMaxTime
+            initialDuration: motion.durationMs
         });
         setEditingZoom(motion.id);
     };
@@ -203,50 +201,36 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = (deltaX / pixelsPerSec) * 1000;
 
-        const { initialSourceEndTime, initialDuration, constraintMinTime, constraintMaxTime } = dragState;
+        const { initialOutputTime, initialDuration } = dragState;
 
         // Apply Logic
         if (dragState.type === 'move') {
-            let newEndTime = initialSourceEndTime + deltaTimeMs;
-            const newStartTime = newEndTime - initialDuration;
+            const newOutputTime = initialOutputTime + deltaTimeMs;
+            const newSourceEndTime = timeMapper.mapOutputToSourceTime(newOutputTime);
 
-            // Constrain Start
-            if (newStartTime < constraintMinTime) {
-                newEndTime = constraintMinTime + initialDuration;
+            if (newSourceEndTime !== -1) {
+                updateViewportMotion(dragState.motionId, {
+                    sourceEndTimeMs: newSourceEndTime
+                });
             }
-
-            // Constrain End
-            if (newEndTime > constraintMaxTime) {
-                newEndTime = constraintMaxTime;
-            }
-
-            // Also clamp 0
-            if ((newEndTime - initialDuration) < 0) {
-                newEndTime = initialDuration;
-            }
-
-            updateViewportMotion(dragState.motionId, {
-                sourceEndTimeMs: newEndTime
-            });
         } else if (dragState.type === 'resize-left') {
             let newDuration = initialDuration - deltaTimeMs;
 
             const MIN_DURATION = 100;
             if (newDuration < MIN_DURATION) newDuration = MIN_DURATION;
 
-            const maxDuration = initialSourceEndTime - constraintMinTime;
-            if (newDuration > maxDuration) newDuration = maxDuration;
+            // Optional: Max Duration constraint could be complicated with gaps
+            // For now, let's just allow it, if it starts in a gap, visualization handles it.
 
-            if (initialSourceEndTime - newDuration < 0) {
-                newDuration = initialSourceEndTime;
-            }
+            // Check bounds?
+            // if (initialSourceEndTime - newDuration < 0) ...
 
             updateViewportMotion(dragState.motionId, {
                 durationMs: newDuration
             });
         }
 
-    }, [dragState, pixelsPerSec, updateViewportMotion]);
+    }, [dragState, pixelsPerSec, updateViewportMotion, timeMapper]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
@@ -286,14 +270,25 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                 const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
                 if (outputEndTime === -1) return null;
 
-                const outputStartTime = outputEndTime - m.durationMs;
-                const timelineEndMs = timeMapper.mapOutputToTimelineTime(outputEndTime);
-                const timelineStartMs = timeMapper.mapOutputToTimelineTime(Math.max(0, outputStartTime));
+                const sourceStartTime = m.sourceEndTimeMs - m.durationMs;
+                let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
 
-                if (timelineEndMs === -1 || timelineStartMs === -1) return null;
+                // If start is invalid (in gap), clamp to specific window start
+                // We know outputEndTime is valid, so find its window.
+                if (outputStartTime === -1) {
+                    const win = timeline.outputWindows.find(w => m.sourceEndTimeMs >= w.startMs && m.sourceEndTimeMs <= w.endMs);
+                    if (win) {
+                        outputStartTime = timeMapper.mapTimelineToOutputTime(win.startMs);
+                    } else {
+                        // Should technically not happen if outputEndTime is valid (which relies on being in a window)
+                        return null; // fallback
+                    }
+                }
 
-                const left = (timelineStartMs / 1000) * pixelsPerSec;
-                const width = ((timelineEndMs - timelineStartMs) / 1000) * pixelsPerSec;
+                if (outputStartTime === -1) return null;
+
+                const left = (outputStartTime / 1000) * pixelsPerSec;
+                const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
 
                 if (width <= 0) return null;
 
