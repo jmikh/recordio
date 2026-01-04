@@ -10,6 +10,7 @@ interface UseTimelineInteractionProps {
     totalOutputDuration: number;
     timeMapper: TimeMapper;
     canvasMode: CanvasMode;
+    timelineOffsetLeft?: number;
 }
 
 export function useTimelineInteraction({
@@ -18,6 +19,7 @@ export function useTimelineInteraction({
     totalOutputDuration,
     timeMapper,
     canvasMode,
+    timelineOffsetLeft,
 }: UseTimelineInteractionProps) {
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const setCurrentTime = usePlaybackStore(s => s.setCurrentTime);
@@ -31,7 +33,8 @@ export function useTimelineInteraction({
         if (!containerRef.current) return { outputTime: 0, timelineTime: 0 };
         const rect = containerRef.current.getBoundingClientRect();
         const scrollLeft = containerRef.current.scrollLeft || 0;
-        const x = e.clientX - rect.left + scrollLeft;
+        // Subtract timelineOffsetLeft from x calculation
+        const x = e.clientX - rect.left + scrollLeft - (timelineOffsetLeft || 0);
 
         // Visual X -> Output Time
         const outputTime = Math.max(0, (x / pixelsPerSec) * 1000);

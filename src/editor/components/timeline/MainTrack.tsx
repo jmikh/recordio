@@ -5,11 +5,14 @@ import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
 import { WaveformSegment } from './WaveformSegment';
 
 
+import { TimelineTrackHeader } from './TimelineTrackHeader';
+
 interface MainTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
     accumulatedX: number; // For layout positioning if needed, but we mostly use absolute based on prev widths
     trackHeight: number;
+    headerWidth: number;
 }
 
 interface DragState {
@@ -28,6 +31,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     timeline,
     pixelsPerSec,
     trackHeight,
+    headerWidth,
 }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const sources = useProjectSources();
@@ -130,90 +134,104 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     let currentX = 0;
 
     return (
-        <div className="w-full relative bg-[#2a2a2a]/50" style={{ height: trackHeight }}>
+        <div className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
+            {/* Sticky Header */}
+            <div className="sticky left-0 z-20 flex-shrink-0" style={{ width: headerWidth }}>
+                <TimelineTrackHeader
+                    title="Video & Audio"
+                    height={trackHeight}
+                    hasAudio={true}
+                    isMuted={useProjectStore(s => s.mutedSources[timeline.recording.screenSourceId])}
+                    onToggleMute={() => useProjectStore.getState().toggleSourceMute(timeline.recording.screenSourceId)}
+                />
+            </div>
 
-            {timeline.outputWindows.map((w, i) => {
-                const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
-                const duration = win.endMs - win.startMs;
-                const left = currentX;
-                const width = (duration / 1000) * pixelsPerSec;
-                currentX += width; // Accumulate for next window
+            {/* Content Container */}
+            <div className="relative flex-1" style={{ height: trackHeight }}>
 
-                const hasCamera = !!timeline.recording.cameraSourceId;
+                {timeline.outputWindows.map((w, i) => {
+                    const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
+                    const duration = win.endMs - win.startMs;
+                    const left = currentX;
+                    const width = (duration / 1000) * pixelsPerSec;
+                    currentX += width; // Accumulate for next window
 
-                // Calculate Source Times for Waveform
-                // The window starts at `startMs` (Timeline Time).
-                // Timeline starts at 0, which corresponds to `timelineOffsetMs` in Source Time (usually 0 unless clipped at start).
-                // Actually, `timelineOffset` shifts the *events*, but for the video source mapping:
-                // Timeline 0 = Source 0 (usually).
-                // Let's assume simple mapping: Source Time = Timeline Time.
-                // If we implement trimming properly, we might need a more complex mapper.
-                // But generally, window.startMs IS the source time if we are just cutting segments from a linear recording.
-                const sourceStartMs = win.startMs;
-                const sourceEndMs = win.endMs;
+                    const hasCamera = !!timeline.recording.cameraSourceId;
 
-                return (
-                    <div
-                        key={w.id}
-                        className="absolute top-0 bottom-0 group"
-                        style={{ left: `${left}px`, width: `${width}px` }}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => handleDragStart(e, w.id, 'move')}
-                    >
-                        {/* 1. Screen Segment */}
-                        <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-blue-900/60 border border-blue-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
-                            {/* Waveform Visualization (Real) */}
-                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
-                                {!screenAudio.isLoading && (
-                                    <WaveformSegment
-                                        peaks={screenAudio.peaks}
-                                        sourceStartMs={sourceStartMs}
-                                        sourceEndMs={sourceEndMs}
-                                        width={width}
-                                        height={hasCamera ? trackHeight / 2 : trackHeight}
-                                        color="#bfdbfe" // blue-200
-                                    />
-                                )}
-                            </div>
-                            <span className="text-[10px] text-blue-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
-                                Screen Part {i + 1}
-                            </span>
-                        </div>
+                    // Calculate Source Times for Waveform
+                    // The window starts at `startMs` (Timeline Time).
+                    // Timeline starts at 0, which corresponds to `timelineOffsetMs` in Source Time (usually 0 unless clipped at start).
+                    // Actually, `timelineOffset` shifts the *events*, but for the video source mapping:
+                    // Timeline 0 = Source 0 (usually).
+                    // Let's assume simple mapping: Source Time = Timeline Time.
+                    // If we implement trimming properly, we might need a more complex mapper.
+                    // But generally, window.startMs IS the source time if we are just cutting segments from a linear recording.
+                    const sourceStartMs = win.startMs;
+                    const sourceEndMs = win.endMs;
 
-                        {/* 2. Camera Segment (if exists) */}
-                        {hasCamera && (
-                            <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border border-purple-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center border-t-0">
+                    return (
+                        <div
+                            key={w.id}
+                            className="absolute top-0 bottom-0 group"
+                            style={{ left: `${left}px`, width: `${width}px` }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => handleDragStart(e, w.id, 'move')}
+                        >
+                            {/* 1. Screen Segment */}
+                            <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-blue-900/60 border border-blue-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
                                 {/* Waveform Visualization (Real) */}
                                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
-                                    {!cameraAudio.isLoading && (
+                                    {!screenAudio.isLoading && (
                                         <WaveformSegment
-                                            peaks={cameraAudio.peaks}
+                                            peaks={screenAudio.peaks}
                                             sourceStartMs={sourceStartMs}
                                             sourceEndMs={sourceEndMs}
                                             width={width}
-                                            height={trackHeight / 2}
-                                            color="#e9d5ff" // purple-200
+                                            height={hasCamera ? trackHeight / 2 : trackHeight}
+                                            color="#bfdbfe" // blue-200
                                         />
                                     )}
                                 </div>
-                                <span className="text-[10px] text-purple-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
-                                    Camera
+                                <span className="text-[10px] text-blue-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
+                                    Screen Part {i + 1}
                                 </span>
                             </div>
-                        )}
 
-                        {/* Resize Handles */}
-                        <div
-                            className="absolute top-0 bottom-0 left-0 w-2 cursor-ew-resize hover:bg-white/30 z-20"
-                            onMouseDown={(e) => handleDragStart(e, w.id, 'left')}
-                        />
-                        <div
-                            className="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize hover:bg-white/30 z-20"
-                            onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
-                        />
-                    </div>
-                );
-            })}
+                            {/* 2. Camera Segment (if exists) */}
+                            {hasCamera && (
+                                <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border border-purple-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center border-t-0">
+                                    {/* Waveform Visualization (Real) */}
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+                                        {!cameraAudio.isLoading && (
+                                            <WaveformSegment
+                                                peaks={cameraAudio.peaks}
+                                                sourceStartMs={sourceStartMs}
+                                                sourceEndMs={sourceEndMs}
+                                                width={width}
+                                                height={trackHeight / 2}
+                                                color="#e9d5ff" // purple-200
+                                            />
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] text-purple-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
+                                        Camera
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Resize Handles */}
+                            <div
+                                className="absolute top-0 bottom-0 left-0 w-2 cursor-ew-resize hover:bg-white/30 z-20"
+                                onMouseDown={(e) => handleDragStart(e, w.id, 'left')}
+                            />
+                            <div
+                                className="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize hover:bg-white/30 z-20"
+                                onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
+                            />
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };

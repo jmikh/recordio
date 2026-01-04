@@ -5,9 +5,10 @@ interface TimelineRulerProps {
     totalWidth: number;
     pixelsPerSec: number;
     height?: number;
+    paddingLeft?: number;
 }
 
-export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixelsPerSec, height = 24 }) => {
+export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixelsPerSec, height = 24, paddingLeft = 0 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -17,7 +18,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const width = Math.max(totalWidth + 500, window.innerWidth);
+        const width = Math.max(totalWidth + 500 + paddingLeft, window.innerWidth);
 
         canvas.width = width * dpr;
         canvas.height = height * dpr;
@@ -26,6 +27,16 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
 
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, width, height);
+
+        // Sidebar Background
+        if (paddingLeft > 0) {
+            ctx.fillStyle = '#1e1e1e';
+            ctx.fillRect(0, 0, paddingLeft, height);
+            // Border
+            ctx.fillStyle = '#333';
+            ctx.fillRect(paddingLeft - 1, 0, 1, height);
+        }
+
         ctx.fillStyle = '#64748b';
         ctx.strokeStyle = '#334155';
         ctx.font = '10px monospace';
@@ -42,11 +53,13 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
             minorInterval = 500;
         }
 
-        const durationMs = (width / pixelsPerSec) * 1000;
+        const durationMs = (totalWidth / pixelsPerSec) * 1000;
 
         ctx.beginPath();
+        // Start t at 0, draw at x + paddingLeft
         for (let t = 0; t <= durationMs; t += minorInterval) {
-            const x = (t / 1000) * pixelsPerSec;
+            const x = ((t / 1000) * pixelsPerSec) + paddingLeft;
+
             if (t % majorInterval === 0) {
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, height);
@@ -58,10 +71,10 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         }
         ctx.stroke();
 
-    }, [totalWidth, pixelsPerSec, height]);
+    }, [totalWidth, pixelsPerSec, height, paddingLeft]);
 
     return (
-        <div className="sticky top-0 z-10 bg-[#1e1e1e] border-b border-[#333]">
+        <div className="sticky top-0 z-30 bg-[#1e1e1e] border-b border-[#333]">
             <canvas ref={canvasRef} className="block pointer-events-none" style={{ height: `${height}px` }} />
         </div>
     );

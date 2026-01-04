@@ -2,12 +2,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import type { ViewportMotion } from '../../../core/types';
+import { TimelineTrackHeader } from './TimelineTrackHeader';
 
 interface ZoomTrackProps {
     pixelsPerSec: number;
     height: number;
     timelineOffset: number;
+    headerWidth: number;
 }
+
+// ... (DragState, HoverInfo interfaces stay same) ...
 
 interface DragState {
     type: 'move' | 'resize-left';
@@ -28,7 +32,7 @@ interface HoverInfo {
     isValid: boolean;
 }
 
-export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset }) => {
+export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset, headerWidth }) => {
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
@@ -52,7 +56,17 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         if (dragState) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
+        // Since we are handling mouse on the wrapper (including header), 
+        // we need to subtract headerWidth to get 'Track X'
+        const rawX = e.clientX - rect.left;
+
+        // If mouse is over header, ignore
+        if (rawX < headerWidth) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const x = rawX - headerWidth;
 
         // Output Time (Continuous)
         const outputTimeMs = (x / pixelsPerSec) * 1000;
@@ -136,7 +150,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
         setHoverInfo({
             timeMs: outputTimeMs,
-            x,
+            x, // X is relative to track content start
             sourceStartTime,
             sourceEndTime,
             width,
@@ -256,108 +270,117 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
     return (
         <div
-            className="w-full relative bg-[#252526] select-none"
+            className="w-full relative bg-[#252526] select-none flex"
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={handleClick}
         >
-            <div className="absolute left-2 top-0 text-[10px] text-gray-500 font-mono pointer-events-none z-10">MOTION</div>
+            {/* Sticky Header */}
+            <div className="sticky left-0 z-20 flex-shrink-0" style={{ width: headerWidth }}>
+                <TimelineTrackHeader
+                    title="Zoom & Pan"
+                    height={height}
+                />
+            </div>
 
-            {/* Existing Motions */}
-            {timeline.recording.viewportMotions?.map((m) => {
-                const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-                if (outputEndTime === -1) return null;
+            {/* Content Area */}
+            <div className="relative flex-1" style={{ height }}>
+                {/* Existing Motions */}
+                {timeline.recording.viewportMotions?.map((m) => {
+                    const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
+                    if (outputEndTime === -1) return null;
 
-                const sourceStartTime = m.sourceEndTimeMs - m.durationMs;
-                let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
+                    const sourceStartTime = m.sourceEndTimeMs - m.durationMs;
+                    let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
 
-                // If start is invalid (in gap), clamp to specific window start
-                // We know outputEndTime is valid, so find its window.
-                if (outputStartTime === -1) {
-                    const win = timeline.outputWindows.find(w => m.sourceEndTimeMs >= w.startMs && m.sourceEndTimeMs <= w.endMs);
-                    if (win) {
-                        outputStartTime = timeMapper.mapTimelineToOutputTime(win.startMs);
-                    } else {
-                        // Should technically not happen if outputEndTime is valid (which relies on being in a window)
-                        return null; // fallback
+                    // If start is invalid (in gap), clamp to specific window start
+                    // We know outputEndTime is valid, so find its window.
+                    if (outputStartTime === -1) {
+                        const win = timeline.outputWindows.find(w => m.sourceEndTimeMs >= w.startMs && m.sourceEndTimeMs <= w.endMs);
+                        if (win) {
+                            outputStartTime = timeMapper.mapTimelineToOutputTime(win.startMs);
+                        } else {
+                            // Should technically not happen if outputEndTime is valid (which relies on being in a window)
+                            return null; // fallback
+                        }
                     }
-                }
 
-                if (outputStartTime === -1) return null;
+                    if (outputStartTime === -1) return null;
 
-                const left = (outputStartTime / 1000) * pixelsPerSec;
-                const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
+                    const left = (outputStartTime / 1000) * pixelsPerSec;
+                    const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
 
-                if (width <= 0) return null;
+                    if (width <= 0) return null;
 
-                const isSelected = editingZoomId === m.id;
-                const isDragging = dragState?.motionId === m.id;
+                    const isSelected = editingZoomId === m.id;
+                    const isDragging = dragState?.motionId === m.id;
 
-                return (
+                    return (
+                        <div
+                            key={m.id}
+                            className={`absolute top-[4px] bottom-[4px] group rounded-sm transition-colors border
+                                ${isSelected ? 'bg-purple-500/40 border-purple-400' : 'bg-purple-500/20 border-purple-500/30 hover:bg-purple-500/30'}
+                                ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+                            `}
+                            style={{
+                                left: `${left}px`,
+                                width: `${Math.max(width, 2)}px`,
+                                zIndex: isSelected ? 20 : 10
+                            }}
+                            onMouseDown={(e) => handleDragStart(e, 'move', m)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingZoom(m.id);
+                            }}
+                        >
+                            {/* Left Resize Handle */}
+                            <div
+                                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-purple-400/50 z-20"
+                                onMouseDown={(e) => handleDragStart(e, 'resize-left', m)}
+                            />
+
+                            {/* Right Edge (Keyframe) - Thicker, Opaque */}
+                            <div
+                                className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-yellow-400' : 'bg-purple-500'} shadow-sm`}
+                            />
+
+                            {/* Label (Optional) */}
+                            {width > 40 && (
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] text-purple-200/70 pointer-events-none truncate max-w-full">
+                                    {parseFloat((project.settings.outputSize.width / m.rect.width).toFixed(1))}x
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {/* Add Zoom Indicator */}
+                {hoverInfo && !editingZoomId && !dragState && hoverInfo.isValid && (
                     <div
-                        key={m.id}
-                        className={`absolute top-[4px] bottom-[4px] group rounded-sm transition-colors border
-                            ${isSelected ? 'bg-purple-500/40 border-purple-400' : 'bg-purple-500/20 border-purple-500/30 hover:bg-purple-500/30'}
-                            ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-                        `}
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-yellow-500/50 bg-yellow-500/10 rounded-sm flex items-center justify-center"
                         style={{
-                            left: `${left}px`,
-                            width: `${Math.max(width, 2)}px`,
-                            zIndex: isSelected ? 20 : 10
-                        }}
-                        onMouseDown={(e) => handleDragStart(e, 'move', m)}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingZoom(m.id);
+                            // Use calculated width (pixel based on time)
+                            // Position: right aligned to mouse X (hoverInfo.x).
+                            // Left = Right - Width
+                            left: `${hoverInfo.x - hoverInfo.width}px`,
+                            width: `${hoverInfo.width}px`
                         }}
                     >
-                        {/* Left Resize Handle */}
-                        <div
-                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-purple-400/50 z-20"
-                            onMouseDown={(e) => handleDragStart(e, 'resize-left', m)}
-                        />
+                        {/* Add Zoom Label (Above) */}
+                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-yellow-200/90 pointer-events-none bg-[#252526]/80 px-1 rounded">
+                            Add Zoom
+                        </div>
 
-                        {/* Right Edge (Keyframe) - Thicker, Opaque */}
-                        <div
-                            className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-yellow-400' : 'bg-purple-500'} shadow-sm`}
-                        />
+                        {/* Right Handle */}
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-yellow-500/50" />
 
-                        {/* Label (Optional) */}
-                        {width > 40 && (
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] text-purple-200/70 pointer-events-none truncate max-w-full">
-                                {parseFloat((project.settings.outputSize.width / m.rect.width).toFixed(1))}x
-                            </div>
-                        )}
+                        {/* Plus Icon */}
+                        <span className="text-yellow-200 text-lg font-light leading-none">+</span>
                     </div>
-                );
-            })}
-
-            {/* Add Zoom Indicator */}
-            {hoverInfo && !editingZoomId && !dragState && hoverInfo.isValid && (
-                <div
-                    className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-yellow-500/50 bg-yellow-500/10 rounded-sm flex items-center justify-center"
-                    style={{
-                        // Use calculated width (pixel based on time)
-                        // Position: right aligned to mouse X (hoverInfo.x).
-                        // Left = Right - Width
-                        left: `${hoverInfo.x - hoverInfo.width}px`,
-                        width: `${hoverInfo.width}px`
-                    }}
-                >
-                    {/* Add Zoom Label (Above) */}
-                    <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-yellow-200/90 pointer-events-none bg-[#252526]/80 px-1 rounded">
-                        Add Zoom
-                    </div>
-
-                    {/* Right Handle */}
-                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-yellow-500/50" />
-
-                    {/* Plus Icon */}
-                    <span className="text-yellow-200 text-lg font-light leading-none">+</span>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

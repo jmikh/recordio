@@ -47,9 +47,9 @@ export const WaveformSegment: React.FC<WaveformSegmentProps> = ({
 
         // Drawing params
         ctx.fillStyle = color;
-        const barWidth = Math.max(2, width / visiblePeaks.length);
-        const gap = 1;
-        const effectiveBarWidth = Math.max(1, barWidth - gap);
+        const barWidth = width / visiblePeaks.length;
+        const gap = barWidth > 2 ? 1 : 0;
+        const effectiveBarWidth = Math.max(0.5, barWidth - gap);
 
         const centerY = height / 2;
         const scaleY = height / 2; // Max height from center

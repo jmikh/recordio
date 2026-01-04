@@ -179,6 +179,21 @@ function Editor() {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] rounded cursor-pointer"
+                            onClick={() => console.log(project)}
+                            title={`Project ID: ${project.id}`}
+                        >
+                            Log Project
+                        </button>
+                        <button
+                            className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white text-[10px] rounded cursor-pointer"
+                            onClick={() => console.log(userEvents)}
+                        >
+                            Log Events
+                        </button>
+                    </div>
                     <div className="text-xs text-gray-500 flex items-center gap-2">
                         {isSaving ? (
                             <span className="text-blue-400">Saving...</span>
@@ -216,26 +231,6 @@ function Editor() {
                             </div>
                         )}
                         {isLoading && <div className="text-white">Loading Project...</div>}
-                    </div>
-                </div>
-
-
-                <div id="debug-side-panel" className="w-80 bg-[#252526] border-l border-[#333] flex flex-col overflow-hidden text-xs text-gray-300">
-                    <div className="p-2 border-b border-[#333]">
-                        <h3 className="font-bold mb-2">Project: {project.name}</h3>
-                        <div className="text-[10px] text-gray-500">ID: {project.id}</div>
-                        <button
-                            className="mt-2 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded cursor-pointer"
-                            onClick={() => console.log(project)}
-                        >
-                            Log Project
-                        </button>
-                        <button
-                            className="mt-2 px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded cursor-pointer"
-                            onClick={() => console.log(userEvents)}
-                        >
-                            Log User Events
-                        </button>
                     </div>
                 </div>
 
