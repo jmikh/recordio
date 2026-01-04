@@ -494,11 +494,14 @@ export const useProjectStore = create<ProjectState>()(
                         const paddingChanged = nextSettings.screen.padding !== currentSettings.screen.padding;
 
                         // Check for any zoom related changes
-                        // Check for any zoom related changes
                         const zoomUpdates = updates.zoom || {};
                         const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.autoZoom !== undefined;
 
-                        if (paddingChanged || zoomChanged) {
+                        // Check for output size changes
+                        const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
+                            nextSettings.outputSize.height !== currentSettings.outputSize.height;
+
+                        if (paddingChanged || zoomChanged || sizeChanged) {
                             nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);
                         }
 
