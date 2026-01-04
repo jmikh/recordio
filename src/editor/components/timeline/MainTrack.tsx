@@ -1,9 +1,10 @@
 // ... imports
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { OutputWindow, Timeline as TimelineType } from '../../../core/types';
 import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
 import { WaveformSegment } from './WaveformSegment';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 
 export const GROUP_HEADER_HEIGHT = 24;
@@ -37,6 +38,14 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const selectedWindowId = useProjectStore(s => s.selectedWindowId);
     const sources = useProjectSources();
     const [dragState, setDragState] = useState<DragState | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Deselect window when clicking outside this track component
+    // This allows clicking on Headers or Rulers to deselect the window, 
+    // while clicking inside the track (handled by onClick below) also deselects if not on a window.
+    useClickOutside(containerRef, () => {
+        if (selectedWindowId) selectWindow(null);
+    });
 
     // Prepare Audio Analysis for Screen and Camera
     const screenSourceId = timeline.recording.screenSourceId;
@@ -136,7 +145,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const trackContentHeight = Math.max(0, trackHeight - GROUP_HEADER_HEIGHT);
 
     return (
-        <div className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
+        <div ref={containerRef} className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>

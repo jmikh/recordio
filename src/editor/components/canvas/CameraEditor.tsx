@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import type { CameraSettings, Rect } from '../../../core/types';
 import { BoundingBox } from './BoundingBox';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 // ------------------------------------------------------------------
 // COMPONENT: Camera Editor Overlay
@@ -62,15 +63,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     };
 
     // Close on Outside Click
-    useEffect(() => {
-        const handleOutsideClick = (e: PointerEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onCancel();
-            }
-        };
-        window.addEventListener('pointerdown', handleOutsideClick);
-        return () => window.removeEventListener('pointerdown', handleOutsideClick);
-    }, [onCancel]);
+    useClickOutside(containerRef, onCancel);
 
     // Close on Escape
     useEffect(() => {

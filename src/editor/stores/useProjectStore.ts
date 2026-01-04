@@ -135,11 +135,19 @@ export const useProjectStore = create<ProjectState>()(
                 editingZoomInitialState: null as ViewportMotion | null,
                 selectedWindowId: null,
 
-                selectWindow: (id) => set({ selectedWindowId: id }),
+                selectWindow: (id) => set({
+                    selectedWindowId: id,
+                    ...(id ? { activeZoomId: null, canvasMode: CanvasMode.Preview } : {})
+                }),
 
                 setCanvasMode: (mode) => set({
                     canvasMode: mode,
-                    ...(mode !== CanvasMode.Zoom ? { activeZoomId: null, editingZoomInitialState: null } : {})
+                    ...(mode !== CanvasMode.Zoom ? { activeZoomId: null, editingZoomInitialState: null } : {}),
+                    // If triggering a mode change (except purely Preview potentially?), deselect window.
+                    // But usually returning to Preview shouldn't necessarily deselect window? 
+                    // User wanted strict "One Active". 
+                    // If mode is NOT Preview (e.g. Crop, Camera), deselect window.
+                    ...(mode !== CanvasMode.Preview ? { selectedWindowId: null } : {})
                 }),
 
                 toggleSourceMute: (sourceId) => set(state => ({
@@ -214,7 +222,7 @@ export const useProjectStore = create<ProjectState>()(
                         set({ editingZoomInitialState: null, canvasMode: CanvasMode.Preview });
                     }
 
-                    set({ activeZoomId: id });
+                    set({ activeZoomId: id, selectedWindowId: null });
                 },
 
                 updateViewportMotion: (id, updates) => {
