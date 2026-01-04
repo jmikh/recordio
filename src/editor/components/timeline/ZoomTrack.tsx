@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import type { ViewportMotion } from '../../../core/types';
-import { TimelineTrackHeader } from './TimelineTrackHeader';
+
 
 interface ZoomTrackProps {
     pixelsPerSec: number;
     height: number;
     timelineOffset: number;
-    headerWidth: number;
 }
 
 // ... (DragState, HoverInfo interfaces stay same) ...
@@ -32,7 +31,7 @@ interface HoverInfo {
     isValid: boolean;
 }
 
-export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset, headerWidth }) => {
+export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset }) => {
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
@@ -57,16 +56,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
 
         const rect = e.currentTarget.getBoundingClientRect();
         // Since we are handling mouse on the wrapper (including header), 
-        // we need to subtract headerWidth to get 'Track X'
         const rawX = e.clientX - rect.left;
-
-        // If mouse is over header, ignore
-        if (rawX < headerWidth) {
-            setHoverInfo(null);
-            return;
-        }
-
-        const x = rawX - headerWidth;
+        const x = rawX;
 
         // Output Time (Continuous)
         const outputTimeMs = (x / pixelsPerSec) * 1000;
@@ -277,13 +268,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             onPointerDown={(e) => e.stopPropagation()}
             onClick={handleClick}
         >
-            {/* Sticky Header */}
-            <div className="sticky left-0 z-20 flex-shrink-0" style={{ width: headerWidth }}>
-                <TimelineTrackHeader
-                    title="Zoom & Pan"
-                    height={height}
-                />
-            </div>
+
 
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>

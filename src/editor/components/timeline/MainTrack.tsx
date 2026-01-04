@@ -4,7 +4,7 @@ import type { OutputWindow, Timeline as TimelineType } from '../../../core/types
 import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
 import { WaveformSegment } from './WaveformSegment';
-import { TimelineTrackHeader } from './TimelineTrackHeader';
+
 
 export const GROUP_HEADER_HEIGHT = 24;
 
@@ -13,7 +13,6 @@ interface MainTrackProps {
     pixelsPerSec: number;
     accumulatedX: number; // For layout positioning if needed, but we mostly use absolute based on prev widths
     trackHeight: number;
-    headerWidth: number;
 }
 
 interface DragState {
@@ -32,7 +31,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     timeline,
     pixelsPerSec,
     trackHeight,
-    headerWidth,
 }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const sources = useProjectSources();
@@ -137,36 +135,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
     return (
         <div className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
-            {/* Sticky Header */}
-            <div className="sticky left-0 z-20 flex-shrink-0 flex flex-col" style={{ width: headerWidth }}>
-                <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-white/5" />
-                {!!cameraSourceId ? (
-                    <div className="flex flex-col flex-1">
-                        <TimelineTrackHeader
-                            title="Screen"
-                            height={trackContentHeight / 2}
-                            hasAudio={true}
-                            isMuted={useProjectStore(s => s.mutedSources[screenSourceId])}
-                            onToggleMute={() => useProjectStore.getState().toggleSourceMute(screenSourceId)}
-                        />
-                        <TimelineTrackHeader
-                            title="Camera"
-                            height={trackContentHeight / 2}
-                            hasAudio={true}
-                            isMuted={useProjectStore(s => s.mutedSources[cameraSourceId])}
-                            onToggleMute={() => useProjectStore.getState().toggleSourceMute(cameraSourceId)}
-                        />
-                    </div>
-                ) : (
-                    <TimelineTrackHeader
-                        title="Screen"
-                        height={trackContentHeight}
-                        hasAudio={true}
-                        isMuted={useProjectStore(s => s.mutedSources[screenSourceId])}
-                        onToggleMute={() => useProjectStore.getState().toggleSourceMute(screenSourceId)}
-                    />
-                )}
-            </div>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>

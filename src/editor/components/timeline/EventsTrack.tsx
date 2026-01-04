@@ -1,7 +1,7 @@
 import React from 'react';
 import type { UserEvents } from '../../../core/types';
 import { TimeMapper } from '../../../core/timeMapper';
-import { TimelineTrackHeader } from './TimelineTrackHeader';
+
 
 interface EventsTrackProps {
     events: UserEvents;
@@ -9,7 +9,6 @@ interface EventsTrackProps {
     timelineOffset: number;
     timeMapper: TimeMapper;
     trackHeight: number;
-    headerWidth: number;
 }
 
 export const EventsTrack: React.FC<EventsTrackProps> = ({
@@ -17,8 +16,7 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
     pixelsPerSec,
     timelineOffset,
     timeMapper,
-    trackHeight,
-    headerWidth
+    trackHeight
 }) => {
     // Shared helper for mapping time
     const mapToLeft = (timeMs: number) => {
@@ -35,13 +33,7 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
 
     return (
         <div className="w-full relative bg-[#252526] flex" style={{ height: trackHeight }}>
-            {/* Sticky Header */}
-            <div className="sticky left-0 z-20 flex-shrink-0" style={{ width: headerWidth }}>
-                <TimelineTrackHeader
-                    title="Input Events"
-                    height={trackHeight}
-                />
-            </div>
+
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>

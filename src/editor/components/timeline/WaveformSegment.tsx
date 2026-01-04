@@ -11,7 +11,7 @@ interface WaveformSegmentProps {
 
 const PEAKS_SAMPLES_PER_SEC = 100;
 
-export const WaveformSegment: React.FC<WaveformSegmentProps> = ({
+const WaveformSegmentComponent: React.FC<WaveformSegmentProps> = ({
     peaks,
     sourceStartMs,
     sourceEndMs,
@@ -56,7 +56,7 @@ export const WaveformSegment: React.FC<WaveformSegmentProps> = ({
 
         visiblePeaks.forEach((peak, i) => {
             const x = i * barWidth;
-            const barHeight = peak * scaleY * 0.9; // Scale to 90% of half-height
+            const barHeight = peak * scaleY * 0.96; // Scale to 96% of half-height (2% padding)
 
             // Draw Top
             ctx.fillRect(x, centerY - barHeight, effectiveBarWidth, barHeight);
@@ -66,6 +66,8 @@ export const WaveformSegment: React.FC<WaveformSegmentProps> = ({
         });
 
     }, [visiblePeaks, width, height, color]);
+
+
 
     return (
         <canvas
@@ -77,3 +79,5 @@ export const WaveformSegment: React.FC<WaveformSegmentProps> = ({
         />
     );
 };
+
+export const WaveformSegment = React.memo(WaveformSegmentComponent);
