@@ -2,6 +2,7 @@ import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { Slider } from '../common/Slider';
 
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -120,21 +121,19 @@ export const ScreenSettings = () => {
             {/* Spacing (Padding) */}
             <div className="flex flex-col gap-2 pt-4 border-t border-gray-700">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
-                <input
-                    type="range"
+                <Slider
                     min={0}
                     max={0.2}
                     step={0.01}
                     value={screenConfig.padding || 0}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
-                    onChange={(e) => updateWithBatching({
+                    onChange={(val) => updateWithBatching({
                         screen: {
                             ...screenConfig,
-                            padding: parseFloat(e.target.value)
+                            padding: val
                         }
                     })}
-                    className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                 />
             </div>
         </div>

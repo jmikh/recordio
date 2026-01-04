@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { HexColorPicker } from "react-colorful";
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { createPortal } from 'react-dom';
+import { Slider } from '../common/Slider';
 
 export interface StyleSettings {
     borderRadius: number;
@@ -127,15 +128,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                             <span>Rounding</span>
                             <span className="font-mono text-[10px]">{borderRadius}px</span>
                         </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="200"
+                        <Slider
+                            min={0}
+                            max={200}
                             value={borderRadius}
                             onPointerDown={onInteractionStart}
                             onPointerUp={onInteractionEnd}
-                            onChange={(e) => onChange({ borderRadius: parseInt(e.target.value) })}
-                            className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
+                            onChange={(val) => onChange({ borderRadius: val })}
                         />
                     </div>
                 )}
@@ -146,15 +145,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                         <span>Border Thickness</span>
                         <span className="font-mono text-[10px]">{borderWidth}px</span>
                     </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="20"
+                    <Slider
+                        min={0}
+                        max={20}
                         value={borderWidth}
                         onPointerDown={onInteractionStart}
                         onPointerUp={onInteractionEnd}
-                        onChange={(e) => onChange({ borderWidth: parseInt(e.target.value) })}
-                        className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
+                        onChange={(val) => onChange({ borderWidth: val })}
                     />
                 </div>
             </div>

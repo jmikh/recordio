@@ -1,6 +1,7 @@
 import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
 import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { Slider } from '../common/Slider';
 
 const SHAPES = [
     { id: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
@@ -105,16 +106,14 @@ export const CameraSettings = () => {
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
                             <span className="text-xs text-gray-500 font-mono">{zoom.toFixed(1)}x</span>
                         </div>
-                        <input
-                            type="range"
-                            min="1"
-                            max="3"
-                            step="0.1"
+                        <Slider
+                            min={1}
+                            max={3}
+                            step={0.1}
                             value={zoom}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
-                            onChange={(e) => updateWithBatching({ camera: { ...cameraConfig, zoom: parseFloat(e.target.value) } })}
-                            className="w-full h-1.5 bg-[#333] rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+                            onChange={(val) => updateWithBatching({ camera: { ...cameraConfig, zoom: val } })}
                         />
                     </div>
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { OutputWindow, Timeline as TimelineType } from '../../../core/types';
-import { useProjectStore } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
+import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
+import { WaveformSegment } from './WaveformSegment';
 
 
 interface MainTrackProps {
@@ -28,7 +30,18 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     trackHeight,
 }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
+    const sources = useProjectSources();
     const [dragState, setDragState] = useState<DragState | null>(null);
+
+    // Prepare Audio Analysis for Screen and Camera
+    const screenSourceId = timeline.recording.screenSourceId;
+    const cameraSourceId = timeline.recording.cameraSourceId;
+
+    const screenSource = sources[screenSourceId];
+    const cameraSource = cameraSourceId ? sources[cameraSourceId] : null;
+
+    const screenAudio = useAudioAnalysis(screenSourceId, screenSource?.url);
+    const cameraAudio = useAudioAnalysis(cameraSourceId || '', cameraSource?.url || '');
 
     // --- Dragging Logic ---
     useEffect(() => {
@@ -129,6 +142,17 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
                 const hasCamera = !!timeline.recording.cameraSourceId;
 
+                // Calculate Source Times for Waveform
+                // The window starts at `startMs` (Timeline Time).
+                // Timeline starts at 0, which corresponds to `timelineOffsetMs` in Source Time (usually 0 unless clipped at start).
+                // Actually, `timelineOffset` shifts the *events*, but for the video source mapping:
+                // Timeline 0 = Source 0 (usually).
+                // Let's assume simple mapping: Source Time = Timeline Time.
+                // If we implement trimming properly, we might need a more complex mapper.
+                // But generally, window.startMs IS the source time if we are just cutting segments from a linear recording.
+                const sourceStartMs = win.startMs;
+                const sourceEndMs = win.endMs;
+
                 return (
                     <div
                         key={w.id}
@@ -139,17 +163,20 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     >
                         {/* 1. Screen Segment */}
                         <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-blue-900/60 border border-blue-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
-                            {/* Waveform Visualization (Simulated) */}
-                            <div className="absolute inset-0 opacity-20 pointer-events-none flex items-center gap-[2px] justify-center overflow-hidden">
-                                {Array.from({ length: Math.min(20, Math.floor(width / 4)) }).map((_, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="w-[2px] bg-blue-200 rounded-full"
-                                        style={{ height: `${20 + Math.random() * 60}%` }}
+                            {/* Waveform Visualization (Real) */}
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+                                {!screenAudio.isLoading && (
+                                    <WaveformSegment
+                                        peaks={screenAudio.peaks}
+                                        sourceStartMs={sourceStartMs}
+                                        sourceEndMs={sourceEndMs}
+                                        width={width}
+                                        height={hasCamera ? trackHeight / 2 : trackHeight}
+                                        color="#bfdbfe" // blue-200
                                     />
-                                ))}
+                                )}
                             </div>
-                            <span className="text-[10px] text-blue-100/70 font-medium truncate px-1 pointer-events-none">
+                            <span className="text-[10px] text-blue-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
                                 Screen Part {i + 1}
                             </span>
                         </div>
@@ -157,17 +184,20 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                         {/* 2. Camera Segment (if exists) */}
                         {hasCamera && (
                             <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border border-purple-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center border-t-0">
-                                {/* Waveform Visualization (Simulated) */}
-                                <div className="absolute inset-0 opacity-20 pointer-events-none flex items-center gap-[2px] justify-center overflow-hidden">
-                                    {Array.from({ length: Math.min(20, Math.floor(width / 4)) }).map((_, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="w-[2px] bg-purple-200 rounded-full"
-                                            style={{ height: `${20 + Math.random() * 60}%` }}
+                                {/* Waveform Visualization (Real) */}
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+                                    {!cameraAudio.isLoading && (
+                                        <WaveformSegment
+                                            peaks={cameraAudio.peaks}
+                                            sourceStartMs={sourceStartMs}
+                                            sourceEndMs={sourceEndMs}
+                                            width={width}
+                                            height={trackHeight / 2}
+                                            color="#e9d5ff" // purple-200
                                         />
-                                    ))}
+                                    )}
                                 </div>
-                                <span className="text-[10px] text-purple-100/70 font-medium truncate px-1 pointer-events-none">
+                                <span className="text-[10px] text-purple-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
                                     Camera
                                 </span>
                             </div>

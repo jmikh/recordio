@@ -5,6 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
+import { Slider } from '../common/Slider';
 // import { ScreenSettings } from './ScreenSettings';
 
 // Helper to convert N, NE, etc. to degrees
@@ -303,20 +304,18 @@ export const BackgroundSettings = () => {
                 {backgroundType === 'image' && (
                     <div className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
-                        <input
-                            type="range"
+                        <Slider
                             min={0}
                             max={50}
                             step={1}
                             value={backgroundBlur || 0}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
-                            onChange={(e) => updateWithBatching({
+                            onChange={(val) => updateWithBatching({
                                 background: {
-                                    backgroundBlur: parseInt(e.target.value)
+                                    backgroundBlur: val
                                 }
                             })}
-                            className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                         />
                     </div>
                 )}

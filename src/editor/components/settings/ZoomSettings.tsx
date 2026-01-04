@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { Slider } from '../common/Slider';
 
 export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
@@ -9,12 +9,7 @@ export const ZoomSettings = () => {
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
 
-    const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = parseInt(e.target.value);
-        if (!isNaN(val)) {
-            updateWithBatching({ zoom: { ...zoomSettings, defaultDurationMs: val } });
-        }
-    };
+
 
     const handleAutoZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         updateSettings({ zoom: { autoZoom: e.target.checked } });
@@ -37,16 +32,14 @@ export const ZoomSettings = () => {
                     <label className="text-xs uppercase font-bold text-gray-500">Transition Duration</label>
                     <span className="text-xs font-mono text-blue-400">{zoomSettings.defaultDurationMs}ms</span>
                 </div>
-                <input
-                    type="range"
+                <Slider
                     min={250}
                     max={1500}
                     step={50}
                     value={zoomSettings.defaultDurationMs}
-                    onChange={handleDurationChange}
+                    onChange={(val) => updateWithBatching({ zoom: { ...zoomSettings, defaultDurationMs: val } })}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
-                    className="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                 />
                 <p className="text-[10px] text-gray-500">
                     Speed of zoom animations.
