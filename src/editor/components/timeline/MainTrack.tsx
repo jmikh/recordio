@@ -137,19 +137,38 @@ export const MainTrack: React.FC<MainTrackProps> = ({
         <div className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
             {/* Sticky Header */}
             <div className="sticky left-0 z-20 flex-shrink-0" style={{ width: headerWidth }}>
-                <TimelineTrackHeader
-                    title="Video & Audio"
-                    height={trackHeight}
-                    hasAudio={true}
-                    isMuted={useProjectStore(s => s.mutedSources[timeline.recording.screenSourceId])}
-                    onToggleMute={() => useProjectStore.getState().toggleSourceMute(timeline.recording.screenSourceId)}
-                />
+                {!!cameraSourceId ? (
+                    <div className="flex flex-col h-full">
+                        <TimelineTrackHeader
+                            title="Screen"
+                            height={trackHeight / 2}
+                            hasAudio={true}
+                            isMuted={useProjectStore(s => s.mutedSources[screenSourceId])}
+                            onToggleMute={() => useProjectStore.getState().toggleSourceMute(screenSourceId)}
+                        />
+                        <TimelineTrackHeader
+                            title="Camera"
+                            height={trackHeight / 2}
+                            hasAudio={true}
+                            isMuted={useProjectStore(s => s.mutedSources[cameraSourceId])}
+                            onToggleMute={() => useProjectStore.getState().toggleSourceMute(cameraSourceId)}
+                        />
+                    </div>
+                ) : (
+                    <TimelineTrackHeader
+                        title="Screen"
+                        height={trackHeight}
+                        hasAudio={true}
+                        isMuted={useProjectStore(s => s.mutedSources[screenSourceId])}
+                        onToggleMute={() => useProjectStore.getState().toggleSourceMute(screenSourceId)}
+                    />
+                )}
             </div>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>
 
-                {timeline.outputWindows.map((w, i) => {
+                {timeline.outputWindows.map((w) => {
                     const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
                     const duration = win.endMs - win.startMs;
                     const left = currentX;
@@ -192,32 +211,29 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                         />
                                     )}
                                 </div>
-                                <span className="text-[10px] text-blue-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
-                                    Screen Part {i + 1}
-                                </span>
                             </div>
 
+
                             {/* 2. Camera Segment (if exists) */}
-                            {hasCamera && (
-                                <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border border-purple-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center border-t-0">
-                                    {/* Waveform Visualization (Real) */}
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
-                                        {!cameraAudio.isLoading && (
-                                            <WaveformSegment
-                                                peaks={cameraAudio.peaks}
-                                                sourceStartMs={sourceStartMs}
-                                                sourceEndMs={sourceEndMs}
-                                                width={width}
-                                                height={trackHeight / 2}
-                                                color="#e9d5ff" // purple-200
-                                            />
-                                        )}
+                            {
+                                hasCamera && (
+                                    <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border border-purple-500/40 rounded-sm overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center border-t-0">
+                                        {/* Waveform Visualization (Real) */}
+                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+                                            {!cameraAudio.isLoading && (
+                                                <WaveformSegment
+                                                    peaks={cameraAudio.peaks}
+                                                    sourceStartMs={sourceStartMs}
+                                                    sourceEndMs={sourceEndMs}
+                                                    width={width}
+                                                    height={trackHeight / 2}
+                                                    color="#e9d5ff" // purple-200
+                                                />
+                                            )}
+                                        </div>
                                     </div>
-                                    <span className="text-[10px] text-purple-100/70 font-medium truncate px-1 pointer-events-none absolute top-0 left-0">
-                                        Camera
-                                    </span>
-                                </div>
-                            )}
+
+                                )}
 
                             {/* Resize Handles */}
                             <div
@@ -231,7 +247,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                         </div>
                     );
                 })}
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
