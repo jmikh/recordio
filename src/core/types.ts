@@ -81,7 +81,7 @@ export interface BackgroundSettings {
     imageUrl?: string; // For presets
     sourceId?: string; // For 'image' type (uploaded)
     customSourceId?: string; // For 'image' type (uploaded)
-    lastColorMode?: 'solid' | 'gradient'; // To remember state
+    lastColorMode: 'gradient' | 'solid'; // To remember state
     backgroundBlur: number;
 }
 
@@ -106,8 +106,6 @@ export interface ProjectSettings {
 
     // Camera
     camera?: CameraSettings;
-    // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
-    lastColorMode?: 'solid' | 'gradient';
 
     // Timeline Visualization
     timelinePixelsPerSecond: number;

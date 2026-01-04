@@ -41,7 +41,8 @@ export class ProjectImpl {
                     color: '#c7d2fe',
                     gradientColors: ['#c7d2fe', '#3a3991'],
                     gradientDirection: 'SE',
-                    backgroundBlur: 0
+                    backgroundBlur: 0,
+                    lastColorMode: 'gradient'
                 },
 
                 camera: {

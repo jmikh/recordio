@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../../storage/projectStorage';
 import type { Project } from '../../core/types';
-import { ProjectImpl } from '../../core/Project';
+
 import { ProjectCard } from './common/ProjectCard';
 
 interface ProjectSelectorProps {
@@ -39,17 +39,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
         window.location.href = url.toString();
     };
 
-    const handleCreateNew = async () => {
-        try {
-            const newProject = ProjectImpl.create('New Project');
-            await ProjectStorage.saveProject(newProject);
-            // Redirect to new project
-            handleOpen(newProject);
-        } catch (err) {
-            console.error("Failed to create new project", err);
-            alert("Failed to create project");
-        }
-    };
+
 
     const handleDelete = async (project: Project) => {
         if (!confirm(`Are you sure you want to delete "${project.name}"?`)) return;
@@ -99,8 +89,10 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                     <>
                         {projects.length === 0 ? (
                             <div className="text-center py-12 text-gray-500 border border-dashed border-gray-700 rounded-xl">
-                                <p className="text-lg">No projects found.</p>
-                                <button onClick={handleCreateNew} className="text-indigo-400 hover:text-indigo-300 mt-2 underline">Create one now</button>
+                                <p className="text-lg mb-2">No projects found.</p>
+                                <p className="text-gray-400">
+                                    To create a new project, start a recording via the Recordo extension.
+                                </p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

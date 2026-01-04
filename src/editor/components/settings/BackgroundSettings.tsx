@@ -176,8 +176,7 @@ export const BackgroundSettings = () => {
     }, [showColorPopover]);
 
     // Determine intent for preview and restore
-    const lastMode = background.lastColorMode || 'solid';
-    const showSolidPreview = isSolid || (!isColorMode && lastMode === 'solid');
+    const showSolidPreview = isSolid || (!isColorMode && background.lastColorMode === 'solid');
 
     const colorCardStyle: React.CSSProperties = showSolidPreview
         ? { backgroundColor: backgroundColor }
@@ -229,7 +228,7 @@ export const BackgroundSettings = () => {
                                 if (!isColorMode) {
                                     updateSettings({
                                         background: {
-                                            type: lastMode
+                                            type: background.lastColorMode
                                         }
                                     });
                                 }
