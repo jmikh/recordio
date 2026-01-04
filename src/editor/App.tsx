@@ -33,6 +33,7 @@ function Editor() {
     const userEvents = useProjectStore(s => s.userEvents);
 
     const loadProject = useProjectStore(s => s.loadProject);
+    const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
@@ -153,7 +154,7 @@ function Editor() {
         <div className="w-full h-screen bg-black flex flex-col overflow-hidden">
 
             {/* Header / Toolbar */}
-            <div className="h-12 bg-[#252526] border-b border-[#333] flex items-center px-4 justify-between shrink-0 z-30 select-none">
+            <div className="h-12 bg-[#252526] border-b border-[#333] flex items-center px-4 justify-between shrink-0 z-30 select-none relative">
                 <div className="flex items-center gap-4">
                     <h1 className="font-bold text-gray-200 text-sm tracking-wide">RECORDO</h1>
                     <div className="h-4 w-[1px] bg-[#444] mx-2"></div>
@@ -180,6 +181,18 @@ function Editor() {
                     <div className="text-[10px] text-gray-500 ml-4">
                         {pastStates.length} / {futureStates.length}
                     </div>
+                </div>
+
+                {/* Project Name (Centered) */}
+                <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+                    <input
+                        type="text"
+                        value={project.name}
+                        onChange={(e) => updateProjectName(e.target.value)}
+                        maxLength={40}
+                        className="bg-transparent text-gray-300 text-sm text-center focus:text-white focus:outline-none focus:bg-[#333] rounded px-2 py-0.5 hover:bg-[#333]/50 transition-colors placeholder-gray-600 w-[300px]"
+                        placeholder="Untitled Project"
+                    />
                 </div>
 
                 <div className="flex items-center gap-4">

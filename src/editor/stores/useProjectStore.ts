@@ -66,6 +66,7 @@ export interface ProjectState {
 
     // Settings Actions
     updateSettings: (settings: DeepPartial<ProjectSettings>) => void;
+    updateProjectName: (name: string) => void;
 }
 
 // Optimization helper
@@ -669,7 +670,6 @@ export const useProjectStore = create<ProjectState>()(
                         };
                         const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
-                        // 6. Return new state
                         return {
                             project: {
                                 ...tempProject,
@@ -684,6 +684,17 @@ export const useProjectStore = create<ProjectState>()(
                             }
                         };
                     });
+                },
+
+                updateProjectName: (name: string) => {
+                    console.log('[Action] updateProjectName', name);
+                    set((state) => ({
+                        project: {
+                            ...state.project,
+                            name,
+                            updatedAt: new Date()
+                        }
+                    }));
                 },
             }),
             {

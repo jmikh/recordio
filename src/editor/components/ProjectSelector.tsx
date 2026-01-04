@@ -62,18 +62,6 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
         }
     };
 
-    const handleRename = async (project: Project, newName: string) => {
-        try {
-            const projectToUpdate = projects.find(p => p.id === project.id);
-            if (projectToUpdate) {
-                const updated = { ...projectToUpdate, name: newName, updatedAt: new Date() };
-                await ProjectStorage.saveProject(updated);
-                fetchProjects();
-            }
-        } catch (error) {
-            console.error('Failed to rename project:', error);
-        }
-    };
 
     return (
         <div className="w-full h-screen bg-[#1e1e1e] flex items-center justify-center text-white flex-col overflow-y-auto">
@@ -122,7 +110,6 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                                         project={p}
                                         variant="grid"
                                         onOpen={handleOpen}
-                                        onRename={handleRename}
                                         onDelete={handleDelete}
                                     />
                                 ))}

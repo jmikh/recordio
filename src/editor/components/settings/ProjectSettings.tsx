@@ -35,7 +35,6 @@ export const ProjectSettings = () => {
     };
 
     const handleDelete = async (project: Project) => {
-        if (!confirm(`Are you sure you want to delete "${project.name}"?`)) return;
 
         try {
             await ProjectStorage.deleteProject(project.id);
@@ -50,18 +49,6 @@ export const ProjectSettings = () => {
         }
     };
 
-    const handleRename = async (project: Project, newName: string) => {
-        try {
-            const projectToUpdate = projects.find(p => p.id === project.id);
-            if (projectToUpdate) {
-                const updated = { ...projectToUpdate, name: newName, updatedAt: new Date() };
-                await ProjectStorage.saveProject(updated);
-                fetchProjects();
-            }
-        } catch (error) {
-            console.error('Failed to rename project:', error);
-        }
-    };
 
     return (
         <div className="flex flex-col h-full text-white">
@@ -79,7 +66,6 @@ export const ProjectSettings = () => {
                         isActive={p.id === activeProject.id}
                         variant="sidebar"
                         onOpen={handleOpen}
-                        onRename={handleRename}
                         onDelete={handleDelete}
                     />
                 ))}
