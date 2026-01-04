@@ -7,6 +7,8 @@ interface TimelineToolbarProps {
     onTogglePlay: () => void;
     pixelsPerSec: number;
     onScaleChange: (scale: number) => void;
+    onScaleInteractionStart?: () => void;
+    onScaleInteractionEnd?: () => void;
     currentTimeMs: number;
     totalDurationMs: number;
     currentResolution?: { width: number; height: number };
@@ -22,6 +24,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     onTogglePlay,
     pixelsPerSec,
     onScaleChange,
+    onScaleInteractionStart,
+    onScaleInteractionEnd,
     currentTimeMs,
     totalDurationMs,
     currentResolution,
@@ -122,6 +126,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     max={MAX_PIXELS_PER_SEC}
                     value={pixelsPerSec}
                     onChange={(e) => onScaleChange(Number(e.target.value))}
+                    onMouseDown={onScaleInteractionStart}
+                    onMouseUp={onScaleInteractionEnd}
                     className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
                 />
             </div>

@@ -108,6 +108,9 @@ export interface ProjectSettings {
     camera?: CameraSettings;
     // Persists the last active color mode (`solid` or `gradient`) to restore it from `image` mode.
     lastColorMode?: 'solid' | 'gradient';
+
+    // Timeline Visualization
+    timelinePixelsPerSecond: number;
 }
 
 // ==========================================

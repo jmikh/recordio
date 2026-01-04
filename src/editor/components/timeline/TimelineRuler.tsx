@@ -5,9 +5,10 @@ interface TimelineRulerProps {
     totalWidth: number;
     pixelsPerSec: number;
     height?: number;
+    headerWidth?: number;
 }
 
-export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixelsPerSec, height = 24 }) => {
+export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixelsPerSec, height = 24, headerWidth = 0 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -17,7 +18,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const width = Math.max(totalWidth + 500, window.innerWidth);
+        // Don't use window.innerWidth directly without offset, and remove buffer
+        const width = Math.max(totalWidth, window.innerWidth - headerWidth);
 
         canvas.width = width * dpr;
         canvas.height = height * dpr;

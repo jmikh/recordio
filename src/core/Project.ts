@@ -57,7 +57,9 @@ export class ProjectImpl {
                     hasGlow: true,
                     zoom: 1
 
-                }
+                },
+
+                timelinePixelsPerSecond: 100
             },
             timeline: {
                 id: crypto.randomUUID(),

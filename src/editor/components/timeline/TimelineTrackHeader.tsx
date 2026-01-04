@@ -1,6 +1,7 @@
 import React from 'react';
 import { MdVolumeUp, MdVolumeOff } from 'react-icons/md';
 
+//TODO get rid of this and use css class instead
 interface TimelineTrackHeaderProps {
     title: string;
     height: number;

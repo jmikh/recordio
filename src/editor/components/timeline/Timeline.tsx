@@ -1,5 +1,5 @@
 // ... imports
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
@@ -13,6 +13,8 @@ import { EventsTrack } from './EventsTrack';
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
+import { TimelineScrollbar } from './TimelineScrollbar';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 // Constants
 const TRACK_HEIGHT = 40;
@@ -20,6 +22,16 @@ const HEADER_WIDTH = 200;
 
 export function Timeline() {
     const containerRef = useRef<HTMLDivElement>(null);
+    const overlayRef = useRef<HTMLDivElement>(null);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (overlayRef.current) {
+            // shows dark transparent overlay to signfiy more track is hiding.
+            const scrollLeft = e.currentTarget.scrollLeft;
+            const opacity = Math.min(scrollLeft / 200, 1);
+            overlayRef.current.style.opacity = opacity.toString();
+        }
+    };
 
     // -- Stores --
     const timeline = useProjectTimeline();
@@ -37,7 +49,22 @@ export function Timeline() {
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
 
     // Zoom Level (Timeline Scale)
-    const [pixelsPerSec, setPixelsPerSec] = useState(100);
+    const pixelsPerSec = projectSettings.timelinePixelsPerSecond || 100; // Fallback for old projects
+    const batcher = useHistoryBatcher();
+
+    const handleScaleChange = (newScale: number) => {
+        batcher.updateWithBatching({ timelinePixelsPerSecond: newScale });
+    };
+
+    // We need to inject batcher start/end into the toolbar if it supports it, 
+    // or just assume the toolbar might handle it? 
+    // The user said "use HistoryBatcher when it gets updated".
+    // If I pass `handleScaleChange` to `onScaleChange`, it fits `updateWithBatching`.
+    // But we also need `startInteraction` and `endInteraction`.
+    // `TimelineToolbar` prop `onScaleChange` is usually `(val) => void`.
+    // Let's assume for now we pass the simple updater, but we might need to modify Toolbar to send start/end events if the slider is used.
+    // However, looking at the user request: "use HistoryBatcher when it gets updated".
+    // I will pass `batcher` related functions to the toolbar.
 
     // -- Derived Data --
     const recording = timeline.recording;
@@ -51,7 +78,7 @@ export function Timeline() {
 
     // Total Duration is now the OUTPUT duration (sum of windows)
     const totalOutputDuration = timeMapper.getOutputDuration();
-    const totalWidth = (totalOutputDuration / 1000) * pixelsPerSec;
+    const totalWidth = (totalOutputDuration / 1000) * pixelsPerSec + 25;
 
     // -- Interaction Hook --
     const {
@@ -91,7 +118,9 @@ export function Timeline() {
                 isPlaying={isPlaying}
                 onTogglePlay={() => setIsPlaying(!isPlaying)}
                 pixelsPerSec={pixelsPerSec}
-                onScaleChange={setPixelsPerSec}
+                onScaleChange={handleScaleChange}
+                onScaleInteractionStart={batcher.startInteraction}
+                onScaleInteractionEnd={batcher.endInteraction}
                 currentTimeMs={timeMapper.mapTimelineToOutputTime(currentTimeMs)}
                 totalDurationMs={totalOutputDuration}
                 currentResolution={projectSettings.outputSize}
@@ -151,65 +180,85 @@ export function Timeline() {
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
-                <div
-                    className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-[#1e1e1e]"
-                    ref={containerRef}
-                    onMouseMove={handleMouseMove}
-                    onMouseDown={handleMouseDown}
-                    onMouseLeave={handleMouseLeave}
-                    onMouseUp={handleMouseUp}
-                >
-                    <div
-                        className="relative min-w-full"
-                        style={{ width: `${Math.max(totalWidth + 400, window.innerWidth - HEADER_WIDTH)}px` }}
-                    >
-                        {/* Ruler */}
-                        <TimelineRuler
-                            totalWidth={totalWidth}
-                            pixelsPerSec={pixelsPerSec}
+                <div className="flex-1 relative overflow-hidden flex flex-col">
+                    <TimelineScrollbar containerRef={containerRef} dependency={pixelsPerSec} />
+
+                    <div className="flex-1 relative overflow-hidden w-full h-full">
+                        {/* Floating Overlay for Scroll Indication */}
+                        <div
+                            ref={overlayRef}
+                            className="absolute left-0 top-0 bottom-0 w-12 z-30 pointer-events-none"
+                            style={{
+                                background: 'linear-gradient(to right, rgba(0,0,0,0.5), transparent)',
+                                opacity: 0,
+                                transition: 'opacity 0.1s ease-out'
+                            }}
                         />
 
-                        {/* Tracks Container */}
-                        <div className="flex flex-col gap-2 relative pl-0">
-                            {/* Main Track */}
-                            <MainTrack
-                                timeline={timeline}
-                                pixelsPerSec={pixelsPerSec}
-                                accumulatedX={0}
-                                trackHeight={mainTrackHeight}
-                            />
-
-                            {/* Zoom Track */}
-                            <ZoomTrack
-                                pixelsPerSec={pixelsPerSec}
-                                height={TRACK_HEIGHT}
-                                timelineOffset={timelineOffset}
-                            />
-
-                            {/* Events Track */}
-                            <EventsTrack
-                                events={userEvents}
-                                pixelsPerSec={pixelsPerSec}
-                                timelineOffset={timelineOffset}
-                                timeMapper={timeMapper}
-                                trackHeight={TRACK_HEIGHT}
-                            />
-                        </div>
-
-                        {/* Hover Line */}
-                        {hoverTime !== null && (
+                        <div
+                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-[#1e1e1e] [&::-webkit-scrollbar]:hidden"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            ref={containerRef}
+                            onScroll={handleScroll}
+                            onMouseMove={handleMouseMove}
+                            onMouseDown={handleMouseDown}
+                            onMouseLeave={handleMouseLeave}
+                            onMouseUp={handleMouseUp}
+                        >
                             <div
-                                className="absolute top-0 bottom-0 w-[1px] bg-white/30 z-20 pointer-events-none"
-                                style={{ left: `${(hoverTime / 1000) * pixelsPerSec}px` }}
-                            />
-                        )}
+                                className="relative min-w-full"
+                                style={{ width: `${totalWidth}px` }}
+                            >
+                                {/* Ruler */}
+                                <TimelineRuler
+                                    totalWidth={totalWidth}
+                                    pixelsPerSec={pixelsPerSec}
+                                    headerWidth={HEADER_WIDTH}
+                                />
 
-                        {/* Playhead (CTI) & Auto-Scroll */}
-                        <TimelinePlayhead
-                            containerRef={containerRef}
-                            pixelsPerSec={pixelsPerSec}
-                            timeMapper={timeMapper}
-                        />
+                                {/* Tracks Container */}
+                                <div className="flex flex-col gap-2 relative pl-0">
+                                    {/* Main Track */}
+                                    <MainTrack
+                                        timeline={timeline}
+                                        pixelsPerSec={pixelsPerSec}
+                                        accumulatedX={0}
+                                        trackHeight={mainTrackHeight}
+                                    />
+
+                                    {/* Zoom Track */}
+                                    <ZoomTrack
+                                        pixelsPerSec={pixelsPerSec}
+                                        height={TRACK_HEIGHT}
+                                        timelineOffset={timelineOffset}
+                                    />
+
+                                    {/* Events Track */}
+                                    <EventsTrack
+                                        events={userEvents}
+                                        pixelsPerSec={pixelsPerSec}
+                                        timelineOffset={timelineOffset}
+                                        timeMapper={timeMapper}
+                                        trackHeight={TRACK_HEIGHT}
+                                    />
+                                </div>
+
+                                {/* Hover Line */}
+                                {hoverTime !== null && (
+                                    <div
+                                        className="absolute top-0 bottom-0 w-[1px] bg-white/30 z-40 pointer-events-none"
+                                        style={{ left: `${(hoverTime / 1000) * pixelsPerSec}px` }}
+                                    />
+                                )}
+
+                                {/* Playhead (CTI) & Auto-Scroll */}
+                                <TimelinePlayhead
+                                    containerRef={containerRef}
+                                    pixelsPerSec={pixelsPerSec}
+                                    timeMapper={timeMapper}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
