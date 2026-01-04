@@ -1,3 +1,4 @@
+// ... imports
 import { useRef, useState, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
@@ -7,7 +8,7 @@ import { ZoomTrack } from './ZoomTrack';
 
 // New Components
 import { TimelineToolbar } from './TimelineToolbar';
-import { MainTrack } from './MainTrack';
+import { MainTrack, GROUP_HEADER_HEIGHT } from './MainTrack';
 import { EventsTrack } from './EventsTrack';
 import { useTimelineInteraction } from './useTimelineInteraction';
 
@@ -118,7 +119,7 @@ export function Timeline() {
                             timeline={timeline}
                             pixelsPerSec={pixelsPerSec}
                             accumulatedX={0}
-                            trackHeight={timeline.recording.cameraSourceId ? TRACK_HEIGHT * 2 : TRACK_HEIGHT}
+                            trackHeight={(timeline.recording.cameraSourceId ? TRACK_HEIGHT * 2 : TRACK_HEIGHT) + GROUP_HEADER_HEIGHT}
                             headerWidth={HEADER_WIDTH}
                         />
 
