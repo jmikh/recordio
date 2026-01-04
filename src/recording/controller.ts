@@ -45,9 +45,7 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
             }
             return false;
 
-        case MSG_TYPES.PING_CONTROLLER:
-            sendResponse("PONG");
-            return false;
+
     }
 
     return false;
@@ -74,6 +72,13 @@ async function handleStart(message: BaseMessage) {
     recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
     const detectionResult = await recorder.start();
+
+    // Update UI to show recording status
+    const waitingEl = document.getElementById('status-waiting');
+    const recordingEl = document.getElementById('status-recording');
+
+    if (waitingEl) waitingEl.style.display = 'none';
+    if (recordingEl) recordingEl.style.display = 'block';
 
     return { success: true, startTime: Date.now(), detection: detectionResult };
 }

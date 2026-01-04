@@ -212,7 +212,7 @@ function App() {
   const hasPermissionError = (isAudioEnabled && audioPermission === 'denied') || (isVideoEnabled && videoPermission === 'denied');
 
   const openOptions = () => {
-    chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
+    chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` });
   };
 
   if (hasPermissionError) {

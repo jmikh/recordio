@@ -56,6 +56,20 @@
             height: 20px;
             background-color: #0000FF;
         }
+
+        .footer-msg {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #aaa;
+            background-color: rgba(26, 26, 46, 0.9);
+            padding: 10px 0;
+            pointer-events: none;
+            /* Let click passthrough if needed, though it's text */
+        }
     </style>
 </head>
 
@@ -74,10 +88,22 @@
         <div class="marker-inner"></div>
     </div>
 
-    <div class="status">
-        <div class="spinner"></div>
-        <p>Recording in progress...</p>
-        <p style="font-size: 0.8rem; opacity: 0.7;">Do not close this tab</p>
+    <div class="status" id="status-container">
+        <!-- Initial Message -->
+        <div id="status-waiting">
+            <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">Click "Share" to start recording</p>
+            <p style="opacity: 0.7;">Select a window or screen in the browser prompt</p>
+        </div>
+
+        <!-- Recording Message (Hidden Initially) -->
+        <div id="status-recording" style="display: none;">
+            <div class="spinner"></div>
+            <p style="font-size: 1.2rem; font-weight: bold; color: #e94560;">Recording in progress...</p>
+        </div>
+    </div>
+
+    <div class="footer-msg">
+        Chrome requires this tab to be opened during the lifetime of the recording
     </div>
     <script type="module" src="./controller.ts"></script>
 </body>

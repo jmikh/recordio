@@ -139,6 +139,8 @@ export interface SourceMetadata {
     hasAudio: boolean;
     fileSizeBytes?: number;
     createdAt?: number;
+    /** Human readable name of the source (e.g. Tab Title or "Desktop") */
+    name: string;
 }
 
 // ==========================================

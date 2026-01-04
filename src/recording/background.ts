@@ -28,10 +28,10 @@ const DEFAULT_STATE: RecordingState = {
 };
 
 let currentState: RecordingState | null = null;
+// Singleton promise to track initialization
+let stateReady: Promise<void> | null = null;
 
-async function ensureState() {
-    if (currentState) return; // Already loaded
-
+async function doEnsureState() {
     try {
         const result = await chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE);
         if (result[STORAGE_KEYS.RECORDING_STATE]) {
@@ -47,6 +47,16 @@ async function ensureState() {
         currentState = { ...DEFAULT_STATE };
     }
 }
+
+function ensureState() {
+    if (!stateReady) {
+        stateReady = doEnsureState();
+    }
+    return stateReady;
+}
+
+// Start State Loading Immediately
+ensureState();
 
 async function saveState(newState: Partial<RecordingState>) {
     // Ensure we have a base state before merging (should be covered by ensureState usage)
@@ -102,18 +112,13 @@ async function waitForOffscreen() {
 
 // --- Controller Tab Setup (Window/Desktop Mode) ---
 
-let controllerTabId: number | null = null;
-
-async function closeControllerTab() {
-    if (controllerTabId) {
-        chrome.tabs.remove(controllerTabId).catch(() => { });
-        controllerTabId = null;
+async function closeControllerTab(tabId: number | null) {
+    if (tabId) {
+        chrome.tabs.remove(tabId).catch(() => { });
     }
 }
 
 async function openControllerTab(): Promise<number> {
-    await closeControllerTab();
-
     const tab = await chrome.tabs.create({
         url: chrome.runtime.getURL('src/recording/controller.html'),
         active: true,
@@ -121,7 +126,6 @@ async function openControllerTab(): Promise<number> {
     });
 
     if (!tab || !tab.id) throw new Error("Failed to create controller tab");
-    controllerTabId = tab.id;
 
     // Wait for tab to fully load (chooseDesktopMedia requires a valid URL)
     await new Promise<void>((resolve) => {
@@ -140,22 +144,6 @@ async function openControllerTab(): Promise<number> {
     });
 
     return tab.id;
-}
-
-async function waitForController() {
-    for (let i = 0; i < 30; i++) { // Try for 3 seconds
-        try {
-            const response = await chrome.runtime.sendMessage({
-                type: MSG_TYPES.PING_CONTROLLER,
-                payload: {}
-            });
-            if (response === 'PONG') return;
-        } catch (e) {
-            // Context not ready
-        }
-        await new Promise(r => setTimeout(r, 100));
-    }
-    throw new Error("Controller tab failed to initialize");
 }
 
 // --- Content Script Injection ---
@@ -279,88 +267,95 @@ async function startTabModeSession(payload: any, sessionId: string) {
 }
 
 async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'screen') {
+    let openedControllerTabId: number | null = null;
     const { hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabId: originalTabId } = payload || {};
 
-    // 1. Open Controller Tab first (needed as target for chooseDesktopMedia in service worker)
-    const controllerTabId = await openControllerTab();
+    try {
+        // 1. Open Controller Tab first (needed as target for chooseDesktopMedia in service worker)
+        openedControllerTabId = await openControllerTab();
 
-    // Get the tab object for chooseDesktopMedia
-    const controllerTab = await chrome.tabs.get(controllerTabId);
+        // Get the tab object for chooseDesktopMedia
+        const controllerTab = await chrome.tabs.get(openedControllerTabId);
 
-    // 2. Show desktop capture picker (needs target tab when called from service worker)
-    const sources = mode === 'window'
-        ? ['window' as const]
-        : ['screen' as const];
+        // 2. Show desktop capture picker (needs target tab when called from service worker)
+        const sources = mode === 'window'
+            ? ['window' as const]
+            : ['screen' as const];
 
-    const sourceId = await new Promise<string>((resolve, reject) => {
-        chrome.desktopCapture.chooseDesktopMedia(sources, controllerTab, (streamId) => {
-            if (streamId) {
-                resolve(streamId);
-            } else {
-                reject(new Error("User cancelled desktop capture picker"));
-            }
+        const sourceId = await new Promise<string>((resolve, reject) => {
+            chrome.desktopCapture.chooseDesktopMedia(sources, controllerTab, (streamId) => {
+                if (streamId) {
+                    resolve(streamId);
+                } else {
+                    reject(new Error("User cancelled desktop capture picker"));
+                }
+            });
         });
-    });
 
-    // 3. Wait for Controller to be ready
-    await waitForController();
-
-    // 4. Generate Config with sourceId
-    const config: RecordingConfig = {
-        hasAudio: hasAudio !== false,
-        hasCamera: hasCamera === true,
-        audioDeviceId: audioDeviceId,
-        videoDeviceId: videoDeviceId,
-        sourceId: sourceId
-    };
-
-    // 5. Send START to Controller
-    const syncTimestamp = Date.now();
-    const startVideoMsg: BaseMessage = {
-        type: MSG_TYPES.START_RECORDING_VIDEO,
-        payload: { config, mode, sessionId }
-    };
-    const controllerResponse = await chrome.runtime.sendMessage(startVideoMsg);
-
-    let recordEvents = true;
-    // Check Window Detection
-    if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isCurrentWindow) {
-        recordEvents = false;
-    }
-
-    if (recordEvents) {
-        // 6. Broadcast START_RECORDING_EVENTS to all tabs
-        // syncTimestamp defined above
-        const startEventsMsg: BaseMessage = {
-            type: MSG_TYPES.START_RECORDING_EVENTS,
-            payload: { startTime: syncTimestamp, sessionId }
+        // 4. Generate Config with sourceId
+        const config: RecordingConfig = {
+            hasAudio: hasAudio !== false,
+            hasCamera: hasCamera === true,
+            audioDeviceId: audioDeviceId,
+            videoDeviceId: videoDeviceId,
+            sourceId: sourceId
         };
 
-        const tabs = await chrome.tabs.query({});
-        for (const tab of tabs) {
-            if (tab.id) {
-                // Send and forget - some tabs might be restricted (chrome:// etc)
-                chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
+        // 5. Send START to Controller
+        const syncTimestamp = Date.now();
+        const startVideoMsg: BaseMessage = {
+            type: MSG_TYPES.START_RECORDING_VIDEO,
+            payload: { config, mode, sessionId }
+        };
+        const controllerResponse = await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
+
+        let recordEvents = true;
+        // Check Window Detection
+        if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isCurrentWindow) {
+            recordEvents = false;
+        }
+
+        if (recordEvents) {
+            // 6. Broadcast START_RECORDING_EVENTS to all tabs
+            // syncTimestamp defined above
+            const startEventsMsg: BaseMessage = {
+                type: MSG_TYPES.START_RECORDING_EVENTS,
+                payload: { startTime: syncTimestamp, sessionId }
+            };
+
+            const tabs = await chrome.tabs.query({});
+            for (const tab of tabs) {
+                if (tab.id) {
+                    // Send and forget - some tabs might be restricted (chrome:// etc)
+                    chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
+                }
             }
         }
+
+        // 7. Update State
+        await saveState({
+            isRecording: true,
+            recordedTabId: null,
+            controllerTabId: openedControllerTabId,
+            startTime: syncTimestamp,
+            currentSessionId: sessionId,
+            mode: mode,
+            originalTabId: originalTabId || null
+        });
+
+        // 8. Switch back to original tab if available
+        if (originalTabId) {
+            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
+        }
+    } catch (error) {
+        if (openedControllerTabId) {
+            closeControllerTab(openedControllerTabId);
+        }
+        if (originalTabId) {
+            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
+        }
+        throw error;
     }
-
-    // 7. Update State
-    await saveState({
-        isRecording: true,
-        recordedTabId: null,
-        controllerTabId: controllerTabId,
-        startTime: syncTimestamp,
-        currentSessionId: sessionId,
-        mode: mode,
-        originalTabId: originalTabId || null
-    });
-
-    // 8. Switch back to original tab if available
-    if (originalTabId) {
-        await chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
-    }
-
 }
 
 async function waitForCountdownDone(tabId: number | undefined, sessionId: string): Promise<Size | null> {
@@ -387,9 +382,12 @@ async function waitForCountdownDone(tabId: number | undefined, sessionId: string
 }
 
 async function handleStopSession(sendResponse: Function) {
+    await ensureState(); // Ensure state is loaded
     logger.log("[Background] Sending STOP_RECORDING");
 
     const finalSessionId = currentState?.currentSessionId;
+    // Capture the controller ID from state before we wipe the state
+    const controllerTabIdToClose = currentState?.controllerTabId;
 
     if (finalSessionId) {
         try {
@@ -398,7 +396,14 @@ async function handleStopSession(sendResponse: Function) {
                 type: MSG_TYPES.STOP_RECORDING_VIDEO,
                 payload: { sessionId: finalSessionId }
             };
-            const response = await chrome.runtime.sendMessage(stopVideoMsg);
+
+            let response;
+            if (currentState?.mode === 'tab') {
+                response = await chrome.runtime.sendMessage(stopVideoMsg);
+            } else if ((currentState?.mode === 'window' || currentState?.mode === 'screen') && controllerTabIdToClose) {
+                response = await chrome.tabs.sendMessage(controllerTabIdToClose, stopVideoMsg);
+            }
+
             logger.log("[Background] Recorder stop response:", response);
 
             // Open editor
@@ -435,7 +440,11 @@ async function handleStopSession(sendResponse: Function) {
 
     // remove those after saving state so they don't accidentally trigger another stop session
     chrome.offscreen.closeDocument().catch(() => { });
-    closeControllerTab();
+
+    // Close using the ID we captured earlier
+    if (controllerTabIdToClose) {
+        closeControllerTab(controllerTabIdToClose);
+    }
 
     sendResponse({ success: true });
 }

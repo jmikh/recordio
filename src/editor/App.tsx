@@ -6,6 +6,7 @@ import { usePlaybackStore } from './stores/usePlaybackStore';
 import { Timeline } from './components/timeline/Timeline';
 
 import { ProjectStorage } from '../storage/projectStorage';
+import { ProjectSelector } from './components/ProjectSelector';
 
 // Icons
 const IconUndo = () => (
@@ -139,24 +140,13 @@ function Editor() {
     }
 
     if (error) {
-        return (
-            <div className="w-full h-screen bg-black flex items-center justify-center text-red-500">
-                Error: {error}
-            </div>
-        );
+        return <ProjectSelector error={error} />;
     }
 
     // Welcome / Empty State
     if (!isLoading && !hasActiveProject) {
-        // Check if we have a projectId param but failed? No, error handles that.
         // This is "No Project Loaded" state.
-        return (
-            <div className="w-full h-screen bg-[#1e1e1e] flex items-center justify-center text-white flex-col gap-4">
-                <h1 className="text-2xl font-bold">Recordo Editor</h1>
-                <p className="text-gray-400">Select a project to load (Sidebar coming soon) or start a new recording.</p>
-                {/* Temporary list trigger validation? */}
-            </div>
-        );
+        return <ProjectSelector />;
     }
 
     return (

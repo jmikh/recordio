@@ -39,7 +39,6 @@ export const MSG_TYPES = {
 
     // Coordination
     PING_OFFSCREEN: 'PING_OFFSCREEN',
-    PING_CONTROLLER: 'PING_CONTROLLER',
     GET_RECORDING_STATE: 'GET_RECORDING_STATE',
 
 } as const;

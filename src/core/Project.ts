@@ -99,10 +99,9 @@ export class ProjectImpl {
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
 
-        // Default Output Window
         const outputWindows = [{
             id: crypto.randomUUID(),
-            startMs: 0,
+            startMs: durationMs < 200 ? 0 : 200,
             endMs: durationMs
         }];
 
