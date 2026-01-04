@@ -70,21 +70,37 @@ export class VideoRecorder {
     }
 
     /**
-     * Starts the recording session.
+     * Prepares the recording session by initializing streams.
+     * Use this to warm up the camera during countdown.
      */
-    public async start(): Promise<WindowDetectionResult | null> {
+    public async prepare(config: RecordingConfig): Promise<void> {
         if (this.state !== 'idle') {
-            throw new Error(`Cannot start recording: Recorder is in ${this.state} state.`);
+            throw new Error(`Cannot prepare recording: Recorder is in ${this.state} state.`);
         }
 
-        console.log(`[VideoRecorder] Starting session ${this.currentSessionId} in ${this.mode} mode.`, this.config);
+        console.log(`[VideoRecorder] Preparing session ${this.currentSessionId} in ${this.mode} mode.`, config);
 
         this.state = 'preparing';
+        this.config = config; // Update config with potentially newer one
         this.screenData = [];
         this.cameraData = [];
         this.activeStreams = [];
 
         await this.initializeStreams(this.config);
+
+        console.log(`[VideoRecorder] Streams initialized (warmup complete).`);
+    }
+
+    /**
+     * Starts the recording session.
+     */
+    public async start(): Promise<WindowDetectionResult | null> {
+        if (this.state !== 'preparing') {
+            throw new Error(`Cannot start recording: Recorder is in ${this.state} state. It must be in 'preparing' state.`);
+        }
+
+        console.log(`[VideoRecorder] Starting session ${this.currentSessionId} in ${this.mode} mode.`, this.config);
+
 
         if (!this.screenRecorder) {
             throw new Error("Screen Recorder failed to initialize.");

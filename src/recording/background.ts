@@ -212,7 +212,27 @@ async function startTabModeSession(payload: any, sessionId: string) {
     // 3. Wait for Offscreen
     await waitForOffscreen();
 
-    // 4. Start Countdown and get dimensions
+    // 5. Generate Config
+    const tabInfo = tabId ? await chrome.tabs.get(tabId) : null;
+    const config: RecordingConfig = {
+        hasAudio: hasAudio !== false,
+        hasCamera: hasCamera === true,
+        streamId: streamId,
+        tabViewportSize: { width: 1920, height: 1080 }, // Temp placeholder, updated in prepare/start
+        audioDeviceId: audioDeviceId,
+        videoDeviceId: videoDeviceId,
+        sourceName: tabInfo?.title || 'Tab'
+    };
+
+    // 6. Send PREPARE to Offscreen (Warmup Streams)
+    // This starts the camera while we do the countdown
+    const prepareVideoMsg: BaseMessage = {
+        type: MSG_TYPES.PREPARE_RECORDING_VIDEO,
+        payload: { config, mode: 'tab', sessionId }
+    };
+    await chrome.runtime.sendMessage(prepareVideoMsg);
+
+    // 7. Start Countdown and get dimensions
     if (tabId) {
         const countdownMsg: BaseMessage = {
             type: MSG_TYPES.START_COUNTDOWN,
@@ -225,17 +245,8 @@ async function startTabModeSession(payload: any, sessionId: string) {
     const dimensions = await waitForCountdownDone(tabId, sessionId);
     if (!dimensions) throw new Error("Could not retrieve viewport dimensions from content script.");
 
-    // 5. Generate Config
-    const tabInfo = tabId ? await chrome.tabs.get(tabId) : null;
-    const config: RecordingConfig = {
-        hasAudio: hasAudio !== false,
-        hasCamera: hasCamera === true,
-        streamId: streamId,
-        tabViewportSize: dimensions,
-        audioDeviceId: audioDeviceId,
-        videoDeviceId: videoDeviceId,
-        sourceName: tabInfo?.title || 'Tab'
-    };
+    // Update config with real dimensions
+    config.tabViewportSize = dimensions;
 
     // 6. Send START to Offscreen (VideoRecorder)
     const startVideoMsg: BaseMessage = {
@@ -442,6 +453,7 @@ async function handleStopSession(sendResponse: Function) {
     });
 
     // remove those after saving state so they don't accidentally trigger another stop session
+    // TODO: comment out to see logs upon exit
     chrome.offscreen.closeDocument().catch(() => { });
 
     // Close using the ID we captured earlier

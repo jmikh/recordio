@@ -20,20 +20,20 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
     const msg = message as BaseMessage;
 
     switch (msg.type) {
+        case MSG_TYPES.PREPARE_RECORDING_VIDEO:
+            handlePrepare(msg)
+                .then((response) => sendResponse(response));
+            return true;
+
         case MSG_TYPES.START_RECORDING_VIDEO:
-            if (message.payload?.mode !== 'tab') {
-                return false;
-            }
             handleStart(msg)
-                .then((response) => sendResponse(response))
-                .catch((e) => sendResponse({ success: false, error: e.message }));
+                .then((response) => sendResponse(response));
             return true;
 
         case MSG_TYPES.STOP_RECORDING_VIDEO:
             handleStop(msg)
-                .then((response) => sendResponse(response))
-                .catch((e) => sendResponse({ success: false, error: e.message }));
-            return true; // Keep channel open for async response
+                .then((response) => sendResponse(response));
+            return true;
 
         case MSG_TYPES.CAPTURE_USER_EVENT:
             if (msg.payload && recorder) {
@@ -50,14 +50,31 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
 });
 
 async function handleStart(message: BaseMessage) {
-    const config: RecordingConfig = message.payload.config;
+    // const config: RecordingConfig = message.payload.config; // Config is now used in prepare()
     const sessionId = message.payload.sessionId;
 
-    recorder = new VideoRecorder(sessionId, config, mode);
+    // Strict check: Recorder MUST be prepared by now
+    if (!recorder || recorder.getStatus().sessionId !== sessionId) {
+        throw new Error("Recorder not prepared for this session. You must call PREPARE_RECORDING_VIDEO first.");
+    }
 
     await recorder.start();
 
     return { success: true, startTime: Date.now() };
+}
+
+async function handlePrepare(message: BaseMessage) {
+    const config: RecordingConfig = message.payload.config;
+    const sessionId = message.payload.sessionId;
+
+    // Use current recorder if exists and matches session (though usually it's null)
+    if (!recorder) {
+        recorder = new VideoRecorder(sessionId, config, mode);
+    }
+
+    await recorder.prepare(config);
+
+    return { success: true };
 }
 
 async function handleStop(message: BaseMessage) {

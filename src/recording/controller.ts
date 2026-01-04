@@ -71,6 +71,8 @@ async function handleStart(message: BaseMessage) {
 
     recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
+    // Initialize streams immediately (Window mode doesn't have a separate warmup phase yet)
+    await recorder.prepare(fullConfig);
     const detectionResult = await recorder.start();
 
     // Update UI to show recording status

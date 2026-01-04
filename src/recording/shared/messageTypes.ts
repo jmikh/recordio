@@ -26,6 +26,7 @@ export const MSG_TYPES = {
     STOP_SESSION: 'STOP_SESSION',
 
     // Recording Control (Background -> Offscreen)
+    PREPARE_RECORDING_VIDEO: 'PREPARE_RECORDING_VIDEO', // Background -> Offscreen (Warmup)
     START_RECORDING_VIDEO: 'START_RECORDING_VIDEO',     // Background -> Offscreen
     STOP_RECORDING_VIDEO: 'STOP_RECORDING_VIDEO',       // Background -> Offscreen
 
