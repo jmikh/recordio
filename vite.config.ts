@@ -17,7 +17,6 @@ export default defineConfig(({ mode }) => ({
       input: {
         editor: resolve(__dirname, 'src/editor/index.html'),
         offscreen: resolve(__dirname, 'src/recording/offscreen.html'),
-        permissions: resolve(__dirname, 'src/permissions/permissions.html'),
 
         controller: resolve(__dirname, 'src/recording/controller.html')
       },
