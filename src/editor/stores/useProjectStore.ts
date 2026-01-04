@@ -41,7 +41,7 @@ export interface ProjectState {
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
-    addSource: (file: Blob, type: 'image' | 'video' | 'audio') => Promise<ID>;
+    addSource: (file: Blob, type: 'image' | 'video' | 'audio', metadata?: Partial<import('../../core/types').SourceMetadata>) => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
     setCanvasMode: (mode: CanvasMode) => void;
     selectWindow: (id: ID | null) => void;
@@ -375,7 +375,7 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                addSource: async (blob, type, metadata = {}) => {
+                addSource: async (blob, type, metadata: Partial<import('../../core/types').SourceMetadata> = {}) => {
                     const state = get();
                     const projectId = state.project.id;
                     const uuid = crypto.randomUUID();
@@ -400,6 +400,7 @@ export const useProjectStore = create<ProjectState>()(
                         durationMs: 0,
                         size: { width: 0, height: 0 },
                         hasAudio: false,
+                        name: metadata.name || 'Untitled Source',
                         ...metadata
                     };
 

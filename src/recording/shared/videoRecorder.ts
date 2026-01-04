@@ -374,7 +374,8 @@ export class VideoRecorder {
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
             hasAudio: true,
-            createdAt: now
+            createdAt: now,
+            name: this.config.sourceName || this.mode
         };
         await ProjectStorage.saveSource(screenSource);
 
@@ -392,7 +393,8 @@ export class VideoRecorder {
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 hasAudio: false, // Audio is in screen or mixed separate, but cam stream usually just video if separate
-                createdAt: now
+                createdAt: now,
+                name: 'Camera'
             };
             await ProjectStorage.saveSource(cameraSource);
         }

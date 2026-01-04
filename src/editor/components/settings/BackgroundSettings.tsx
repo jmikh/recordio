@@ -121,7 +121,7 @@ export const BackgroundSettings = () => {
         if (!file) return;
 
         try {
-            const newSourceId = await addSource(file, 'image');
+            const newSourceId = await addSource(file, 'image', { name: file.name });
             updateSettings({
                 background: {
                     type: 'image',

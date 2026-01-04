@@ -93,7 +93,11 @@ export class ProjectImpl {
         screenEvents: UserEvents, // Required for calculating zooms
         cameraSource?: SourceMetadata
     ): Project {
-        const project = this.create("Recording - " + new Date().toLocaleString());
+        let name = screenSource.name || "New Project";
+        if (name.length > 40) {
+            name = name.substring(0, 37) + "...";
+        }
+        const project = this.create(name);
         project.id = projectId; // Override random ID with specific projectId
 
         // Use Screen Recording Duration as the Project Duration

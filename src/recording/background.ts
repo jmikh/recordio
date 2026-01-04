@@ -226,13 +226,15 @@ async function startTabModeSession(payload: any, sessionId: string) {
     if (!dimensions) throw new Error("Could not retrieve viewport dimensions from content script.");
 
     // 5. Generate Config
+    const tabInfo = tabId ? await chrome.tabs.get(tabId) : null;
     const config: RecordingConfig = {
         hasAudio: hasAudio !== false,
         hasCamera: hasCamera === true,
         streamId: streamId,
         tabViewportSize: dimensions,
         audioDeviceId: audioDeviceId,
-        videoDeviceId: videoDeviceId
+        videoDeviceId: videoDeviceId,
+        sourceName: tabInfo?.title || 'Tab'
     };
 
     // 6. Send START to Offscreen (VideoRecorder)
@@ -298,7 +300,8 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             hasCamera: hasCamera === true,
             audioDeviceId: audioDeviceId,
             videoDeviceId: videoDeviceId,
-            sourceId: sourceId
+            sourceId: sourceId,
+            sourceName: mode === 'window' ? 'Window' : 'Desktop'
         };
 
         // 5. Send START to Controller

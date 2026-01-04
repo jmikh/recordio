@@ -73,6 +73,7 @@ export interface RecordingConfig {
     tabViewportSize?: import('../../core/types').Size; // Target dimensions (for window mode calibration)
     streamId?: string; // Required for tab recording
     sourceId?: string; // For desktop capture (window/desktop mode)
+    sourceName?: string; // Human readable name (e.g. Tab Title)
 }
 
 export interface StartSessionPayload {
