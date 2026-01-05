@@ -213,12 +213,29 @@ async function startTabModeSession(payload: any, sessionId: string) {
     await waitForOffscreen();
 
     // 5. Generate Config
-    const tabInfo = tabId ? await chrome.tabs.get(tabId) : null;
+    const tabInfo =  await chrome.tabs.get(tabId);
+
+    // Fetch REAL dimensions from content script now
+    // This ensures MediaStreams are initialized with correct constraints
+    if (!tabId) throw new Error("No tab ID");
+
+    // Simple await-based fetch. This will throw if content script is gone.
+    const initialDimensions: any = await chrome.tabs.sendMessage(tabId, { type: MSG_TYPES.GET_VIEWPORT_SIZE });
+
+    if (!initialDimensions) {
+        throw new Error("Failed to get viewport size: No response");
+    }
+
     const config: RecordingConfig = {
         hasAudio: hasAudio !== false,
         hasCamera: hasCamera === true,
         streamId: streamId,
-        tabViewportSize: { width: 1920, height: 1080 }, // Temp placeholder, updated in prepare/start
+        tabViewportSize: {
+            width: Math.round(initialDimensions.width * (initialDimensions.dpr || 1)),
+            height: Math.round(initialDimensions.height * (initialDimensions.dpr || 1))
+        },
+
+
         audioDeviceId: audioDeviceId,
         videoDeviceId: videoDeviceId,
         sourceName: tabInfo?.title || 'Tab'

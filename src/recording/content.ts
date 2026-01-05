@@ -59,6 +59,15 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
 
 
     switch (message.type) {
+        case MSG_TYPES.GET_VIEWPORT_SIZE:
+            // @ts-ignore
+            _sendResponse({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                dpr: window.devicePixelRatio
+            });
+            break;
+
         case MSG_TYPES.START_COUNTDOWN:
             handleCountdown(message);
             break;

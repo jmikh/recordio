@@ -88,6 +88,15 @@ export class VideoRecorder {
 
         await this.initializeStreams(this.config);
 
+        // Detect Window if Window Mode (moved from start)
+        if (this.mode === 'window') {
+            const screenStream = this.activeStreams[0];
+            if (screenStream) {
+                this.detectionResult = await detectWindow(screenStream);
+                console.log("[VideoRecorder] Detection isCurrentWindow:", this.detectionResult.isCurrentWindow);
+            }
+        }
+
         console.log(`[VideoRecorder] Streams initialized (warmup complete).`);
     }
 
@@ -116,14 +125,7 @@ export class VideoRecorder {
 
         console.log(`[VideoRecorder] Recording started.`);
 
-        // Detect Window if Window Mode
-        if (this.mode === 'window') {
-            const screenStream = this.activeStreams[0];
-            if (screenStream) {
-                this.detectionResult = await detectWindow(screenStream);
-                console.log("[VideoRecorder] Detection isCurrentWindow:", this.detectionResult.isCurrentWindow);
-            }
-        }
+        // Window detection is now done in prepare()
 
         return this.detectionResult; // Return to controller
     }
