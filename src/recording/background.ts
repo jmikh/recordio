@@ -354,7 +354,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
 
         let recordEvents = true;
         // Check Window Detection (from PREPARE response)
-        if (prepareResponse && prepareResponse.detection && !prepareResponse.detection.isCurrentWindow) {
+        if (prepareResponse && prepareResponse.detection && !prepareResponse.detection.isControllerWindow) {
             recordEvents = false;
         }
 

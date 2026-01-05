@@ -17,13 +17,13 @@
 // Tolerance for color matching (due to video compression)
 
 export interface WindowDetectionResult { // Renamed from CalibrationResult
-    isCurrentWindow: boolean;
+    isControllerWindow: boolean;
     yOffset: number;
     xOffset: number; // Might have side borders
 }
 
 
-export async function detectWindow(stream: MediaStream): Promise<WindowDetectionResult> {
+export async function detectControllerWindow(stream: MediaStream): Promise<WindowDetectionResult> {
     const video = document.createElement('video');
     video.srcObject = stream;
     // Attributes to help with background execution
@@ -41,7 +41,7 @@ export async function detectWindow(stream: MediaStream): Promise<WindowDetection
         const timeoutId = setTimeout(() => {
             console.warn("[VideoValidation] Stream Validation timed out. Returning invalid.");
             cleanup();
-            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+            resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
         }, 1500);
 
         const extractFrame = () => {
@@ -55,7 +55,7 @@ export async function detectWindow(stream: MediaStream): Promise<WindowDetection
                     clearTimeout(timeoutId);
                     cleanup();
                     // Resolve invalid rather than reject
-                    return resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+                    return resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
                 }
 
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -70,7 +70,7 @@ export async function detectWindow(stream: MediaStream): Promise<WindowDetection
                 console.error("[VideoValidation] Error extracting frame:", e);
                 clearTimeout(timeoutId);
                 cleanup();
-                resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+                resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
             }
         };
 
@@ -88,7 +88,7 @@ export async function detectWindow(stream: MediaStream): Promise<WindowDetection
         video.onerror = () => {
             clearTimeout(timeoutId);
             cleanup();
-            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+            resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
         };
     });
 }
@@ -108,7 +108,7 @@ export async function detectWindowInBlob(blob: Blob): Promise<WindowDetectionRes
         const timeoutId = setTimeout(() => {
             console.warn("[VideoValidation] Validation timed out (background tab?). Returning invalid.");
             cleanup();
-            resolve({ isCurrentWindow: false, xOffset: 0, yOffset: 0 });
+            resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
         }, 3000); // 3 seconds timeout
 
         const extractFrame = () => {
@@ -239,7 +239,7 @@ function findMarkers(imageData: ImageData): WindowDetectionResult {
                             // x is the X-Offset.
 
                             return {
-                                isCurrentWindow: true,
+                                isControllerWindow: true,
                                 xOffset: x,
                                 yOffset: y
                             };
@@ -250,5 +250,5 @@ function findMarkers(imageData: ImageData): WindowDetectionResult {
         }
     }
 
-    return { isCurrentWindow: false, xOffset: 0, yOffset: 0 };
+    return { isControllerWindow: false, xOffset: 0, yOffset: 0 };
 }

@@ -14,7 +14,7 @@ import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { ProjectImpl } from '../../core/Project';
 import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
-import { detectWindow, type WindowDetectionResult } from './windowDetector';
+import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
@@ -92,8 +92,10 @@ export class VideoRecorder {
         if (this.mode === 'window') {
             const screenStream = this.activeStreams[0];
             if (screenStream) {
-                this.detectionResult = await detectWindow(screenStream);
-                console.log("[VideoRecorder] Detection isCurrentWindow:", this.detectionResult.isCurrentWindow);
+                // Detect if the recorded window is the controller window (current window)
+                // This is used to determine if we need to apply offsets to the recorded events
+                this.detectionResult = await detectControllerWindow(screenStream);
+                console.log("[VideoRecorder] Detection isControllerWindow:", this.detectionResult?.isControllerWindow);
             }
         }
 
@@ -205,7 +207,7 @@ export class VideoRecorder {
         if (this.state !== 'recording') return;
 
         // Apply Offsets if Valid
-        if (this.detectionResult && this.detectionResult.isCurrentWindow) {
+        if (this.detectionResult && this.detectionResult.isControllerWindow) {
             this.applyOffsetToEvent(event, this.detectionResult.xOffset, this.detectionResult.yOffset);
         }
 
