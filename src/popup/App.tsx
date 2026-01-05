@@ -25,6 +25,7 @@ function App() {
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [audioPermission, setAudioPermission] = useState<PermissionState>('unknown');
   const [videoPermission, setVideoPermission] = useState<PermissionState>('unknown');
+  const [canInjectContentScript, setCanInjectContentScript] = useState<boolean | null>(null);
 
   useEffect(() => {
     // 1. Initial State from Storage
@@ -67,6 +68,25 @@ function App() {
       stopStream(videoStream);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const checkInjection = async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+        if (!tab?.id) return;
+
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => { }
+        });
+        setCanInjectContentScript(true);
+      } catch (e) {
+        setCanInjectContentScript(false);
+      }
+    };
+    checkInjection();
+  }, []);
 
   const stopStream = (stream: MediaStream | null) => {
     if (stream) {
@@ -189,6 +209,7 @@ function App() {
       }, (response: any) => {
         if (response?.success) {
           setIsRecording(true);
+          window.close();
         } else {
           console.error("Failed to start recording", response?.error);
         }
@@ -264,6 +285,17 @@ function App() {
               ))}
             </div>
 
+            {recordingMode === 'tab' && canInjectContentScript === false && (
+              <div className="w-full bg-red-500/10 border border-red-500/50 rounded-lg p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
+                <div className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                </div>
+                <span className="text-xs text-red-200 leading-tight">
+                  Cannot record tab of Chrome own pages. Start Recordo in another tab or use Window or Screen mode instead.
+                </span>
+              </div>
+            )}
+
             {/* Audio Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
@@ -318,8 +350,8 @@ function App() {
 
             <button
               onClick={startRecording}
-              disabled={hasPermissionError}
-              className={`mt-2 group relative w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-red-500/50 ${hasPermissionError ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
+              className={`mt-2 group relative w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-red-500/50 ${(hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="w-5 h-5 bg-white rounded-full group-hover:scale-110 transition-transform" />
             </button>

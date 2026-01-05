@@ -67,6 +67,10 @@ export interface ProjectState {
     // Settings Actions
     updateSettings: (settings: DeepPartial<ProjectSettings>) => void;
     updateProjectName: (name: string) => void;
+
+    // Export Actions
+    exportState: import('../export/ExportManager').ExportProgress & { isExporting: boolean };
+    setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
 }
 
 // Optimization helper
@@ -135,6 +139,9 @@ export const useProjectStore = create<ProjectState>()(
                 activeZoomId: null,
                 editingZoomInitialState: null as ViewportMotion | null,
                 selectedWindowId: null,
+
+                // Export State
+                exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null },
 
                 selectWindow: (id) => set({
                     selectedWindowId: id,
@@ -516,7 +523,9 @@ export const useProjectStore = create<ProjectState>()(
                         const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
                             nextSettings.outputSize.height !== currentSettings.outputSize.height;
 
-                        if (paddingChanged || zoomChanged || sizeChanged) {
+                        if (sizeChanged && !nextSettings.zoom.autoZoom) {
+                            nextMotions = [];
+                        } else if (paddingChanged || zoomChanged || sizeChanged) {
                             nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);
                         }
 
@@ -696,6 +705,12 @@ export const useProjectStore = create<ProjectState>()(
                         }
                     }));
                 },
+
+                setExportState: (updates) => {
+                    set(state => ({
+                        exportState: { ...state.exportState, ...updates }
+                    }));
+                }
             }),
             {
                 // Zundo Configuration

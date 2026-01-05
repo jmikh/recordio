@@ -7,6 +7,8 @@ import { Timeline } from './components/timeline/Timeline';
 
 import { ProjectStorage } from '../storage/projectStorage';
 import { ProjectSelector } from './components/ProjectSelector';
+import { ExportButton } from './components/header/ExportButton';
+import { ExportModal } from './components/modals/ExportModal';
 
 // Icons
 const IconUndo = () => (
@@ -226,9 +228,12 @@ function Editor() {
                         )}
                     </div>
                     {/* User Profile / Other Actions */}
+                    <ExportButton />
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500"></div>
                 </div>
             </div>
+
+            <ExportModal />
 
             <div className="flex-1 flex overflow-hidden">
                 <SettingsPanel />

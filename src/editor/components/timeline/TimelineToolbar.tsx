@@ -54,17 +54,17 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     }, []);
 
     const resolutions = [
-        { label: '1:1 (Square)', width: 1080, height: 1080 },
-        { label: '4:3 (Classic)', width: 1440, height: 1080 },
-        { label: '16:9 (Widescreen)', width: 1920, height: 1080 },
+        { label: '1:1 (Square)', width: 1080 * 2, height: 1080 * 2 },
+        { label: '4:3 (Classic)', width: 1440 * 2, height: 1080 * 2 },
+        { label: '16:9 (Widescreen)', width: 1920 * 2, height: 1080 * 2 },
     ];
 
     const currentAspectLabel = (() => {
         if (!currentResolution) return 'Ratio';
         const { width, height } = currentResolution;
-        if (width === 1080 && height === 1080) return '1:1';
-        if (width === 1440 && height === 1080) return '4:3';
-        if (width === 1920 && height === 1080) return '16:9';
+        if (width === 1080 * 2 && height === 1080 * 2) return '1:1';
+        if (width === 1440 * 2 && height === 1080 * 2) return '4:3';
+        if (width === 1920 * 2 && height === 1080 * 2) return '16:9';
         return 'Custom';
     })();
 

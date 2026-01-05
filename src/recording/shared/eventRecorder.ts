@@ -362,6 +362,8 @@ export class EventRecorder {
 
     // --- Pollers ---
 
+    private lastSentMousePos: { x: number, y: number } | null = null;
+
     private pollMouse = () => {
         if (!this.isActive()) return;
 
@@ -370,17 +372,34 @@ export class EventRecorder {
 
         if (realNow - this.lastMouseTime >= this.MOUSE_POLL_INTERVAL) {
             this.lastMouseTime = realNow;
-            this.sendMessage(EventType.MOUSEPOS, {
-                ...this.lastMousePos,
-                timestamp: now
-            });
+            const currentPos = this.lastMousePos.mousePos;
 
-            if (this.bufferedMouseDown) {
-                this.dragPath.push({
-                    type: EventType.MOUSEPOS,
-                    mousePos: this.lastMousePos.mousePos,
+            // Only send if position changed
+            if (!this.lastSentMousePos ||
+                currentPos.x !== this.lastSentMousePos.x ||
+                currentPos.y !== this.lastSentMousePos.y) {
+
+                this.sendMessage(EventType.MOUSEPOS, {
+                    ...this.lastMousePos,
                     timestamp: now
                 });
+                this.lastSentMousePos = currentPos;
+            }
+
+            if (this.bufferedMouseDown) {
+                // For drag path, we also want to avoid duplicates
+                const lastPathPoint = this.dragPath.length > 0 ? this.dragPath[this.dragPath.length - 1] : null;
+
+                if (!lastPathPoint ||
+                    lastPathPoint.mousePos.x !== currentPos.x ||
+                    lastPathPoint.mousePos.y !== currentPos.y) {
+
+                    this.dragPath.push({
+                        type: EventType.MOUSEPOS,
+                        mousePos: currentPos,
+                        timestamp: now
+                    });
+                }
             }
         }
     }
