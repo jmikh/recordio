@@ -163,6 +163,7 @@ function startCountdown(): Promise<void> {
             } else {
                 clearInterval(interval);
                 overlay.remove();
+                resolve();
             }
         }, 1000);
     });
