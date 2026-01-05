@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
-import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectHistory, useProjectSources } from './stores/useProjectStore';
 import { usePlaybackStore } from './stores/usePlaybackStore';
 import { Timeline } from './components/timeline/Timeline';
 
@@ -30,6 +30,7 @@ function Editor() {
 
     // -- Project State --
     const project = useProjectData();
+    const sources = useProjectSources();
     const userEvents = useProjectStore(s => s.userEvents);
 
     const loadProject = useProjectStore(s => s.loadProject);
@@ -209,6 +210,12 @@ function Editor() {
                             onClick={() => console.log(userEvents)}
                         >
                             Log Events
+                        </button>
+                        <button
+                            className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[10px] rounded cursor-pointer"
+                            onClick={() => console.log(sources)}
+                        >
+                            Log Sources
                         </button>
                     </div>
                     <div className="text-xs text-gray-500 flex items-center gap-2">
