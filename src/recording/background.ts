@@ -270,6 +270,8 @@ async function startTabModeSession(payload: any, sessionId: string) {
         type: MSG_TYPES.START_RECORDING_VIDEO,
         payload: { config, mode: 'tab', sessionId }
     };
+    // ensures enough time the timer overlay to disappear
+    await new Promise(resolve => setTimeout(resolve, 100));
     await chrome.runtime.sendMessage(startVideoMsg);
 
     // 7. Send START to Content (Start Event Capture)
@@ -343,6 +345,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         // 6. Switch back to original tab if available (Before Start)
         if (originalTabId) {
             chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
+
         }
 
         // 7. Send START to Controller
@@ -350,6 +353,8 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             type: MSG_TYPES.START_RECORDING_VIDEO,
             payload: { config, mode, sessionId }
         };
+        // ensures enough time for the tab switch to take effect
+        await new Promise(resolve => setTimeout(resolve, 100));
         await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
 
         let recordEvents = true;

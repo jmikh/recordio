@@ -324,6 +324,7 @@ export class VideoRecorder {
     }
 
     private async getScreenStream(config: RecordingConfig): Promise<MediaStream> {
+        console.log("getScreenStream: ", this.mode);
         if (this.mode === 'tab') {
             const streamId = config.streamId;
             if (!streamId) throw new Error("Stream ID is required for tab recording mode.");
