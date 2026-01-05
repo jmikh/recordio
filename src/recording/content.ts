@@ -15,6 +15,7 @@
 import { logger } from '../utils/logger';
 import { MSG_TYPES, type BaseMessage } from './shared/messageTypes';
 import { EventRecorder } from './shared/eventRecorder';
+import { BlurManager } from './blur/blurManager';
 
 // Cleanup mechanism for previous instances
 const cleanupEvent = new Event('recordo-cleanup');
@@ -50,6 +51,7 @@ chrome.runtime.sendMessage({
 let eventRecorder: EventRecorder | null = null;
 let isPreparing = false;
 let currentSessionId = '';
+const blurManager = new BlurManager();
 
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
@@ -81,6 +83,14 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
             console.log("[Content] Stopping recording events...");
             handleStopRecording();
             break;
+
+        case MSG_TYPES.ENABLE_BLUR_MODE:
+            blurManager.enable();
+            break;
+
+        case MSG_TYPES.DISABLE_BLUR_MODE:
+            blurManager.disable();
+            break;
     }
 };
 
@@ -92,6 +102,7 @@ function handleCountdown(message: BaseMessage) {
     if (isPreparing) return;
     isPreparing = true;
     currentSessionId = message.payload?.sessionId;
+    blurManager.disable(); // Ensure tool UI is gone before recording
     logger.log("[Content] Preparing recording (Countdown)", currentSessionId);
     startCountdown().then(() => {
         isPreparing = false;
@@ -119,6 +130,7 @@ function handleStateResponse(response: any) {
 }
 
 function handleStartRecording(message: any) {
+    blurManager.disable(); // Ensure tool UI is gone before recording
     const startTime = message.payload?.startTime || Date.now();
     startRecording(startTime);
 }

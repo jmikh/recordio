@@ -43,6 +43,10 @@ export const MSG_TYPES = {
     GET_RECORDING_STATE: 'GET_RECORDING_STATE',
     GET_VIEWPORT_SIZE: 'GET_VIEWPORT_SIZE',
 
+    // Blur Mode
+    ENABLE_BLUR_MODE: 'ENABLE_BLUR_MODE',
+    DISABLE_BLUR_MODE: 'DISABLE_BLUR_MODE',
+
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];

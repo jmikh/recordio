@@ -236,6 +236,21 @@ function App() {
     chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` });
   };
 
+  const handleBlurMode = async () => {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
+      if (!tab?.id) return;
+
+      chrome.tabs.sendMessage(tab.id, {
+        type: MSG_TYPES.ENABLE_BLUR_MODE
+      });
+      window.close();
+    } catch (error) {
+      console.error("Failed to enable blur mode:", error);
+    }
+  };
+
   if (hasPermissionError) {
     return (
       <div className="w-[320px] bg-slate-900 text-white font-sans overflow-hidden flex flex-col p-4">
@@ -277,7 +292,17 @@ function App() {
               {['tab', 'window', 'screen'].map((mode) => (
                 <button
                   key={mode}
-                  onClick={() => setRecordingMode(mode as any)}
+                  onClick={() => {
+                    setRecordingMode(mode as any);
+                    // If leaving tab mode, disable blur
+                    if (mode !== 'tab') {
+                      chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+                        if (tabs[0]?.id) {
+                          chrome.tabs.sendMessage(tabs[0].id, { type: MSG_TYPES.DISABLE_BLUR_MODE });
+                        }
+                      });
+                    }
+                  }}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all capitalize ${recordingMode === mode ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   {mode}
@@ -294,6 +319,16 @@ function App() {
                   Cannot record tab of Chrome own pages. Start Recordo in another tab or use Window or Screen mode instead.
                 </span>
               </div>
+            )}
+
+            {recordingMode === 'tab' && canInjectContentScript !== false && (
+              <button
+                onClick={handleBlurMode}
+                className="w-full mb-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /><path d="M10 12h.01" /><path d="M2 2l20 20" /></svg>
+                Blur Elements
+              </button>
             )}
 
             {/* Audio Controls */}

@@ -7,6 +7,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/viewMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox } from './BoundingBox';
+import { DimmedOverlay } from '../common/DimmedOverlay';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
@@ -199,10 +200,10 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     }, [startInteraction, endInteraction]);
 
     // Convert to Percentages for rendering (handling CSS scaling of container) for Dimming Layer
-    const leftPct = toPct(renderedRect.x, outputSize.width);
-    const topPct = toPct(renderedRect.y, outputSize.height);
-    const widthPct = toPct(renderedRect.width, outputSize.width);
-    const heightPct = toPct(renderedRect.height, outputSize.height);
+    // const leftPct = toPct(renderedRect.x, outputSize.width);
+    // const topPct = toPct(renderedRect.y, outputSize.height);
+    // const widthPct = toPct(renderedRect.width, outputSize.width);
+    // const heightPct = toPct(renderedRect.height, outputSize.height);
 
     // Check if crop is centered
     const isCentered = Math.abs(currentCrop.x - (inputSize.width - currentCrop.width) / 2) < 1 &&
@@ -220,22 +221,9 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             className="absolute inset-0 z-50 overflow-hidden"
         >
             {/* Dimming Layers */}
-            <div
-                className="absolute inset-0 bg-black/60 pointer-events-none"
-                style={{
-                    clipPath: `polygon(
-                    0% 0%, 
-                    0% 100%, 
-                    100% 100%, 
-                    100% 0%, 
-                    0% 0%, 
-                    ${leftPct}% ${topPct}%, 
-                    ${leftPct + widthPct}% ${topPct}%, 
-                    ${leftPct + widthPct}% ${topPct + heightPct}%, 
-                    ${leftPct}% ${topPct + heightPct}%, 
-                    ${leftPct}% ${topPct}%
-                  )`
-                }}
+            <DimmedOverlay
+                holeRect={renderedRect}
+                containerSize={outputSize}
             />
 
             {/* Toolbar */}

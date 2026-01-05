@@ -7,6 +7,7 @@ import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { BoundingBox } from './BoundingBox';
+import { DimmedOverlay } from '../common/DimmedOverlay';
 
 // ------------------------------------------------------------------
 // LOGIC: Static Render Strategy
@@ -235,24 +236,17 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
             className="absolute inset-0 w-full h-full z-50 overflow-hidden text-sm"
             onPointerDown={handleContainerPointerDown}
         >
+            <DimmedOverlay
+                holeRect={currentRect}
+                containerSize={videoSize}
+            />
             <BoundingBox
                 rect={currentRect}
                 canvasSize={videoSize}
                 maintainAspectRatio={true}
                 onChange={handleRectChange}
                 onCommit={onCommit}
-            >
-                {/* Dimming Effect: Shadow around user focus */}
-                <div
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
-                        border: '1px solid rgba(255, 255, 255, 0.5)',
-                        pointerEvents: 'none'
-                    }}
-                />
-            </BoundingBox>
+            />
         </div>
     );
 };
