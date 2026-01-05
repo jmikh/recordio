@@ -213,7 +213,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
     await waitForOffscreen();
 
     // 5. Generate Config
-    const tabInfo =  await chrome.tabs.get(tabId);
+    const tabInfo = await chrome.tabs.get(tabId);
 
     // Fetch REAL dimensions from content script now
     // This ensures MediaStreams are initialized with correct constraints
@@ -332,22 +332,34 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             sourceName: mode === 'window' ? 'Window' : 'Desktop'
         };
 
-        // 5. Send START to Controller
+        // 5. Send PREPARE to Controller
         const syncTimestamp = Date.now();
+        const prepareVideoMsg: BaseMessage = {
+            type: MSG_TYPES.PREPARE_RECORDING_VIDEO,
+            payload: { config, mode, sessionId }
+        };
+        const prepareResponse = await chrome.tabs.sendMessage(openedControllerTabId, prepareVideoMsg);
+
+        // 6. Switch back to original tab if available (Before Start)
+        if (originalTabId) {
+            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
+        }
+
+        // 7. Send START to Controller
         const startVideoMsg: BaseMessage = {
             type: MSG_TYPES.START_RECORDING_VIDEO,
             payload: { config, mode, sessionId }
         };
-        const controllerResponse = await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
+        await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
 
         let recordEvents = true;
-        // Check Window Detection
-        if (controllerResponse && controllerResponse.detection && !controllerResponse.detection.isCurrentWindow) {
+        // Check Window Detection (from PREPARE response)
+        if (prepareResponse && prepareResponse.detection && !prepareResponse.detection.isCurrentWindow) {
             recordEvents = false;
         }
 
         if (recordEvents) {
-            // 6. Broadcast START_RECORDING_EVENTS to all tabs
+            // 7. Broadcast START_RECORDING_EVENTS to all tabs
             // syncTimestamp defined above
             const startEventsMsg: BaseMessage = {
                 type: MSG_TYPES.START_RECORDING_EVENTS,
@@ -374,10 +386,6 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             originalTabId: originalTabId || null
         });
 
-        // 8. Switch back to original tab if available
-        if (originalTabId) {
-            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
-        }
     } catch (error) {
         if (openedControllerTabId) {
             closeControllerTab(openedControllerTabId);

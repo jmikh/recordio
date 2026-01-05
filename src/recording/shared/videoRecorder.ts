@@ -73,7 +73,7 @@ export class VideoRecorder {
      * Prepares the recording session by initializing streams.
      * Use this to warm up the camera during countdown.
      */
-    public async prepare(config: RecordingConfig): Promise<void> {
+    public async prepare(config: RecordingConfig): Promise<WindowDetectionResult | null> {
         if (this.state !== 'idle') {
             throw new Error(`Cannot prepare recording: Recorder is in ${this.state} state.`);
         }
@@ -98,12 +98,14 @@ export class VideoRecorder {
         }
 
         console.log(`[VideoRecorder] Streams initialized (warmup complete).`);
+
+        return this.detectionResult;
     }
 
     /**
      * Starts the recording session.
      */
-    public async start(): Promise<WindowDetectionResult | null> {
+    public async start(): Promise<void> {
         if (this.state !== 'preparing') {
             throw new Error(`Cannot start recording: Recorder is in ${this.state} state. It must be in 'preparing' state.`);
         }
@@ -127,7 +129,7 @@ export class VideoRecorder {
 
         // Window detection is now done in prepare()
 
-        return this.detectionResult; // Return to controller
+        // Window detection is now done in prepare()
     }
 
     /**

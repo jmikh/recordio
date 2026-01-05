@@ -21,6 +21,15 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
     const msg = message as BaseMessage;
 
     switch (msg.type) {
+        case MSG_TYPES.PREPARE_RECORDING_VIDEO:
+            if (message.payload?.mode === 'tab') {
+                return false;
+            }
+            handlePrepare(msg)
+                .then((response) => sendResponse(response))
+                .catch((e) => sendResponse({ success: false, error: e.message }));
+            return true;
+
         case MSG_TYPES.START_RECORDING_VIDEO:
             if (message.payload?.mode === 'tab') {
                 return false;
@@ -51,7 +60,7 @@ chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
     return false;
 });
 
-async function handleStart(message: BaseMessage) {
+async function handlePrepare(message: BaseMessage) {
     const config: RecordingConfig = message.payload.config;
     const sessionId = message.payload.sessionId;
     const msgMode = message.payload.mode || 'window';
@@ -71,9 +80,20 @@ async function handleStart(message: BaseMessage) {
 
     recorder = new VideoRecorder(sessionId, fullConfig, msgMode);
 
-    // Initialize streams immediately (Window mode doesn't have a separate warmup phase yet)
-    await recorder.prepare(fullConfig);
-    const detectionResult = await recorder.start();
+    // Prepare and get detection result
+    const detectionResult = await recorder.prepare(fullConfig);
+
+    // In Window/Desktop mode, detection happens during prepare now
+    return { success: true, detection: detectionResult };
+}
+
+async function handleStart(_message: BaseMessage) {
+    if (!recorder) {
+        throw new Error("Recorder not initialized. Call PREPARE first.");
+    }
+
+    // Start recording (this will return the stored detection result)
+    await recorder.start();
 
     // Update UI to show recording status
     const waitingEl = document.getElementById('status-waiting');
@@ -82,7 +102,7 @@ async function handleStart(message: BaseMessage) {
     if (waitingEl) waitingEl.style.display = 'none';
     if (recordingEl) recordingEl.style.display = 'block';
 
-    return { success: true, startTime: Date.now(), detection: detectionResult };
+    return { success: true, startTime: Date.now() };
 }
 
 async function handleStop(message: BaseMessage) {

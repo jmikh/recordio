@@ -163,7 +163,8 @@ function startCountdown(): Promise<void> {
             } else {
                 clearInterval(interval);
                 overlay.remove();
-                resolve();
+                // Ensure paint clears before resolving (starting recording)
+                setTimeout(() => resolve(), 100);
             }
         }, 1000);
     });

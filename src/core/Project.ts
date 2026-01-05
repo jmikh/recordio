@@ -106,7 +106,7 @@ export class ProjectImpl {
 
         const outputWindows = [{
             id: crypto.randomUUID(),
-            startMs: durationMs < 200 ? 0 : 200,
+            startMs: 0,
             endMs: durationMs
         }];
 
