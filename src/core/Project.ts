@@ -46,10 +46,10 @@ export class ProjectImpl {
                 },
 
                 camera: {
-                    width: 800,
-                    height: 600,
-                    x: 50,
-                    y: 1080 - 650,
+                    width: 300,
+                    height: 300,
+                    x: 25,
+                    y: 1080 - 325,
                     shape: 'circle',
                     borderRadius: 50,
                     borderWidth: 2,

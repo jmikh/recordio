@@ -4,7 +4,6 @@ zoom
 - scroll recording might be reporting last timestamp of the scroll (mild)
 - flush typing event and reset it if mouse down or scroll are detected
 - test perfomance with large videos (specially zoom calculations)
-- record onmousemove events instead of mouse position (makes event storing cheaper)
 - deal with mouse going outside of the viewport in window mode
 
 

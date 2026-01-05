@@ -60,7 +60,7 @@ export class ExportManager {
         });
 
         videoEncoder.configure({
-            codec: 'avc1.42001f', // Baseline Profile
+            codec: this.getCodecString(quality), // Dynamic codec based on resolution
             width,
             height,
             bitrate: this.getBitrate(quality),
@@ -411,6 +411,16 @@ export class ExportManager {
             case '720p': return 720;
             case '1080p': return 1080;
             case '4K': return 2160;
+        }
+    }
+
+    private getCodecString(q: ExportQuality): string {
+        switch (q) {
+            case '4K': return 'avc1.640033'; // High Profile, Level 5.1
+            case '1080p': return 'avc1.64002a'; // High Profile, Level 4.2
+            case '720p':
+            case '360p':
+            default: return 'avc1.42001f'; // Baseline Profile, Level 3.1
         }
     }
 

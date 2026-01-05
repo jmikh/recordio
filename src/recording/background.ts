@@ -335,7 +335,6 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         };
 
         // 5. Send PREPARE to Controller
-        const syncTimestamp = Date.now();
         const prepareVideoMsg: BaseMessage = {
             type: MSG_TYPES.PREPARE_RECORDING_VIDEO,
             payload: { config, mode, sessionId }
@@ -353,8 +352,10 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             type: MSG_TYPES.START_RECORDING_VIDEO,
             payload: { config, mode, sessionId }
         };
-        // ensures enough time for the tab switch to take effect
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // ensures enough time for the tab switch to take effect and 
+        // web cam to warm up
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const syncTimestamp = Date.now();
         await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
 
         let recordEvents = true;
