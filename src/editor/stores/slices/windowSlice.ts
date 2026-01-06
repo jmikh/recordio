@@ -1,8 +1,8 @@
-
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow } from '../../../core/types';
 import { recalculateAutoZooms } from '../../utils/zoomUtils';
+import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {
     addOutputWindow: (window: OutputWindow) => void;
@@ -12,7 +12,9 @@ export interface WindowSlice {
     clearWindows: () => void;
 }
 
-export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], WindowSlice> = (set) => ({
+const getSnapshot = () => useUIStore.getState();
+
+export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], WindowSlice> = (set, _get, store) => ({
     addOutputWindow: (window) => {
         console.log('[Action] addOutputWindow', window);
         set((state) => {
@@ -29,6 +31,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
             return {
+                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -45,7 +48,9 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
     },
 
     updateOutputWindow: (id, updates) => {
-        console.log('[Action] updateOutputWindow', id, updates);
+        if ((store as any).temporal.getState().isTracking) {
+            console.log('[Action] updateOutputWindow', id, updates);
+        }
         set((state) => {
             const nextOutputWindows = state.project.timeline.outputWindows
                 .map(w => w.id === id ? { ...w, ...updates } : w)
@@ -61,6 +66,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
             return {
+                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -90,11 +96,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             };
             const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
-            // Clear selection if deleted
-            const nextSelected = state.selectedWindowId === id ? null : state.selectedWindowId;
-
             return {
-                selectedWindowId: nextSelected,
+                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -149,6 +152,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
             return {
+                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -177,7 +181,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
 
             return {
-                selectedWindowId: null,
+                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {

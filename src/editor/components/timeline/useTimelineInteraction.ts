@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import type { RefObject } from 'react';
 import { TimeMapper } from '../../../core/timeMapper';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
-import { CanvasMode } from '../../stores/useProjectStore';
+import { CanvasMode } from '../../stores/useUIStore';
 
 interface UseTimelineInteractionProps {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -52,7 +52,7 @@ export function useTimelineInteraction({
         // Hover uses Visual/Output Time
         setHoverTime(outputTime);
 
-        const isBlockingEdit = canvasMode === CanvasMode.Crop || canvasMode === CanvasMode.Zoom;
+        const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
 
         if (isCTIScrubbing) {
             if (timelineTime !== -1) {

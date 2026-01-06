@@ -8,7 +8,7 @@ export const ZoomSettings = () => {
     const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
-    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
 
 
@@ -36,7 +36,7 @@ export const ZoomSettings = () => {
                     max={1500}
                     step={50}
                     value={zoomSettings.defaultDurationMs}
-                    onChange={(val) => updateWithBatching({ zoom: { ...zoomSettings, defaultDurationMs: val } })}
+                    onChange={(val) => batchAction(() => updateSettings({ zoom: { ...zoomSettings, defaultDurationMs: val } }))}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />

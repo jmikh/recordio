@@ -13,9 +13,11 @@ export interface SettingsSlice {
     updateSettings: (settings: DeepPartial<ProjectSettings>) => boolean;
 }
 
-export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SettingsSlice> = (set) => ({
+export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SettingsSlice> = (set, _get, store) => ({
     updateSettings: (updates: any) => {
-        console.log('[Action] updateSettings', updates);
+        if ((store as any).temporal.getState().isTracking) {
+            console.log('[Action] updateSettings', updates);
+        }
         let hasChanged = false; // Capture change status
 
         set((state) => {

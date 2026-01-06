@@ -1,10 +1,11 @@
 import { useRef, useEffect } from 'react';
-import { useProjectStore, useProjectData, useProjectSources, CanvasMode } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
-import { renderZoomEditor, ZoomEditor } from './ZoomEditor';
+import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
 import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
@@ -14,8 +15,8 @@ import type { CameraSettings, Rect } from '../../../core/types';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
-    const canvasMode = useProjectStore(s => s.canvasMode);
-    const activeZoomId = useProjectStore(s => s.activeZoomId);
+    const canvasMode = useUIStore(s => s.canvasMode);
+    const activeZoomId = useUIStore(s => s.selectedZoomId);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -45,14 +46,15 @@ export const CanvasContainer = () => {
 
         const tick = (time: number) => {
             const pbState = usePlaybackStore.getState();
-            const { canvasMode, activeZoomId, project, sources, userEvents } = useProjectStore.getState();
+            const { project, sources, userEvents } = useProjectStore.getState();
+            const { canvasMode, selectedZoomId: activeZoomId } = useUIStore.getState();
 
             // FPS Logging (Optional)
             if (time - lastFpsTime >= 1000) lastFpsTime = time;
 
             // Only advance time if NOT in a blocking edit mode
             // (Crop and Zoom block playback time updates (implicit in original), Camera does not)
-            const isBlockingEdit = canvasMode === CanvasMode.Crop || canvasMode === CanvasMode.Zoom;
+            const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
 
             if (pbState.isPlaying && !isBlockingEdit) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -123,16 +125,17 @@ export const CanvasContainer = () => {
                     deviceFrameImg: deviceFrameRef.current
                 };
 
-                if (canvasMode === CanvasMode.Crop) {
+                if (canvasMode === CanvasMode.CropEdit) {
                     renderCropEditor(resources, {
                         project,
                         sources,
                         currentTimeMs: effectiveTimeMs
                     });
-                } else if (canvasMode === CanvasMode.Zoom && activeZoomId) {
+                } else if (canvasMode === CanvasMode.ZoomEdit && activeZoomId) {
                     renderZoomEditor(resources, {
                         project,
                         sources,
+                        currentTimeMs: effectiveTimeMs,
                         editingZoomId: activeZoomId,
                         previewZoomRect: previewZoomRectRef.current
                     });
@@ -245,7 +248,7 @@ export const CanvasContainer = () => {
                 />
 
                 {/* CROP OVERLAY (Highest Priority) */}
-                {canvasMode === CanvasMode.Crop && (
+                {canvasMode === CanvasMode.CropEdit && (
                     <CropEditor videoSize={(() => {
                         const screenId = project.timeline.recording.screenSourceId;
                         const v = internalVideoRefs.current[screenId];
@@ -254,12 +257,12 @@ export const CanvasContainer = () => {
                 )}
 
                 {/* ZOOM OVERLAY */}
-                {canvasMode === CanvasMode.Zoom && activeZoomId && (
+                {canvasMode === CanvasMode.ZoomEdit && activeZoomId && (
                     <ZoomEditor previewRectRef={previewZoomRectRef} />
                 )}
 
                 {/* CAMERA OVERLAY */}
-                {canvasMode === CanvasMode.Camera && (
+                {canvasMode === CanvasMode.CameraEdit && (
                     <CameraEditor cameraRef={previewCameraSettingsRef} />
                 )}
             </div>

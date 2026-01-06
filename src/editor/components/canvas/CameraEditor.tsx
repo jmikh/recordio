@@ -1,8 +1,10 @@
 import React, { useRef, useEffect } from 'react';
-import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CameraSettings, Rect } from '../../../core/types';
 import { BoundingBox } from './BoundingBox';
 import { useClickOutside } from '../../hooks/useClickOutside';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 // ------------------------------------------------------------------
 // COMPONENT: Camera Editor Overlay
@@ -14,9 +16,12 @@ interface CameraEditorProps {
 
 export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // Connect to Store
-    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const project = useProjectStore(s => s.project);
+
+    // Batcher for consistent history behavior
+    const { batchAction } = useHistoryBatcher();
 
     // Derived State
     const outputSize = project.settings.outputSize;
@@ -32,7 +37,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             ...initialSettings,
             ...rect
         };
-        updateSettings({ camera: newSettings });
+        batchAction(() => updateSettings({ camera: newSettings }));
         cameraRef.current = null;
     };
 

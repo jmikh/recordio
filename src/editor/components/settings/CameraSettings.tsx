@@ -1,4 +1,5 @@
-import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
@@ -12,10 +13,10 @@ const SHAPES = [
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
-    const canvasMode = useProjectStore(s => s.canvasMode);
-    const isEditingCamera = canvasMode === CanvasMode.Camera;
-    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const canvasMode = useUIStore(s => s.canvasMode);
+    const isEditingCamera = canvasMode === CanvasMode.CameraEdit;
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const cameraConfig = project.settings.camera;
 
@@ -69,7 +70,7 @@ export const CameraSettings = () => {
 
                 <div className="flex gap-2 mb-6">
                     <button
-                        onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.Camera)}
+                        onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
                         className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${isEditingCamera
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
                             : 'bg-[#333] text-gray-200 hover:bg-[#444]'
@@ -113,7 +114,7 @@ export const CameraSettings = () => {
                             value={zoom}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
-                            onChange={(val) => updateWithBatching({ camera: { ...cameraConfig, zoom: val } })}
+                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, zoom: val } }))}
                         />
                     </div>
 
@@ -125,7 +126,7 @@ export const CameraSettings = () => {
                             hasShadow,
                             hasGlow
                         }}
-                        onChange={(updates) => updateWithBatching({ camera: { ...cameraConfig, ...updates } })}
+                        onChange={(updates) => batchAction(() => updateSettings({ camera: { ...cameraConfig, ...updates } }))}
                         showRadius={shape === 'rect' || shape === 'square'}
                         onInteractionStart={startInteraction}
                         onInteractionEnd={endInteraction}

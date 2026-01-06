@@ -1,4 +1,5 @@
-import { useProjectStore, CanvasMode } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { StyleControls } from './StyleControls';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -7,8 +8,8 @@ import { Slider } from '../common/Slider';
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
-    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Ensure screen settings exist (fallback for legacy projects if not fully migrated yet)
     // Default to device mode if undefined to match old behavior
@@ -34,7 +35,7 @@ export const ScreenSettings = () => {
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs font-bold text-gray-500 uppercase">Screen Style</h3>
                 <button
-                    onClick={() => setCanvasMode(CanvasMode.Crop)}
+                    onClick={() => setCanvasMode(CanvasMode.CropEdit)}
                     className="text-[10px] bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors"
                 >
                     Crop Video
@@ -107,9 +108,9 @@ export const ScreenSettings = () => {
                         hasShadow: screenConfig.hasShadow,
                         hasGlow: screenConfig.hasGlow
                     }}
-                    onChange={(updates) => updateWithBatching({
+                    onChange={(updates) => batchAction(() => updateSettings({
                         screen: { ...screenConfig, ...updates }
-                    })}
+                    }))}
                     onColorPopoverOpen={startInteraction}
                     onColorPopoverClose={endInteraction}
                     showRadius={true}
@@ -128,12 +129,12 @@ export const ScreenSettings = () => {
                     value={screenConfig.padding || 0}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
-                    onChange={(val) => updateWithBatching({
+                    onChange={(val) => batchAction(() => updateSettings({
                         screen: {
                             ...screenConfig,
                             padding: val
                         }
-                    })}
+                    }))}
                 />
             </div>
         </div>

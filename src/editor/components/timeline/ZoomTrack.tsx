@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { TimeMapper } from '../../../core/timeMapper';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import type { ViewportMotion } from '../../../core/types';
 
 
@@ -9,8 +11,6 @@ interface ZoomTrackProps {
     height: number;
     timelineOffset: number;
 }
-
-// ... (DragState, HoverInfo interfaces stay same) ...
 
 interface DragState {
     type: 'move' | 'resize-left';
@@ -35,9 +35,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
-    const editingZoomId = useProjectStore(s => s.activeZoomId);
-    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
+
+    // UI State
+    const editingZoomId = useUIStore(s => s.selectedZoomId);
+    const setEditingZoom = (id: string | null) => {
+        const store = useUIStore.getState();
+        store.selectZoom(id);
+    };
+
     const project = useProjectStore(s => s.project);
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Memoize TimeMapper for consistent usage
     const timeMapper = useMemo(() => {
@@ -197,6 +204,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             initialSourceEndTime: motion.sourceEndTimeMs,
             initialDuration: motion.durationMs
         });
+        startInteraction();
         setEditingZoom(motion.id);
     };
 
@@ -214,9 +222,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             const newSourceEndTime = timeMapper.mapOutputToSourceTime(newOutputTime);
 
             if (newSourceEndTime !== -1) {
-                updateViewportMotion(dragState.motionId, {
+                batchAction(() => updateViewportMotion(dragState.motionId, {
                     sourceEndTimeMs: newSourceEndTime
-                });
+                }));
             }
         } else if (dragState.type === 'resize-left') {
             let newDuration = initialDuration - deltaTimeMs;
@@ -230,18 +238,19 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             // Check bounds?
             // if (initialSourceEndTime - newDuration < 0) ...
 
-            updateViewportMotion(dragState.motionId, {
+            batchAction(() => updateViewportMotion(dragState.motionId, {
                 durationMs: newDuration
-            });
+            }));
         }
 
-    }, [dragState, pixelsPerSec, updateViewportMotion, timeMapper]);
+    }, [dragState, pixelsPerSec, updateViewportMotion, timeMapper, batchAction]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
             setDragState(null);
+            endInteraction();
         }
-    }, [dragState]);
+    }, [dragState, endInteraction]);
 
     useEffect(() => {
         if (dragState) {

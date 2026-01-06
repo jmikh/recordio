@@ -15,6 +15,7 @@ import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { TimelineScrollbar } from './TimelineScrollbar';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { useUIStore } from '../../stores/useUIStore';
 
 // Constants
 const TRACK_HEIGHT = 40;
@@ -37,7 +38,7 @@ export function Timeline() {
     const timeline = useProjectTimeline();
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
-    const canvasMode = useProjectStore(s => s.canvasMode);
+    const canvasMode = useUIStore(s => s.canvasMode);
     const projectSettings = useProjectStore(s => s.project.settings);
     const updateSettings = useProjectStore(s => s.updateSettings);
 
@@ -53,7 +54,7 @@ export function Timeline() {
     const batcher = useHistoryBatcher();
 
     const handleScaleChange = (newScale: number) => {
-        batcher.updateWithBatching({ timelinePixelsPerSecond: newScale });
+        batcher.batchAction(() => updateSettings({ timelinePixelsPerSecond: newScale }));
     };
 
     // We need to inject batcher start/end into the toolbar if it supports it, 
@@ -111,8 +112,8 @@ export function Timeline() {
     };
 
     // --- Deletion Listener ---
-    const selectedWindowId = useProjectStore(s => s.selectedWindowId);
-    const selectWindow = useProjectStore(s => s.selectWindow);
+    const selectedWindowId = useUIStore(s => s.selectedWindowId);
+    const selectWindow = useUIStore(s => s.selectWindow);
     const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
 
     useEffect(() => {

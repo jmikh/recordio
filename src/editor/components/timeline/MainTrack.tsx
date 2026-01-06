@@ -1,18 +1,17 @@
-// ... imports
 import React, { useState, useEffect, useRef } from 'react';
 import type { OutputWindow, Timeline as TimelineType } from '../../../core/types';
 import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
 import { WaveformSegment } from './WaveformSegment';
 import { useClickOutside } from '../../hooks/useClickOutside';
-
+import { useUIStore } from '../../stores/useUIStore';
 
 export const GROUP_HEADER_HEIGHT = 24;
 
 interface MainTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
-    accumulatedX: number; // For layout positioning if needed, but we mostly use absolute based on prev widths
+    accumulatedX: number;
     trackHeight: number;
 }
 
@@ -34,8 +33,8 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     trackHeight,
 }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
-    const selectWindow = useProjectStore(s => s.selectWindow);
-    const selectedWindowId = useProjectStore(s => s.selectedWindowId);
+    const selectWindow = useUIStore(s => s.selectWindow);
+    const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const sources = useProjectSources();
     const [dragState, setDragState] = useState<DragState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -98,7 +97,12 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
         const handleGlobalMouseUp = () => {
             if (dragState) {
-                updateOutputWindow(dragState.windowId, dragState.currentWindow);
+                const hasChanged = dragState.currentWindow.startMs !== dragState.initialWindow.startMs ||
+                    dragState.currentWindow.endMs !== dragState.initialWindow.endMs;
+
+                if (hasChanged) {
+                    updateOutputWindow(dragState.windowId, dragState.currentWindow);
+                }
             }
             setDragState(null);
         };

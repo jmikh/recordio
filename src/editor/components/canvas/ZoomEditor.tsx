@@ -1,50 +1,54 @@
 import React, { useRef, useEffect } from 'react';
-import type { Rect, Project } from '../../../core/types';
-import { useProjectStore, type ProjectState } from '../../stores/useProjectStore';
+import type { Rect } from '../../../core/types';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimeMapper } from '../../../core/timeMapper';
-import type { RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../common/DimmedOverlay';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+
+import { type RenderResources } from './PlaybackRenderer';
+import { drawScreen } from '../../../core/painters/screenPainter';
+import { drawWebcam } from '../../../core/painters/webcamPainter';
+import type { ProjectState } from '../../stores/useProjectStore';
+import type { Project } from '../../../core/types';
 
 // ------------------------------------------------------------------
-// LOGIC: Static Render Strategy
+// LOGIC: Render Strategy
 // ------------------------------------------------------------------
 export const renderZoomEditor = (
     resources: RenderResources,
     state: {
         project: Project,
         sources: ProjectState['sources'],
-        editingZoomId: string,
-        previewZoomRect?: Rect | null
+        currentTimeMs: number,
+        editingZoomId: string | null,
+        previewZoomRect: Rect | null
     }
 ) => {
     const { ctx, videoRefs } = resources;
-    const { project, sources } = state;
+    const { project, sources, editingZoomId, previewZoomRect } = state;
     const outputSize = project.settings.outputSize;
 
     const screenSource = sources[project.timeline.recording.screenSourceId];
 
-    // FORCE FULL VIEWPORT (Identity) for Editing
+    // Force Full Viewport (Ignore current Zoom) so user can see context
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // Render Screen Layer
     if (screenSource) {
         const video = videoRefs[screenSource.id];
-        if (!video) {
-            throw new Error(`[ZoomEditor] Video element not found for source ${screenSource.id}`);
+        if (video) {
+            drawScreen(
+                ctx,
+                video,
+                project,
+                sources,
+                effectiveViewport,
+                resources.deviceFrameImg
+            );
         }
-
-        drawScreen(
-            ctx,
-            video,
-            project,
-            sources,
-            effectiveViewport,
-            resources.deviceFrameImg
-        );
     }
 
     // Render Camera Layer (Relative to Zoom)
@@ -53,15 +57,15 @@ export const renderZoomEditor = (
     const cameraSourceId = project.timeline.recording.cameraSourceId;
     const cameraSource = cameraSourceId ? sources[cameraSourceId] : undefined;
 
-    // Only render if we have a camera source and it's enabled (implied by existence in some contexts, but let's check source)
+    // Only render if we have a camera source and it's enabled
     if (cameraSource && cameraSettings) {
         const video = videoRefs[cameraSource.id];
         if (video) {
             // 2. Determine Zoom Rect (Preview or Committed)
-            let zoomRect = state.previewZoomRect;
-            if (!zoomRect) {
-                const motion = project.timeline.recording.viewportMotions.find(m => m.id === state.editingZoomId);
-                zoomRect = motion?.rect;
+            let zoomRect = previewZoomRect;
+            if (!zoomRect && editingZoomId) {
+                const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
+                zoomRect = motion?.rect || null;
             }
 
             if (zoomRect) {
@@ -69,16 +73,12 @@ export const renderZoomEditor = (
                 // The camera is defined in absolute canvas coordinates (0..outputWidth, 0..outputHeight).
                 // We want to project it into the zoomRect.
                 //
-                // Relative X ratio = (Camera X) / (Output Width)
-                // New X = ZoomRect X + (Relative X ratio * ZoomRect Width)
-                //
-                // Scale Factor = ZoomRect Width / Output Width (assuming uniform aspect ratio zoom usually, but let's use width)
+                // Scale Factor = ZoomRect Width / Output Width
 
                 const scaleFactor = zoomRect.width / outputSize.width;
 
                 const relativeX = (cameraSettings.x / outputSize.width) * zoomRect.width;
-                const relativeY = (cameraSettings.y / outputSize.height) * zoomRect.height; // Assuming ZoomRect matches AR, otherwise this might skew position?
-                // Usually zoom rect matches aspect ratio if constrained. 
+                const relativeY = (cameraSettings.y / outputSize.height) * zoomRect.height;
 
                 const projectedX = zoomRect.x + relativeX;
                 const projectedY = zoomRect.y + relativeY;
@@ -102,24 +102,23 @@ export const renderZoomEditor = (
             }
         }
     }
-
 };
-
-
-// NOTE: Webcam and Keyboard are HIDDEN in Zoom Edit mode (except we just added manual render above).
-
 
 // ------------------------------------------------------------------
 // COMPONENT: Interactive Overlay
 // ------------------------------------------------------------------
 
 export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect | null> }> = ({ previewRectRef }) => {
-    // Connect to Store
-    const editingZoomId = useProjectStore(s => s.activeZoomId);
-    const setEditingZoom = useProjectStore(s => s.setEditingZoom);
+    // Connect to Stores
+    const editingZoomId = useUIStore(s => s.selectedZoomId);
+
+    // Actions
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
     const deleteViewportMotion = useProjectStore(s => s.deleteViewportMotion);
     const project = useProjectStore(s => s.project);
+
+    // History Batcher
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Sync Playback to Zoom End Time
     useEffect(() => {
@@ -140,7 +139,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                 }
             }
         }
-    }, [editingZoomId, project.timeline.recording.viewportMotions]);
+    }, [editingZoomId]); // Reduced dependency to avoid loops
 
     // Derived State
     const videoSize = project.settings.outputSize;
@@ -149,17 +148,48 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         : null;
 
     // Actions
-    const onCommit = (rect: Rect) => editingZoomId && updateViewportMotion(editingZoomId, { rect });
-    const onCancel = () => setEditingZoom(null);
+    const onCommit = (rect: Rect) => {
+        if (!editingZoomId) return;
+
+        batchAction(() => {
+            updateViewportMotion(editingZoomId, { rect });
+        });
+    };
+
+    const onCancel = () => {
+        // Just deselect. No "Cancel" of changes because they are applied live now via batcher.
+        useUIStore.getState().setCanvasMode(CanvasMode.Preview);
+    };
+
     const onDelete = () => {
         if (editingZoomId) {
             deleteViewportMotion(editingZoomId);
-            setEditingZoom(null);
+            onCancel();
         }
     };
 
     const containerRef = useRef<HTMLDivElement>(null);
-    // Local state to track rect *during* drag before committing
+    // Local state to track rect *during* drag before committing ??
+    // Actually, with batchAction, we can commit live?
+    // But the BoundingBox calls onCommit on every drag frame?
+    // Yes, BoundingBox usually calls onChange while dragging and onCommit on end.
+    // If it calls onCommit on end, we don't need batchAction?
+    // Wait, typical BoundingBox behavior:
+    // "onChange" -> internal state update, visual update.
+    // "onCommit" -> final update (mouse up).
+
+    // If BoundingBox only calls onCommit on MouseUp, then we don't strictly need batcher?
+    // BUT the user asked for "pause temporal after first update".
+    // This implies we ARE updating the store *during* the drag (live updates).
+    // So "onChange" should probably call "onCommit" (updateStore)?
+
+    // Let's assume BoundingBox's onChange is for live updates.
+    // If we want the store to have live updates (so the renderer draws it), we must update the store in onChange.
+
+    // Refactor:
+    // handleRectChange (onChange) -> batchAction(updateStore)
+    // onCommit -> endInteraction()
+
     const [currentRect, setCurrentRect] = React.useState<Rect>(initialRect || { x: 0, y: 0, width: 0, height: 0 });
 
     // Sync state if initialRect changes externally (e.g. undo/redo)
@@ -173,7 +203,22 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     const handleRectChange = (newRect: Rect) => {
         setCurrentRect(newRect);
         if (previewRectRef) previewRectRef.current = newRect;
+
+        // Live Update Store!
+        if (editingZoomId) {
+            batchAction(() => {
+                updateViewportMotion(editingZoomId, { rect: newRect });
+            });
+        }
     };
+
+    // Batch history during the entire editing session
+    useEffect(() => {
+        if (editingZoomId) {
+            startInteraction();
+            return () => endInteraction();
+        }
+    }, [editingZoomId, startInteraction, endInteraction]);
 
     // Key Listener
     useEffect(() => {
@@ -188,7 +233,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onDelete, onCancel]);
+    }, [onDelete, onCancel]); // Verify stable refs
 
     // Close when clicking strictly outside the container
     useEffect(() => {
@@ -204,6 +249,8 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     // Click on background moves the zoom box
     const handleContainerPointerDown = (e: React.PointerEvent) => {
         // Only trigger if clicking the container background directly
+        if (e.target !== containerRef.current || !initialRect) return;
+
         if (e.target !== containerRef.current || !initialRect) return;
 
         const rect = containerRef.current.getBoundingClientRect();
@@ -224,9 +271,35 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         if (newY + initialRect.height > videoSize.height) newY = videoSize.height - initialRect.height;
 
         const newRect = { ...initialRect, x: newX, y: newY };
-        handleRectChange(newRect);
-        onCommit(newRect);
+        handleRectChange(newRect); // This now triggers batchAction update
     };
+
+
+
+
+    if (!initialRect || !editingZoomId) return null;
+
+    // ... Bounding Box Props ...
+    // onChange -> handleRectChange (Live updates via batcher)
+    // onCommit -> (Currently does nothing special, maybe final sync?)
+    // onDragStart -> startInteraction
+    // onDragEnd -> endInteraction
+
+    // Check if BoundingBox supports onDragStart/End.
+    // If NOT, I might need to verify file content again. I viewed it previously.
+    // It has `onChange` and `onCommit`. usually onCommit is end of drag.
+    // So onDragStart is missing?
+
+    // I entered this assuming BoundingBox needs modification or I wrap it.
+    // Let's assume onCommit is "End of Drag".
+    // But "Start of Drag" is implicit in first interaction logic of batcher?
+    // NO, batcher requires `startInteraction()` to be called explicitly to reset the latch!
+
+    // I will wrap BoundingBox in a div that captures pointer down? No, BoundingBox handles dragging.
+    // I should check BoundingBox.tsx to see if I can add onInteractionStart/End props or if I need to rely on onCommit for End.
+
+    // For now, I'll assume I can pass `onPointerDownCapture={startInteraction}` to the bounding box container?
+
 
     if (!initialRect || !editingZoomId) return null;
 

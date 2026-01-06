@@ -18,40 +18,27 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 
-export const CanvasMode = {
-    Preview: 'preview',
-    Crop: 'crop',
-    Camera: 'camera',
-    Zoom: 'zoom'
-} as const;
-export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
-
 export interface ProjectState extends WindowSlice, SettingsSlice {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents; // Single set of loaded events (Never null)
     isSaving: boolean;
 
-    // Canvas Mode State
-    canvasMode: CanvasMode;
-    activeZoomId: ID | null;
-    editingZoomInitialState: ViewportMotion | null;
-    selectedWindowId: ID | null;
+    // Context Awareness for Undo
+    // Stores the UI state at the moment of this history entry
+    uiSnapshot?: Partial<import('./useUIStore').UIState>;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
     addSource: (file: Blob, type: 'image' | 'video' | 'audio', metadata?: Partial<import('../../core/types').SourceMetadata>) => Promise<ID>;
     getSource: (id: ID) => import('../../core/types').SourceMetadata;
-    setCanvasMode: (mode: CanvasMode) => void;
-    selectWindow: (id: ID | null) => void;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
     toggleSourceMute: (sourceId: ID) => void;
 
-    // Zoom Editing Actions
-    setEditingZoom: (id: ID | null) => void;
+    // Zoom Actions
     updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
     addViewportMotion: (motion: ViewportMotion) => void;
     deleteViewportMotion: (id: ID) => void;
@@ -68,6 +55,11 @@ export interface ProjectState extends WindowSlice, SettingsSlice {
     setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
 }
 
+import { useUIStore } from './useUIStore';
+
+// Helper to capture snapshot
+const getSnapshot = () => useUIStore.getState();
+
 export const useProjectStore = create<ProjectState>()(
     subscribeWithSelector(
         temporal(
@@ -79,33 +71,12 @@ export const useProjectStore = create<ProjectState>()(
                 isSaving: false,
                 mutedSources: {},
 
-                // Canvas Mode Logic
-                canvasMode: CanvasMode.Preview,
-                activeZoomId: null,
-                editingZoomInitialState: null as ViewportMotion | null,
-                selectedWindowId: null,
-
                 // Export State
                 exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null },
 
                 // Slices
                 ...createWindowSlice(set, get, store),
                 ...createSettingsSlice(set, get, store),
-
-                selectWindow: (id) => set({
-                    selectedWindowId: id,
-                    ...(id ? { activeZoomId: null, canvasMode: CanvasMode.Preview } : {})
-                }),
-
-                setCanvasMode: (mode) => set({
-                    canvasMode: mode,
-                    ...(mode !== CanvasMode.Zoom ? { activeZoomId: null, editingZoomInitialState: null } : {}),
-                    // If triggering a mode change (except purely Preview potentially?), deselect window.
-                    // But usually returning to Preview shouldn't necessarily deselect window? 
-                    // User wanted strict "One Active". 
-                    // If mode is NOT Preview (e.g. Crop, Camera), deselect window.
-                    ...(mode !== CanvasMode.Preview ? { selectedWindowId: null } : {})
-                }),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {
@@ -114,76 +85,10 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 })),
 
-                setEditingZoom: (id) => {
-                    const store = useProjectStore;
-                    const state = get(); // Use if needed
-
-                    if (id) {
-                        console.log('[Action] setEditingZoom START', id);
-
-                        // 1. Capture Initial State
-                        const motion = state.project.timeline.recording.viewportMotions.find(m => m.id === id);
-                        if (motion) {
-                            set({ editingZoomInitialState: { ...motion } });
-                        }
-
-                        // 2. Pause History
-                        store.temporal.getState().pause();
-
-                        // 3. Set Mode
-                        set({ canvasMode: CanvasMode.Zoom, activeZoomId: id });
-
-                    } else {
-                        console.log('[Action] setEditingZoom END (Commit)');
-                        const editingId = state.activeZoomId;
-                        const initial = state.editingZoomInitialState;
-                        const currentFunctions = get(); // Fresh getters
-
-                        if (editingId && initial) {
-                            const currentMotion = state.project.timeline.recording.viewportMotions.find(m => m.id === editingId);
-
-                            if (currentMotion) {
-                                // A. Revert to Initial (While Paused) so Zundo sees "No Change" effectively? 
-                                //    Wait, Zundo paused means it ignored the intermediate changes.
-                                //    So the "Current State" in Zundo's eyes is effectively "Unknown" or "Last Snapshot".
-                                //    If we Resume now, Zundo will take a snapshot of the *Current State* as the *New Head*?
-                                //    No, Zundo usually snapshots on *change*.
-
-                                //    If we Resume, and then Change, it diffs Current vs New.
-                                //    But "Current" is already the Moved State.
-
-                                //    So we MUST:
-                                //    1. Revert to Initial (While Paused).
-                                //    2. Resume.
-                                //    3. Set to Final.
-
-                                // Revert
-                                currentFunctions.updateViewportMotion(editingId, initial);
-
-                                // Resume
-                                store.temporal.getState().resume();
-
-                                // Apply Final (This triggers the history entry)
-                                // We need to do this in a setTimeout or just next line? Synchronous should work if Zundo subscribes synchronously.
-                                // However, we are inside a `set` or action scope.
-                                // Let's try synchronous.
-                                currentFunctions.updateViewportMotion(editingId, currentMotion);
-                            } else {
-                                store.temporal.getState().resume();
-                            }
-                        } else {
-                            store.temporal.getState().resume();
-                        }
-
-                        // Cleanup
-                        set({ editingZoomInitialState: null, canvasMode: CanvasMode.Preview });
-                    }
-
-                    set({ activeZoomId: id, selectedWindowId: null });
-                },
-
                 updateViewportMotion: (id, updates) => {
-                    console.log('[Action] updateViewportMotion', id, updates);
+                    if (useProjectStore.temporal.getState().isTracking) {
+                        console.log('[Action] updateViewportMotion', id, updates);
+                    }
                     set(state => {
                         const motions = state.project.timeline.recording.viewportMotions;
                         const idx = motions.findIndex(m => m.id === id);
@@ -200,6 +105,7 @@ export const useProjectStore = create<ProjectState>()(
                         };
 
                         return {
+                            uiSnapshot: getSnapshot(),
                             project: {
                                 ...state.project,
                                 settings: nextSettings,
@@ -226,6 +132,7 @@ export const useProjectStore = create<ProjectState>()(
                         };
 
                         return {
+                            uiSnapshot: getSnapshot(),
                             project: {
                                 ...state.project,
                                 settings: nextSettings,
@@ -252,6 +159,7 @@ export const useProjectStore = create<ProjectState>()(
                         };
 
                         return {
+                            uiSnapshot: getSnapshot(),
                             project: {
                                 ...state.project,
                                 settings: nextSettings,
@@ -265,17 +173,13 @@ export const useProjectStore = create<ProjectState>()(
                             }
                         };
                     });
-                    // Also ensure we exit edit mode if we deleted the active one
-                    const currentEdit = get().activeZoomId;
-                    if (currentEdit === id) {
-                        get().setEditingZoom(null);
-                    }
                 },
 
                 clearViewportMotions: () => {
                     console.log('[Action] clearViewportMotions');
                     set(state => {
                         return {
+                            uiSnapshot: getSnapshot(), // Implicit snapshot
                             project: {
                                 ...state.project,
                                 timeline: {
@@ -422,7 +326,8 @@ export const useProjectStore = create<ProjectState>()(
             {
                 // Zundo Configuration
                 partialize: (state) => ({
-                    project: state.project
+                    project: state.project,
+                    uiSnapshot: state.uiSnapshot
                 }),
                 equality: (a, b) => JSON.stringify(a) === JSON.stringify(b), // Deep compare to avoid unnecessary history
                 limit: 50 // meaningful limit
@@ -452,5 +357,5 @@ export const useProjectTimeline = () => useProjectStore(s => s.project.timeline)
 export const useProjectSources = () => useProjectStore(s => s.sources);
 export const useRecording = () => useProjectStore(s => s.project.timeline.recording);
 export const useProjectHistory = <T,>(
-    selector: (state: TemporalState<{ project: Project }>) => T
+    selector: (state: TemporalState<{ project: Project; uiSnapshot?: Partial<import('./useProjectStore').ProjectState['uiSnapshot']> }>) => T
 ) => useStore(useProjectStore.temporal, selector);

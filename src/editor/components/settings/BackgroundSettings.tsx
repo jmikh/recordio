@@ -55,7 +55,7 @@ export const BackgroundSettings = () => {
     const isCustom = backgroundType === 'image' && !!backgroundSourceId;
 
     // --- Undo/Redo Batching Helpers ---
-    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const handleColorTypeChange = (type: 'solid' | 'gradient') => {
         updateSettings({
@@ -67,22 +67,22 @@ export const BackgroundSettings = () => {
     };
 
     const handleColorChange = (color: string) => {
-        updateWithBatching({
+        batchAction(() => updateSettings({
             background: {
                 color
             }
-        });
+        }));
     };
 
     const handleGradientColorChange = (index: 0 | 1, color: string) => {
         const newColors = [...gradientColors] as [string, string];
         newColors[index] = color;
 
-        updateWithBatching({
+        batchAction(() => updateSettings({
             background: {
                 gradientColors: newColors
             }
-        });
+        }));
     };
 
     const handleDirectionChange = (direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW') => {
@@ -310,11 +310,11 @@ export const BackgroundSettings = () => {
                             value={backgroundBlur || 0}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
-                            onChange={(val) => updateWithBatching({
+                            onChange={(val) => batchAction(() => updateSettings({
                                 background: {
                                     backgroundBlur: val
                                 }
-                            })}
+                            }))}
                         />
                     </div>
                 )}

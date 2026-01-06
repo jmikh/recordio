@@ -1,76 +1,53 @@
-import { useRef, useCallback } from 'react';
-import { useProjectStore, useProjectData } from '../stores/useProjectStore';
+import { useCallback } from 'react';
+import { useProjectStore } from '../stores/useProjectStore';
+
+// Module-level singleton state to support cross-component nesting
+// (e.g. ZoomEditor keeps a session open while ZoomTrack performs drag operations)
+let interactionCount = 0;
+let hasLatched = false;
 
 /**
- * useHistoryBatcher
- * 
- * A hook to optimize undo/redo behavior for continuous interactions (like dragging sliders or color pickers).
- * 
- * Problem:
- * Continuous updates (e.g., dragging a slider from 0 to 100) flood the history stack with intermediate states.
- * If we simply pause history at the start, we miss capturing the *initial* state (0), so undoing would skip it.
- * 
- * Strategy ("The Latch"):
- * 1. `startInteraction`: Marks the start of an interaction but does NOT pause yet.
- * 2. First `updateWithBatching`: Allows the update to go through to the store. This forces `zundo` to snapshot
- *    the *previous* state (the state before drag started) into the history stack.
- *    IMMEDIATELY after this first update, we pause the history.
- * 3. Subsequent updates: History is paused, so intermediate values are ignored.
- * 4. `endInteraction`: Resumes history tracking.
- * 
- * Result:
- * The history stack contains [State Before Drag] -> [State After Drag].
- * All intermediate "during drag" states are discarded.
+ * A hook to batch continuous updates into a single history entry using a "Latch" pattern.
+ * Uses a global reference counter to handle overlapping or nested interactions.
  */
 export const useHistoryBatcher = () => {
-    // We access the store directly to call pause/resume
-    const project = useProjectData(); // Just to ensure we are inside the provider context if needed, though mostly for logic.
-    const updateSettings = useProjectStore(s => s.updateSettings);
-
-    const isInteracting = useRef(false);
-    const hasPaused = useRef(false);
-
-    /**
-     * Call this when the user starts an interaction (onPointerDown, onClick to open).
-     */
     const startInteraction = useCallback(() => {
-        isInteracting.current = true;
-        hasPaused.current = false;
-        // deliberate: do not pause yet!
+        if (interactionCount === 0) {
+            hasLatched = false;
+            // Safety check to ensure we aren't already paused from a stuck state
+            const temporalState = useProjectStore.temporal.getState() as any;
+            if (temporalState.isPaused) {
+                temporalState.resume();
+            }
+        }
+        interactionCount++;
     }, []);
 
-    /**
-     * Call this when the interaction ends (onPointerUp, onBlur).
-     */
     const endInteraction = useCallback(() => {
-        if (hasPaused.current) {
+        interactionCount--;
+        if (interactionCount <= 0) {
+            interactionCount = 0; // clamp
+            hasLatched = false;
             useProjectStore.temporal.getState().resume();
         }
-        isInteracting.current = false;
-        hasPaused.current = false;
     }, []);
 
-    // Optimization helper
-    type DeepPartial<T> = {
-        [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-    };
+    const batchAction = useCallback((action: () => void) => {
+        // Execute the action (which should trigger a store update)
+        action();
 
-    /**
-     * Use this instead of `updateSettings` directly during the interaction.
-     */
-    const updateWithBatching = useCallback((updates: DeepPartial<typeof project.settings>) => {
-        // Check if there are actual changes before applying
-        const hasChanges = updateSettings(updates);
-
-        if (hasChanges && isInteracting.current && !hasPaused.current) {
+        // If we are interacting and haven't latched (paused) yet...
+        if (interactionCount > 0 && !hasLatched) {
+            // We just made the FIRST update. Zundo should have seen this change or will see it immediately.
+            // We pause history now so subsequent updates in this interaction are not recorded.
             useProjectStore.temporal.getState().pause();
-            hasPaused.current = true;
+            hasLatched = true;
         }
-    }, [updateSettings]);
+    }, []);
 
     return {
         startInteraction,
         endInteraction,
-        updateWithBatching
+        batchAction
     };
 };

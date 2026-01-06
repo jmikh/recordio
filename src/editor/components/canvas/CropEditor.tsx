@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import type { Rect, Project } from '../../../core/types';
-import { useProjectStore, type ProjectState, useProjectData, CanvasMode } from '../../stores/useProjectStore';
+import { useProjectStore, type ProjectState, useProjectData } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -60,13 +61,6 @@ export const renderCropEditor = (
     // Render Screen Layer
     if (screenSource) {
         const video = videoRefs[screenSource.id];
-        if (!video) {
-            // If video not loaded, we might skip or show placeholder. 
-            // drawScreen throws if video missing usually, or handling internally?
-            // screenPainter: drawScreen checks video source existence but assumes video element passed is valid?
-            // actually drawScreen takes "video" HTMLVideoElement.
-        }
-
         if (video) {
             drawScreen(
                 ctx,
@@ -88,10 +82,11 @@ export const renderCropEditor = (
 export const CropEditor: React.FC<{ videoSize?: { width: number, height: number } }> = ({ videoSize }) => {
     // Connect to Store
     const project = useProjectData();
-    const setCanvasMode = useProjectStore(s => s.setCanvasMode);
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
     const sources = useProjectStore(s => s.sources);
+    const updateSettings = useProjectStore(s => s.updateSettings);
 
-    const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Determine dimensions
     const outputSize = project.settings.outputSize;
@@ -174,7 +169,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             height: newRelativeRect.height * scaleY
         };
 
-        updateWithBatching({ screen: { crop: newCrop } });
+        batchAction(() => updateSettings({ screen: { crop: newCrop } }));
     };
 
     // Close when clicking outside the canvas container
@@ -198,12 +193,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             endInteraction();
         };
     }, [startInteraction, endInteraction]);
-
-    // Convert to Percentages for rendering (handling CSS scaling of container) for Dimming Layer
-    // const leftPct = toPct(renderedRect.x, outputSize.width);
-    // const topPct = toPct(renderedRect.y, outputSize.height);
-    // const widthPct = toPct(renderedRect.width, outputSize.width);
-    // const heightPct = toPct(renderedRect.height, outputSize.height);
 
     // Check if crop is centered
     const isCentered = Math.abs(currentCrop.x - (inputSize.width - currentCrop.width) / 2) < 1 &&
