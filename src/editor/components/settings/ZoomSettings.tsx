@@ -5,7 +5,7 @@ import { Slider } from '../common/Slider';
 
 export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const updateRecording = useProjectStore(s => s.updateRecording);
+    const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
     const { startInteraction, endInteraction, updateWithBatching } = useHistoryBatcher();
@@ -18,7 +18,7 @@ export const ZoomSettings = () => {
 
     const handleClearZooms = () => {
         // 1. Clear motions
-        updateRecording({ viewportMotions: [] });
+        clearViewportMotions();
         // 2. Disable auto zoom to prevent recalc
         updateSettings({ zoom: { autoZoom: false } });
     };

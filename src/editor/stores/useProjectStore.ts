@@ -1,12 +1,11 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, Recording, OutputWindow, UserEvents, ViewportMotion, ProjectSettings } from '../../core/types';
+import type { Project, ID, UserEvents, ViewportMotion } from '../../core/types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
-import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
-import { TimeMapper } from '../../core/timeMapper';
-import { isSubset } from '../utils/subsetMatcher';
+import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
+import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
 
 const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
@@ -27,7 +26,7 @@ export const CanvasMode = {
 } as const;
 export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
 
-export interface ProjectState {
+export interface ProjectState extends WindowSlice, SettingsSlice {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents; // Single set of loaded events (Never null)
@@ -56,17 +55,12 @@ export interface ProjectState {
     updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
     addViewportMotion: (motion: ViewportMotion) => void;
     deleteViewportMotion: (id: ID) => void;
+    clearViewportMotions: () => void;
 
     // Timeline Actions
-    updateRecording: (updates: Partial<Recording>) => void;
-    updateTimeline: (updates: Partial<import('../../core/types').Timeline>) => void;
-    addOutputWindow: (window: OutputWindow) => void;
-    updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
-    removeOutputWindow: (id: ID) => void;
-    splitWindow: (windowId: ID, splitTimeMs: number) => void;
+
 
     // Settings Actions
-    updateSettings: (settings: DeepPartial<ProjectSettings>) => boolean;
     updateProjectName: (name: string) => void;
 
     // Export Actions
@@ -74,60 +68,10 @@ export interface ProjectState {
     setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
 }
 
-// Optimization helper
-type DeepPartial<T> = {
-    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-// Helper to recalculate zooms synchronously
-const recalculateAutoZooms = (
-    project: Project,
-    sources: Record<ID, import('../../core/types').SourceMetadata>,
-    events: UserEvents
-): ViewportMotion[] => {
-    // 1. If Auto Zoom is ON, regenerate completely
-    if (project.settings.zoom.autoZoom) {
-        const screenSourceId = project.timeline.recording.screenSourceId;
-        const sourceMetadata = sources[screenSourceId];
-
-        if (!sourceMetadata) {
-            console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
-            return project.timeline.recording.viewportMotions;
-        }
-
-        const viewMapper = new ViewMapper(
-            sourceMetadata.size,
-            project.settings.outputSize,
-            project.settings.screen.padding,
-            project.settings.screen.crop
-        );
-
-        const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
-
-        return calculateZoomSchedule(
-            project.settings.zoom.maxZoom,
-            project.settings.zoom.defaultDurationMs,
-            viewMapper,
-            events,
-            timeMapper
-        );
-    }
-
-    // 2. If Auto Zoom is OFF, cleanup invalid/gap zooms
-    // We filter out any zooms whose "target time" (sourceEndTimeMs) falls into a gap in the (new) windows.
-    const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
-    const currentMotions = project.timeline.recording.viewportMotions || [];
-
-    return currentMotions.filter(m => {
-        const outputTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-        return outputTime !== -1;
-    });
-};
-
 export const useProjectStore = create<ProjectState>()(
     subscribeWithSelector(
         temporal(
-            (set, get) => ({
+            (set, get, store) => ({
                 // Initialize with a default empty project
                 project: ProjectImpl.create('Untitled Project'),
                 sources: {},
@@ -143,6 +87,10 @@ export const useProjectStore = create<ProjectState>()(
 
                 // Export State
                 exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null },
+
+                // Slices
+                ...createWindowSlice(set, get, store),
+                ...createSettingsSlice(set, get, store),
 
                 selectWindow: (id) => set({
                     selectedWindowId: id,
@@ -324,6 +272,24 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
+                clearViewportMotions: () => {
+                    console.log('[Action] clearViewportMotions');
+                    set(state => {
+                        return {
+                            project: {
+                                ...state.project,
+                                timeline: {
+                                    ...state.project.timeline,
+                                    recording: {
+                                        ...state.project.timeline.recording,
+                                        viewportMotions: []
+                                    }
+                                }
+                            }
+                        };
+                    });
+                },
+
                 loadProject: async (project) => {
                     console.log('[Action] loadProject', project.id);
 
@@ -434,280 +400,7 @@ export const useProjectStore = create<ProjectState>()(
                     return sourceId;
                 },
 
-                updateRecording: (updates) => {
-                    console.log('[Action] updateRecording', updates);
-                    set((state) => ({
-                        project: {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                recording: {
-                                    ...state.project.timeline.recording,
-                                    ...updates
-                                }
-                            },
-                            updatedAt: new Date()
-                        }
-                    }));
-                },
 
-                updateTimeline: (updates) => {
-                    console.log('[Action] updateTimeline', updates);
-                    set((state) => ({
-                        project: {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                ...updates
-                            },
-                            updatedAt: new Date()
-                        }
-                    }));
-                },
-
-                updateSettings: (updates: any) => {
-                    console.log('[Action] updateSettings', updates);
-                    let hasChanged = false; // Capture change status
-
-                    set((state) => {
-                        const currentSettings = state.project.settings;
-
-                        // OPTIMIZATION: Check if incoming updates are already satisfied by current state
-                        if (isSubset(currentSettings, updates)) {
-                            // No real changes
-                            return state;
-                        }
-
-                        // If we are here, changes exist
-                        hasChanged = true;
-
-                        // Deep merge known nested objects
-                        // We use the existing setting as base, and merge updates on top
-                        // This handles both "full object replacement" (if spread by caller) and "partial update"
-
-                        const nextSettings: ProjectSettings = {
-                            ...currentSettings,
-                            ...updates,
-                            // Specialized deep merges for nested objects
-                            background: {
-                                ...currentSettings.background,
-                                ...(updates.background || {})
-                            },
-                            screen: {
-                                ...currentSettings.screen,
-                                ...(updates.screen || {})
-                            },
-                            zoom: {
-                                ...currentSettings.zoom,
-                                ...(updates.zoom || {})
-                            },
-                            camera: {
-                                ...currentSettings.camera,
-                                ...(updates.camera || {})
-                            },
-                            // OutputSize is a simple object, can be merged deeply too
-                            outputSize: {
-                                ...currentSettings.outputSize,
-                                ...(updates.outputSize || {})
-                            }
-                        };
-
-                        const nextProject = {
-                            ...state.project,
-                            settings: nextSettings,
-                            updatedAt: new Date()
-                        };
-
-                        // Recalculate Zooms if necessary conditions met
-                        // 1. Zoom settings changed
-                        // 2. Padding changed
-                        let nextMotions = state.project.timeline.recording.viewportMotions;
-
-                        // Check padding inside the now-merged settings or from updates
-                        // Using merged settings is safer
-                        const paddingChanged = nextSettings.screen.padding !== currentSettings.screen.padding;
-
-                        // Check for any zoom related changes
-                        const zoomUpdates = updates.zoom || {};
-                        const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.autoZoom !== undefined;
-
-                        // Check for output size changes
-                        const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
-                            nextSettings.outputSize.height !== currentSettings.outputSize.height;
-
-                        if (sizeChanged && !nextSettings.zoom.autoZoom) {
-                            nextMotions = [];
-                        } else if (paddingChanged || zoomChanged || sizeChanged) {
-                            nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);
-                        }
-
-                        return {
-                            project: {
-                                ...nextProject,
-                                timeline: {
-                                    ...nextProject.timeline,
-                                    recording: {
-                                        ...nextProject.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                }
-                            }
-                        };
-                    });
-
-                    return hasChanged;
-                },
-
-                addOutputWindow: (window) => {
-                    console.log('[Action] addOutputWindow', window);
-                    set((state) => {
-                        const nextOutputWindows = [...state.project.timeline.outputWindows, window].sort((a, b) => a.startMs - b.startMs);
-
-                        // Temporary project state to calculate zooms
-                        const tempProject = {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                outputWindows: nextOutputWindows
-                            }
-                        };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
-
-                        return {
-                            project: {
-                                ...tempProject,
-                                timeline: {
-                                    ...tempProject.timeline,
-                                    recording: {
-                                        ...tempProject.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                },
-                                updatedAt: new Date()
-                            }
-                        };
-                    });
-                },
-
-                updateOutputWindow: (id, updates) => {
-                    console.log('[Action] updateOutputWindow', id, updates);
-                    set((state) => {
-                        const nextOutputWindows = state.project.timeline.outputWindows
-                            .map(w => w.id === id ? { ...w, ...updates } : w)
-                            .sort((a, b) => a.startMs - b.startMs);
-
-                        const tempProject = {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                outputWindows: nextOutputWindows
-                            }
-                        };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
-
-                        return {
-                            project: {
-                                ...tempProject,
-                                timeline: {
-                                    ...tempProject.timeline,
-                                    recording: {
-                                        ...tempProject.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                },
-                                updatedAt: new Date()
-                            }
-                        };
-                    });
-                },
-
-                removeOutputWindow: (id) => {
-                    console.log('[Action] removeOutputWindow', id);
-                    set((state) => {
-                        const nextOutputWindows = state.project.timeline.outputWindows.filter(w => w.id !== id);
-
-                        const tempProject = {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                outputWindows: nextOutputWindows
-                            }
-                        };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
-
-                        // Clear selection if deleted
-                        const nextSelected = state.selectedWindowId === id ? null : state.selectedWindowId;
-
-                        return {
-                            selectedWindowId: nextSelected,
-                            project: {
-                                ...tempProject,
-                                timeline: {
-                                    ...tempProject.timeline,
-                                    recording: {
-                                        ...tempProject.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                },
-                                updatedAt: new Date()
-                            }
-                        };
-                    });
-                },
-
-                splitWindow: (windowId, splitTimeMs) => {
-                    console.log('[Action] splitWindow', windowId, splitTimeMs);
-                    set((state) => {
-                        // 1. Find the window to split
-                        const windowIndex = state.project.timeline.outputWindows.findIndex(w => w.id === windowId);
-                        if (windowIndex === -1) return state; // No-op if not found
-
-                        const originalWin = state.project.timeline.outputWindows[windowIndex];
-
-                        // 2. Shrink original window
-                        const shrunkWin = { ...originalWin, endMs: splitTimeMs };
-
-                        // 3. Create new window
-                        // We need a way to generate IDs safely. Using randomUUID for now.
-                        const newWin: OutputWindow = {
-                            id: crypto.randomUUID(),
-                            startMs: splitTimeMs,
-                            endMs: originalWin.endMs
-                        };
-
-                        // 4. Construct new window list
-                        // We replace the original with shrunk, and append the new one.
-                        // Then sort.
-                        let nextOutputWindows = [...state.project.timeline.outputWindows];
-                        nextOutputWindows[windowIndex] = shrunkWin;
-                        nextOutputWindows.push(newWin);
-                        nextOutputWindows.sort((a, b) => a.startMs - b.startMs);
-
-                        // 5. Recalculate Zooms (Atomic!)
-                        const tempProject = {
-                            ...state.project,
-                            timeline: {
-                                ...state.project.timeline,
-                                outputWindows: nextOutputWindows
-                            }
-                        };
-                        const nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
-
-                        return {
-                            project: {
-                                ...tempProject,
-                                timeline: {
-                                    ...tempProject.timeline,
-                                    recording: {
-                                        ...tempProject.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                },
-                                updatedAt: new Date()
-                            }
-                        };
-                    });
-                },
 
                 updateProjectName: (name: string) => {
                     console.log('[Action] updateProjectName', name);
