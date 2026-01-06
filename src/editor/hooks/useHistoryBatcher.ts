@@ -60,14 +60,7 @@ export const useHistoryBatcher = () => {
      */
     const updateWithBatching = useCallback((updates: DeepPartial<typeof project.settings>) => {
         // Check if there are actual changes before applying
-        let hasChanges = false;
-
-        // Shallow check of top-level keys for now (optimization tradeoff)
-        // Since we are mostly updating nested specific fields, we assume if called, it's likely a change.
-        // Or we can do a simple check.
-        hasChanges = true;
-
-        updateSettings(updates);
+        const hasChanges = updateSettings(updates);
 
         if (hasChanges && isInteracting.current && !hasPaused.current) {
             useProjectStore.temporal.getState().pause();

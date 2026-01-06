@@ -6,6 +6,7 @@ import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { TimeMapper } from '../../core/timeMapper';
+import { isSubset } from '../utils/subsetMatcher';
 
 const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
@@ -65,7 +66,7 @@ export interface ProjectState {
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
 
     // Settings Actions
-    updateSettings: (settings: DeepPartial<ProjectSettings>) => void;
+    updateSettings: (settings: DeepPartial<ProjectSettings>) => boolean;
     updateProjectName: (name: string) => void;
 
     // Export Actions
@@ -466,8 +467,19 @@ export const useProjectStore = create<ProjectState>()(
 
                 updateSettings: (updates: any) => {
                     console.log('[Action] updateSettings', updates);
+                    let hasChanged = false; // Capture change status
+
                     set((state) => {
                         const currentSettings = state.project.settings;
+
+                        // OPTIMIZATION: Check if incoming updates are already satisfied by current state
+                        if (isSubset(currentSettings, updates)) {
+                            // No real changes
+                            return state;
+                        }
+
+                        // If we are here, changes exist
+                        hasChanged = true;
 
                         // Deep merge known nested objects
                         // We use the existing setting as base, and merge updates on top
@@ -542,6 +554,8 @@ export const useProjectStore = create<ProjectState>()(
                             }
                         };
                     });
+
+                    return hasChanged;
                 },
 
                 addOutputWindow: (window) => {
