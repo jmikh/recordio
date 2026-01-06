@@ -7,8 +7,8 @@ import { Timeline } from './components/timeline/Timeline';
 
 import { ProjectStorage } from '../storage/projectStorage';
 import { ProjectSelector } from './components/ProjectSelector';
-import { ExportButton } from './components/header/ExportButton';
-import { ExportModal } from './components/modals/ExportModal';
+import { ExportButton } from './components/export/ExportButton';
+import { ExportModal } from './components/export/ExportModal';
 
 // Icons
 const IconUndo = () => (

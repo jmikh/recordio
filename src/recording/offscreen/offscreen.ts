@@ -8,8 +8,8 @@
  * For window/desktop recording, see controller.ts instead.
  */
 
-import { VideoRecorder } from './shared/videoRecorder';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig } from './shared/messageTypes';
+import { VideoRecorder } from '../shared/videoRecorder';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig } from '../shared/messageTypes';
 
 
 let recorder: VideoRecorder | null = null;

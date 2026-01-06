@@ -13,7 +13,7 @@
  */
 
 import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
-import { MSG_TYPES, type BaseMessage } from './messageTypes';
+import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { logger } from '../../utils/logger';
 
 

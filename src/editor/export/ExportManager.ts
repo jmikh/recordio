@@ -1,5 +1,5 @@
 import * as Mp4Muxer from 'mp4-muxer';
-import { scaleProject } from '../../core/projectScaler';
+import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
@@ -36,7 +36,7 @@ export class ExportManager {
         console.log(`[Export] Starting export at ${width}x${height} (${quality})`);
 
         // 2. Prepare Render Project (Clone with resize)
-        const renderProject = scaleProject(project, { width, height });
+        const renderProject = ProjectImpl.scale(project, { width, height });
 
         // 3. Prepare Muxer & Encoders
         const muxer = new Mp4Muxer.Muxer({

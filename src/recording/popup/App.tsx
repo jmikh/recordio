@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { MSG_TYPES, STORAGE_KEYS } from '../recording/shared/messageTypes';
+import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
-import permissionGuide from '../assets/permission-guide.jpg';
+import permissionGuide from '../../assets/permission-guide.jpg';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 

@@ -12,10 +12,10 @@
  * which forwards them to the active recorder (offscreen or controller).
  */
 
-import { logger } from '../utils/logger';
-import { MSG_TYPES, type BaseMessage } from './shared/messageTypes';
-import { EventRecorder } from './shared/eventRecorder';
-import { BlurManager } from './blur/blurManager';
+import { logger } from '../../utils/logger';
+import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
+import { EventRecorder } from './eventRecorder';
+import { BlurManager } from './blurManager';
 
 // Cleanup mechanism for previous instances
 const cleanupEvent = new Event('recordo-cleanup');

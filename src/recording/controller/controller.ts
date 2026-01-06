@@ -9,8 +9,8 @@
  * then sends the sourceId here to start recording.
  */
 
-import { VideoRecorder } from './shared/videoRecorder';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig } from './shared/messageTypes';
+import { VideoRecorder } from '../shared/videoRecorder';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig } from '../shared/messageTypes';
 
 
 

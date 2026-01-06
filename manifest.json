@@ -16,10 +16,10 @@
         "<all_urls>"
     ],
     "action": {
-        "default_popup": "src/popup/index.html"
+        "default_popup": "src/recording/popup/index.html"
     },
     "background": {
-        "service_worker": "src/recording/background.ts",
+        "service_worker": "src/recording/background/background.ts",
         "type": "module"
     },
     "icons": {
@@ -33,7 +33,7 @@
                 "<all_urls>"
             ],
             "js": [
-                "src/recording/content.ts"
+                "src/recording/content/content.ts"
             ]
         }
     ],

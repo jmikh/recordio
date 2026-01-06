@@ -8,9 +8,9 @@
  * - Persists state to chrome.storage.session for service worker restarts
  */
 
-import { type Size } from '../core/types';
-import { logger } from '../utils/logger';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from './shared/messageTypes';
+import { type Size } from '../../core/types';
+import { logger } from '../../utils/logger';
+import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
 logger.log("Background service worker running");
 
@@ -120,7 +120,7 @@ async function closeControllerTab(tabId: number | null) {
 
 async function openControllerTab(): Promise<number> {
     const tab = await chrome.tabs.create({
-        url: chrome.runtime.getURL('src/recording/controller.html'),
+        url: chrome.runtime.getURL('src/recording/controller/controller.html'),
         active: true,
         pinned: true
     });
@@ -148,7 +148,7 @@ async function openControllerTab(): Promise<number> {
 
 // --- Content Script Injection ---
 
-import contentScriptPath from './content.ts?script';
+import contentScriptPath from '../content/content.ts?script';
 
 chrome.runtime.onInstalled.addListener(async () => {
     console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
@@ -203,7 +203,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
     if (!tabId) throw new Error("Tab ID is required for tab recording");
 
     // 1. Setup Offscreen
-    await setupOffscreenDocument('src/recording/offscreen.html');
+    await setupOffscreenDocument('src/recording/offscreen/offscreen.html');
 
     // 2. Get Media Stream ID
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
