@@ -382,15 +382,17 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         width: `${toPct(rect.width, canvasSize.width)}%`,
         height: `${toPct(rect.height, canvasSize.height)}%`,
         cursor: 'move',
-        border: '2px solid green',
+        // Border handled by CSS class for animation
         boxSizing: 'border-box',
         pointerEvents: 'auto', // Ensure interactive even if parent is pointer-events: none
+        zIndex: 100,
     };
 
     return (
         <div
             ref={boxRef}
             style={boxStyle}
+            className="bounding-box-glow"
             onPointerDown={(e) => handlePointerDown(e, 'move')}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

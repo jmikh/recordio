@@ -7,6 +7,14 @@ zoom
 - deal with mouse going outside of the viewport in window mode
 
 
+Recording
+=========
+- don't accept events until recording starts
+- add extensions open close time as events
+- add blur open and done events....
+- figure out how to do UI for auto cut sections
+
+
 core
 ====
 - support window speed
