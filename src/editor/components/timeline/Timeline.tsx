@@ -1,7 +1,6 @@
 // ... imports
 import { useRef, useMemo, useEffect } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
-import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimeMapper } from '../../../core/timeMapper';
 import { ZoomTrack } from './ZoomTrack';
@@ -42,12 +41,12 @@ export function Timeline() {
     const projectSettings = useProjectStore(s => s.project.settings);
     const updateSettings = useProjectStore(s => s.updateSettings);
 
-    const isPlaying = usePlaybackStore(s => s.isPlaying);
+    const isPlaying = useUIStore(s => s.isPlaying);
     // Note: We deliberately DO NOT subscribe to currentTimeMs here to prevent re-renders
-    const setIsPlaying = usePlaybackStore(s => s.setIsPlaying);
+    const setIsPlaying = useUIStore(s => s.setIsPlaying);
 
     // We only need currentTimeMs for the Toolbar
-    const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
+    const currentTimeMs = useUIStore(s => s.currentTimeMs);
 
     // Timeline State - Sync with UI Store
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);

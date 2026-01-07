@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { ID } from '../../core/types';
+import type { ID, TimeMs } from '../../core/types';
 
 export const CanvasMode = {
     Preview: 'preview',
@@ -35,6 +35,15 @@ export interface UIState {
     pixelsPerSec: number;
     setTimelineOffset: (offset: number) => void;
     setPixelsPerSec: (pps: number) => void;
+
+    // Playback State
+    isPlaying: boolean;
+    currentTimeMs: TimeMs;
+    previewTimeMs: TimeMs | null;
+
+    setIsPlaying: (playing: boolean) => void;
+    setCurrentTime: (timeMs: TimeMs) => void;
+    setPreviewTime: (timeMs: TimeMs | null) => void;
 
     // Explicit reset to default state
     reset: () => void;
@@ -82,8 +91,17 @@ export const useUIStore = create<UIState>((set) => ({
     timelineOffset: 0,
     pixelsPerSec: 100, // Default zoom level
 
+    // Playback State
+    isPlaying: false,
+    currentTimeMs: 0,
+    previewTimeMs: null,
+
     setTimelineOffset: (timelineOffset) => set({ timelineOffset }),
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
+
+    setIsPlaying: (isPlaying) => set({ isPlaying }),
+    setCurrentTime: (currentTimeMs) => set({ currentTimeMs }),
+    setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 
     reset: () => set({
         canvasMode: CanvasMode.Preview,
@@ -91,6 +109,9 @@ export const useUIStore = create<UIState>((set) => ({
         selectedWindowId: null,
         selectedSettingsPanel: SettingsPanel.Project,
         timelineOffset: 0,
-        pixelsPerSec: 100
+        pixelsPerSec: 100,
+        isPlaying: false,
+        currentTimeMs: 0,
+        previewTimeMs: null,
     })
 }));

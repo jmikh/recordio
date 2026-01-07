@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { usePlaybackStore } from '../../stores/usePlaybackStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { TimeMapper } from '../../../core/timeMapper';
 
 interface TimelinePlayheadProps {
@@ -14,8 +14,8 @@ export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
     timeMapper
 }) => {
     // We subscribe deeply to avoid parent re-renders
-    const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
-    const isPlaying = usePlaybackStore(s => s.isPlaying);
+    const currentTimeMs = useUIStore(s => s.currentTimeMs);
+    const isPlaying = useUIStore(s => s.isPlaying);
 
     // Auto-Scroll Logic (Page Flip)
     useEffect(() => {

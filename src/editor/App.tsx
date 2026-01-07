@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory, useProjectSources } from './stores/useProjectStore';
-import { usePlaybackStore } from './stores/usePlaybackStore';
 import { Timeline } from './components/timeline/Timeline';
 import { useUIStore } from './stores/useUIStore';
 import { useHistorySync } from './hooks/useHistorySync';
@@ -98,7 +97,7 @@ function Editor() {
 
             if (e.code === 'Space') {
                 e.preventDefault(); // Prevent scrolling
-                const { isPlaying, setIsPlaying } = usePlaybackStore.getState();
+                const { isPlaying, setIsPlaying } = useUIStore.getState();
                 setIsPlaying(!isPlaying);
             }
         };

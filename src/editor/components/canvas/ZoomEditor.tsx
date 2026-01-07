@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import type { Rect } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../common/DimmedOverlay';
@@ -135,7 +134,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
             if (outputTime !== -1) {
                 const timelineTime = timeMapper.mapOutputToTimelineTime(outputTime);
                 if (timelineTime !== -1) {
-                    usePlaybackStore.getState().setCurrentTime(timelineTime);
+                    useUIStore.getState().setCurrentTime(timelineTime);
                 }
             }
         }

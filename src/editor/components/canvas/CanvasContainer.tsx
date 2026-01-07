@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { usePlaybackStore } from '../../stores/usePlaybackStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
@@ -21,7 +20,7 @@ export const CanvasContainer = () => {
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
     const sources = useProjectSources();
-    const isPlaying = usePlaybackStore(s => s.isPlaying);
+    const isPlaying = useUIStore(s => s.isPlaying);
     const mutedSources = useProjectStore(s => s.mutedSources);
 
     // DOM Refs for Resources
@@ -45,9 +44,9 @@ export const CanvasContainer = () => {
         let lastFpsTime = 0;
 
         const tick = (time: number) => {
-            const pbState = usePlaybackStore.getState();
+            const uiState = useUIStore.getState();
             const { project, sources, userEvents } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId } = useUIStore.getState();
+            const { canvasMode, selectedZoomId: activeZoomId } = uiState;
 
             // FPS Logging (Optional)
             if (time - lastFpsTime >= 1000) lastFpsTime = time;
@@ -56,13 +55,13 @@ export const CanvasContainer = () => {
             // (Crop and Zoom block playback time updates (implicit in original), Camera does not)
             const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
 
-            if (pbState.isPlaying && !isBlockingEdit) {
+            if (uiState.isPlaying && !isBlockingEdit) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
                 const delta = time - lastTimeRef.current;
                 const safeDelta = Math.min(delta, 100);
 
                 if (safeDelta > 0) {
-                    let nextTime = pbState.currentTimeMs + safeDelta;
+                    let nextTime = uiState.currentTimeMs + safeDelta;
                     // Gap Skipping Logic
                     const windows = project.timeline.outputWindows;
                     const activeWindow = windows.find(w => nextTime >= w.startMs && nextTime < w.endMs);
@@ -70,12 +69,12 @@ export const CanvasContainer = () => {
                         const nextWin = windows.find(w => w.startMs > nextTime);
                         if (nextWin) nextTime = nextWin.startMs;
                         else {
-                            pbState.setIsPlaying(false);
+                            uiState.setIsPlaying(false);
                             const lastWin = windows[windows.length - 1];
                             nextTime = lastWin ? lastWin.endMs : 0;
                         }
                     }
-                    pbState.setCurrentTime(nextTime);
+                    uiState.setCurrentTime(nextTime);
                 }
                 lastTimeRef.current = time;
             } else {
@@ -98,16 +97,16 @@ export const CanvasContainer = () => {
                 );
 
                 // 2. DETERMINE FRAME TIME
-                let effectiveTimeMs = pbState.currentTimeMs;
+                let effectiveTimeMs = uiState.currentTimeMs;
 
                 // Implement Preview Logic
-                if (!pbState.isPlaying && !isBlockingEdit && pbState.previewTimeMs !== null) {
-                    effectiveTimeMs = pbState.previewTimeMs;
+                if (!uiState.isPlaying && !isBlockingEdit && uiState.previewTimeMs !== null) {
+                    effectiveTimeMs = uiState.previewTimeMs;
                 }
 
                 // 3. SYNC VIDEO
                 const sourceTimeMs = effectiveTimeMs - project.timeline.recording.timelineOffsetMs;
-                const isPlaying = pbState.isPlaying && !isBlockingEdit;
+                const isPlaying = uiState.isPlaying && !isBlockingEdit;
 
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
