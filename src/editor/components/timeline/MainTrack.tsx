@@ -17,7 +17,7 @@ interface MainTrackProps {
 
 interface DragState {
     windowId: string;
-    type: 'left' | 'right' | 'move';
+    type: 'left' | 'right';
     startX: number;
     initialWindow: OutputWindow;
     currentWindow: OutputWindow;
@@ -76,20 +76,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 const proposedEnd = win.endMs + deltaMs;
                 // Cannot go past maxEnd, cannot cross startMs
                 newWindow.endMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + 100);
-            } else if (dragState.type === 'move') {
-                const duration = win.endMs - win.startMs;
-                const proposedStart = win.startMs + deltaMs;
-
-                let safeStart = Math.max(proposedStart, minStart);
-                let safeEnd = safeStart + duration;
-
-                if (safeEnd > maxEnd) {
-                    safeEnd = maxEnd;
-                    safeStart = safeEnd - duration;
-                }
-
-                newWindow.startMs = safeStart;
-                newWindow.endMs = safeEnd;
             }
 
             setDragState(prev => prev ? { ...prev, currentWindow: newWindow } : null);
@@ -116,7 +102,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
         };
     }, [dragState, pixelsPerSec, updateOutputWindow]);
 
-    const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right' | 'move') => {
+    const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right') => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -175,7 +161,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 e.stopPropagation();
                                 selectWindow(w.id);
                             }}
-                            onMouseDown={(e) => handleDragStart(e, w.id, 'move')}
                         >
                             {/* Group Header */}
                             <div

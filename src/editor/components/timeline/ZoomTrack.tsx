@@ -13,12 +13,11 @@ interface ZoomTrackProps {
 }
 
 interface DragState {
-    type: 'move' | 'resize-left';
+    type: 'move';
     motionId: string;
     startX: number;
     initialOutputTime: number; // Anchor in Output Time
     initialSourceEndTime: number;
-    initialDuration: number;
     // Constraints can stay relative or simplified
 }
 
@@ -118,33 +117,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         }
 
         const sourceEndTime = mouseSourceTimeMs;
-        const sourceStartTime = mouseSourceTimeMs - actualDuration;
+        const sourceStartTime = sourceEndTime - actualDuration;
 
         // Calculate visual width mapping back to Output
-        const outputEndTime = outputTimeMs;
-        // Start might map to -1 if duration spans across cut into gap.
-        // We assume contiguous for adding new zoom? Or we clamp?
-        // If we just mapped Output->Source, then `sourceEndTime` is valid.
-        // `sourceStartTime` might be in gap?
-        // Check output start
-        let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
-
-        // If start is invalid (gap), clamp to nearest window start?
-        // Since we are "adding" a zoom, maybe we just use standard width (pixels)?
-        // If the duration is truly 600ms, and it fits in the clip, fine.
-        // If it crosses a cut, it might effectively be shorter visually.
-        // Let's rely on TimeMapper mapping.
-
-        if (outputStartTime === -1) {
-            // Fallback: If map fails, it means start is not visible.
-            // We can find the window containing sourceEndTime and clamp to its start.
-            // But for Hover UI, maybe just `outputEndTime - duration` is easier visual approximation?
-            // No, `left` depends on it.
-            // Let's assume standard width for hover to avoid jitter.
-            outputStartTime = outputEndTime - actualDuration;
-        }
-
-        const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
+        const width = (actualDuration / 1000) * pixelsPerSec;
 
         setHoverInfo({
             timeMs: outputTimeMs,
@@ -190,7 +166,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     // DRAG HANDLERS (MOVE & RESIZE)
     // ------------------------------------------------------------------
 
-    const handleDragStart = (e: React.MouseEvent, type: 'move' | 'resize-left', motion: ViewportMotion) => {
+    const handleDragStart = (e: React.MouseEvent, type: 'move', motion: ViewportMotion) => {
         e.stopPropagation();
 
         const outputEndTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
@@ -201,8 +177,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
             motionId: motion.id,
             startX: e.clientX,
             initialOutputTime: outputEndTime,
-            initialSourceEndTime: motion.sourceEndTimeMs,
-            initialDuration: motion.durationMs
+            initialSourceEndTime: motion.sourceEndTimeMs
         });
         startInteraction();
         setEditingZoom(motion.id);
@@ -214,7 +189,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = (deltaX / pixelsPerSec) * 1000;
 
-        const { initialOutputTime, initialDuration } = dragState;
+        const { initialOutputTime } = dragState;
 
         // Apply Logic
         if (dragState.type === 'move') {
@@ -226,23 +201,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                     sourceEndTimeMs: newSourceEndTime
                 }));
             }
-        } else if (dragState.type === 'resize-left') {
-            let newDuration = initialDuration - deltaTimeMs;
-
-            const MIN_DURATION = 100;
-            if (newDuration < MIN_DURATION) newDuration = MIN_DURATION;
-
-            // Optional: Max Duration constraint could be complicated with gaps
-            // For now, let's just allow it, if it starts in a gap, visualization handles it.
-
-            // Check bounds?
-            // if (initialSourceEndTime - newDuration < 0) ...
-
-            batchAction(() => updateViewportMotion(dragState.motionId, {
-                durationMs: newDuration
-            }));
         }
-
     }, [dragState, pixelsPerSec, updateViewportMotion, timeMapper, batchAction]);
 
     const handleGlobalMouseUp = useCallback(() => {
@@ -286,22 +245,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                     const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
                     if (outputEndTime === -1) return null;
 
-                    const sourceStartTime = m.sourceEndTimeMs - m.durationMs;
-                    let outputStartTime = timeMapper.mapSourceToOutputTime(sourceStartTime);
-
-                    // If start is invalid (in gap), clamp to specific window start
-                    // We know outputEndTime is valid, so find its window.
-                    if (outputStartTime === -1) {
-                        const win = timeline.outputWindows.find(w => m.sourceEndTimeMs >= w.startMs && m.sourceEndTimeMs <= w.endMs);
-                        if (win) {
-                            outputStartTime = timeMapper.mapTimelineToOutputTime(win.startMs);
-                        } else {
-                            // Should technically not happen if outputEndTime is valid (which relies on being in a window)
-                            return null; // fallback
-                        }
-                    }
-
-                    if (outputStartTime === -1) return null;
+                    let outputStartTime = outputEndTime - m.durationMs;
 
                     const left = (outputStartTime / 1000) * pixelsPerSec;
                     const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
@@ -329,12 +273,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
                                 setEditingZoom(m.id);
                             }}
                         >
-                            {/* Left Resize Handle */}
-                            <div
-                                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-purple-400/50 z-20"
-                                onMouseDown={(e) => handleDragStart(e, 'resize-left', m)}
-                            />
-
                             {/* Right Edge (Keyframe) - Thicker, Opaque */}
                             <div
                                 className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-yellow-400' : 'bg-purple-500'} shadow-sm`}
