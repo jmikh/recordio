@@ -1,7 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '../common/Slider';
+import { RangeSlider } from '../common/RangeSlider';
 
 export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
@@ -23,25 +23,30 @@ export const ZoomSettings = () => {
         updateSettings({ zoom: { autoZoom: false } });
     };
 
+    const handleDurationChange = (minMs: number, maxMs: number) => {
+        batchAction(() => updateSettings({ zoom: { ...zoomSettings, minZoomDurationMs: minMs, maxZoomDurationMs: maxMs } }));
+    };
+
     return (
         <div className="flex flex-col gap-6 text-sm text-gray-300">
             {/* Transition Duration */}
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                     <label className="text-xs uppercase font-bold text-gray-500">Transition Duration</label>
-                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoomDurationMs}ms</span>
+                    <span className="text-xs font-mono text-blue-400">{zoomSettings.minZoomDurationMs}ms – {zoomSettings.maxZoomDurationMs}ms</span>
                 </div>
-                <Slider
-                    min={250}
-                    max={1500}
+                <RangeSlider
+                    min={200}
+                    max={1000}
                     step={50}
-                    value={zoomSettings.maxZoomDurationMs}
-                    onChange={(val) => batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoomDurationMs: val } }))}
+                    minValue={zoomSettings.minZoomDurationMs}
+                    maxValue={zoomSettings.maxZoomDurationMs}
+                    onChange={handleDurationChange}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />
                 <p className="text-[10px] text-gray-500">
-                    Speed of zoom animations.
+                    Min and max speed of zoom animations.
                 </p>
             </div>
 
