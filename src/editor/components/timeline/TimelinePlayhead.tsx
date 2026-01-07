@@ -1,17 +1,14 @@
 import React, { useEffect } from 'react';
 import { useUIStore } from '../../stores/useUIStore';
-import { TimeMapper } from '../../../core/timeMapper';
 
 interface TimelinePlayheadProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     pixelsPerSec: number;
-    timeMapper: TimeMapper;
 }
 
 export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
     containerRef,
     pixelsPerSec,
-    timeMapper
 }) => {
     // We subscribe deeply to avoid parent re-renders
     const currentTimeMs = useUIStore(s => s.currentTimeMs);
@@ -21,9 +18,8 @@ export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
     useEffect(() => {
         if (!isPlaying || !containerRef.current) return;
 
-        const outputTime = timeMapper.mapTimelineToOutputTime(currentTimeMs);
-        if (outputTime === -1) return;
-
+        // currentTimeMs is already in output time
+        const outputTime = currentTimeMs;
         const px = (outputTime / 1000) * pixelsPerSec;
         const container = containerRef.current;
         const scrollLeft = container.scrollLeft;
@@ -44,12 +40,10 @@ export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
             container.scrollTo({ left: px, behavior: 'auto' });
         }
 
-    }, [currentTimeMs, isPlaying, pixelsPerSec, containerRef, timeMapper]);
+    }, [currentTimeMs, isPlaying, pixelsPerSec, containerRef]);
 
-    // Render Playhead Line
-    const ctiOutputTime = timeMapper.mapTimelineToOutputTime(currentTimeMs);
-    if (ctiOutputTime === -1) return null;
-
+    // Render Playhead Line - currentTimeMs is already in output time
+    const ctiOutputTime = currentTimeMs;
     const left = (ctiOutputTime / 1000) * pixelsPerSec;
 
     return (

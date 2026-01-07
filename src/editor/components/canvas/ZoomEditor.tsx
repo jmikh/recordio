@@ -131,10 +131,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
             const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
             if (outputTime !== -1) {
-                const timelineTime = timeMapper.mapOutputToTimelineTime(outputTime);
-                if (timelineTime !== -1) {
-                    useUIStore.getState().setCurrentTime(timelineTime);
-                }
+                useUIStore.getState().setCurrentTime(outputTime);
             }
         }
     }, [editingZoomId]); // Reduced dependency to avoid loops

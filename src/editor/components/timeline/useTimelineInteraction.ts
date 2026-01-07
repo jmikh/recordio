@@ -1,19 +1,16 @@
 import { useState, useCallback } from 'react';
 import type { RefObject } from 'react';
-import { TimeMapper } from '../../../core/timeMapper';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 interface UseTimelineInteractionProps {
     containerRef: RefObject<HTMLDivElement | null>;
     totalOutputDuration: number;
-    timeMapper: TimeMapper;
     timelineOffsetLeft?: number;
 }
 
 export function useTimelineInteraction({
     containerRef,
     totalOutputDuration,
-    timeMapper,
     timelineOffsetLeft,
 }: UseTimelineInteractionProps) {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -27,7 +24,7 @@ export function useTimelineInteraction({
     const [isCTIScrubbing, setIsCTIScrubbing] = useState(false);
 
     const getTimeFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
-        if (!containerRef.current) return { outputTime: 0, timelineTime: 0 };
+        if (!containerRef.current) return { outputTime: 0 };
         const rect = containerRef.current.getBoundingClientRect();
         const scrollLeft = containerRef.current.scrollLeft || 0;
         // Subtract timelineOffsetLeft from x calculation
@@ -36,29 +33,24 @@ export function useTimelineInteraction({
         // Visual X -> Output Time
         const outputTime = Math.max(0, (x / pixelsPerSec) * 1000);
 
-        // Map to Timeline Time
+        // Clamp to total duration
         const clampedOutputTime = Math.min(outputTime, totalOutputDuration);
-        const timelineTime = timeMapper.mapOutputToTimelineTime(clampedOutputTime);
 
-        return { outputTime, timelineTime };
-    }, [containerRef, pixelsPerSec, totalOutputDuration, timeMapper]);
+        return { outputTime: clampedOutputTime };
+    }, [containerRef, pixelsPerSec, totalOutputDuration, timelineOffsetLeft]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        const { outputTime, timelineTime } = getTimeFromEvent(e);
+        const { outputTime } = getTimeFromEvent(e);
 
-        // Hover uses Visual/Output Time
+        // Hover uses Output Time
         setHoverTime(outputTime);
 
         const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
 
         if (isCTIScrubbing) {
-            if (timelineTime !== -1) {
-                setCurrentTime(timelineTime);
-            }
+            setCurrentTime(outputTime);
         } else if (!isPlaying && !isBlockingEdit) {
-            if (timelineTime !== -1) {
-                setPreviewTime(timelineTime);
-            }
+            setPreviewTime(outputTime);
         } else {
             setPreviewTime(null);
         }
@@ -66,10 +58,8 @@ export function useTimelineInteraction({
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         setIsCTIScrubbing(true);
-        const { timelineTime } = getTimeFromEvent(e);
-        if (timelineTime !== -1) {
-            setCurrentTime(timelineTime);
-        }
+        const { outputTime } = getTimeFromEvent(e);
+        setCurrentTime(outputTime);
     }, [getTimeFromEvent, setCurrentTime]);
 
     const handleMouseLeave = useCallback(() => {

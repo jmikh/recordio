@@ -52,7 +52,7 @@ export class PlaybackRenderer {
 
         if (activeWindow) {
             const timeMapper = new TimeMapper(outputWindows);
-            const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
+            const outputTimeMs = currentTimeMs;
             const viewportMotions = recording.viewportMotions || [];
 
             effectiveViewport = getViewportStateAtTime(

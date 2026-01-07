@@ -19,7 +19,7 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     // Shared helper for mapping time
     const mapToLeft = (timeMs: number) => {
-        const outputTime = timeMapper.mapTimelineToOutputTime(timeMs);
+        const outputTime = timeMapper.mapSourceToOutputTime(timeMs);
         if (outputTime === -1) return null;
         return (outputTime / 1000) * pixelsPerSec;
     };
@@ -60,8 +60,8 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
                             ? d.path[d.path.length - 1].timestamp
                             : startMs + 500;
 
-                    const outputStart = timeMapper.mapTimelineToOutputTime(startMs);
-                    const outputEnd = timeMapper.mapTimelineToOutputTime(endMs);
+                    const outputStart = timeMapper.mapSourceToOutputTime(startMs);
+                    const outputEnd = timeMapper.mapSourceToOutputTime(endMs);
 
                     if (outputStart === -1) return null;
 

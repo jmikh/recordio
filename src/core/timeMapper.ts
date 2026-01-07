@@ -7,22 +7,24 @@ export class TimeMapper {
         this.windows = windows;
     }
 
+
+
     /**
-     * Maps a Timeline Time (which includes gaps) to Output Time (continuous video time).
-     * 
-     * @param timelineTimeMs The absolute time on the timeline
-     * @returns The output time in ms, or -1 if the time is in a gap
+     * Converts a Source Time (e.g. raw recording timestamp) to Output Time.
+     * Note: A single Source Time might appear multiple times if clips are duplicated, 
+     * or not at all if trimmed. This function returns the FIRST occurrence or -1.
      */
-    mapTimelineToOutputTime(timelineTimeMs: number): number {
+    mapSourceToOutputTime(sourceTimeMs: number): number {
+        // Source Time = Output Time (Since offset is always 0)
+        // We check if this Output Time exists in any window.
         let outputTimeAccumulator = 0;
 
         for (const win of this.windows) {
-            if (timelineTimeMs >= win.startMs && timelineTimeMs <= win.endMs) {
+            if (sourceTimeMs >= win.startMs && sourceTimeMs <= win.endMs) {
                 // Inside this window
-                return outputTimeAccumulator + (timelineTimeMs - win.startMs);
-            } else if (timelineTimeMs < win.startMs) {
+                return outputTimeAccumulator + (sourceTimeMs - win.startMs);
+            } else if (sourceTimeMs < win.startMs) {
                 // Before this window (gap)
-                // return -1 to indicate "not visible".
                 return -1;
             }
 
@@ -34,45 +36,15 @@ export class TimeMapper {
     }
 
     /**
-     * Maps an Output Time back to Timeline Time.
-     * Useful for finding where a specific frame in the final video comes from.
-     */
-    mapOutputToTimelineTime(outputTimeMs: number): number {
-        let outputTimeAccumulator = 0;
-
-        for (const win of this.windows) {
-            const winDuration = win.endMs - win.startMs;
-            if (outputTimeMs <= outputTimeAccumulator + winDuration) {
-                const offsetInWindow = outputTimeMs - outputTimeAccumulator;
-                return win.startMs + offsetInWindow;
-            }
-            outputTimeAccumulator += winDuration;
-        }
-
-        return -1; // Out of bounds
-    }
-
-    /**
-     * Converts a Source Time (e.g. raw recording timestamp) to Output Time.
-     * Note: A single Source Time might appear multiple times if clips are duplicated, 
-     * or not at all if trimmed. This function returns the FIRST occurrence or -1.
-     */
-    mapSourceToOutputTime(sourceTimeMs: number): number {
-        // Source Time = Timeline Time (Since offset is always 0)
-        // We check if this Timeline Time exists in any window.
-        return this.mapTimelineToOutputTime(sourceTimeMs);
-    }
-
-    /**
      * Maps an Output Time back to Source Time.
-     * Returns -1 if mapped time is invalid.
+     * Since Timeline Time = Output Time = Source Time, this is an identity function
+     * that validates the time is within bounds.
      */
     mapOutputToSourceTime(outputTimeMs: number): number {
-        const timelineTime = this.mapOutputToTimelineTime(outputTimeMs);
-        if (timelineTime === -1) return -1;
-
-        // Timeline Time = Source Time (offset is 0)
-        return timelineTime;
+        // Validate the time is within the output duration
+        const totalDuration = this.getOutputDuration();
+        if (outputTimeMs < 0 || outputTimeMs > totalDuration) return -1;
+        return outputTimeMs;
     }
 
     /**
@@ -89,15 +61,14 @@ export class TimeMapper {
      * The end time is clamped to the end of the window where the start time is found.
      */
     mapSourceRangeToOutputRange(sourceStartMs: number, sourceEndMs: number | undefined): { start: number, end: number } | null {
-        // Timeline Time = Source Time
-        const timelineTime = sourceStartMs;
+        // Source Time = Output Time (since offset is always 0)
         let acc = 0;
         let startWin: OutputWindow | null = null;
         let startWinAcc = 0;
 
         // Find start window
         for (const w of this.windows) {
-            if (timelineTime >= w.startMs && timelineTime < w.endMs) {
+            if (sourceStartMs >= w.startMs && sourceStartMs < w.endMs) {
                 startWin = w;
                 startWinAcc = acc;
                 break;
@@ -107,14 +78,13 @@ export class TimeMapper {
 
         if (!startWin) return null; // Start is not visible
 
-        const mappedTime = startWinAcc + (timelineTime - startWin.startMs);
+        const mappedTime = startWinAcc + (sourceStartMs - startWin.startMs);
         let mappedEndTime = mappedTime;
 
         if (sourceEndMs !== undefined) {
-            const timelineEnd = sourceEndMs;
             // Clamp end time to the end of the current window to ensure validity
             // This handles cases where typing extends into a cut/trim.
-            const relevantEnd = Math.min(timelineEnd, startWin.endMs);
+            const relevantEnd = Math.min(sourceEndMs, startWin.endMs);
             mappedEndTime = startWinAcc + (relevantEnd - startWin.startMs);
         }
 

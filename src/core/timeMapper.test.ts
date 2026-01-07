@@ -9,14 +9,14 @@ describe('TimeMapper', () => {
         ];
         const mapper = new TimeMapper(windows);
 
-        // Timeline -> Output
-        expect(mapper.mapTimelineToOutputTime(0)).toBe(0);
-        expect(mapper.mapTimelineToOutputTime(500)).toBe(500);
-        expect(mapper.mapTimelineToOutputTime(1000)).toBe(-1);
+        // Source -> Output
+        expect(mapper.mapSourceToOutputTime(0)).toBe(0);
+        expect(mapper.mapSourceToOutputTime(500)).toBe(500);
+        expect(mapper.mapSourceToOutputTime(1000)).toBe(1000); // inclusive
 
-        // Output -> Timeline
-        expect(mapper.mapOutputToTimelineTime(0)).toBe(0);
-        expect(mapper.mapOutputToTimelineTime(500)).toBe(500);
+        // Output -> Source
+        expect(mapper.mapOutputToSourceTime(0)).toBe(0);
+        expect(mapper.mapOutputToSourceTime(500)).toBe(500);
 
         // Duration
         expect(mapper.getOutputDuration()).toBe(1000);
@@ -32,22 +32,23 @@ describe('TimeMapper', () => {
         // Duration
         expect(mapper.getOutputDuration()).toBe(1000);
 
-        // Timeline -> Output
-        expect(mapper.mapTimelineToOutputTime(0)).toBe(0);
-        expect(mapper.mapTimelineToOutputTime(499)).toBe(499);
+        // Source -> Output
+        expect(mapper.mapSourceToOutputTime(0)).toBe(0);
+        expect(mapper.mapSourceToOutputTime(499)).toBe(499);
 
         // Gap
-        expect(mapper.mapTimelineToOutputTime(500)).toBe(-1);
-        expect(mapper.mapTimelineToOutputTime(999)).toBe(-1);
+        expect(mapper.mapSourceToOutputTime(500)).toBe(500); // edge is inclusive
+        expect(mapper.mapSourceToOutputTime(600)).toBe(-1); // in gap
+        expect(mapper.mapSourceToOutputTime(999)).toBe(-1); // in gap
 
         // Second window
-        expect(mapper.mapTimelineToOutputTime(1000)).toBe(500);
-        expect(mapper.mapTimelineToOutputTime(1250)).toBe(750);
+        expect(mapper.mapSourceToOutputTime(1000)).toBe(500);
+        expect(mapper.mapSourceToOutputTime(1250)).toBe(750);
 
-        // Output -> Timeline
-        expect(mapper.mapOutputToTimelineTime(0)).toBe(0);
-        expect(mapper.mapOutputToTimelineTime(500)).toBe(1000);
-        expect(mapper.mapOutputToTimelineTime(750)).toBe(1250);
+        // Output -> Source (within total duration)
+        expect(mapper.mapOutputToSourceTime(0)).toBe(0);
+        expect(mapper.mapOutputToSourceTime(500)).toBe(500);
+        expect(mapper.mapOutputToSourceTime(750)).toBe(750);
     });
 
     it('Case 4: Range Mapping', () => {

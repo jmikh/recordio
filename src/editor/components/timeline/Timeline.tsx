@@ -104,7 +104,6 @@ export function Timeline() {
     } = useTimelineInteraction({
         containerRef,
         totalOutputDuration,
-        timeMapper,
         timelineOffsetLeft: 0,
     });
 
@@ -153,7 +152,7 @@ export function Timeline() {
                 onScaleChange={handleScaleChange}
                 onScaleInteractionStart={batcher.startInteraction}
                 onScaleInteractionEnd={batcher.endInteraction}
-                currentTimeMs={timeMapper.mapTimelineToOutputTime(currentTimeMs)}
+                currentTimeMs={currentTimeMs}
                 totalDurationMs={totalOutputDuration}
                 currentResolution={projectSettings.outputSize}
                 onResolutionChange={handleResolutionChange}
@@ -284,7 +283,6 @@ export function Timeline() {
                                 <TimelinePlayhead
                                     containerRef={containerRef}
                                     pixelsPerSec={pixelsPerSec}
-                                    timeMapper={timeMapper}
                                 />
                             </div>
                         </div>
