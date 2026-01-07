@@ -31,9 +31,8 @@ export interface UIState {
     setSettingsPanel: (panel: SettingsPanel) => void;
 
     // Timeline State
-    timelineOffset: number;
+    // Timeline State
     pixelsPerSec: number;
-    setTimelineOffset: (offset: number) => void;
     setPixelsPerSec: (pps: number) => void;
 
     // Playback State
@@ -88,7 +87,7 @@ export const useUIStore = create<UIState>((set) => ({
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
 
     // Timeline State
-    timelineOffset: 0,
+    // Timeline State
     pixelsPerSec: 100, // Default zoom level
 
     // Playback State
@@ -96,7 +95,6 @@ export const useUIStore = create<UIState>((set) => ({
     currentTimeMs: 0,
     previewTimeMs: null,
 
-    setTimelineOffset: (timelineOffset) => set({ timelineOffset }),
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
     setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -108,7 +106,6 @@ export const useUIStore = create<UIState>((set) => ({
         selectedZoomId: null,
         selectedWindowId: null,
         selectedSettingsPanel: SettingsPanel.Project,
-        timelineOffset: 0,
         pixelsPerSec: 100,
         isPlaying: false,
         currentTimeMs: 0,

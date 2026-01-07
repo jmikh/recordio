@@ -212,7 +212,7 @@ export class ExportManager {
 
                     const startTime = window.startMs / 1000;
                     const duration = (window.endMs - window.startMs) / 1000;
-                    const offset = (window.startMs - renderProject.timeline.recording.timelineOffsetMs) / 1000;
+                    const offset = (window.startMs) / 1000;
 
                     if (offset >= 0 && offset < audioBuffer.duration) {
                         sourceNode.start(startTime, offset, duration);
@@ -255,7 +255,7 @@ export class ExportManager {
 
                 // Seek Videos (Wait for seek completion)
                 // We need to map Output Time -> Source Time
-                const sourceTimeMs = currentTimeMs - renderProject.timeline.recording.timelineOffsetMs;
+                const sourceTimeMs = currentTimeMs;
                 await Promise.all(Object.values(videoElements).map(async (v) => {
                     v.currentTime = sourceTimeMs / 1000;
                     // Wait for 'seeked' event? 

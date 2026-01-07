@@ -29,14 +29,14 @@ export const ZoomSettings = () => {
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                     <label className="text-xs uppercase font-bold text-gray-500">Transition Duration</label>
-                    <span className="text-xs font-mono text-blue-400">{zoomSettings.defaultDurationMs}ms</span>
+                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoomDurationMs}ms</span>
                 </div>
                 <Slider
                     min={250}
                     max={1500}
                     step={50}
-                    value={zoomSettings.defaultDurationMs}
-                    onChange={(val) => batchAction(() => updateSettings({ zoom: { ...zoomSettings, defaultDurationMs: val } }))}
+                    value={zoomSettings.maxZoomDurationMs}
+                    onChange={(val) => batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoomDurationMs: val } }))}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />

@@ -7,8 +7,7 @@ describe('TimeMapper', () => {
         const windows: OutputWindow[] = [
             { id: '1', startMs: 0, endMs: 1000 }
         ];
-        const timelineOffset = 0;
-        const mapper = new TimeMapper(timelineOffset, windows);
+        const mapper = new TimeMapper(windows);
 
         // Timeline -> Output
         expect(mapper.mapTimelineToOutputTime(0)).toBe(0);
@@ -28,7 +27,7 @@ describe('TimeMapper', () => {
             { id: '1', startMs: 0, endMs: 500 },
             { id: '2', startMs: 1000, endMs: 1500 }
         ];
-        const mapper = new TimeMapper(0, windows);
+        const mapper = new TimeMapper(windows);
 
         // Duration
         expect(mapper.getOutputDuration()).toBe(1000);
@@ -51,27 +50,12 @@ describe('TimeMapper', () => {
         expect(mapper.mapOutputToTimelineTime(750)).toBe(1250);
     });
 
-    it('Case 3: Timeline Offset', () => {
-        const windows: OutputWindow[] = [
-            { id: '1', startMs: 0, endMs: 1000 }
-        ];
-        const timelineOffset = -2000;
-        const mapper = new TimeMapper(timelineOffset, windows);
-
-        // Source -> Output
-        expect(mapper.mapSourceToOutputTime(2000)).toBe(0);
-        expect(mapper.mapSourceToOutputTime(2500)).toBe(500);
-
-        // Output -> Source
-        expect(mapper.mapOutputToSourceTime(500)).toBe(2500);
-    });
-
     it('Case 4: Range Mapping', () => {
         const windows: OutputWindow[] = [
             { id: '1', startMs: 0, endMs: 500 },
             { id: '2', startMs: 1000, endMs: 2000 }
         ];
-        const mapper = new TimeMapper(0, windows);
+        const mapper = new TimeMapper(windows);
 
         // Sub-case A: Fully inside window
         const r1 = mapper.mapSourceRangeToOutputRange(100, 400);

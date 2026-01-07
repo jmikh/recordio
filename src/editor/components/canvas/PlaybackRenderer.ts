@@ -38,7 +38,8 @@ export class PlaybackRenderer {
         const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs <= w.endMs);
 
         // 2. Calculate Times
-        const sourceTimeMs = currentTimeMs - recording.timelineOffsetMs;
+        // 2. Calculate Times
+        const sourceTimeMs = currentTimeMs;
 
         // 3. Resolve Items
         const screenSource = sources[recording.screenSourceId];
@@ -50,7 +51,7 @@ export class PlaybackRenderer {
         let effectiveViewport: Rect;
 
         if (activeWindow) {
-            const timeMapper = new TimeMapper(recording.timelineOffsetMs, outputWindows);
+            const timeMapper = new TimeMapper(outputWindows);
             const outputTimeMs = timeMapper.mapTimelineToOutputTime(currentTimeMs);
             const viewportMotions = recording.viewportMotions || [];
 

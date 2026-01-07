@@ -88,7 +88,8 @@ export interface BackgroundSettings {
 export interface ZoomSettings {
     maxZoom: number;
     autoZoom: boolean;
-    defaultDurationMs: number;
+    maxZoomDurationMs: number;
+    minZoomDurationMs: number;
 }
 
 export interface ProjectSettings {
@@ -196,9 +197,6 @@ export interface OutputWindow {
  * Represents the recording session data.
  */
 export interface Recording {
-    /** Time from the beginning of the timeline at which video starts (defaults to 0) */
-    timelineOffsetMs: TimeMs;
-
     screenSourceId: ID;
     cameraSourceId?: ID;
 

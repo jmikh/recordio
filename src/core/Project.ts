@@ -22,7 +22,8 @@ export class ProjectImpl {
                 zoom: {
                     maxZoom: 2,
                     autoZoom: true,
-                    defaultDurationMs: 600
+                    maxZoomDurationMs: 600,
+                    minZoomDurationMs: 300
                 },
 
                 screen: {
@@ -68,7 +69,6 @@ export class ProjectImpl {
                 // For now, let's assume a project must have a recording eventually.
                 // We'll init with empty values that need to be populated.
                 recording: {
-                    timelineOffsetMs: 0,
                     screenSourceId: '',
                     viewportMotions: []
                 },
@@ -116,18 +116,17 @@ export class ProjectImpl {
             project.settings.screen.padding
         );
 
-        const timeMapper = new TimeMapper(0, outputWindows);
+        const timeMapper = new TimeMapper(outputWindows);
 
         const viewportMotions = calculateZoomSchedule(
             project.settings.zoom.maxZoom,
-            project.settings.zoom.defaultDurationMs,
+            project.settings.zoom.maxZoomDurationMs,
             viewMapper,
             screenEvents,
             timeMapper
         );
 
         const recording: Recording = {
-            timelineOffsetMs: 0,
             screenSourceId: screenSource.id,
             cameraSourceId: cameraSource?.id,
             viewportMotions: viewportMotions

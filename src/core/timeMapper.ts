@@ -1,11 +1,9 @@
 import type { OutputWindow } from './types';
 
 export class TimeMapper {
-    private readonly timelineOffsetMs: number;
     private readonly windows: OutputWindow[];
 
-    constructor(timelineOffsetMs: number, windows: OutputWindow[]) {
-        this.timelineOffsetMs = timelineOffsetMs;
+    constructor(windows: OutputWindow[]) {
         this.windows = windows;
     }
 
@@ -60,11 +58,9 @@ export class TimeMapper {
      * or not at all if trimmed. This function returns the FIRST occurrence or -1.
      */
     mapSourceToOutputTime(sourceTimeMs: number): number {
-        // Source Time + Offset = Timeline Time (Un-trimmed)
+        // Source Time = Timeline Time (Since offset is always 0)
         // We check if this Timeline Time exists in any window.
-
-        const timelineTime = sourceTimeMs + this.timelineOffsetMs;
-        return this.mapTimelineToOutputTime(timelineTime);
+        return this.mapTimelineToOutputTime(sourceTimeMs);
     }
 
     /**
@@ -74,7 +70,9 @@ export class TimeMapper {
     mapOutputToSourceTime(outputTimeMs: number): number {
         const timelineTime = this.mapOutputToTimelineTime(outputTimeMs);
         if (timelineTime === -1) return -1;
-        return timelineTime - this.timelineOffsetMs;
+
+        // Timeline Time = Source Time (offset is 0)
+        return timelineTime;
     }
 
     /**
@@ -91,7 +89,8 @@ export class TimeMapper {
      * The end time is clamped to the end of the window where the start time is found.
      */
     mapSourceRangeToOutputRange(sourceStartMs: number, sourceEndMs: number | undefined): { start: number, end: number } | null {
-        const timelineTime = sourceStartMs + this.timelineOffsetMs;
+        // Timeline Time = Source Time
+        const timelineTime = sourceStartMs;
         let acc = 0;
         let startWin: OutputWindow | null = null;
         let startWinAcc = 0;
@@ -112,7 +111,7 @@ export class TimeMapper {
         let mappedEndTime = mappedTime;
 
         if (sourceEndMs !== undefined) {
-            const timelineEnd = sourceEndMs + this.timelineOffsetMs;
+            const timelineEnd = sourceEndMs;
             // Clamp end time to the end of the current window to ensure validity
             // This handles cases where typing extends into a cut/trim.
             const relevantEnd = Math.min(timelineEnd, startWin.endMs);

@@ -20,16 +20,13 @@ interface DragState {
 }
 
 interface HoverInfo {
-    timeMs: number; // Mouse time
     x: number;
-    sourceStartTime: number;
     sourceEndTime: number;
+    durationMs: number;
     width: number;
-    isValid: boolean;
 }
 
 export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
-    const timelineOffset = useUIStore(s => s.timelineOffset);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
@@ -47,8 +44,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     // Memoize TimeMapper for consistent usage
     const timeMapper = useMemo(() => {
-        return new TimeMapper(timelineOffset, timeline.outputWindows);
-    }, [timelineOffset, timeline.outputWindows]);
+        return new TimeMapper(timeline.outputWindows);
+    }, [timeline.outputWindows]);
 
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const [dragState, setDragState] = useState<DragState | null>(null);
@@ -109,30 +106,31 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             }
         }
 
-        const defaultDur = project.settings.zoom.defaultDurationMs;
+        const defaultDur = project.settings.zoom.maxZoomDurationMs;
         const availableDuration = mouseSourceTimeMs - prevEnd;
 
         // Clamp duration
-        const actualDuration = Math.min(defaultDur, availableDuration);
+        let actualDuration = Math.min(defaultDur, availableDuration);
+        let sourceEndTime = mouseSourceTimeMs;
 
-        if (actualDuration < 50) {
-            setHoverInfo(null);
-            return;
+        if (actualDuration < project.settings.zoom.minZoomDurationMs) {
+            actualDuration = project.settings.zoom.minZoomDurationMs;
+            sourceEndTime = prevEnd + actualDuration;
         }
-
-        const sourceEndTime = mouseSourceTimeMs;
-        const sourceStartTime = sourceEndTime - actualDuration;
 
         // Calculate visual width mapping back to Output
         const width = (actualDuration / 1000) * pixelsPerSec;
 
+        // Recalculate X based on the constrained sourceEndTime to ensure visual consistency
+        // This prevents the ghost block from visually intersecting previous blocks when clamped
+        const constrainedOutputTimeMs = timeMapper.mapSourceToOutputTime(sourceEndTime);
+        const constrainedX = (constrainedOutputTimeMs / 1000) * pixelsPerSec;
+
         setHoverInfo({
-            timeMs: outputTimeMs,
-            x, // X is relative to track content start
-            sourceStartTime,
+            x: constrainedX,
+            durationMs: actualDuration,
             sourceEndTime,
             width,
-            isValid: true
         });
     };
 
@@ -149,13 +147,13 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             return;
         }
 
-        if (!hoverInfo || !hoverInfo.isValid) return;
+        if (!hoverInfo) return;
 
         // Create Motion
         const newMotion: ViewportMotion = {
             id: crypto.randomUUID(),
             sourceEndTimeMs: hoverInfo.sourceEndTime,
-            durationMs: hoverInfo.sourceEndTime - hoverInfo.sourceStartTime,
+            durationMs: hoverInfo.durationMs,
             reason: 'Manual Zoom',
             rect: { ...project.settings.outputSize, x: 0, y: 0 }
         };
@@ -297,7 +295,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 })}
 
                 {/* Add Zoom Indicator */}
-                {hoverInfo && !editingZoomId && !dragState && hoverInfo.isValid && (
+                {hoverInfo && !editingZoomId && !dragState && (
                     <div
                         className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-yellow-500/50 bg-yellow-500/10 rounded-sm flex items-center justify-center"
                         style={{

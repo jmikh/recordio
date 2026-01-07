@@ -46,7 +46,7 @@ const recalculateOutputTimeEvents = (
 
 export function calculateZoomSchedule(
     maxZoom: number,
-    defaultDurationMs: number,
+    maxZoomDurationMs: number,
     viewMapper: ViewMapper,
     events: UserEvents,
     timeMapper: TimeMapper
@@ -180,7 +180,7 @@ export function calculateZoomSchedule(
                 motions.push({
                     id: crypto.randomUUID(),
                     sourceEndTimeMs: sourceEndTime,
-                    durationMs: defaultDurationMs,
+                    durationMs: maxZoomDurationMs,
                     rect: targetViewport,
                     reason: evt.type
                 });
@@ -190,7 +190,7 @@ export function calculateZoomSchedule(
     };
 
 
-    const ZOOM_TRANSITION_DURATION = defaultDurationMs;
+    const ZOOM_TRANSITION_DURATION = maxZoomDurationMs;
     const IGNORE_EVENTS_BUFFER = 3000;
     const totalOutputDuration = timeMapper.getOutputDuration();
     const zoomOutStartTime = Math.max(0, totalOutputDuration - IGNORE_EVENTS_BUFFER);

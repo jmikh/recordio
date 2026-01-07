@@ -126,7 +126,6 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
         if (motion) {
             const timeMapper = new TimeMapper(
-                project.timeline.recording.timelineOffsetMs,
                 project.timeline.outputWindows
             );
 

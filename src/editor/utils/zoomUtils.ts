@@ -28,11 +28,11 @@ export const recalculateAutoZooms = (
             project.settings.screen.crop
         );
 
-        const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
+        const timeMapper = new TimeMapper(project.timeline.outputWindows);
 
         return calculateZoomSchedule(
             project.settings.zoom.maxZoom,
-            project.settings.zoom.defaultDurationMs,
+            project.settings.zoom.maxZoomDurationMs,
             viewMapper,
             events,
             timeMapper
@@ -41,7 +41,7 @@ export const recalculateAutoZooms = (
 
     // 2. If Auto Zoom is OFF, cleanup invalid/gap zooms
     // We filter out any zooms whose "target time" (sourceEndTimeMs) falls into a gap in the (new) windows.
-    const timeMapper = new TimeMapper(project.timeline.recording.timelineOffsetMs, project.timeline.outputWindows);
+    const timeMapper = new TimeMapper(project.timeline.outputWindows);
     const currentMotions = project.timeline.recording.viewportMotions || [];
 
     return currentMotions.filter(m => {

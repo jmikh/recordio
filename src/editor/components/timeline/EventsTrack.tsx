@@ -16,11 +16,10 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
     timeMapper,
     trackHeight
 }) => {
-    const timelineOffset = useUIStore(s => s.timelineOffset);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     // Shared helper for mapping time
     const mapToLeft = (timeMs: number) => {
-        const outputTime = timeMapper.mapTimelineToOutputTime(timeMs + timelineOffset);
+        const outputTime = timeMapper.mapTimelineToOutputTime(timeMs);
         if (outputTime === -1) return null;
         return (outputTime / 1000) * pixelsPerSec;
     };
@@ -54,11 +53,11 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
 
                 {/* Drags */}
                 {events.drags?.map((d, i) => {
-                    const startMs = d.timestamp + timelineOffset;
+                    const startMs = d.timestamp;
                     const endMs = (d.endTime !== undefined)
-                        ? d.endTime + timelineOffset
+                        ? d.endTime
                         : (d.path && d.path.length > 0)
-                            ? d.path[d.path.length - 1].timestamp + timelineOffset
+                            ? d.path[d.path.length - 1].timestamp
                             : startMs + 500;
 
                     const outputStart = timeMapper.mapTimelineToOutputTime(startMs);

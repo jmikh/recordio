@@ -105,7 +105,7 @@ export const CanvasContainer = () => {
                 }
 
                 // 3. SYNC VIDEO
-                const sourceTimeMs = effectiveTimeMs - project.timeline.recording.timelineOffsetMs;
+                const sourceTimeMs = effectiveTimeMs;
                 const isPlaying = uiState.isPlaying && !isBlockingEdit;
 
                 Object.values(sources).forEach(source => {

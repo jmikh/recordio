@@ -50,9 +50,7 @@ export function Timeline() {
 
     // Timeline State - Sync with UI Store
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
-    const timelineOffset = useUIStore(s => s.timelineOffset);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
-    const setTimelineOffset = useUIStore(s => s.setTimelineOffset);
     const batcher = useHistoryBatcher();
 
     // Sync initial Pps if needed, but primarily we rely on store default.
@@ -66,12 +64,6 @@ export function Timeline() {
     // We can remove this effect entirely if there's no other source.
     // However, let's keep it safe: if project has no persistence, we just rely on store defaults.
     // Effect removed.
-
-    // Sync from Recording -> UI Store
-    useEffect(() => {
-        const offset = timeline.recording.timelineOffsetMs || 0;
-        setTimelineOffset(offset);
-    }, [timeline.recording.timelineOffsetMs, setTimelineOffset]);
 
     const handleScaleChange = (newScale: number) => {
         // Update store only
@@ -95,8 +87,8 @@ export function Timeline() {
 
     // Memoize TimeMapper
     const timeMapper = useMemo(() => {
-        return new TimeMapper(timelineOffset, timeline.outputWindows);
-    }, [timelineOffset, timeline.outputWindows]);
+        return new TimeMapper(timeline.outputWindows);
+    }, [timeline.outputWindows]);
 
     // Total Duration is now the OUTPUT duration (sum of windows)
     const totalOutputDuration = timeMapper.getOutputDuration();
