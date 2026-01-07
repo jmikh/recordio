@@ -106,9 +106,6 @@ export interface ProjectSettings {
 
     // Camera
     camera?: CameraSettings;
-
-    // Timeline Visualization
-    timelinePixelsPerSecond: number;
 }
 
 // ==========================================

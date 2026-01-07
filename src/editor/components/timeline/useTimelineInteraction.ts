@@ -2,25 +2,23 @@ import { useState, useCallback } from 'react';
 import type { RefObject } from 'react';
 import { TimeMapper } from '../../../core/timeMapper';
 import { usePlaybackStore } from '../../stores/usePlaybackStore';
-import { CanvasMode } from '../../stores/useUIStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 interface UseTimelineInteractionProps {
     containerRef: RefObject<HTMLDivElement | null>;
-    pixelsPerSec: number;
     totalOutputDuration: number;
     timeMapper: TimeMapper;
-    canvasMode: CanvasMode;
     timelineOffsetLeft?: number;
 }
 
 export function useTimelineInteraction({
     containerRef,
-    pixelsPerSec,
     totalOutputDuration,
     timeMapper,
-    canvasMode,
     timelineOffsetLeft,
 }: UseTimelineInteractionProps) {
+    const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
+    const canvasMode = useUIStore(s => s.canvasMode);
     const isPlaying = usePlaybackStore(s => s.isPlaying);
     const setCurrentTime = usePlaybackStore(s => s.setCurrentTime);
     const setPreviewTime = usePlaybackStore(s => s.setPreviewTime);

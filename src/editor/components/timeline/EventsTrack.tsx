@@ -3,21 +3,21 @@ import type { UserEvents } from '../../../core/types';
 import { TimeMapper } from '../../../core/timeMapper';
 
 
+import { useUIStore } from '../../stores/useUIStore';
+
 interface EventsTrackProps {
     events: UserEvents;
-    pixelsPerSec: number;
-    timelineOffset: number;
     timeMapper: TimeMapper;
     trackHeight: number;
 }
 
 export const EventsTrack: React.FC<EventsTrackProps> = ({
     events,
-    pixelsPerSec,
-    timelineOffset,
     timeMapper,
     trackHeight
 }) => {
+    const timelineOffset = useUIStore(s => s.timelineOffset);
+    const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     // Shared helper for mapping time
     const mapToLeft = (timeMs: number) => {
         const outputTime = timeMapper.mapTimelineToOutputTime(timeMs + timelineOffset);

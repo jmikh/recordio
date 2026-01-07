@@ -7,9 +7,7 @@ import type { ViewportMotion } from '../../../core/types';
 
 
 interface ZoomTrackProps {
-    pixelsPerSec: number;
     height: number;
-    timelineOffset: number;
 }
 
 interface DragState {
@@ -30,7 +28,9 @@ interface HoverInfo {
     isValid: boolean;
 }
 
-export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, timelineOffset }) => {
+export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
+    const timelineOffset = useUIStore(s => s.timelineOffset);
+    const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
@@ -57,6 +57,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
     // MOUSE HANDLERS (HOVER & CLICK-TO-ADD)
     // ------------------------------------------------------------------
 
+    /**
+     * Handles hover interactions for 'Add Zoom' ghost block.
+     * DISABLED while dragging to prevent interference/ghost blocks appearing during drag.
+     */
     const handleMouseMove = (e: React.MouseEvent) => {
         if (dragState) return;
 
@@ -183,6 +187,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ pixelsPerSec, height, time
         setEditingZoom(motion.id);
     };
 
+    /**
+     * Handles the actual dragging logic (Move).
+     * Attached to window to track mouse movements outside the track area.
+     */
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         if (!dragState) return;
 

@@ -38,7 +38,7 @@ export function Timeline() {
     const timeline = useProjectTimeline();
     const splitWindow = useProjectStore(s => s.splitWindow);
     const userEvents = useProjectStore(s => s.userEvents);
-    const canvasMode = useUIStore(s => s.canvasMode);
+    // const canvasMode = useUIStore(s => s.canvasMode); // Unused
     const projectSettings = useProjectStore(s => s.project.settings);
     const updateSettings = useProjectStore(s => s.updateSettings);
 
@@ -49,12 +49,34 @@ export function Timeline() {
     // We only need currentTimeMs for the Toolbar
     const currentTimeMs = usePlaybackStore(s => s.currentTimeMs);
 
-    // Zoom Level (Timeline Scale)
-    const pixelsPerSec = projectSettings.timelinePixelsPerSecond || 100; // Fallback for old projects
+    // Timeline State - Sync with UI Store
+    const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
+    const timelineOffset = useUIStore(s => s.timelineOffset);
+    const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
+    const setTimelineOffset = useUIStore(s => s.setTimelineOffset);
     const batcher = useHistoryBatcher();
 
+    // Sync initial Pps if needed, but primarily we rely on store default.
+    // If we want to persist per-session, we might need a separate mechanism, 
+    // but user requested "always use the one from UI store".
+    // So we just set it once on mount if we want a default other than 100?
+    // Actually, UI Store has default 100.
+    // If we want to support "default zoom" from project settings (generic), 
+    // we could keep a generic 'defaultZoom'? but user said "remove it".
+    // So we just rely on UI Store default (100).
+    // We can remove this effect entirely if there's no other source.
+    // However, let's keep it safe: if project has no persistence, we just rely on store defaults.
+    // Effect removed.
+
+    // Sync from Recording -> UI Store
+    useEffect(() => {
+        const offset = timeline.recording.timelineOffsetMs || 0;
+        setTimelineOffset(offset);
+    }, [timeline.recording.timelineOffsetMs, setTimelineOffset]);
+
     const handleScaleChange = (newScale: number) => {
-        batcher.batchAction(() => updateSettings({ timelinePixelsPerSecond: newScale }));
+        // Update store only
+        setPixelsPerSec(newScale);
     };
 
     // We need to inject batcher start/end into the toolbar if it supports it, 
@@ -68,8 +90,8 @@ export function Timeline() {
     // I will pass `batcher` related functions to the toolbar.
 
     // -- Derived Data --
-    const recording = timeline.recording;
-    const timelineOffset = recording.timelineOffsetMs;
+    // const recording = timeline.recording; // Unused
+    // const timelineOffset = recording.timelineOffsetMs; // Now from store
     const mainTrackHeight = (timeline.recording.cameraSourceId ? TRACK_HEIGHT * 2 : TRACK_HEIGHT) + GROUP_HEADER_HEIGHT;
 
     // Memoize TimeMapper
@@ -90,10 +112,8 @@ export function Timeline() {
         handleMouseUp
     } = useTimelineInteraction({
         containerRef,
-        pixelsPerSec,
         totalOutputDuration,
         timeMapper,
-        canvasMode,
         timelineOffsetLeft: 0,
     });
 
@@ -250,16 +270,12 @@ export function Timeline() {
 
                                     {/* Zoom Track */}
                                     <ZoomTrack
-                                        pixelsPerSec={pixelsPerSec}
                                         height={TRACK_HEIGHT}
-                                        timelineOffset={timelineOffset}
                                     />
 
                                     {/* Events Track */}
                                     <EventsTrack
                                         events={userEvents}
-                                        pixelsPerSec={pixelsPerSec}
-                                        timelineOffset={timelineOffset}
                                         timeMapper={timeMapper}
                                         trackHeight={TRACK_HEIGHT}
                                     />

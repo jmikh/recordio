@@ -30,6 +30,12 @@ export interface UIState {
     selectZoom: (id: ID | null) => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
+    // Timeline State
+    timelineOffset: number;
+    pixelsPerSec: number;
+    setTimelineOffset: (offset: number) => void;
+    setPixelsPerSec: (pps: number) => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -72,10 +78,19 @@ export const useUIStore = create<UIState>((set) => ({
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
 
+    // Timeline State
+    timelineOffset: 0,
+    pixelsPerSec: 100, // Default zoom level
+
+    setTimelineOffset: (timelineOffset) => set({ timelineOffset }),
+    setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
+
     reset: () => set({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
         selectedWindowId: null,
-        selectedSettingsPanel: SettingsPanel.Project
+        selectedSettingsPanel: SettingsPanel.Project,
+        timelineOffset: 0,
+        pixelsPerSec: 100
     })
 }));
