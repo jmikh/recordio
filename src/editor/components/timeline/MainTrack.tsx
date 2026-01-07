@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { OutputWindow, Timeline as TimelineType } from '../../../core/types';
 import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../hooks/useAudioAnalysis';
 import { WaveformSegment } from './WaveformSegment';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useUIStore } from '../../stores/useUIStore';
+import { TimeMapper } from '../../../core/timeMapper';
+import { TimePixelMapper } from '../../utils/timePixelMapper';
 
 export const GROUP_HEADER_HEIGHT = 24;
 
@@ -39,6 +41,12 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const [dragState, setDragState] = useState<DragState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    // Create TimePixelMapper for coordinate conversions
+    const coords = useMemo(() => {
+        const timeMapper = new TimeMapper(timeline.outputWindows);
+        return new TimePixelMapper(timeMapper, pixelsPerSec);
+    }, [timeline.outputWindows, pixelsPerSec]);
+
     // Deselect window when clicking outside this track component
     // This allows clicking on Headers or Rulers to deselect the window, 
     // while clicking inside the track (handled by onClick below) also deselects if not on a window.
@@ -62,7 +70,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
         const handleGlobalMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - dragState.startX;
-            const deltaMs = (deltaX / pixelsPerSec) * 1000;
+            const deltaMs = coords.xToMs(deltaX);
             const win = dragState.initialWindow;
             const { minStart, maxEnd } = dragState.constraints;
 
@@ -100,7 +108,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [dragState, pixelsPerSec, updateOutputWindow]);
+    }, [dragState, coords, updateOutputWindow]);
 
     const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right') => {
         e.preventDefault();
@@ -145,7 +153,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     const isSelected = selectedWindowId === w.id;
                     const durationMs = win.endMs - win.startMs;
                     const left = currentX;
-                    const width = (durationMs / 1000) * pixelsPerSec;
+                    const width = coords.msToX(durationMs);
                     currentX += width; // Accumulate for next window
 
                     const hasCamera = !!timeline.recording.cameraSourceId;

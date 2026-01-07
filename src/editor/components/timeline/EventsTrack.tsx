@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { UserEvents } from '../../../core/types';
 import { TimeMapper } from '../../../core/timeMapper';
-
+import { TimePixelMapper } from '../../utils/timePixelMapper';
 
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -17,12 +17,10 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
     trackHeight
 }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
-    // Shared helper for mapping time
-    const mapToLeft = (timeMs: number) => {
-        const outputTime = timeMapper.mapSourceToOutputTime(timeMs);
-        if (outputTime === -1) return null;
-        return (outputTime / 1000) * pixelsPerSec;
-    };
+
+    const coords = useMemo(() => {
+        return new TimePixelMapper(timeMapper, pixelsPerSec);
+    }, [timeMapper, pixelsPerSec]);
 
     const formatFullTime = (ms: number) => {
         const s = Math.floor(ms / 1000);
@@ -38,8 +36,8 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
             <div className="relative flex-1" style={{ height: trackHeight }}>
                 {/* Clicks */}
                 {events.mouseClicks?.map((c, i) => {
-                    const left = mapToLeft(c.timestamp);
-                    if (left === null) return null;
+                    const left = coords.sourceTimeToX(c.timestamp);
+                    if (left === -1) return null;
 
                     return (
                         <div
@@ -67,12 +65,12 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
 
                     let width = 0;
                     if (outputEnd !== -1) {
-                        width = ((outputEnd - outputStart) / 1000) * pixelsPerSec;
+                        width = coords.msToX(outputEnd - outputStart);
                     } else {
-                        width = (0.5) * pixelsPerSec; // fallback width
+                        width = coords.msToX(500); // fallback width
                     }
 
-                    const left = (outputStart / 1000) * pixelsPerSec;
+                    const left = coords.msToX(outputStart);
 
                     return (
                         <div
@@ -85,8 +83,8 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
 
                 {/* Keyboard Events */}
                 {events.keyboardEvents?.map((k, i) => {
-                    const left = mapToLeft(k.timestamp);
-                    if (left === null) return null;
+                    const left = coords.sourceTimeToX(k.timestamp);
+                    if (left === -1) return null;
 
                     return (
                         <div

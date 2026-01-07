@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { TimeMapper } from '../../../core/timeMapper';
+import { TimePixelMapper } from '../../utils/timePixelMapper';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import type { ViewportMotion } from '../../../core/types';
 
@@ -42,10 +43,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const project = useProjectStore(s => s.project);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    // Memoize TimeMapper for consistent usage
+    // Memoize TimeMapper and TimePixelMapper for consistent usage
     const timeMapper = useMemo(() => {
         return new TimeMapper(timeline.outputWindows);
     }, [timeline.outputWindows]);
+
+    const coords = useMemo(() => {
+        return new TimePixelMapper(timeMapper, pixelsPerSec);
+    }, [timeMapper, pixelsPerSec]);
 
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const [dragState, setDragState] = useState<DragState | null>(null);
@@ -62,18 +67,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         if (dragState) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
-        // Since we are handling mouse on the wrapper (including header), 
-        const rawX = e.clientX - rect.left;
-        const x = rawX;
+        const x = e.clientX - rect.left;
 
-        // Output Time (Continuous)
-        const outputTimeMs = (x / pixelsPerSec) * 1000;
-
-        // Map Output -> Source
-        // If we are in a gap or after end, mapOutputToSourceTime returns -1?
-        // Actually mapOutputToSourceTime handles 0..Total mapped.
-        // If x is past end, outputTimeMs > total. map returns -1.
-        let mouseSourceTimeMs = timeMapper.mapOutputToSourceTime(outputTimeMs);
+        // Convert x to source time (chains through TimeMapper)
+        let mouseSourceTimeMs = coords.xToSourceTime(x);
 
         if (mouseSourceTimeMs === -1) {
             setHoverInfo(null);
@@ -118,13 +115,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             sourceEndTime = prevEnd + actualDuration;
         }
 
-        // Calculate visual width mapping back to Output
-        const width = (actualDuration / 1000) * pixelsPerSec;
-
-        // Recalculate X based on the constrained sourceEndTime to ensure visual consistency
-        // This prevents the ghost block from visually intersecting previous blocks when clamped
-        const constrainedOutputTimeMs = timeMapper.mapSourceToOutputTime(sourceEndTime);
-        const constrainedX = (constrainedOutputTimeMs / 1000) * pixelsPerSec;
+        // Calculate visual width and position
+        const width = coords.msToX(actualDuration);
+        const constrainedX = coords.sourceTimeToX(sourceEndTime);
 
         setHoverInfo({
             x: constrainedX,
@@ -171,9 +164,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const handleDragStart = (e: React.MouseEvent, type: 'move', motion: ViewportMotion) => {
         e.stopPropagation();
 
-        const outputEndTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
-        if (outputEndTime === -1) return; // Should be impossible if clicked
+        const outputEndTimeX = coords.sourceTimeToX(motion.sourceEndTimeMs);
+        if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
+        const outputEndTime = coords.xToMs(outputEndTimeX);
         setDragState({
             type,
             motionId: motion.id,
@@ -193,7 +187,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         if (!dragState) return;
 
         const deltaX = e.clientX - dragState.startX;
-        const deltaTimeMs = (deltaX / pixelsPerSec) * 1000;
+        const deltaTimeMs = coords.xToMs(deltaX);
 
         const { initialOutputTime } = dragState;
 
@@ -208,7 +202,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 }));
             }
         }
-    }, [dragState, pixelsPerSec, updateViewportMotion, timeMapper, batchAction]);
+    }, [dragState, coords, updateViewportMotion, timeMapper, batchAction]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
@@ -248,13 +242,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             <div className="relative flex-1" style={{ height }}>
                 {/* Existing Motions */}
                 {timeline.recording.viewportMotions?.map((m) => {
-                    const outputEndTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-                    if (outputEndTime === -1) return null;
+                    const endX = coords.sourceTimeToX(m.sourceEndTimeMs);
+                    if (endX === -1) return null;
 
-                    let outputStartTime = outputEndTime - m.durationMs;
-
-                    const left = (outputStartTime / 1000) * pixelsPerSec;
-                    const width = ((outputEndTime - outputStartTime) / 1000) * pixelsPerSec;
+                    const width = coords.msToX(m.durationMs);
+                    const left = endX - width;
 
                     if (width <= 0) return null;
 
