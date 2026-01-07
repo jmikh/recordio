@@ -27,6 +27,49 @@ interface HoverInfo {
     width: number;
 }
 
+/**
+ * Calculate boundary constraints for a zoom block.
+ * Returns the end of the previous block (or 0) and the start of the next block (or timelineEnd).
+ * 
+ * This scans all other blocks to find the closest ones in either direction.
+ */
+function getZoomBlockBounds(
+    targetMotionId: string | null,
+    motions: ViewportMotion[],
+    timelineEnd: number
+): { prevEnd: number; nextStart: number } {
+    // Find the current block position to determine what's "before" and "after"
+    const currentMotion = targetMotionId
+        ? motions.find(m => m.id === targetMotionId)
+        : null;
+
+    // If no current motion, default to finding closest to start
+    const referenceEnd = currentMotion?.sourceEndTimeMs ?? 0;
+    const referenceStart = currentMotion
+        ? currentMotion.sourceEndTimeMs - currentMotion.durationMs
+        : 0;
+
+    let prevEnd = 0;
+    let nextStart = timelineEnd;
+
+    for (const m of motions) {
+        if (m.id === targetMotionId) continue;
+        const mEnd = m.sourceEndTimeMs;
+        const mStart = m.sourceEndTimeMs - m.durationMs;
+
+        // A block is "previous" if it's entirely before our current start
+        if (mEnd <= referenceStart && mEnd > prevEnd) {
+            prevEnd = mEnd;
+        }
+        // A block is "next" if it starts at or after our current end
+        if (mStart >= referenceEnd && mStart < nextStart) {
+            nextStart = mStart;
+        }
+    }
+
+    return { prevEnd, nextStart };
+}
+
 export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
@@ -182,6 +225,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     /**
      * Handles the actual dragging logic (Move).
      * Attached to window to track mouse movements outside the track area.
+     * Prevents overlap with adjacent blocks and dynamically adjusts duration.
      */
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         if (!dragState) return;
@@ -189,20 +233,31 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const { initialOutputTime } = dragState;
+        const motions = timeline.recording.viewportMotions || [];
+        let targetSourceEnd = dragState.initialSourceEndTime + deltaTimeMs;
 
-        // Apply Logic
-        if (dragState.type === 'move') {
-            const newOutputTime = initialOutputTime + deltaTimeMs;
-            const newSourceEndTime = timeMapper.mapOutputToSourceTime(newOutputTime);
+        // Get boundaries (excluding self)
+        const { prevEnd, nextStart } = getZoomBlockBounds(
+            dragState.motionId, motions, timeline.durationMs
+        );
 
-            if (newSourceEndTime !== -1) {
-                batchAction(() => updateViewportMotion(dragState.motionId, {
-                    sourceEndTimeMs: newSourceEndTime
-                }));
-            }
-        }
-    }, [dragState, coords, updateViewportMotion, timeMapper, batchAction]);
+        const { minZoomDurationMs, maxZoomDurationMs } = project.settings.zoom;
+
+        // Clamp sourceEndTime to boundaries
+        // Left: must leave room for at least minZoomDurationMs
+        targetSourceEnd = Math.max(targetSourceEnd, prevEnd + minZoomDurationMs);
+        // Right: cannot exceed next block start or timeline end
+        targetSourceEnd = Math.min(targetSourceEnd, nextStart, timeline.durationMs);
+
+        // Calculate duration based on available space
+        const availableSpace = targetSourceEnd - prevEnd;
+        const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
+
+        batchAction(() => updateViewportMotion(dragState.motionId, {
+            sourceEndTimeMs: targetSourceEnd,
+            durationMs: targetDuration
+        }));
+    }, [dragState, coords, updateViewportMotion, timeline, project.settings.zoom, batchAction]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {

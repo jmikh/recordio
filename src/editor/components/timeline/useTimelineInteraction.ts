@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { RefObject } from 'react';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { TimeMapper } from '../../../core/timeMapper';
 
 interface UseTimelineInteractionProps {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -18,10 +20,31 @@ export function useTimelineInteraction({
     const isPlaying = useUIStore(s => s.isPlaying);
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setPreviewTime = useUIStore(s => s.setPreviewTime);
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
+
+    const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
+    const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions);
+
+    const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [isCTIScrubbing, setIsCTIScrubbing] = useState(false);
+
+    // When a zoom is selected, set currentTime to its end output time and clear hover/preview
+    useEffect(() => {
+        if (selectedZoomId) {
+            const motion = viewportMotions?.find(m => m.id === selectedZoomId);
+            if (motion) {
+                const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
+                if (outputTime !== -1) {
+                    setCurrentTime(outputTime);
+                }
+            }
+            setPreviewTime(null);
+            setHoverTime(null);
+        }
+    }, [selectedZoomId, viewportMotions, timeMapper, setCurrentTime, setPreviewTime]);
 
     const getTimeFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!containerRef.current) return { outputTime: 0 };
@@ -42,13 +65,18 @@ export function useTimelineInteraction({
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const { outputTime } = getTimeFromEvent(e);
 
-        // Hover uses Output Time
-        setHoverTime(outputTime);
-
         const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
+
+        // Hover uses Output Time - but hide during blocking edits
+        if (isBlockingEdit) {
+            setHoverTime(null);
+        } else {
+            setHoverTime(outputTime);
+        }
 
         if (isCTIScrubbing) {
             setCurrentTime(outputTime);
+            setPreviewTime(null);
         } else if (!isPlaying && !isBlockingEdit) {
             setPreviewTime(outputTime);
         } else {

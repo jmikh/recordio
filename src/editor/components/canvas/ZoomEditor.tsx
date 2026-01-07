@@ -164,26 +164,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     };
 
     const containerRef = useRef<HTMLDivElement>(null);
-    // Local state to track rect *during* drag before committing ??
-    // Actually, with batchAction, we can commit live?
-    // But the BoundingBox calls onCommit on every drag frame?
-    // Yes, BoundingBox usually calls onChange while dragging and onCommit on end.
-    // If it calls onCommit on end, we don't need batchAction?
-    // Wait, typical BoundingBox behavior:
-    // "onChange" -> internal state update, visual update.
-    // "onCommit" -> final update (mouse up).
 
-    // If BoundingBox only calls onCommit on MouseUp, then we don't strictly need batcher?
-    // BUT the user asked for "pause temporal after first update".
-    // This implies we ARE updating the store *during* the drag (live updates).
-    // So "onChange" should probably call "onCommit" (updateStore)?
-
-    // Let's assume BoundingBox's onChange is for live updates.
-    // If we want the store to have live updates (so the renderer draws it), we must update the store in onChange.
-
-    // Refactor:
-    // handleRectChange (onChange) -> batchAction(updateStore)
-    // onCommit -> endInteraction()
 
     const [currentRect, setCurrentRect] = React.useState<Rect>(initialRect || { x: 0, y: 0, width: 0, height: 0 });
 
@@ -268,32 +249,6 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         const newRect = { ...initialRect, x: newX, y: newY };
         handleRectChange(newRect); // This now triggers batchAction update
     };
-
-
-
-
-    if (!initialRect || !editingZoomId) return null;
-
-    // ... Bounding Box Props ...
-    // onChange -> handleRectChange (Live updates via batcher)
-    // onCommit -> (Currently does nothing special, maybe final sync?)
-    // onDragStart -> startInteraction
-    // onDragEnd -> endInteraction
-
-    // Check if BoundingBox supports onDragStart/End.
-    // If NOT, I might need to verify file content again. I viewed it previously.
-    // It has `onChange` and `onCommit`. usually onCommit is end of drag.
-    // So onDragStart is missing?
-
-    // I entered this assuming BoundingBox needs modification or I wrap it.
-    // Let's assume onCommit is "End of Drag".
-    // But "Start of Drag" is implicit in first interaction logic of batcher?
-    // NO, batcher requires `startInteraction()` to be called explicitly to reset the latch!
-
-    // I will wrap BoundingBox in a div that captures pointer down? No, BoundingBox handles dragging.
-    // I should check BoundingBox.tsx to see if I can add onInteractionStart/End props or if I need to rely on onCommit for End.
-
-    // For now, I'll assume I can pass `onPointerDownCapture={startInteraction}` to the bounding box container?
 
 
     if (!initialRect || !editingZoomId) return null;
