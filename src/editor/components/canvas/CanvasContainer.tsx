@@ -44,6 +44,7 @@ export const CanvasContainer = () => {
     // Loop State
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
+    const frameCountRef = useRef<number>(0);
 
     // -----------------------------------------------------------
     // RENDER LOOP
@@ -52,12 +53,25 @@ export const CanvasContainer = () => {
         let lastFpsTime = 0;
 
         const tick = (time: number) => {
+            const startTime = performance.now();
             const uiState = useUIStore.getState();
             const { project, sources, userEvents } = useProjectStore.getState();
             const { canvasMode, selectedZoomId: activeZoomId } = uiState;
 
             // FPS Logging (Optional)
-            if (time - lastFpsTime >= 1000) lastFpsTime = time;
+            if (time - lastFpsTime >= 1000) {
+                // Calculate FPS
+                const elapsedSeconds = (time - lastFpsTime) / 1000;
+                const fps = Math.round(frameCountRef.current / elapsedSeconds);
+
+                // Update Store
+                useUIStore.getState().setFps(fps);
+
+                // Reset
+                lastFpsTime = time;
+                frameCountRef.current = 0;
+            }
+            frameCountRef.current++;
 
             if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -146,6 +160,12 @@ export const CanvasContainer = () => {
                         overrideCameraSettings: previewCameraSettingsRef.current || undefined
                     });
                 }
+            }
+
+            // Frame Time Logging
+            const frameDuration = performance.now() - startTime;
+            if (frameCountRef.current % 10 === 0) { // Throttle updates
+                useUIStore.getState().setFrameTime(frameDuration);
             }
 
             animationFrameRef.current = requestAnimationFrame(tick);

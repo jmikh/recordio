@@ -40,6 +40,12 @@ export interface UIState {
     currentTimeMs: TimeMs;
     previewTimeMs: TimeMs | null;
 
+    // Performance Monitoring
+    fps: number;
+    frameTime: number;
+    setFps: (fps: number) => void;
+    setFrameTime: (ms: number) => void;
+
     setIsPlaying: (playing: boolean) => void;
     setCurrentTime: (timeMs: TimeMs) => void;
     setPreviewTime: (timeMs: TimeMs | null) => void;
@@ -96,6 +102,12 @@ export const useUIStore = create<UIState>((set) => ({
     currentTimeMs: 0,
     previewTimeMs: null,
 
+    // Performance Monitoring
+    fps: 0,
+    frameTime: 0,
+    setFps: (fps) => set({ fps }),
+    setFrameTime: (frameTime) => set({ frameTime }),
+
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
     setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null }),
@@ -111,5 +123,7 @@ export const useUIStore = create<UIState>((set) => ({
         isPlaying: false,
         currentTimeMs: 0,
         previewTimeMs: null,
+        fps: 0,
+        frameTime: 0,
     })
 }));

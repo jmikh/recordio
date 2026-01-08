@@ -198,7 +198,8 @@ export function calculateZoomSchedule(
                                 sourceEndTimeMs: sourceEndTime,
                                 durationMs: availableGap,
                                 rect: targetViewport,
-                                reason: evt.type
+                                reason: evt.type,
+                                type: 'auto'
                             });
                             lastViewport = targetViewport;
                             lastMustSeeRect = mustSeeRect;
@@ -226,7 +227,8 @@ export function calculateZoomSchedule(
                             sourceEndTimeMs: sourceEndTime,
                             durationMs: maxZoomDurationMs,
                             rect: targetViewport,
-                            reason: evt.type
+                            reason: evt.type,
+                            type: 'auto'
                         });
                         lastViewport = targetViewport;
                         lastMustSeeRect = mustSeeRect;
@@ -238,7 +240,8 @@ export function calculateZoomSchedule(
                         sourceEndTimeMs: sourceEndTime,
                         durationMs: maxZoomDurationMs,
                         rect: targetViewport,
-                        reason: evt.type
+                        reason: evt.type,
+                        type: 'auto'
                     });
                     lastViewport = targetViewport;
                     lastMustSeeRect = mustSeeRect;
@@ -326,7 +329,8 @@ export function calculateZoomSchedule(
                 sourceEndTimeMs: sourceEndTime,
                 durationMs: ZOOM_TRANSITION_DURATION,
                 rect: { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height },
-                reason: 'end_zoomout'
+                reason: 'end_zoomout',
+                type: 'auto'
             });
         }
     }

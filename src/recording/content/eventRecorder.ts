@@ -100,6 +100,9 @@ export class EventRecorder {
     private mousePollInterval: any = null;
     private typingPollInterval: any = null;
 
+    private readonly SCROLL_THROTTLE_MS = 500;
+    private lastScrollEventEmitted = 0;
+
     constructor(startTime: number) {
         this.startTime = startTime;
         this.start();
@@ -328,6 +331,10 @@ export class EventRecorder {
         // Simple throttle logic could be added here if needed, but we rely on browser event scheduling + explicit checks
         const now = this.getRelativeTime();
 
+        if (now - this.lastScrollEventEmitted < this.SCROLL_THROTTLE_MS) {
+            return;
+        }
+
         let targetRect: Rect;
         if (e.target instanceof Element) {
             const rect = e.target.getBoundingClientRect();
@@ -342,6 +349,8 @@ export class EventRecorder {
             mousePos: this.lastMousePos.mousePos,
             targetRect: this.dprScaleRect(targetRect)
         });
+
+        this.lastScrollEventEmitted = now;
     }
 
     private handleUrlChange = () => {

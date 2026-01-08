@@ -196,7 +196,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             sourceEndTimeMs: hoverInfo.sourceEndTime,
             durationMs: hoverInfo.durationMs,
             reason: 'Manual Zoom',
-            rect: { ...project.settings.outputSize, x: 0, y: 0 }
+            rect: { ...project.settings.outputSize, x: 0, y: 0 },
+            type: 'manual'
         };
 
         addViewportMotion(newMotion);
@@ -260,7 +261,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
         batchAction(() => updateViewportMotion(dragState.motionId, {
             sourceEndTimeMs: timeMapper.mapOutputToSourceTime(targetOutputEndTime),
-            durationMs: targetDuration
+            durationMs: targetDuration,
+            type: 'manual'
         }));
     }, [dragState, coords, updateViewportMotion, timeline, project.settings.zoom, batchAction]);
 
@@ -338,9 +340,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             />
 
                             {/* Label (Optional) */}
-                            {width > 40 && (
+                            {width > 20 && (
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] text-purple-200/70 pointer-events-none truncate max-w-full">
-                                    {parseFloat((project.settings.outputSize.width / m.rect.width).toFixed(1))}x
+                                    {width > 45 ? m.type : (m.type === 'auto' ? 'A' : 'M')}
                                 </div>
                             )}
                         </div>

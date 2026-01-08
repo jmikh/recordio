@@ -147,7 +147,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         if (!editingZoomId) return;
 
         batchAction(() => {
-            updateViewportMotion(editingZoomId, { rect });
+            updateViewportMotion(editingZoomId, { rect, type: 'manual' });
         });
     };
 

@@ -215,6 +215,7 @@ export interface ViewportMotion {
     durationMs: TimeMs;
     rect: Rect;
     reason: string;
+    type: 'auto' | 'manual';
 }
 
 /**

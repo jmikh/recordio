@@ -146,6 +146,9 @@ function Editor() {
         };
     }
 
+    const fps = useUIStore(s => s.fps);
+    const frameTime = useUIStore(s => s.frameTime);
+
     if (error) {
         return <ProjectSelector error={error} />;
     }
@@ -245,6 +248,21 @@ function Editor() {
                     >
                         Log UI
                     </button>
+                    {/* FPS Counter */}
+                    <div className="ml-auto flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-gray-600">FPS</span>
+                        <span className={`text-xs font-mono font-bold ${fps < 55 ? 'text-red-400' : 'text-green-400'}`}>
+                            {fps}
+                        </span>
+                    </div>
+
+                    {/* Frame Time */}
+                    <div className="flex items-center gap-2 border-l border-[#333] pl-2">
+                        <span className="text-[10px] uppercase font-bold text-gray-600">FT</span>
+                        <span className={`text-xs font-mono font-bold ${frameTime > 16.6 ? 'text-red-400' : 'text-green-400'}`}>
+                            {frameTime.toFixed(1)}ms
+                        </span>
+                    </div>
                 </div>
             </div>
 
