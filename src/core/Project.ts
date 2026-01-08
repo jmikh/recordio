@@ -119,8 +119,7 @@ export class ProjectImpl {
         const timeMapper = new TimeMapper(outputWindows);
 
         const viewportMotions = calculateZoomSchedule(
-            project.settings.zoom.maxZoom,
-            project.settings.zoom.maxZoomDurationMs,
+            project.settings.zoom,
             viewMapper,
             screenEvents,
             timeMapper

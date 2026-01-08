@@ -37,14 +37,34 @@ export class TimeMapper {
 
     /**
      * Maps an Output Time back to Source Time.
-     * Since Timeline Time = Output Time = Source Time, this is an identity function
-     * that validates the time is within bounds.
+     * Walks through windows to find which window contains the output time,
+     * then calculates the corresponding source time.
      */
     mapOutputToSourceTime(outputTimeMs: number): number {
-        // Validate the time is within the output duration
-        const totalDuration = this.getOutputDuration();
-        if (outputTimeMs < 0 || outputTimeMs > totalDuration) return -1;
-        return outputTimeMs;
+        if (outputTimeMs < 0) return -1;
+
+        let outputTimeAccumulator = 0;
+
+        for (const win of this.windows) {
+            const windowDuration = win.endMs - win.startMs;
+            const windowOutputEnd = outputTimeAccumulator + windowDuration;
+
+            if (outputTimeMs < windowOutputEnd) {
+                // Output time falls within this window
+                const offsetWithinWindow = outputTimeMs - outputTimeAccumulator;
+                return win.startMs + offsetWithinWindow;
+            }
+
+            outputTimeAccumulator = windowOutputEnd;
+        }
+
+        // Handle exact end of last window (inclusive end)
+        if (outputTimeMs === outputTimeAccumulator && this.windows.length > 0) {
+            const lastWindow = this.windows[this.windows.length - 1];
+            return lastWindow.endMs;
+        }
+
+        return -1; // Past end of all windows
     }
 
     /**
@@ -61,7 +81,6 @@ export class TimeMapper {
      * The end time is clamped to the end of the window where the start time is found.
      */
     mapSourceRangeToOutputRange(sourceStartMs: number, sourceEndMs: number | undefined): { start: number, end: number } | null {
-        // Source Time = Output Time (since offset is always 0)
         let acc = 0;
         let startWin: OutputWindow | null = null;
         let startWinAcc = 0;

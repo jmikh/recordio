@@ -1,4 +1,4 @@
-import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType } from './types';
+import { type UserEvents, type ViewportMotion, type Size, type Rect, EventType, type ZoomSettings } from './types';
 import { ViewMapper } from './viewMapper';
 import { TimeMapper } from './timeMapper';
 
@@ -45,12 +45,12 @@ const recalculateOutputTimeEvents = (
 };
 
 export function calculateZoomSchedule(
-    maxZoom: number,
-    maxZoomDurationMs: number,
+    zoomSettings: ZoomSettings,
     viewMapper: ViewMapper,
     events: UserEvents,
     timeMapper: TimeMapper
 ): ViewportMotion[] {
+    const { maxZoom, maxZoomDurationMs, minZoomDurationMs } = zoomSettings;
     console.log('[ZoomDebug] calculateZoomSchedule2');
 
     // 1. Map all events to Output Time
@@ -152,6 +152,7 @@ export function calculateZoomSchedule(
     const motions: ViewportMotion[] = [];
     const outputVideoSize = viewMapper.outputVideoSize;
     let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
+    let lastMustSeeRect: Rect = lastViewport;
 
     const processEvent = (evt: any, isHover: boolean) => {
         const mustSeeRect = getMustSeeRect(evt, maxZoom, viewMapper);
@@ -177,14 +178,71 @@ export function calculateZoomSchedule(
         if (shouldGenerateMotion) {
             const sourceEndTime = timeMapper.mapOutputToSourceTime(evt.timestamp);
             if (sourceEndTime !== -1) {
-                motions.push({
-                    id: crypto.randomUUID(),
-                    sourceEndTimeMs: sourceEndTime,
-                    durationMs: maxZoomDurationMs,
-                    rect: targetViewport,
-                    reason: evt.type
-                });
-                lastViewport = targetViewport;
+                const currentStartOutputTime = evt.timestamp - maxZoomDurationMs;
+
+                // Check for intersection with previous motion
+                if (motions.length > 0) {
+                    const prevMotion = motions[motions.length - 1];
+                    const prevEndOutputTime = timeMapper.mapSourceToOutputTime(prevMotion.sourceEndTimeMs);
+
+                    if (currentStartOutputTime < prevEndOutputTime) {
+                        console.log("Intersection detected");
+                        // Intersection detected - try shrinking duration
+                        const availableGap = evt.timestamp - prevEndOutputTime;
+
+                        if (availableGap >= minZoomDurationMs) {
+                            console.log("Shrinking duration to fit in the gap");
+                            // Shrink duration to fit in the gap
+                            motions.push({
+                                id: crypto.randomUUID(),
+                                sourceEndTimeMs: sourceEndTime,
+                                durationMs: availableGap,
+                                rect: targetViewport,
+                                reason: evt.type
+                            });
+                            lastViewport = targetViewport;
+                            lastMustSeeRect = mustSeeRect;
+                        } else {
+                            console.log("Not enough gap even with min duration - merge zooms");
+                            // Not enough gap even with min duration - merge zooms
+                            // Create bounding rect for both must-see rects
+                            const boundingRect: Rect = {
+                                x: Math.min(lastMustSeeRect.x, mustSeeRect.x),
+                                y: Math.min(lastMustSeeRect.y, mustSeeRect.y),
+                                width: Math.max(lastMustSeeRect.x + lastMustSeeRect.width, mustSeeRect.x + mustSeeRect.width) - Math.min(lastMustSeeRect.x, mustSeeRect.x),
+                                height: Math.max(lastMustSeeRect.y + lastMustSeeRect.height, mustSeeRect.y + mustSeeRect.height) - Math.min(lastMustSeeRect.y, mustSeeRect.y)
+                            };
+
+                            // Get merged viewport and update previous motion
+                            const mergedViewport = getViewport(boundingRect, maxZoom, viewMapper);
+                            prevMotion.rect = mergedViewport;
+                            lastViewport = mergedViewport;
+                            lastMustSeeRect = boundingRect;
+                        }
+                    } else {
+                        // No intersection - add normally
+                        motions.push({
+                            id: crypto.randomUUID(),
+                            sourceEndTimeMs: sourceEndTime,
+                            durationMs: maxZoomDurationMs,
+                            rect: targetViewport,
+                            reason: evt.type
+                        });
+                        lastViewport = targetViewport;
+                        lastMustSeeRect = mustSeeRect;
+                    }
+                } else {
+                    // First motion - add normally
+                    motions.push({
+                        id: crypto.randomUUID(),
+                        sourceEndTimeMs: sourceEndTime,
+                        durationMs: maxZoomDurationMs,
+                        rect: targetViewport,
+                        reason: evt.type
+                    });
+                    lastViewport = targetViewport;
+                    lastMustSeeRect = mustSeeRect;
+                }
             }
         }
     };

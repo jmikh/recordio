@@ -7,3 +7,4 @@ trigger: always_on
 - Never open chrome yourself, I will validate all UI fixes
 - If a component is context aware and has only one instance let it jsut use zustand local store directory
 - Never worry about backward compatability
+- Source Time means the time in video (no gaps), output time is actual time in output after applying windows to source video. we use timeMapper to translate between both

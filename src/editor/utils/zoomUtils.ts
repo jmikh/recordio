@@ -31,8 +31,7 @@ export const recalculateAutoZooms = (
         const timeMapper = new TimeMapper(project.timeline.outputWindows);
 
         return calculateZoomSchedule(
-            project.settings.zoom.maxZoom,
-            project.settings.zoom.maxZoomDurationMs,
+            project.settings.zoom,
             viewMapper,
             events,
             timeMapper

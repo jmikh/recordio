@@ -95,6 +95,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeMapper, pixelsPerSec]);
 
+    // Derive output duration from output windows
+    const outputDuration = useMemo(() => {
+        return timeMapper.getOutputDuration();
+    }, [timeMapper]);
+
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const [dragState, setDragState] = useState<DragState | null>(null);
 
@@ -237,8 +242,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         let targetSourceEnd = dragState.initialSourceEndTime + deltaTimeMs;
 
         // Get boundaries (excluding self)
+        // Use output duration as the boundary for zoom blocks
         const { prevEnd, nextStart } = getZoomBlockBounds(
-            dragState.motionId, motions, timeline.durationMs
+            dragState.motionId, motions, outputDuration
         );
 
         const { minZoomDurationMs, maxZoomDurationMs } = project.settings.zoom;
@@ -246,8 +252,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         // Clamp sourceEndTime to boundaries
         // Left: must leave room for at least minZoomDurationMs
         targetSourceEnd = Math.max(targetSourceEnd, prevEnd + minZoomDurationMs);
-        // Right: cannot exceed next block start or timeline end
-        targetSourceEnd = Math.min(targetSourceEnd, nextStart, timeline.durationMs);
+        // Right: cannot exceed next block start or output duration
+        targetSourceEnd = Math.min(targetSourceEnd, nextStart, outputDuration);
 
         // Calculate duration based on available space
         const availableSpace = targetSourceEnd - prevEnd;
@@ -323,6 +329,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             onMouseDown={(e) => handleDragStart(e, 'move', m)}
                             onClick={(e) => {
                                 e.stopPropagation();
+                                console.log('viewportMotion', m);
                                 setEditingZoom(m.id);
                             }}
                         >

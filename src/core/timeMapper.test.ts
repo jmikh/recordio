@@ -46,9 +46,11 @@ describe('TimeMapper', () => {
         expect(mapper.mapSourceToOutputTime(1250)).toBe(750);
 
         // Output -> Source (within total duration)
+        // Output 0-500 maps to source 0-500 (first window)
+        // Output 500-1000 maps to source 1000-1500 (second window)
         expect(mapper.mapOutputToSourceTime(0)).toBe(0);
-        expect(mapper.mapOutputToSourceTime(500)).toBe(500);
-        expect(mapper.mapOutputToSourceTime(750)).toBe(750);
+        expect(mapper.mapOutputToSourceTime(500)).toBe(1000); // start of second window
+        expect(mapper.mapOutputToSourceTime(750)).toBe(1250); // 250ms into second window
     });
 
     it('Case 4: Range Mapping', () => {

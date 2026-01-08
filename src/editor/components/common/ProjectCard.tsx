@@ -75,7 +75,8 @@ export const ProjectCard = ({
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
                     {(() => {
-                        const ms = project.timeline?.durationMs || 0;
+                        const windows = project.timeline?.outputWindows || [];
+                        const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
                         const seconds = Math.floor(ms / 1000);
                         const m = Math.floor(seconds / 60);
                         const s = seconds % 60;
