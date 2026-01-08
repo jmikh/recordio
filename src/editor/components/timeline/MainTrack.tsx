@@ -35,7 +35,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     pixelsPerSec,
     trackHeight,
 }) => {
-    console.log('MainTrack rerender');
+    //console.log('MainTrack rerender');
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const selectWindow = useUIStore(s => s.selectWindow);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);

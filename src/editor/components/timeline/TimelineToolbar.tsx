@@ -14,7 +14,7 @@ const MAX_PIXELS_PER_SEC = 200;
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
 }) => {
-    console.log('[Rerender] TimelineToolbar');
+    //console.log('[Rerender] TimelineToolbar');
     // Stores
     const timeline = useProjectTimeline();
     const splitWindow = useProjectStore(s => s.splitWindow);

@@ -14,7 +14,7 @@ import { getDeviceFrame } from '../../../core/deviceFrames';
 import type { CameraSettings, Rect } from '../../../core/types';
 
 export const CanvasContainer = () => {
-    console.log('[Rerender] CanvasContainer');
+     //console.log('[Rerender] CanvasContainer');
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);

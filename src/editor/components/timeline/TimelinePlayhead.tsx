@@ -10,7 +10,7 @@ export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
     containerRef,
     pixelsPerSec,
 }) => {
-    console.log('[Rerender] TimelinePlayhead');
+    //console.log('[Rerender] TimelinePlayhead');
     const playheadRef = React.useRef<HTMLDivElement>(null);
     // const isPlaying = useUIStore(s => s.isPlaying); // Removed unused
 
