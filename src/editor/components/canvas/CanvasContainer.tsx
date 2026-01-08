@@ -150,7 +150,7 @@ export const CanvasContainer = () => {
                         overrideCameraSettings: previewCameraSettingsRef.current || undefined
                     });
                 }
-            }
+            };
         };
 
         animationFrameRef.current = requestAnimationFrame(tick);
@@ -273,9 +273,11 @@ export const CanvasContainer = () => {
 const syncVideo = (video: HTMLVideoElement, desiredTimeS: number, isPlaying: boolean) => {
     if (isPlaying) {
         if (video.paused) video.play().catch(() => { });
-        if (Math.abs(video.currentTime - desiredTimeS) > 0.2) video.currentTime = desiredTimeS;
+        if (Math.abs(video.currentTime - desiredTimeS) > 0.4) {
+            video.currentTime = desiredTimeS;
+        }
     } else {
         if (!video.paused) video.pause();
-        if (Math.abs(video.currentTime - desiredTimeS) > 0.001) video.currentTime = desiredTimeS;
+        if (Math.abs(video.currentTime - desiredTimeS) > 0.2) video.currentTime = desiredTimeS;
     }
 };
