@@ -76,9 +76,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const cameraAudio = useAudioAnalysis(cameraSourceId || '', cameraSource?.url || '');
 
     // --- Dragging Logic ---
-
-    // Note: Live updates via store (HistoryBatcher) mean we don't need local window state for rendering
-    // But we keep dragState to track the *interaction* metadata (start position, initial constraints).
+    // Uses HistoryBatcher to provide live store updates during drag interactions (batches hundreds of updates into one history step).
 
     useEffect(() => {
         if (!dragState) return;
@@ -102,7 +100,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             }
 
             // Live Update to Store (Batched)
-            // Only update if changed
+            // Batch continuous updates (e.g. 60fps drag) into a single undoable history action.
             if (newWindow.startMs !== dragState.currentWindow.startMs || newWindow.endMs !== dragState.currentWindow.endMs) {
                 batchAction(() => {
                     updateOutputWindow(dragState.windowId, newWindow);
@@ -110,31 +108,15 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 setDragState(prev => prev ? { ...prev, currentWindow: newWindow } : null);
 
                 // Update Playhead Position & Reset Preview
+                // Sync the main playhead to the edge being dragged for precise editing feedback.
                 setPreviewTime(null);
 
-                // Note: dragState.outputStartMs corresponds to the output start of the window 
-                // BEFORE the drag began (if left handle moves, visual left edge stays put in current ripple implementation)
-                // However, if we drag left handle right (trim head), the clip shortens.
-                // The visual left might stay at 'outputStartMs' but the content shifts.
-                // Re-verification: MainTrack uses `currentX += width`.
-                // If I trim the head, duration decreases. 'width' decreases.
-                // If I am observing this window, its left edge is determined by previous windows.
-                // Previous windows did NOT change. So 'outputStartMs' is the Output Start of THIS window.
-
                 if (dragState.type === 'left') {
-                    // Left Side Drag:
-                    // User wants "outputime corresponding to left side of window + 1ms"
-                    // The left side of the window (in output time) is `dragState.outputStartMs`.
-                    // Wait, if I trim the head, the clip now starts deeper in the source.
-                    // But on the timeline, it starts at `outputStartMs`.
-                    // So we want to see the frame at `outputStartMs + 1ms`?
-                    // Yes, because that's the new "first frame" of the clip on the timeline.
+                    // Left Edge Drag: Sync Playhead to the new start of the clip + 1ms (first visible frame)
                     setCurrentTime(dragState.outputStartMs + 1);
 
                 } else if (dragState.type === 'right') {
-                    // Right Side Drag:
-                    // User wants "right side of window - 1ms"
-                    // Right Side Output Time = Output Start + Duration
+                    // Right Edge Drag: Sync Playhead to the new end of the clip - 1ms (last visible frame)
                     const newDuration = newWindow.endMs - newWindow.startMs;
                     const rightSideOutputTime = dragState.outputStartMs + newDuration;
                     setCurrentTime(rightSideOutputTime - 1);
