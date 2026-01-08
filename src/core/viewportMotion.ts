@@ -196,6 +196,7 @@ export function calculateZoomSchedule(
                             motions.push({
                                 id: crypto.randomUUID(),
                                 sourceEndTimeMs: sourceEndTime,
+                                outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                                 durationMs: availableGap,
                                 rect: targetViewport,
                                 reason: evt.type,
@@ -225,6 +226,7 @@ export function calculateZoomSchedule(
                         motions.push({
                             id: crypto.randomUUID(),
                             sourceEndTimeMs: sourceEndTime,
+                            outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                             durationMs: maxZoomDurationMs,
                             rect: targetViewport,
                             reason: evt.type,
@@ -238,6 +240,7 @@ export function calculateZoomSchedule(
                     motions.push({
                         id: crypto.randomUUID(),
                         sourceEndTimeMs: sourceEndTime,
+                        outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                         durationMs: maxZoomDurationMs,
                         rect: targetViewport,
                         reason: evt.type,
@@ -327,6 +330,7 @@ export function calculateZoomSchedule(
             motions.push({
                 id: crypto.randomUUID(),
                 sourceEndTimeMs: sourceEndTime,
+                outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                 durationMs: ZOOM_TRANSITION_DURATION,
                 rect: { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height },
                 reason: 'end_zoomout',

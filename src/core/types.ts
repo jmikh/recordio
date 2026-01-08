@@ -212,6 +212,8 @@ export interface ViewportMotion {
     id: ID;
     /** End time in SOURCE time. */
     sourceEndTimeMs: TimeMs;
+    /** End time in OUTPUT time. (Cached for performance/usage) */
+    outputEndTimeMs: TimeMs;
     durationMs: TimeMs;
     rect: Rect;
     reason: string;

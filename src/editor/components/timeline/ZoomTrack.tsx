@@ -194,6 +194,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const newMotion: ViewportMotion = {
             id: crypto.randomUUID(),
             sourceEndTimeMs: hoverInfo.sourceEndTime,
+            outputEndTimeMs: timeMapper.mapSourceToOutputTime(hoverInfo.sourceEndTime),
             durationMs: hoverInfo.durationMs,
             reason: 'Manual Zoom',
             rect: { ...project.settings.outputSize, x: 0, y: 0 },
@@ -261,6 +262,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
         batchAction(() => updateViewportMotion(dragState.motionId, {
             sourceEndTimeMs: timeMapper.mapOutputToSourceTime(targetOutputEndTime),
+            outputEndTimeMs: targetOutputEndTime,
             durationMs: targetDuration,
             type: 'manual'
         }));
