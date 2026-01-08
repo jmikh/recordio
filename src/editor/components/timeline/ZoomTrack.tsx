@@ -15,7 +15,7 @@ interface DragState {
     type: 'move';
     motionId: string;
     startX: number;
-    initialOutputTime: number; // Anchor in Output Time
+    initialOutputEndTime: number; // Anchor in Output Time
     initialSourceEndTime: number;
     // Constraints can stay relative or simplified
 }
@@ -215,12 +215,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const outputEndTimeX = coords.sourceTimeToX(motion.sourceEndTimeMs);
         if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
-        const outputEndTime = coords.xToMs(outputEndTimeX);
         setDragState({
             type,
             motionId: motion.id,
             startX: e.clientX,
-            initialOutputTime: outputEndTime,
+            initialOutputEndTime: timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs),
             initialSourceEndTime: motion.sourceEndTimeMs
         });
         startInteraction();
@@ -239,7 +238,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const deltaTimeMs = coords.xToMs(deltaX);
 
         const motions = timeline.recording.viewportMotions || [];
-        let targetSourceEnd = dragState.initialSourceEndTime + deltaTimeMs;
+        let targetOutputEndTime = dragState.initialOutputEndTime + deltaTimeMs;
 
         // Get boundaries (excluding self)
         // Use output duration as the boundary for zoom blocks
@@ -251,16 +250,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
         // Clamp sourceEndTime to boundaries
         // Left: must leave room for at least minZoomDurationMs
-        targetSourceEnd = Math.max(targetSourceEnd, prevEnd + minZoomDurationMs);
+        targetOutputEndTime = Math.max(targetOutputEndTime, timeMapper.mapSourceToOutputTime(prevEnd) + minZoomDurationMs);
         // Right: cannot exceed next block start or output duration
-        targetSourceEnd = Math.min(targetSourceEnd, nextStart, outputDuration);
+        targetOutputEndTime = Math.min(targetOutputEndTime, timeMapper.mapSourceToOutputTime(nextStart), outputDuration);
 
         // Calculate duration based on available space
-        const availableSpace = targetSourceEnd - prevEnd;
+        const availableSpace = targetOutputEndTime - prevEnd;
         const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
 
         batchAction(() => updateViewportMotion(dragState.motionId, {
-            sourceEndTimeMs: targetSourceEnd,
+            sourceEndTimeMs: timeMapper.mapOutputToSourceTime(targetOutputEndTime),
             durationMs: targetDuration
         }));
     }, [dragState, coords, updateViewportMotion, timeline, project.settings.zoom, batchAction]);
