@@ -19,6 +19,7 @@ const WaveformSegmentComponent: React.FC<WaveformSegmentProps> = ({
     height,
     color
 }) => {
+    console.log("WaveformSegment", peaks.length, sourceStartMs, sourceEndMs, width, height, color);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate which slice of peaks to show

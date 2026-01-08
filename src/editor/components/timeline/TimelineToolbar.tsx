@@ -2,6 +2,7 @@ import React from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { TimeMapper } from '../../../core/timeMapper';
 
 interface TimelineToolbarProps {
     totalDurationMs: number;
@@ -33,10 +34,16 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     // Handlers
     const handleSplit = () => {
         const currentTime = useUIStore.getState().currentTimeMs;
-        const activeWinIndex = timeline.outputWindows.findIndex(w => currentTime > w.startMs && currentTime < w.endMs);
-        if (activeWinIndex === -1) return;
-        const win = timeline.outputWindows[activeWinIndex];
-        splitWindow(win.id, currentTime);
+        const timeMapper = new TimeMapper(timeline.outputWindows);
+
+        const result = timeMapper.getWindowAtOutputTime(currentTime);
+        if (!result) return;
+
+        const { window: win, outputStartMs } = result;
+        const offset = currentTime - outputStartMs;
+        const splitTime = win.startMs + offset;
+
+        splitWindow(win.id, splitTime);
     };
 
     const handleScaleChange = (newScale: number) => {

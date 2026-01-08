@@ -70,6 +70,32 @@ export class TimeMapper {
     }
 
     /**
+     * Returns the window containing the given output time, along with its start time in output timeline.
+     */
+    getWindowAtOutputTime(outputTimeMs: number): { window: OutputWindow, outputStartMs: number } | null {
+        if (outputTimeMs < 0) return null;
+
+        let outputTimeAccumulator = 0;
+
+        for (const win of this.windows) {
+            const windowDuration = win.endMs - win.startMs;
+            const windowOutputEnd = outputTimeAccumulator + windowDuration;
+
+            // Strict less than for end, greater equal for start (typical hit-test)
+            // But for split, we usually want even the exact boundary to belong to the PREVIOUS window 
+            // if we are right on the edge? Or NEXT? 
+            // Usually cursor is exclusive at end.
+            if (outputTimeMs < windowOutputEnd) {
+                return { window: win, outputStartMs: outputTimeAccumulator };
+            }
+
+            outputTimeAccumulator = windowOutputEnd;
+        }
+
+        return null;
+    }
+
+    /**
      * Gets the total duration of the output video.
      */
     getOutputDuration(): number {
