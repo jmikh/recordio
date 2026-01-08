@@ -49,10 +49,27 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // RENDER LOOP
     // -----------------------------------------------------------
+    // -----------------------------------------------------------
+    // RENDER LOOP
+    // -----------------------------------------------------------
+    const TARGET_FPS = 60;
+    const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
     useEffect(() => {
         let lastFpsTime = 0;
+        let lastRenderTime = 0;
 
         const tick = (time: number) => {
+            animationFrameRef.current = requestAnimationFrame(tick);
+
+            // Throttle FPS
+            const elapsed = time - lastRenderTime;
+            if (elapsed < FRAME_INTERVAL) {
+                return;
+            }
+            // Adjust for drift, but don't let it spiral if we pause or tab away
+            lastRenderTime = time - (elapsed % FRAME_INTERVAL);
+
             const startTime = performance.now();
             const uiState = useUIStore.getState();
             const { project, sources, userEvents } = useProjectStore.getState();
@@ -167,8 +184,6 @@ export const CanvasContainer = () => {
             if (frameCountRef.current % 10 === 0) { // Throttle updates
                 useUIStore.getState().setFrameTime(frameDuration);
             }
-
-            animationFrameRef.current = requestAnimationFrame(tick);
         };
 
         animationFrameRef.current = requestAnimationFrame(tick);

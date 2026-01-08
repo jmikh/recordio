@@ -1,36 +1,53 @@
 import React from 'react';
-
+import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 interface TimelineToolbarProps {
-    onSplit: () => void;
-    isPlaying: boolean;
-    onTogglePlay: () => void;
-    pixelsPerSec: number;
-    onScaleChange: (scale: number) => void;
-    onScaleInteractionStart?: () => void;
-    onScaleInteractionEnd?: () => void;
-    currentTimeMs: number;
     totalDurationMs: number;
-    currentResolution?: { width: number; height: number };
-    onResolutionChange?: (width: number, height: number) => void;
 }
 
 const MIN_PIXELS_PER_SEC = 10;
 const MAX_PIXELS_PER_SEC = 200;
 
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
-    onSplit,
-    isPlaying,
-    onTogglePlay,
-    pixelsPerSec,
-    onScaleChange,
-    onScaleInteractionStart,
-    onScaleInteractionEnd,
-    currentTimeMs,
     totalDurationMs,
-    currentResolution,
-    onResolutionChange
 }) => {
+    // Stores
+    const timeline = useProjectTimeline();
+    const splitWindow = useProjectStore(s => s.splitWindow);
+    const updateSettings = useProjectStore(s => s.updateSettings);
+    const currentResolution = useProjectStore(s => s.project.settings.outputSize);
+
+    const currentTimeMs = useUIStore(s => s.currentTimeMs);
+    const isPlaying = useUIStore(s => s.isPlaying);
+    const setIsPlaying = useUIStore(s => s.setIsPlaying);
+    const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
+    const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
+
+    // History Batcher
+    const batcher = useHistoryBatcher();
+
+    // Handlers
+    const handleSplit = () => {
+        // Use getState to avoid extra re-renders if this component re-renders (though it subscribes to time anyway)
+        // But here we already subscribe to time, so we can use `currentTimeMs` directly.
+        const activeWinIndex = timeline.outputWindows.findIndex(w => currentTimeMs > w.startMs && currentTimeMs < w.endMs);
+        if (activeWinIndex === -1) return;
+        const win = timeline.outputWindows[activeWinIndex];
+        splitWindow(win.id, currentTimeMs);
+    };
+
+    const handleScaleChange = (newScale: number) => {
+        setPixelsPerSec(newScale);
+    };
+
+    const handleResolutionChange = (width: number, height: number) => {
+        updateSettings({ outputSize: { width, height } });
+    };
+
+    const onTogglePlay = () => setIsPlaying(!isPlaying);
+
     // Helper format
     const formatFullTime = (ms: number) => {
         const s = Math.floor(ms / 1000);
@@ -72,7 +89,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         <div className="h-10 flex items-center px-4 bg-[#252526] border-b border-[#333] shrink-0 justify-between">
             <div className="flex items-center gap-2">
                 <button
-                    onClick={onSplit}
+                    onClick={handleSplit}
                     className="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs border border-[#555]"
                     title="Split at Playhead"
                 >
@@ -97,7 +114,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                                     key={res.label}
                                     className="px-3 py-2 text-left text-xs hover:bg-[#333] text-gray-200 border-b border-[#333] last:border-0"
                                     onClick={() => {
-                                        onResolutionChange?.(res.width, res.height);
+                                        handleResolutionChange(res.width, res.height);
                                         setIsRatioOpen(false);
                                     }}
                                 >
@@ -125,9 +142,9 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     min={MIN_PIXELS_PER_SEC}
                     max={MAX_PIXELS_PER_SEC}
                     value={pixelsPerSec}
-                    onChange={(e) => onScaleChange(Number(e.target.value))}
-                    onMouseDown={onScaleInteractionStart}
-                    onMouseUp={onScaleInteractionEnd}
+                    onChange={(e) => handleScaleChange(Number(e.target.value))}
+                    onMouseDown={batcher.startInteraction}
+                    onMouseUp={batcher.endInteraction}
                     className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
                 />
             </div>

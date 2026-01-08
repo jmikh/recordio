@@ -14,7 +14,6 @@ export const GROUP_HEADER_HEIGHT = 24;
 interface MainTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
-    accumulatedX: number;
     trackHeight: number;
 }
 
