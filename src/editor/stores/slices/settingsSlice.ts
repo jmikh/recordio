@@ -88,7 +88,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
 
             if (sizeChanged && !nextSettings.zoom.autoZoom) {
                 nextMotions = [];
-            } else if (paddingChanged || zoomChanged || sizeChanged) {
+            } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.autoZoom) {
                 nextMotions = recalculateAutoZooms(nextProject, state.sources, state.userEvents);
             }
 

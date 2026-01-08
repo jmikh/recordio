@@ -3,6 +3,7 @@ import type { ID, Project, UserEvents, ViewportMotion } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { TimeMapper } from '../../core/timeMapper';
 
+
 /**
  * Helper to recalculate zooms synchronously
  */
@@ -38,42 +39,57 @@ export const recalculateAutoZooms = (
         );
     }
 
-    // 2. If Auto Zoom is OFF, cleanup invalid/gap zooms
-    // We filter out any zooms whose "target time" (sourceEndTimeMs) falls into a gap in the (new) windows.
-    // AND we resolve intersections by prioritizing the earlier motion (since sorted)
-    // and shrinking/expanding the next one to fit into available space.
-    const timeMapper = new TimeMapper(project.timeline.outputWindows);
-    const currentMotions = project.timeline.recording.viewportMotions || [];
+    return project.timeline.recording.viewportMotions;
+};
 
-    const { minZoomDurationMs, maxZoomDurationMs } = project.settings.zoom;
 
-    const validMotions: ViewportMotion[] = [];
-    let prevOutputEnd = 0;
+/**
+ * Shifts manual zooms based on a time delta in output time.
+ * @param motions Current list of viewport motions
+ * @param pivotTimeMs The point in output time where the change occurred
+ * @param deltaMs The amount of time added (positive) or removed (negative)
+ */
+export const shiftManualZooms = (
+    motions: ViewportMotion[],
+    pivotTimeMs: number,
+    deltaMs: number
+): ViewportMotion[] => {
+    // Clone to avoid mutation
+    let nextMotions = [...motions];
 
-    for (const m of currentMotions) {
-        // 1. Must exist in valid output time
-        const outputTime = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-        if (outputTime === -1) continue;
+    const absDelta = Math.abs(deltaMs);
 
-        // 2. Calculate available space in OUTPUT time
-        // This accounts for trims/cuts between the previous zoom and this one.
-        const availableSpace = outputTime - prevOutputEnd;
-
-        // 3. If space is less than min duration, we can't fit it -> omit
-        if (availableSpace < minZoomDurationMs) continue;
-
-        // 4. Expand to max duration if possible, bounded by available output space
-        // Note: durationMs in ViewportMotion is typically Source Duration.
-        // But for visual continuity in a trimmed timeline, we ensure it fits in Output Time.
-        const newDuration = Math.min(availableSpace, maxZoomDurationMs);
-
-        validMotions.push({
-            ...m,
-            durationMs: newDuration
+    if (deltaMs > 0) {
+        return nextMotions.map(m => {
+            // For simple implementation: if the motion's end time is > pivot, shift it.
+            if (m.outputEndTimeMs > pivotTimeMs) {
+                return {
+                    ...m,
+                    outputEndTimeMs: m.outputEndTimeMs + deltaMs
+                };
+            }
+            return m;
         });
+    } else {
+        // Removing time
+        const deleteRangeStart = pivotTimeMs;
+        const deleteRangeEnd = pivotTimeMs + absDelta;
 
-        prevOutputEnd = outputTime;
+        return nextMotions.filter(m => {
+            // Drop if it falls in the deleted range
+            if (m.outputEndTimeMs > deleteRangeStart && m.outputEndTimeMs <= deleteRangeEnd) {
+                return false;
+            }
+            return true;
+        }).map(m => {
+            // Shift items that were after the deleted range
+            if (m.outputEndTimeMs > deleteRangeEnd) {
+                return {
+                    ...m,
+                    outputEndTimeMs: m.outputEndTimeMs - absDelta
+                };
+            }
+            return m;
+        });
     }
-
-    return validMotions;
 };

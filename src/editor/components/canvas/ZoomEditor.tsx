@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import type { Rect } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { TimeMapper } from '../../../core/timeMapper';
+
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../common/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -125,11 +125,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
         const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
         if (motion) {
-            const timeMapper = new TimeMapper(
-                project.timeline.outputWindows
-            );
-
-            const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
+            const outputTime = motion.outputEndTimeMs;
             if (outputTime !== -1) {
                 useUIStore.getState().setCurrentTime(outputTime);
             }

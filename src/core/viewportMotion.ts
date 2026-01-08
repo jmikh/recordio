@@ -183,7 +183,7 @@ export function calculateZoomSchedule(
                 // Check for intersection with previous motion
                 if (motions.length > 0) {
                     const prevMotion = motions[motions.length - 1];
-                    const prevEndOutputTime = timeMapper.mapSourceToOutputTime(prevMotion.sourceEndTimeMs);
+                    const prevEndOutputTime = prevMotion.outputEndTimeMs;
 
                     if (currentStartOutputTime < prevEndOutputTime) {
                         console.log("Intersection detected");
@@ -195,7 +195,6 @@ export function calculateZoomSchedule(
                             // Shrink duration to fit in the gap
                             motions.push({
                                 id: crypto.randomUUID(),
-                                sourceEndTimeMs: sourceEndTime,
                                 outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                                 durationMs: availableGap,
                                 rect: targetViewport,
@@ -225,7 +224,6 @@ export function calculateZoomSchedule(
                         // No intersection - add normally
                         motions.push({
                             id: crypto.randomUUID(),
-                            sourceEndTimeMs: sourceEndTime,
                             outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                             durationMs: maxZoomDurationMs,
                             rect: targetViewport,
@@ -239,7 +237,6 @@ export function calculateZoomSchedule(
                     // First motion - add normally
                     motions.push({
                         id: crypto.randomUUID(),
-                        sourceEndTimeMs: sourceEndTime,
                         outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                         durationMs: maxZoomDurationMs,
                         rect: targetViewport,
@@ -329,7 +326,6 @@ export function calculateZoomSchedule(
         if (sourceEndTime !== -1) {
             motions.push({
                 id: crypto.randomUUID(),
-                sourceEndTimeMs: sourceEndTime,
                 outputEndTimeMs: timeMapper.mapSourceToOutputTime(sourceEndTime),
                 durationMs: ZOOM_TRANSITION_DURATION,
                 rect: { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height },

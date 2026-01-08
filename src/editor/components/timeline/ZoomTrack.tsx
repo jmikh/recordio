@@ -16,7 +16,6 @@ interface DragState {
     motionId: string;
     startX: number;
     initialOutputEndTime: number; // Anchor in Output Time
-    initialSourceEndTime: number;
     // Constraints can stay relative or simplified
 }
 
@@ -186,7 +185,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         // Create Motion
         const newMotion: ViewportMotion = {
             id: crypto.randomUUID(),
-            sourceEndTimeMs: timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTime),
             outputEndTimeMs: hoverInfo.outputEndTime,
             durationMs: hoverInfo.durationMs,
             reason: 'Manual Zoom',
@@ -207,15 +205,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const handleDragStart = (e: React.MouseEvent, type: 'move', motion: ViewportMotion) => {
         e.stopPropagation();
 
-        const outputEndTimeX = coords.sourceTimeToX(motion.sourceEndTimeMs);
+        const outputEndTimeX = coords.msToX(motion.outputEndTimeMs);
         if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
         setDragState({
             type,
             motionId: motion.id,
             startX: e.clientX,
-            initialOutputEndTime: timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs),
-            initialSourceEndTime: motion.sourceEndTimeMs
+            initialOutputEndTime: motion.outputEndTimeMs,
         });
         startInteraction();
         setEditingZoom(motion.id);
@@ -254,7 +251,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
 
         batchAction(() => updateViewportMotion(dragState.motionId, {
-            sourceEndTimeMs: timeMapper.mapOutputToSourceTime(targetOutputEndTime),
             outputEndTimeMs: targetOutputEndTime,
             durationMs: targetDuration,
             type: 'manual'

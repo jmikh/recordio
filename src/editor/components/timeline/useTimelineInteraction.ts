@@ -36,7 +36,8 @@ export function useTimelineInteraction({
         if (selectedZoomId) {
             const motion = viewportMotions?.find(m => m.id === selectedZoomId);
             if (motion) {
-                const outputTime = timeMapper.mapSourceToOutputTime(motion.sourceEndTimeMs);
+                // Use cached output time
+                const outputTime = motion.outputEndTimeMs;
                 if (outputTime !== -1) {
                     setCurrentTime(outputTime);
                 }
