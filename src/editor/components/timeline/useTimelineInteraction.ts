@@ -64,6 +64,9 @@ export function useTimelineInteraction({
     }, [containerRef, pixelsPerSec, totalOutputDuration, timelineOffsetLeft]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
+        // If external drag operating, do not interfere with time/preview
+        if (useUIStore.getState().isResizingWindow) return;
+
         const { outputTime } = getTimeFromEvent(e);
 
         // Hover uses Output Time - but hide during blocking edits

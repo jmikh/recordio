@@ -24,8 +24,10 @@ export interface UIState {
     selectedZoomId: ID | null;
     selectedWindowId: ID | null;
     selectedSettingsPanel: SettingsPanel;
+    isResizingWindow: boolean;
 
     setCanvasMode: (mode: Exclude<CanvasMode, typeof CanvasMode.ZoomEdit>) => void;
+    setIsResizingWindow: (isResizing: boolean) => void;
     selectWindow: (id: ID | null) => void;
     selectZoom: (id: ID | null) => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
@@ -60,12 +62,14 @@ export const useUIStore = create<UIState>((set) => ({
     selectedZoomId: null,
     selectedWindowId: null,
     selectedSettingsPanel: SettingsPanel.Project,
+    isResizingWindow: false,
 
     // Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
         ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedWindowId: null } : { isPlaying: false })
     }),
+    setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
 
     selectWindow: (selectedWindowId) => set({
         selectedWindowId,
@@ -125,5 +129,6 @@ export const useUIStore = create<UIState>((set) => ({
         previewTimeMs: null,
         fps: 0,
         frameTime: 0,
+        isResizingWindow: false,
     })
 }));

@@ -7,6 +7,7 @@ import { useClickOutside } from '../../hooks/useClickOutside';
 import { useUIStore } from '../../stores/useUIStore';
 import { TimeMapper } from '../../../core/timeMapper';
 import { TimePixelMapper } from '../../utils/timePixelMapper';
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 export const GROUP_HEADER_HEIGHT = 24;
 
@@ -21,6 +22,7 @@ interface DragState {
     windowId: string;
     type: 'left' | 'right';
     startX: number;
+    outputStartMs: number;
     initialWindow: OutputWindow;
     currentWindow: OutputWindow;
     constraints: {
@@ -37,9 +39,18 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
     const selectWindow = useUIStore(s => s.selectWindow);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
+
+    // UI Actions
+    const setPreviewTime = useUIStore(s => s.setPreviewTime);
+    const setCurrentTime = useUIStore(s => s.setCurrentTime);
+    const setIsResizingWindow = useUIStore(s => s.setIsResizingWindow);
+
     const sources = useProjectSources();
     const [dragState, setDragState] = useState<DragState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // History Batcher
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Create TimePixelMapper for coordinate conversions
     const coords = useMemo(() => {
@@ -65,6 +76,10 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const cameraAudio = useAudioAnalysis(cameraSourceId || '', cameraSource?.url || '');
 
     // --- Dragging Logic ---
+
+    // Note: Live updates via store (HistoryBatcher) mean we don't need local window state for rendering
+    // But we keep dragState to track the *interaction* metadata (start position, initial constraints).
+
     useEffect(() => {
         if (!dragState) return;
 
@@ -86,17 +101,51 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 newWindow.endMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + 100);
             }
 
-            setDragState(prev => prev ? { ...prev, currentWindow: newWindow } : null);
+            // Live Update to Store (Batched)
+            // Only update if changed
+            if (newWindow.startMs !== dragState.currentWindow.startMs || newWindow.endMs !== dragState.currentWindow.endMs) {
+                batchAction(() => {
+                    updateOutputWindow(dragState.windowId, newWindow);
+                });
+                setDragState(prev => prev ? { ...prev, currentWindow: newWindow } : null);
+
+                // Update Playhead Position & Reset Preview
+                setPreviewTime(null);
+
+                // Note: dragState.outputStartMs corresponds to the output start of the window 
+                // BEFORE the drag began (if left handle moves, visual left edge stays put in current ripple implementation)
+                // However, if we drag left handle right (trim head), the clip shortens.
+                // The visual left might stay at 'outputStartMs' but the content shifts.
+                // Re-verification: MainTrack uses `currentX += width`.
+                // If I trim the head, duration decreases. 'width' decreases.
+                // If I am observing this window, its left edge is determined by previous windows.
+                // Previous windows did NOT change. So 'outputStartMs' is the Output Start of THIS window.
+
+                if (dragState.type === 'left') {
+                    // Left Side Drag:
+                    // User wants "outputime corresponding to left side of window + 1ms"
+                    // The left side of the window (in output time) is `dragState.outputStartMs`.
+                    // Wait, if I trim the head, the clip now starts deeper in the source.
+                    // But on the timeline, it starts at `outputStartMs`.
+                    // So we want to see the frame at `outputStartMs + 1ms`?
+                    // Yes, because that's the new "first frame" of the clip on the timeline.
+                    setCurrentTime(dragState.outputStartMs + 1);
+
+                } else if (dragState.type === 'right') {
+                    // Right Side Drag:
+                    // User wants "right side of window - 1ms"
+                    // Right Side Output Time = Output Start + Duration
+                    const newDuration = newWindow.endMs - newWindow.startMs;
+                    const rightSideOutputTime = dragState.outputStartMs + newDuration;
+                    setCurrentTime(rightSideOutputTime - 1);
+                }
+            }
         };
 
         const handleGlobalMouseUp = () => {
             if (dragState) {
-                const hasChanged = dragState.currentWindow.startMs !== dragState.initialWindow.startMs ||
-                    dragState.currentWindow.endMs !== dragState.initialWindow.endMs;
-
-                if (hasChanged) {
-                    updateOutputWindow(dragState.windowId, dragState.currentWindow);
-                }
+                endInteraction();
+                setIsResizingWindow(false);
             }
             setDragState(null);
         };
@@ -108,7 +157,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [dragState, coords, updateOutputWindow]);
+    }, [dragState, coords, updateOutputWindow, batchAction, endInteraction, setPreviewTime, setCurrentTime]);
 
     const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right') => {
         e.preventDefault();
@@ -120,6 +169,13 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
         let minStart = 0;
         let maxEnd = timeline.durationMs || 10000;
+        let outputStartMs = 0;
+
+        // Calculate output start for this window
+        for (let i = 0; i < winIndex; i++) {
+            const w = timeline.outputWindows[i];
+            outputStartMs += (w.endMs - w.startMs);
+        }
 
         if (winIndex > 0) {
             minStart = timeline.outputWindows[winIndex - 1].endMs;
@@ -128,10 +184,14 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             maxEnd = timeline.outputWindows[winIndex + 1].startMs;
         }
 
+        startInteraction();
+        setIsResizingWindow(true);
+
         setDragState({
             windowId: id,
             type,
             startX: e.clientX,
+            outputStartMs,
             initialWindow: win,
             currentWindow: win,
             constraints: { minStart, maxEnd }
