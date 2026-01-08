@@ -271,6 +271,9 @@ export class VideoRecorder {
         }
 
         // 5. Mix Audio & Setup Recorders
+        const mimeType = VideoRecorder.getSupportedMimeType();
+        console.log(`[VideoRecorder] Selected MimeType: ${mimeType}`);
+
         if (cameraStream) {
             // --- DUAL MODE ---
             // Camera Stream gets Microphone
@@ -280,8 +283,8 @@ export class VideoRecorder {
             }
 
             // Screen Stream is just Screen (System Audio already inside + playing locally)
-            this.screenRecorder = new MediaRecorder(screenStream, { mimeType: 'video/webm;codecs=vp9' });
-            this.cameraRecorder = new MediaRecorder(cameraFinalStream, { mimeType: 'video/webm;codecs=vp9' });
+            this.screenRecorder = new MediaRecorder(screenStream, { mimeType });
+            this.cameraRecorder = new MediaRecorder(cameraFinalStream, { mimeType });
         } else {
             // --- SINGLE MODE ---
             // Screen Stream gets mixed: System (if any) + Mic
@@ -307,7 +310,7 @@ export class VideoRecorder {
                 ]);
             }
 
-            this.screenRecorder = new MediaRecorder(finalScreenStream, { mimeType: 'video/webm;codecs=vp9' });
+            this.screenRecorder = new MediaRecorder(finalScreenStream, { mimeType });
         }
 
         // Data Handlers
@@ -376,7 +379,9 @@ export class VideoRecorder {
         const now = Date.now();
 
         // 1. Save Screen Recording
-        const screenBlob = new Blob(this.screenData, { type: 'video/webm' });
+        const screenMimeType = this.screenRecorder?.mimeType || 'video/webm';
+        console.log(`[VideoRecorder] Saving Screen Blob with MimeType: ${screenMimeType}`);
+        const screenBlob = new Blob(this.screenData, { type: screenMimeType });
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
@@ -405,7 +410,9 @@ export class VideoRecorder {
         // 4. Save Camera Recording (If any)
         let cameraSource: SourceMetadata | undefined;
         if (this.cameraData.length > 0) {
-            const camBlob = new Blob(this.cameraData, { type: 'video/webm' });
+            const camMimeType = this.cameraRecorder?.mimeType || 'video/webm';
+            console.log(`[VideoRecorder] Saving Camera Blob with MimeType: ${camMimeType}`);
+            const camBlob = new Blob(this.cameraData, { type: camMimeType });
             const camBlobId = `rec-${projectId}-camera`;
             await ProjectStorage.saveRecordingBlob(camBlobId, camBlob);
 
@@ -478,5 +485,25 @@ export class VideoRecorder {
                 });
             }
         }
+    }
+
+    /**
+     * static helper to detect supported mime type
+     */
+    static getSupportedMimeType(): string {
+        const types = [
+            'video/mp4;codecs=avc1,mp4a.40.2', // Standard MP4
+            'video/webm;codecs=h264',          // Standard WebM (H.264)
+            'video/webm;codecs=vp9',           // High quality VP9
+            'video/webm;codecs=vp8',           // Fallback VP8
+            'video/webm'                       // Generic
+        ];
+
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        return 'video/webm';
     }
 }
