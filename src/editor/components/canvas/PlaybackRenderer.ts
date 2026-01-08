@@ -34,10 +34,6 @@ export class PlaybackRenderer {
         const { timeline } = project;
         const { recording, outputWindows } = timeline;
 
-        // 1. Check if ACTIVE
-        const activeWindow = outputWindows.find(w => currentTimeMs >= w.startMs && currentTimeMs <= w.endMs);
-
-        // 2. Calculate Times
         // 2. Calculate Times
         const sourceTimeMs = currentTimeMs;
 
@@ -50,21 +46,16 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
 
-        if (activeWindow) {
-            const timeMapper = new TimeMapper(outputWindows);
-            const outputTimeMs = currentTimeMs;
-            const viewportMotions = recording.viewportMotions || [];
+        const timeMapper = new TimeMapper(outputWindows);
+        const outputTimeMs = currentTimeMs;
+        const viewportMotions = recording.viewportMotions || [];
 
-            effectiveViewport = getViewportStateAtTime(
-                viewportMotions,
-                outputTimeMs,
-                outputSize,
-                timeMapper
-            );
-        } else {
-            // Fallback: Full Viewport
-            effectiveViewport = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
-        }
+        effectiveViewport = getViewportStateAtTime(
+            viewportMotions,
+            outputTimeMs,
+            outputSize,
+            timeMapper
+        );
         // -----------------------------------------------------------
 
         // Render Screen Layer
@@ -83,12 +74,8 @@ export class PlaybackRenderer {
                 resources.deviceFrameImg
             );
 
-            // We only add effects if it's an active window, otherwise we just show what the
-            // screen looked like at that time.
-            if (activeWindow) {
-                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
-                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
-            }
+            paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+            drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
         }
 
 
@@ -110,13 +97,11 @@ export class PlaybackRenderer {
         }
 
         // Render Keyboard Overlay
-        if (activeWindow) {
-            drawKeyboardOverlay(
-                ctx,
-                userEvents.keyboardEvents,
-                sourceTimeMs,
-                outputSize
-            );
-        }
+        drawKeyboardOverlay(
+            ctx,
+            userEvents.keyboardEvents,
+            sourceTimeMs,
+            outputSize
+        );
     }
 }

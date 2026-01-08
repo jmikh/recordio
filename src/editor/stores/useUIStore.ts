@@ -58,7 +58,7 @@ export const useUIStore = create<UIState>((set) => ({
     // Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedWindowId: null } : {})
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedWindowId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => set({
@@ -73,6 +73,7 @@ export const useUIStore = create<UIState>((set) => ({
                 selectedZoomId,
                 selectedWindowId: null,
                 canvasMode: CanvasMode.ZoomEdit,
+                isPlaying: false,
             };
         }
         if (state.canvasMode === CanvasMode.ZoomEdit) {
@@ -97,7 +98,7 @@ export const useUIStore = create<UIState>((set) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null }),
     setCurrentTime: (currentTimeMs) => set({ currentTimeMs }),
     setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 

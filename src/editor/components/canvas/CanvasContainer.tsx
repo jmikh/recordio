@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
+import { TimeMapper } from '../../../core/timeMapper';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
@@ -22,6 +23,13 @@ export const CanvasContainer = () => {
     const sources = useProjectSources();
     const isPlaying = useUIStore(s => s.isPlaying);
     const mutedSources = useProjectStore(s => s.mutedSources);
+
+    // TimeMapper
+    const timeMapper = useMemo(() => {
+        return new TimeMapper(project.timeline.outputWindows);
+    }, [project.timeline.outputWindows]);
+    const timeMapperRef = useRef(timeMapper);
+    timeMapperRef.current = timeMapper;
 
     // DOM Refs for Resources
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
@@ -51,28 +59,19 @@ export const CanvasContainer = () => {
             // FPS Logging (Optional)
             if (time - lastFpsTime >= 1000) lastFpsTime = time;
 
-            // Only advance time if NOT in a blocking edit mode
-            // (Crop and Zoom block playback time updates (implicit in original), Camera does not)
-            const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
-
-            if (uiState.isPlaying && !isBlockingEdit) {
+            if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
                 const delta = time - lastTimeRef.current;
                 const safeDelta = Math.min(delta, 100);
 
                 if (safeDelta > 0) {
                     let nextTime = uiState.currentTimeMs + safeDelta;
-                    // Gap Skipping Logic
-                    const windows = project.timeline.outputWindows;
-                    const activeWindow = windows.find(w => nextTime >= w.startMs && nextTime < w.endMs);
-                    if (!activeWindow) {
-                        const nextWin = windows.find(w => w.startMs > nextTime);
-                        if (nextWin) nextTime = nextWin.startMs;
-                        else {
-                            uiState.setIsPlaying(false);
-                            const lastWin = windows[windows.length - 1];
-                            nextTime = lastWin ? lastWin.endMs : 0;
-                        }
+                    // Use the latest timeMapper from the ref (synced with React state)
+                    const outputDuration = timeMapperRef.current.outputDuration;
+
+                    if (nextTime >= outputDuration) {
+                        nextTime = outputDuration;
+                        uiState.setIsPlaying(false);
                     }
                     uiState.setCurrentTime(nextTime);
                 }
@@ -100,18 +99,17 @@ export const CanvasContainer = () => {
                 let effectiveTimeMs = uiState.currentTimeMs;
 
                 // Implement Preview Logic
-                if (!uiState.isPlaying && !isBlockingEdit && uiState.previewTimeMs !== null) {
+                if (!uiState.isPlaying && uiState.previewTimeMs !== null) {
                     effectiveTimeMs = uiState.previewTimeMs;
                 }
 
                 // 3. SYNC VIDEO
                 const sourceTimeMs = effectiveTimeMs;
-                const isPlaying = uiState.isPlaying && !isBlockingEdit;
 
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
                     if (video) {
-                        syncVideo(video, sourceTimeMs / 1000, isPlaying);
+                        syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
                     }
                 });
 

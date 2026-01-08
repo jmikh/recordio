@@ -2,9 +2,11 @@ import type { OutputWindow } from './types';
 
 export class TimeMapper {
     private readonly windows: OutputWindow[];
+    public readonly outputDuration: number;
 
     constructor(windows: OutputWindow[]) {
         this.windows = windows;
+        this.outputDuration = this.windows.reduce((acc, win) => acc + (win.endMs - win.startMs), 0);
     }
 
 
@@ -71,7 +73,7 @@ export class TimeMapper {
      * Gets the total duration of the output video.
      */
     getOutputDuration(): number {
-        return this.windows.reduce((acc, win) => acc + (win.endMs - win.startMs), 0);
+        return this.outputDuration;
     }
 
     /**

@@ -65,10 +65,8 @@ export function useTimelineInteraction({
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const { outputTime } = getTimeFromEvent(e);
 
-        const isBlockingEdit = canvasMode === CanvasMode.CropEdit || canvasMode === CanvasMode.ZoomEdit;
-
         // Hover uses Output Time - but hide during blocking edits
-        if (isBlockingEdit) {
+        if (canvasMode !== CanvasMode.Preview) {
             setHoverTime(null);
         } else {
             setHoverTime(outputTime);
@@ -77,7 +75,7 @@ export function useTimelineInteraction({
         if (isCTIScrubbing) {
             setCurrentTime(outputTime);
             setPreviewTime(null);
-        } else if (!isPlaying && !isBlockingEdit) {
+        } else if (!isPlaying && canvasMode === CanvasMode.Preview) {
             setPreviewTime(outputTime);
         } else {
             setPreviewTime(null);
