@@ -22,7 +22,7 @@ interface DragState {
 
 interface HoverInfo {
     x: number;
-    sourceEndTime: number;
+    outputEndTime: number;
     durationMs: number;
     width: number;
 }
@@ -44,9 +44,9 @@ function getZoomBlockBounds(
         : null;
 
     // If no current motion, default to finding closest to start
-    const referenceEnd = currentMotion?.sourceEndTimeMs ?? 0;
+    const referenceEnd = currentMotion?.outputEndTimeMs ?? 0;
     const referenceStart = currentMotion
-        ? currentMotion.sourceEndTimeMs - currentMotion.durationMs
+        ? currentMotion.outputEndTimeMs - currentMotion.durationMs
         : 0;
 
     let prevEnd = 0;
@@ -54,8 +54,8 @@ function getZoomBlockBounds(
 
     for (const m of motions) {
         if (m.id === targetMotionId) continue;
-        const mEnd = m.sourceEndTimeMs;
-        const mStart = m.sourceEndTimeMs - m.durationMs;
+        const mEnd = m.outputEndTimeMs;
+        const mStart = m.outputEndTimeMs - m.durationMs;
 
         // A block is "previous" if it's entirely before our current start
         if (mEnd <= referenceStart && mEnd > prevEnd) {
@@ -117,22 +117,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
 
-        // Convert x to source time (chains through TimeMapper)
-        let mouseSourceTimeMs = coords.xToSourceTime(x);
-
-        if (mouseSourceTimeMs === -1) {
-            setHoverInfo(null);
-            return;
-        }
+        // Convert x directly to output time
+        let mouseOutputTimeMs = coords.xToMs(x);
 
         const motions = timeline.recording.viewportMotions || [];
 
         // 1. Check if we are inside an existing motion
-        // We check using source interval
         const isInside = motions.some(m => {
-            const start = m.sourceEndTimeMs - m.durationMs;
-            const end = m.sourceEndTimeMs;
-            return mouseSourceTimeMs > start && mouseSourceTimeMs < end;
+            const start = m.outputEndTimeMs - m.durationMs;
+            const end = m.outputEndTimeMs;
+            return mouseOutputTimeMs > start && mouseOutputTimeMs < end;
         });
 
         if (isInside) {
@@ -141,36 +135,35 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         }
 
         // 2. Calculate Available Duration backwards (to the left)
-        // Find the closest previous motion end
         let prevEnd = 0;
         for (const m of motions) {
-            if (m.sourceEndTimeMs <= mouseSourceTimeMs) {
-                if (m.sourceEndTimeMs > prevEnd) {
-                    prevEnd = m.sourceEndTimeMs;
+            if (m.outputEndTimeMs <= mouseOutputTimeMs) {
+                if (m.outputEndTimeMs > prevEnd) {
+                    prevEnd = m.outputEndTimeMs;
                 }
             }
         }
 
         const defaultDur = project.settings.zoom.maxZoomDurationMs;
-        const availableDuration = mouseSourceTimeMs - prevEnd;
+        const availableDuration = mouseOutputTimeMs - prevEnd;
 
         // Clamp duration
         let actualDuration = Math.min(defaultDur, availableDuration);
-        let sourceEndTime = mouseSourceTimeMs;
+        let outputEndTime = mouseOutputTimeMs;
 
         if (actualDuration < project.settings.zoom.minZoomDurationMs) {
             actualDuration = project.settings.zoom.minZoomDurationMs;
-            sourceEndTime = prevEnd + actualDuration;
+            outputEndTime = prevEnd + actualDuration;
         }
 
         // Calculate visual width and position
         const width = coords.msToX(actualDuration);
-        const constrainedX = coords.sourceTimeToX(sourceEndTime);
+        const constrainedX = coords.msToX(outputEndTime);
 
         setHoverInfo({
             x: constrainedX,
             durationMs: actualDuration,
-            sourceEndTime,
+            outputEndTime,
             width,
         });
     };
@@ -193,8 +186,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         // Create Motion
         const newMotion: ViewportMotion = {
             id: crypto.randomUUID(),
-            sourceEndTimeMs: hoverInfo.sourceEndTime,
-            outputEndTimeMs: timeMapper.mapSourceToOutputTime(hoverInfo.sourceEndTime),
+            sourceEndTimeMs: timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTime),
+            outputEndTimeMs: hoverInfo.outputEndTime,
             durationMs: hoverInfo.durationMs,
             reason: 'Manual Zoom',
             rect: { ...project.settings.outputSize, x: 0, y: 0 },
@@ -252,9 +245,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
         // Clamp sourceEndTime to boundaries
         // Left: must leave room for at least minZoomDurationMs
-        targetOutputEndTime = Math.max(targetOutputEndTime, timeMapper.mapSourceToOutputTime(prevEnd) + minZoomDurationMs);
+        targetOutputEndTime = Math.max(targetOutputEndTime, prevEnd + minZoomDurationMs);
         // Right: cannot exceed next block start or output duration
-        targetOutputEndTime = Math.min(targetOutputEndTime, timeMapper.mapSourceToOutputTime(nextStart), outputDuration);
+        targetOutputEndTime = Math.min(targetOutputEndTime, nextStart, outputDuration);
 
         // Calculate duration based on available space
         const availableSpace = targetOutputEndTime - prevEnd;
@@ -306,8 +299,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             <div className="relative flex-1" style={{ height }}>
                 {/* Existing Motions */}
                 {timeline.recording.viewportMotions?.map((m) => {
-                    const endX = coords.sourceTimeToX(m.sourceEndTimeMs);
-                    if (endX === -1) return null;
+                    // Use output time directly
+                    const endX = coords.msToX(m.outputEndTimeMs);
 
                     const width = coords.msToX(m.durationMs);
                     const left = endX - width;

@@ -476,23 +476,22 @@ function clampViewport(viewport: Rect, outputSize: Size): Rect {
 export function getViewportStateAtTime(
     motions: ViewportMotion[],
     outputTimeMs: number,
-    outputSize: Size,
-    timeMapper: TimeMapper
+    outputSize: Size
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // 1. Prepare valid motions with computed start/end times in Output Space
     const validMotions = motions
         .map(m => {
-            const end = timeMapper.mapSourceToOutputTime(m.sourceEndTimeMs);
-            if (end === -1) return null;
+            // OPTIMIZATION: Use cached outputEndTimeMs directly!
+            const end = m.outputEndTimeMs;
+
             return {
                 ...m,
                 endTime: end,
                 startTime: end - m.durationMs
             };
         })
-        .filter((m): m is NonNullable<typeof m> => m !== null)
         .sort((a, b) => a.startTime - b.startTime); // Ensure chronological order
 
     let currentRect = fullRect;

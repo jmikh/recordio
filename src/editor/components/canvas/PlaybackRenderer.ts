@@ -3,7 +3,7 @@ import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
-import { TimeMapper } from '../../../core/timeMapper';
+
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
@@ -32,7 +32,7 @@ export class PlaybackRenderer {
         const outputSize = project.settings.outputSize;
 
         const { timeline } = project;
-        const { recording, outputWindows } = timeline;
+        const { recording } = timeline;
 
         // 2. Calculate Times
         const sourceTimeMs = currentTimeMs;
@@ -46,15 +46,14 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
 
-        const timeMapper = new TimeMapper(outputWindows);
+
         const outputTimeMs = currentTimeMs;
         const viewportMotions = recording.viewportMotions || [];
 
         effectiveViewport = getViewportStateAtTime(
             viewportMotions,
             outputTimeMs,
-            outputSize,
-            timeMapper
+            outputSize
         );
         // -----------------------------------------------------------
 
