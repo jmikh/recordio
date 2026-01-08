@@ -103,12 +103,18 @@ export const CanvasContainer = () => {
                 }
 
                 // 3. SYNC VIDEO
-                const sourceTimeMs = effectiveTimeMs;
+                // Use TimeMapper to get the correct source time for this output time
+                const sourceTimeMs = timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs);
 
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
                     if (video) {
-                        syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
+                        if (sourceTimeMs === -1) {
+                            // GAP: Ensure video is paused if we are in a gap
+                            if (!video.paused) video.pause();
+                        } else {
+                            syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
+                        }
                     }
                 });
 

@@ -13,13 +13,15 @@ const MAX_PIXELS_PER_SEC = 200;
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
 }) => {
+    console.log('[Rerender] TimelineToolbar');
     // Stores
     const timeline = useProjectTimeline();
     const splitWindow = useProjectStore(s => s.splitWindow);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const currentResolution = useProjectStore(s => s.project.settings.outputSize);
 
-    const currentTimeMs = useUIStore(s => s.currentTimeMs);
+    // Subscribe for perf
+    const timeDisplayRef = React.useRef<HTMLDivElement>(null);
     const isPlaying = useUIStore(s => s.isPlaying);
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -30,12 +32,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
     // Handlers
     const handleSplit = () => {
-        // Use getState to avoid extra re-renders if this component re-renders (though it subscribes to time anyway)
-        // But here we already subscribe to time, so we can use `currentTimeMs` directly.
-        const activeWinIndex = timeline.outputWindows.findIndex(w => currentTimeMs > w.startMs && currentTimeMs < w.endMs);
+        const currentTime = useUIStore.getState().currentTimeMs;
+        const activeWinIndex = timeline.outputWindows.findIndex(w => currentTime > w.startMs && currentTime < w.endMs);
         if (activeWinIndex === -1) return;
         const win = timeline.outputWindows[activeWinIndex];
-        splitWindow(win.id, currentTimeMs);
+        splitWindow(win.id, currentTime);
     };
 
     const handleScaleChange = (newScale: number) => {
@@ -56,6 +57,22 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         const dec = Math.floor((ms % 1000) / 100);
         return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}.${dec}`;
     };
+
+    // perf: Update time without re-render
+    React.useEffect(() => {
+        // Initial set
+        if (timeDisplayRef.current) {
+            const time = useUIStore.getState().currentTimeMs;
+            timeDisplayRef.current.textContent = `${formatFullTime(Math.max(0, time))} / ${formatFullTime(totalDurationMs)}`;
+        }
+
+        const unsub = useUIStore.subscribe((state) => {
+            if (timeDisplayRef.current) {
+                timeDisplayRef.current.textContent = `${formatFullTime(Math.max(0, state.currentTimeMs))} / ${formatFullTime(totalDurationMs)}`;
+            }
+        });
+        return unsub;
+    }, [totalDurationMs]);
 
     const [isRatioOpen, setIsRatioOpen] = React.useState(false);
     const ratioRef = React.useRef<HTMLDivElement>(null);
@@ -130,8 +147,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 <button onClick={onTogglePlay} className="hover:text-green-400">
                     {isPlaying ? '⏸' : '▶️'}
                 </button>
-                <div className="font-mono text-xs text-gray-400 w-32 text-center">
-                    {formatFullTime(Math.max(0, currentTimeMs))} / {formatFullTime(totalDurationMs)}
+                <div
+                    ref={timeDisplayRef}
+                    className="font-mono text-xs text-gray-400 w-32 text-center"
+                >
+                    00:00.0 / {formatFullTime(totalDurationMs)}
                 </div>
             </div>
 
