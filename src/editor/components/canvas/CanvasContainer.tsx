@@ -14,6 +14,7 @@ import { getDeviceFrame } from '../../../core/deviceFrames';
 import type { CameraSettings, Rect } from '../../../core/types';
 
 export const CanvasContainer = () => {
+    console.log('[Rerender] CanvasContainer');
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
@@ -44,51 +45,18 @@ export const CanvasContainer = () => {
     // Loop State
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
-    const frameCountRef = useRef<number>(0);
 
     // -----------------------------------------------------------
     // RENDER LOOP
     // -----------------------------------------------------------
     // -----------------------------------------------------------
-    // RENDER LOOP
-    // -----------------------------------------------------------
-    const TARGET_FPS = 60;
-    const FRAME_INTERVAL = 1000 / TARGET_FPS;
-
     useEffect(() => {
-        let lastFpsTime = 0;
-        let lastRenderTime = 0;
-
         const tick = (time: number) => {
             animationFrameRef.current = requestAnimationFrame(tick);
 
-            // Throttle FPS
-            const elapsed = time - lastRenderTime;
-            if (elapsed < FRAME_INTERVAL) {
-                return;
-            }
-            // Adjust for drift, but don't let it spiral if we pause or tab away
-            lastRenderTime = time - (elapsed % FRAME_INTERVAL);
-
-            const startTime = performance.now();
             const uiState = useUIStore.getState();
             const { project, sources, userEvents } = useProjectStore.getState();
             const { canvasMode, selectedZoomId: activeZoomId } = uiState;
-
-            // FPS Logging (Optional)
-            if (time - lastFpsTime >= 1000) {
-                // Calculate FPS
-                const elapsedSeconds = (time - lastFpsTime) / 1000;
-                const fps = Math.round(frameCountRef.current / elapsedSeconds);
-
-                // Update Store
-                useUIStore.getState().setFps(fps);
-
-                // Reset
-                lastFpsTime = time;
-                frameCountRef.current = 0;
-            }
-            frameCountRef.current++;
 
             if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -168,7 +136,6 @@ export const CanvasContainer = () => {
                         previewZoomRect: previewZoomRectRef.current
                     });
                 } else {
-                    // Preview OR Camera mode (Camera overlays on top, but base is playback)
                     PlaybackRenderer.render(resources, {
                         project,
                         sources,
@@ -177,12 +144,6 @@ export const CanvasContainer = () => {
                         overrideCameraSettings: previewCameraSettingsRef.current || undefined
                     });
                 }
-            }
-
-            // Frame Time Logging
-            const frameDuration = performance.now() - startTime;
-            if (frameCountRef.current % 10 === 0) { // Throttle updates
-                useUIStore.getState().setFrameTime(frameDuration);
             }
         };
 

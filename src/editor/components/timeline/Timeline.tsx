@@ -20,6 +20,7 @@ const TRACK_HEIGHT = 40;
 const HEADER_WIDTH = 200;
 
 export function Timeline() {
+    console.log('[Rerender] Timeline');
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
 

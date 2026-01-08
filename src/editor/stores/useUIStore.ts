@@ -43,10 +43,10 @@ export interface UIState {
     previewTimeMs: TimeMs | null;
 
     // Performance Monitoring
-    fps: number;
-    frameTime: number;
-    setFps: (fps: number) => void;
-    setFrameTime: (ms: number) => void;
+    // fps: number;
+    // frameTime: number;
+    // setFps: (fps: number) => void;
+    // setFrameTime: (ms: number) => void;
 
     setIsPlaying: (playing: boolean) => void;
     setCurrentTime: (timeMs: TimeMs) => void;
@@ -107,10 +107,10 @@ export const useUIStore = create<UIState>((set) => ({
     previewTimeMs: null,
 
     // Performance Monitoring
-    fps: 0,
-    frameTime: 0,
-    setFps: (fps) => set({ fps }),
-    setFrameTime: (frameTime) => set({ frameTime }),
+    // fps: 0,
+    // frameTime: 0,
+    // setFps: (fps) => set({ fps }),
+    // setFrameTime: (frameTime) => set({ frameTime }),
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
@@ -127,8 +127,8 @@ export const useUIStore = create<UIState>((set) => ({
         isPlaying: false,
         currentTimeMs: 0,
         previewTimeMs: null,
-        fps: 0,
-        frameTime: 0,
+        // fps: 0,
+        // frameTime: 0,
         isResizingWindow: false,
     })
 }));
