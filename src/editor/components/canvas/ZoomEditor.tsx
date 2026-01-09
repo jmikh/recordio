@@ -273,7 +273,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                 className="absolute top-4 inset-x-0 flex justify-center pointer-events-auto z-[1000]"
             >
                 <button
-                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${Math.abs(currentRect.x) < 1 &&
+                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${Math.abs(currentRect.x) < 1 &&
                         Math.abs(currentRect.y) < 1 &&
                         Math.abs(currentRect.width - videoSize.width) < 1 &&
                         Math.abs(currentRect.height - videoSize.height) < 1

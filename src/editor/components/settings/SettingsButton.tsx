@@ -26,10 +26,10 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
             onClick={onClick}
             style={transitionStyle}
             className={`
-                group relative w-full h-12 rounded-full transition-all overflow-hidden font-sans text-xs shadow-inner-bold font-medium
+                group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold
                 ${isActive
-                    ? 'bg-primary border-primary'
-                    : 'bg-background border-border text-text-muted border hover:border-text-muted/30'
+                    ? 'bg-primary border border-primary'
+                    : 'bg-background text-text-muted border border-transparent hover:border-text-muted/30'
                 }
             `}
         >

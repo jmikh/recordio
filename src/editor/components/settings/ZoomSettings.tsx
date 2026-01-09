@@ -1,7 +1,8 @@
-import React from 'react';
+
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
+import { MultiToggle } from '../common/MultiToggle';
 
 export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
@@ -12,9 +13,7 @@ export const ZoomSettings = () => {
 
 
 
-    const handleAutoZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        updateSettings({ zoom: { ...zoomSettings, autoZoom: e.target.checked } });
-    };
+
 
     const handleClearZooms = () => {
         // 1. Clear motions
@@ -46,9 +45,6 @@ export const ZoomSettings = () => {
                     showTooltip
                     units="ms"
                 />
-                <p className="text-[10px] text-text-muted/60">
-                    Duration of the zoom animation.
-                </p>
             </div>
 
             {/* Max Zoom */}
@@ -65,9 +61,6 @@ export const ZoomSettings = () => {
                     units="x"
                     decimals={1}
                 />
-                <p className="text-[10px] text-text-muted/60">
-                    Maximum zoom level applied to the content.
-                </p>
             </div>
 
             <div className="h-px bg-border" />
@@ -75,20 +68,19 @@ export const ZoomSettings = () => {
             {/* Auto Zoom */}
             <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs uppercase font-bold text-text-muted/60">Auto Zoom</label>
-                    <p className="text-[10px] text-text-muted/60 max-w-[200px]">
-                        Automatically create zooms based on mouse movement.
-                    </p>
+                    <label className="text-xs uppercase font-bold text-text-muted/60">Zoom Mode</label>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={zoomSettings.autoZoom}
-                        onChange={handleAutoZoomChange}
-                        className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+                <MultiToggle
+                    value={zoomSettings.autoZoom ? 'auto' : 'manual'}
+                    onChange={(val: string) => {
+                        const isAuto = val === 'auto';
+                        updateSettings({ zoom: { ...zoomSettings, autoZoom: isAuto } });
+                    }}
+                    options={[
+                        { value: 'auto', label: 'Auto' },
+                        { value: 'manual', label: 'Manual' }
+                    ]}
+                />
             </div>
 
             {/* Actions */}
@@ -96,7 +88,7 @@ export const ZoomSettings = () => {
                 <button
                     onClick={handleClearZooms}
                     disabled={viewportMotions.length === 0}
-                    className={`w-full py-2 px-4 rounded text-xs font-medium transition-colors border flex items-center justify-center gap-2
+                    className={`w-full py-2 px-4 rounded text-xs transition-colors border flex items-center justify-center gap-2
                         ${viewportMotions.length === 0
                             ? 'bg-surface text-text-muted/40 border-transparent cursor-not-allowed' // Disabled state
                             : 'bg-surface hover:bg-surface-elevated text-text-main border-border hover:border-text-muted/40'        // Active state (Neutral)

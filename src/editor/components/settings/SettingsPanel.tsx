@@ -89,9 +89,6 @@ export const SettingsPanel = () => {
 
             {/* Content Area */}
             <div className="w-72 flex flex-col">
-                <div className="h-12 border-b border-border flex items-center px-6 font-bold text-text-main text-sm uppercase tracking-wider bg-surface/50 backdrop-blur-sm">
-                    {activeTab === 'zoom' ? 'Zoom Effects' : activeTab}
-                </div>
                 <div className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar">
                     {activeTab === 'project' && <ProjectSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}

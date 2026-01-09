@@ -70,13 +70,13 @@ export const ColorSettings = ({
             {/* Toggle */}
             <div className="flex bg-surface p-1 rounded-lg">
                 <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isSolid ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
+                    className={`flex-1 py-1.5 text-xs rounded transition-colors ${isSolid ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
                     onClick={() => onTypeChange('solid')}
                 >
                     Solid
                 </button>
                 <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isGradient ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
+                    className={`flex-1 py-1.5 text-xs rounded transition-colors ${isGradient ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
                     onClick={() => onTypeChange('gradient')}
                 >
                     Gradient

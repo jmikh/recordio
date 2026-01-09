@@ -265,7 +265,7 @@ function App() {
 
         <button
           onClick={openOptions}
-          className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium transition-colors border border-slate-600"
+          className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded transition-colors border border-slate-600"
         >
           Open Settings
         </button>
@@ -303,7 +303,7 @@ function App() {
                       });
                     }
                   }}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all capitalize ${recordingMode === mode ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                  className={`flex-1 py-1.5 text-xs rounded-md transition-all capitalize ${recordingMode === mode ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   {mode}
                 </button>
@@ -334,7 +334,7 @@ function App() {
             {/* Audio Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <span className="text-sm text-slate-300 flex items-center gap-2">
                   Microphone
                 </span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -361,7 +361,7 @@ function App() {
             {/* Video Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-slate-300">Camera</span>
+                <span className="text-sm text-slate-300">Camera</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={isVideoEnabled} onChange={(e) => handleVideoToggle(e.target.checked)} className="sr-only peer" />
                   <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-600"></div>
@@ -400,7 +400,7 @@ function App() {
           </button>
         )}
 
-        <p className="mt-6 text-slate-400 font-medium text-xs">
+        <p className="mt-6 text-slate-400 text-xs">
           {isRecording ? 'Recording in progress...' : 'Ready to capture'}
         </p>
       </div>

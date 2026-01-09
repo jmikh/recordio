@@ -70,7 +70,7 @@ export const ExportButton = () => {
     return (
         <div className="relative">
             <button
-                className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-fg text-xs font-medium rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-fg text-xs rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={isExporting}
             >

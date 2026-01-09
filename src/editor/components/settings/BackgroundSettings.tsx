@@ -217,82 +217,91 @@ export const BackgroundSettings = () => {
 
             {/* Main Background Grid */}
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 block">Background</label>
                 <div className="flex flex-col gap-4">
                     {/* Row 1: Color + Upload */}
                     <div className="flex gap-4">
                         {/* 1. Color Card */}
-                        <div
-                            ref={colorButtonRef}
-                            onClick={() => {
-                                if (!isColorMode) {
-                                    updateSettings({
-                                        background: {
-                                            type: background.lastColorMode
-                                        }
-                                    });
-                                }
-                                if (!showColorPopover) {
-                                    startInteraction();
-                                } else {
-                                    endInteraction();
-                                }
-                                setShowColorPopover(!showColorPopover);
-                            }}
-                            className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
-                                ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
-                                }`}
-                            style={colorCardStyle}
-                            title="Color / Gradient"
-                        >
-                            <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
-                                <IoIosColorFilter size={20} />
+                        <div className="flex flex-col gap-2">
+                            <span className="text-xs text-gray-400">Color</span>
+                            <div
+                                ref={colorButtonRef}
+                                onClick={() => {
+                                    if (!isColorMode) {
+                                        updateSettings({
+                                            background: {
+                                                type: background.lastColorMode
+                                            }
+                                        });
+                                    }
+                                    if (!showColorPopover) {
+                                        startInteraction();
+                                    } else {
+                                        endInteraction();
+                                    }
+                                    setShowColorPopover(!showColorPopover);
+                                }}
+                                className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
+                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
+                                    }`}
+                                style={colorCardStyle}
+                                title="Color / Gradient"
+                            >
+                                <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
+                                    <IoIosColorFilter size={20} />
+                                </div>
                             </div>
+
                         </div>
 
                         {/* 2. Upload Card */}
-                        <div
-                            onClick={handleCustomSelect}
-                            className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
-                                ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                : 'border-transparent bg-gray-700 ring-1 ring-white/10 hover:ring-white/30'
-                                }`}
-                            title="Upload Image"
-                        >
-                            {customSource && (
-                                <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
-                            )}
-                            <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'bg-black/20 text-white'}`}>
-                                <CiImageOn size={20} />
+                        <div className="flex flex-col gap-2">
+                            <span className="text-xs text-gray-400">Custom</span>
+                            <div
+                                onClick={handleCustomSelect}
+                                className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
+                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    : 'border-transparent bg-gray-700 ring-1 ring-white/10 hover:ring-white/30'
+                                    }`}
+                                title="Upload Image"
+                            >
+                                {customSource && (
+                                    <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
+                                )}
+                                <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'bg-black/20 text-white'}`}>
+                                    <CiImageOn size={20} />
+                                </div>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleUpload}
+                                />
                             </div>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept="image/*"
-                                onChange={handleUpload}
-                            />
                         </div>
                     </div>
 
                     {/* Row 2: Presets */}
-                    <div className="flex flex-wrap gap-4">
-                        {BACKGROUND_IMAGES.map(img => {
-                            const isActive = isPreset && backgroundImageUrl === img.url;
-                            return (
-                                <div
-                                    key={img.url}
-                                    className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
-                                        ? 'border-blue-500 ring-2 ring-blue-500/30'
-                                        : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
-                                    onClick={() => handlePresetSelect(img.url)}
-                                    title={img.name}
-                                >
-                                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-                                </div>
-                            );
-                        })}
+                    <div className="flex flex-col gap-2">
+                        <span className="text-xs text-gray-400">Presets</span>
+                        <div className="flex flex-wrap gap-4">
+                            {BACKGROUND_IMAGES.map(img => {
+                                const isActive = isPreset && backgroundImageUrl === img.url;
+                                return (
+                                    <div
+                                        key={img.url}
+                                        className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
+                                            ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                            : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
+                                        onClick={() => handlePresetSelect(img.url)}
+                                        title={img.name}
+                                    >
+                                        <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>

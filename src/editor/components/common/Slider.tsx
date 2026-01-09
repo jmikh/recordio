@@ -117,7 +117,7 @@ export const Slider: React.FC<SliderProps> = ({
     return (
         <div className={`w-full ${className}`}>
             {label && (
-                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                <label className="text-xs text-gray-400 mb-2 block">
                     {label}
                 </label>
             )}

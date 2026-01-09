@@ -78,7 +78,7 @@ export const ScreenSettings = () => {
                                         className="w-full h-full object-contain p-1"
                                     />
                                 </div>
-                                <span className={`text-[10px] uppercase tracking-wide font-medium text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
+                                <span className={`text-[10px] uppercase tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
                                     }`}>
                                     {frame.name}
                                 </span>

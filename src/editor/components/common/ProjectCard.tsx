@@ -38,18 +38,18 @@ export const ProjectCard = ({
                     className="absolute inset-0 z-20 bg-background/95 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <p className="text-sm text-text-main mb-1 font-medium">Deleting is final.</p>
+                    <p className="text-sm text-text-main mb-1">Deleting is final.</p>
                     <p className="text-sm text-text-muted mb-4">Confirm?</p>
                     <div className="flex space-x-3">
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsDeleting(false); }}
-                            className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-elevated rounded-md transition-colors border border-border"
+                            className="px-3 py-1.5 text-xs text-text-muted hover:text-text-main hover:bg-surface-elevated rounded-md transition-colors border border-border"
                         >
                             No
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); onDelete(project); }}
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-destructive hover:bg-destructive/90 rounded-md shadow-sm transition-colors"
+                            className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-md shadow-sm transition-colors"
                         >
                             Yes
                         </button>
@@ -73,7 +73,7 @@ export const ProjectCard = ({
                 )}
 
                 {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded">
                     {(() => {
                         const windows = project.timeline?.outputWindows || [];
                         const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);

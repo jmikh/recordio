@@ -225,7 +225,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 }}
             >
                 <button
-                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isCentered
+                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${isCentered
                         ? 'bg-surface text-text-muted/50 cursor-not-allowed'
                         : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
                         }`}
@@ -245,7 +245,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 </button>
 
                 <button
-                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isFullView
+                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${isFullView
                         ? 'bg-surface text-text-muted/50 cursor-not-allowed'
                         : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
                         }`}

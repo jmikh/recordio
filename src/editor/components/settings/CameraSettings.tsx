@@ -63,12 +63,10 @@ export const CameraSettings = () => {
     return (
         <div className="space-y-6 relative">
             <div>
-                <h3 className="text-xs font-bold text-gray-500 uppercase mb-4">Camera Overlay</h3>
-
                 <div className="flex gap-2 mb-6">
                     <button
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                        className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${isEditingCamera
+                        className={`flex-1 py-2 px-4 rounded text-sm transition-colors ${isEditingCamera
                             ? 'bg-primary text-primary-fg hover:bg-primary/90'
                             : 'bg-surface-elevated text-text-main hover:bg-surface'
                             }`}
@@ -80,7 +78,6 @@ export const CameraSettings = () => {
                 <div className="space-y-6">
                     {/* Shape */}
                     <div className="space-y-3">
-                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wide">Shape</label>
                         <MultiToggle
                             options={[
                                 { value: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
