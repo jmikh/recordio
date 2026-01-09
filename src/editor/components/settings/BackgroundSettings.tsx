@@ -306,7 +306,6 @@ export const BackgroundSettings = () => {
                         <Slider
                             min={0}
                             max={50}
-                            step={1}
                             value={backgroundBlur || 0}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}

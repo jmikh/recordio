@@ -110,7 +110,6 @@ export const CameraSettings = () => {
                         <Slider
                             min={1}
                             max={3}
-                            step={0.1}
                             value={zoom}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}

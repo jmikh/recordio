@@ -26,7 +26,7 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
             onClick={onClick}
             style={transitionStyle}
             className={`
-                group relative w-full h-12 rounded-full transition-all overflow-hidden border font-sans
+                group relative w-full h-12 rounded-full transition-all overflow-hidden border font-sans text-xs shadow-inner-bold font-medium
                 ${isActive
                     ? 'bg-primary border-primary'
                     : 'bg-surface border-border text-text-muted hover:border-text-muted/30'
@@ -37,11 +37,9 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
             <div
                 style={transitionStyle}
                 className={`
-                    absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-lg z-10 transition-all
+                    absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all
                     ${isActive
-                        // Selected: Move to Right. BG is Surface (Black). Text is Primary.
-                        ? 'left-[calc(100%-2.75rem)] bg-surface text-primary'
-                        // Unselected: At Left. BG is Primary (Brand). Text is White.
+                        ? 'left-[calc(100%-2.75rem)] bg-surface text-text-main'
                         : 'left-1 bg-primary text-primary-fg'
                     }
                 `}
@@ -68,7 +66,7 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                 <span
                     style={transitionStyle}
                     className={`
-                    text-sm font-semibold tracking-wide whitespace-nowrap transition-colors
+                    tracking-wide whitespace-nowrap transition-colors
                     ${isActive
                             ? 'text-primary-fg'
                             : 'text-text-muted group-hover:text-text-main'
@@ -77,6 +75,6 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                     {label}
                 </span>
             </div>
-        </button>
+        </button >
     );
 };

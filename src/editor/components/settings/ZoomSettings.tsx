@@ -42,7 +42,6 @@ export const ZoomSettings = () => {
                 <Slider
                     min={zoomSettings.minZoomDurationMs}
                     max={1000}
-                    step={50}
                     value={zoomSettings.maxZoomDurationMs}
                     onChange={handleMaxDurationChange}
                     onPointerDown={startInteraction}
@@ -62,7 +61,6 @@ export const ZoomSettings = () => {
                 <Slider
                     min={1.1}
                     max={5}
-                    step={0.1}
                     value={zoomSettings.maxZoom}
                     onChange={handleMaxZoomChange}
                     onPointerDown={startInteraction}

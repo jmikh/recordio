@@ -35,6 +35,10 @@ export default {
         DEFAULT: "var(--tertiary)",
         fg: "var(--tertiary-fg)",
       },
+      quaternary: {
+        DEFAULT: "var(--quaternary)",
+        fg: "var(--quaternary-fg)",
+      },
       destructive: "var(--destructive)",
     },
     borderRadius: {
@@ -45,6 +49,10 @@ export default {
     spacing: {
       header: "var(--header-height)",
       track: "var(--track-height)",
+    },
+    boxShadow: {
+      'inner-bold': 'var(--shadow-inner-bold)',
+      'float': 'var(--shadow-float)',
     },
     fontFamily: {
       sans: ["var(--font-sans)"],

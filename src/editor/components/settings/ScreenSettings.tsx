@@ -125,7 +125,6 @@ export const ScreenSettings = () => {
                 <Slider
                     min={0}
                     max={0.2}
-                    step={0.01}
                     value={screenConfig.padding || 0}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}

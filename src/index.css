@@ -30,7 +30,14 @@
   --color-tertiary: var(--tertiary);
   --color-tertiary-fg: var(--tertiary-fg);
 
+  --color-quaternary: var(--quaternary);
+  --color-quaternary-fg: var(--quaternary-fg);
+
   --color-destructive: var(--destructive);
+
+  /* Shadows */
+  --shadow-inner-bold: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 4px 12px rgba(0, 0, 0, 0.5);
 
   /* Radius */
   --radius-sm: 4px;
@@ -67,9 +74,9 @@
   --white-muted: rgba(255, 255, 255, 0.7);
 
   /* --- 2. Semantic Tokens (Values) --- */
-  --bg-app: var(--slate-950);
-  --bg-surface: var(--slate-900);
-  --bg-surface-elevated: var(--slate-800);
+  --bg-app: rgb(19, 19, 19);
+  --bg-surface: rgb(34, 34, 34);
+  --bg-surface-elevated: rgb(43, 43, 43);
 
   --text-main: var(--white);
   --text-muted: var(--white-muted);
@@ -80,13 +87,16 @@
   --border-primary: var(--violet-500);
 
   --primary: var(--brand-primary);
-  --primary-fg: var(--white);
+  --primary-fg: var(--slate-950);
 
-  --secondary: var(--slate-700);
+  --secondary: #9FDB95;
   --secondary-fg: var(--white);
 
   --tertiary: var(--emerald-500);
   --tertiary-fg: var(--slate-950);
+
+  --quaternary: rgb(239, 174, 246);
+  --quaternary-fg: var(--slate-950);
 
   --destructive: var(--rose-500);
   --success: var(--emerald-500);

@@ -52,7 +52,7 @@ export const SettingsPanel = () => {
     return (
         <div className="flex h-full border-r border-border bg-surface-elevated">
             {/* Sidebar Navigation */}
-            <div className="w-56 flex flex-col items-center py-6 px-4 gap-4 border-r border-border bg-surface">
+            <div className="w-46 flex flex-col items-center py-6 px-4 gap-4 border-r border-border bg-surface">
                 <SettingsButton
                     label="Projects"
                     icon={<IconProject />}
@@ -66,7 +66,7 @@ export const SettingsPanel = () => {
                     onClick={() => setActiveTab('screen')}
                 />
                 <SettingsButton
-                    label="Zoom Effects"
+                    label="Effects"
                     icon={<IconZoom />}
                     isActive={activeTab === 'zoom'}
                     onClick={() => setActiveTab('zoom')}
