@@ -4,6 +4,7 @@ import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { ZoomSettings } from './ZoomSettings';
 import { CameraSettings } from './CameraSettings';
+import { SettingsButton } from './SettingsButton';
 
 type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera';
 
@@ -51,50 +52,45 @@ export const SettingsPanel = () => {
     return (
         <div className="flex h-full border-r border-border bg-surface-elevated">
             {/* Sidebar Navigation */}
-            <div className="w-12 flex flex-col items-center py-4 gap-4 border-r border-border bg-surface">
-                <button
+            <div className="w-56 flex flex-col items-center py-6 px-4 gap-4 border-r border-border bg-surface">
+                <SettingsButton
+                    label="Projects"
+                    icon={<IconProject />}
+                    isActive={activeTab === 'project'}
                     onClick={() => setActiveTab('project')}
-                    title="Project Settings"
-                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'project' ? 'bg-surface-elevated text-text-main' : ''}`}
-                >
-                    <IconProject />
-                </button>
-                <button
+                />
+                <SettingsButton
+                    label="Screen"
+                    icon={<IconScreen />}
+                    isActive={activeTab === 'screen'}
                     onClick={() => setActiveTab('screen')}
-                    title="Screen Settings"
-                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'screen' ? 'bg-surface-elevated text-text-main' : ''}`}
-                >
-                    <IconScreen />
-                </button>
-                <button
+                />
+                <SettingsButton
+                    label="Zoom Effects"
+                    icon={<IconZoom />}
+                    isActive={activeTab === 'zoom'}
                     onClick={() => setActiveTab('zoom')}
-                    title="Zoom Settings"
-                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'zoom' ? 'bg-surface-elevated text-text-main' : ''}`}
-                >
-                    <IconZoom />
-                </button>
-                <button
+                />
+                <SettingsButton
+                    label="Background"
+                    icon={<IconBackground />}
+                    isActive={activeTab === 'background'}
                     onClick={() => setActiveTab('background')}
-                    title="Background Settings"
-                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'background' ? 'bg-surface-elevated text-text-main' : ''}`}
-                >
-                    <IconBackground />
-                </button>
-                <button
+                />
+                <SettingsButton
+                    label="Webcam"
+                    icon={<IconCamera />}
+                    isActive={activeTab === 'camera'}
                     onClick={() => setActiveTab('camera')}
-                    title="Camera Settings"
-                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'camera' ? 'bg-surface-elevated text-text-main' : ''}`}
-                >
-                    <IconCamera />
-                </button>
+                />
             </div>
 
             {/* Content Area */}
-            <div className="w-64 flex flex-col">
-                <div className="h-10 border-b border-border flex items-center px-4 font-bold text-text-main text-sm uppercase tracking-wider">
-                    {activeTab}
+            <div className="w-72 flex flex-col">
+                <div className="h-12 border-b border-border flex items-center px-6 font-bold text-text-main text-sm uppercase tracking-wider bg-surface/50 backdrop-blur-sm">
+                    {activeTab === 'zoom' ? 'Zoom Effects' : activeTab}
                 </div>
-                <div className="p-4 flex-1 overflow-y-auto text-text-muted">
+                <div className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar">
                     {activeTab === 'project' && <ProjectSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'zoom' && <ZoomSettings />}

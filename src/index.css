@@ -2,15 +2,13 @@
 @import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
 
 @theme {
-  /* --- Semantic Color Mapping --- */
-
-  /* Typography */
-  --font-sans: 'Satoshi', sans-serif;
-
   /* Surface / Backgrounds */
   --color-background: var(--bg-app);
   --color-surface: var(--bg-surface);
   --color-surface-elevated: var(--bg-surface-elevated);
+
+  /* Typography */
+  --font-sans: 'Satoshi', sans-serif;
 
   /* Borders */
   --color-border: var(--border-base);
@@ -58,6 +56,7 @@
   --violet-600: #7c3aed;
   --violet-500: #8b5cf6;
   --violet-400: #a78bfa;
+  --brand-primary: #6166E6;
 
   /* Semantic - Functional */
   --emerald-500: #10b981;
@@ -80,7 +79,7 @@
   --border-highlight: var(--white-alpha-20);
   --border-primary: var(--violet-500);
 
-  --primary: var(--violet-600);
+  --primary: var(--brand-primary);
   --primary-fg: var(--white);
 
   --secondary: var(--slate-700);
@@ -101,6 +100,12 @@
   --border-base: #ffffff;
 }
 */
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+}
 
 /* --- 3. Component Layer --- */
 @layer components {
