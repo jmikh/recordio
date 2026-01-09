@@ -287,6 +287,7 @@ export interface HoverEvent extends BaseEvent {
 export interface ScrollEvent extends BaseEvent {
     type: typeof EventType.SCROLL;
     targetRect: Rect;
+    endTime: number;
 }
 
 export interface TypingEvent extends BaseEvent {

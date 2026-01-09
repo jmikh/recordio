@@ -39,12 +39,4 @@ export class TimePixelMapper {
         return this.msToX(outputTime);
     }
 
-    /**
-     * Convert x pixels to source time (chains through TimeMapper).
-     * Returns -1 if outside valid range.
-     */
-    xToSourceTime(x: number): number {
-        const outputTimeMs = this.xToMs(x);
-        return this.timeMapper.mapOutputToSourceTime(outputTimeMs);
-    }
 }

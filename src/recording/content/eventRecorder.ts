@@ -86,6 +86,9 @@ export class EventRecorder {
     // Typing Session State
     private currentTypingSession: { startTime: number; targetRect: Rect; element: HTMLElement } | null = null;
 
+    // Scroll Session State
+    private currentScrollSession: { startTime: number; targetRect: Rect; lastScrollTime: number } | null = null;
+
     // Drag State
     private bufferedMouseDown: { event: any, timestamp: number } | null = null;
     private dragPath: MousePositionEvent[] = [];
@@ -95,13 +98,11 @@ export class EventRecorder {
     private readonly TYPING_POLL_INTERVAL = 100;
     private readonly CLICK_THRESHOLD = 500;
     private readonly DRAG_DISTANCE_THRESHOLD = 5;
+    private readonly SCROLL_SESSION_TIMEOUT = 1000;
 
     // Intervals
     private mousePollInterval: any = null;
     private typingPollInterval: any = null;
-
-    private readonly SCROLL_THROTTLE_MS = 500;
-    private lastScrollEventEmitted = 0;
 
     constructor(startTime: number) {
         this.startTime = startTime;
@@ -120,6 +121,7 @@ export class EventRecorder {
         if (!this.isRecording) return;
         this.isRecording = false;
         this.flushPendingTypingSession();
+        this.flushPendingScrollSession();
         this.removeListeners();
         this.stopPolling();
         logger.log("[ContentRecorder] Stopped capturing events.");
@@ -223,6 +225,9 @@ export class EventRecorder {
     private handlePointerDown = (e: PointerEvent) => {
         if (!this.isActive()) return;
 
+        // Interaction should flush pending scroll
+        this.flushPendingScrollSession();
+
         const dpr = window.devicePixelRatio || 1;
         let elementMeta: Partial<Size> = {};
         if (e.target instanceof Element) {
@@ -286,6 +291,9 @@ export class EventRecorder {
     private handleKeyDown = (e: KeyboardEvent) => {
         if (!this.isActive()) return;
 
+        // Interaction should flush pending scroll
+        this.flushPendingScrollSession();
+
         const target = e.target as HTMLElement;
         const tagName = target.tagName;
         const isContentEditable = target.isContentEditable;
@@ -328,37 +336,37 @@ export class EventRecorder {
     private handleScroll = (e: Event) => {
         if (!this.isActive()) return;
 
-        // Simple throttle logic could be added here if needed, but we rely on browser event scheduling + explicit checks
         const now = this.getRelativeTime();
 
-        if (now - this.lastScrollEventEmitted < this.SCROLL_THROTTLE_MS) {
-            return;
-        }
+        // If this is a new session or continuation
+        if (!this.currentScrollSession) {
+            let targetRect: Rect;
+            if (e.target instanceof Element) {
+                const rect = e.target.getBoundingClientRect();
+                targetRect = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+            } else {
+                targetRect = getLayoutAwareViewport();
+            }
 
-        let targetRect: Rect;
-        if (e.target instanceof Element) {
-            const rect = e.target.getBoundingClientRect();
-            targetRect = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+            this.currentScrollSession = {
+                startTime: now,
+                targetRect: this.dprScaleRect(targetRect),
+                lastScrollTime: now
+            };
         } else {
-            // Full Page (simplification for now, assuming window scroll)
-            targetRect = getLayoutAwareViewport();
+            // Update last scroll time
+            this.currentScrollSession.lastScrollTime = now;
         }
-
-        this.sendMessage(EventType.SCROLL, {
-            timestamp: now,
-            mousePos: this.lastMousePos.mousePos,
-            targetRect: this.dprScaleRect(targetRect)
-        });
-
-        this.lastScrollEventEmitted = now;
     }
 
     private handleUrlChange = () => {
+        this.flushPendingScrollSession();
         this.sendUrlEvent();
     }
 
     private handlePageUnload = () => {
         this.flushPendingTypingSession();
+        this.flushPendingScrollSession();
     }
 
     private sendUrlEvent() {
@@ -378,6 +386,13 @@ export class EventRecorder {
 
         const now = this.getRelativeTime();
         const realNow = Date.now();
+
+        // Check Scroll Session Timeout
+        if (this.currentScrollSession) {
+            if (now - this.currentScrollSession.lastScrollTime > this.SCROLL_SESSION_TIMEOUT) {
+                this.flushPendingScrollSession();
+            }
+        }
 
         if (realNow - this.lastMouseTime >= this.MOUSE_POLL_INTERVAL) {
             this.lastMouseTime = realNow;
@@ -464,6 +479,18 @@ export class EventRecorder {
                 endTime: now
             });
             this.currentTypingSession = null;
+        }
+    }
+
+    private flushPendingScrollSession() {
+        if (this.currentScrollSession) {
+            this.sendMessage(EventType.SCROLL, {
+                timestamp: this.currentScrollSession.startTime,
+                mousePos: this.lastMousePos.mousePos,
+                targetRect: this.currentScrollSession.targetRect,
+                endTime: this.currentScrollSession.lastScrollTime
+            });
+            this.currentScrollSession = null;
         }
     }
 }
