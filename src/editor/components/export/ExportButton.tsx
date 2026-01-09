@@ -70,7 +70,7 @@ export const ExportButton = () => {
     return (
         <div className="relative">
             <button
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-fg text-xs font-medium rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={isExporting}
             >
@@ -83,11 +83,11 @@ export const ExportButton = () => {
             {isOpen && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-32 bg-[#252526] border border-[#333] rounded shadow-xl z-50 py-1">
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-surface-elevated border border-border rounded shadow-xl z-50 py-1">
                         {(['360p', '720p', '1080p', '4K'] as ExportQuality[]).map(q => (
                             <button
                                 key={q}
-                                className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-[#333] hover:text-white transition-colors"
+                                className="w-full text-left px-4 py-2 text-xs text-text-muted hover:bg-surface hover:text-text-main transition-colors"
                                 onClick={() => handleExport(q)}
                             >
                                 {q}

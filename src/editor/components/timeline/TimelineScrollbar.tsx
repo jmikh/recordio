@@ -129,12 +129,12 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
 
     return (
         <div
-            className={`h-3 w-full bg-[#1e1e1e] border-b border-[#333] relative flex items-center shrink-0 ${className || ''}`}
+            className={`h-3 w-full bg-surface border-b border-border relative flex items-center shrink-0 ${className || ''}`}
             ref={trackRef}
         >
             <div
                 ref={thumbRef}
-                className={`h-1.5 rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-[#3b82f6]' : 'bg-[#475569] hover:bg-[#64748b]'}`}
+                className={`h-1.5 rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-surface-elevated hover:bg-primary/50'}`}
                 style={{
                     width: thumbWidth,
                     left: thumbLeft,

@@ -57,10 +57,10 @@ export const TimelinePlayhead: React.FC<TimelinePlayheadProps> = ({
     return (
         <div
             ref={playheadRef}
-            className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-30 pointer-events-none"
+            className="absolute top-0 bottom-0 w-[1px] bg-destructive z-30 pointer-events-none"
             style={{ left: `0px`, height: '100%' }}
         >
-            <div className="absolute -top-1 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[8px] border-t-red-500"></div>
+            <div className="absolute -top-1 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[8px] border-t-destructive"></div>
         </div>
     );
 };

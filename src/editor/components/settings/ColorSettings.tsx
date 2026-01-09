@@ -66,17 +66,17 @@ export const ColorSettings = ({
     };
 
     return (
-        <div className="p-4 bg-[#252525] rounded-lg border border-gray-700/50 space-y-4 text-gray-200 shadow-xl">
+        <div className="p-4 bg-surface-elevated rounded-lg border border-border space-y-4 text-text-main shadow-xl">
             {/* Toggle */}
-            <div className="flex bg-[#1a1a1a] p-1 rounded-lg">
+            <div className="flex bg-surface p-1 rounded-lg">
                 <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isSolid ? 'bg-gray-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isSolid ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
                     onClick={() => onTypeChange('solid')}
                 >
                     Solid
                 </button>
                 <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isGradient ? 'bg-gray-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${isGradient ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
                     onClick={() => onTypeChange('gradient')}
                 >
                     Gradient
@@ -131,28 +131,28 @@ export const ColorSettings = ({
 
             {/* Hex Input */}
             <div className="space-y-1">
-                <div className="text-[10px] text-gray-500 uppercase font-semibold">Hex Color</div>
-                <div className="flex bg-[#1a1a1a] border border-gray-700 rounded px-2 py-1.5 items-center gap-2">
-                    <span className="text-gray-500 mr-2 select-none">#</span>
+                <div className="text-[10px] text-text-muted uppercase font-semibold">Hex Color</div>
+                <div className="flex bg-surface border border-border rounded px-2 py-1.5 items-center gap-2">
+                    <span className="text-text-muted mr-2 select-none">#</span>
                     <input
                         type="text"
                         value={activeColorValue.replace('#', '')}
                         onChange={(e) => handleColorUpdate(`#${e.target.value}`)}
-                        className="bg-transparent border-none outline-none text-xs font-mono text-gray-200 w-full uppercase"
+                        className="bg-transparent border-none outline-none text-xs font-mono text-text-main w-full uppercase"
                         maxLength={6}
                     />
-                    <div className="w-4 h-4 rounded border border-gray-600" style={{ backgroundColor: activeColorValue }} />
+                    <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
                 </div>
             </div>
 
             {/* Direction Compass (Only if Gradient) */}
             {isGradient && (
-                <div className="border-t border-gray-700 pt-4 mt-2">
+                <div className="border-t border-border pt-4 mt-2">
                     <div className="flex flex-col gap-2 items-center">
-                        <label className="text-[10px] text-gray-500 uppercase font-semibold">Direction</label>
-                        <div className="relative w-32 h-32 flex items-center justify-center bg-[#1a1a1a] rounded-full border border-gray-700/50 shadow-inner mt-2">
+                        <label className="text-[10px] text-text-muted uppercase font-semibold">Direction</label>
+                        <div className="relative w-32 h-32 flex items-center justify-center bg-surface rounded-full border border-border shadow-inner mt-2">
                             {/* Center Dot */}
-                            <div className="absolute w-2 h-2 bg-gray-600 rounded-full z-10" />
+                            <div className="absolute w-2 h-2 bg-text-muted rounded-full z-10" />
 
                             {GRADIENT_DIRECTIONS.filter(d => !!d).map((dir) => {
                                 const isSelected = safeGradient.direction === dir;
@@ -180,8 +180,8 @@ export const ColorSettings = ({
                                         key={dir}
                                         onClick={() => handleDirectionClick(dir)}
                                         className={`absolute w-8 h-8 rounded-full flex items-center justify-center transition-all transform hover:scale-110 ${isSelected
-                                            ? 'bg-blue-600 text-white shadow-blue-500/50 shadow-md z-20'
-                                            : 'text-gray-500 hover:text-gray-200 hover:bg-[#333]'}`}
+                                            ? 'bg-primary text-primary-fg shadow-primary/50 shadow-md z-20'
+                                            : 'text-text-muted hover:text-text-main hover:bg-surface-elevated'}`}
                                         style={{
                                             transform: `translate(${x}px, ${y}px)`,
                                         }}

@@ -226,8 +226,8 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             >
                 <button
                     className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isCentered
-                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        ? 'bg-surface text-text-muted/50 cursor-not-allowed'
+                        : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
                         }`}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -246,8 +246,8 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
                 <button
                     className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${isFullView
-                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        ? 'bg-surface text-text-muted/50 cursor-not-allowed'
+                        : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
                         }`}
                     onClick={(e) => {
                         e.stopPropagation();

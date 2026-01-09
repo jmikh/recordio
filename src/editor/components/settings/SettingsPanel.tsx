@@ -49,41 +49,41 @@ export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('background');
 
     return (
-        <div className="flex h-full border-r border-[#333] bg-[#252526]">
+        <div className="flex h-full border-r border-border bg-surface-elevated">
             {/* Sidebar Navigation */}
-            <div className="w-12 flex flex-col items-center py-4 gap-4 border-r border-[#333] bg-[#1e1e1e]">
+            <div className="w-12 flex flex-col items-center py-4 gap-4 border-r border-border bg-surface">
                 <button
                     onClick={() => setActiveTab('project')}
                     title="Project Settings"
-                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'project' ? 'bg-[#333] text-white' : ''}`}
+                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'project' ? 'bg-surface-elevated text-text-main' : ''}`}
                 >
                     <IconProject />
                 </button>
                 <button
                     onClick={() => setActiveTab('screen')}
                     title="Screen Settings"
-                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'screen' ? 'bg-[#333] text-white' : ''}`}
+                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'screen' ? 'bg-surface-elevated text-text-main' : ''}`}
                 >
                     <IconScreen />
                 </button>
                 <button
                     onClick={() => setActiveTab('zoom')}
                     title="Zoom Settings"
-                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'zoom' ? 'bg-[#333] text-white' : ''}`}
+                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'zoom' ? 'bg-surface-elevated text-text-main' : ''}`}
                 >
                     <IconZoom />
                 </button>
                 <button
                     onClick={() => setActiveTab('background')}
                     title="Background Settings"
-                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'background' ? 'bg-[#333] text-white' : ''}`}
+                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'background' ? 'bg-surface-elevated text-text-main' : ''}`}
                 >
                     <IconBackground />
                 </button>
                 <button
                     onClick={() => setActiveTab('camera')}
                     title="Camera Settings"
-                    className={`p-2 rounded hover:bg-[#333] text-gray-400 hover:text-white transition-colors ${activeTab === 'camera' ? 'bg-[#333] text-white' : ''}`}
+                    className={`p-2 rounded hover:bg-surface-elevated text-text-muted hover:text-text-main transition-colors ${activeTab === 'camera' ? 'bg-surface-elevated text-text-main' : ''}`}
                 >
                     <IconCamera />
                 </button>
@@ -91,10 +91,10 @@ export const SettingsPanel = () => {
 
             {/* Content Area */}
             <div className="w-64 flex flex-col">
-                <div className="h-10 border-b border-[#333] flex items-center px-4 font-bold text-gray-300 text-sm uppercase tracking-wider">
+                <div className="h-10 border-b border-border flex items-center px-4 font-bold text-text-main text-sm uppercase tracking-wider">
                     {activeTab}
                 </div>
-                <div className="p-4 flex-1 overflow-y-auto text-gray-300">
+                <div className="p-4 flex-1 overflow-y-auto text-text-muted">
                     {activeTab === 'project' && <ProjectSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'zoom' && <ZoomSettings />}

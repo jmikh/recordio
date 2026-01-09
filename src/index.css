@@ -1,7 +1,127 @@
 @import "tailwindcss";
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
 
-/* Custom styles can go here */
+@theme {
+  /* --- Semantic Color Mapping --- */
 
+  /* Typography */
+  --font-sans: 'Satoshi', sans-serif;
+
+  /* Surface / Backgrounds */
+  --color-background: var(--bg-app);
+  --color-surface: var(--bg-surface);
+  --color-surface-elevated: var(--bg-surface-elevated);
+
+  /* Borders */
+  --color-border: var(--border-base);
+  --color-border-highlight: var(--border-highlight);
+  --color-border-primary: var(--border-primary);
+
+  /* Text */
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverted: var(--text-inverted);
+
+  /* Primary Action */
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-fg: var(--secondary-fg);
+
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-fg: var(--tertiary-fg);
+
+  --color-destructive: var(--destructive);
+
+  /* Radius */
+  --radius-sm: 4px;
+  /* We can define raw values here or map to vars */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Spacing */
+  --spacing-header: 48px;
+  --spacing-track: 40px;
+}
+
+:root {
+  /* --- 1. Raw Palette (Internal Use Only) --- */
+  /* Slate / Dark Scale */
+  --slate-950: #020617;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+
+  /* Violet / Indigo Accent */
+  --violet-600: #7c3aed;
+  --violet-500: #8b5cf6;
+  --violet-400: #a78bfa;
+
+  /* Semantic - Functional */
+  --emerald-500: #10b981;
+  --rose-500: #f43f5e;
+  --white: #ffffff;
+  --white-alpha-10: rgba(255, 255, 255, 0.1);
+  --white-alpha-20: rgba(255, 255, 255, 0.2);
+  --white-muted: rgba(255, 255, 255, 0.7);
+
+  /* --- 2. Semantic Tokens (Values) --- */
+  --bg-app: var(--slate-950);
+  --bg-surface: var(--slate-900);
+  --bg-surface-elevated: var(--slate-800);
+
+  --text-main: var(--white);
+  --text-muted: var(--white-muted);
+  --text-inverted: var(--slate-900);
+
+  --border-base: var(--white-alpha-10);
+  --border-highlight: var(--white-alpha-20);
+  --border-primary: var(--violet-500);
+
+  --primary: var(--violet-600);
+  --primary-fg: var(--white);
+
+  --secondary: var(--slate-700);
+  --secondary-fg: var(--white);
+
+  --tertiary: var(--emerald-500);
+  --tertiary-fg: var(--slate-950);
+
+  --destructive: var(--rose-500);
+  --success: var(--emerald-500);
+}
+
+/* Theme Override Example: High Contrast */
+/* 
+[data-theme="high-contrast"] {
+  --bg-app: #000000;
+  --bg-surface: #111111;
+  --border-base: #ffffff;
+}
+*/
+
+/* --- 3. Component Layer --- */
+@layer components {
+
+  /* Standard Panel */
+  .panel-base {
+    @apply bg-surface border border-border rounded-md text-text-main;
+  }
+
+  /* Interactive Item */
+  .item-interactive {
+    @apply hover:bg-surface-elevated transition-colors cursor-pointer;
+  }
+
+  /* Primary Button */
+  .btn-primary {
+    @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium hover:opacity-90 transition-opacity;
+  }
+}
+
+/* Retaining legacy animations for now */
 @keyframes flashing-glow {
   0% {
     box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.5);
@@ -21,6 +141,5 @@
 
 .bounding-box-glow {
   animation: flashing-glow 1.5s infinite ease-in-out;
-  border: 2px solid green;
-  /* Fallback/Base styles */
+  border: 2px solid var(--success);
 }

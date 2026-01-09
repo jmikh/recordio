@@ -29,7 +29,7 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
     };
 
     return (
-        <div className="w-full relative bg-[#252526] flex" style={{ height: trackHeight }}>
+        <div className="w-full relative bg-surface-elevated flex" style={{ height: trackHeight }}>
 
 
             {/* Content Container */}

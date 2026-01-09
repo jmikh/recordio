@@ -87,7 +87,7 @@ export function Timeline() {
     }, [selectedWindowId, removeOutputWindow]);
 
     return (
-        <div className="flex flex-col h-full bg-[#1e1e1e] select-none text-white font-sans">
+        <div className="flex flex-col h-full bg-background select-none text-text-main font-sans">
             {/* 1. Toolbar */}
             <TimelineToolbar
                 totalDurationMs={totalOutputDuration}
@@ -98,16 +98,16 @@ export function Timeline() {
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
-                    className="flex-shrink-0 flex flex-col z-20 bg-[#1e1e1e] border-r border-[#333]"
+                    className="flex-shrink-0 flex flex-col z-20 bg-background border-r border-border"
                     style={{ width: HEADER_WIDTH }}
                 >
                     {/* Spacer for Ruler */}
-                    <div style={{ height: 24 }} className="border-b border-[#333] shrink-0" />
+                    <div style={{ height: 24 }} className="border-b border-border shrink-0" />
 
                     {/* Header: Main Track */}
                     <div className="shrink-0" style={{ height: mainTrackHeight }}>
                         <div className="flex flex-col w-full h-full">
-                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-white/5 bg-[#2a2a2a]/50" />
+                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-border bg-surface/50" />
                             {!!timeline.recording.cameraSourceId ? (
                                 <div className="flex flex-col flex-1">
                                     <TimelineTrackHeader
@@ -162,7 +162,7 @@ export function Timeline() {
                         />
 
                         <div
-                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-[#1e1e1e] [&::-webkit-scrollbar]:hidden"
+                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-background [&::-webkit-scrollbar]:hidden"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                             ref={containerRef}
                             onScroll={handleScroll}

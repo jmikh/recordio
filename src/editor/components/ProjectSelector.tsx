@@ -52,20 +52,20 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
 
 
     return (
-        <div className="w-full h-screen bg-[#1e1e1e] flex flex-col overflow-hidden text-white">
+        <div className="w-full h-screen bg-background flex flex-col overflow-hidden text-text-main">
             {/* Header - Fixed */}
             <div className="w-full flex justify-center shrink-0">
                 <div className="w-full max-w-4xl p-8 pb-4 flex flex-col gap-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Recordo Projects</h1>
-                            <p className="text-gray-400 mt-1">Select a project to continue editing</p>
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-tertiary">Recordo Projects</h1>
+                            <p className="text-text-muted mt-1">Select a project to continue editing</p>
                         </div>
                     </div>
 
                     {/* Error Message */}
                     {error && (
-                        <div className="bg-red-900/30 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg flex items-center gap-3">
+                        <div className="bg-destructive/20 border border-destructive/50 text-destructive-foreground px-4 py-3 rounded-lg flex items-center gap-3">
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -83,7 +83,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                         {isLoading && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
                                 {[1, 2, 3].map(i => (
-                                    <div key={i} className="bg-gray-800 h-48 rounded-xl"></div>
+                                    <div key={i} className="bg-surface h-48 rounded-xl"></div>
                                 ))}
                             </div>
                         )}
@@ -92,9 +92,9 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                         {!isLoading && (
                             <>
                                 {projects.length === 0 ? (
-                                    <div className="text-center py-12 text-gray-500 border border-dashed border-gray-700 rounded-xl">
+                                    <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-xl">
                                         <p className="text-lg mb-2">No projects found.</p>
-                                        <p className="text-gray-400">
+                                        <p className="text-text-muted">
                                             To create a new project, start a recording via the Recordo extension.
                                         </p>
                                     </div>

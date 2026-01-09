@@ -8,7 +8,7 @@ export const DebugBar = () => {
 
 
     return (
-        <div className="h-8 flex items-center px-4 gap-2 border-t border-[#333] bg-[#1e1e1e]">
+        <div className="h-8 flex items-center px-4 gap-2 border-t border-border bg-background">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mr-2">Debug</span>
             <button
                 className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"

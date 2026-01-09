@@ -29,10 +29,14 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, width, height);
 
+        // Read theme colors
+        const style = getComputedStyle(document.documentElement);
+        const textColor = style.getPropertyValue('--color-text-muted') || '#64748b';
+        const tickColor = style.getPropertyValue('--color-border-primary') || '#334155';
 
-        ctx.fillStyle = '#64748b';
-        ctx.strokeStyle = '#334155';
-        ctx.font = '10px monospace';
+        ctx.fillStyle = textColor; // text-muted
+        ctx.strokeStyle = tickColor; // border-primary (or highlight)
+        ctx.font = `10px ${style.getPropertyValue('--font-sans') || 'sans-serif'}`;
         ctx.textBaseline = 'top';
 
         let majorInterval = 1000;
@@ -67,7 +71,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
     }, [totalWidth, pixelsPerSec, height]);
 
     return (
-        <div className="sticky top-0 z-30 bg-[#1e1e1e] border-b border-[#333]">
+        <div className="sticky top-0 z-30 bg-surface border-b border-border">
             <canvas ref={canvasRef} className="block pointer-events-none" style={{ height: `${height}px` }} />
         </div>
     );

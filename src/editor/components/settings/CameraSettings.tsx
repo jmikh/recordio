@@ -72,8 +72,8 @@ export const CameraSettings = () => {
                     <button
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
                         className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${isEditingCamera
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-[#333] text-gray-200 hover:bg-[#444]'
+                            ? 'bg-primary text-primary-fg hover:bg-primary/90'
+                            : 'bg-surface-elevated text-text-main hover:bg-surface'
                             }`}
                     >
                         {isEditingCamera ? 'Done Editing' : 'Edit Position & Size'}
@@ -83,15 +83,15 @@ export const CameraSettings = () => {
                 <div className="space-y-6">
                     {/* Shape */}
                     <div className="space-y-3">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Shape</label>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wide">Shape</label>
                         <div className="grid grid-cols-3 gap-2">
                             {SHAPES.map((s) => (
                                 <button
                                     key={s.id}
                                     onClick={() => handleShapeChange(s.id as any)}
                                     className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${shape === s.id
-                                        ? 'bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-sm'
-                                        : 'bg-[#1a1a1a] border-gray-800 text-gray-500 hover:border-gray-700 hover:bg-[#202020]'
+                                        ? 'bg-primary/10 border-primary/50 text-primary shadow-sm'
+                                        : 'bg-surface border-border text-text-muted hover:border-text-muted/50 hover:bg-surface-elevated'
                                         }`}
                                 >
                                     {s.icon}

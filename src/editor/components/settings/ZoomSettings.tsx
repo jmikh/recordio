@@ -32,12 +32,12 @@ export const ZoomSettings = () => {
     };
 
     return (
-        <div className="flex flex-col gap-6 text-sm text-gray-300">
+        <div className="flex flex-col gap-6 text-sm text-text-muted">
             {/* Transition Duration */}
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                    <label className="text-xs uppercase font-bold text-gray-500">Transition Time</label>
-                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoomDurationMs}ms</span>
+                    <label className="text-xs uppercase font-bold text-text-muted/60">Transition Time</label>
+                    <span className="text-xs font-mono text-tertiary">{zoomSettings.maxZoomDurationMs}ms</span>
                 </div>
                 <Slider
                     min={zoomSettings.minZoomDurationMs}
@@ -48,7 +48,7 @@ export const ZoomSettings = () => {
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-text-muted/60">
                     Duration of the zoom animation.
                 </p>
             </div>
@@ -56,8 +56,8 @@ export const ZoomSettings = () => {
             {/* Max Zoom */}
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                    <label className="text-xs uppercase font-bold text-gray-500">Max Zoom</label>
-                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoom}x</span>
+                    <label className="text-xs uppercase font-bold text-text-muted/60">Max Zoom</label>
+                    <span className="text-xs font-mono text-tertiary">{zoomSettings.maxZoom}x</span>
                 </div>
                 <Slider
                     min={1.1}
@@ -68,18 +68,18 @@ export const ZoomSettings = () => {
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-text-muted/60">
                     Maximum zoom level applied to the content.
                 </p>
             </div>
 
-            <div className="h-px bg-gray-800" />
+            <div className="h-px bg-border" />
 
             {/* Auto Zoom */}
             <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs uppercase font-bold text-gray-500">Auto Zoom</label>
-                    <p className="text-[10px] text-gray-500 max-w-[200px]">
+                    <label className="text-xs uppercase font-bold text-text-muted/60">Auto Zoom</label>
+                    <p className="text-[10px] text-text-muted/60 max-w-[200px]">
                         Automatically create zooms based on mouse movement.
                     </p>
                 </div>
@@ -90,7 +90,7 @@ export const ZoomSettings = () => {
                         onChange={handleAutoZoomChange}
                         className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className="w-9 h-5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
             </div>
 
@@ -101,8 +101,8 @@ export const ZoomSettings = () => {
                     disabled={viewportMotions.length === 0}
                     className={`w-full py-2 px-4 rounded text-xs font-medium transition-colors border flex items-center justify-center gap-2
                         ${viewportMotions.length === 0
-                            ? 'bg-gray-700/30 text-gray-500 border-transparent cursor-not-allowed' // Disabled state
-                            : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600'        // Active state (Neutral)
+                            ? 'bg-surface text-text-muted/40 border-transparent cursor-not-allowed' // Disabled state
+                            : 'bg-surface hover:bg-surface-elevated text-text-main border-border hover:border-text-muted/40'        // Active state (Neutral)
                         }
                     `}
                 >

@@ -26,19 +26,19 @@ export const Header = () => {
     const futureStates = useProjectHistory(state => state.futureStates);
 
     return (
-        <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-30 select-none">
+        <div className="bg-surface-elevated border-b border-border flex flex-col shrink-0 z-30 select-none">
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <h1 className="font-bold text-gray-200 text-sm tracking-wide">RECORDO</h1>
-                    <div className="h-4 w-[1px] bg-[#444] mx-2"></div>
+                    <h1 className="font-bold text-text-main text-sm tracking-wide">RECORDO</h1>
+                    <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
                         <button
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="p-2 text-gray-400 hover:text-white hover:bg-[#333] rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent"
                         >
                             <IconUndo />
                         </button>
@@ -46,13 +46,13 @@ export const Header = () => {
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="p-2 text-gray-400 hover:text-white hover:bg-[#333] rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent"
                         >
                             <IconRedo />
                         </button>
                     </div>
 
-                    <div className="text-[10px] text-gray-500 ml-4">
+                    <div className="text-[10px] text-text-muted ml-4">
                         {pastStates.length} / {futureStates.length}
                     </div>
                 </div>
@@ -64,22 +64,22 @@ export const Header = () => {
                         value={project.name}
                         onChange={(e) => updateProjectName(e.target.value)}
                         maxLength={40}
-                        className="bg-transparent text-gray-300 text-sm text-center focus:text-white focus:outline-none focus:bg-[#333] rounded px-2 py-0.5 hover:bg-[#333]/50 transition-colors placeholder-gray-600 w-[300px]"
+                        className="bg-transparent text-text-main text-sm text-center focus:text-text-main focus:outline-none focus:bg-surface rounded px-2 py-0.5 hover:bg-surface/50 transition-colors placeholder-text-muted w-[300px]"
                         placeholder="Untitled Project"
                     />
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                    <div className="text-xs text-text-muted flex items-center gap-2">
                         {isSaving ? (
-                            <span className="text-blue-400">Saving...</span>
+                            <span className="text-primary-fg animate-pulse">Saving...</span>
                         ) : (
-                            <span className="text-gray-600">All changes saved</span>
+                            <span className="text-text-muted">All changes saved</span>
                         )}
                     </div>
                     {/* User Profile / Other Actions */}
                     <ExportButton />
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500"></div>
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
                 </div>
             </div>
         </div>

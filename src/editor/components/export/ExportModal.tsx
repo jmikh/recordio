@@ -15,27 +15,27 @@ export const ExportModal = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-[#1e1e1e] border border-[#333] rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
+        <div className="fixed inset-0 z-[100] bg-background/80 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-surface-elevated border border-border rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
 
                 <div className="flex items-center justify-between">
-                    <h2 className="text-white font-semibold text-lg">Exporting Project</h2>
-                    <div className="spinner w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <h2 className="text-text-main font-semibold text-lg">Exporting Project</h2>
+                    <div className="spinner w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
 
-                <p className="text-gray-400 text-sm opacity-80 truncate">
+                <p className="text-text-muted text-sm opacity-80 truncate">
                     {projectName}
                 </p>
 
                 <div className="flex flex-col gap-2">
-                    <div className="h-2 bg-[#333] rounded-full overflow-hidden">
+                    <div className="h-2 bg-surface rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                            className="h-full bg-primary transition-all duration-300 ease-out"
                             style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
                         />
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-gray-400">
+                    <div className="flex items-center justify-between text-xs text-text-muted">
                         <span>{Math.round(progress * 100)}%</span>
                         <span>
                             {timeRemainingSeconds !== null
@@ -48,7 +48,7 @@ export const ExportModal = () => {
                 <div className="flex justify-end pt-2">
                     <button
                         onClick={handleCancel}
-                        className="px-4 py-2 bg-[#333] hover:bg-[#444] text-white text-sm rounded transition-colors"
+                        className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-main text-sm rounded transition-colors border border-border"
                     >
                         Cancel
                     </button>

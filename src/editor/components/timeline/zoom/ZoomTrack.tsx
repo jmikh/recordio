@@ -64,7 +64,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     return (
         <div
-            className="w-full relative bg-[#252526] select-none flex"
+            className="w-full relative bg-surface-elevated select-none flex"
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -109,7 +109,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none ${isSelected ? 'bg-purple-500/40' : 'bg-purple-600/40'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none ${isSelected ? 'bg-primary/40' : 'bg-primary/30'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -127,7 +127,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             <React.Fragment key={m.id}>
                                 <div
                                     className={`absolute top-[4px] bottom-[4px] group rounded-sm transition-colors border
-                                        ${isSelected ? 'bg-purple-600 border-purple-400' : 'bg-purple-600 border-purple-600/30 hover:bg-purple-500'}
+                                        ${isSelected ? 'bg-primary border-primary-fg' : 'bg-primary/80 border-primary/30 hover:bg-primary'}
                                         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
                                     `}
                                     style={{
@@ -144,14 +144,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                 >
                                     {/* Arrows Pattern */}
                                     <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-40">
-                                        <span className="text-[10px] text-white select-none tracking-widest font-mono">
+                                        <span className="text-[10px] text-primary-fg select-none tracking-widest font-mono">
                                             {arrows}
                                         </span>
                                     </div>
 
                                     {/* Right Edge (Keyframe) - Thicker, Opaque */}
                                     <div
-                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-yellow-400' : 'bg-purple-900'} shadow-sm`}
+                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-tertiary' : 'bg-primary-fg/50'} shadow-sm`}
                                     />
 
                                 </div>
@@ -164,7 +164,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 {/* Add Zoom Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-yellow-500/50 bg-yellow-500/10 rounded-sm flex items-center justify-center"
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-tertiary/50 bg-tertiary/10 rounded-sm flex items-center justify-center"
                         style={{
                             // Use calculated width (pixel based on time)
                             // Position: right aligned to mouse X (hoverInfo.x).
@@ -174,15 +174,15 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                         }}
                     >
                         {/* Add Zoom Label (Above) */}
-                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-yellow-200/90 pointer-events-none bg-[#252526]/80 px-1 rounded">
+                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-tertiary pointer-events-none bg-surface-elevated/80 px-1 rounded">
                             Add Zoom
                         </div>
 
                         {/* Right Handle */}
-                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-yellow-500/50" />
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-tertiary/50" />
 
                         {/* Plus Icon */}
-                        <span className="text-yellow-200 text-lg font-light leading-none">+</span>
+                        <span className="text-tertiary text-lg font-light leading-none">+</span>
                     </div>
                 )}
             </div>

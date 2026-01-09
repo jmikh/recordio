@@ -43,12 +43,12 @@ export const ScreenSettings = () => {
             </div>
 
             {/* Mode Toggle */}
-            <div className="bg-[#1a1a1a] p-1 rounded-lg flex">
+            <div className="bg-surface p-1 rounded-lg flex">
                 <button
                     onClick={() => handleModeChange('device')}
                     className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${screenConfig.mode === 'device'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-400 hover:text-gray-200'
+                        ? 'bg-primary text-primary-fg shadow'
+                        : 'text-text-muted hover:text-text-main'
                         }`}
                 >
                     Device Frame
@@ -56,8 +56,8 @@ export const ScreenSettings = () => {
                 <button
                     onClick={() => handleModeChange('border')}
                     className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${screenConfig.mode === 'border'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-400 hover:text-gray-200'
+                        ? 'bg-primary text-primary-fg shadow'
+                        : 'text-text-muted hover:text-text-main'
                         }`}
                 >
                     Custom

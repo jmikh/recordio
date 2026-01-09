@@ -110,11 +110,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     })();
 
     return (
-        <div className="h-10 flex items-center px-4 bg-[#252526] border-b border-[#333] shrink-0 justify-between">
+        <div className="h-10 flex items-center px-4 bg-surface-elevated border-b border-border shrink-0 justify-between">
             <div className="flex items-center gap-2">
                 <button
                     onClick={handleSplit}
-                    className="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs border border-[#555]"
+                    className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border"
                     title="Split at Playhead"
                 >
                     Split
@@ -124,7 +124,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 <div className="relative" ref={ratioRef}>
                     <button
                         onClick={() => setIsRatioOpen(!isRatioOpen)}
-                        className="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-xs border border-[#555] flex items-center gap-1 min-w-[60px] justify-center"
+                        className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border flex items-center gap-1 min-w-[60px] justify-center"
                         title="Change Aspect Ratio"
                     >
                         {currentAspectLabel}
@@ -132,11 +132,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     </button>
 
                     {isRatioOpen && (
-                        <div className="absolute bottom-full left-0 mb-1 w-40 bg-[#252526] border border-[#444] rounded shadow-xl overflow-hidden z-50 flex flex-col">
+                        <div className="absolute bottom-full left-0 mb-1 w-40 bg-surface-elevated border border-border rounded shadow-xl overflow-hidden z-50 flex flex-col">
                             {resolutions.map((res) => (
                                 <button
                                     key={res.label}
-                                    className="px-3 py-2 text-left text-xs hover:bg-[#333] text-gray-200 border-b border-[#333] last:border-0"
+                                    className="px-3 py-2 text-left text-xs hover:bg-surface text-text-main border-b border-border last:border-0"
                                     onClick={() => {
                                         handleResolutionChange(res.width, res.height);
                                         setIsRatioOpen(false);
@@ -150,20 +150,20 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-[#111] px-4 py-1 rounded-full border border-[#333]">
-                <button onClick={onTogglePlay} className="hover:text-green-400">
+            <div className="flex items-center gap-4 bg-background px-4 py-1 rounded-full border border-border">
+                <button onClick={onTogglePlay} className="hover:text-primary transition-colors">
                     {isPlaying ? '⏸' : '▶️'}
                 </button>
                 <div
                     ref={timeDisplayRef}
-                    className="font-mono text-xs text-gray-400 w-32 text-center"
+                    className="font-mono text-xs text-text-muted w-32 text-center"
                 >
                     00:00.0 / {formatFullTime(totalDurationMs)}
                 </div>
             </div>
 
             <div className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-500">Scale</span>
+                <span className="text-[10px] text-text-muted">Scale</span>
                 <input
                     type="range"
                     min={MIN_PIXELS_PER_SEC}
@@ -172,7 +172,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     onChange={(e) => handleScaleChange(Number(e.target.value))}
                     onMouseDown={batcher.startInteraction}
                     onMouseUp={batcher.endInteraction}
-                    className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                    className="w-24 h-1 bg-surface rounded-lg appearance-none cursor-pointer"
                 />
             </div>
         </div>

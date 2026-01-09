@@ -45,7 +45,7 @@ const Handle: React.FC<HandleProps> = ({
     const size = 20;
     const thickness = 2;
     const length = 10;
-    const color = 'orange';
+    const color = 'var(--primary)';
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -111,7 +111,7 @@ const SideHandle: React.FC<HandleProps> = ({
     const size = 20;
     const thickness = 2;
     const length = 15;
-    const color = 'orange';
+    const color = 'var(--primary)';
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',

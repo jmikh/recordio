@@ -56,7 +56,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const trackContentHeight = Math.max(0, trackHeight - GROUP_HEADER_HEIGHT);
 
     return (
-        <div ref={containerRef} className="w-full relative bg-[#2a2a2a]/50 flex" style={{ height: trackHeight }}>
+        <div ref={containerRef} className="w-full relative bg-surface/50 flex" style={{ height: trackHeight }}>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>
@@ -84,11 +84,11 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                             }}
                         >
                             {/* Visual Window Content (Clipped) */}
-                            <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-yellow-500 border-2' : 'border-white/20 hover:border-white/40'}`}>
+                            <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-primary border-2' : 'border-border-highlight hover:border-border-primary'}`}>
                                 {/* Group Header */}
                                 <div
                                     style={{ height: GROUP_HEADER_HEIGHT }}
-                                    className="bg-white/5 border-b border-white/10 px-2 flex items-center text-xs text-white/50 select-none"
+                                    className="bg-surface-elevated border-b border-border px-2 flex items-center text-xs text-text-muted select-none"
                                 >
                                     {(durationMs / 1000).toFixed(1)}s
                                 </div>
@@ -96,7 +96,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 {/* Tracks Area */}
                                 <div className="relative flex-1 w-full">
                                     {/* 1. Screen Segment */}
-                                    <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-blue-900/60 border-y border-blue-500/40 first:border-t-0 last:border-b-0 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
+                                    <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-secondary/60 border-y border-secondary-fg/20 first:border-t-0 last:border-b-0 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
                                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
                                             {!screenAudio.isLoading && (
                                                 <WaveformSegment
@@ -105,7 +105,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                                     sourceEndMs={sourceEndMs}
                                                     width={width}
                                                     height={hasCamera ? trackContentHeight / 2 : trackContentHeight}
-                                                    color="#bfdbfe" // blue-200
+                                                    color="var(--secondary-fg)" // Use variable
                                                 />
                                             )}
                                         </div>
@@ -115,7 +115,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                     {/* 2. Camera Segment (if exists) */}
                                     {
                                         hasCamera && (
-                                            <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-purple-900/60 border-b border-purple-500/40 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center">
+                                            <div className="absolute left-0 right-0 bottom-0 top-1/2 bg-tertiary/60 border-b border-tertiary-fg/20 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center">
                                                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
                                                     {!cameraAudio.isLoading && (
                                                         <WaveformSegment
@@ -124,7 +124,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                                             sourceEndMs={sourceEndMs}
                                                             width={width}
                                                             height={trackContentHeight / 2}
-                                                            color="#e9d5ff" // purple-200
+                                                            color="var(--tertiary-fg)"
                                                         />
                                                     )}
                                                 </div>
@@ -136,18 +136,18 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
                             {/* Resize Handles (Overlay entire group) */}
                             <div
-                                className="absolute top-0 bottom-0 left-0 w-2 cursor-ew-resize hover:bg-white/10 z-20"
+                                className="absolute top-0 bottom-0 left-0 w-2 cursor-ew-resize hover:bg-border-highlight z-20"
                                 onMouseDown={(e) => handleDragStart(e, w.id, 'left')}
                             />
                             <div
-                                className="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize hover:bg-white/10 z-20"
+                                className="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize hover:bg-border-highlight z-20"
                                 onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
                             />
 
                             {/* Gap Bubble */}
                             {dragState && dragState.windowId === w.id && (
                                 <div
-                                    className="absolute -bottom-6 bg-black/90 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-white/10 z-50 pointer-events-none whitespace-nowrap"
+                                    className="absolute -bottom-6 bg-surface-elevated text-text-main text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border z-50 pointer-events-none whitespace-nowrap"
                                     style={{
                                         [dragState.type === 'left' ? 'left' : 'right']: 0,
                                         transform: dragState.type === 'left' ? 'translateX(-50%)' : 'translateX(50%)',

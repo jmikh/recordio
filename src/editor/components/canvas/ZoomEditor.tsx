@@ -277,8 +277,8 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                         Math.abs(currentRect.y) < 1 &&
                         Math.abs(currentRect.width - videoSize.width) < 1 &&
                         Math.abs(currentRect.height - videoSize.height) < 1
-                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        ? 'bg-surface-elevated text-text-muted cursor-not-allowed'
+                        : 'bg-primary hover:bg-primary/90 text-primary-fg'
                         }`}
                     onClick={(e) => {
                         e.stopPropagation();
