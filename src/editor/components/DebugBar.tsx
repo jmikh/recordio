@@ -12,10 +12,10 @@ export const DebugBar = () => {
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mr-2">Debug</span>
             <button
                 className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
-                onClick={() => console.log(useProjectStore.getState())}
+                onClick={() => console.log(useProjectStore.getState().project)}
                 title={`Project ID: ${project.id}`}
             >
-                Log Project State
+                Log Project
             </button>
             <button
                 className="px-2 py-0.5 bg-green-900/50 hover:bg-green-800 text-green-200 text-[10px] rounded cursor-pointer border border-green-800"

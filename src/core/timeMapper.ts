@@ -104,37 +104,56 @@ export class TimeMapper {
 
     /**
      * Maps a source range (start/end) to an output range.
-     * Returns the output start and end times.
-     * If the start time is not in any window, returns null.
-     * The end time is clamped to the end of the window where the start time is found.
+     * Returns the output start and end times representing the visible portion of the range.
+     * If sourceEndMs is undefined, it is treated as a point event.
+     *
+     * - If the range is fully visible, returns the corresponding output range.
+     * - If the range overlaps with gaps, returns the start of the first visible segment and end of the last visible segment.
+     * - If the range is completely hidden (in a gap), returns null.
      */
     mapSourceRangeToOutputRange(sourceStartMs: number, sourceEndMs: number | undefined): { start: number, end: number } | null {
         let acc = 0;
-        let startWin: OutputWindow | null = null;
-        let startWinAcc = 0;
+        let startOutput: number | null = null;
+        let endOutput: number | null = null;
 
-        // Find start window
+        // If sourceEndMs is undefined, this is a point event (e.g. click), otherwise it's a range (e.g. scroll).
+        const isPoint = sourceEndMs === undefined;
+        const effectiveEnd = isPoint ? sourceStartMs : sourceEndMs;
+
         for (const w of this.windows) {
-            if (sourceStartMs >= w.startMs && sourceStartMs < w.endMs) {
-                startWin = w;
-                startWinAcc = acc;
-                break;
-            }
+            const outputOffset = acc;
             acc += (w.endMs - w.startMs);
+
+            if (isPoint) {
+                // Check if the point falls within the current window [start, end]
+                if (sourceStartMs >= w.startMs && sourceStartMs <= w.endMs) {
+                    const mapped = outputOffset + (sourceStartMs - w.startMs);
+                    return { start: mapped, end: mapped };
+                }
+            } else {
+                // Check for overlap between the source range and the current window
+                const overlapStart = Math.max(sourceStartMs, w.startMs);
+                const overlapEnd = Math.min(effectiveEnd, w.endMs);
+
+                // If valid overlap exists
+                if (overlapStart < overlapEnd) {
+                    const mappedStart = outputOffset + (overlapStart - w.startMs);
+                    const mappedEnd = outputOffset + (overlapEnd - w.startMs);
+
+                    // Record the first visible start time
+                    if (startOutput === null) {
+                        startOutput = mappedStart;
+                    }
+                    // Continually update the end time (extending the visible range through multiple windows)
+                    endOutput = mappedEnd;
+                }
+            }
         }
 
-        if (!startWin) return null; // Start is not visible
-
-        const mappedTime = startWinAcc + (sourceStartMs - startWin.startMs);
-        let mappedEndTime = mappedTime;
-
-        if (sourceEndMs !== undefined) {
-            // Clamp end time to the end of the current window to ensure validity
-            // This handles cases where typing extends into a cut/trim.
-            const relevantEnd = Math.min(sourceEndMs, startWin.endMs);
-            mappedEndTime = startWinAcc + (relevantEnd - startWin.startMs);
+        if (startOutput !== null && endOutput !== null) {
+            return { start: startOutput, end: endOutput };
         }
 
-        return { start: mappedTime, end: mappedEndTime };
+        return null;
     }
 }
