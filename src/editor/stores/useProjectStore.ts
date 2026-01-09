@@ -1,11 +1,12 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, UserEvents, ViewportMotion } from '../../core/types';
+import type { Project, ID, UserEvents } from '../../core/types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
+import { createViewportMotionSlice, type ViewportMotionSlice } from './slices/viewportMotionSlice';
 
 const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
@@ -18,7 +19,7 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ViewportMotionSlice {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents; // Single set of loaded events (Never null)
@@ -39,10 +40,7 @@ export interface ProjectState extends WindowSlice, SettingsSlice {
     toggleSourceMute: (sourceId: ID) => void;
 
     // Zoom Actions
-    updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
-    addViewportMotion: (motion: ViewportMotion) => void;
-    deleteViewportMotion: (id: ID) => void;
-    clearViewportMotions: () => void;
+    // (Moved to ViewportMotionSlice)
 
     // Timeline Actions
 
@@ -55,10 +53,7 @@ export interface ProjectState extends WindowSlice, SettingsSlice {
     setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
 }
 
-import { useUIStore } from './useUIStore';
 
-// Helper to capture snapshot
-const getSnapshot = () => useUIStore.getState();
 
 export const useProjectStore = create<ProjectState>()(
     subscribeWithSelector(
@@ -77,6 +72,7 @@ export const useProjectStore = create<ProjectState>()(
                 // Slices
                 ...createWindowSlice(set, get, store),
                 ...createSettingsSlice(set, get, store),
+                ...createViewportMotionSlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {
@@ -85,115 +81,7 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 })),
 
-                updateViewportMotion: (id, updates) => {
-                    if (useProjectStore.temporal.getState().isTracking) {
-                        console.log('[Action] updateViewportMotion', id, updates);
-                    }
-                    set(state => {
-                        const motions = state.project.timeline.recording.viewportMotions;
-                        const idx = motions.findIndex(m => m.id === id);
-                        if (idx === -1) return state;
-
-                        const nextMotions = [...motions];
-                        nextMotions[idx] = { ...nextMotions[idx], ...updates };
-
-                        // FORCE AUTO ZOOM OFF if it was on
-                        // This prevents recalc from overwriting our manual work
-                        const nextSettings = {
-                            ...state.project.settings,
-                            zoom: { ...state.project.settings.zoom, autoZoom: false }
-                        };
-
-                        return {
-                            uiSnapshot: getSnapshot(),
-                            project: {
-                                ...state.project,
-                                settings: nextSettings,
-                                timeline: {
-                                    ...state.project.timeline,
-                                    recording: {
-                                        ...state.project.timeline.recording,
-                                        viewportMotions: nextMotions
-                                    }
-                                }
-                            }
-                        };
-                    });
-                },
-
-                addViewportMotion: (motion) => {
-                    console.log('[Action] addViewportMotion', motion);
-                    set(state => {
-                        const motions = [...state.project.timeline.recording.viewportMotions, motion]
-                            .sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
-
-                        const nextSettings = {
-                            ...state.project.settings,
-                            zoom: { ...state.project.settings.zoom, autoZoom: false }
-                        };
-
-                        return {
-                            uiSnapshot: getSnapshot(),
-                            project: {
-                                ...state.project,
-                                settings: nextSettings,
-                                timeline: {
-                                    ...state.project.timeline,
-                                    recording: {
-                                        ...state.project.timeline.recording,
-                                        viewportMotions: motions
-                                    }
-                                }
-                            }
-                        };
-                    });
-                },
-
-                deleteViewportMotion: (id) => {
-                    console.log('[Action] deleteViewportMotion', id);
-                    set(state => {
-                        const motions = state.project.timeline.recording.viewportMotions.filter(m => m.id !== id);
-
-                        const nextSettings = {
-                            ...state.project.settings,
-                            zoom: { ...state.project.settings.zoom, autoZoom: false }
-                        };
-
-                        return {
-                            uiSnapshot: getSnapshot(),
-                            project: {
-                                ...state.project,
-                                settings: nextSettings,
-                                timeline: {
-                                    ...state.project.timeline,
-                                    recording: {
-                                        ...state.project.timeline.recording,
-                                        viewportMotions: motions
-                                    }
-                                }
-                            }
-                        };
-                    });
-                },
-
-                clearViewportMotions: () => {
-                    console.log('[Action] clearViewportMotions');
-                    set(state => {
-                        return {
-                            uiSnapshot: getSnapshot(), // Implicit snapshot
-                            project: {
-                                ...state.project,
-                                timeline: {
-                                    ...state.project.timeline,
-                                    recording: {
-                                        ...state.project.timeline.recording,
-                                        viewportMotions: []
-                                    }
-                                }
-                            }
-                        };
-                    });
-                },
+                // Viewport motions moved to slice
 
                 loadProject: async (project) => {
                     console.log('[Action] loadProject', project.id);
