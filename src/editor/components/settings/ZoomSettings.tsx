@@ -1,7 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { RangeSlider } from '../common/RangeSlider';
+import { Slider } from '../common/Slider';
 
 export const ZoomSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
@@ -13,18 +13,22 @@ export const ZoomSettings = () => {
 
 
     const handleAutoZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        updateSettings({ zoom: { autoZoom: e.target.checked } });
+        updateSettings({ zoom: { ...zoomSettings, autoZoom: e.target.checked } });
     };
 
     const handleClearZooms = () => {
         // 1. Clear motions
         clearViewportMotions();
         // 2. Disable auto zoom to prevent recalc
-        updateSettings({ zoom: { autoZoom: false } });
+        updateSettings({ zoom: { ...zoomSettings, autoZoom: false } });
     };
 
-    const handleDurationChange = (minMs: number, maxMs: number) => {
-        batchAction(() => updateSettings({ zoom: { ...zoomSettings, minZoomDurationMs: minMs, maxZoomDurationMs: maxMs } }));
+    const handleMaxDurationChange = (val: number) => {
+        batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoomDurationMs: val } }));
+    };
+
+    const handleMaxZoomChange = (val: number) => {
+        batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoom: val } }));
     };
 
     return (
@@ -32,21 +36,40 @@ export const ZoomSettings = () => {
             {/* Transition Duration */}
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                    <label className="text-xs uppercase font-bold text-gray-500">Transition Duration</label>
-                    <span className="text-xs font-mono text-blue-400">{zoomSettings.minZoomDurationMs}ms – {zoomSettings.maxZoomDurationMs}ms</span>
+                    <label className="text-xs uppercase font-bold text-gray-500">Transition Time</label>
+                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoomDurationMs}ms</span>
                 </div>
-                <RangeSlider
-                    min={200}
+                <Slider
+                    min={zoomSettings.minZoomDurationMs}
                     max={1000}
                     step={50}
-                    minValue={zoomSettings.minZoomDurationMs}
-                    maxValue={zoomSettings.maxZoomDurationMs}
-                    onChange={handleDurationChange}
+                    value={zoomSettings.maxZoomDurationMs}
+                    onChange={handleMaxDurationChange}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                 />
                 <p className="text-[10px] text-gray-500">
-                    Min and max speed of zoom animations.
+                    Duration of the zoom animation.
+                </p>
+            </div>
+
+            {/* Max Zoom */}
+            <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                    <label className="text-xs uppercase font-bold text-gray-500">Max Zoom</label>
+                    <span className="text-xs font-mono text-blue-400">{zoomSettings.maxZoom}x</span>
+                </div>
+                <Slider
+                    min={1.1}
+                    max={5}
+                    step={0.1}
+                    value={zoomSettings.maxZoom}
+                    onChange={handleMaxZoomChange}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
+                />
+                <p className="text-[10px] text-gray-500">
+                    Maximum zoom level applied to the content.
                 </p>
             </div>
 
