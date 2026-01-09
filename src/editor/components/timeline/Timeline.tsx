@@ -3,11 +3,11 @@ import { useRef, useMemo, useEffect } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimeMapper } from '../../../core/timeMapper';
-import { ZoomTrack } from './ZoomTrack';
+import { ZoomTrack } from './zoom/ZoomTrack';
 
 // New Components
 import { TimelineToolbar } from './TimelineToolbar';
-import { MainTrack, GROUP_HEADER_HEIGHT } from './MainTrack';
+import { MainTrack, GROUP_HEADER_HEIGHT } from './main/MainTrack';
 import { EventsTrack } from './EventsTrack';
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';

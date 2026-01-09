@@ -52,7 +52,9 @@ export const recalculateAutoZooms = (
 export const shiftManualZooms = (
     motions: ViewportMotion[],
     pivotTimeMs: number,
-    deltaMs: number
+    deltaMs: number,
+    minZoomDurationMs: number,
+    maxZoomDurationMs: number
 ): ViewportMotion[] => {
     // Clone to avoid mutation
     let nextMotions = [...motions];
@@ -71,25 +73,71 @@ export const shiftManualZooms = (
             return m;
         });
     } else {
-        // Removing time
+        // Removing time (Backward Shift)
         const deleteRangeStart = pivotTimeMs;
         const deleteRangeEnd = pivotTimeMs + absDelta;
 
-        return nextMotions.filter(m => {
-            // Drop if it falls in the deleted range
+        // 1. Filter out items that end strictly inside the deleted range
+        // Note: Items that *start* inside but *end* outside will be shifted (shortened from start)
+        const candidates = nextMotions.filter(m => {
             if (m.outputEndTimeMs > deleteRangeStart && m.outputEndTimeMs <= deleteRangeEnd) {
                 return false;
             }
             return true;
-        }).map(m => {
-            // Shift items that were after the deleted range
-            if (m.outputEndTimeMs > deleteRangeEnd) {
-                return {
-                    ...m,
-                    outputEndTimeMs: m.outputEndTimeMs - absDelta
-                };
-            }
-            return m;
         });
+
+        const result: ViewportMotion[] = [];
+        let leftBoundary = 0;
+        console.log("deleteRangeStart", deleteRangeStart);
+        console.log("deleteRangeEnd", deleteRangeEnd);
+        let i = 0;
+        for (const m of candidates) {
+            console.log("i=", i++, " m", m);
+            if (m.outputEndTimeMs <= deleteRangeStart) {
+                console.log("pushing before delete range", m.outputEndTimeMs, deleteRangeStart);
+                result.push(m);
+                leftBoundary = m.outputEndTimeMs;
+                continue;
+            } else if (m.outputEndTimeMs <= deleteRangeEnd) {
+                console.log("skipping in delete range")
+                continue;
+            }
+
+            let newEndTime = m.outputEndTimeMs - absDelta;
+
+            // Try to expand to max duration
+            let newDuration = maxZoomDurationMs;
+            const idealStartTime = newEndTime - newDuration;
+
+            if (idealStartTime >= leftBoundary) {
+                console.log("pushing after left boundary", idealStartTime, leftBoundary);
+                result.push({
+                    ...m,
+                    outputEndTimeMs: newEndTime,
+                    durationMs: newDuration
+                });
+                leftBoundary = newEndTime;
+            } else {
+                // We need to shrink the block (collision with leftBoundary)
+                const newStartTime = leftBoundary;
+                const newDuration = newEndTime - newStartTime;
+
+                if (newDuration >= minZoomDurationMs) {
+                    console.log("pushing after shrinking");
+                    // Fits with shortening
+                    result.push({
+                        ...m,
+                        outputEndTimeMs: newEndTime,
+                        durationMs: newDuration
+                    });
+                    leftBoundary = newEndTime;
+                } else {
+                    // Gap too small, drop it.
+                    console.log('Dropping block due to collision', { newDuration, minZoomDurationMs, leftBoundary });
+                }
+            }
+        }
+
+        return result;
     }
 };

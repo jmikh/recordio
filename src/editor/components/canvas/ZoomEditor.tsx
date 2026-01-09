@@ -252,13 +252,14 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-50 overflow-hidden text-sm"
+            className="absolute inset-0 w-full h-full z-50 text-sm"
             onPointerDown={handleContainerPointerDown}
         >
             <DimmedOverlay
                 holeRect={currentRect}
                 containerSize={videoSize}
             />
+
             <BoundingBox
                 rect={currentRect}
                 canvasSize={videoSize}
@@ -266,6 +267,43 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                 onChange={handleRectChange}
                 onCommit={onCommit}
             />
+
+            {/* Toolbar - Render after BoundingBox to ensure it's on top */}
+            <div
+                className="absolute flex gap-2 pointer-events-auto justify-center z-[1000] -translate-y-full pb-2"
+                style={{
+                    top: `${currentRect.y}px`,
+                    left: `${currentRect.x}px`,
+                    width: `${currentRect.width}px`,
+                }}
+            >
+                <button
+                    className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${Math.abs(currentRect.x) < 1 &&
+                        Math.abs(currentRect.y) < 1 &&
+                        Math.abs(currentRect.width - videoSize.width) < 1 &&
+                        Math.abs(currentRect.height - videoSize.height) < 1
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        }`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // Also stop immediate propagation just in case
+                        e.nativeEvent.stopImmediatePropagation();
+
+                        const isFullView = Math.abs(currentRect.x) < 1 &&
+                            Math.abs(currentRect.y) < 1 &&
+                            Math.abs(currentRect.width - videoSize.width) < 1 &&
+                            Math.abs(currentRect.height - videoSize.height) < 1;
+
+                        if (isFullView) return;
+
+                        const newRect = { x: 0, y: 0, width: videoSize.width, height: videoSize.height };
+                        handleRectChange(newRect);
+                    }}
+                >
+                    Full View
+                </button>
+            </div>
         </div>
     );
 };

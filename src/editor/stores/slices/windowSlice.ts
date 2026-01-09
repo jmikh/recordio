@@ -74,7 +74,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     const delta = oldStart - newWindow.startMs;
                     // For left-side trim, pivot is at the start of the window in output time
                     const pivot = outputStartMs;
-                    nextMotions = shiftManualZooms(nextMotions, pivot, delta);
+                    nextMotions = shiftManualZooms(nextMotions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
                 }
 
                 // 2. Check End Change (Trimming/Extending from RIGHT)
@@ -85,7 +85,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 if (newWindow.endMs !== oldEnd) {
                     const delta = newWindow.endMs - oldEnd;
                     const pivot = outputStartMs + oldDuration;
-                    nextMotions = shiftManualZooms(nextMotions, pivot, delta);
+                    nextMotions = shiftManualZooms(nextMotions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
                 }
             }
 
@@ -142,7 +142,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 // Pivot: outputStartMs
                 // Delta: -Duration
                 const duration = getWindowDuration(targetWindow);
-                nextMotions = shiftManualZooms(nextMotions, outputStartMs, -duration);
+                nextMotions = shiftManualZooms(nextMotions, outputStartMs, -duration, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
             }
 
             return {

@@ -124,7 +124,8 @@ export const useProjectStore = create<ProjectState>()(
                 addViewportMotion: (motion) => {
                     console.log('[Action] addViewportMotion', motion);
                     set(state => {
-                        const motions = [...state.project.timeline.recording.viewportMotions, motion];
+                        const motions = [...state.project.timeline.recording.viewportMotions, motion]
+                            .sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
 
                         const nextSettings = {
                             ...state.project.settings,
