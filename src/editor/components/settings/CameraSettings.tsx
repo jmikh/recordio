@@ -3,12 +3,9 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
+import { MultiToggle } from '../common/MultiToggle';
 
-const SHAPES = [
-    { id: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
-    { id: 'square', label: 'Square', icon: <div className="w-4 h-4 border border-current" /> },
-    { id: 'circle', label: 'Circle', icon: <div className="w-4 h-4 rounded-full border border-current" /> },
-] as const;
+
 
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -84,38 +81,31 @@ export const CameraSettings = () => {
                     {/* Shape */}
                     <div className="space-y-3">
                         <label className="text-xs font-semibold text-text-muted uppercase tracking-wide">Shape</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {SHAPES.map((s) => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => handleShapeChange(s.id as any)}
-                                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${shape === s.id
-                                        ? 'bg-primary/10 border-primary/50 text-primary shadow-sm'
-                                        : 'bg-surface border-border text-text-muted hover:border-text-muted/50 hover:bg-surface-elevated'
-                                        }`}
-                                >
-                                    {s.icon}
-                                    <span className="text-[10px] font-medium">{s.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <MultiToggle
+                            options={[
+                                { value: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
+                                { value: 'square', label: 'Square', icon: <div className="w-4 h-4 border border-current" /> },
+                                { value: 'circle', label: 'Circle', icon: <div className="w-4 h-4 rounded-full border border-current" /> },
+                            ]}
+                            value={shape}
+                            onChange={(val) => handleShapeChange(val as any)}
+                        />
                     </div>
 
                     {/* Zoom */}
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
-                            <span className="text-xs text-gray-500 font-mono">{zoom.toFixed(1)}x</span>
-                        </div>
-                        <Slider
-                            min={1}
-                            max={3}
-                            value={zoom}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, zoom: val } }))}
-                        />
-                    </div>
+                    {/* Zoom */}
+                    <Slider
+                        label="Zoom"
+                        min={1}
+                        max={3}
+                        value={zoom}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, zoom: val } }))}
+                        showTooltip
+                        units="x"
+                        decimals={1}
+                    />
 
                     <StyleControls
                         settings={{

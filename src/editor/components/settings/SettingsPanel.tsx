@@ -5,6 +5,7 @@ import { ScreenSettings } from './ScreenSettings';
 import { ZoomSettings } from './ZoomSettings';
 import { CameraSettings } from './CameraSettings';
 import { SettingsButton } from './SettingsButton';
+import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 
 type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera';
 
@@ -45,6 +46,7 @@ const IconCamera = () => (
         <circle cx="12" cy="13" r="4" />
     </svg>
 );
+
 
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('background');
@@ -97,6 +99,13 @@ export const SettingsPanel = () => {
                     {activeTab === 'background' && <BackgroundSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
                 </div>
+            </div>
+
+            {/* Preload Device Frames */}
+            <div className="hidden">
+                {DEVICE_FRAMES.map(frame => (
+                    <img key={frame.id} src={frame.thumbnailUrl} alt="" />
+                ))}
             </div>
         </div>
     );

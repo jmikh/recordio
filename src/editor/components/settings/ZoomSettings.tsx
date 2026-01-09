@@ -35,17 +35,16 @@ export const ZoomSettings = () => {
         <div className="flex flex-col gap-6 text-sm text-text-muted">
             {/* Transition Duration */}
             <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                    <label className="text-xs uppercase font-bold text-text-muted/60">Transition Time</label>
-                    <span className="text-xs font-mono text-tertiary">{zoomSettings.maxZoomDurationMs}ms</span>
-                </div>
                 <Slider
+                    label="Transition Time"
                     min={zoomSettings.minZoomDurationMs}
                     max={1000}
                     value={zoomSettings.maxZoomDurationMs}
                     onChange={handleMaxDurationChange}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
+                    showTooltip
+                    units="ms"
                 />
                 <p className="text-[10px] text-text-muted/60">
                     Duration of the zoom animation.
@@ -54,17 +53,17 @@ export const ZoomSettings = () => {
 
             {/* Max Zoom */}
             <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                    <label className="text-xs uppercase font-bold text-text-muted/60">Max Zoom</label>
-                    <span className="text-xs font-mono text-tertiary">{zoomSettings.maxZoom}x</span>
-                </div>
                 <Slider
+                    label="Max Zoom"
                     min={1.1}
                     max={5}
                     value={zoomSettings.maxZoom}
                     onChange={handleMaxZoomChange}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
+                    showTooltip
+                    units="x"
+                    decimals={1}
                 />
                 <p className="text-[10px] text-text-muted/60">
                     Maximum zoom level applied to the content.

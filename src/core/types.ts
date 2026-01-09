@@ -310,6 +310,7 @@ export interface DeviceFrame {
     id: ID;
     name: string;
     imageUrl: string;
+    thumbnailUrl: string;
     // The inner screen rectangle in the frame image (relative to image 0,0)
     // Used to calculate border thickness ratios
     screenRect: Rect;

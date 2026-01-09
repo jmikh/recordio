@@ -301,21 +301,21 @@ export const BackgroundSettings = () => {
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
                 {/* Blur */}
                 {backgroundType === 'image' && (
-                    <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Blur</label>
-                        <Slider
-                            min={0}
-                            max={50}
-                            value={backgroundBlur || 0}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({
-                                background: {
-                                    backgroundBlur: val
-                                }
-                            }))}
-                        />
-                    </div>
+                    <Slider
+                        label="Blur"
+                        min={0}
+                        max={50}
+                        value={backgroundBlur || 0}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(val) => batchAction(() => updateSettings({
+                            background: {
+                                backgroundBlur: val
+                            }
+                        }))}
+                        showTooltip
+                        units="px"
+                    />
                 )}
             </div>
         </div >

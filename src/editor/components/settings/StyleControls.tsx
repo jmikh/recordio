@@ -3,6 +3,7 @@ import { HexColorPicker } from "react-colorful";
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { createPortal } from 'react-dom';
 import { Slider } from '../common/Slider';
+import { MultiToggle } from '../common/MultiToggle';
 
 export interface StyleSettings {
     borderRadius: number;
@@ -73,19 +74,21 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         <div className="space-y-6">
             {/* Style (Border & Rounding) */}
             <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Style</label>
-                    <div className="flex items-center gap-2">
-                        {/* Color Picker Button */}
-                        <button
-                            ref={colorButtonRef}
-                            onClick={toggleColorPopover}
-                            className="w-5 h-5 rounded-full border border-gray-600 shadow-sm flex items-center justify-center transition-all hover:scale-105"
-                            style={{ backgroundColor: borderColor }}
-                            title="Border & Dynamic Effect Color"
-                        >
-                        </button>
-                    </div>
+                {/* Color Picker Button */}
+                {/* Color Picker Button & Hex Display */}
+                <div
+                    ref={colorButtonRef as any}
+                    onClick={toggleColorPopover}
+                    className="flex items-center gap-3 p-2 bg-surface border border-border rounded-lg cursor-pointer hover:border-gray-500 transition-colors group"
+                    title="Border & Dynamic Effect Color"
+                >
+                    <div
+                        className="w-6 h-6 rounded-full border border-gray-600 shadow-sm"
+                        style={{ backgroundColor: borderColor }}
+                    />
+                    <span className="text-xs font-mono text-gray-400 group-hover:text-gray-200 transition-colors uppercase">
+                        {borderColor}
+                    </span>
                 </div>
 
                 {/* Color Popover */}
@@ -122,74 +125,50 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 )}
 
                 {/* Rounding Slider */}
-                {showRadius && (
-                    <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-gray-400">
-                            <span>Rounding</span>
-                            <span className="font-mono text-[10px]">{borderRadius}px</span>
-                        </div>
-                        <Slider
-                            min={0}
-                            max={200}
-                            value={borderRadius}
-                            onPointerDown={onInteractionStart}
-                            onPointerUp={onInteractionEnd}
-                            onChange={(val) => onChange({ borderRadius: val })}
-                        />
-                    </div>
-                )}
+                {/* Rounding Slider */}
+                <Slider
+                    label="Rounding"
+                    min={0}
+                    max={200}
+                    value={borderRadius}
+                    onPointerDown={onInteractionStart}
+                    onPointerUp={onInteractionEnd}
+                    onChange={(val) => onChange({ borderRadius: val })}
+                    disabled={!showRadius}
+                    showTooltip
+                    units="px"
+                    className={!showRadius ? 'opacity-50' : ''}
+                />
 
                 {/* Border Width Slider */}
-                <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-gray-400">
-                        <span>Border Thickness</span>
-                        <span className="font-mono text-[10px]">{borderWidth}px</span>
-                    </div>
-                    <Slider
-                        min={0}
-                        max={20}
-                        value={borderWidth}
-                        onPointerDown={onInteractionStart}
-                        onPointerUp={onInteractionEnd}
-                        onChange={(val) => onChange({ borderWidth: val })}
-                    />
-                </div>
+                {/* Border Width Slider */}
+                <Slider
+                    label="Thickness"
+                    min={0}
+                    max={20}
+                    value={borderWidth}
+                    onPointerDown={onInteractionStart}
+                    onPointerUp={onInteractionEnd}
+                    onChange={(val) => onChange({ borderWidth: val })}
+                    showTooltip
+                    units="px"
+                />
             </div>
 
-            {/* Effects Toggle */}
-            <div className="space-y-3 pt-4 border-t border-border">
-                <label className="text-xs font-semibold text-text-muted uppercase tracking-wide">Effects</label>
 
-                <div className="flex bg-surface p-1 rounded-lg">
-                    <button
-                        onClick={() => onChange({ hasShadow: true, hasGlow: false })}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${hasShadow
-                            ? 'bg-surface-elevated text-text-main shadow'
-                            : 'text-text-muted hover:text-text-main'
-                            }`}
-                    >
-                        Shadow
-                    </button>
-                    <button
-                        onClick={() => onChange({ hasShadow: false, hasGlow: false })}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${!hasShadow && !hasGlow
-                            ? 'bg-surface-elevated text-text-main shadow'
-                            : 'text-text-muted hover:text-text-main'
-                            }`}
-                    >
-                        None
-                    </button>
-                    <button
-                        onClick={() => onChange({ hasShadow: false, hasGlow: true })}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${hasGlow
-                            ? 'bg-surface-elevated text-text-main shadow'
-                            : 'text-text-muted hover:text-text-main'
-                            }`}
-                    >
-                        Glow
-                    </button>
-                </div>
-            </div>
+            <MultiToggle
+                options={[
+                    { value: 'shadow', label: 'Shadow' },
+                    { value: 'none', label: 'None' },
+                    { value: 'glow', label: 'Glow' }
+                ]}
+                value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
+                onChange={(val) => {
+                    if (val === 'shadow') onChange({ hasShadow: true, hasGlow: false });
+                    else if (val === 'glow') onChange({ hasShadow: false, hasGlow: true });
+                    else onChange({ hasShadow: false, hasGlow: false });
+                }}
+            />
         </div>
     );
 };

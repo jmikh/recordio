@@ -4,6 +4,7 @@ import { StyleControls } from './StyleControls';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
+import { MultiToggle } from '../common/MultiToggle';
 
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -43,63 +44,52 @@ export const ScreenSettings = () => {
             </div>
 
             {/* Mode Toggle */}
-            <div className="bg-surface p-1 rounded-lg flex">
-                <button
-                    onClick={() => handleModeChange('device')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${screenConfig.mode === 'device'
-                        ? 'bg-primary text-primary-fg shadow'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Device Frame
-                </button>
-                <button
-                    onClick={() => handleModeChange('border')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${screenConfig.mode === 'border'
-                        ? 'bg-primary text-primary-fg shadow'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Custom
-                </button>
+            <MultiToggle
+                options={[
+                    { value: 'device', label: 'Device Frame' },
+                    { value: 'border', label: 'Custom' }
+                ]}
+                value={screenConfig.mode}
+                onChange={(val) => handleModeChange(val as any)}
+                className="mb-4"
+            />
+
+            {/* Device Selection - Always mounted to keep images loaded */}
+            <div className={`space-y-3 ${screenConfig.mode === 'device' ? '' : 'hidden'}`}>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
+                <div className="grid grid-cols-2 gap-2">
+                    {DEVICE_FRAMES.map(frame => {
+                        const isSelected = screenConfig.deviceFrameId === frame.id;
+                        return (
+                            <div key={frame.id} className="flex flex-col gap-1">
+                                <div
+                                    onClick={() => updateSettings({
+                                        screen: { ...screenConfig, deviceFrameId: frame.id }
+                                    })}
+                                    className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
+                                        ? 'border-blue-500 ring-2 ring-blue-500/30 bg-white'
+                                        : 'border-transparent ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
+                                        }`}
+                                    title={frame.name}
+                                >
+                                    <img
+                                        src={frame.thumbnailUrl}
+                                        alt={frame.name}
+                                        className="w-full h-full object-contain p-1"
+                                    />
+                                </div>
+                                <span className={`text-[10px] uppercase tracking-wide font-medium text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
+                                    }`}>
+                                    {frame.name}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {screenConfig.mode === 'device' ? (
-                /* Device Selection */
-                <div className="space-y-3">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Device Frame</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {DEVICE_FRAMES.map(frame => {
-                            const isSelected = screenConfig.deviceFrameId === frame.id;
-                            return (
-                                <div key={frame.id} className="flex flex-col gap-1">
-                                    <div
-                                        onClick={() => updateSettings({
-                                            screen: { ...screenConfig, deviceFrameId: frame.id }
-                                        })}
-                                        className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
-                                            ? 'border-blue-500 ring-2 ring-blue-500/30 bg-white'
-                                            : 'border-transparent ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
-                                            }`}
-                                        title={frame.name}
-                                    >
-                                        <img
-                                            src={frame.imageUrl}
-                                            alt={frame.name}
-                                            className="w-full h-full object-contain p-1"
-                                        />
-                                    </div>
-                                    <span className={`text-[10px] uppercase tracking-wide font-medium text-center truncate px-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-gray-400'
-                                        }`}>
-                                        {frame.name}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            ) : (
-                /* Custom Style Controls */
+            {/* Custom Style Controls */}
+            {screenConfig.mode === 'border' && (
                 <StyleControls
                     settings={{
                         borderRadius: screenConfig.borderRadius,
@@ -120,9 +110,9 @@ export const ScreenSettings = () => {
             )}
 
             {/* Spacing (Padding) */}
-            <div className="flex flex-col gap-2 pt-4 border-t border-gray-700">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spacing</label>
+            <div className="pt-4 border-t border-gray-700">
                 <Slider
+                    label="Spacing"
                     min={0}
                     max={0.2}
                     value={screenConfig.padding || 0}
@@ -134,6 +124,8 @@ export const ScreenSettings = () => {
                             padding: val
                         }
                     }))}
+                    showTooltip
+                    decimals={2}
                 />
             </div>
         </div>

@@ -36,7 +36,8 @@ function defineFrame(
             top: screen.y / dimensions.height,
             bottom: (dimensions.height - (screen.y + screen.height)) / dimensions.height
         },
-        customScaling
+        customScaling,
+        thumbnailUrl: imageUrl.replace('/assets/devices/', '/assets/devices/thumbnails/')
     };
 }
 

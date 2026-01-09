@@ -8,6 +8,11 @@ interface SliderProps {
     className?: string; // Additional classes for container
     onPointerDown?: () => void;
     onPointerUp?: () => void;
+    disabled?: boolean;
+    showTooltip?: boolean;
+    decimals?: number;
+    units?: string;
+    label?: string;
 }
 
 // Configurable Height Constant
@@ -29,7 +34,12 @@ export const Slider: React.FC<SliderProps> = ({
     max = 100,
     className = '',
     onPointerDown,
-    onPointerUp
+    onPointerUp,
+    disabled = false,
+    showTooltip = false,
+    decimals = 0,
+    units = '',
+    label
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -39,7 +49,7 @@ export const Slider: React.FC<SliderProps> = ({
     const fraction = (clampedValue - min) / (max - min);
 
     const handleInteraction = useCallback((clientX: number) => {
-        if (!containerRef.current) return;
+        if (!containerRef.current || disabled) return;
 
         const rect = containerRef.current.getBoundingClientRect();
         const width = rect.width;
@@ -67,9 +77,10 @@ export const Slider: React.FC<SliderProps> = ({
         newValue = Math.min(Math.max(newValue, min), max);
 
         onChange(newValue);
-    }, [max, min, onChange]);
+    }, [max, min, onChange, disabled]);
 
     const handlePointerDown = (e: React.PointerEvent) => {
+        if (disabled) return;
         e.preventDefault(); // Prevent text selection
         setIsDragging(true);
         if (onPointerDown) onPointerDown();
@@ -101,41 +112,62 @@ export const Slider: React.FC<SliderProps> = ({
         };
     }, [isDragging, handleInteraction, onPointerUp]);
 
-    return (
-        // Container with explicit height
-        <div
-            ref={containerRef}
-            onPointerDown={handlePointerDown}
-            style={{ height: `${SLIDER_HEIGHT}px` }}
-            className={`
-                relative w-full rounded-full overflow-hidden cursor-pointer touch-none shadow-inner-bold
-                bg-surface select-none
-                ${className}
-            `}
-        >
-            {/* Left Track (Primary Color) 
-                Width calculation uses PADDING to ensure alignment.
-                Starts at 0.
-                Length = Left Padding + Thumb Size + Travel * Fraction + Extension (Padding)
-            */}
-            <div
-                className="absolute top-0 left-0 bottom-0 bg-secondary border border-secondary pointer-events-none rounded-full shadow-inner-bold"
-                style={{
-                    width: `calc(${PADDING}px + ${THUMB_SIZE}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction} + ${PADDING}px)`
-                }}
-            />
+    const thumbLeft = `calc(${PADDING}px + ${THUMB_RADIUS}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction})`;
 
-            {/* Marker / Thumb 
-                Left calculation starts at PADDING + THUMB_RADIUS
-                Travels for (100% - PADDING*2 - THUMB_SIZE)
-            */}
+    return (
+        <div className={`w-full ${className}`}>
+            {label && (
+                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                    {label}
+                </label>
+            )}
+            {/* Container with explicit height */}
             <div
-                className="absolute top-1 bottom-1 aspect-square bg-surface rounded-full pointer-events-none transition-transform active:scale-95 shadow-inner-bold"
-                style={{
-                    left: `calc(${PADDING}px + ${THUMB_RADIUS}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction})`,
-                    transform: `translate(-50%, 0)`
-                }}
-            />
+                ref={containerRef}
+                onPointerDown={handlePointerDown}
+                style={{ height: `${SLIDER_HEIGHT}px` }}
+                className={`
+                    relative w-full touch-none select-none group cursor-pointer
+                    ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                `}
+            >
+                {/* Background & Track Container (Clipped) */}
+                <div className="absolute inset-0 rounded-full overflow-hidden bg-surface shadow-inner-bold">
+                    {/* Left Track (Primary Color) */}
+                    <div
+                        className="absolute top-0 left-0 bottom-0 bg-secondary border border-secondary pointer-events-none rounded-full shadow-inner-bold"
+                        style={{
+                            width: `calc(${PADDING}px + ${THUMB_SIZE}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction} + ${PADDING}px)`
+                        }}
+                    />
+                </div>
+
+                {/* Marker / Thumb */}
+                <div
+                    className="absolute top-1 bottom-1 aspect-square bg-background rounded-full pointer-events-none transition-transform active:scale-95 z-10"
+                    style={{
+                        left: thumbLeft,
+                        transform: `translate(-50%, 0)`
+                    }}
+                />
+
+                {/* Tooltip */}
+                {showTooltip && isDragging && (
+                    <div
+                        className="absolute bottom-full mb-1 flex flex-col items-center pointer-events-none z-20"
+                        style={{
+                            left: thumbLeft,
+                            transform: `translate(-50%, 0)`
+                        }}
+                    >
+                        <div className="bg-tertiary text-tertiary-fg text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                            {value.toFixed(decimals)}{units}
+                        </div>
+                        {/* Connection Line */}
+                        <div className="w-[1px] h-2 bg-tertiary mt-[-1px]" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

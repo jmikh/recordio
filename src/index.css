@@ -75,8 +75,8 @@
 
   /* --- 2. Semantic Tokens (Values) --- */
   --bg-app: rgb(19, 19, 19);
-  --bg-surface: rgb(34, 34, 34);
-  --bg-surface-elevated: rgb(43, 43, 43);
+  --bg-surface: rgb(26, 26, 26);
+  --bg-surface-elevated: rgb(36, 36, 36);
 
   --text-main: var(--white);
   --text-muted: var(--white-muted);
@@ -90,9 +90,9 @@
   --primary-fg: var(--slate-950);
 
   --secondary: #9FDB95;
-  --secondary-fg: var(--white);
+  --secondary-fg: var(--slate-950);
 
-  --tertiary: var(--emerald-500);
+  --tertiary: rgb(224 224 108);
   --tertiary-fg: var(--slate-950);
 
   --quaternary: rgb(239, 174, 246);
