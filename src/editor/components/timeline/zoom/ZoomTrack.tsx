@@ -109,7 +109,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none ${isSelected ? 'bg-purple-500/40' : 'bg-blue-500/20'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none ${isSelected ? 'bg-purple-500/40' : 'bg-purple-600/40'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -119,6 +119,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                 );
                             }
                         }
+
+                        const arrowCount = Math.max(0, Math.floor(width / 10));
+                        const arrows = ">".repeat(arrowCount);
 
                         return (
                             <React.Fragment key={m.id}>
@@ -139,6 +142,13 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                         setEditingZoom(m.id);
                                     }}
                                 >
+                                    {/* Arrows Pattern */}
+                                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-40">
+                                        <span className="text-[10px] text-white select-none tracking-widest font-mono">
+                                            {arrows}
+                                        </span>
+                                    </div>
+
                                     {/* Right Edge (Keyframe) - Thicker, Opaque */}
                                     <div
                                         className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-yellow-400' : 'bg-purple-900'} shadow-sm`}

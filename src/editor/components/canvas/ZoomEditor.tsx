@@ -270,12 +270,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
             {/* Toolbar - Render after BoundingBox to ensure it's on top */}
             <div
-                className="absolute flex gap-2 pointer-events-auto justify-center z-[1000] -translate-y-full pb-2"
-                style={{
-                    top: `${currentRect.y}px`,
-                    left: `${currentRect.x}px`,
-                    width: `${currentRect.width}px`,
-                }}
+                className="absolute top-4 inset-x-0 flex justify-center pointer-events-auto z-[1000]"
             >
                 <button
                     className={`text-xs px-3 py-1.5 rounded shadow font-medium transition-colors ${Math.abs(currentRect.x) < 1 &&
