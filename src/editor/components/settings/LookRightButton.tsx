@@ -1,20 +1,29 @@
 import React from 'react';
+import { motion } from 'framer-motion';
+import { FaChevronRight } from 'react-icons/fa';
 
-interface SettingsButtonProps {
-    label: string;
+interface LookRightButtonProps {
+    /** The default icon to show when not active */
     icon: React.ReactNode;
+    /** Whether the button is in the active state */
     isActive: boolean;
+    /** Click handler */
     onClick: () => void;
+    /** Optional label text */
+    label?: string;
+    /** Additional classes */
+    className?: string;
 }
 
 const ANIMATION_DURATION = '1000ms';
 const ANIMATION_EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 
-export const SettingsButton: React.FC<SettingsButtonProps> = ({
-    label,
+export const LookRightButton: React.FC<LookRightButtonProps> = ({
     icon,
     isActive,
-    onClick
+    onClick,
+    label,
+    className = ''
 }) => {
     const transitionStyle = {
         transitionDuration: ANIMATION_DURATION,
@@ -25,33 +34,47 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
         <button
             onClick={onClick}
             style={transitionStyle}
+            // Match SettingsButton container classes
             className={`
                 group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold
                 ${isActive
-                    ? 'bg-primary border border-primary'
-                    : 'bg-background text-text-muted border border-transparent hover:border-text-muted/30'
+                    ? 'bg-tertiary border border-tertiary'
+                    : 'bg-background text-text-muted border not-hover:border-secondary/30 hover:border-secondary'
                 }
+                ${className}
             `}
         >
             {/* Sliding Circle Container for Icon */}
-            <div
-                style={transitionStyle}
+            <motion.div
+                style={transitionStyle as any} // Cast to any to avoid type conflict with motion style
                 className={`
                     absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all
                     ${isActive
-                        ? 'left-[calc(100%-2.75rem)] bg-background text-text-main'
-                        : 'left-1 text-primary'
+                        ? 'left-[calc(100%-2.75rem)] bg-background text-text-main' // Moves to RIGHT
+                        : 'left-1 bg-secondary text-secondary-fg' // Stays on LEFT
                     }
                 `}
+                animate={isActive ? {
+                    x: [0, -20, 0],
+                } : { x: 0 }}
+                transition={isActive ? {
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatDelay: 0.5,
+                    delay: 1 // Wait for the 1s layout transition to finish
+                } : {}}
             >
-                {/* Icon Scale/Rotate Animation */}
-                <div
-                    style={transitionStyle}
-                    className={`transition-transform ${isActive ? 'scale-100' : 'scale-90'}`}
-                >
-                    {icon}
+                {/* Icon Content */}
+                <div className={`flex items-center justify-center ${isActive ? 'text-tertiary' : ''}`}>
+                    {isActive ? (
+                        <FaChevronRight className="w-4 h-4" />
+                    ) : (
+                        <div style={transitionStyle} className="transition-transform scale-90">
+                            {icon}
+                        </div>
+                    )}
                 </div>
-            </div>
+            </motion.div>
 
             {/* Label Container */}
             <div
@@ -75,6 +98,6 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                     {label}
                 </span>
             </div>
-        </button >
+        </button>
     );
 };

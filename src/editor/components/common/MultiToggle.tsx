@@ -13,8 +13,8 @@ interface MultiToggleProps<T extends string> {
     className?: string;
 }
 
-const ANIMATION_DURATION = '300ms';
-const ANIMATION_EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
+const ANIMATION_DURATION = '500ms';
+const ANIMATION_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 export const MultiToggle = <T extends string>({
     options,
@@ -35,7 +35,7 @@ export const MultiToggle = <T extends string>({
     return (
         <div
             className={`
-                relative flex items-center bg-surface rounded-lg select-none overflow-hidden border border-border
+                relative flex items-center bg-surface rounded-lg select-none overflow-hidden 
                 ${className}
             `}
         >
@@ -57,7 +57,7 @@ export const MultiToggle = <T extends string>({
                         key={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-2
+                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4
                             text-xs z-10 outline-none
                             transition-colors duration-200
                             ${isSelected

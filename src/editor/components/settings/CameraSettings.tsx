@@ -4,6 +4,9 @@ import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
 import { MultiToggle } from '../common/MultiToggle';
+import { LookRightButton } from './LookRightButton';
+import { FaCheck } from 'react-icons/fa';
+import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
 
 
 
@@ -64,15 +67,13 @@ export const CameraSettings = () => {
         <div className="space-y-6 relative">
             <div>
                 <div className="flex gap-2 mb-6">
-                    <button
+                    <LookRightButton
+                        icon={isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight className="w-5 h-5" />}
+                        isActive={isEditingCamera}
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                        className={`flex-1 py-2 px-4 rounded text-sm transition-colors ${isEditingCamera
-                            ? 'bg-primary text-primary-fg hover:bg-primary/90'
-                            : 'bg-surface-elevated text-text-main hover:bg-surface'
-                            }`}
-                    >
-                        {isEditingCamera ? 'Done Editing' : 'Edit Position & Size'}
-                    </button>
+                        label={isEditingCamera ? 'Done Editing' : 'Edit Position & Size'}
+                        className="flex-1"
+                    />
                 </div>
 
                 <div className="space-y-6">
@@ -80,9 +81,9 @@ export const CameraSettings = () => {
                     <div className="space-y-3">
                         <MultiToggle
                             options={[
-                                { value: 'rect', label: 'Rectangle', icon: <div className="w-4 h-3 border border-current" /> },
-                                { value: 'square', label: 'Square', icon: <div className="w-4 h-4 border border-current" /> },
-                                { value: 'circle', label: 'Circle', icon: <div className="w-4 h-4 rounded-full border border-current" /> },
+                                { value: 'rect', label: 'Rectangle' },
+                                { value: 'square', label: 'Square' },
+                                { value: 'circle', label: 'Circle' },
                             ]}
                             value={shape}
                             onChange={(val) => handleShapeChange(val as any)}
@@ -103,6 +104,10 @@ export const CameraSettings = () => {
                         units="x"
                         decimals={1}
                     />
+
+
+                    <div className="border-t border-gray-700" />
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-2 text-center">Border</label>
 
                     <StyleControls
                         settings={{

@@ -32,6 +32,22 @@ export const ZoomSettings = () => {
 
     return (
         <div className="flex flex-col gap-6 text-sm text-text-muted">
+            {/* Header with Title and Toggle */}
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
+                <MultiToggle
+                    value={zoomSettings.autoZoom ? 'auto' : 'manual'}
+                    onChange={(val: string) => {
+                        const isAuto = val === 'auto';
+                        updateSettings({ zoom: { ...zoomSettings, autoZoom: isAuto } });
+                    }}
+                    options={[
+                        { value: 'auto', label: 'Auto' },
+                        { value: 'manual', label: 'Manual' }
+                    ]}
+                />
+            </div>
+
             {/* Transition Duration */}
             <div className="flex flex-col gap-2">
                 <Slider
@@ -60,26 +76,6 @@ export const ZoomSettings = () => {
                     showTooltip
                     units="x"
                     decimals={1}
-                />
-            </div>
-
-            <div className="h-px bg-border" />
-
-            {/* Auto Zoom */}
-            <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs uppercase font-bold text-text-muted/60">Zoom Mode</label>
-                </div>
-                <MultiToggle
-                    value={zoomSettings.autoZoom ? 'auto' : 'manual'}
-                    onChange={(val: string) => {
-                        const isAuto = val === 'auto';
-                        updateSettings({ zoom: { ...zoomSettings, autoZoom: isAuto } });
-                    }}
-                    options={[
-                        { value: 'auto', label: 'Auto' },
-                        { value: 'manual', label: 'Manual' }
-                    ]}
                 />
             </div>
 
