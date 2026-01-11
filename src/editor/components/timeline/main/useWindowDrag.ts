@@ -37,18 +37,24 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
 
         const handleGlobalMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - dragState.startX;
-            const deltaMs = coords.xToMs(deltaX);
+            const outputDeltaMs = coords.xToMs(deltaX);
             const win = dragState.initialWindow;
             const { minStart, maxEnd } = dragState.constraints;
+
+            // Convert output time delta to source time delta
+            // When dragging a window with speed, the visual width represents output time,
+            // but we're modifying source time (startMs/endMs)
+            const speed = win.speed || 1.0;
+            const sourceDeltaMs = outputDeltaMs * speed;
 
             let newWindow = { ...win };
 
             if (dragState.type === 'left') {
-                const proposedStart = win.startMs + deltaMs;
+                const proposedStart = win.startMs + sourceDeltaMs;
                 // Cannot go before minStart, cannot cross endMs (min dur 100ms)
                 newWindow.startMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MinWindowDurationMs);
             } else if (dragState.type === 'right') {
-                const proposedEnd = win.endMs + deltaMs;
+                const proposedEnd = win.endMs + sourceDeltaMs;
                 // Cannot go past maxEnd, cannot cross startMs
                 newWindow.endMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MinWindowDurationMs);
             }
@@ -71,7 +77,8 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
 
                 } else if (dragState.type === 'right') {
                     // Right Edge Drag: Sync Playhead to the new end of the clip - 1ms (last visible frame)
-                    const newDuration = newWindow.endMs - newWindow.startMs;
+                    const speed = newWindow.speed || 1.0;
+                    const newDuration = (newWindow.endMs - newWindow.startMs) / speed;
                     const rightSideOutputTime = dragState.outputStartMs + newDuration;
                     setCurrentTime(rightSideOutputTime - 1);
                 }
@@ -110,7 +117,8 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
         // Calculate output start for this window
         for (let i = 0; i < winIndex; i++) {
             const w = timeline.outputWindows[i];
-            outputStartMs += (w.endMs - w.startMs);
+            const speed = w.speed || 1.0;
+            outputStartMs += (w.endMs - w.startMs) / speed;
         }
 
         if (winIndex > 0) {

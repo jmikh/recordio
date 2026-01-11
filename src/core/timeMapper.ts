@@ -6,7 +6,10 @@ export class TimeMapper {
 
     constructor(windows: OutputWindow[]) {
         this.windows = windows;
-        this.outputDuration = this.windows.reduce((acc, win) => acc + (win.endMs - win.startMs), 0);
+        this.outputDuration = this.windows.reduce((acc, win) => {
+            const speed = win.speed || 1.0;
+            return acc + ((win.endMs - win.startMs) / speed);
+        }, 0);
     }
 
 
@@ -24,14 +27,16 @@ export class TimeMapper {
         for (const win of this.windows) {
             if (sourceTimeMs >= win.startMs && sourceTimeMs <= win.endMs) {
                 // Inside this window
-                return outputTimeAccumulator + (sourceTimeMs - win.startMs);
+                const speed = win.speed || 1.0;
+                return outputTimeAccumulator + ((sourceTimeMs - win.startMs) / speed);
             } else if (sourceTimeMs < win.startMs) {
                 // Before this window (gap)
                 return -1;
             }
 
             // Passed this window
-            outputTimeAccumulator += (win.endMs - win.startMs);
+            const speed = win.speed || 1.0;
+            outputTimeAccumulator += (win.endMs - win.startMs) / speed;
         }
 
         return -1; // End of timeline or gap
@@ -48,13 +53,16 @@ export class TimeMapper {
         let outputTimeAccumulator = 0;
 
         for (const win of this.windows) {
-            const windowDuration = win.endMs - win.startMs;
-            const windowOutputEnd = outputTimeAccumulator + windowDuration;
+            const speed = win.speed || 1.0;
+            const windowSourceDuration = win.endMs - win.startMs;
+            const windowOutputDuration = windowSourceDuration / speed;
+            const windowOutputEnd = outputTimeAccumulator + windowOutputDuration;
 
             if (outputTimeMs < windowOutputEnd) {
                 // Output time falls within this window
                 const offsetWithinWindow = outputTimeMs - outputTimeAccumulator;
-                return win.startMs + offsetWithinWindow;
+                // Multiply by speed to get source offset
+                return win.startMs + (offsetWithinWindow * speed);
             }
 
             outputTimeAccumulator = windowOutputEnd;
@@ -78,8 +86,10 @@ export class TimeMapper {
         let outputTimeAccumulator = 0;
 
         for (const win of this.windows) {
-            const windowDuration = win.endMs - win.startMs;
-            const windowOutputEnd = outputTimeAccumulator + windowDuration;
+            const speed = win.speed || 1.0;
+            const windowSourceDuration = win.endMs - win.startMs;
+            const windowOutputDuration = windowSourceDuration / speed;
+            const windowOutputEnd = outputTimeAccumulator + windowOutputDuration;
 
             // Strict less than for end, greater equal for start (typical hit-test)
             // But for split, we usually want even the exact boundary to belong to the PREVIOUS window 
@@ -121,13 +131,14 @@ export class TimeMapper {
         const effectiveEnd = isPoint ? sourceStartMs : sourceEndMs;
 
         for (const w of this.windows) {
+            const speed = w.speed || 1.0;
             const outputOffset = acc;
-            acc += (w.endMs - w.startMs);
+            acc += (w.endMs - w.startMs) / speed;
 
             if (isPoint) {
                 // Check if the point falls within the current window [start, end]
                 if (sourceStartMs >= w.startMs && sourceStartMs <= w.endMs) {
-                    const mapped = outputOffset + (sourceStartMs - w.startMs);
+                    const mapped = outputOffset + ((sourceStartMs - w.startMs) / speed);
                     return { start: mapped, end: mapped };
                 }
             } else {
@@ -137,8 +148,8 @@ export class TimeMapper {
 
                 // If valid overlap exists
                 if (overlapStart < overlapEnd) {
-                    const mappedStart = outputOffset + (overlapStart - w.startMs);
-                    const mappedEnd = outputOffset + (overlapEnd - w.startMs);
+                    const mappedStart = outputOffset + ((overlapStart - w.startMs) / speed);
+                    const mappedEnd = outputOffset + ((overlapEnd - w.startMs) / speed);
 
                     // Record the first visible start time
                     if (startOutput === null) {

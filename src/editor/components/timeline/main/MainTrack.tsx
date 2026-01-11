@@ -9,6 +9,7 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimeMapper } from '../../../../core/timeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
+import { SpeedControl } from './SpeedControl';
 
 export const GROUP_HEADER_HEIGHT = 24;
 
@@ -25,6 +26,12 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 }) => {
     const selectWindow = useUIStore(s => s.selectWindow);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
+
+    const [speedControlState, setSpeedControlState] = React.useState<{
+        windowId: string;
+        speed: number;
+        anchorEl: HTMLElement;
+    } | null>(null);
 
     const sources = useProjectSources();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -65,9 +72,11 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 {timeline.outputWindows.map((w) => {
                     const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
                     const isSelected = selectedWindowId === w.id;
-                    const durationMs = win.endMs - win.startMs;
+                    const sourceDurationMs = win.endMs - win.startMs;
+                    const speed = win.speed || 1.0;
+                    const outputDurationMs = sourceDurationMs / speed;
                     const left = currentX;
-                    const width = coords.msToX(durationMs);
+                    const width = coords.msToX(outputDurationMs);
                     currentX += width; // Accumulate for next window
 
                     const hasCamera = !!timeline.recording.cameraSourceId;
@@ -89,9 +98,30 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 {/* Group Header */}
                                 <div
                                     style={{ height: GROUP_HEADER_HEIGHT }}
-                                    className="bg-surface-elevated border-b border-border px-2 flex items-center text-xs text-text-muted select-none"
+                                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-between text-xs text-text-muted select-none"
                                 >
-                                    {(durationMs / 1000).toFixed(1)}s
+                                    {/* Duration on left - hide if window too small */}
+                                    {width >= 60 && <span>{(outputDurationMs / 1000).toFixed(1)}s</span>}
+
+                                    {/* Speed on right */}
+                                    <span
+                                        className="cursor-pointer hover:text-primary transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSpeedControlState({
+                                                windowId: w.id,
+                                                speed: win.speed || 1.0,
+                                                anchorEl: e.currentTarget as HTMLElement
+                                            });
+                                        }}
+                                    >
+                                        {(() => {
+                                            const speed = win.speed || 1.0;
+                                            // Format to remove trailing zeros
+                                            const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
+                                            return `${formatted}x`;
+                                        })()}
+                                    </span>
                                 </div>
 
                                 {/* Tracks Area */}
@@ -179,6 +209,16 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     );
                 })}
             </div >
+
+            {/* Speed Control Popover */}
+            {speedControlState && (
+                <SpeedControl
+                    windowId={speedControlState.windowId}
+                    currentSpeed={speedControlState.speed}
+                    anchorEl={speedControlState.anchorEl}
+                    onClose={() => setSpeedControlState(null)}
+                />
+            )}
         </div >
     );
 };

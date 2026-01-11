@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow } from '../../../core/types';
+import type { ID, OutputWindow, ViewportMotion } from '../../../core/types';
 import { recalculateAutoZooms, shiftManualZooms } from '../../utils/zoomUtils';
 import { useUIStore } from '../useUIStore';
 
@@ -13,7 +13,10 @@ export interface WindowSlice {
 
 const getSnapshot = () => useUIStore.getState();
 
-const getWindowDuration = (w: OutputWindow) => w.endMs - w.startMs;
+const getWindowDuration = (w: OutputWindow) => {
+    const speed = w.speed || 1.0;
+    return (w.endMs - w.startMs) / speed;
+};
 
 export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], WindowSlice> = (set, _get, store) => ({
 
@@ -39,7 +42,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             const oldStart = targetWindow.startMs;
             const oldEnd = targetWindow.endMs;
-            const oldDuration = oldEnd - oldStart;
+            const oldSpeed = targetWindow.speed || 1.0;
+            const oldDuration = (oldEnd - oldStart) / oldSpeed;
 
             // Apply updates to get new window
             const newWindow = { ...targetWindow, ...updates };
@@ -86,6 +90,102 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     const delta = newWindow.endMs - oldEnd;
                     const pivot = outputStartMs + oldDuration;
                     nextMotions = shiftManualZooms(nextMotions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
+                }
+
+                // 3. Check Speed Change
+                // If speed changed, the output duration changes even if start/end didn't change
+                if (updates.speed !== undefined && newWindow.speed !== oldSpeed) {
+                    const newDuration = (newWindow.endMs - newWindow.startMs) / (newWindow.speed || 1.0);
+                    const durationDelta = newDuration - oldDuration;
+
+                    // Handle motions in manual mode
+                    if (!state.project.settings.zoom.autoZoom) {
+                        // Split motions into three categories:
+                        // 1. Before this window (outputStartMs) - unchanged
+                        // 2. Within this window (outputStartMs to outputStartMs + oldDuration) - need adjustment
+                        // 3. After this window (> outputStartMs + oldDuration) - shift by durationDelta
+
+                        const windowOutputEnd = outputStartMs + oldDuration;
+                        const beforeWindow: ViewportMotion[] = [];
+                        const withinWindow: ViewportMotion[] = [];
+                        const afterWindow: ViewportMotion[] = [];
+
+                        nextMotions.forEach(m => {
+                            if (m.outputEndTimeMs <= outputStartMs) {
+                                beforeWindow.push(m);
+                            } else if (m.outputEndTimeMs <= windowOutputEnd) {
+                                withinWindow.push(m);
+                            } else {
+                                afterWindow.push(m);
+                            }
+                        });
+
+                        // Adjust motions within the window
+                        let adjustedWithinWindow: ViewportMotion[] = [];
+
+                        // Speed changes should SCALE the motions, not shift them like trimming
+                        // A motion at output time 4s in a 10s window at 1x speed
+                        // should be at output time 2s in a 5s window at 2x speed
+                        const speedRatio = (newWindow.speed || 1.0) / oldSpeed;
+
+                        let leftBoundary = outputStartMs;
+                        for (const m of withinWindow) {
+                            // Calculate the relative position within the old window (0 to 1)
+                            const relativePosition = (m.outputEndTimeMs - outputStartMs) / oldDuration;
+
+                            // Apply the relative position to the new window duration
+                            const newEndTime = outputStartMs + (relativePosition * newDuration);
+
+                            // Scale the duration proportionally
+                            const scaledDuration = m.durationMs / speedRatio;
+
+                            // Try to use max duration if possible, otherwise use scaled duration
+                            let finalDuration = Math.min(
+                                state.project.settings.zoom.maxZoomDurationMs,
+                                Math.max(scaledDuration, state.project.settings.zoom.minZoomDurationMs)
+                            );
+
+                            // Check if this motion fits without collision
+                            const idealStartTime = newEndTime - finalDuration;
+
+                            if (idealStartTime >= leftBoundary) {
+                                // Fits perfectly
+                                adjustedWithinWindow.push({
+                                    ...m,
+                                    outputEndTimeMs: newEndTime,
+                                    durationMs: finalDuration
+                                });
+                                leftBoundary = newEndTime;
+                            } else {
+                                // Collision with previous motion - shrink duration
+                                const availableSpace = newEndTime - leftBoundary;
+
+                                if (availableSpace >= state.project.settings.zoom.minZoomDurationMs) {
+                                    // Fits with reduced duration
+                                    adjustedWithinWindow.push({
+                                        ...m,
+                                        outputEndTimeMs: newEndTime,
+                                        durationMs: availableSpace
+                                    });
+                                    leftBoundary = newEndTime;
+                                }
+                                // else: drop the motion due to insufficient space
+                            }
+                        }
+
+                        // Shift motions after the window
+                        const shiftedAfterWindow = afterWindow.map(m => ({
+                            ...m,
+                            outputEndTimeMs: m.outputEndTimeMs + durationDelta
+                        }));
+
+                        // Combine all motions
+                        nextMotions = [
+                            ...beforeWindow,
+                            ...adjustedWithinWindow,
+                            ...shiftedAfterWindow
+                        ];
+                    }
                 }
             }
 
@@ -179,7 +279,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const newWin: OutputWindow = {
                 id: crypto.randomUUID(),
                 startMs: splitTimeMs,
-                endMs: originalWin.endMs
+                endMs: originalWin.endMs,
+                speed: originalWin.speed  // Preserve speed from original window
             };
 
             // 4. Construct new window list

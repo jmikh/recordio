@@ -191,6 +191,8 @@ export interface OutputWindow {
     startMs: TimeMs;
     /** Timeline-based end time */
     endMs: TimeMs;
+    /** Playback speed multiplier (default: 1.0). 2.0 = 2x speed, 0.5 = 0.5x speed */
+    speed?: number;
 }
 
 /**

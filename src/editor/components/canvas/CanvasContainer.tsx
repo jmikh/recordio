@@ -106,13 +106,22 @@ export const CanvasContainer = () => {
                 // Use TimeMapper to get the correct source time for this output time
                 const sourceTimeMs = timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs);
 
+                // Get current window speed for playback rate
+                const windowInfo = timeMapperRef.current.getWindowAtOutputTime(effectiveTimeMs);
+                const playbackSpeed = windowInfo?.window.speed || 1.0;
+
                 Object.values(sources).forEach(source => {
                     const video = internalVideoRefs.current[source.id];
                     if (video) {
                         if (sourceTimeMs === -1) {
                             // GAP: Ensure video is paused if we are in a gap
                             if (!video.paused) video.pause();
+                            video.playbackRate = 1.0;  // Reset playback rate
                         } else {
+                            // Set playback rate to match window speed
+                            if (video.playbackRate !== playbackSpeed) {
+                                video.playbackRate = playbackSpeed;
+                            }
                             syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
                         }
                     }

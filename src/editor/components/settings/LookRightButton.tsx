@@ -50,8 +50,8 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 className={`
                     absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all
                     ${isActive
-                        ? 'left-[calc(100%-2.75rem)] bg-background text-text-main' // Moves to RIGHT
-                        : 'left-1 bg-settings-primary text-primary-fg' // Stays on LEFT
+                        ? 'left-[calc(100%-2.75rem)] bg-background text-text-main border-background' // Moves to RIGHT
+                        : 'left-1 bg-settings-primary text-primary-fg shadow-inner-bold border border-settings-primary' // Stays on LEFT
                     }
                 `}
                 animate={isActive ? {
