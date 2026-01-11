@@ -241,7 +241,7 @@ export const BackgroundSettings = () => {
                                     setShowColorPopover(!showColorPopover);
                                 }}
                                 className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
-                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    ? 'border-settings-primary ring-2 ring-settings-primary/30'
                                     : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
                                     }`}
                                 style={colorCardStyle}
@@ -260,7 +260,7 @@ export const BackgroundSettings = () => {
                             <div
                                 onClick={handleCustomSelect}
                                 className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
-                                    ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                    ? 'border-settings-primary ring-2 ring-settings-primary/30'
                                     : 'border-transparent bg-gray-700 ring-1 ring-white/10 hover:ring-white/30'
                                     }`}
                                 title="Upload Image"
@@ -292,7 +292,7 @@ export const BackgroundSettings = () => {
                                     <div
                                         key={img.url}
                                         className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
-                                            ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                            ? 'border-settings-primary ring-2 ring-settings-primary/30'
                                             : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
                                         onClick={() => handlePresetSelect(img.url)}
                                         title={img.name}

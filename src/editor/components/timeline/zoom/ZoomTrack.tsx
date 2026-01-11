@@ -55,8 +55,20 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         coords,
         dragState,
         editingZoomId,
-        setEditingZoom
+        setEditingZoom,
+        outputDuration
     );
+
+    // Shared arrow pattern style
+    const arrowPatternStyle: React.CSSProperties = {
+        backgroundImage: `
+            repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px),
+            repeating-linear-gradient(135deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px)
+        `,
+        backgroundSize: '100% 50%',
+        backgroundPosition: 'top left, bottom left',
+        backgroundRepeat: 'no-repeat'
+    };
 
     // ------------------------------------------------------------------
     // RENDER
@@ -109,7 +121,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none ${isSelected ? 'bg-primary/40' : 'bg-primary/30'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-t border-b border-r rounded-r-xl border-zoomtrack-primary ${isSelected ? 'bg-zoomtrack-primary/50' : 'bg-zoomtrack-primary/30'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -120,20 +132,18 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             }
                         }
 
-                        const arrowCount = Math.max(0, Math.floor(width / 10));
-                        const arrows = ">".repeat(arrowCount);
-
                         return (
                             <React.Fragment key={m.id}>
                                 <div
-                                    className={`absolute top-[4px] bottom-[4px] group rounded-sm transition-colors border
-                                        ${isSelected ? 'bg-primary border-primary-fg' : 'bg-primary/80 border-primary/30 hover:bg-primary'}
+                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border
+                                        ${isSelected ? 'bg-zoomtrack-primary border-zoomtrack-secondary' : 'bg-zoomtrack-primary/80 not-hover:border-zoomtrack-primary/50 hover:border-zoomtrack-secondary/50 hover:bg-zoomtrack-primary'}
                                         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
                                     `}
                                     style={{
                                         left: `${left}px`,
                                         width: `${Math.max(width, 2)}px`,
-                                        zIndex: isSelected ? 20 : 10
+                                        zIndex: isSelected ? 20 : 10,
+                                        ...arrowPatternStyle
                                     }}
                                     onMouseDown={(e) => handleDragStart(e, 'move', m)}
                                     onClick={(e) => {
@@ -142,16 +152,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                         setEditingZoom(m.id);
                                     }}
                                 >
-                                    {/* Arrows Pattern */}
-                                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-40">
-                                        <span className="text-[10px] text-primary-fg select-none tracking-widest font-mono">
-                                            {arrows}
-                                        </span>
-                                    </div>
 
                                     {/* Right Edge (Keyframe) - Thicker, Opaque */}
                                     <div
-                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-tertiary' : 'bg-primary-fg/50'} shadow-sm`}
+                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-zoomtrack-secondary' : 'bg-primary-fg/50'} shadow-sm`}
                                     />
 
                                 </div>
@@ -164,28 +168,26 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 {/* Add Zoom Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-tertiary/50 bg-tertiary/10 rounded-sm flex items-center justify-center"
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-zoomtrack-secondary bg-zoomtrack-secondary/80 rounded-sm flex items-center justify-center"
                         style={{
                             // Use calculated width (pixel based on time)
                             // Position: right aligned to mouse X (hoverInfo.x).
                             // Left = Right - Width
                             left: `${hoverInfo.x - hoverInfo.width}px`,
-                            width: `${hoverInfo.width}px`
+                            width: `${hoverInfo.width}px`,
+                            ...arrowPatternStyle
                         }}
                     >
                         {/* Add Zoom Label (Above) */}
-                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-tertiary pointer-events-none bg-surface-elevated/80 px-1 rounded">
+                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-zoomtrack-secondary pointer-events-none bg-surface-elevated/80 px-1 rounded">
                             Add Zoom
                         </div>
 
                         {/* Right Handle */}
-                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-tertiary/50" />
-
-                        {/* Plus Icon */}
-                        <span className="text-tertiary text-lg font-light leading-none">+</span>
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-zoomtrack-secondary/50" />
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 };

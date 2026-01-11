@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { Timeline as TimelineType } from '../../../../core/types';
 import { useProjectSources } from '../../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
@@ -96,7 +97,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 {/* Tracks Area */}
                                 <div className="relative flex-1 w-full">
                                     {/* 1. Screen Segment */}
-                                    <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-secondary/60 border-y border-secondary-fg/20 first:border-t-0 last:border-b-0 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
+                                    <div className={`absolute left-0 right-0 top-0 ${hasCamera ? 'bottom-1/2' : 'bottom-0'} bg-primary border border-primary shadow-inner-bold first:border-t-0 last:border-b-0 overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
                                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
                                             {!screenAudio.isLoading && (
                                                 <WaveformSegment
@@ -144,23 +145,36 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
                             />
 
-                            {/* Gap Bubble */}
-                            {dragState && dragState.windowId === w.id && (
-                                <div
-                                    className="absolute -bottom-6 bg-surface-elevated text-text-main text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border z-50 pointer-events-none whitespace-nowrap"
-                                    style={{
-                                        [dragState.type === 'left' ? 'left' : 'right']: 0,
-                                        transform: dragState.type === 'left' ? 'translateX(-50%)' : 'translateX(50%)',
-                                    }}
-                                >
-                                    [ {(
-                                        (dragState.type === 'left'
-                                            ? (win.startMs - dragState.constraints.minStart)
-                                            : (dragState.constraints.maxEnd - win.endMs)
-                                        ) / 1000
-                                    ).toFixed(2)}s ]
-                                </div>
-                            )}
+                            {/* Gap Bubble (Portal) */}
+                            {dragState && dragState.windowId === w.id && (() => {
+                                const rect = containerRef.current?.getBoundingClientRect();
+                                if (!rect) return null;
+
+                                const isLeft = dragState.type === 'left';
+                                const indicatorX = rect.left + left + (isLeft ? 0 : width);
+                                const indicatorY = rect.bottom;
+
+                                return createPortal(
+                                    <div
+                                        className="fixed z-[9999] pointer-events-none"
+                                        style={{
+                                            top: `${indicatorY}px`,
+                                            left: `${indicatorX}px`,
+                                            transform: isLeft ? 'translate(-50%, 24px)' : 'translate(50%, 24px)' // Add offset to be below
+                                        }}
+                                    >
+                                        <div className="bg-surface-elevated text-text-main text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border whitespace-nowrap">
+                                            [ {(
+                                                (isLeft
+                                                    ? (win.startMs - dragState.constraints.minStart)
+                                                    : (dragState.constraints.maxEnd - win.endMs)
+                                                ) / 1000
+                                            ).toFixed(2)}s ]
+                                        </div>
+                                    </div>,
+                                    document.body
+                                );
+                            })()}
                         </div>
                     );
                 })}

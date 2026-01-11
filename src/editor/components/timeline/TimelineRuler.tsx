@@ -31,8 +31,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
 
         // Read theme colors
         const style = getComputedStyle(document.documentElement);
-        const textColor = style.getPropertyValue('--color-text-muted') || '#64748b';
-        const tickColor = style.getPropertyValue('--color-border-primary') || '#334155';
+        const textColor = 'rgba(255, 255, 255, 0.6)';
+        const tickColor = 'rgba(255, 255, 255, 0.4)';
 
         ctx.fillStyle = textColor; // text-muted
         ctx.strokeStyle = tickColor; // border-primary (or highlight)

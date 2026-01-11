@@ -46,7 +46,7 @@ export const MultiToggle = <T extends string>({
                     width: `${100 / count}%`,
                     left: `${(selectedIndex === -1 ? 0 : selectedIndex) * (100 / count)}%`
                 }}
-                className="absolute inset-y-0 bg-secondary border border-secondary shadow-inner-bold z-0 rounded-lg"
+                className="absolute inset-y-0 bg-settings-primary border border-settings-primary shadow-inner-bold z-0 rounded-lg"
             />
 
             {/* Options */}
@@ -57,9 +57,10 @@ export const MultiToggle = <T extends string>({
                         key={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4
+                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4 min-w-0
                             text-xs z-10 outline-none
                             transition-colors duration-200
+                            text-center
                             ${isSelected
                                 ? 'text-primary-fg '
                                 : 'text-text-muted hover:text-text-main'

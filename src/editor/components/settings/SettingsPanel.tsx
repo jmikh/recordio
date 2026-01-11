@@ -42,14 +42,16 @@ const IconBackground = () => (
 
 const IconCamera = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-        <circle cx="12" cy="13" r="4" />
+        <circle cx="12" cy="10" r="8" />
+        <circle cx="12" cy="10" r="3" />
+        <path d="M7 22h10" />
+        <path d="M12 22v-4" />
     </svg>
 );
 
 
 export const SettingsPanel = () => {
-    const [activeTab, setActiveTab] = useState<Tab>('background');
+    const [activeTab, setActiveTab] = useState<Tab>('screen');
 
     return (
         <div className="flex h-full border-r border-border bg-surface-elevated">
@@ -62,22 +64,16 @@ export const SettingsPanel = () => {
                     onClick={() => setActiveTab('project')}
                 />
                 <SettingsButton
-                    label="Screen"
-                    icon={<IconScreen />}
-                    isActive={activeTab === 'screen'}
-                    onClick={() => setActiveTab('screen')}
-                />
-                <SettingsButton
-                    label="Effects"
-                    icon={<IconZoom />}
-                    isActive={activeTab === 'zoom'}
-                    onClick={() => setActiveTab('zoom')}
-                />
-                <SettingsButton
                     label="Background"
                     icon={<IconBackground />}
                     isActive={activeTab === 'background'}
                     onClick={() => setActiveTab('background')}
+                />
+                <SettingsButton
+                    label="Screen"
+                    icon={<IconScreen />}
+                    isActive={activeTab === 'screen'}
+                    onClick={() => setActiveTab('screen')}
                 />
                 <SettingsButton
                     label="Webcam"
@@ -85,16 +81,22 @@ export const SettingsPanel = () => {
                     isActive={activeTab === 'camera'}
                     onClick={() => setActiveTab('camera')}
                 />
+                <SettingsButton
+                    label="Effects"
+                    icon={<IconZoom />}
+                    isActive={activeTab === 'zoom'}
+                    onClick={() => setActiveTab('zoom')}
+                />
             </div>
 
             {/* Content Area */}
             <div className="w-72 flex flex-col">
                 <div className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar">
                     {activeTab === 'project' && <ProjectSettings />}
-                    {activeTab === 'screen' && <ScreenSettings />}
-                    {activeTab === 'zoom' && <ZoomSettings />}
                     {activeTab === 'background' && <BackgroundSettings />}
+                    {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
+                    {activeTab === 'zoom' && <ZoomSettings />}
                 </div>
             </div>
 

@@ -27,10 +27,18 @@ export const ProjectCard = ({
                 group relative flex flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
-                    ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(var(--primary),0.15)] scale-[1.02]'
+                    ? 'shadow-[0_0_15px_rgba(var(--primary),0.15)] scale-[1.02]'
                     : 'bg-surface-elevated border-border hover:border-text-muted/50 hover:scale-[1.01] hover:shadow-lg'
                 }
             `}
+            style={isActive ? {
+                borderColor: 'var(--card-active-primary, var(--primary))',
+                backgroundColor: 'color-mix(in srgb, var(--card-active-primary, var(--primary)), transparent 90%)',
+                // Note: shadow color from tailwind class uses opacity, tricky to override with variable without color-mix or calc. 
+                // We'll leave the shadow using primary for now or use color-mix if needed.
+                // Actually, let's override shadow too if we can.
+                boxShadow: '0 0 15px color-mix(in srgb, var(--card-active-primary, var(--primary)), transparent 85%)'
+            } : undefined}
         >
             {/* Delete Confirmation Overlay */}
             {isDeleting && (
@@ -95,10 +103,13 @@ export const ProjectCard = ({
             <div className="w-full min-w-0 flex-shrink-0">
                 <div className="flex flex-col">
                     <div className="flex justify-between items-start">
-                        <h3 className={`font-semibold truncate pr-2 ${isActive ? 'text-primary' : 'text-text-main'} ${isGrid ? 'text-base' : 'text-sm'}`}>
+                        <h3
+                            className={`font-semibold truncate pr-2 ${!isActive ? 'text-text-main' : ''} ${isGrid ? 'text-base' : 'text-sm'}`}
+                            style={isActive ? { color: 'var(--card-active-primary, var(--primary))' } : undefined}
+                        >
                             {project.name}
                         </h3>
-                        {isActive && <span className="flex h-2 w-2 rounded-full bg-tertiary flex-shrink-0 mt-1.5 shadow-[0_0_5px_rgba(var(--tertiary),0.5)]"></span>}
+                        {isActive && <span className="flex h-2 w-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: 'var(--card-active-dot, var(--tertiary))', boxShadow: '0 0 5px var(--card-active-dot, var(--tertiary))' }}></span>}
                     </div>
                     <div className="flex items-center text-xs text-text-muted space-x-2 mt-1">
                         <span>{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>

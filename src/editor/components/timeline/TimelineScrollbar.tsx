@@ -4,9 +4,10 @@ interface TimelineScrollbarProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     className?: string;
     dependency?: any;
+    orientation?: 'horizontal' | 'vertical';
 }
 
-export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerRef, className, dependency }) => {
+export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerRef, className, dependency, orientation = 'horizontal' }) => {
     const trackRef = useRef<HTMLDivElement>(null);
     const thumbRef = useRef<HTMLDivElement>(null);
     const [thumbWidth, setThumbWidth] = useState(0);
@@ -21,33 +22,35 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
         const track = trackRef.current;
         if (!container || !track) return;
 
-        const { scrollLeft, scrollWidth, clientWidth } = container;
-        const trackWidth = track.clientWidth;
+        const isHorizontal = orientation === 'horizontal';
 
-        // Calculate thumb width
-        // thumbWidth / trackWidth = clientWidth / scrollWidth
-        let newThumbWidth = (clientWidth / scrollWidth) * trackWidth;
-        // Min width for usability
-        newThumbWidth = Math.max(newThumbWidth, 40);
-        // If content fits, thumb is full width (or hidden? user usually expects hidden if no scroll, or full width)
-        if (scrollWidth <= clientWidth) {
-            newThumbWidth = trackWidth;
+        const scrollPos = isHorizontal ? container.scrollLeft : container.scrollTop;
+        const scrollSize = isHorizontal ? container.scrollWidth : container.scrollHeight;
+        const clientSize = isHorizontal ? container.clientWidth : container.clientHeight;
+        const trackSize = isHorizontal ? track.clientWidth : track.clientHeight;
+
+        // Calculate thumb size
+        let newThumbSize = (clientSize / scrollSize) * trackSize;
+        // Min size for usability
+        newThumbSize = Math.max(newThumbSize, 40);
+        // If content fits, thumb is full size
+        if (scrollSize <= clientSize) {
+            newThumbSize = trackSize;
         }
 
-        setThumbWidth(newThumbWidth);
+        setThumbWidth(newThumbSize);
 
         // Calculate thumb position
-        // thumbLeft / (trackWidth - thumbWidth) = scrollLeft / (scrollWidth - clientWidth)
-        const maxThumbLeft = trackWidth - newThumbWidth;
-        const maxScrollLeft = scrollWidth - clientWidth;
+        const maxThumbPos = trackSize - newThumbSize;
+        const maxScrollPos = scrollSize - clientSize;
 
-        if (maxScrollLeft > 0) {
-            const ratio = scrollLeft / maxScrollLeft;
-            setThumbLeft(ratio * maxThumbLeft);
+        if (maxScrollPos > 0) {
+            const ratio = scrollPos / maxScrollPos;
+            setThumbLeft(ratio * maxThumbPos);
         } else {
             setThumbLeft(0);
         }
-    }, [containerRef]);
+    }, [containerRef, orientation]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -76,8 +79,9 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
         if (!container) return;
 
         setIsDragging(true);
-        startXRef.current = e.clientX;
-        startScrollLeftRef.current = container.scrollLeft;
+        const isHorizontal = orientation === 'horizontal';
+        startXRef.current = isHorizontal ? e.clientX : e.clientY;
+        startScrollLeftRef.current = isHorizontal ? container.scrollLeft : container.scrollTop;
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
@@ -88,31 +92,26 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
         const track = trackRef.current;
         if (!container || !track) return;
 
-        const deltaX = e.clientX - startXRef.current;
-        const trackWidth = track.clientWidth;
-        const { scrollWidth, clientWidth } = container;
+        const isHorizontal = orientation === 'horizontal';
+        const delta = isHorizontal ? e.clientX - startXRef.current : e.clientY - startXRef.current;
+        const trackSize = isHorizontal ? track.clientWidth : track.clientHeight;
+        const scrollSize = isHorizontal ? container.scrollWidth : container.scrollHeight;
+        const clientSize = isHorizontal ? container.clientWidth : container.clientHeight;
 
-        // Calculate how much 1px of thumb moves the scroll
-        // ratio = scrollWidth / trackWidth (approx)
-        // More precise: 
-        // maxThumbMove = trackWidth - thumbWidth
-        // maxScroll = scrollWidth - clientWidth
-        // scrollDelta = (deltaX / maxThumbMove) * maxScroll
-
-        // We can't rely on state here as it might be stale? 
-        // Actually we need the *current* thumbWidth which is in state. 
-        // Using refs for width would be safer but let's try rects.
-
-        const currentThumbWidth = thumbRef.current?.clientWidth || 0;
-        const maxThumbMove = trackWidth - currentThumbWidth;
-        const maxScroll = scrollWidth - clientWidth;
+        const currentThumbSize = isHorizontal ? thumbRef.current?.clientWidth || 0 : thumbRef.current?.clientHeight || 0;
+        const maxThumbMove = trackSize - currentThumbSize;
+        const maxScroll = scrollSize - clientSize;
 
         if (maxThumbMove > 0) {
-            const scrollDelta = (deltaX / maxThumbMove) * maxScroll;
-            container.scrollLeft = startScrollLeftRef.current + scrollDelta;
+            const scrollDelta = (delta / maxThumbMove) * maxScroll;
+            if (isHorizontal) {
+                container.scrollLeft = startScrollLeftRef.current + scrollDelta;
+            } else {
+                container.scrollTop = startScrollLeftRef.current + scrollDelta;
+            }
         }
 
-    }, [containerRef]);
+    }, [containerRef, orientation]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
@@ -127,19 +126,30 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
     // We can hide it if thumbWidth == trackWidth (approx)
     // But for now let's just render.
 
+    const isHorizontal = orientation === 'horizontal';
+    const isScrollable = isHorizontal
+        ? thumbWidth !== trackRef.current?.clientWidth
+        : thumbWidth !== trackRef.current?.clientHeight;
+
     return (
         <div
-            className={`h-3 w-full bg-surface border-b border-border relative flex items-center shrink-0 ${className || ''}`}
+            className={`${isHorizontal ? 'h-3 w-full' : 'w-3 h-full'} bg-surface ${isHorizontal ? 'border-b' : 'border-l'} border-border relative flex items-center shrink-0 ${className || ''}`}
             ref={trackRef}
         >
             <div
                 ref={thumbRef}
-                className={`h-1.5 rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-surface-elevated hover:bg-primary/50'}`}
+                className={`${isHorizontal ? 'h-1.5' : 'w-1.5'} rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-surface-elevated hover:bg-primary/50'}`}
                 style={{
-                    width: thumbWidth,
-                    left: thumbLeft,
-                    // If thumb covers full width, maybe lower opacity or hide?
-                    display: thumbWidth === trackRef.current?.clientWidth ? 'none' : 'block'
+                    ...(isHorizontal ? {
+                        width: thumbWidth,
+                        left: thumbLeft,
+                        height: '6px'
+                    } : {
+                        height: thumbWidth,
+                        top: thumbLeft,
+                        width: '6px'
+                    }),
+                    display: isScrollable ? 'block' : 'none'
                 }}
                 onMouseDown={handleMouseDown}
             />

@@ -18,7 +18,8 @@ export function useZoomHover(
     coords: TimePixelMapper,
     dragState: DragState | null,
     editingZoomId: string | null,
-    setEditingZoom: (id: string | null) => void
+    setEditingZoom: (id: string | null) => void,
+    outputDuration: number
 ) {
     const addViewportMotion = useProjectStore(s => s.addViewportMotion);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -35,6 +36,12 @@ export function useZoomHover(
 
         // Convert x directly to output time
         let mouseOutputTimeMs = coords.xToMs(x);
+
+        // Don't show hover if we're past the end of the output
+        if (mouseOutputTimeMs > outputDuration) {
+            setHoverInfo(null);
+            return;
+        }
 
         const motions = timeline.recording.viewportMotions || [];
 

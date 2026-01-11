@@ -38,8 +38,8 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
             className={`
                 group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold
                 ${isActive
-                    ? 'bg-tertiary border border-tertiary'
-                    : 'bg-background text-text-muted border not-hover:border-secondary/30 hover:border-secondary'
+                    ? 'bg-settings-primary border border-settings-primary'
+                    : 'bg-background text-text-muted border not-hover:border-settings-primary/30 hover:border-settings-primary'
                 }
                 ${className}
             `}
@@ -51,7 +51,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                     absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all
                     ${isActive
                         ? 'left-[calc(100%-2.75rem)] bg-background text-text-main' // Moves to RIGHT
-                        : 'left-1 bg-secondary text-secondary-fg' // Stays on LEFT
+                        : 'left-1 bg-settings-primary text-primary-fg' // Stays on LEFT
                     }
                 `}
                 animate={isActive ? {
@@ -65,7 +65,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 } : {}}
             >
                 {/* Icon Content */}
-                <div className={`flex items-center justify-center ${isActive ? 'text-tertiary' : ''}`}>
+                <div className={`flex items-center justify-center ${isActive ? 'text-settings-primary' : ''}`}>
                     {isActive ? (
                         <FaChevronRight className="w-4 h-4" />
                     ) : (

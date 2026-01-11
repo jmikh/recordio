@@ -58,6 +58,5 @@ export default {
       sans: ["var(--font-sans)"],
     }
   },
-},
-plugins: [],
+  plugins: [],
 }

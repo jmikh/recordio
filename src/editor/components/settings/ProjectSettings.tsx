@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import type { Project } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { ProjectCard } from '../common/ProjectCard';
+import { TimelineScrollbar } from '../timeline/TimelineScrollbar';
 
 export const ProjectSettings = () => {
     const { project: activeProject, isSaving } = useProjectStore();
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchProjects();
@@ -56,19 +58,31 @@ export const ProjectSettings = () => {
                 <h2 className="text-lg font-semibold">Projects ({projects.length})</h2>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                {isLoading && <div className="text-center text-gray-500 py-4">Loading...</div>}
+            <div className="flex-1 flex">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-scroll space-y-2 pr-2 scrollbar-hide"
+                    style={{ '--card-active-primary': 'var(--settings-primary)', '--card-active-dot': 'var(--settings-primary)' } as React.CSSProperties}
+                >
+                    {isLoading && <div className="text-center text-gray-500 py-4">Loading...</div>}
 
-                {projects.map(p => (
-                    <ProjectCard
-                        key={p.id}
-                        project={p}
-                        isActive={p.id === activeProject.id}
-                        variant="sidebar"
-                        onOpen={handleOpen}
-                        onDelete={handleDelete}
-                    />
-                ))}
+                    {projects.map(p => (
+                        <ProjectCard
+                            key={p.id}
+                            project={p}
+                            isActive={p.id === activeProject.id}
+                            variant="sidebar"
+                            onOpen={handleOpen}
+                            onDelete={handleDelete}
+                        />
+                    ))}
+                </div>
+
+                <TimelineScrollbar
+                    containerRef={scrollContainerRef}
+                    orientation="vertical"
+                    dependency={projects.length}
+                />
             </div>
         </div>
     );

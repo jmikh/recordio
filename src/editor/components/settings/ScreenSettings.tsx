@@ -96,7 +96,7 @@ export const ScreenSettings = () => {
                                             screen: { ...screenConfig, deviceFrameId: frame.id }
                                         })}
                                         className={`cursor-pointer w-full aspect-[16/10] rounded-lg border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
-                                            ? 'border-secondary ring-2 ring-secondary/30 bg-white'
+                                            ? 'border-settings-primary ring-2 ring-settings-primary/30 bg-white'
                                             : 'border-transparent ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
                                             }`}
                                         title={frame.name}
@@ -107,7 +107,7 @@ export const ScreenSettings = () => {
                                             className="w-full h-full object-contain p-1"
                                         />
                                     </div>
-                                    <span className={`text-[10px] tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-secondary' : 'text-gray-400'
+                                    <span className={`text-[10px] tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-settings-primary' : 'text-gray-400'
                                         }`}>
                                         {frame.name}
                                     </span>
