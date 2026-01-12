@@ -56,6 +56,10 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                     ...currentSettings.camera,
                     ...(updates.camera || {})
                 },
+                captions: {
+                    ...currentSettings.captions,
+                    ...(updates.captions || {})
+                },
                 // OutputSize is a simple object, can be merged deeply too
                 outputSize: {
                     ...currentSettings.outputSize,
