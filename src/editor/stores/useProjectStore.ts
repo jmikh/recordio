@@ -7,6 +7,7 @@ import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
 import { createViewportMotionSlice, type ViewportMotionSlice } from './slices/viewportMotionSlice';
+import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 
 const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
@@ -19,7 +20,7 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ViewportMotionSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ViewportMotionSlice, TranscriptionSlice {
     project: Project;
     sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
     userEvents: UserEvents; // Single set of loaded events (Never null)
@@ -73,6 +74,7 @@ export const useProjectStore = create<ProjectState>()(
                 ...createWindowSlice(set, get, store),
                 ...createSettingsSlice(set, get, store),
                 ...createViewportMotionSlice(set, get, store),
+                ...createTranscriptionSlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {

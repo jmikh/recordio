@@ -92,6 +92,32 @@ export interface ZoomSettings {
     minZoomDurationMs: number;
 }
 
+export interface CaptionSettings {
+    visible: boolean;
+    size: number; // Font size in pixels
+}
+
+/**
+ * Represents a single caption segment.
+ * Timestamps are in source time (raw video time before windows/speed adjustments).
+ */
+export interface CaptionSegment {
+    id: ID;
+    text: string;
+    /** Start time in source video (milliseconds) */
+    sourceStartMs: number;
+    /** End time in source video (milliseconds) */
+    sourceEndMs: number;
+}
+
+/**
+ * Complete caption data for a recording.
+ */
+export interface Captions {
+    segments: CaptionSegment[];
+    generatedAt: Date;
+}
+
 export interface ProjectSettings {
     outputSize: Size;
     frameRate: number;
@@ -107,6 +133,9 @@ export interface ProjectSettings {
 
     // Camera
     camera?: CameraSettings;
+
+    // Captions
+    captions: CaptionSettings;
 }
 
 // ==========================================
@@ -203,6 +232,9 @@ export interface Recording {
     cameraSourceId?: ID;
 
     viewportMotions: ViewportMotion[];
+
+    /** Optional caption data from webcam audio */
+    captions?: Captions;
 }
 
 

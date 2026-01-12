@@ -8,6 +8,7 @@ import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
 import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
+import { CaptionOverlay } from './CaptionOverlay';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
@@ -273,6 +274,9 @@ export const CanvasContainer = () => {
                 {canvasMode === CanvasMode.CameraEdit && (
                     <CameraEditor cameraRef={previewCameraSettingsRef} />
                 )}
+
+                {/* CAPTION OVERLAY */}
+                <CaptionOverlay />
             </div>
         </div>
     );

@@ -4,10 +4,11 @@ import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { ZoomSettings } from './ZoomSettings';
 import { CameraSettings } from './CameraSettings';
+import { CaptionsControls } from './CaptionsControls';
 import { SettingsButton } from './SettingsButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 
-type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera';
+type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions';
 
 const IconProject = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,6 +50,13 @@ const IconCamera = () => (
     </svg>
 );
 
+const IconCaptions = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="15" width="20" height="4" rx="1" />
+        <rect x="2" y="5" width="18" height="4" rx="1" />
+    </svg>
+);
+
 
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('screen');
@@ -87,6 +95,12 @@ export const SettingsPanel = () => {
                     isActive={activeTab === 'zoom'}
                     onClick={() => setActiveTab('zoom')}
                 />
+                <SettingsButton
+                    label="Captions"
+                    icon={<IconCaptions />}
+                    isActive={activeTab === 'captions'}
+                    onClick={() => setActiveTab('captions')}
+                />
             </div>
 
             {/* Content Area */}
@@ -97,6 +111,7 @@ export const SettingsPanel = () => {
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
                     {activeTab === 'zoom' && <ZoomSettings />}
+                    {activeTab === 'captions' && <CaptionsControls />}
                 </div>
             </div>
 
