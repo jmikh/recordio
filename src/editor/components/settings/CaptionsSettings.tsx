@@ -64,9 +64,9 @@ export function CaptionsSettings() {
         setIsPlaying(false);
 
         // Move CTI to the start of the caption in output time
-        const outputTime = timeMapper.mapSourceToOutputTime(segment.sourceStartMs);
-        if (outputTime >= 0) {
-            setCurrentTime(outputTime);
+        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+        if (outputRange) {
+            setCurrentTime(outputRange.start);
         }
 
         startInteraction();
@@ -216,7 +216,7 @@ export function CaptionsSettings() {
                                 const isEditing = editingId === segment.id;
 
                                 return (
-                                    <div key={segment.id} className="relative inline-block bg-surface text-white px-3 py-2 rounded font-medium text-xs w-full">
+                                    <div key={segment.id} className={`relative inline-block bg-surface text-white px-3 py-2 rounded font-medium text-xs w-full border transition-colors ${isEditing ? 'border-settings-primary' : 'border-transparent'}`}>
                                         {/* Delete button - top right of entire div */}
                                         <button
                                             onClick={() => handleDelete(segment.id)}

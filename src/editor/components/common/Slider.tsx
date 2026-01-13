@@ -16,16 +16,11 @@ interface SliderProps {
 }
 
 // Configurable Height Constant
-const SLIDER_HEIGHT = 16; // Easy to change, affecting all instances
-
-// Derived Dimensions
-const PADDING = 2; // Padding for all sides (top/bottom/left/right)
-// Top/Bottom: Matches "top-1 bottom-1" style
-// Left/Right: Insets the slider travel range
-// Extension: Used to extend the track past the marker
-
-const THUMB_SIZE = SLIDER_HEIGHT - (PADDING * 2);
+const SLIDER_HEIGHT = 20; // Container height for touch target
+const TRACK_HEIGHT = 4; // Visual track height
+const THUMB_SIZE = 16; // Thumb diameter
 const THUMB_RADIUS = THUMB_SIZE / 2;
+const PADDING = 2; // Keep some padding for touch target calculation safety
 
 export const Slider: React.FC<SliderProps> = ({
     value,
@@ -44,7 +39,7 @@ export const Slider: React.FC<SliderProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
 
-    // Calculate percentage 0..1 for internal logic
+    // Calculate percentage 0..1
     const clampedValue = Math.min(Math.max(value, min), max);
     const fraction = (clampedValue - min) / (max - min);
 
@@ -54,13 +49,18 @@ export const Slider: React.FC<SliderProps> = ({
         const rect = containerRef.current.getBoundingClientRect();
         const width = rect.width;
 
-        let relativeX = clientX - rect.left;
+        // Effective interactive width is the full width minus the thumb size (to keep thumb inside ends)
+        // We want the center of the thumb to go from 0 to width
+        // But visually we usually constrain it so thumb doesn't overflow.
+        // Let's keep the existing logic:
+        // track starts at PADDING + THUMB_RADIUS and ends at width - PADDING - THUMB_RADIUS
+        // But for a thin slider visually we might want the thumb to go potentially to the very edge?
+        // Let's stick to the previous safe padding logic for now to ensure no overlap issues,
+        // but can adjust if user wants full-width edge-to-edge.
 
-        // Effective position starts after the left padding + radius
-        let effectivePos = relativeX - (PADDING + THUMB_RADIUS);
-
-        // Total travel length is reduced by padding on both sides
-        let travelLength = width - (PADDING * 2) - THUMB_SIZE;
+        const relativeX = clientX - rect.left;
+        const effectivePos = relativeX - (PADDING + THUMB_RADIUS);
+        const travelLength = width - (PADDING * 2) - THUMB_SIZE;
 
         let rawFraction = 0;
         if (travelLength > 0) {
@@ -68,12 +68,9 @@ export const Slider: React.FC<SliderProps> = ({
         }
 
         rawFraction = Math.max(0, Math.min(1, rawFraction));
-
         let newValue = min + rawFraction * (max - min);
 
-        // No step logic - continuous
-
-        // Clamp again just in case rounding pushed it out
+        // Clamp again
         newValue = Math.min(Math.max(newValue, min), max);
 
         onChange(newValue);
@@ -81,7 +78,7 @@ export const Slider: React.FC<SliderProps> = ({
 
     const handlePointerDown = (e: React.PointerEvent) => {
         if (disabled) return;
-        e.preventDefault(); // Prevent text selection
+        e.preventDefault();
         setIsDragging(true);
         if (onPointerDown) onPointerDown();
         handleInteraction(e.clientX);
@@ -112,6 +109,7 @@ export const Slider: React.FC<SliderProps> = ({
         };
     }, [isDragging, handleInteraction, onPointerUp]);
 
+    // Calculate thumb position for style
     const thumbLeft = `calc(${PADDING}px + ${THUMB_RADIUS}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction})`;
 
     return (
@@ -121,31 +119,40 @@ export const Slider: React.FC<SliderProps> = ({
                     {label}
                 </label>
             )}
-            {/* Container with explicit height */}
+
             <div
                 ref={containerRef}
                 onPointerDown={handlePointerDown}
                 style={{ height: `${SLIDER_HEIGHT}px` }}
                 className={`
-                    relative w-full touch-none select-none group cursor-pointer
+                    relative w-full touch-none select-none group flex items-center
                     ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                 `}
             >
-                {/* Background & Track Container (Clipped) */}
-                <div className="absolute inset-0 rounded-full overflow-hidden bg-surface shadow-inner-bold">
-                    {/* Left Track (Primary Color) */}
+                {/* Visual Track - Full Width Background (Inactive part) */}
+                <div
+                    className="absolute left-0 right-0 rounded-full bg-black"
+                    style={{
+                        height: `${TRACK_HEIGHT}px`,
+                        left: `${PADDING}px`,
+                        right: `${PADDING}px`
+                    }}
+                >
+                    {/* Active Track (Left side) */}
                     <div
-                        className="absolute top-0 left-0 bottom-0 bg-settings-primary  pointer-events-none rounded-full shadow-inner-bold"
+                        className="absolute top-0 left-0 bottom-0 bg-settings-primary rounded-full"
                         style={{
-                            width: `calc(${PADDING}px + ${THUMB_SIZE}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction} + ${PADDING}px)`
+                            width: `calc(${fraction} * 100%)`
                         }}
                     />
                 </div>
 
                 {/* Marker / Thumb */}
                 <div
-                    className="absolute top-1 bottom-1 aspect-square bg-text-muted rounded-full pointer-events-none transition-transform active:scale-95 z-10"
+                    className="absolute bg-white border-3 border-settings-primary rounded-full pointer-events-none transition-transform active:scale-95 z-10 shadow-sm"
                     style={{
+                        height: `${THUMB_SIZE}px`,
+                        width: `${THUMB_SIZE}px`,
                         left: thumbLeft,
                         transform: `translate(-50%, 0)`
                     }}
@@ -154,7 +161,7 @@ export const Slider: React.FC<SliderProps> = ({
                 {/* Tooltip */}
                 {showTooltip && isDragging && (
                     <div
-                        className="absolute bottom-full mb-1 flex flex-col items-center pointer-events-none z-20"
+                        className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none z-20"
                         style={{
                             left: thumbLeft,
                             transform: `translate(-50%, 0)`

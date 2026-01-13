@@ -190,8 +190,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 >
                     Fit
                 </button>
-                <div className="w-[1px] h-4 bg-border mx-1" />
-                <span className="text-[10px] text-text-muted">Scale</span>
                 <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                     className="hover:text-primary transition-colors text-text-muted"

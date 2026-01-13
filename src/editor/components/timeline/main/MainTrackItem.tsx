@@ -104,12 +104,9 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                 {/* Group Header */}
                 <div
                     style={{ height: GROUP_HEADER_HEIGHT }}
-                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-between text-xs text-text-muted select-none"
+                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-start gap-2 text-xs text-text-muted select-none"
                 >
-                    {/* Duration on left - hide if window too small */}
-                    {width >= 60 && <span>{(outputDurationMs / 1000).toFixed(1)}s</span>}
-
-                    {/* Speed on right */}
+                    {/* Speed - always show (prioritized) */}
                     <span
                         className="cursor-pointer hover:text-primary transition-colors"
                         onClick={(e) => {
@@ -128,6 +125,9 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                             return `${formatted}x`;
                         })()}
                     </span>
+
+                    {/* Duration - hide if window too small, less priority than speed */}
+                    {width >= 70 && <span>{(outputDurationMs / 1000).toFixed(1)}s</span>}
                 </div>
 
                 {/* Tracks Area */}
@@ -179,7 +179,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                         style={{
                             top: `${indicatorY}px`,
                             left: `${indicatorX}px`,
-                            transform: isLeft ? 'translate(-50%, 24px)' : 'translate(50%, 24px)' // Add offset to be below
+                            transform: 'translate(-50%, 12px)'
                         }}
                     >
                         <div className="bg-surface-elevated text-text-main text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border whitespace-nowrap">
