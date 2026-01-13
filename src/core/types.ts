@@ -71,6 +71,7 @@ export interface ScreenSettings extends StyleSettings {
     deviceFrameId?: ID;
     crop?: Rect;
     padding: number;
+    mute: boolean; // defaults to false
 }
 
 export interface BackgroundSettings {

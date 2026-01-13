@@ -33,7 +33,8 @@ export class ProjectImpl {
                     borderWidth: 8,
                     borderColor: '#667eea',
                     hasShadow: true,
-                    hasGlow: false
+                    hasGlow: false,
+                    mute: false
                 },
 
                 background: {

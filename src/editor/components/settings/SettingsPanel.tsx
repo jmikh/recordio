@@ -58,8 +58,11 @@ const IconCaptions = () => (
 );
 
 
+import { Scrollbar } from '../common/Scrollbar';
+
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('screen');
+    const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
 
     return (
         <div className="flex h-full border-r border-border bg-surface-elevated">
@@ -104,8 +107,11 @@ export const SettingsPanel = () => {
             </div>
 
             {/* Content Area */}
-            <div className="w-72 flex flex-col">
-                <div className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar">
+            <div className="w-72 flex flex-row relative h-full">
+                <div
+                    ref={setScrollContainer}
+                    className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar scrollbar-hide"
+                >
                     {activeTab === 'project' && <ProjectSettings />}
                     {activeTab === 'background' && <BackgroundSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}
@@ -113,6 +119,11 @@ export const SettingsPanel = () => {
                     {activeTab === 'zoom' && <ZoomSettings />}
                     {activeTab === 'captions' && <CaptionsSettings />}
                 </div>
+                <Scrollbar
+                    container={scrollContainer}
+                    orientation="vertical"
+                    dependency={activeTab} // Reset/re-calc when tab changes
+                />
             </div>
 
             {/* Preload Device Frames */}

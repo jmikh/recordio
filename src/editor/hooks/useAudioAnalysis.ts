@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-interface AudioAnalysisResult {
+export interface AudioAnalysisResult {
     peaks: number[]; // Normalized -1..1 or 0..1 depending on usage
     duration: number;
     isLoading: boolean;

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-interface TimelineScrollbarProps {
-    containerRef: React.RefObject<HTMLDivElement | null>;
+interface ScrollbarProps {
+    container: HTMLElement | null;
     className?: string;
     dependency?: any;
     orientation?: 'horizontal' | 'vertical';
 }
 
-export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerRef, className, dependency, orientation = 'horizontal' }) => {
+export const Scrollbar: React.FC<ScrollbarProps> = ({ container, className, dependency, orientation = 'horizontal' }) => {
     const trackRef = useRef<HTMLDivElement>(null);
     const thumbRef = useRef<HTMLDivElement>(null);
     const [thumbWidth, setThumbWidth] = useState(0);
@@ -18,7 +18,6 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
 
     // Sync scrollbar with container scroll
     const updateScrollbar = useCallback(() => {
-        const container = containerRef.current;
         const track = trackRef.current;
         if (!container || !track) return;
 
@@ -50,10 +49,9 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
         } else {
             setThumbLeft(0);
         }
-    }, [containerRef, orientation]);
+    }, [container, orientation]);
 
     useEffect(() => {
-        const container = containerRef.current;
         if (!container) return;
 
         // Listen to scroll events
@@ -62,6 +60,8 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
         // Listen to resize to update dimensions
         const observer = new ResizeObserver(updateScrollbar);
         observer.observe(container);
+        // Also observe children to detect content height changes
+        Array.from(container.children).forEach(child => observer.observe(child));
 
         // Initial update
         updateScrollbar();
@@ -70,12 +70,11 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
             container.removeEventListener('scroll', updateScrollbar);
             observer.disconnect();
         };
-    }, [containerRef, updateScrollbar, dependency]);
+    }, [container, updateScrollbar, dependency]);
 
     // Handle Dragging
     const handleMouseDown = (e: React.MouseEvent) => {
         e.preventDefault();
-        const container = containerRef.current;
         if (!container) return;
 
         setIsDragging(true);
@@ -88,7 +87,6 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
     };
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
-        const container = containerRef.current;
         const track = trackRef.current;
         if (!container || !track) return;
 
@@ -111,7 +109,7 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
             }
         }
 
-    }, [containerRef, orientation]);
+    }, [container, orientation]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
@@ -122,19 +120,33 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
     // If no scroll needed, render nothing or empty track?
     // User wants "on theme scroll bar". Probably should be visible but disabled if no scroll, or hidden.
     // Usually hidden is better.
-    // Let's check if scrollable from state?
-    // We can hide it if thumbWidth == trackWidth (approx)
-    // But for now let's just render.
 
     const isHorizontal = orientation === 'horizontal';
     const isScrollable = isHorizontal
         ? thumbWidth !== trackRef.current?.clientWidth
         : thumbWidth !== trackRef.current?.clientHeight;
 
+    // We use visibility: hidden instead of display: none so we can still measure track dimensions if needed
+    // although if hidden, user can't interact.
+    // If not scrollable, we hide the whole track.
+
+    if (!isScrollable && !isDragging) { // Keep visible if dragging to prevent glitch
+        // Actually if not scrollable, you can't be dragging? 
+        // dragging implies thumb exists.
+        // But safe to check.
+    }
+
+    const isVisible = isScrollable || isDragging;
+
     return (
         <div
-            className={`${isHorizontal ? 'h-3 w-full' : 'w-3 h-full'} bg-surface ${isHorizontal ? 'border-b' : 'border-l'} border-border relative flex items-center shrink-0 ${className || ''}`}
+            className={`${isHorizontal ? 'h-3 w-full flex-row border-b' : 'w-3 h-full flex-col border-l'} bg-surface border-border relative flex items-center shrink-0 ${className || ''}`}
             ref={trackRef}
+            style={{
+                visibility: isVisible ? 'visible' : 'hidden',
+                opacity: isVisible ? 1 : 0,
+                transition: 'opacity 0.2s'
+            }}
         >
             <div
                 ref={thumbRef}
@@ -148,8 +160,7 @@ export const TimelineScrollbar: React.FC<TimelineScrollbarProps> = ({ containerR
                         height: thumbWidth,
                         top: thumbLeft,
                         width: '6px'
-                    }),
-                    display: isScrollable ? 'block' : 'none'
+                    })
                 }}
                 onMouseDown={handleMouseDown}
             />

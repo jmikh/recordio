@@ -108,7 +108,7 @@
 
   --settings-primary: var(--primary);
 
-  --zoomtrack-primary: var(--primary);
+  --zoomtrack-primary: var(--secondary);
   --zoomtrack-secondary: var(--tertiary);
 }
 
@@ -147,6 +147,16 @@
   .scrollbar-hide::-webkit-scrollbar {
     /* Safari and Chrome */
     display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 }
 

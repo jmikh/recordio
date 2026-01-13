@@ -1,5 +1,5 @@
 // ... imports
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimeMapper } from '../../../core/timeMapper';
@@ -12,25 +12,48 @@ import { EventsTrack } from './EventsTrack';
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
-import { TimelineScrollbar } from './TimelineScrollbar';
+import { Scrollbar } from '../common/Scrollbar';
 import { useUIStore } from '../../stores/useUIStore';
+import { CaptionsTrack } from './CaptionsTrack';
 
 // Constants
 const TRACK_HEIGHT = 40;
+const EVENTS_TRACK_HEIGHT = 20;
 const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.6;
 const HEADER_WIDTH = 200;
 
 export function Timeline() {
     //console.log('[Rerender] Timeline');
     const containerRef = useRef<HTMLDivElement>(null);
+    const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
+    const overlayEndRef = useRef<HTMLDivElement>(null);
+
+    const setContainerRef = (node: HTMLDivElement | null) => {
+        containerRef.current = node;
+        setContainerEl(node);
+    };
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollLeft = e.currentTarget.scrollLeft;
+
         if (overlayRef.current) {
             // shows dark transparent overlay to signfiy more track is hiding.
-            const scrollLeft = e.currentTarget.scrollLeft;
             const opacity = Math.min(scrollLeft / 200, 1);
             overlayRef.current.style.opacity = opacity.toString();
+        }
+
+        if (overlayEndRef.current) {
+            const maxScroll = e.currentTarget.scrollWidth - e.currentTarget.clientWidth;
+            const remaining = maxScroll - scrollLeft;
+            // hide if no scroll
+            if (maxScroll <= 0) {
+                overlayEndRef.current.style.opacity = '0';
+                return;
+            }
+
+            const opacity = Math.min(remaining / 200, 1);
+            overlayEndRef.current.style.opacity = opacity.toString();
         }
     };
 
@@ -42,7 +65,8 @@ export function Timeline() {
 
 
     // -- Derived Data --
-    const mainTrackHeight = (timeline.recording.cameraSourceId ? TRACK_HEIGHT * 2 : TRACK_HEIGHT) + GROUP_HEADER_HEIGHT;
+    // -- Derived Data --
+    const mainTrackHeight = TRACK_HEIGHT + GROUP_HEADER_HEIGHT;
 
     // Memoize TimeMapper
     const timeMapper = useMemo(() => {
@@ -100,6 +124,40 @@ export function Timeline() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedWindowId, removeOutputWindow]);
 
+    // Initial check for overlays
+    useEffect(() => {
+        const check = () => {
+            if (containerRef.current && overlayEndRef.current) {
+                const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+                const maxScroll = scrollWidth - clientWidth;
+
+                // Left overlay
+                if (overlayRef.current) {
+                    overlayRef.current.style.opacity = Math.min(scrollLeft / 200, 1).toString();
+                }
+                // Right overlay
+                if (maxScroll <= 0) {
+                    overlayEndRef.current.style.opacity = '0';
+                } else {
+                    const remaining = maxScroll - scrollLeft;
+                    overlayEndRef.current.style.opacity = Math.min(remaining / 200, 1).toString();
+                }
+            }
+        };
+
+        // Helper to debounce or delay slightly to ensure layout
+        const timer = setTimeout(check, 0);
+        window.addEventListener('resize', check);
+
+        // Also check when content size might change (e.g. totalWidth changes)
+        check();
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', check);
+        };
+    }, [totalOutputDuration, pixelsPerSec]); // deps that affect width
+
     return (
         <div className="flex flex-col h-full bg-background select-none text-text-main font-sans">
             {/* 1. Toolbar */}
@@ -124,16 +182,10 @@ export function Timeline() {
                         <div className="flex flex-col w-full h-full">
                             <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-border bg-surface/50" />
                             {!!timeline.recording.cameraSourceId ? (
-                                <div className="flex flex-col flex-1">
-                                    <TimelineTrackHeader
-                                        title="Screen"
-                                        height={TRACK_HEIGHT}
-                                    />
-                                    <TimelineTrackHeader
-                                        title="Camera"
-                                        height={TRACK_HEIGHT}
-                                    />
-                                </div>
+                                <TimelineTrackHeader
+                                    title="Screen & Camera"
+                                    height={TRACK_HEIGHT}
+                                />
                             ) : (
                                 <TimelineTrackHeader
                                     title="Screen"
@@ -155,14 +207,23 @@ export function Timeline() {
                     <div className="h-2 shrink-0" />
 
                     {/* Header: Events */}
-                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Input Events" height={TRACK_HEIGHT} />
+                    <div className="shrink-0" style={{ height: EVENTS_TRACK_HEIGHT }}>
+                        <TimelineTrackHeader title="Input Events" height={EVENTS_TRACK_HEIGHT} />
                     </div>
+
+                    {/* Gap */}
+                    <div className="h-2 shrink-0" />
+
+                    {/* Header: Captions */}
+                    {!!timeline.recording.captions && timeline.recording.captions.segments.length > 0 && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineTrackHeader title="Captions" height={TRACK_HEIGHT} />
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
-                    <TimelineScrollbar containerRef={containerRef} dependency={pixelsPerSec} />
 
                     <div className="flex-1 relative overflow-hidden w-full h-full">
                         {/* Floating Overlay for Scroll Indication */}
@@ -175,11 +236,20 @@ export function Timeline() {
                                 transition: 'opacity 0.1s ease-out'
                             }}
                         />
+                        <div
+                            ref={overlayEndRef}
+                            className="absolute right-0 top-0 bottom-0 w-12 z-30 pointer-events-none"
+                            style={{
+                                background: 'linear-gradient(to left, rgba(0,0,0,0.5), transparent)',
+                                opacity: 0,
+                                transition: 'opacity 0.1s ease-out'
+                            }}
+                        />
 
                         <div
                             className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-background [&::-webkit-scrollbar]:hidden"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                            ref={containerRef}
+                            ref={setContainerRef}
                             onScroll={handleScroll}
                             onMouseMove={handleMouseMove}
                             onMouseDown={handleMouseDown}
@@ -217,6 +287,11 @@ export function Timeline() {
                                     <EventsTrack
                                         events={userEvents}
                                         timeMapper={timeMapper}
+                                        trackHeight={EVENTS_TRACK_HEIGHT}
+                                    />
+
+                                    {/* Captions Track */}
+                                    <CaptionsTrack
                                         trackHeight={TRACK_HEIGHT}
                                     />
                                 </div>
@@ -236,7 +311,9 @@ export function Timeline() {
                                 />
                             </div>
                         </div>
+
                     </div>
+                    <Scrollbar container={containerEl} dependency={pixelsPerSec} className="border-b-0 border-t" />
                 </div>
             </div>
         </div>

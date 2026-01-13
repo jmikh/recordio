@@ -6,8 +6,9 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
 import { MultiToggle } from '../common/MultiToggle';
 import { LookRightButton } from './LookRightButton';
-import { FaCheck } from 'react-icons/fa6';
 import { IoCropSharp } from 'react-icons/io5';
+import { FaCheck } from 'react-icons/fa6';
+import { FaVolumeOff } from 'react-icons/fa6';
 
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -67,6 +68,24 @@ export const ScreenSettings = () => {
                     showTooltip
                     decimals={2}
                 />
+            </div>
+
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-text-secondary">
+                    <FaVolumeOff className="w-4 h-4" />
+                    <span className="text-xs font-medium select-none">Mute Screen Audio</span>
+                </div>
+
+                <button
+                    onClick={() => updateSettings({
+                        screen: { ...screenConfig, mute: !screenConfig.mute }
+                    })}
+                    className={`h-5 w-9 rounded-full p-0.5 transition-colors relative border border-border ${screenConfig.mute ? 'bg-primary border-primary' : 'bg-surface-elevated'
+                        }`}
+                >
+                    <div className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${screenConfig.mute ? 'translate-x-4' : 'translate-x-0'
+                        }`} />
+                </button>
             </div>
 
             <div className="border-t border-gray-700" />

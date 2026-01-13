@@ -67,8 +67,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // Shared arrow pattern style
     const arrowPatternStyle: React.CSSProperties = {
         backgroundImage: `
-            repeating-linear-gradient(45deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.2) ${halfStripe}px, rgba(0,0,0,0.2) ${stripePx}px),
-            repeating-linear-gradient(135deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.2) ${halfStripe}px, rgba(0,0,0,0.2) ${stripePx}px)
+            repeating-linear-gradient(45deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.5) ${halfStripe}px, rgba(0,0,0,0.5) ${stripePx}px),
+            repeating-linear-gradient(135deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.5) ${halfStripe}px, rgba(0,0,0,0.5) ${stripePx}px)
         `,
         backgroundSize: '100% 50%',
         backgroundPosition: 'top left, bottom left',
