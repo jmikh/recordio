@@ -5,6 +5,7 @@ import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
 import { drawCaptions } from '../../../core/painters/captionPainter';
 
+
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
@@ -105,13 +106,15 @@ export class PlaybackRenderer {
         );
 
         // Render Captions
-        drawCaptions(
-            ctx,
-            recording.captions,
-            project.settings.captions,
-            timeline.outputWindows,
-            currentTimeMs,
-            outputSize
-        );
+        if (project.settings.captions.visible) {
+            drawCaptions(
+                ctx,
+                recording.captions,
+                project.settings.captions,
+                timeline.outputWindows,
+                currentTimeMs,
+                outputSize
+            );
+        }
     }
 }

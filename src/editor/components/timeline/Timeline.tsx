@@ -14,7 +14,7 @@ import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { Scrollbar } from '../common/Scrollbar';
 import { useUIStore } from '../../stores/useUIStore';
-import { CaptionsTrack } from './CaptionsTrack';
+
 
 // Constants
 const TRACK_HEIGHT = 40;
@@ -214,12 +214,7 @@ export function Timeline() {
                     {/* Gap */}
                     <div className="h-2 shrink-0" />
 
-                    {/* Header: Captions */}
-                    {!!timeline.recording.captions && timeline.recording.captions.segments.length > 0 && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineTrackHeader title="Captions" height={TRACK_HEIGHT} />
-                        </div>
-                    )}
+
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
@@ -290,10 +285,7 @@ export function Timeline() {
                                         trackHeight={EVENTS_TRACK_HEIGHT}
                                     />
 
-                                    {/* Captions Track */}
-                                    <CaptionsTrack
-                                        trackHeight={TRACK_HEIGHT}
-                                    />
+
                                 </div>
 
                                 {/* Hover Line */}

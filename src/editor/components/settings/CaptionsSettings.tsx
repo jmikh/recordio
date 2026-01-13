@@ -146,15 +146,6 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-text-main">Captions</h3>
-                {captions && (
-                    <span className="text-xs text-text-muted">
-                        {captions.segments.length} segments
-                    </span>
-                )}
-            </div>
-
             {/* Caption Settings */}
             <div className="space-y-3 pb-3 border-b border-border">
                 <div className="flex items-center justify-between">
@@ -213,36 +204,41 @@ export function CaptionsSettings() {
             )}
 
             {captions && captions.segments.length > 0 && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                    <div className="text-xs font-medium text-text-muted mb-2">Caption Segments</div>
+                <div className="space-y-2">
                     <div className="space-y-2">
-                        {captions.segments.map((segment: CaptionSegment) => {
-                            const isEditing = editingId === segment.id;
+                        {(() => {
+                            const timeMapper = new TimeMapper(project.timeline.outputWindows);
+                            return captions.segments.map(segment => {
+                                const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+                                if (!range) return null;
+                                const outputStart = range.start;
+                                const outputEnd = range.end;
+                                const isEditing = editingId === segment.id;
 
-                            return (
-                                <div
-                                    key={segment.id}
-                                    className="relative p-2 bg-surface-elevated rounded text-xs transition-colors"
-                                >
-                                    <div className="relative inline-block bg-surface text-white px-3 py-2 rounded font-medium text-xs w-full">
+                                return (
+                                    <div key={segment.id} className="relative inline-block bg-surface text-white px-3 py-2 rounded font-medium text-xs w-full">
                                         {/* Delete button - top right of entire div */}
                                         <button
                                             onClick={() => handleDelete(segment.id)}
                                             className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-white/60 hover:text-red-400 transition-colors rounded z-10"
-                                            title="Delete segment"
+                                            title="Delete caption"
                                         >
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                             </svg>
                                         </button>
 
-                                        {/* Timestamps - floated left */}
-                                        <div className="float-left mr-2 mb-1 flex flex-col gap-1 text-white font-mono text-[10px]">
+                                        {/* Timestamps - Row Layout */}
+                                        <div className="mb-1 flex items-center justify-center gap-1 text-white font-mono text-[10px]">
                                             <div className="bg-surface-elevated px-1.5 py-1 rounded">
-                                                {formatTime(segment.sourceStartMs)}
+                                                {formatTime(outputStart)}
                                             </div>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                                <polyline points="12 5 19 12 12 19" />
+                                            </svg>
                                             <div className="bg-surface-elevated px-1.5 py-1 rounded">
-                                                {formatTime(segment.sourceEndMs)}
+                                                {formatTime(outputEnd)}
                                             </div>
                                         </div>
 
@@ -267,16 +263,13 @@ export function CaptionsSettings() {
                                             {segment.text}
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            });
+                        })()}
                     </div>
                 </div>
-            )}
-
-            <p className="text-xs text-text-muted">
-                Captions generated using local AI models running entirely in your browser.
-            </p>
-        </div>
+            )
+            }
+        </div >
     );
 }
