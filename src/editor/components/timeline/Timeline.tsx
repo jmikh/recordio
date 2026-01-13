@@ -1,9 +1,9 @@
 // ... imports
-import { useRef, useMemo, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
-import { TimeMapper } from '../../../core/timeMapper';
 import { ZoomTrack } from './zoom/ZoomTrack';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
 import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
@@ -69,9 +69,7 @@ export function Timeline() {
     const mainTrackHeight = TRACK_HEIGHT + GROUP_HEADER_HEIGHT;
 
     // Memoize TimeMapper
-    const timeMapper = useMemo(() => {
-        return new TimeMapper(timeline.outputWindows);
-    }, [timeline.outputWindows]);
+    const timeMapper = useTimeMapper();
 
     // Total Duration is now the OUTPUT duration (sum of windows)
     const totalOutputDuration = timeMapper.getOutputDuration();

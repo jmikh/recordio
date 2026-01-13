@@ -2,8 +2,9 @@ import React from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { TimeMapper } from '../../../core/timeMapper';
-import { MdPlayArrow, MdPause } from 'react-icons/md';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
+import { Slider } from '../common/Slider';
 
 
 interface TimelineToolbarProps {
@@ -38,7 +39,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     // Handlers
     const handleSplit = () => {
         const currentTime = useUIStore.getState().currentTimeMs;
-        const timeMapper = new TimeMapper(timeline.outputWindows);
+        const timeMapper = getTimeMapper(timeline.outputWindows);
 
         const result = timeMapper.getWindowAtOutputTime(currentTime);
         if (!result) return;
@@ -191,16 +192,29 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 </button>
                 <div className="w-[1px] h-4 bg-border mx-1" />
                 <span className="text-[10px] text-text-muted">Scale</span>
-                <input
-                    type="range"
-                    min={MIN_PIXELS_PER_SEC}
-                    max={MAX_PIXELS_PER_SEC}
-                    value={pixelsPerSec}
-                    onChange={(e) => handleScaleChange(Number(e.target.value))}
-                    onMouseDown={batcher.startInteraction}
-                    onMouseUp={batcher.endInteraction}
-                    className="w-24 h-1 bg-surface rounded-lg appearance-none cursor-pointer"
-                />
+                <button
+                    onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
+                    className="hover:text-primary transition-colors text-text-muted"
+                >
+                    <MdRemove size={14} />
+                </button>
+                <div className="w-24">
+                    <Slider
+                        value={pixelsPerSec}
+                        onChange={handleScaleChange}
+                        min={MIN_PIXELS_PER_SEC}
+                        max={MAX_PIXELS_PER_SEC}
+                        onPointerDown={batcher.startInteraction}
+                        onPointerUp={batcher.endInteraction}
+                        showTooltip
+                    />
+                </div>
+                <button
+                    onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
+                    className="hover:text-primary transition-colors text-text-muted"
+                >
+                    <MdAdd size={14} />
+                </button>
             </div>
         </div>
     );

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
-import { TimeMapper } from '../../../../core/timeMapper';
+import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useZoomDrag } from './useZoomDrag';
 import { useZoomHover } from './useZoomHover';
@@ -24,9 +24,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const project = useProjectStore(s => s.project);
 
     // Memoize TimeMapper and TimePixelMapper for consistent usage
-    const timeMapper = useMemo(() => {
-        return new TimeMapper(timeline.outputWindows);
-    }, [timeline.outputWindows]);
+    const timeMapper = useTimeMapper();
 
     const coords = useMemo(() => {
         return new TimePixelMapper(timeMapper, pixelsPerSec);

@@ -4,7 +4,7 @@ import { useProjectSources, useProjectStore } from '../../../stores/useProjectSt
 import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
 import { useClickOutside } from '../../../hooks/useClickOutside';
 import { useUIStore } from '../../../stores/useUIStore'; // Removed unused useUIStore
-import { TimeMapper } from '../../../../core/timeMapper';
+import { getTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
 import { SpeedControl } from './SpeedControl';
@@ -38,7 +38,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
     // Create TimePixelMapper for coordinate conversions
     const coords = useMemo(() => {
-        const timeMapper = new TimeMapper(timeline.outputWindows);
+        const timeMapper = getTimeMapper(timeline.outputWindows);
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeline.outputWindows, pixelsPerSec]);
 

@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { RefObject } from 'react';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { TimeMapper } from '../../../core/timeMapper';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 interface UseTimelineInteractionProps {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -22,10 +22,9 @@ export function useTimelineInteraction({
     const setPreviewTime = useUIStore(s => s.setPreviewTime);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
 
-    const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
     const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions);
 
-    const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
+    const timeMapper = useTimeMapper();
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<number | null>(null);

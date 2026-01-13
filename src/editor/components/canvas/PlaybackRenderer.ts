@@ -1,4 +1,5 @@
 import { drawScreen } from '../../../core/painters/screenPainter';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
@@ -111,7 +112,7 @@ export class PlaybackRenderer {
                 ctx,
                 recording.captions,
                 project.settings.captions,
-                timeline.outputWindows,
+                getTimeMapper(timeline.outputWindows),
                 currentTimeMs,
                 outputSize
             );

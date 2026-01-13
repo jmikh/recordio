@@ -135,7 +135,7 @@ export const Slider: React.FC<SliderProps> = ({
                 <div className="absolute inset-0 rounded-full overflow-hidden bg-surface shadow-inner-bold">
                     {/* Left Track (Primary Color) */}
                     <div
-                        className="absolute top-0 left-0 bottom-0 bg-settings-primary border border-settings-primary pointer-events-none rounded-full shadow-inner-bold"
+                        className="absolute top-0 left-0 bottom-0 bg-settings-primary  pointer-events-none rounded-full shadow-inner-bold"
                         style={{
                             width: `calc(${PADDING}px + ${THUMB_SIZE}px + (100% - ${PADDING * 2}px - ${THUMB_SIZE}px) * ${fraction} + ${PADDING}px)`
                         }}

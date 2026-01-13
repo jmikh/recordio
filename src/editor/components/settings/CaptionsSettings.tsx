@@ -4,7 +4,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CaptionSegment } from '../../../core/types';
 import { Slider } from '../common/Slider';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { TimeMapper } from '../../../core/timeMapper';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 /**
  * Settings panel for managing captions.
@@ -30,6 +30,8 @@ export function CaptionsSettings() {
 
     const captions = project.timeline.recording.captions;
     const settings = project.settings.captions || { visible: true, size: 24 };
+
+    const timeMapper = useTimeMapper();
 
     // Focus when editing starts
     useEffect(() => {
@@ -62,7 +64,6 @@ export function CaptionsSettings() {
         setIsPlaying(false);
 
         // Move CTI to the start of the caption in output time
-        const timeMapper = new TimeMapper(project.timeline.outputWindows);
         const outputTime = timeMapper.mapSourceToOutputTime(segment.sourceStartMs);
         if (outputTime >= 0) {
             setCurrentTime(outputTime);
@@ -207,7 +208,6 @@ export function CaptionsSettings() {
                 <div className="space-y-2">
                     <div className="space-y-2">
                         {(() => {
-                            const timeMapper = new TimeMapper(project.timeline.outputWindows);
                             return captions.segments.map(segment => {
                                 const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
                                 if (!range) return null;

@@ -1,7 +1,7 @@
 
 import type { ID, Project, UserEvents, ViewportMotion } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
-import { TimeMapper } from '../../core/timeMapper';
+import { getTimeMapper } from '../hooks/useTimeMapper';
 
 
 /**
@@ -29,7 +29,7 @@ export const recalculateAutoZooms = (
             project.settings.screen.crop
         );
 
-        const timeMapper = new TimeMapper(project.timeline.outputWindows);
+        const timeMapper = getTimeMapper(project.timeline.outputWindows);
 
         return calculateZoomSchedule(
             project.settings.zoom,
@@ -40,6 +40,43 @@ export const recalculateAutoZooms = (
     }
 
     return project.timeline.recording.viewportMotions;
+};
+
+
+/**
+ * Updates the duration of all manual zooms while preserving their end time.
+ * If extending backwards causes a collision with the previous block, it is clamped.
+ */
+export const updateManualZoomDuration = (
+    motions: ViewportMotion[],
+    targetDurationMs: number
+): ViewportMotion[] => {
+    // Sort to handle left-to-right collision logic
+    const sortedMotions = [...motions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+    const result: ViewportMotion[] = [];
+    let leftBoundary = 0;
+
+    for (const m of sortedMotions) {
+        // Calculate ideal start time based on fixed end time
+        let newEndTime = m.outputEndTimeMs;
+        let newDuration = targetDurationMs;
+        let newStartTime = newEndTime - newDuration;
+
+        // Check collision with previous block
+        if (newStartTime < leftBoundary) {
+            newStartTime = leftBoundary;
+            newDuration = newEndTime - newStartTime;
+        }
+
+        result.push({
+            ...m,
+            durationMs: newDuration
+            // outputEndTimeMs remains preserved
+        });
+        leftBoundary = newEndTime;
+    }
+
+    return result;
 };
 
 

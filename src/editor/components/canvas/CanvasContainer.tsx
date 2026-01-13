@@ -1,8 +1,8 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect } from 'react';
 import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
-import { TimeMapper } from '../../../core/timeMapper';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
@@ -26,9 +26,7 @@ export const CanvasContainer = () => {
     const mutedSources = useProjectStore(s => s.mutedSources);
 
     // TimeMapper
-    const timeMapper = useMemo(() => {
-        return new TimeMapper(project.timeline.outputWindows);
-    }, [project.timeline.outputWindows]);
+    const timeMapper = useTimeMapper();
     const timeMapperRef = useRef(timeMapper);
     timeMapperRef.current = timeMapper;
 

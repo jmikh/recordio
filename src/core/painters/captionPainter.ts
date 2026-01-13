@@ -1,4 +1,4 @@
-import type { Captions, Size, CaptionSettings, OutputWindow } from '../types';
+import type { Captions, Size, CaptionSettings } from '../types';
 import { CaptionTimeMapper } from '../CaptionTimeMapper';
 import { TimeMapper } from '../timeMapper';
 
@@ -16,7 +16,7 @@ export function drawCaptions(
     ctx: CanvasRenderingContext2D,
     captions: Captions | undefined,
     settings: CaptionSettings,
-    outputWindows: OutputWindow[],
+    timeMapper: TimeMapper,
     currentTimeMs: number,
     outputSize: Size
 ) {
@@ -26,7 +26,6 @@ export function drawCaptions(
     }
 
     // Create caption time mapper
-    const timeMapper = new TimeMapper(outputWindows);
     const captionTimeMapper = new CaptionTimeMapper(captions.segments, timeMapper);
 
     // Get visible captions at current time
