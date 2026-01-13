@@ -22,8 +22,8 @@ export class ProjectImpl {
                 zoom: {
                     maxZoom: 1.5,
                     autoZoom: true,
-                    maxZoomDurationMs: 2000,
-                    minZoomDurationMs: 500
+                    maxZoomDurationMs: 750,
+                    minZoomDurationMs: 200
                 },
 
                 screen: {

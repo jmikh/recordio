@@ -59,11 +59,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         outputDuration
     );
 
+
+    const timePerStripe = 0.2; // 0.2s per stripe
+    const stripePx = Math.max(4, pixelsPerSec * timePerStripe);
+    const halfStripe = stripePx / 2;
+
     // Shared arrow pattern style
     const arrowPatternStyle: React.CSSProperties = {
         backgroundImage: `
-            repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px),
-            repeating-linear-gradient(135deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px)
+            repeating-linear-gradient(45deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.2) ${halfStripe}px, rgba(0,0,0,0.2) ${stripePx}px),
+            repeating-linear-gradient(135deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.2) ${halfStripe}px, rgba(0,0,0,0.2) ${stripePx}px)
         `,
         backgroundSize: '100% 50%',
         backgroundPosition: 'top left, bottom left',

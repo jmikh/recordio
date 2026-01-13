@@ -41,18 +41,19 @@ export function drawCaptions(
     const paddingX = 32;
     const paddingY = 16;
     const cornerRadius = 12;
-    const marginBottom = 128; // Distance from bottom of canvas
-    const maxWidth = Math.min(outputSize.width * 0.8, 900); // Max 80% width or 900px
+    const marginBottom = outputSize.height * 0.02; // 2% from bottom of canvas
+    const maxWidth = outputSize.width * 0.75; // 75% of canvas width
 
     ctx.save();
 
     // Font Setup
-    ctx.font = `600 ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.font = `600 ${fontSize}px Satoshi, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
 
     // Stack multiple captions vertically (though typically there's only one)
-    let yOffset = outputSize.height - marginBottom;
+    // Start from the bottom - this is where the bottom of the first caption box will be
+    let boxBottomY = outputSize.height - marginBottom;
 
     for (const caption of visibleCaptions) {
         const text = caption.text;
@@ -75,7 +76,8 @@ export function drawCaptions(
 
         const x = outputSize.width / 2;
         const boxX = x - boxWidth / 2;
-        const boxY = yOffset - boxHeight;
+        // Calculate top of box from bottom position
+        const boxY = boxBottomY - boxHeight;
 
         // Draw Background Box with backdrop blur effect
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -106,7 +108,8 @@ export function drawCaptions(
         }
 
         // Move up for next caption (if any)
-        yOffset = boxY - 16; // 16px gap between captions
+        // Next caption's bottom will be above current box top with a 16px gap
+        boxBottomY = boxY - 16;
     }
 
     ctx.restore();

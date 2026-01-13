@@ -3,16 +3,20 @@ import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStor
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TimeMapper } from '../../../core/timeMapper';
+import { MdPlayArrow, MdPause } from 'react-icons/md';
+
 
 interface TimelineToolbarProps {
     totalDurationMs: number;
+    onFit: () => void;
 }
 
-const MIN_PIXELS_PER_SEC = 10;
-const MAX_PIXELS_PER_SEC = 200;
+export const MIN_PIXELS_PER_SEC = 10;
+export const MAX_PIXELS_PER_SEC = 200;
 
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
+    onFit,
 }) => {
     //console.log('[Rerender] TimelineToolbar');
     // Stores
@@ -57,25 +61,40 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const onTogglePlay = () => setIsPlaying(!isPlaying);
 
     // Helper format
-    const formatFullTime = (ms: number) => {
-        const s = Math.floor(ms / 1000);
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        const dec = Math.floor((ms % 1000) / 100);
-        return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}.${dec}`;
+    const formatSmartTime = (ms: number, totalMs: number) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const deciseconds = Math.floor((ms % 1000) / 100);
+
+        const hasHours = totalMs >= 3600000;
+
+        if (hasHours) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${deciseconds}`;
+        } else {
+            return `${minutes}:${seconds.toString().padStart(2, '0')}.${deciseconds}`;
+        }
     };
 
     // perf: Update time without re-render
     React.useEffect(() => {
+        const updateTimeDisplay = () => {
+            if (timeDisplayRef.current) {
+                const time = useUIStore.getState().currentTimeMs;
+                timeDisplayRef.current.textContent = `${formatSmartTime(Math.max(0, time), totalDurationMs)} / ${formatSmartTime(totalDurationMs, totalDurationMs)}`;
+            }
+        };
+
         // Initial set
-        if (timeDisplayRef.current) {
-            const time = useUIStore.getState().currentTimeMs;
-            timeDisplayRef.current.textContent = `${formatFullTime(Math.max(0, time))} / ${formatFullTime(totalDurationMs)}`;
-        }
+        updateTimeDisplay();
 
         const unsub = useUIStore.subscribe((state) => {
+            // Only update if playing or time changed significantly? No, just update.
+            // But we can check if string changed to avoid DOM touch if needed. 
+            // DOM textContent set is cheap enough.
             if (timeDisplayRef.current) {
-                timeDisplayRef.current.textContent = `${formatFullTime(Math.max(0, state.currentTimeMs))} / ${formatFullTime(totalDurationMs)}`;
+                timeDisplayRef.current.textContent = `${formatSmartTime(Math.max(0, state.currentTimeMs), totalDurationMs)} / ${formatSmartTime(totalDurationMs, totalDurationMs)}`;
             }
         });
         return unsub;
@@ -151,18 +170,26 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             </div>
 
             <div className="flex items-center gap-4 bg-background px-4 py-1 rounded-full border border-border">
-                <button onClick={onTogglePlay} className="hover:text-primary transition-colors">
-                    {isPlaying ? '⏸' : '▶️'}
+                <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-main">
+                    {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
                 <div
                     ref={timeDisplayRef}
-                    className="font-mono text-xs text-text-muted w-32 text-center"
+                    className="font-mono text-xs text-text-muted min-w-[100px] text-center"
                 >
-                    00:00.0 / {formatFullTime(totalDurationMs)}
+                    00:00.0 / {formatSmartTime(totalDurationMs, totalDurationMs)}
                 </div>
             </div>
 
             <div className="flex items-center gap-2">
+                <button
+                    onClick={onFit}
+                    className="px-2 py-0.5 bg-surface hover:bg-surface-elevated rounded text-[10px] border border-border"
+                    title="Fit timeline to screen"
+                >
+                    Fit
+                </button>
+                <div className="w-[1px] h-4 bg-border mx-1" />
                 <span className="text-[10px] text-text-muted">Scale</span>
                 <input
                     type="range"

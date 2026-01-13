@@ -7,6 +7,7 @@ export const CanvasMode = {
     CropEdit: 'cropEdit',
     CameraEdit: 'cameraEdit',
     ZoomEdit: 'zoomEdit',
+    CaptionEdit: 'captionEdit',
 } as const;
 export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
 

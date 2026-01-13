@@ -9,6 +9,8 @@
 export class BlurManager {
     private isEnabled = false;
     private toast: HTMLElement | null = null;
+    private overlay: HTMLElement | null = null;
+    private overlayLabel: HTMLElement | null = null;
     private highlightedElement: HTMLElement | null = null;
 
 
@@ -17,6 +19,7 @@ export class BlurManager {
         this.handleMouseOut = this.handleMouseOut.bind(this);
         this.handleClick = this.handleClick.bind(this);
         this.handleToastClick = this.handleToastClick.bind(this);
+        this.handleScroll = this.handleScroll.bind(this);
     }
 
     public enable() {
@@ -25,8 +28,9 @@ export class BlurManager {
 
         this.injectStyles();
         this.createToast();
+        this.createOverlay();
         this.addEventListeners();
-        document.body.style.cursor = 'crosshair';
+        document.body.style.cursor = 'default';
     }
 
     public disable() {
@@ -34,13 +38,9 @@ export class BlurManager {
         this.isEnabled = false;
 
         this.removeToast();
+        this.removeOverlay();
         this.removeEventListeners();
 
-        // Remove highlight if exists
-        if (this.highlightedElement) {
-            this.highlightedElement.classList.remove('recordo-highlight');
-            this.highlightedElement = null;
-        }
         document.body.style.cursor = '';
     }
 
@@ -53,19 +53,33 @@ export class BlurManager {
             .recordo-blur {
                 filter: blur(8px) !important;
                 user-select: none;
-            }
-            .recordo-highlight {
-                box-shadow: 0 0 0 2px #FF4081, inset 0 0 0 2px rgba(255, 64, 129, 0.2) !important;
-                background-color: rgba(255, 64, 129, 0.1) !important;
-                cursor: crosshair !important;
-                z-index: 10000;
-                border-radius: 2px;
-            }
-            .recordo-blur {
-                filter: blur(8px) !important;
-                user-select: none;
                 pointer-events: auto !important;
-                z-index: 10001;
+            }
+            #recordo-blur-overlay {
+                position: fixed;
+                z-index: 2147483647; /* Max z-index */
+                pointer-events: none;
+                border: 2px solid #6166E6;
+                background-color: rgba(97, 102, 230, 0.05);
+                border-radius: 4px;
+                transition: all 0.05s ease-out;
+                display: none;
+                box-sizing: border-box;
+            }
+            #recordo-blur-label {
+                position: absolute;
+                top: -28px;
+                left: -2px;
+                background-color: #6166E6;
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px 4px 4px 0;
+                font-size: 12px;
+                font-family: system-ui, -apple-system, sans-serif;
+                font-weight: 500;
+                white-space: nowrap;
+                pointer-events: none;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             #recordo-blur-toast {
                 position: fixed;
@@ -77,7 +91,7 @@ export class BlurManager {
                 padding: 12px 24px;
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                z-index: 2147483647; /* Max z-index */
+                z-index: 2147483647;
                 font-family: system-ui, -apple-system, sans-serif;
                 display: flex;
                 align-items: center;
@@ -133,72 +147,158 @@ export class BlurManager {
         }
     }
 
+    private createOverlay() {
+        if (this.overlay) return;
+
+        this.overlay = document.createElement('div');
+        this.overlay.id = 'recordo-blur-overlay';
+
+        this.overlayLabel = document.createElement('div');
+        this.overlayLabel.id = 'recordo-blur-label';
+        this.overlay.appendChild(this.overlayLabel);
+
+        document.body.appendChild(this.overlay);
+    }
+
+    private removeOverlay() {
+        if (this.overlay) {
+            this.overlay.remove();
+            this.overlay = null;
+            this.overlayLabel = null;
+        }
+    }
+
     private addEventListeners() {
         document.addEventListener('mouseover', this.handleMouseOver, true);
         document.addEventListener('mouseout', this.handleMouseOut, true);
         document.addEventListener('click', this.handleClick, true);
+        document.addEventListener('scroll', this.handleScroll, true);
     }
 
     private removeEventListeners() {
         document.removeEventListener('mouseover', this.handleMouseOver, true);
         document.removeEventListener('mouseout', this.handleMouseOut, true);
         document.removeEventListener('click', this.handleClick, true);
+        document.removeEventListener('scroll', this.handleScroll, true);
+    }
+
+    private updateOverlay(element: HTMLElement) {
+        if (!this.overlay || !this.overlayLabel) return;
+
+        const rect = element.getBoundingClientRect();
+        const isBlurred = element.classList.contains('recordo-blur');
+
+        this.overlay.style.display = 'block';
+        this.overlay.style.top = `${rect.top}px`;
+        this.overlay.style.left = `${rect.left}px`;
+        this.overlay.style.width = `${rect.width}px`;
+        this.overlay.style.height = `${rect.height}px`;
+
+        // Check if label fits on top
+        if (rect.top < 30) {
+            this.overlayLabel.style.top = '0px';
+            this.overlayLabel.style.borderRadius = '0 0 4px 0';
+        } else {
+            this.overlayLabel.style.top = '-28px';
+            this.overlayLabel.style.borderRadius = '4px 4px 4px 0';
+        }
+
+        if (isBlurred) {
+            // Already blurred: Green theme
+            this.overlay.style.borderColor = '#9FDB95';
+            this.overlay.style.backgroundColor = 'rgba(159, 219, 149, 0.05)';
+            this.overlayLabel.style.backgroundColor = '#9FDB95';
+            this.overlayLabel.style.color = '#020617'; // Slate 950
+            this.overlayLabel.textContent = 'Click to unblur';
+        } else {
+            // Not blurred: Purple theme
+            this.overlay.style.borderColor = '#6166E6';
+            this.overlay.style.backgroundColor = 'rgba(97, 102, 230, 0.05)';
+            this.overlayLabel.style.backgroundColor = '#6166E6';
+            this.overlayLabel.style.color = 'white';
+            this.overlayLabel.textContent = 'Click to blur';
+        }
+    }
+
+    private handleScroll() {
+        if (this.highlightedElement) {
+            this.updateOverlay(this.highlightedElement);
+        }
     }
 
     private handleMouseOver(e: MouseEvent) {
-        const target = e.target as HTMLElement;
+        let target = e.target as HTMLElement;
         // Ignore our own UI
         if (this.toast && (this.toast === target || this.toast.contains(target))) return;
+        if (this.overlay && (this.overlay === target || this.overlay.contains(target))) return;
 
-        // Remove prev highlight
-        if (this.highlightedElement && this.highlightedElement !== target) {
-            this.highlightedElement.classList.remove('recordo-highlight');
-        }
-
-        // Check if target is inside a blurred element
-        if (target.closest('.recordo-blur') && !target.classList.contains('recordo-blur')) {
-            return;
+        // Redirect to blurred ancestor if exists
+        const closestBlurred = target.closest('.recordo-blur');
+        if (closestBlurred) {
+            target = closestBlurred as HTMLElement;
         }
 
         this.highlightedElement = target;
-        this.highlightedElement.classList.add('recordo-highlight');
+
+        // Show overlay with correct color
+        this.updateOverlay(target);
+
+        // Calculate cursor style
+        target.style.cursor = 'pointer';
     }
 
     private handleMouseOut(e: MouseEvent) {
-        const target = e.target as HTMLElement;
+        let target = e.target as HTMLElement;
+        const closestBlurred = target.closest('.recordo-blur');
+        if (closestBlurred) {
+            target = closestBlurred as HTMLElement;
+        }
+
         if (target === this.highlightedElement) {
-            target.classList.remove('recordo-highlight');
+            // Check if we are moving to a descendant (which means we are still "inside" the target)
+            const related = e.relatedTarget as HTMLElement;
+            if (related && target.contains(related)) {
+                return;
+            }
+
+            target.style.cursor = '';
             this.highlightedElement = null;
+            if (this.overlay) {
+                this.overlay.style.display = 'none';
+            }
         }
     }
 
     private handleClick(e: MouseEvent) {
-        const target = e.target as HTMLElement;
+        let target = e.target as HTMLElement;
 
         // Allow clicking our own UI
         if (this.toast && (this.toast === target || this.toast.contains(target))) return;
+
+        // Redirect to blurred ancestor if exists
+        const closestBlurred = target.closest('.recordo-blur');
+        if (closestBlurred) {
+            target = closestBlurred as HTMLElement;
+        }
 
         e.preventDefault();
         e.stopPropagation();
 
         if (target.classList.contains('recordo-blur')) {
             target.classList.remove('recordo-blur');
-            return;
+        } else {
+            target.classList.add('recordo-blur');
+            // Remove blur from any children to avoid double-blur
+            const nestedBlurred = target.querySelectorAll('.recordo-blur');
+            nestedBlurred.forEach(el => el.classList.remove('recordo-blur'));
         }
 
-        // Check if we are clicking something inside a blurred element (shouldn't happen with pointer-events fix, but safe to check)
-        const closestBlurred = target.closest('.recordo-blur');
-        if (closestBlurred) {
-            closestBlurred.classList.remove('recordo-blur');
-            return;
-        }
-
-        target.classList.add('recordo-blur');
-        target.classList.remove('recordo-highlight'); // Remove highlight immediately for visual feedback
+        // Update overlay immediately to reflect new state
+        this.updateOverlay(target);
     }
 
     private handleToastClick(e: MouseEvent) {
-        e.stopPropagation(); // Just in case
+        e.stopPropagation();
         this.disable();
     }
 }

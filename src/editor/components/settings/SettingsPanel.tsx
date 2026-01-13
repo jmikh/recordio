@@ -4,7 +4,7 @@ import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { ZoomSettings } from './ZoomSettings';
 import { CameraSettings } from './CameraSettings';
-import { CaptionsControls } from './CaptionsControls';
+import { CaptionsSettings } from './CaptionsSettings';
 import { SettingsButton } from './SettingsButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 
@@ -111,7 +111,7 @@ export const SettingsPanel = () => {
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
                     {activeTab === 'zoom' && <ZoomSettings />}
-                    {activeTab === 'captions' && <CaptionsControls />}
+                    {activeTab === 'captions' && <CaptionsSettings />}
                 </div>
             </div>
 

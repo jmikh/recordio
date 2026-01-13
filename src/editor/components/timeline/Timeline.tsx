@@ -6,7 +6,7 @@ import { TimeMapper } from '../../../core/timeMapper';
 import { ZoomTrack } from './zoom/ZoomTrack';
 
 // New Components
-import { TimelineToolbar } from './TimelineToolbar';
+import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
 import { MainTrack, GROUP_HEADER_HEIGHT } from './main/MainTrack';
 import { EventsTrack } from './EventsTrack';
 import { TimelineTrackHeader } from './TimelineTrackHeader';
@@ -17,6 +17,7 @@ import { useUIStore } from '../../stores/useUIStore';
 
 // Constants
 const TRACK_HEIGHT = 40;
+const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.6;
 const HEADER_WIDTH = 200;
 
 export function Timeline() {
@@ -37,6 +38,7 @@ export function Timeline() {
     const timeline = useProjectTimeline();
     const userEvents = useProjectStore(s => s.userEvents);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
+    const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
 
 
     // -- Derived Data --
@@ -50,6 +52,18 @@ export function Timeline() {
     // Total Duration is now the OUTPUT duration (sum of windows)
     const totalOutputDuration = timeMapper.getOutputDuration();
     const totalWidth = (totalOutputDuration / 1000) * pixelsPerSec + 25;
+
+    const handleFit = () => {
+        if (!containerRef.current) return;
+        // minimal padding
+        const availableWidth = containerRef.current.clientWidth - 50;
+
+        if (totalOutputDuration > 0) {
+            const fitPps = (availableWidth * 1000) / totalOutputDuration;
+            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
+            setPixelsPerSec(clampedPps);
+        }
+    };
 
     // -- Interaction Hook --
     const {
@@ -91,6 +105,7 @@ export function Timeline() {
             {/* 1. Toolbar */}
             <TimelineToolbar
                 totalDurationMs={totalOutputDuration}
+                onFit={handleFit}
             />
 
             {/* 2. Timeline Body (Split Pane) */}
@@ -132,8 +147,8 @@ export function Timeline() {
                     <div className="h-2 shrink-0" />
 
                     {/* Header: Zoom */}
-                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Zoom & Pan" height={TRACK_HEIGHT} />
+                    <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
+                        <TimelineTrackHeader title="Zoom & Pan" height={ZOOM_TRACK_HEIGHT} />
                     </div>
 
                     {/* Gap */}
@@ -195,7 +210,7 @@ export function Timeline() {
 
                                     {/* Zoom Track */}
                                     <ZoomTrack
-                                        height={TRACK_HEIGHT}
+                                        height={ZOOM_TRACK_HEIGHT}
                                     />
 
                                     {/* Events Track */}

@@ -144,7 +144,7 @@ export const Slider: React.FC<SliderProps> = ({
 
                 {/* Marker / Thumb */}
                 <div
-                    className="absolute top-1 bottom-1 aspect-square bg-background rounded-full pointer-events-none transition-transform active:scale-95 z-10"
+                    className="absolute top-1 bottom-1 aspect-square bg-text-muted rounded-full pointer-events-none transition-transform active:scale-95 z-10"
                     style={{
                         left: thumbLeft,
                         transform: `translate(-50%, 0)`

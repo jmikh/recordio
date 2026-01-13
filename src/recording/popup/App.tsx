@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
+import { MultiToggle } from '../../editor/components/common/MultiToggle';
 import permissionGuide from '../../assets/permission-guide.jpg';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
@@ -288,26 +289,28 @@ function App() {
           <div className="flex flex-col items-center w-full gap-5">
 
             {/* Mode Selection */}
-            <div className="flex bg-slate-800 p-1 rounded-lg w-full gap-1">
-              {['tab', 'window', 'screen'].map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setRecordingMode(mode as any);
-                    // If leaving tab mode, disable blur
-                    if (mode !== 'tab') {
-                      chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
-                        if (tabs[0]?.id) {
-                          chrome.tabs.sendMessage(tabs[0].id, { type: MSG_TYPES.DISABLE_BLUR_MODE });
-                        }
-                      });
-                    }
-                  }}
-                  className={`flex-1 py-1.5 text-xs rounded-md transition-all capitalize ${recordingMode === mode ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  {mode}
-                </button>
-              ))}
+            {/* Mode Selection */}
+            <div className="w-full">
+              <MultiToggle
+                options={[
+                  { value: 'tab', label: 'Tab' },
+                  { value: 'window', label: 'Window' },
+                  { value: 'screen', label: 'Screen' }
+                ]}
+                value={recordingMode}
+                onChange={(mode) => {
+                  setRecordingMode(mode);
+                  // If leaving tab mode, disable blur
+                  if (mode !== 'tab') {
+                    chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+                      if (tabs[0]?.id) {
+                        chrome.tabs.sendMessage(tabs[0].id, { type: MSG_TYPES.DISABLE_BLUR_MODE });
+                      }
+                    });
+                  }
+                }}
+                className="w-full text-xs"
+              />
             </div>
 
             {recordingMode === 'tab' && canInjectContentScript === false && (

@@ -1,6 +1,6 @@
 import React from 'react';
 
-interface MultiToggleOption<T extends string> {
+export interface MultiToggleOption<T extends string> {
     value: T;
     label?: string;
     icon?: React.ReactNode;
