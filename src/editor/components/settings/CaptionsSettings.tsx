@@ -174,13 +174,24 @@ export function CaptionsSettings() {
                 />
             </div>
 
-            {!captions && !isTranscribing && (
-                <button
-                    onClick={handleGenerate}
-                    className="w-full px-4 py-2 bg-settings-primary text-primary-fg rounded-lg hover:bg-settings-primary/90 transition-colors text-sm font-medium"
-                >
-                    Generate Captions
-                </button>
+            {!isTranscribing && (
+                <div className="flex flex-col gap-2">
+                    {!captions ? (
+                        <button
+                            onClick={handleGenerate}
+                            className="w-full px-4 py-2 bg-settings-primary text-primary-fg rounded-lg hover:bg-settings-primary/90 transition-colors text-sm font-medium"
+                        >
+                            Generate Captions
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleGenerate}
+                            className="w-full px-3 py-1.5 bg-surface-elevated text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
+                        >
+                            Regenerate Captions
+                        </button>
+                    )}
+                </div>
             )}
 
             {isTranscribing && (
