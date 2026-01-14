@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
@@ -11,19 +11,14 @@ interface SpeedControlProps {
     onClose: () => void;
 }
 
-const SPEED_MIN = 0.5;
-const SPEED_MAX = 2.5;
-const SPEED_STEP = 0.25;
-
 export const SpeedControl: React.FC<SpeedControlProps> = ({
     windowId,
     currentSpeed,
     anchorEl,
     onClose
 }) => {
-    const [speed, setSpeed] = useState(currentSpeed);
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
-    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+    const { batchAction } = useHistoryBatcher();
     const popoverRef = useRef<HTMLDivElement>(null);
 
     // Handle click outside to close
@@ -33,82 +28,50 @@ export const SpeedControl: React.FC<SpeedControlProps> = ({
                 onClose();
             }
         };
+        // Use mousedown on document to catch clicks outside
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [onClose]);
 
-    const handleSpeedChange = (newSpeed: number) => {
-        const clampedSpeed = Math.max(SPEED_MIN, Math.min(SPEED_MAX, newSpeed));
-        setSpeed(clampedSpeed);
+    const handleSpeedSelect = (newSpeed: number) => {
         batchAction(() => {
-            updateOutputWindow(windowId, { speed: clampedSpeed });
+            updateOutputWindow(windowId, { speed: newSpeed });
         });
-    };
-
-    const handleSliderStart = () => {
-        startInteraction();
-    };
-
-    const handleSliderEnd = () => {
-        endInteraction();
+        onClose();
     };
 
     if (!anchorEl) return null;
 
     const rect = anchorEl.getBoundingClientRect();
+    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5];
 
     return createPortal(
         <div
             ref={popoverRef}
-            className="fixed z-[9999] bg-surface-elevated border border-border rounded-lg shadow-xl p-3"
+            className="fixed z-[9999] bg-surface-elevated border border-border rounded shadow-xl py-1 flex flex-col min-w-[120px]"
             style={{
-                top: `${rect.bottom + 8}px`,
+                // Position above the anchor
+                bottom: `${window.innerHeight - rect.top + 8}px`,
                 left: `${rect.left}px`,
-                minWidth: '200px'
             }}
         >
-            {/* Header */}
-            <div className="text-xs font-medium text-text-main mb-2">
-                Playback Speed
-            </div>
-
-            {/* Speed Display */}
-            <div className="text-center text-lg font-mono font-bold text-primary mb-3">
-                {speed.toFixed(2)}x
-            </div>
-
-            {/* Slider */}
-            <input
-                type="range"
-                min={SPEED_MIN}
-                max={SPEED_MAX}
-                step={SPEED_STEP}
-                value={speed}
-                onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                onMouseDown={handleSliderStart}
-                onMouseUp={handleSliderEnd}
-                className="w-full mb-3"
-            />
-
-            {/* Preset Buttons */}
-            <div className="flex gap-1 justify-between">
-                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5].map(presetSpeed => (
-                    <button
-                        key={presetSpeed}
-                        onClick={() => {
-                            startInteraction();
-                            handleSpeedChange(presetSpeed);
-                            endInteraction();
-                        }}
-                        className={`px-2 py-1 text-xs rounded transition-colors ${Math.abs(speed - presetSpeed) < 0.01
-                                ? 'bg-primary text-primary-fg'
-                                : 'bg-surface hover:bg-surface-hover text-text-muted'
-                            }`}
-                    >
-                        {presetSpeed}x
-                    </button>
-                ))}
-            </div>
+            {speeds.map(presetSpeed => (
+                <button
+                    key={presetSpeed}
+                    onClick={() => handleSpeedSelect(presetSpeed)}
+                    className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center justify-between ${Math.abs(currentSpeed - presetSpeed) < 0.01
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-text-muted hover:bg-surface hover:text-text-main'
+                        }`}
+                >
+                    <span>{presetSpeed}x</span>
+                    {Math.abs(currentSpeed - presetSpeed) < 0.01 && (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                    )}
+                </button>
+            ))}
         </div>,
         document.body
     );

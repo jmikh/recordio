@@ -32,10 +32,6 @@ export class TranscriptionService {
     // Use English-only model - simpler and more reliable
     private readonly MODEL_NAME = 'Xenova/whisper-base.en';
 
-    // Minimum confidence threshold for including segments (0-1)
-    // Note: Whisper may not provide confidence scores for all chunks
-    private readonly MIN_CONFIDENCE = 0.3;
-
     private constructor() { }
 
     /**
@@ -220,24 +216,6 @@ export class TranscriptionService {
             // Whisper returns timestamps in seconds, convert to milliseconds
             const sourceStartMs = Math.round((chunk.timestamp[0] || 0) * 1000);
             const sourceEndMs = Math.round((chunk.timestamp[1] || sourceStartMs + 1000) * 1000);
-
-            // Extract confidence if available (may not exist for all models/outputs)
-            const confidence = chunk.score !== undefined ? chunk.score : undefined;
-
-            // Log confidence if available
-            if (confidence !== undefined) {
-                console.log(`[TranscriptionService] Chunk ${i}: confidence=${confidence.toFixed(3)}, text="${text.substring(0, 30)}..."`);
-
-                // Skip low-confidence segments if threshold is set
-                if (confidence < this.MIN_CONFIDENCE) {
-                    console.warn(
-                        `[TranscriptionService] ⚠️ OMITTED low-confidence segment:\n` +
-                        `  Score: ${confidence.toFixed(3)} (threshold: ${this.MIN_CONFIDENCE})\n` +
-                        `  Text: "${text}"`
-                    );
-                    continue;
-                }
-            }
 
             segments.push({
                 id: crypto.randomUUID(),
