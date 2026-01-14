@@ -60,12 +60,17 @@ export class TranscriptionService {
      */
     async transcribeWebcamAudio(
         videoBlob: Blob,
-        onProgress?: (progress: number) => void
+        onProgress?: (progress: number) => void,
+        signal?: AbortSignal
     ): Promise<Captions> {
         try {
+            if (signal?.aborted) throw new Error('Aborted');
+
             // Step 1: Extract audio from video (0-30% of progress)
             onProgress?.(0.05);
             const audioData = await this.extractAudioFromVideo(videoBlob);
+
+            if (signal?.aborted) throw new Error('Aborted');
 
             if (!audioData) {
                 throw new Error('No audio track found in webcam video. Cannot transcribe.');
@@ -80,6 +85,8 @@ export class TranscriptionService {
                 await this.loadModel(this.MODEL_NAME);
             }
 
+            if (signal?.aborted) throw new Error('Aborted');
+
             onProgress?.(0.6);
 
             // Step 3: Run transcription (60-95% of progress)
@@ -87,11 +94,15 @@ export class TranscriptionService {
                 throw new Error('Whisper model failed to load.');
             }
 
+            // Note: transformers.js pipeline might not support signal directly yet, 
+            // but we check before running.
             const result = await this.whisperPipeline(audioData, {
                 return_timestamps: true,
                 chunk_length_s: 30,
                 stride_length_s: 5
             });
+
+            if (signal?.aborted) throw new Error('Aborted');
 
             onProgress?.(0.95);
 

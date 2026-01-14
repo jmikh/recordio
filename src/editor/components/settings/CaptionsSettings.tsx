@@ -5,6 +5,8 @@ import type { CaptionSegment } from '../../../core/types';
 import { Slider } from '../common/Slider';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
+import { TranscriptionService } from '../../../core/TranscriptionService';
+import { CaptionProgressModal } from '../caption/CaptionProgressModal';
 
 /**
  * Settings panel for managing captions.
@@ -12,12 +14,13 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 export function CaptionsSettings() {
     const project = useProjectStore(state => state.project);
     const updateSettings = useProjectStore(state => state.updateSettings);
-    const generateTranscription = useProjectStore(state => state.generateTranscription);
     const updateCaptionSegment = useProjectStore(state => state.updateCaptionSegment);
     const deleteCaptionSegment = useProjectStore(state => state.deleteCaptionSegment);
     const isTranscribing = useProjectStore(state => state.isTranscribing);
     const transcriptionProgress = useProjectStore(state => state.transcriptionProgress);
     const transcriptionError = useProjectStore(state => state.transcriptionError);
+    const setTranscriptionState = useProjectStore(state => state.setTranscriptionState);
+    const setCaptions = useProjectStore(state => state.setCaptions);
 
     // UI Store actions
     const setCanvasMode = useUIStore(state => state.setCanvasMode);
@@ -27,6 +30,7 @@ export function CaptionsSettings() {
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const [editingId, setEditingId] = useState<string | null>(null);
     const inputRef = useRef<HTMLDivElement>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const captions = project.timeline.recording.captions;
     const settings = project.settings.captions || { visible: true, size: 24 };
@@ -41,11 +45,87 @@ export function CaptionsSettings() {
     }, [editingId]);
 
     const handleGenerate = async () => {
+        const state = useProjectStore.getState();
+        const cameraSourceId = state.project.timeline.recording.cameraSourceId;
+
+        if (!cameraSourceId) {
+            console.error('[CaptionsSettings] No camera source available for transcription');
+            setTranscriptionState({ transcriptionError: 'No webcam recording found' });
+            return;
+        }
+
+        const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
+        if (!cameraSource) {
+            console.error('[CaptionsSettings] Camera source not found:', cameraSourceId);
+            setTranscriptionState({ transcriptionError: 'Webcam source not found' });
+            return;
+        }
+
         try {
             console.log('[CaptionsSettings] Starting transcription generation');
-            await generateTranscription();
-        } catch (error) {
+
+            // Pause playback
+            setIsPlaying(false);
+
+            // Setup AbortController
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            abortControllerRef.current = new AbortController();
+            const signal = abortControllerRef.current.signal;
+
+            setTranscriptionState({
+                isTranscribing: true,
+                transcriptionProgress: 0,
+                transcriptionError: null
+            });
+
+            // Fetch video
+            const response = await fetch(cameraSource.url);
+            if (!response.ok) throw new Error(`Failed to fetch webcam video: ${response.statusText}`);
+            const videoBlob = await response.blob();
+
+            if (signal.aborted) throw new Error('Aborted');
+
+            // Run transcription
+            const transcriptionService = TranscriptionService.getInstance();
+            const transcriptionData = await transcriptionService.transcribeWebcamAudio(
+                videoBlob,
+                (progress) => {
+                    setTranscriptionState({ transcriptionProgress: progress });
+                },
+                signal
+            );
+
+            // Success
+            setCaptions(transcriptionData);
+            setTranscriptionState({
+                isTranscribing: false,
+                transcriptionProgress: 1
+            });
+
+        } catch (error: any) {
+            if (error.message === 'Aborted') {
+                console.log('[CaptionsSettings] Transcription cancelled');
+                setTranscriptionState({ isTranscribing: false });
+                return;
+            }
             console.error('[CaptionsSettings] Failed to generate transcription:', error);
+            setTranscriptionState({
+                isTranscribing: false,
+                transcriptionError: error instanceof Error ? error.message : 'Unknown error occurred'
+            });
+        } finally {
+            if (abortControllerRef.current?.signal.aborted) {
+                abortControllerRef.current = null;
+            }
+        }
+    };
+
+    const handleCancel = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
         }
     };
 
@@ -290,6 +370,12 @@ export function CaptionsSettings() {
                     </div>
                 )
             }
+            {/* Modal is rendered here to share access to handleCancel */}
+            <CaptionProgressModal
+                isOpen={isTranscribing}
+                progress={transcriptionProgress}
+                onCancel={handleCancel}
+            />
         </div >
     );
 }
