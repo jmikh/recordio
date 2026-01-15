@@ -107,6 +107,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                         // Calculate extension to next block
                         let extensionNode = null;
+                        let extWidth = 0;
                         const outputSize = project.settings.outputSize;
                         const isFullScreen = Math.abs(m.rect.x) < 1 &&
                             Math.abs(m.rect.y) < 1 &&
@@ -119,12 +120,12 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                             // Only extend if there is a gap or we are at the end
                             const nextStartX = coords.msToX(nextStartMs);
-                            const extWidth = nextStartX - endX;
+                            extWidth = nextStartX - endX;
 
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-t border-b border-r border-primary ${isSelected ? 'bg-primary-muted' : 'bg-primary-disabled'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-2 border-l-0 bg-primary-disabled border-primary-disabled ${isSelected ? 'border-secondary bg-primary-muted' : 'group-hover:border-primary-highlighted'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -138,9 +139,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                         return (
                             <React.Fragment key={m.id}>
                                 <div
-                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border
-                                        ${isSelected ? 'border-secondary border-2' : 'not-hover:border-primary hover:border-secondary-muted border-2'}
+                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border-2 border-r-4
+                                        ${isSelected ? 'border-secondary' : 'not-hover:border-primary-muted hover:border-primary-highlighted'}
                                         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+                                        ${isFullScreen ? 'rounded-r-xl' : ''}
                                     `}
                                     style={{
                                         left: `${left}px`,
@@ -155,12 +157,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                         setEditingZoom(m.id);
                                     }}
                                 >
-
-                                    {/* Right Edge (Keyframe) - Thicker, Opaque */}
-                                    <div
-                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-secondary' : 'not-hover:bg-primary hover:bg-secondary-muted'} shadow-sm`}
-                                    />
-
                                 </div>
                                 {extensionNode}
                             </React.Fragment>
@@ -171,7 +167,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 {/* Add Zoom Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary rounded-sm flex items-center justify-center"
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary border-2 border-r-4 flex items-center justify-center"
                         style={{
                             // Use calculated width (pixel based on time)
                             // Position: right aligned to mouse X (hoverInfo.x).
@@ -185,9 +181,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                         <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-secondary pointer-events-none bg-surface-elevated/80 px-1 rounded">
                             Add Zoom
                         </div>
-
-                        {/* Right Handle */}
-                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-secondary/50" />
                     </div>
                 )}
             </div>

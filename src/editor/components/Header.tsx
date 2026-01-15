@@ -1,4 +1,5 @@
 import { useProjectStore, useProjectData, useProjectHistory } from '../stores/useProjectStore';
+import { useUIStore } from '../stores/useUIStore';
 import { ExportButton } from './export/ExportButton';
 
 // Icons
@@ -51,6 +52,16 @@ export const Header = () => {
                             <IconRedo />
                         </button>
                     </div>
+
+                    <div className="h-4 w-[1px] bg-border mx-2"></div>
+
+                    <button
+                        onClick={() => useUIStore.getState().toggleDebugBar()}
+                        title="Toggle Debug Bar"
+                        className="px-2 py-1 text-[10px] text-text-muted hover:text-text-main hover:bg-surface rounded border border-border"
+                    >
+                        Debug
+                    </button>
 
                     <div className="text-[10px] text-text-muted ml-4">
                         {pastStates.length} / {futureStates.length}

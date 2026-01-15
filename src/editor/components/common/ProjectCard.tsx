@@ -35,7 +35,7 @@ export const ProjectCard = ({
             {/* Delete Confirmation Overlay */}
             {isDeleting && (
                 <div
-                    className="absolute inset-0 z-20 bg-background/95 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
+                    className="absolute inset-0 z-20 bg-overlay flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <p className="text-sm text-text-main mb-1">Deleting is final.</p>
@@ -96,7 +96,7 @@ export const ProjectCard = ({
                 <div className="flex flex-col">
                     <div className="flex justify-between items-start">
                         <h3
-                            className={`font-semibold truncate pr-2 text-text-main ${isGrid ? 'text-base' : 'text-sm'}`}
+                            className={`font-normal truncate pr-2 text-text-main text-sm`}
                         >
                             {project.name}
                         </h3>

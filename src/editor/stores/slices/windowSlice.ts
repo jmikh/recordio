@@ -11,7 +11,22 @@ export interface WindowSlice {
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
 }
 
-const getSnapshot = () => useUIStore.getState();
+const getSnapshot = () => {
+    const state = useUIStore.getState();
+    // Only capture serializable UI state, exclude refs
+    return {
+        canvasMode: state.canvasMode,
+        selectedZoomId: state.selectedZoomId,
+        selectedWindowId: state.selectedWindowId,
+        selectedSettingsPanel: state.selectedSettingsPanel,
+        isResizingWindow: state.isResizingWindow,
+        pixelsPerSec: state.pixelsPerSec,
+        isPlaying: state.isPlaying,
+        currentTimeMs: state.currentTimeMs,
+        previewTimeMs: state.previewTimeMs,
+        showDebugBar: state.showDebugBar
+    };
+};
 
 const getWindowDuration = (w: OutputWindow) => {
     const speed = w.speed || 1.0;

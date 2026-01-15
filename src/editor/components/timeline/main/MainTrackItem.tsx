@@ -133,10 +133,10 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                 {/* Tracks Area */}
                 <div className="relative flex-1 w-full">
                     {/* Unified Segment */}
-                    <div className={`absolute left-0 right-0 top-0 bottom-0 bg-surface-elevated/20 border border-primary shadow-inner-bold overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
+                    <div className={`absolute left-0 right-0 top-0 bottom-0 border border-primary shadow-inner-bold overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
 
                         {/* Background fill based on content? Or just keep generic primary? Using primary as base. */}
-                        <div className="absolute inset-0 bg-primary opacity-90" />
+                        <div className="absolute inset-0 bg-primary" />
 
                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
                             {displayMode !== 'none' && (
@@ -173,22 +173,23 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                 const indicatorX = rect.left + left + (isLeft ? 0 : width);
                 const indicatorY = rect.bottom;
 
+                // Calculate remaining gap to constraints (how much room left before hitting edge)
+                const currentWin = dragState.currentWindow;
+                const remainingGapMs = isLeft
+                    ? (currentWin.startMs - dragState.constraints.minStart)
+                    : (dragState.constraints.maxEnd - currentWin.endMs);
+
                 return createPortal(
                     <div
                         className="fixed z-[9999] pointer-events-none"
                         style={{
                             top: `${indicatorY}px`,
                             left: `${indicatorX}px`,
-                            transform: 'translate(-50%, 12px)'
+                            transform: 'translate(-50%, 8px)'
                         }}
                     >
-                        <div className="bg-surface-elevated text-text-main text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border whitespace-nowrap">
-                            [ {(
-                                (isLeft
-                                    ? (win.startMs - dragState.constraints.minStart)
-                                    : (dragState.constraints.maxEnd - win.endMs)
-                                ) / 1000
-                            ).toFixed(2)}s ]
+                        <div className="relative rounded-lg bg-secondary text-text-on-secondary text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border border-border whitespace-nowrap before:content-[''] before:absolute before:top-0 before:left-1/2 before:-translate-x-1/2 before:-translate-y-full before:border-[8px] before:border-transparent before:border-b-border before:z-10 after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:-translate-y-[calc(100%-1px)] after:border-[8px] after:border-transparent after:border-b-secondary after:z-20">
+                            {(remainingGapMs / 1000).toFixed(2)}s
                         </div>
                     </div>,
                     document.body

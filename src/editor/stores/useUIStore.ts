@@ -54,6 +54,10 @@ export interface UIState {
     setCurrentTime: (timeMs: TimeMs) => void;
     setPreviewTime: (timeMs: TimeMs | null) => void;
 
+    // Debug Bar
+    showDebugBar: boolean;
+    toggleDebugBar: () => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -138,6 +142,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     },
     setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 
+    // Debug Bar
+    showDebugBar: false,
+    toggleDebugBar: () => set((state) => ({ showDebugBar: !state.showDebugBar })),
+
     reset: () => set({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
@@ -151,5 +159,6 @@ export const useUIStore = create<UIState>((set, get) => ({
         // fps: 0,
         // frameTime: 0,
         isResizingWindow: false,
+        showDebugBar: false,
     })
 }));

@@ -109,7 +109,7 @@
      ───────────────────────────────────────────────────────── */
    --surface-body: oklch(0.13 0 0);
    --surface-default: oklch(0.17 0 0);
-   --surface-raised: oklch(0.22 0 0);
+   --surface-raised: oklch(0.21 0 0);
    --surface-overlay: oklch(0.25 0 0);
 
    /* ─────────────────────────────────────────────────────────

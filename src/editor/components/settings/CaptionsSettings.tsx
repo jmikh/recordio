@@ -7,6 +7,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
 import { CaptionProgressModal } from '../caption/CaptionProgressModal';
+import { PrimaryButton } from '../common/PrimaryButton';
 
 /**
  * Settings panel for managing captions.
@@ -260,12 +261,12 @@ export function CaptionsSettings() {
                 !isTranscribing && (
                     <div className="flex flex-col gap-2">
                         {!captions ? (
-                            <button
+                            <PrimaryButton
                                 onClick={handleGenerate}
-                                className="w-full px-4 py-2  text-primary-fg rounded-lg transition-colors text-sm font-medium"
+                                className="w-full"
                             >
                                 Generate Captions
-                            </button>
+                            </PrimaryButton>
                         ) : (
                             <button
                                 onClick={handleGenerate}

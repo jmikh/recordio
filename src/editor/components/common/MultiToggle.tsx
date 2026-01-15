@@ -35,7 +35,7 @@ export const MultiToggle = <T extends string>({
     return (
         <div
             className={`
-                relative flex items-center bg-hover-subtle border border-border rounded-lg select-none overflow-hidden hover:border-border-hover
+                relative flex items-center bg-hover-subtle rounded-lg select-none overflow-hidden
                 ${className}
             `}
         >
@@ -57,7 +57,7 @@ export const MultiToggle = <T extends string>({
                         key={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4 min-w-0 rounded-lg
+                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4 min-w-0 rounded-lg 
                             text-xs z-10 outline-none
                             text-center
                             transition-colors duration-200

@@ -47,21 +47,32 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
             const speed = win.speed || 1.0;
             const sourceDeltaMs = outputDeltaMs * speed;
 
-            let newWindow = { ...win };
+            // Create new window with only serializable properties to avoid circular references
+            let newStartMs = win.startMs;
+            let newEndMs = win.endMs;
 
             if (dragState.type === 'left') {
                 const proposedStart = win.startMs + sourceDeltaMs;
                 // Cannot go before minStart, cannot cross endMs (min dur 100ms)
-                newWindow.startMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MinWindowDurationMs);
+                newStartMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MinWindowDurationMs);
             } else if (dragState.type === 'right') {
                 const proposedEnd = win.endMs + sourceDeltaMs;
                 // Cannot go past maxEnd, cannot cross startMs
-                newWindow.endMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MinWindowDurationMs);
+                newEndMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MinWindowDurationMs);
             }
 
-            // Live Update to Store (Batched)
-            // Batch continuous updates (e.g. 60fps drag) into a single undoable history action.
-            if (newWindow.startMs !== dragState.currentWindow.startMs || newWindow.endMs !== dragState.currentWindow.endMs) {
+            // Only update if values changed
+            if (newStartMs !== dragState.currentWindow.startMs || newEndMs !== dragState.currentWindow.endMs) {
+                // Create new window object with only serializable properties
+                const newWindow: OutputWindow = {
+                    id: win.id,
+                    startMs: newStartMs,
+                    endMs: newEndMs,
+                    speed: win.speed
+                };
+
+                // Live Update to Store (Batched)
+                // Batch continuous updates (e.g. 60fps drag) into a single undoable history action.
                 batchAction(() => {
                     updateOutputWindow(dragState.windowId, newWindow);
                 });
@@ -132,13 +143,21 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
         setIsResizingWindow(true);
         setIsPlaying(false);
 
+        // Create clean window object with only serializable properties to avoid circular references
+        const cleanWindow: OutputWindow = {
+            id: win.id,
+            startMs: win.startMs,
+            endMs: win.endMs,
+            speed: win.speed
+        };
+
         setDragState({
             windowId: id,
             type,
             startX: e.clientX,
             outputStartMs,
-            initialWindow: win,
-            currentWindow: win,
+            initialWindow: cleanWindow,
+            currentWindow: cleanWindow,
             constraints: { minStart, maxEnd }
         });
     };

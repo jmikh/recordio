@@ -38,11 +38,11 @@ export class ProjectImpl {
                 },
 
                 background: {
-                    type: 'solid',
-                    color: '#121212',
+                    type: 'gradient',
+                    color: '#6078c4ff',
                     gradientColors: ['#667eea', '#764ba2'],
                     gradientDirection: 'SE',
-                    lastColorMode: 'solid',
+                    lastColorMode: 'gradient',
                     backgroundBlur: 0
                 },
 

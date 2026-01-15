@@ -5,6 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { Slider } from '../common/Slider';
+import { Dropdown } from '../common/Dropdown';
+import type { DropdownOption } from '../common/Dropdown';
 
 
 interface TimelineToolbarProps {
@@ -14,6 +16,18 @@ interface TimelineToolbarProps {
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
+
+interface Resolution {
+    label: string;
+    width: number;
+    height: number;
+}
+
+const RESOLUTIONS: Resolution[] = [
+    { label: '1:1', width: 1080 * 2, height: 1080 * 2 },
+    { label: '4:3', width: 1440 * 2, height: 1080 * 2 },
+    { label: '16:9', width: 1920 * 2, height: 1080 * 2 },
+];
 
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
@@ -45,8 +59,10 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         if (!result) return;
 
         const { window: win, outputStartMs } = result;
-        const offset = currentTime - outputStartMs;
-        const splitTime = win.startMs + offset;
+        const outputOffset = currentTime - outputStartMs;
+        const speed = win.speed || 1.0;
+        const sourceOffset = outputOffset * speed;  // Convert output time to source time
+        const splitTime = win.startMs + sourceOffset;
 
         splitWindow(win.id, splitTime);
     };
@@ -55,8 +71,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         setPixelsPerSec(newScale);
     };
 
-    const handleResolutionChange = (width: number, height: number) => {
-        updateSettings({ outputSize: { width, height } });
+    const handleResolutionChange = (resolution: Resolution) => {
+        updateSettings({ outputSize: { width: resolution.width, height: resolution.height } });
     };
 
     const onTogglePlay = () => setIsPlaying(!isPlaying);
@@ -101,33 +117,16 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         return unsub;
     }, [totalDurationMs]);
 
-    const [isRatioOpen, setIsRatioOpen] = React.useState(false);
-    const ratioRef = React.useRef<HTMLDivElement>(null);
+    // Get current aspect ratio and resolution
+    const currentResolutionObj = RESOLUTIONS.find(
+        r => r.width === currentResolution?.width && r.height === currentResolution?.height
+    ) || RESOLUTIONS[2]; // Default to 16:9
 
-    React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (ratioRef.current && !ratioRef.current.contains(event.target as Node)) {
-                setIsRatioOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
-    const resolutions = [
-        { label: '1:1 (Square)', width: 1080 * 2, height: 1080 * 2 },
-        { label: '4:3 (Classic)', width: 1440 * 2, height: 1080 * 2 },
-        { label: '16:9 (Widescreen)', width: 1920 * 2, height: 1080 * 2 },
-    ];
-
-    const currentAspectLabel = (() => {
-        if (!currentResolution) return 'Ratio';
-        const { width, height } = currentResolution;
-        if (width === 1080 * 2 && height === 1080 * 2) return '1:1';
-        if (width === 1440 * 2 && height === 1080 * 2) return '4:3';
-        if (width === 1920 * 2 && height === 1080 * 2) return '16:9';
-        return 'Custom';
-    })();
+    const resolutionOptions: DropdownOption<Resolution>[] = RESOLUTIONS.map(res => ({
+        value: res,
+        label: res.label,
+    }));
 
     return (
         <div className="h-10 flex items-center px-4 bg-surface-elevated border-b border-border shrink-0 justify-between">
@@ -140,34 +139,22 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     Split
                 </button>
 
-                {/* Aspect Ratio Drop Up */}
-                <div className="relative" ref={ratioRef}>
-                    <button
-                        onClick={() => setIsRatioOpen(!isRatioOpen)}
-                        className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border flex items-center gap-1 min-w-[60px] justify-center"
-                        title="Change Aspect Ratio"
-                    >
-                        {currentAspectLabel}
-                        <span className="text-[10px] opacity-70">▲</span>
-                    </button>
-
-                    {isRatioOpen && (
-                        <div className="absolute bottom-full left-0 mb-1 w-40 bg-surface-elevated border border-border rounded shadow-xl overflow-hidden z-50 flex flex-col">
-                            {resolutions.map((res) => (
-                                <button
-                                    key={res.label}
-                                    className="px-3 py-2 text-left text-xs hover:bg-surface text-text-main border-b border-border last:border-0"
-                                    onClick={() => {
-                                        handleResolutionChange(res.width, res.height);
-                                        setIsRatioOpen(false);
-                                    }}
-                                >
-                                    {res.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                {/* Aspect Ratio Dropdown */}
+                <Dropdown
+                    options={resolutionOptions}
+                    value={currentResolutionObj}
+                    onChange={handleResolutionChange}
+                    trigger={
+                        <button
+                            className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border flex items-center gap-1 min-w-[60px] justify-center"
+                            title="Change Aspect Ratio"
+                        >
+                            {currentResolutionObj.label}
+                            <span className="text-[10px] opacity-70">▲</span>
+                        </button>
+                    }
+                    direction="up"
+                />
             </div>
 
             <div className="flex items-center gap-4 bg-background px-4 py-1 rounded-full border border-border">

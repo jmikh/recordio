@@ -165,7 +165,7 @@ export function Timeline() {
     }, [totalOutputDuration, pixelsPerSec]); // deps that affect width
 
     return (
-        <div className="flex flex-col h-full bg-background select-none text-text-main font-sans">
+        <div className="flex flex-col h-full bg-surface select-none text-text-main font-sans">
             {/* 1. Toolbar */}
             <TimelineToolbar
                 totalDurationMs={totalOutputDuration}

@@ -64,7 +64,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
     const trackContentHeight = Math.max(0, trackHeight - GROUP_HEADER_HEIGHT);
 
     return (
-        <div ref={containerRef} className="w-full relative bg-surface/50 flex" style={{ height: trackHeight }}>
+        <div ref={containerRef} className="w-full relative flex" style={{ height: trackHeight }}>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>

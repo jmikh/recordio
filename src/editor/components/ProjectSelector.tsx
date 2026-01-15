@@ -52,7 +52,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
 
 
     return (
-        <div className="w-full h-screen bg-background flex flex-col overflow-hidden text-text-main">
+        <div className="w-full h-screen bg-surface flex flex-col overflow-hidden text-text-main">
             {/* Header - Fixed */}
             <div className="w-full flex justify-center shrink-0">
                 <div className="w-full max-w-4xl p-8 pb-4 flex flex-col gap-6">

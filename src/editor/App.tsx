@@ -27,6 +27,7 @@ function Editor() {
     const loadProject = useProjectStore(s => s.loadProject);
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
+    const showDebugBar = useUIStore(s => s.showDebugBar);
 
 
     // Initialization State
@@ -146,10 +147,12 @@ function Editor() {
             {/* Header / Toolbar */}
             <Header />
 
-            <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-30 select-none">
-                {/* Bottom Row: Debug Tools */}
-                <DebugBar />
-            </div>
+            {showDebugBar && (
+                <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-30 select-none">
+                    {/* Bottom Row: Debug Tools */}
+                    <DebugBar />
+                </div>
+            )}
 
             <ExportModal />
 
@@ -157,7 +160,7 @@ function Editor() {
                 <SettingsPanel />
                 <div
                     id="video-player-container"
-                    className="flex-1 flex overflow-hidden relative items-center justify-center bg-[#1e1e1e]"
+                    className="flex-1 flex overflow-hidden relative items-center justify-center bg-body"
                 >
                     <div
                         ref={setContainerElement}
