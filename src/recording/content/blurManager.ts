@@ -52,11 +52,8 @@ export class BlurManager {
         style.textContent = `
             .recordo-blur {
                 filter: blur(8px) !important;
-                user-select: none !important;
+                user-select: none;
                 pointer-events: auto !important;
-                position: relative !important;
-                z-index: auto !important;
-                isolation: auto !important;
             }
             #recordo-blur-overlay {
                 position: fixed;
@@ -243,17 +240,6 @@ export class BlurManager {
 
         this.highlightedElement = target;
 
-        // Log element info for debugging
-        const elementInfo = {
-            tag: target.tagName,
-            class: target.className,
-            id: target.id,
-            zIndex: window.getComputedStyle(target).zIndex,
-            pointerEvents: window.getComputedStyle(target).pointerEvents,
-            position: window.getComputedStyle(target).position
-        };
-        console.log('[BlurManager] Hovering element:', elementInfo);
-
         // Show overlay with correct color
         this.updateOverlay(target);
 
@@ -295,29 +281,17 @@ export class BlurManager {
             target = closestBlurred as HTMLElement;
         }
 
-        console.log('[BlurManager] Click detected on:', {
-            tag: target.tagName,
-            class: target.className,
-            id: target.id,
-            hasBlurClass: target.classList.contains('recordo-blur')
-        });
-
         e.preventDefault();
         e.stopPropagation();
 
         if (target.classList.contains('recordo-blur')) {
-            console.log('[BlurManager] Removing blur from element');
             target.classList.remove('recordo-blur');
         } else {
-            console.log('[BlurManager] Adding blur to element');
             target.classList.add('recordo-blur');
             // Remove blur from any children to avoid double-blur
             const nestedBlurred = target.querySelectorAll('.recordo-blur');
-            console.log('[BlurManager] Removing blur from', nestedBlurred.length, 'nested elements');
             nestedBlurred.forEach(el => el.classList.remove('recordo-blur'));
         }
-
-        console.log('[BlurManager] After click - element classes:', target.className);
 
         // Update overlay immediately to reflect new state
         this.updateOverlay(target);
