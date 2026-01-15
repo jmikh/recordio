@@ -38,6 +38,7 @@ export class ProjectImpl {
                     borderRadius: 16,
                     borderWidth: 8,
                     borderColor: '#667eea',
+                    deviceFrameId: 'macbook-air-dark',
                     hasShadow: true,
                     hasGlow: false,
                     mute: false

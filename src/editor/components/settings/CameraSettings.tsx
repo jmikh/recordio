@@ -35,9 +35,7 @@ export const CameraSettings = () => {
 
     if (!cameraSource) {
         return (
-            <div className="p-4">
-                <Notice>Camera was not used for this recording</Notice>
-            </div>
+            <Notice>Camera was not used for this recording</Notice>
         );
     }
 
@@ -80,7 +78,7 @@ export const CameraSettings = () => {
                         icon={isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight className="w-5 h-5" />}
                         isActive={isEditingCamera}
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                        label={isEditingCamera ? 'Done Editing' : 'Edit Position & Size'}
+                        label={isEditingCamera ? 'Editing...' : 'Edit Position & Size'}
                         className="flex-1"
                     />
                 </div>

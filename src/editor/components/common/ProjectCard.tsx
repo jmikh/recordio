@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Project } from '../../../core/types';
+import { XButton } from './XButton';
 
 interface ProjectCardProps {
     project: Project;
@@ -35,23 +36,22 @@ export const ProjectCard = ({
             {/* Delete Confirmation Overlay */}
             {isDeleting && (
                 <div
-                    className="absolute inset-0 z-20 bg-overlay flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
+                    className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <p className="text-sm text-text-main mb-1">Deleting is final.</p>
-                    <p className="text-sm text-text-muted mb-4">Confirm?</p>
+                    <p className="text-sm text-text-main mb-1">Deleting is final</p>
                     <div className="flex space-x-3">
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsDeleting(false); }}
-                            className="px-3 py-1.5 text-xs text-text-muted hover:text-text-main hover:bg-surface-elevated rounded-md transition-colors border border-border"
+                            className="px-3 py-1.5 text-xs text-text-muted hover:text-text-main bg-surface-raised hover:bg-surface-overlay rounded-md transition-colors border border-border"
                         >
-                            No
+                            Cancel
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); onDelete(project); }}
                             className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-md shadow-sm transition-colors"
                         >
-                            Yes
+                            Confirm
                         </button>
                     </div>
                 </div>
@@ -110,18 +110,11 @@ export const ProjectCard = ({
 
             {/* Actions (Hover) */}
             {!isDeleting && (
-                <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 z-10">
-                    <div className="flex bg-background/90 backdrop-blur-md rounded-lg shadow-lg border border-border p-1">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                            className="p-1.5 text-text-muted hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                            title="Delete"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 z-10">
+                    <XButton
+                        onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
+                        title="Delete"
+                    />
                 </div>
             )}
         </div>

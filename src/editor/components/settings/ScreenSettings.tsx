@@ -18,18 +18,7 @@ export const ScreenSettings = () => {
     const isEditingCrop = canvasMode === CanvasMode.CropEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    // Ensure screen settings exist (fallback for legacy projects if not fully migrated yet)
-    // Default to device mode if undefined to match old behavior
-    const screenConfig = project.settings.screen || {
-        mode: 'device',
-        deviceFrameId: 'macbook-pro',
-        borderRadius: 12,
-        borderWidth: 0,
-        borderColor: '#ffffff',
-        hasShadow: true,
-        hasGlow: false,
-        padding: 0.1
-    };
+    const screenConfig = project.settings.screen;
 
     const handleModeChange = (mode: 'device' | 'border') => {
         updateSettings({
@@ -47,7 +36,7 @@ export const ScreenSettings = () => {
                         icon={isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-5 h-5" />}
                         isActive={isEditingCrop}
                         onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
-                        label={isEditingCrop ? 'Done Cropping' : 'Crop Video'}
+                        label={isEditingCrop ? 'Editing...' : 'Crop Screen'}
                         className="w-auto px-6"
                     />
                 </div>

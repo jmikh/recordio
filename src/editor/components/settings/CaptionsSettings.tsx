@@ -9,6 +9,7 @@ import { TranscriptionService } from '../../../core/TranscriptionService';
 import { CaptionProgressModal } from '../caption/CaptionProgressModal';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { Notice } from '../common/Notice';
+import { XButton } from '../common/XButton';
 
 /**
  * Settings panel for managing captions.
@@ -269,57 +270,61 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
+            {/* Notice Section */}
             {!hasMicrophone ? (
                 <Notice>Microphone was not used for this recording</Notice>
             ) : (
-                <>
-                    {/* Caption Settings */}
-                    <div className="space-y-3 pb-3 border-b border-border">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-medium text-text-muted">Visible</label>
-                            <button
-                                onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
-                                    }`}
-                            >
-                                <span
-                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.visible ? 'translate-x-5' : 'translate-x-1'
-                                        }`}
-                                />
-                            </button>
-                        </div>
+                <p className="text-xs text-text-muted">Currently only support English captions</p>
+            )}
 
-                        <Slider
-                            value={settings.size}
-                            onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
-                            min={16}
-                            max={48}
-                            label="Size"
-                            units="px"
-                            decimals={0}
-                        />
+            {/* Generate/Regenerate Buttons - only show if microphone is available */}
+            {hasMicrophone && !isTranscribing && (
+                <div className="flex flex-col gap-2">
+                    {!captions ? (
+                        <PrimaryButton
+                            onClick={handleGenerate}
+                            className="w-full"
+                        >
+                            Generate Captions
+                        </PrimaryButton>
+                    ) : (
+                        <PrimaryButton
+                            onClick={handleGenerate}
+                            className="w-full"
+                        >
+                            Regenerate Captions
+                        </PrimaryButton>
+                    )}
+                </div>
+            )}
+
+            {/* Caption Settings - only show if microphone is available */}
+            {hasMicrophone && (
+                <div className="space-y-3 pb-3 border-b border-border">
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-text-muted">Visible</label>
+                        <button
+                            onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.visible ? 'translate-x-5' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
                     </div>
 
-                    {!isTranscribing && (
-                        <div className="flex flex-col gap-2">
-                            {!captions ? (
-                                <PrimaryButton
-                                    onClick={handleGenerate}
-                                    className="w-full"
-                                >
-                                    Generate Captions
-                                </PrimaryButton>
-                            ) : (
-                                <button
-                                    onClick={handleGenerate}
-                                    className="w-full px-3 py-1.5 text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
-                                >
-                                    Regenerate Captions
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </>
+                    <Slider
+                        value={settings.size}
+                        onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
+                        min={16}
+                        max={48}
+                        label="Size"
+                        units="px"
+                        decimals={0}
+                    />
+                </div>
             )}
 
             {
@@ -375,15 +380,10 @@ export function CaptionsSettings() {
                                                         {formatTime(outputEnd)}
                                                     </span>
                                                 </div>
-                                                <button
+                                                <XButton
                                                     onClick={() => handleDelete(segment.id)}
-                                                    className="w-4 h-4 flex items-center justify-center text-text-muted hover:text-destructive transition-colors rounded"
                                                     title="Delete caption"
-                                                >
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                </button>
+                                                />
                                             </div>
 
                                             {/* Caption content */}
