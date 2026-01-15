@@ -6,7 +6,7 @@ import { Slider } from '../common/Slider';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
-import { CaptionProgressModal } from '../caption/CaptionProgressModal';
+import { ProgressModal } from '../common/ProgressModal';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { Notice } from '../common/Notice';
 import { XButton } from '../common/XButton';
@@ -274,7 +274,7 @@ export function CaptionsSettings() {
             {!hasMicrophone ? (
                 <Notice>Microphone was not used for this recording</Notice>
             ) : (
-                <p className="text-xs text-text-muted">Currently only support English captions</p>
+                <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
             )}
 
             {/* Generate/Regenerate Buttons - only show if microphone is available */}
@@ -419,9 +419,12 @@ export function CaptionsSettings() {
                 )
             }
             {/* Modal is rendered here to share access to handleCancel */}
-            <CaptionProgressModal
+            <ProgressModal
                 isOpen={isTranscribing}
+                title="Generating Captions"
+                projectName={project.name}
                 progress={transcriptionProgress}
+                statusText="Processing audio..."
                 onCancel={handleCancel}
             />
         </div >

@@ -59,7 +59,7 @@ export const EffectsSettings = () => {
                 <Slider
                     label="Transition Time"
                     min={zoomSettings.minZoomDurationMs}
-                    max={1000}
+                    max={1500}
                     value={zoomSettings.maxZoomDurationMs}
                     onChange={handleMaxDurationChange}
                     onPointerDown={startInteraction}

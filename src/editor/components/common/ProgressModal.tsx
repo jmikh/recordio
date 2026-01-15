@@ -1,14 +1,20 @@
-import { useProjectStore } from '../../stores/useProjectStore';
-
-interface CaptionProgressModalProps {
+interface ProgressModalProps {
     isOpen: boolean;
+    title: string;
+    projectName: string;
     progress: number;
+    statusText: string;
     onCancel: () => void;
 }
 
-export const CaptionProgressModal = ({ isOpen, progress, onCancel }: CaptionProgressModalProps) => {
-    const projectName = useProjectStore(s => s.project.name);
-
+export const ProgressModal = ({
+    isOpen,
+    title,
+    projectName,
+    progress,
+    statusText,
+    onCancel
+}: ProgressModalProps) => {
     if (!isOpen) return null;
 
     return (
@@ -16,7 +22,7 @@ export const CaptionProgressModal = ({ isOpen, progress, onCancel }: CaptionProg
             <div className="bg-surface-elevated border border-border rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
 
                 <div className="flex items-center justify-between">
-                    <h2 className="text-text-main font-semibold text-lg">Generating Captions</h2>
+                    <h2 className="text-text-main font-semibold text-lg">{title}</h2>
                     <div className="spinner w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
 
@@ -34,9 +40,7 @@ export const CaptionProgressModal = ({ isOpen, progress, onCancel }: CaptionProg
 
                     <div className="flex items-center justify-between text-xs text-text-muted">
                         <span>{Math.round(progress * 100)}%</span>
-                        <span>
-                            Processing audio...
-                        </span>
+                        <span>{statusText}</span>
                     </div>
                 </div>
 

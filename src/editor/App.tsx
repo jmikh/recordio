@@ -9,7 +9,8 @@ import { useHistorySync } from './hooks/useHistorySync';
 
 import { ProjectStorage } from '../storage/projectStorage';
 import { ProjectSelector } from './components/ProjectSelector';
-import { ExportModal } from './components/export/ExportModal';
+import { ProgressModal } from './components/common/ProgressModal';
+import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/Header';
 
@@ -28,6 +29,11 @@ function Editor() {
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const showDebugBar = useUIStore(s => s.showDebugBar);
+
+    // Export state (must be at top level - Rules of Hooks)
+    const isExporting = useProjectStore(s => s.exportState.isExporting);
+    const exportProgress = useProjectStore(s => s.exportState.progress);
+    const timeRemainingSeconds = useProjectStore(s => s.exportState.timeRemainingSeconds);
 
 
     // Initialization State
@@ -154,7 +160,23 @@ function Editor() {
                 </div>
             )}
 
-            <ExportModal />
+            <ProgressModal
+                isOpen={isExporting}
+                title="Exporting Project"
+                projectName={project.name}
+                progress={exportProgress}
+                statusText={
+                    timeRemainingSeconds !== null
+                        ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
+                        : 'Estimating time...'
+                }
+                onCancel={() => {
+                    const manager = (window as any).__activeExportManager;
+                    if (manager) {
+                        manager.cancel();
+                    }
+                }}
+            />
 
             <div className="flex-1 flex overflow-hidden">
                 <SettingsPanel />

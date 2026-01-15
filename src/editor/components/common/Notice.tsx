@@ -19,7 +19,7 @@ export const Notice = ({ children, variant = 'info', className = '' }: NoticePro
 
     return (
         <div
-            className={`flex items-start gap-3 text-sm px-4 py-3 rounded-lg border ${variantStyles[variant]} ${className}`}
+            className={`font-normal flex items-start gap-3 text-sm px-4 py-3 rounded-lg border ${variantStyles[variant]} ${className}`}
         >
             {/* Exclamation Icon */}
             <div className="flex-shrink-0 mt-0.5">
