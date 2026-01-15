@@ -65,9 +65,9 @@ export const SettingsPanel = () => {
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
 
     return (
-        <div className="flex h-full border-r border-border bg-surface-elevated">
+        <div className="flex h-full border-r border-border bg-surface">
             {/* Sidebar Navigation */}
-            <div className="w-46 flex flex-col items-center py-6 px-4 gap-4 border-r border-border bg-surface">
+            <div className="w-46 flex flex-col items-center py-6 px-4 gap-4">
                 <SettingsButton
                     label="Projects"
                     icon={<IconProject />}
@@ -107,7 +107,7 @@ export const SettingsPanel = () => {
             </div>
 
             {/* Content Area */}
-            <div className="w-72 flex flex-row relative h-full">
+            <div className="w-72 flex flex-row relative h-full bg-surface-raised">
                 <div
                     ref={setScrollContainer}
                     className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar scrollbar-hide"

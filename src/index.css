@@ -1,184 +1,264 @@
 @import "tailwindcss";
 @import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
 
+/* ============================================================
+   OKLCH Design System
+   ============================================================ */
+
 @theme {
-  /* Surface / Backgrounds */
-  --color-background: var(--bg-app);
-  --color-surface: var(--bg-surface);
-  --color-surface-elevated: var(--bg-surface-elevated);
+   /* Typography */
+   --font-sans: 'Satoshi', sans-serif;
 
-  /* Typography */
-  --font-sans: 'Satoshi', sans-serif;
+   /* ─────────────────────────────────────────────────────────
+     Surfaces
+     ───────────────────────────────────────────────────────── */
+   --color-surface-body: var(--surface-body);
+   --color-surface: var(--surface-default);
+   --color-surface-raised: var(--surface-raised);
+   --color-surface-overlay: var(--surface-overlay);
 
-  /* Borders */
-  --color-border: var(--border-base);
-  --color-border-highlight: var(--border-highlight);
-  --color-border-primary: var(--border-primary);
+   /* ─────────────────────────────────────────────────────────
+     Hovers
+     ───────────────────────────────────────────────────────── */
+   --color-hover-subtle: var(--hover-subtle);
+   --color-hover: var(--hover);
+   --color-hover-bold: var(--hover-bold);
+   --color-hover-primary: var(--primary-muted);
 
-  /* Text */
-  --color-text-main: var(--text-main);
-  --color-text-muted: var(--text-muted);
-  --color-text-inverted: var(--text-inverted);
+   /* ─────────────────────────────────────────────────────────
+     Borders
+     ───────────────────────────────────────────────────────── */
+   --color-border: var(--border-default);
+   --color-border-hover: var(--border-hover);
+   --color-border-selected: var(--border-selected);
+   --color-border-primary: var(--border-primary);
 
-  /* Primary Action */
-  --color-primary: var(--primary);
-  --color-primary-fg: var(--primary-fg);
+   /* ─────────────────────────────────────────────────────────
+     Primary
+     ───────────────────────────────────────────────────────── */
+   --color-primary: var(--primary);
+   --color-primary-muted: var(--primary-muted);
+   --color-primary-highlighted: var(--primary-highlighted);
+   --color-primary-disabled: var(--primary-disabled);
+   --color-primary-fg: var(--text-on-primary);
 
-  --color-secondary: var(--secondary);
-  --color-secondary-fg: var(--secondary-fg);
+   /* ─────────────────────────────────────────────────────────
+     Secondary
+     ───────────────────────────────────────────────────────── */
+   --color-secondary: var(--secondary);
+   --color-secondary-muted: var(--secondary-muted);
+   --color-secondary-highlighted: var(--secondary-highlighted);
+   --color-secondary-disabled: var(--secondary-disabled);
+   --color-secondary-fg: var(--text-on-secondary);
 
-  --color-tertiary: var(--tertiary);
-  --color-tertiary-fg: var(--tertiary-fg);
+   /* ─────────────────────────────────────────────────────────
+     Semantic States
+     ───────────────────────────────────────────────────────── */
+   --color-destructive: var(--destructive);
+   --color-success: var(--success);
 
-  --color-quaternary: var(--quaternary);
-  --color-quaternary-fg: var(--quaternary-fg);
+   /* ─────────────────────────────────────────────────────────
+     Text
+     ───────────────────────────────────────────────────────── */
+   --color-text-main: var(--text-main);
+   --color-text-muted: var(--text-muted);
+   --color-text-disabled: var(--text-disabled);
+   --color-text-primary: var(--text-primary);
+   --color-text-on-primary: var(--text-on-primary);
 
-  --color-destructive: var(--destructive);
+   /* ─────────────────────────────────────────────────────────
+     Focus Ring
+     ───────────────────────────────────────────────────────── */
+   --color-ring: var(--ring-color);
 
-  --color-settings-primary: var(--settings-primary);
+   /* ─────────────────────────────────────────────────────────
+     Shadows
+     ───────────────────────────────────────────────────────── */
+   --shadow-inner-bold: inset 0 2px 4px oklch(0 0 0 / 30%);
+   --shadow-float: 0 4px 12px oklch(0 0 0 / 50%);
 
-  --color-zoomtrack-primary: var(--zoomtrack-primary);
-  --color-zoomtrack-secondary: var(--zoomtrack-secondary);
+   /* ─────────────────────────────────────────────────────────
+     Radius
+     ───────────────────────────────────────────────────────── */
+   --radius-sm: 4px;
+   --radius-md: 8px;
+   --radius-lg: 12px;
 
-  /* Shadows */
-  --shadow-inner-bold: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-float: 0 4px 12px rgba(0, 0, 0, 0.5);
-
-  /* Radius */
-  --radius-sm: 4px;
-  /* We can define raw values here or map to vars */
-  --radius-md: 8px;
-  --radius-lg: 12px;
-
-  /* Spacing */
-  --spacing-header: 48px;
-  --spacing-track: 40px;
+   /* ─────────────────────────────────────────────────────────
+     Spacing
+     ───────────────────────────────────────────────────────── */
+   --spacing-header: 48px;
+   --spacing-track: 40px;
 }
 
 :root {
-  /* --- 1. Raw Palette (Internal Use Only) --- */
-  /* Slate / Dark Scale */
-  --slate-950: #020617;
-  --slate-900: #0f172a;
-  --slate-800: #1e293b;
-  --slate-700: #334155;
-  --slate-600: #475569;
+   /* ============================================================
+     Layer 1: OKLCH Primitives
+     ============================================================ */
 
-  /* Violet / Indigo Accent */
-  --violet-600: #7c3aed;
-  --violet-500: #8b5cf6;
-  --violet-400: #a78bfa;
-  --brand-primary: #6166E6;
+   /* Hues */
+   --hue-primary: 265;
+   --hue-secondary: 135;
 
-  /* Semantic - Functional */
-  --emerald-500: #10b981;
-  --rose-500: #f43f5e;
-  --white: #ffffff;
-  --white-alpha-10: rgba(255, 255, 255, 0.1);
-  --white-alpha-20: rgba(255, 255, 255, 0.2);
-  --white-muted: rgba(255, 255, 255, 0.7);
+   /* ============================================================
+     Layer 2: Semantic Tokens
+     ============================================================ */
 
-  /* --- 2. Semantic Tokens (Values) --- */
-  --bg-app: rgb(19, 19, 19);
-  --bg-surface: rgb(26, 26, 26);
-  --bg-surface-elevated: rgb(36, 36, 36);
+   /* ─────────────────────────────────────────────────────────
+     1. Surfaces (Body → Surface → Raised → Overlay)
+     ───────────────────────────────────────────────────────── */
+   --surface-body: oklch(0.13 0 0);
+   --surface-default: oklch(0.17 0 0);
+   --surface-raised: oklch(0.22 0 0);
+   --surface-overlay: oklch(0.25 0 0);
 
-  --text-main: var(--white);
-  --text-muted: var(--white-muted);
-  --text-inverted: var(--slate-900);
+   /* ─────────────────────────────────────────────────────────
+     2. Hover Backgrounds
+     ───────────────────────────────────────────────────────── */
+   --hover-subtle: oklch(1 0 0 / 8%);
+   --hover: oklch(1 0 0 / 12%);
+   --hover-bold: oklch(1 0 0 / 18%);
 
-  --border-base: var(--white-alpha-10);
-  --border-highlight: var(--white-alpha-20);
-  --border-primary: var(--violet-500);
+   /* ─────────────────────────────────────────────────────────
+     3. Borders (White with transparency)
+     ───────────────────────────────────────────────────────── */
+   --border-default: oklch(1 0 0 / 8%);
+   --border-hover: oklch(1 0 0 / 15%);
+   --border-selected: oklch(1 0 0 / 25%);
+   --border-primary: var(--primary);
 
-  --primary: var(--brand-primary);
-  --primary-fg: var(--slate-950);
+   /* ─────────────────────────────────────────────────────────
+     4. Primary Color Variants
+     ───────────────────────────────────────────────────────── */
+   --primary: oklch(0.58 0.19 var(--hue-primary));
+   --primary-muted: oklch(0.45 0.12 var(--hue-primary));
+   --primary-highlighted: oklch(0.66 0.20 var(--hue-primary));
+   --primary-disabled: oklch(0.40 0.08 var(--hue-primary));
 
-  --secondary: #9FDB95;
-  --secondary-fg: var(--slate-950);
+   /* ─────────────────────────────────────────────────────────
+     5. Secondary Color Variants
+     ───────────────────────────────────────────────────────── */
+   --secondary: oklch(0.80 0.15 var(--hue-secondary));
+   --secondary-muted: oklch(0.65 0.10 var(--hue-secondary));
+   --secondary-highlighted: oklch(0.87 0.16 var(--hue-secondary));
+   --secondary-disabled: oklch(0.55 0.06 var(--hue-secondary));
 
-  --tertiary: rgb(224 224 108);
-  --tertiary-fg: var(--slate-950);
+   /* ─────────────────────────────────────────────────────────
+     6. Text Colors
+     ───────────────────────────────────────────────────────── */
+   --text-main: oklch(0.98 0 0);
+   --text-muted: oklch(0.98 0 0 / 60%);
+   --text-disabled: oklch(0.98 0 0 / 38%);
+   --text-primary: var(--primary);
+   --text-on-primary: oklch(0.15 0 0);
+   --text-on-secondary: oklch(0.15 0 0);
 
-  --quaternary: rgb(239, 174, 246);
-  --quaternary-fg: var(--slate-950);
+   /* ─────────────────────────────────────────────────────────
+     7. Focus Ring
+     ───────────────────────────────────────────────────────── */
+   --ring-color: oklch(0.65 0.22 var(--hue-primary));
+   --ring-width: 2px;
+   --ring-offset: 2px;
 
-  --destructive: var(--rose-500);
-  --success: var(--emerald-500);
-
-  --settings-primary: var(--primary);
-
-  --zoomtrack-primary: var(--secondary);
-  --zoomtrack-secondary: var(--tertiary);
+   /* ─────────────────────────────────────────────────────────
+     8. Semantic States
+     ───────────────────────────────────────────────────────── */
+   --destructive: oklch(0.65 0.25 25);
+   --success: oklch(0.70 0.18 155);
 }
 
 
 @layer base {
-  html {
-    font-family: var(--font-sans);
-    font-weight: 500;
-  }
+   html {
+      font-family: var(--font-sans);
+      font-weight: 500;
+   }
 }
 
-/* --- 3. Component Layer --- */
+/* ============================================================
+   Layer 4: Component Classes
+   ============================================================ */
 @layer components {
 
-  /* Standard Panel */
-  .panel-base {
-    @apply bg-surface border border-border rounded-md text-text-main;
-  }
+   /* Standard Panel */
+   .panel-base {
+      @apply bg-surface border border-border rounded-md text-text-main;
+   }
 
-  /* Interactive Item */
-  .item-interactive {
-    @apply hover:bg-surface-elevated transition-colors cursor-pointer;
-  }
+   /* Interactive Item */
+   .item-interactive {
+      @apply hover:bg-hover-subtle transition-colors cursor-pointer;
+   }
 
-  /* Primary Button */
-  .btn-primary {
-    @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium hover:opacity-90 transition-opacity;
-  }
+   /* Primary Button */
+   .btn-primary {
+      @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium transition-colors;
+   }
 
-  /* Hide Scrollbar */
-  .scrollbar-hide {
-    /* Firefox */
-    scrollbar-width: none;
-  }
+   .btn-primary:hover {
+      @apply bg-primary-highlighted;
+   }
 
-  .scrollbar-hide::-webkit-scrollbar {
-    /* Safari and Chrome */
-    display: none;
-    width: 0;
-    height: 0;
-    background: transparent;
-  }
+   .btn-primary:disabled {
+      @apply bg-primary-disabled text-text-disabled cursor-not-allowed;
+   }
 
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    /* IE and Edge */
-    scrollbar-width: none;
-    /* Firefox */
-  }
+   /* Focus Ring Utility */
+   .focus-ring:focus-visible {
+      outline: 2px solid transparent;
+      /* High contrast fallback */
+      outline-offset: var(--ring-offset);
+      box-shadow:
+         0 0 0 var(--ring-offset) var(--surface-body),
+         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
+   }
+
+   /* Active Ring Utility - always visible when applied */
+   .ring-active {
+      outline: 2px solid transparent;
+      outline-offset: var(--ring-offset);
+      box-shadow:
+         0 0 0 var(--ring-offset) var(--surface-body),
+         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
+   }
+
+   /* Hide Scrollbar */
+   .scrollbar-hide {
+      scrollbar-width: none;
+      /* Firefox */
+      -ms-overflow-style: none;
+      /* IE and Edge */
+   }
+
+   .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+      background: transparent;
+   }
 }
 
-/* Retaining legacy animations for now */
+/* ============================================================
+   Animations (Retained)
+   ============================================================ */
 @keyframes flashing-glow {
-  0% {
-    box-shadow: inset 0 0 5px color-mix(in srgb, var(--settings-primary) 50%, transparent);
-    border-color: color-mix(in srgb, var(--settings-primary) 80%, transparent);
-  }
+   0% {
+      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
+      border-color: oklch(from var(--primary) l c h / 80%);
+   }
 
-  50% {
-    box-shadow: inset 0 0 20px color-mix(in srgb, var(--settings-primary) 90%, transparent);
-    border-color: var(--settings-primary);
-  }
+   50% {
+      box-shadow: inset 0 0 20px oklch(from var(--primary) l c h / 90%);
+      border-color: var(--primary);
+   }
 
-  100% {
-    box-shadow: inset 0 0 5px color-mix(in srgb, var(--settings-primary) 50%, transparent);
-    border-color: color-mix(in srgb, var(--settings-primary) 80%, transparent);
-  }
+   100% {
+      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
+      border-color: oklch(from var(--primary) l c h / 80%);
+   }
 }
 
 .bounding-box-glow {
-  animation: flashing-glow 1.5s infinite ease-in-out;
-  border: 2px solid var(--settings-primary);
+   animation: flashing-glow 1.5s infinite ease-in-out;
+   border: 2px solid var(--primary);
 }

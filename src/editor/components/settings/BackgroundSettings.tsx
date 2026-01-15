@@ -222,7 +222,7 @@ export const BackgroundSettings = () => {
                     <div className="flex gap-4">
                         {/* 1. Color Card */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-xs text-gray-400">Color</span>
+                            <span className="text-xs text-text-muted">Color</span>
                             <div
                                 ref={colorButtonRef}
                                 onClick={() => {
@@ -240,9 +240,9 @@ export const BackgroundSettings = () => {
                                     }
                                     setShowColorPopover(!showColorPopover);
                                 }}
-                                className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${isColorMode || showColorPopover
-                                    ? 'border-settings-primary ring-2 ring-settings-primary/30'
-                                    : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'
+                                className={`cursor-pointer w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 ${isColorMode || showColorPopover
+                                    ? 'outline outline-2 outline-offset-2 outline-primary'
+                                    : 'border border-transparent ring-1 ring-border hover:ring-border-hover'
                                     }`}
                                 style={colorCardStyle}
                                 title="Color / Gradient"
@@ -256,19 +256,19 @@ export const BackgroundSettings = () => {
 
                         {/* 2. Upload Card */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-xs text-gray-400">Custom</span>
+                            <span className="text-xs text-text-muted">Custom</span>
                             <div
                                 onClick={handleCustomSelect}
-                                className={`cursor-pointer w-12 h-12 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all shadow-lg ${isCustom
-                                    ? 'border-settings-primary ring-2 ring-settings-primary/30'
-                                    : 'border-transparent bg-gray-700 ring-1 ring-white/10 hover:ring-white/30'
+                                className={`cursor-pointer w-12 h-12 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 ${isCustom
+                                    ? 'outline outline-2 outline-offset-2 outline-primary'
+                                    : 'border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-hover-subtle hover:bg-hover'
                                     }`}
                                 title="Upload Image"
                             >
                                 {customSource && (
                                     <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
                                 )}
-                                <div className={`flex items-center justify-center p-1.5 rounded-full ${customSource ? 'bg-black/40 text-white z-10' : 'bg-black/20 text-white'}`}>
+                                <div className={`flex items-center justify-center p-1.5 text-text-main rounded-full ${customSource ? 'bg-black/40  z-10' : 'bg-transparent'}`}>
                                     <CiImageOn size={20} />
                                 </div>
                                 <input
@@ -284,16 +284,16 @@ export const BackgroundSettings = () => {
 
                     {/* Row 2: Presets */}
                     <div className="flex flex-col gap-2">
-                        <span className="text-xs text-gray-400">Presets</span>
+                        <span className="text-xs text-text-muted">Presets</span>
                         <div className="flex flex-wrap gap-4">
                             {BACKGROUND_IMAGES.map(img => {
                                 const isActive = isPreset && backgroundImageUrl === img.url;
                                 return (
                                     <div
                                         key={img.url}
-                                        className={`cursor-pointer w-12 h-12 rounded-full border-2 overflow-hidden relative shadow-lg transition-all ${isActive
-                                            ? 'border-settings-primary ring-2 ring-settings-primary/30'
-                                            : 'border-transparent ring-1 ring-white/10 hover:ring-white/30'}`}
+                                        className={`cursor-pointer w-12 h-12 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
+                                            ? 'outline outline-2 outline-offset-2 outline-primary'
+                                            : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
                                         onClick={() => handlePresetSelect(img.url)}
                                         title={img.name}
                                     >
@@ -307,7 +307,7 @@ export const BackgroundSettings = () => {
             </div>
 
             {/* Effects */}
-            <div className="flex flex-col gap-4 pt-4 border-t border-gray-700">
+            <div className="flex flex-col gap-4 pt-4 border-t border-border">
                 {/* Blur */}
                 {backgroundType === 'image' && (
                     <Slider

@@ -233,7 +233,7 @@ export function CaptionsSettings() {
                     <label className="text-xs font-medium text-text-muted">Visible</label>
                     <button
                         onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-settings-primary' : 'bg-surface-elevated'
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
                             }`}
                     >
                         <span
@@ -262,14 +262,14 @@ export function CaptionsSettings() {
                         {!captions ? (
                             <button
                                 onClick={handleGenerate}
-                                className="w-full px-4 py-2 bg-settings-primary text-primary-fg rounded-lg hover:bg-settings-primary/90 transition-colors text-sm font-medium"
+                                className="w-full px-4 py-2  text-primary-fg rounded-lg transition-colors text-sm font-medium"
                             >
                                 Generate Captions
                             </button>
                         ) : (
                             <button
                                 onClick={handleGenerate}
-                                className="w-full px-3 py-1.5 bg-surface-elevated text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
+                                className="w-full px-3 py-1.5 text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
                             >
                                 Regenerate Captions
                             </button>
@@ -285,9 +285,9 @@ export function CaptionsSettings() {
                             <span>Transcribing audio...</span>
                             <span>{Math.round(transcriptionProgress * 100)}%</span>
                         </div>
-                        <div className="w-full h-2 bg-surface-elevated rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-settings-primary transition-all duration-300"
+                                className="h-full bg-primary transition-all duration-300"
                                 style={{ width: `${transcriptionProgress * 100}%` }}
                             />
                         </div>
@@ -305,8 +305,8 @@ export function CaptionsSettings() {
 
             {
                 captions && captions.segments.length > 0 && (
-                    <div className="space-y-2">
-                        <div className="space-y-2">
+                    <div className="space-y-5">
+                        <div className="space-y-5">
                             {(() => {
                                 return captions.segments.map(segment => {
                                     const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
@@ -316,33 +316,33 @@ export function CaptionsSettings() {
                                     const isEditing = editingId === segment.id;
 
                                     return (
-                                        <div key={segment.id} className={`relative inline-block bg-surface text-white px-3 py-2 rounded font-medium text-xs w-full border transition-colors ${isEditing ? 'border-settings-primary' : 'border-transparent'}`}>
-                                            {/* Delete button - top right of entire div */}
-                                            <button
-                                                onClick={() => handleDelete(segment.id)}
-                                                className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-white/60 hover:text-red-400 transition-colors rounded z-10"
-                                                title="Delete caption"
-                                            >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-
-                                            {/* Timestamps - Row Layout */}
-                                            <div className="mb-1 flex items-center justify-center gap-1 text-white font-mono text-[10px]">
-                                                <div className="bg-surface-elevated px-1.5 py-1 rounded">
+                                        <div
+                                            key={segment.id}
+                                            className={`group relative inline-block px-3 pt-4 pb-2 rounded bg-surface-overlay font-medium text-xs w-full border transition-colors ${isEditing ? 'ring-active border-border' : 'border-border hover:border-border-hover hover:bg-hover-subtle'}`}
+                                        >
+                                            {/* Floating capsule - time + delete */}
+                                            <div className="absolute left-1/2 -translate-x-1/2 -top-3 flex items-center gap-1.5 bg-surface-raised border border-border rounded-full px-2 py-0.5 z-10">
+                                                <span className="text-text-muted font-mono text-[10px]">
                                                     {formatTime(outputStart)}
-                                                </div>
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+                                                </span>
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
                                                     <line x1="5" y1="12" x2="19" y2="12" />
                                                     <polyline points="12 5 19 12 12 19" />
                                                 </svg>
-                                                <div className="bg-surface-elevated px-1.5 py-1 rounded">
+                                                <span className="text-text-muted font-mono text-[10px]">
                                                     {formatTime(outputEnd)}
-                                                </div>
+                                                </span>
+                                                <button
+                                                    onClick={() => handleDelete(segment.id)}
+                                                    className="w-4 h-4 flex items-center justify-center text-text-muted hover:text-destructive transition-colors rounded"
+                                                    title="Delete caption"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
                                             </div>
 
-                                            {/* Caption text - wraps around timestamps */}
                                             <div
                                                 ref={isEditing ? inputRef : null}
                                                 contentEditable={isEditing}
@@ -350,7 +350,7 @@ export function CaptionsSettings() {
                                                 onInput={(e) => handleInput(e, segment.id)}
                                                 onKeyDown={handleKeyDown}
                                                 onBlur={handleBlur}
-                                                className="cursor-text"
+                                                className={`cursor-text transition-colors ${isEditing ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'}`}
                                                 style={{
                                                     lineHeight: 1.4,
                                                     textShadow: '0 1px 2px rgba(0,0,0,0.8)',

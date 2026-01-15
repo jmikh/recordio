@@ -18,7 +18,7 @@ interface SliderProps {
 // Configurable Height Constant
 const SLIDER_HEIGHT = 20; // Container height for touch target
 const TRACK_HEIGHT = 4; // Visual track height
-const THUMB_SIZE = 16; // Thumb diameter
+const THUMB_SIZE = 12; // Thumb diameter
 const THUMB_RADIUS = THUMB_SIZE / 2;
 const PADDING = 2; // Keep some padding for touch target calculation safety
 
@@ -131,7 +131,7 @@ export const Slider: React.FC<SliderProps> = ({
             >
                 {/* Visual Track - Full Width Background (Inactive part) */}
                 <div
-                    className="absolute left-0 right-0 rounded-full bg-black"
+                    className="absolute left-0 right-0 rounded-full bg-text-disabled"
                     style={{
                         height: `${TRACK_HEIGHT}px`,
                         left: `${PADDING}px`,
@@ -140,7 +140,7 @@ export const Slider: React.FC<SliderProps> = ({
                 >
                     {/* Active Track (Left side) */}
                     <div
-                        className="absolute top-0 left-0 bottom-0 bg-settings-primary rounded-full"
+                        className="absolute top-0 left-0 bottom-0 bg-text-main rounded-full"
                         style={{
                             width: `calc(${fraction} * 100%)`
                         }}
@@ -149,14 +149,28 @@ export const Slider: React.FC<SliderProps> = ({
 
                 {/* Marker / Thumb */}
                 <div
-                    className="absolute bg-white border-3 border-settings-primary rounded-full pointer-events-none transition-transform active:scale-95 z-10 shadow-sm"
+                    className="absolute rounded-full pointer-events-none z-10 flex items-center justify-center"
                     style={{
-                        height: `${THUMB_SIZE}px`,
-                        width: `${THUMB_SIZE}px`,
+                        height: `${THUMB_SIZE + 12}px`,
+                        width: `${THUMB_SIZE + 12}px`,
                         left: thumbLeft,
                         transform: `translate(-50%, 0)`
                     }}
-                />
+                >
+                    {/* Hover Halo */}
+                    <div
+                        className={`absolute inset-0 rounded-full bg-hover-subtle transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            }`}
+                    />
+                    {/* Thumb */}
+                    <div
+                        className="bg-white rounded-full shadow-sm transition-transform"
+                        style={{
+                            height: `${THUMB_SIZE}px`,
+                            width: `${THUMB_SIZE}px`,
+                        }}
+                    />
+                </div>
 
                 {/* Tooltip */}
                 {showTooltip && isDragging && (

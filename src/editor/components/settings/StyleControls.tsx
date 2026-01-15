@@ -57,10 +57,10 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         if (!showColorPopover) {
             if (colorButtonRef.current) {
                 const rect = colorButtonRef.current.getBoundingClientRect();
-                // Position to the left of the button by default (since panel is on right)
+                // Position to the right of the button
                 setPopoverPos({
                     top: rect.top,
-                    left: rect.left - 220
+                    left: rect.right + 8 // 8px spacing from button
                 });
             }
             onColorPopoverOpen?.();
@@ -79,7 +79,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 <div
                     ref={colorButtonRef as any}
                     onClick={toggleColorPopover}
-                    className="flex items-center gap-3 p-2 bg-surface border border-border rounded-lg cursor-pointer hover:border-gray-500 transition-colors group"
+                    className="flex items-center gap-3 p-2 bg-transparent border border-border rounded-lg cursor-pointer hover:border-gray-500 transition-colors group"
                     title="Border & Dynamic Effect Color"
                 >
                     <div
@@ -95,7 +95,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 {showColorPopover && createPortal(
                     <div
                         ref={popoverRef}
-                        className="fixed z-[9999] p-4 bg-surface-elevated rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-[9999] p-4 bg-surface-overlay rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
                         style={{
                             top: popoverPos.top,
                             left: popoverPos.left,
@@ -103,7 +103,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                         }}
                     >
                         <div className="space-y-3">
-                            <div className="text-[10px] text-text-muted uppercase font-semibold">Effect Color</div>
+                            <div className="text-[10px] text-text-muted uppercase font-semibold"></div>
                             <HexColorPicker
                                 color={borderColor}
                                 onChange={(c) => onChange({ borderColor: c })}

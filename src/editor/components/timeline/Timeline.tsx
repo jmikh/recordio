@@ -19,7 +19,7 @@ import { useUIStore } from '../../stores/useUIStore';
 // Constants
 const TRACK_HEIGHT = 40;
 const EVENTS_TRACK_HEIGHT = 20;
-const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.6;
+const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.9;
 const HEADER_WIDTH = 200;
 
 export function Timeline() {
@@ -28,6 +28,14 @@ export function Timeline() {
     const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
     const overlayEndRef = useRef<HTMLDivElement>(null);
+
+    const setTimelineContainerRef = useUIStore(s => s.setTimelineContainerRef);
+
+    // Register container ref with UIStore for auto-scroll on setCurrentTime
+    useEffect(() => {
+        setTimelineContainerRef(containerRef);
+        return () => setTimelineContainerRef(null);
+    }, [setTimelineContainerRef]);
 
     const setContainerRef = (node: HTMLDivElement | null) => {
         containerRef.current = node;

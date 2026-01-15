@@ -10,8 +10,12 @@ export interface ViewportMotionSlice {
     clearViewportMotions: () => void;
 }
 
-// Helper to capture snapshot
-const getSnapshot = () => useUIStore.getState();
+// Helper to capture snapshot (excluding DOM refs to avoid circular references)
+const getSnapshot = () => {
+    const state = useUIStore.getState();
+    const { timelineContainerRef, ...serializableState } = state;
+    return serializableState;
+};
 
 export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ViewportMotionSlice> = (set, _get, store) => ({
     updateViewportMotion: (id, updates) => {

@@ -36,10 +36,10 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
             style={transitionStyle}
             // Match SettingsButton container classes
             className={`
-                group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold
+                group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold border border-border
                 ${isActive
-                    ? 'bg-settings-primary border border-settings-primary'
-                    : 'bg-background text-text-muted border not-hover:border-settings-primary/30 hover:border-settings-primary'
+                    ? 'bg-primary/20 border border-primary'
+                    : 'bg-background text-text-muted hover:bg-hover-subtle hover:border-border-hover'
                 }
                 ${className}
             `}
@@ -48,10 +48,10 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
             <motion.div
                 style={transitionStyle as any} // Cast to any to avoid type conflict with motion style
                 className={`
-                    absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all
+                    absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all bg-primary
                     ${isActive
-                        ? 'left-[calc(100%-2.75rem)] bg-background text-text-main border-background' // Moves to RIGHT
-                        : 'left-1 bg-settings-primary text-primary-fg shadow-inner-bold border border-settings-primary' // Stays on LEFT
+                        ? 'left-[calc(100%-2.75rem)] text-text-main' // Moves to RIGHT
+                        : 'left-1 text-text-muted' // Stays on LEFT
                     }
                 `}
                 animate={isActive ? {
@@ -65,7 +65,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 } : {}}
             >
                 {/* Icon Content */}
-                <div className={`flex items-center justify-center ${isActive ? 'text-settings-primary' : ''}`}>
+                <div className={`flex items-center justify-center text-text-main`}>
                     {isActive ? (
                         <FaChevronRight className="w-4 h-4" />
                     ) : (
@@ -91,7 +91,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                     className={`
                     tracking-wide whitespace-nowrap transition-colors
                     ${isActive
-                            ? 'text-primary-fg'
+                            ? 'text-text-main'
                             : 'text-text-muted group-hover:text-text-main'
                         }
                 `}>

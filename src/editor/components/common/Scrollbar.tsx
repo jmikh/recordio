@@ -140,7 +140,7 @@ export const Scrollbar: React.FC<ScrollbarProps> = ({ container, className, depe
 
     return (
         <div
-            className={`${isHorizontal ? 'h-3 w-full flex-row border-b' : 'w-3 h-full flex-col border-l'} bg-surface border-border relative flex items-center shrink-0 ${className || ''}`}
+            className={`${isHorizontal ? 'h-3 w-full flex-row border-b' : 'w-3 h-full flex-col border-l'} border-border relative flex items-center shrink-0 ${className || ''}`}
             ref={trackRef}
             style={{
                 visibility: isVisible ? 'visible' : 'hidden',
@@ -150,7 +150,7 @@ export const Scrollbar: React.FC<ScrollbarProps> = ({ container, className, depe
         >
             <div
                 ref={thumbRef}
-                className={`${isHorizontal ? 'h-1.5' : 'w-1.5'} rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-surface-elevated hover:bg-primary/50'}`}
+                className={`${isHorizontal ? 'h-1.5' : 'w-1.5'} rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-hover-subtle hover:bg-primary-muted'}`}
                 style={{
                     ...(isHorizontal ? {
                         width: thumbWidth,

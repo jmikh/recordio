@@ -34,7 +34,8 @@ export interface UIState {
     setSettingsPanel: (panel: SettingsPanel) => void;
 
     // Timeline State
-    // Timeline State
+    timelineContainerRef: React.RefObject<HTMLDivElement | null> | null;
+    setTimelineContainerRef: (ref: React.RefObject<HTMLDivElement | null> | null) => void;
     pixelsPerSec: number;
     setPixelsPerSec: (pps: number) => void;
 
@@ -57,7 +58,7 @@ export interface UIState {
     reset: () => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
     // Initial State
     canvasMode: CanvasMode.Preview,
     selectedZoomId: null,
@@ -99,7 +100,8 @@ export const useUIStore = create<UIState>((set) => ({
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
 
     // Timeline State
-    // Timeline State
+    timelineContainerRef: null,
+    setTimelineContainerRef: (timelineContainerRef) => set({ timelineContainerRef }),
     pixelsPerSec: 100, // Default zoom level
 
     // Playback State
@@ -116,7 +118,24 @@ export const useUIStore = create<UIState>((set) => ({
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
     setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null }),
-    setCurrentTime: (currentTimeMs) => set({ currentTimeMs }),
+    setCurrentTime: (currentTimeMs) => {
+        const state = get();
+        const container = state.timelineContainerRef?.current;
+
+        // Auto-scroll timeline if CTI is outside visible viewport (page-flip logic)
+        if (container && !state.isPlaying) {
+            const px = (currentTimeMs / 1000) * state.pixelsPerSec;
+            const scrollLeft = container.scrollLeft;
+            const clientWidth = container.clientWidth;
+
+            if (px > scrollLeft + clientWidth || px < scrollLeft) {
+                // Center the CTI in the viewport
+                container.scrollTo({ left: px - clientWidth / 2, behavior: 'auto' });
+            }
+        }
+
+        set({ currentTimeMs });
+    },
     setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 
     reset: () => set({
@@ -124,6 +143,7 @@ export const useUIStore = create<UIState>((set) => ({
         selectedZoomId: null,
         selectedWindowId: null,
         selectedSettingsPanel: SettingsPanel.Project,
+        timelineContainerRef: null,
         pixelsPerSec: 100,
         isPlaying: false,
         currentTimeMs: 0,

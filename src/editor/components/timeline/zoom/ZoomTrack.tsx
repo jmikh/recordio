@@ -62,16 +62,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const stripePx = Math.max(4, pixelsPerSec * timePerStripe);
     const halfStripe = stripePx / 2;
 
-    // Shared arrow pattern style
-    const arrowPatternStyle: React.CSSProperties = {
+    // Shared arrow pattern style generator
+    const getArrowPatternStyle = (primaryColor: string, secondaryColor: string): React.CSSProperties => ({
         backgroundImage: `
-            repeating-linear-gradient(45deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.5) ${halfStripe}px, rgba(0,0,0,0.5) ${stripePx}px),
-            repeating-linear-gradient(135deg, transparent, transparent ${halfStripe}px, rgba(0,0,0,0.5) ${halfStripe}px, rgba(0,0,0,0.5) ${stripePx}px)
+            repeating-linear-gradient(45deg, ${primaryColor}, ${primaryColor} ${halfStripe}px, ${secondaryColor} ${halfStripe}px, ${secondaryColor} ${stripePx}px),
+            repeating-linear-gradient(135deg, ${primaryColor}, ${primaryColor} ${halfStripe}px, ${secondaryColor} ${halfStripe}px, ${secondaryColor} ${stripePx}px)
         `,
         backgroundSize: '100% 50%',
         backgroundPosition: 'top left, bottom left',
         backgroundRepeat: 'no-repeat'
-    };
+    });
 
     // ------------------------------------------------------------------
     // RENDER
@@ -124,7 +124,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-t border-b border-r rounded-r-xl border-zoomtrack-primary ${isSelected ? 'bg-zoomtrack-primary/50' : 'bg-zoomtrack-primary/30'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-t border-b border-r border-primary ${isSelected ? 'bg-primary-muted' : 'bg-primary-disabled'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -139,14 +139,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             <React.Fragment key={m.id}>
                                 <div
                                     className={`absolute top-[4px] bottom-[4px] group  transition-colors border
-                                        ${isSelected ? 'bg-zoomtrack-primary border-zoomtrack-secondary' : 'bg-zoomtrack-primary/80 not-hover:border-zoomtrack-primary/50 hover:border-zoomtrack-secondary/50 hover:bg-zoomtrack-primary'}
+                                        ${isSelected ? 'border-secondary border-2' : 'not-hover:border-primary hover:border-secondary-muted border-2'}
                                         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
                                     `}
                                     style={{
                                         left: `${left}px`,
                                         width: `${Math.max(width, 2)}px`,
                                         zIndex: isSelected ? 20 : 10,
-                                        ...arrowPatternStyle
+                                        ...getArrowPatternStyle('var(--primary)', 'var(--primary-disabled)')
                                     }}
                                     onMouseDown={(e) => handleDragStart(e, 'move', m)}
                                     onClick={(e) => {
@@ -158,7 +158,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                                     {/* Right Edge (Keyframe) - Thicker, Opaque */}
                                     <div
-                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-zoomtrack-secondary' : 'bg-primary-fg/50'} shadow-sm`}
+                                        className={`absolute right-0 top-0 bottom-0 w-1.5 ${isSelected ? 'bg-secondary' : 'not-hover:bg-primary hover:bg-secondary-muted'} shadow-sm`}
                                     />
 
                                 </div>
@@ -171,23 +171,23 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 {/* Add Zoom Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-0 border border-zoomtrack-secondary bg-zoomtrack-secondary/80 rounded-sm flex items-center justify-center"
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary rounded-sm flex items-center justify-center"
                         style={{
                             // Use calculated width (pixel based on time)
                             // Position: right aligned to mouse X (hoverInfo.x).
                             // Left = Right - Width
                             left: `${hoverInfo.x - hoverInfo.width}px`,
                             width: `${hoverInfo.width}px`,
-                            ...arrowPatternStyle
+                            ...getArrowPatternStyle('var(--secondary)', 'var(--secondary-disabled)')
                         }}
                     >
                         {/* Add Zoom Label (Above) */}
-                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-zoomtrack-secondary pointer-events-none bg-surface-elevated/80 px-1 rounded">
+                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-secondary pointer-events-none bg-surface-elevated/80 px-1 rounded">
                             Add Zoom
                         </div>
 
                         {/* Right Handle */}
-                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-zoomtrack-secondary/50" />
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-secondary/50" />
                     </div>
                 )}
             </div>

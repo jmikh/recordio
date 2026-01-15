@@ -27,18 +27,10 @@ export const ProjectCard = ({
                 group relative flex flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
-                    ? 'shadow-[0_0_15px_rgba(var(--primary),0.15)] scale-[1.02]'
-                    : 'bg-surface-elevated border-border hover:border-text-muted/50 hover:scale-[1.01] hover:shadow-lg'
+                    ? 'border-border-primary bg-primary/10 scale-[1.02]'
+                    : 'border-border bg-surface-overlay hover:border-border-hover hover:bg-hover-subtle hover:scale-[1.01] hover:shadow-lg'
                 }
             `}
-            style={isActive ? {
-                borderColor: 'var(--card-active-primary, var(--primary))',
-                backgroundColor: 'color-mix(in srgb, var(--card-active-primary, var(--primary)), transparent 90%)',
-                // Note: shadow color from tailwind class uses opacity, tricky to override with variable without color-mix or calc. 
-                // We'll leave the shadow using primary for now or use color-mix if needed.
-                // Actually, let's override shadow too if we can.
-                boxShadow: '0 0 15px color-mix(in srgb, var(--card-active-primary, var(--primary)), transparent 85%)'
-            } : undefined}
         >
             {/* Delete Confirmation Overlay */}
             {isDeleting && (
@@ -81,7 +73,7 @@ export const ProjectCard = ({
                 )}
 
                 {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded">
+                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-main text-[10px] px-1.5 py-0.5 rounded">
                     {(() => {
                         const windows = project.timeline?.outputWindows || [];
                         const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
@@ -104,12 +96,11 @@ export const ProjectCard = ({
                 <div className="flex flex-col">
                     <div className="flex justify-between items-start">
                         <h3
-                            className={`font-semibold truncate pr-2 ${!isActive ? 'text-text-main' : ''} ${isGrid ? 'text-base' : 'text-sm'}`}
-                            style={isActive ? { color: 'var(--card-active-primary, var(--primary))' } : undefined}
+                            className={`font-semibold truncate pr-2 text-text-main ${isGrid ? 'text-base' : 'text-sm'}`}
                         >
                             {project.name}
                         </h3>
-                        {isActive && <span className="flex h-2 w-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: 'var(--card-active-dot, var(--tertiary))', boxShadow: '0 0 5px var(--card-active-dot, var(--tertiary))' }}></span>}
+                        {isActive && <span className="flex h-2 w-2 rounded-full flex-shrink-0 mt-1.5 bg-primary shadow-[0_0_5px_var(--primary)]"></span>}
                     </div>
                     <div className="flex items-center text-xs text-text-muted space-x-2 mt-1">
                         <span>{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>

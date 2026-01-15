@@ -17,7 +17,6 @@ Recording
 
 core
 ====
-- support window speed
 - GIF export
 - Confirm Peremissions dialog is working well and deal if user reject it
 - video size export options

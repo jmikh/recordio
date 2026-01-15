@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import { MultiToggle } from '../common/MultiToggle';
 
 
 const GRADIENT_DIRECTIONS = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'] as const;
@@ -66,22 +67,16 @@ export const ColorSettings = ({
     };
 
     return (
-        <div className="p-4 bg-surface-elevated rounded-lg border border-border space-y-4 text-text-main shadow-xl">
+        <div className="p-4 bg-surface-overlay rounded-lg border border-border space-y-4 text-text-main shadow-xl">
             {/* Toggle */}
-            <div className="flex bg-surface p-1 rounded-lg">
-                <button
-                    className={`flex-1 py-1.5 text-xs rounded transition-colors ${isSolid ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
-                    onClick={() => onTypeChange('solid')}
-                >
-                    Solid
-                </button>
-                <button
-                    className={`flex-1 py-1.5 text-xs rounded transition-colors ${isGradient ? 'bg-surface-elevated text-text-main shadow' : 'text-text-muted hover:text-text-main'}`}
-                    onClick={() => onTypeChange('gradient')}
-                >
-                    Gradient
-                </button>
-            </div>
+            <MultiToggle
+                options={[
+                    { value: 'solid', label: 'Solid' },
+                    { value: 'gradient', label: 'Gradient' }
+                ]}
+                value={isSolid ? 'solid' : 'gradient'}
+                onChange={onTypeChange}
+            />
 
             {/* Gradient Selector (Only if Gradient) */}
             {isGradient && (
@@ -93,10 +88,12 @@ export const ColorSettings = ({
                             className={`cursor-pointer flex flex-col items-center gap-2`}
                         >
                             <div
-                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === i ? 'border-blue-500 ring-2 ring-blue-500/30 scale-110' : 'border-gray-600 hover:border-gray-400'}`}
+                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === i
+                                    ? 'border-ring ring-2 ring-ring/30 scale-110'
+                                    : 'border-border hover:border-border-hover'}`}
                                 style={{ backgroundColor: c }}
                             />
-                            <span className={`text-[10px] uppercase font-bold transition-colors ${activeGradientIndex === i ? 'text-blue-400' : 'text-gray-500'}`}>
+                            <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === i ? 'text-text-primary' : 'text-text-muted'}`}>
                                 {i === 0 ? 'Start' : 'End'}
                             </span>
                         </div>
@@ -106,13 +103,13 @@ export const ColorSettings = ({
 
             {/* Color Palette */}
             <div className="space-y-2">
-                <div className="text-[10px] text-gray-500 uppercase font-semibold">Palette</div>
+                <div className="text-[10px] text-text-muted font-semibold">Palette</div>
                 <div className="grid grid-cols-7 gap-1.5">
                     {PRESET_COLORS.map(c => (
                         <button
                             key={c}
                             onClick={() => handleColorUpdate(c)}
-                            className="w-6 h-6 rounded-full border border-gray-600/30 hover:border-white focus:outline-none focus:ring-1 focus:ring-white/50 transition-transform hover:scale-110"
+                            className="w-6 h-6 rounded-full border border-border hover:border-border-selected focus:outline-none focus:ring-1 focus:ring-ring/50 transition-transform hover:scale-110"
                             style={{ backgroundColor: c }}
                             title={c}
                         />
@@ -131,14 +128,14 @@ export const ColorSettings = ({
 
             {/* Hex Input */}
             <div className="space-y-1">
-                <div className="text-[10px] text-text-muted uppercase font-semibold">Hex Color</div>
+                <div className="text-[10px] text-text-muted font-semibold">Hex Color</div>
                 <div className="flex bg-surface border border-border rounded px-2 py-1.5 items-center gap-2">
                     <span className="text-text-muted mr-2 select-none">#</span>
                     <input
                         type="text"
                         value={activeColorValue.replace('#', '')}
                         onChange={(e) => handleColorUpdate(`#${e.target.value}`)}
-                        className="bg-transparent border-none outline-none text-xs font-mono text-text-main w-full uppercase"
+                        className="bg-transparent border-none outline-none text-xs font-mono text-text-main w-full"
                         maxLength={6}
                     />
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
@@ -149,7 +146,7 @@ export const ColorSettings = ({
             {isGradient && (
                 <div className="border-t border-border pt-4 mt-2">
                     <div className="flex flex-col gap-2 items-center">
-                        <label className="text-[10px] text-text-muted uppercase font-semibold">Direction</label>
+                        <label className="text-[10px] text-text-muted font-semibold">Direction</label>
                         <div className="relative w-32 h-32 flex items-center justify-center bg-surface rounded-full border border-border shadow-inner mt-2">
                             {/* Center Dot */}
                             <div className="absolute w-2 h-2 bg-text-muted rounded-full z-10" />
