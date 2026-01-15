@@ -14,8 +14,8 @@ export const PrimaryButton = forwardRef<HTMLButtonElement, PrimaryButtonProps>(
                border border-border
                bg-primary hover:bg-primary-highlighted
                text-text-on-primary
-               rounded-lg
-               px-4 py-2
+               rounded-sm
+               px-2 py-1
                font-medium
                transition-colors
                cursor-pointer

@@ -402,6 +402,7 @@ export class VideoRecorder {
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
             hasAudio: true,
+            has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0), // Mic baked into screen if no camera
             createdAt: now,
             name: this.config.sourceName || this.mode
         };
@@ -423,6 +424,7 @@ export class VideoRecorder {
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 hasAudio: false, // Audio is in screen or mixed separate, but cam stream usually just video if separate
+                has_microphone: Boolean(this.config.hasAudio), // Mic is on camera track in dual mode
                 createdAt: now,
                 name: 'Camera'
             };

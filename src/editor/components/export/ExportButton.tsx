@@ -3,6 +3,7 @@ import type { ExportQuality } from '../../export/ExportManager';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { Dropdown } from '../common/Dropdown';
 import type { DropdownOption } from '../common/Dropdown';
+import { PrimaryButton } from '../common/PrimaryButton';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
     { value: '360p', label: '360p' },
@@ -78,15 +79,15 @@ export const ExportButton = () => {
             value={null as any} // No default selection - this is an action dropdown, not a state selector
             onChange={handleExport}
             trigger={
-                <button
-                    className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-fg text-xs rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                <PrimaryButton
+                    className="px-3 py-1.5 text-xs flex items-center gap-2"
                     disabled={isExporting}
                 >
                     <span>Export</span>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6 9l6 6 6-6" />
                     </svg>
-                </button>
+                </PrimaryButton>
             }
             direction="down"
         />

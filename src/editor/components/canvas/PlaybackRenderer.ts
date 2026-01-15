@@ -76,8 +76,13 @@ export class PlaybackRenderer {
                 resources.deviceFrameImg
             );
 
-            paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
-            drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
+            // Conditionally render effects based on settings
+            if (project.settings.effects?.showMouseClicks) {
+                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+            }
+            if (project.settings.effects?.showMouseDrags) {
+                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
+            }
         }
 
 
@@ -99,12 +104,14 @@ export class PlaybackRenderer {
         }
 
         // Render Keyboard Overlay
-        drawKeyboardOverlay(
-            ctx,
-            userEvents.keyboardEvents,
-            sourceTimeMs,
-            outputSize
-        );
+        if (project.settings.effects?.showKeyboardClicks) {
+            drawKeyboardOverlay(
+                ctx,
+                userEvents.keyboardEvents,
+                sourceTimeMs,
+                outputSize
+            );
+        }
 
         // Render Captions
         if (project.settings.captions.visible) {

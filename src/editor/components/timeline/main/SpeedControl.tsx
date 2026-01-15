@@ -48,7 +48,7 @@ export const SpeedControl: React.FC<SpeedControlProps> = ({
     return createPortal(
         <div
             ref={popoverRef}
-            className="fixed z-[9999] bg-surface-overlay border border-border rounded shadow-xl py-1 flex flex-col min-w-[120px]"
+            className="fixed z-[9999] bg-surface-overlay border border-border rounded shadow-xl p-1 flex flex-col min-w-[120px]"
             style={{
                 bottom: `${window.innerHeight - rect.top + 8}px`,
                 left: `${rect.left}px`,
@@ -61,9 +61,9 @@ export const SpeedControl: React.FC<SpeedControlProps> = ({
                     <button
                         key={presetSpeed}
                         onClick={() => handleSpeedSelect(presetSpeed)}
-                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors flex items-center justify-between ${isSelected
-                                ? 'bg-primary/20 text-primary'
-                                : 'text-text-muted hover:bg-hover hover:text-text-main'
+                        className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center justify-between rounded-sm ${isSelected
+                            ? 'bg-primary/20 text-primary'
+                            : 'text-text-muted hover:bg-hover hover:text-text-main'
                             }`}
                     >
                         <span>{presetSpeed}x</span>

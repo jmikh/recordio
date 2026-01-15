@@ -36,10 +36,10 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
             style={transitionStyle}
             // Match SettingsButton container classes
             className={`
-                group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs shadow-inner-bold border border-border
+                group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs border border-border
                 ${isActive
                     ? 'bg-primary/20 border border-primary'
-                    : 'bg-background text-text-muted hover:bg-hover-subtle hover:border-border-hover'
+                    : 'not-hover:bg-hover-subtle hover:bg-hover text-text-muted hx border-transparent'
                 }
                 ${className}
             `}

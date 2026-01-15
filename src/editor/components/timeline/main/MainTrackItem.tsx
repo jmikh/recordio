@@ -100,7 +100,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
             }}
         >
             {/* Visual Window Content (Clipped) */}
-            <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-primary border-2' : 'border-border-highlight hover:border-border-primary'}`}>
+            <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-secondary' : 'border-primary-muted hover:border-border-primary'}`}>
                 {/* Group Header */}
                 <div
                     style={{ height: GROUP_HEADER_HEIGHT }}
@@ -133,10 +133,10 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                 {/* Tracks Area */}
                 <div className="relative flex-1 w-full">
                     {/* Unified Segment */}
-                    <div className={`absolute left-0 right-0 top-0 bottom-0 border border-primary shadow-inner-bold overflow-hidden hover:brightness-110 active:brightness-125 transition-all cursor-pointer box-border flex items-center justify-center`}>
+                    <div className={`absolute left-0 right-0 top-0 bottom-0 overflow-hidden transition-all cursor-pointer box-border flex items-center justify-center`}>
 
-                        {/* Background fill based on content? Or just keep generic primary? Using primary as base. */}
-                        <div className="absolute inset-0 bg-primary" />
+                        {/* Background fill - highlighted when selected or hovering */}
+                        <div className={`absolute inset-0 transition-colors ${isSelected ? 'bg-primary-highlighted' : 'bg-primary group-hover:bg-primary-highlighted'}`} />
 
                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
                             {displayMode !== 'none' && (
@@ -156,11 +156,11 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
 
             {/* Resize Handles (Overlay entire group) */}
             <div
-                className="absolute top-0 bottom-0 left-0 w-2 cursor-ew-resize hover:bg-border-highlight z-20"
+                className="absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-l-lg"
                 onMouseDown={(e) => handleDragStart(e, w.id, 'left')}
             />
             <div
-                className="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize hover:bg-border-highlight z-20"
+                className="absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-r-lg"
                 onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
             />
 

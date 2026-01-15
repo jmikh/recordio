@@ -9,12 +9,13 @@ import { ViewMapper } from '../../../core/viewMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../common/DimmedOverlay';
+import { SecondaryButton } from '../common/SecondaryButton';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
 // ------------------------------------------------------------------
 
-const EDITOR_PADDING = 0.05;
+const EDITOR_PADDING = 0.0;
 
 export const renderCropEditor = (
     resources: RenderResources,
@@ -217,18 +218,15 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
             {/* Toolbar */}
             <div
-                className="absolute flex gap-2 pointer-events-auto justify-center z-[60]"
+                className="absolute flex gap-2 pointer-events-auto justify-center z-[200]"
                 style={{
                     left: `${toPct(viewMapper.contentRect.x, outputSize.width)}%`,
-                    top: `calc(${toPct(viewMapper.contentRect.y, outputSize.height)}% - 40px)`,
+                    top: `calc(${toPct(viewMapper.contentRect.y, outputSize.height)}% + 8px)`,
                     width: `${toPct(viewMapper.contentRect.width, outputSize.width)}%`,
+                    padding: 0,
                 }}
             >
-                <button
-                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${isCentered
-                        ? 'bg-surface text-text-muted/50 cursor-not-allowed'
-                        : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
-                        }`}
+                <SecondaryButton
                     onClick={(e) => {
                         e.stopPropagation();
                         if (isCentered) return;
@@ -242,13 +240,9 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                     disabled={isCentered}
                 >
                     Center
-                </button>
+                </SecondaryButton>
 
-                <button
-                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${isFullView
-                        ? 'bg-surface text-text-muted/50 cursor-not-allowed'
-                        : 'bg-surface-elevated hover:bg-surface text-text-main hover:text-white border border-border'
-                        }`}
+                <SecondaryButton
                     onClick={(e) => {
                         e.stopPropagation();
                         if (isFullView) return;
@@ -260,7 +254,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                     disabled={isFullView}
                 >
                     Full View
-                </button>
+                </SecondaryButton>
             </div>
 
             {/* Bounding Box Container */}

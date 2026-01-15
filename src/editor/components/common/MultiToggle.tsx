@@ -35,7 +35,7 @@ export const MultiToggle = <T extends string>({
     return (
         <div
             className={`
-                relative flex items-center bg-hover-subtle rounded-lg select-none overflow-hidden
+                relative flex items-center bg-hover-subtle rounded-sm select-none overflow-hidden shadow-sm
                 ${className}
             `}
         >
@@ -46,7 +46,7 @@ export const MultiToggle = <T extends string>({
                     width: `${100 / count}%`,
                     left: `${(selectedIndex === -1 ? 0 : selectedIndex) * (100 / count)}%`
                 }}
-                className="absolute inset-y-0 bg-primary/20 border border-primary z-0 rounded-lg"
+                className="absolute inset-y-0 bg-primary/20 border border-primary z-0 rounded-sm"
             />
 
             {/* Options */}

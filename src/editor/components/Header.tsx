@@ -69,16 +69,14 @@ export const Header = () => {
                 </div>
 
                 {/* Project Name (Centered in Top Row) */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
-                    <input
-                        type="text"
-                        value={project.name}
-                        onChange={(e) => updateProjectName(e.target.value)}
-                        maxLength={40}
-                        className="bg-transparent text-text-main text-sm text-center focus:text-text-main focus:outline-none focus:bg-surface rounded px-2 py-0.5 hover:bg-surface/50 transition-colors placeholder-text-muted w-[300px]"
-                        placeholder="Untitled Project"
-                    />
-                </div>
+                <input
+                    type="text"
+                    value={project.name}
+                    onChange={(e) => updateProjectName(e.target.value)}
+                    maxLength={40}
+                    className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-hover-subtle text-text-muted text-sm text-center border border-border focus:text-text-main hover:bg-hover hover:border-border-highlighted focus:bg-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-muted w-[300px] focus-ring"
+                    placeholder="Untitled Project"
+                />
 
                 <div className="flex items-center gap-4">
                     <div className="text-xs text-text-muted flex items-center gap-2">

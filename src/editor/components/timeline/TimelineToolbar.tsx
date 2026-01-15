@@ -7,6 +7,7 @@ import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { Slider } from '../common/Slider';
 import { Dropdown } from '../common/Dropdown';
 import type { DropdownOption } from '../common/Dropdown';
+import { Button } from '../common/Button';
 
 
 interface TimelineToolbarProps {
@@ -131,13 +132,13 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     return (
         <div className="h-10 flex items-center px-4 bg-surface-elevated border-b border-border shrink-0 justify-between">
             <div className="flex items-center gap-2">
-                <button
+                <Button
                     onClick={handleSplit}
-                    className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border"
+                    className="px-3 py-1 text-xs"
                     title="Split at Playhead"
                 >
                     Split
-                </button>
+                </Button>
 
                 {/* Aspect Ratio Dropdown */}
                 <Dropdown
@@ -145,13 +146,13 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     value={currentResolutionObj}
                     onChange={handleResolutionChange}
                     trigger={
-                        <button
-                            className="px-3 py-1 bg-surface hover:bg-surface-elevated rounded text-xs border border-border flex items-center gap-1 min-w-[60px] justify-center"
+                        <Button
+                            className="px-3 py-1 text-xs flex items-center gap-1 min-w-[60px] justify-center"
                             title="Change Aspect Ratio"
                         >
                             {currentResolutionObj.label}
                             <span className="text-[10px] opacity-70">▲</span>
-                        </button>
+                        </Button>
                     }
                     direction="up"
                 />
@@ -170,13 +171,13 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-                <button
+                <Button
                     onClick={onFit}
-                    className="px-2 py-0.5 bg-surface hover:bg-surface-elevated rounded text-[10px] border border-border"
+                    className="px-2 py-0.5 text-[10px]"
                     title="Fit timeline to screen"
                 >
                     Fit
-                </button>
+                </Button>
                 <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                     className="hover:text-primary transition-colors text-text-muted"

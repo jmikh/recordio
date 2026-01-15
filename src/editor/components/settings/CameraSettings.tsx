@@ -5,6 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
 import { MultiToggle } from '../common/MultiToggle';
 import { LookRightButton } from './LookRightButton';
+import { Notice } from '../common/Notice';
 import { FaCheck } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
 
@@ -26,8 +27,16 @@ export const CameraSettings = () => {
 
     if (!cameraConfig) {
         return (
-            <div className="p-4 text-center text-gray-400">
-                <p>No camera configured for this project.</p>
+            <div className="p-4">
+                <Notice>No camera configured for this project.</Notice>
+            </div>
+        );
+    }
+
+    if (!cameraSource) {
+        return (
+            <div className="p-4">
+                <Notice>Camera was not used for this recording</Notice>
             </div>
         );
     }

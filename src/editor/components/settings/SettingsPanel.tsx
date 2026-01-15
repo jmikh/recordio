@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
-import { ZoomSettings } from './ZoomSettings';
+import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { SettingsButton } from './SettingsButton';
@@ -116,7 +116,7 @@ export const SettingsPanel = () => {
                     {activeTab === 'background' && <BackgroundSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
-                    {activeTab === 'zoom' && <ZoomSettings />}
+                    {activeTab === 'zoom' && <EffectsSettings />}
                     {activeTab === 'captions' && <CaptionsSettings />}
                 </div>
                 <Scrollbar

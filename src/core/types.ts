@@ -93,6 +93,12 @@ export interface ZoomSettings {
     minZoomDurationMs: number;
 }
 
+export interface EffectSettings {
+    showMouseClicks: boolean;
+    showMouseDrags: boolean;
+    showKeyboardClicks: boolean;
+}
+
 export interface CaptionSettings {
     visible: boolean;
     size: number; // Font size in pixels
@@ -125,6 +131,9 @@ export interface ProjectSettings {
 
     // Zoom
     zoom: ZoomSettings;
+
+    // Effects
+    effects: EffectSettings;
 
     // Background
     background: BackgroundSettings;
@@ -163,6 +172,7 @@ export interface SourceMetadata {
     /** Frames Per Second (Video only) */
     fps?: number;
     hasAudio: boolean;
+    has_microphone: boolean;
     fileSizeBytes?: number;
     createdAt?: number;
     /** Human readable name of the source (e.g. Tab Title or "Desktop") */

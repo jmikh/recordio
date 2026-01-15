@@ -3,14 +3,15 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../common/Slider';
 import { MultiToggle } from '../common/MultiToggle';
+import { Toggle } from '../common/Toggle';
 
-export const ZoomSettings = () => {
+export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
+    const effectSettings = useProjectStore(s => s.project.settings.effects);
     const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
 
 
 
@@ -30,8 +31,13 @@ export const ZoomSettings = () => {
         batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoom: val } }));
     };
 
+    const handleEffectToggle = (key: keyof typeof effectSettings, value: boolean) => {
+        updateSettings({ effects: { ...effectSettings, [key]: value } });
+    };
+
     return (
         <div className="flex flex-col gap-6 text-sm text-text-muted">
+            {/* ZOOM SETTINGS */}
             {/* Header with Title and Toggle */}
             <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
@@ -98,6 +104,41 @@ export const ZoomSettings = () => {
                     </svg>
                     Clear All Zooms
                 </button>
+            </div>
+
+            {/* SEPARATOR */}
+            <div className="border-t border-border"></div>
+
+            {/* EFFECT SETTINGS */}
+            <div className="flex flex-col gap-4">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Effects</label>
+
+                {/* Mouse Clicks */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-muted">Mouse Clicks</span>
+                    <Toggle
+                        value={effectSettings.showMouseClicks}
+                        onChange={(val) => handleEffectToggle('showMouseClicks', val)}
+                    />
+                </div>
+
+                {/* Mouse Drags */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-muted">Mouse Drags</span>
+                    <Toggle
+                        value={effectSettings.showMouseDrags}
+                        onChange={(val) => handleEffectToggle('showMouseDrags', val)}
+                    />
+                </div>
+
+                {/* Keyboard Clicks */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-muted">Keyboard Clicks</span>
+                    <Toggle
+                        value={effectSettings.showKeyboardClicks}
+                        onChange={(val) => handleEffectToggle('showKeyboardClicks', val)}
+                    />
+                </div>
             </div>
         </div>
     );

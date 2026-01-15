@@ -20,7 +20,7 @@ import { useUIStore } from '../../stores/useUIStore';
 const TRACK_HEIGHT = 40;
 const EVENTS_TRACK_HEIGHT = 20;
 const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.9;
-const HEADER_WIDTH = 200;
+const HEADER_WIDTH = 125;
 
 export function Timeline() {
     //console.log('[Rerender] Timeline');
@@ -173,11 +173,11 @@ export function Timeline() {
             />
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div className="flex-1 flex overflow-hidden relative">
+            <div className="flex-1 flex bg-surface-raised overflow-hidden relative">
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
-                    className="flex-shrink-0 flex flex-col z-20 bg-background border-r border-border"
+                    className="flex-shrink-0 flex flex-col z-20 border-r border-border"
                     style={{ width: HEADER_WIDTH }}
                 >
                     {/* Spacer for Ruler */}
@@ -186,7 +186,7 @@ export function Timeline() {
                     {/* Header: Main Track */}
                     <div className="shrink-0" style={{ height: mainTrackHeight }}>
                         <div className="flex flex-col w-full h-full">
-                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-border bg-surface/50" />
+                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-border" />
                             {!!timeline.recording.cameraSourceId ? (
                                 <TimelineTrackHeader
                                     title="Screen & Camera"
@@ -248,7 +248,7 @@ export function Timeline() {
                         />
 
                         <div
-                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-background [&::-webkit-scrollbar]:hidden"
+                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar [&::-webkit-scrollbar]:hidden"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                             ref={setContainerRef}
                             onScroll={handleScroll}

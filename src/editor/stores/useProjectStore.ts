@@ -170,6 +170,7 @@ export const useProjectStore = create<ProjectState>()(
                         durationMs: 0,
                         size: { width: 0, height: 0 },
                         hasAudio: false,
+                        has_microphone: false, // Default to false for manually added sources
                         name: metadata.name || 'Untitled Source',
                         ...metadata
                     };

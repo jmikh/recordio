@@ -50,11 +50,12 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
             minorInterval = 500;
         }
 
-        const durationMs = (totalWidth / pixelsPerSec) * 1000;
+        // Calculate the full visible width in milliseconds to extend ruler to viewport edge
+        const visibleDurationMs = (width / pixelsPerSec) * 1000;
 
         ctx.beginPath();
-        // Start t at 0, draw at x + paddingLeft
-        for (let t = 0; t <= durationMs; t += minorInterval) {
+        // Start t at 0, draw until the end of visible area
+        for (let t = 0; t <= visibleDurationMs; t += minorInterval) {
             const x = ((t / 1000) * pixelsPerSec);
 
             if (t % majorInterval === 0) {

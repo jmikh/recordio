@@ -6,6 +6,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../common/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { SecondaryButton } from '../common/SecondaryButton';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -272,14 +273,8 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
             <div
                 className="absolute top-4 inset-x-0 flex justify-center pointer-events-auto z-[1000]"
             >
-                <button
-                    className={`text-xs px-3 py-1.5 rounded shadow transition-colors ${Math.abs(currentRect.x) < 1 &&
-                        Math.abs(currentRect.y) < 1 &&
-                        Math.abs(currentRect.width - videoSize.width) < 1 &&
-                        Math.abs(currentRect.height - videoSize.height) < 1
-                        ? 'bg-surface-elevated text-text-muted cursor-not-allowed'
-                        : 'bg-primary hover:bg-primary/90 text-primary-fg'
-                        }`}
+                <SecondaryButton
+                    className="text-xs shadow"
                     onClick={(e) => {
                         e.stopPropagation();
                         // Also stop immediate propagation just in case
@@ -295,9 +290,13 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                         const newRect = { x: 0, y: 0, width: videoSize.width, height: videoSize.height };
                         handleRectChange(newRect);
                     }}
+                    disabled={Math.abs(currentRect.x) < 1 &&
+                        Math.abs(currentRect.y) < 1 &&
+                        Math.abs(currentRect.width - videoSize.width) < 1 &&
+                        Math.abs(currentRect.height - videoSize.height) < 1}
                 >
                     Full View
-                </button>
+                </SecondaryButton>
             </div>
         </div>
     );

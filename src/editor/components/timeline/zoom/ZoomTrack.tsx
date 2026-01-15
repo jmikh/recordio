@@ -125,7 +125,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             if (extWidth > 0) {
                                 extensionNode = (
                                     <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border-2 border-l-0 bg-primary-disabled border-primary-disabled ${isSelected ? 'border-secondary bg-primary-muted' : 'group-hover:border-primary-highlighted'}`}
+                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border border-l-0 bg-primary-disabled border-primary-disabled ${isSelected ? 'border-secondary bg-primary-muted' : 'group-hover:border-primary-highlighted'}`}
                                         style={{
                                             left: `${endX}px`,
                                             width: `${extWidth}px`,
@@ -139,7 +139,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                         return (
                             <React.Fragment key={m.id}>
                                 <div
-                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border-2 border-r-4
+                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border border-r-4
                                         ${isSelected ? 'border-secondary' : 'not-hover:border-primary-muted hover:border-primary-highlighted'}
                                         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
                                         ${isFullScreen ? 'rounded-r-xl' : ''}
@@ -167,7 +167,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 {/* Add Zoom Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary border-2 border-r-4 flex items-center justify-center"
+                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary border border-r-4 flex items-center justify-center"
                         style={{
                             // Use calculated width (pixel based on time)
                             // Position: right aligned to mouse X (hoverInfo.x).
@@ -178,7 +178,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                         }}
                     >
                         {/* Add Zoom Label (Above) */}
-                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-secondary pointer-events-none bg-surface-elevated/80 px-1 rounded">
+                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-secondary pointer-events-none bg-surface-overlay px-1 rounded">
                             Add Zoom
                         </div>
                     </div>

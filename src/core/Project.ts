@@ -26,6 +26,12 @@ export class ProjectImpl {
                     minZoomDurationMs: 200
                 },
 
+                effects: {
+                    showMouseClicks: true,
+                    showMouseDrags: true,
+                    showKeyboardClicks: true
+                },
+
                 screen: {
                     mode: 'border',
                     padding: 0,

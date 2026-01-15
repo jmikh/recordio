@@ -8,6 +8,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
 import { CaptionProgressModal } from '../caption/CaptionProgressModal';
 import { PrimaryButton } from '../common/PrimaryButton';
+import { Notice } from '../common/Notice';
 
 /**
  * Settings panel for managing captions.
@@ -48,19 +49,38 @@ export function CaptionsSettings() {
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
         const cameraSourceId = state.project.timeline.recording.cameraSourceId;
+        const screenSourceId = state.project.timeline.recording.screenSourceId;
 
-        if (!cameraSourceId) {
-            console.error('[CaptionsSettings] No camera source available for transcription');
-            setTranscriptionState({ transcriptionError: 'No webcam recording found' });
+        // Determine which source has microphone
+        let sourceToTranscribe = null;
+        let sourceName = '';
+
+        // Check camera source first
+        if (cameraSourceId) {
+            const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
+            if (cameraSource && cameraSource.has_microphone) {
+                sourceToTranscribe = cameraSource;
+                sourceName = 'camera';
+            }
+        }
+
+        // Fall back to screen source if camera doesn't have microphone
+        if (!sourceToTranscribe && screenSourceId) {
+            const screenSource = Object.values(state.sources).find((s: any) => s.id === screenSourceId);
+            if (screenSource && screenSource.has_microphone) {
+                sourceToTranscribe = screenSource;
+                sourceName = 'screen';
+            }
+        }
+
+        // If no source has microphone, show error
+        if (!sourceToTranscribe) {
+            console.error('[CaptionsSettings] No microphone audio available for transcription');
+            setTranscriptionState({ transcriptionError: 'No microphone audio found in recording' });
             return;
         }
 
-        const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
-        if (!cameraSource) {
-            console.error('[CaptionsSettings] Camera source not found:', cameraSourceId);
-            setTranscriptionState({ transcriptionError: 'Webcam source not found' });
-            return;
-        }
+        console.log(`[CaptionsSettings] Using ${sourceName} source for transcription`);
 
         try {
             console.log('[CaptionsSettings] Starting transcription generation');
@@ -82,8 +102,8 @@ export function CaptionsSettings() {
             });
 
             // Fetch video
-            const response = await fetch(cameraSource.url);
-            if (!response.ok) throw new Error(`Failed to fetch webcam video: ${response.statusText}`);
+            const response = await fetch(sourceToTranscribe.url);
+            if (!response.ok) throw new Error(`Failed to fetch video: ${response.statusText}`);
             const videoBlob = await response.blob();
 
             if (signal.aborted) throw new Error('Aborted');
@@ -226,58 +246,81 @@ export function CaptionsSettings() {
         deleteCaptionSegment(segmentId);
     };
 
+    // Check if any source has microphone
+    const state = useProjectStore.getState();
+    const cameraSourceId = state.project.timeline.recording.cameraSourceId;
+    const screenSourceId = state.project.timeline.recording.screenSourceId;
+
+    let hasMicrophone = false;
+
+    if (cameraSourceId) {
+        const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
+        if (cameraSource && cameraSource.has_microphone) {
+            hasMicrophone = true;
+        }
+    }
+
+    if (!hasMicrophone && screenSourceId) {
+        const screenSource = Object.values(state.sources).find((s: any) => s.id === screenSourceId);
+        if (screenSource && screenSource.has_microphone) {
+            hasMicrophone = true;
+        }
+    }
+
     return (
         <div className="space-y-4">
-            {/* Caption Settings */}
-            <div className="space-y-3 pb-3 border-b border-border">
-                <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-text-muted">Visible</label>
-                    <button
-                        onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
-                            }`}
-                    >
-                        <span
-                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.visible ? 'translate-x-5' : 'translate-x-1'
-                                }`}
-                        />
-                    </button>
-                </div>
-
-                <Slider
-                    value={settings.size}
-                    onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
-                    min={16}
-                    max={48}
-                    label="Size"
-                    units="px"
-                    decimals={0}
-                />
-            </div>
-
-
-
-            {
-                !isTranscribing && (
-                    <div className="flex flex-col gap-2">
-                        {!captions ? (
-                            <PrimaryButton
-                                onClick={handleGenerate}
-                                className="w-full"
-                            >
-                                Generate Captions
-                            </PrimaryButton>
-                        ) : (
+            {!hasMicrophone ? (
+                <Notice>Microphone was not used for this recording</Notice>
+            ) : (
+                <>
+                    {/* Caption Settings */}
+                    <div className="space-y-3 pb-3 border-b border-border">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-medium text-text-muted">Visible</label>
                             <button
-                                onClick={handleGenerate}
-                                className="w-full px-3 py-1.5 text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
+                                onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
+                                    }`}
                             >
-                                Regenerate Captions
+                                <span
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.visible ? 'translate-x-5' : 'translate-x-1'
+                                        }`}
+                                />
                             </button>
-                        )}
+                        </div>
+
+                        <Slider
+                            value={settings.size}
+                            onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
+                            min={16}
+                            max={48}
+                            label="Size"
+                            units="px"
+                            decimals={0}
+                        />
                     </div>
-                )
-            }
+
+                    {!isTranscribing && (
+                        <div className="flex flex-col gap-2">
+                            {!captions ? (
+                                <PrimaryButton
+                                    onClick={handleGenerate}
+                                    className="w-full"
+                                >
+                                    Generate Captions
+                                </PrimaryButton>
+                            ) : (
+                                <button
+                                    onClick={handleGenerate}
+                                    className="w-full px-3 py-1.5 text-text-primary hover:bg-surface-elevated-hover rounded-md transition-colors text-xs font-medium border border-border"
+                                >
+                                    Regenerate Captions
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
 
             {
                 isTranscribing && (
@@ -298,9 +341,9 @@ export function CaptionsSettings() {
 
             {
                 transcriptionError && (
-                    <div className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded border border-red-500/20">
+                    <Notice variant="error">
                         {transcriptionError}
-                    </div>
+                    </Notice>
                 )
             }
 
@@ -317,22 +360,21 @@ export function CaptionsSettings() {
                                     const isEditing = editingId === segment.id;
 
                                     return (
-                                        <div
-                                            key={segment.id}
-                                            className={`group relative inline-block px-3 pt-4 pb-2 rounded bg-surface-overlay font-medium text-xs w-full border transition-colors ${isEditing ? 'ring-active border-border' : 'border-border hover:border-border-hover hover:bg-hover-subtle'}`}
-                                        >
-                                            {/* Floating capsule - time + delete */}
-                                            <div className="absolute left-1/2 -translate-x-1/2 -top-3 flex items-center gap-1.5 bg-surface-raised border border-border rounded-full px-2 py-0.5 z-10">
-                                                <span className="text-text-muted font-mono text-[10px]">
-                                                    {formatTime(outputStart)}
-                                                </span>
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
-                                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                                    <polyline points="12 5 19 12 12 19" />
-                                                </svg>
-                                                <span className="text-text-muted font-mono text-[10px]">
-                                                    {formatTime(outputEnd)}
-                                                </span>
+                                        <div key={segment.id} className="flex flex-col w-full">
+                                            {/* Capsule bar - time + delete */}
+                                            <div className="flex items-center justify-between bg-surface-raised border border-border rounded px-3 py-0.5">
+                                                <div className="flex-1 flex items-center justify-center gap-1.5">
+                                                    <span className="text-text-muted font-mono text-[10px]">
+                                                        {formatTime(outputStart)}
+                                                    </span>
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
+                                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                                        <polyline points="12 5 19 12 12 19" />
+                                                    </svg>
+                                                    <span className="text-text-muted font-mono text-[10px]">
+                                                        {formatTime(outputEnd)}
+                                                    </span>
+                                                </div>
                                                 <button
                                                     onClick={() => handleDelete(segment.id)}
                                                     className="w-4 h-4 flex items-center justify-center text-text-muted hover:text-destructive transition-colors rounded"
@@ -344,24 +386,29 @@ export function CaptionsSettings() {
                                                 </button>
                                             </div>
 
+                                            {/* Caption content */}
                                             <div
-                                                ref={isEditing ? inputRef : null}
-                                                contentEditable={isEditing}
-                                                suppressContentEditableWarning
-                                                onInput={(e) => handleInput(e, segment.id)}
-                                                onKeyDown={handleKeyDown}
-                                                onBlur={handleBlur}
-                                                className={`cursor-text transition-colors ${isEditing ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'}`}
-                                                style={{
-                                                    lineHeight: 1.4,
-                                                    textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-                                                    whiteSpace: 'pre-wrap',
-                                                    wordBreak: 'break-word',
-                                                    outline: 'none'
-                                                }}
-                                                onClick={() => !isEditing && handleEditStart(segment)}
+                                                className={`group px-3 py-2 rounded bg-surface-overlay font-medium text-xs w-full border transition-colors ${isEditing ? 'ring-active border-border' : 'border-border hover:border-border-hover hover:bg-hover-subtle'}`}
                                             >
-                                                {segment.text}
+                                                <div
+                                                    ref={isEditing ? inputRef : null}
+                                                    contentEditable={isEditing}
+                                                    suppressContentEditableWarning
+                                                    onInput={(e) => handleInput(e, segment.id)}
+                                                    onKeyDown={handleKeyDown}
+                                                    onBlur={handleBlur}
+                                                    className={`cursor-text transition-colors ${isEditing ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'}`}
+                                                    style={{
+                                                        lineHeight: 1.4,
+                                                        textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                                                        whiteSpace: 'pre-wrap',
+                                                        wordBreak: 'break-word',
+                                                        outline: 'none'
+                                                    }}
+                                                    onClick={() => !isEditing && handleEditStart(segment)}
+                                                >
+                                                    {segment.text}
+                                                </div>
                                             </div>
                                         </div>
                                     );

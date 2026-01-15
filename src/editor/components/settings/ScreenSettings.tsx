@@ -92,7 +92,6 @@ export const ScreenSettings = () => {
 
             {/* Area 2: Framing */}
             <div>
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-2 text-center">Framing</label>
                 <MultiToggle
                     options={[
                         { value: 'device', label: 'Device' },

@@ -286,10 +286,24 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             const originalWin = state.project.timeline.outputWindows[windowIndex];
 
-            // 2. Shrink original window
+            // 2. Calculate durations for both resulting windows
+            const firstWindowDuration = getWindowDuration({ ...originalWin, endMs: splitTimeMs });
+            const secondWindowDuration = getWindowDuration({ ...originalWin, startMs: splitTimeMs });
+
+            // 3. Validate minimum duration (100ms) for both windows
+            const MIN_WINDOW_DURATION_MS = 100;
+            if (firstWindowDuration < MIN_WINDOW_DURATION_MS || secondWindowDuration < MIN_WINDOW_DURATION_MS) {
+                console.warn('[splitWindow] Split aborted: Both windows must be at least 100ms', {
+                    firstWindowDuration,
+                    secondWindowDuration
+                });
+                return state; // No-op if either window would be too small
+            }
+
+            // 4. Shrink original window
             const shrunkWin = { ...originalWin, endMs: splitTimeMs };
 
-            // 3. Create new window
+            // 5. Create new window
             // We need a way to generate IDs safely. Using randomUUID for now.
             const newWin: OutputWindow = {
                 id: crypto.randomUUID(),
