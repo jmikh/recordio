@@ -149,7 +149,6 @@
    --text-main: oklch(0.98 0 0);
    --text-muted: oklch(0.98 0 0 / 60%);
    --text-disabled: oklch(0.98 0 0 / 38%);
-   --text-primary: var(--primary);
    --text-on-primary: oklch(0.15 0 0);
    --text-on-secondary: oklch(0.15 0 0);
 
