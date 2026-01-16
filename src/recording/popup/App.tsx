@@ -291,7 +291,7 @@ function App() {
   }
 
   return (
-    <div className="w-[320px] bg-surface-body text-text-main font-sans overflow-hidden flex flex-col transition-all duration-300">
+    <div className="w-[320px] bg-surface-body text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
       <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
         <h1 className="text-2xl font-bold mb-6 text-primary">
           Recordo
@@ -349,7 +349,7 @@ function App() {
             {/* Audio Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-text-main flex items-center gap-2">
+                <span className="text-sm text-text-highlighted flex items-center gap-2">
                   Microphone
                 </span>
                 <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
@@ -371,7 +371,7 @@ function App() {
                     value={selectedAudioId}
                     onChange={setSelectedAudioId}
                     trigger={
-                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-highlighted cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
                         <span>{audioDevices.find(d => d.deviceId === selectedAudioId)?.label || `Microphone ${selectedAudioId.slice(0, 4)}...`}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="6 9 12 15 18 9" />
@@ -387,7 +387,7 @@ function App() {
             {/* Video Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-text-main">Camera</span>
+                <span className="text-sm text-text-highlighted">Camera</span>
                 <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
               </div>
               {isVideoEnabled && (
@@ -406,7 +406,7 @@ function App() {
                     value={selectedVideoId}
                     onChange={setSelectedVideoId}
                     trigger={
-                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-highlighted cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
                         <span>{videoDevices.find(d => d.deviceId === selectedVideoId)?.label || `Camera ${selectedVideoId.slice(0, 4)}...`}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="6 9 12 15 18 9" />
@@ -436,7 +436,7 @@ function App() {
           </button>
         )}
 
-        <p className="mt-6 text-text-muted text-xs">
+        <p className="mt-6 text-text-main text-xs">
           {isRecording ? 'Recording in progress...' : 'Ready to capture'}
         </p>
 

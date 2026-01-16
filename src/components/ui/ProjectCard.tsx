@@ -39,11 +39,11 @@ export const ProjectCard = ({
                     className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <p className="text-sm text-text-main mb-1">Deleting is final</p>
+                    <p className="text-sm text-text-highlighted mb-1">Deleting is final</p>
                     <div className="flex space-x-3">
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsDeleting(false); }}
-                            className="px-3 py-1.5 text-xs text-text-muted hover:text-text-main bg-surface-raised hover:bg-surface-overlay rounded-md transition-colors border border-border"
+                            className="px-3 py-1.5 text-xs text-text-main hover:text-text-highlighted bg-surface-raised hover:bg-surface-overlay rounded-md transition-colors border border-border"
                         >
                             Cancel
                         </button>
@@ -65,7 +65,7 @@ export const ProjectCard = ({
                 {project.thumbnail ? (
                     <img src={project.thumbnail} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted/50 bg-surface/50">
+                    <div className="w-full h-full flex items-center justify-center text-text-main/50 bg-surface/50">
                         <svg className={`${isGrid ? 'w-12 h-12' : 'w-8 h-8'} opacity-50`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
@@ -73,7 +73,7 @@ export const ProjectCard = ({
                 )}
 
                 {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-main text-[10px] px-1.5 py-0.5 rounded">
+                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-[10px] px-1.5 py-0.5 rounded">
                     {(() => {
                         const windows = project.timeline?.outputWindows || [];
                         const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
@@ -96,13 +96,13 @@ export const ProjectCard = ({
                 <div className="flex flex-col">
                     <div className="flex justify-between items-start">
                         <h3
-                            className={`font-normal truncate pr-2 text-text-main text-sm`}
+                            className={`font-normal truncate pr-2 text-text-highlighted text-sm`}
                         >
                             {project.name}
                         </h3>
                         {isActive && <span className="flex h-2 w-2 rounded-full flex-shrink-0 mt-1.5 bg-primary shadow-[0_0_5px_var(--primary)]"></span>}
                     </div>
-                    <div className="flex items-center text-xs text-text-muted space-x-2 mt-1">
+                    <div className="flex items-center text-xs text-text-main space-x-2 mt-1">
                         <span>{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                 </div>

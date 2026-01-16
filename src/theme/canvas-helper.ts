@@ -25,6 +25,7 @@ export const theme = {
             primary: () => getThemeToken('--border-primary'),
         },
         text: {
+            highlighted: () => getThemeToken('--text-highlighted'),
             main: () => getThemeToken('--text-main'),
             muted: () => getThemeToken('--text-muted'),
         },

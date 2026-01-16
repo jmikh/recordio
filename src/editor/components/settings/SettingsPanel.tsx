@@ -110,7 +110,7 @@ export const SettingsPanel = () => {
             <div className="w-72 flex flex-row relative h-full bg-surface-raised">
                 <div
                     ref={setScrollContainer}
-                    className="p-6 flex-1 overflow-y-auto text-text-muted custom-scrollbar scrollbar-hide"
+                    className="p-6 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
                 >
                     {activeTab === 'project' && <ProjectSettings />}
                     {activeTab === 'background' && <BackgroundSettings />}

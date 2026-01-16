@@ -222,7 +222,7 @@ export const BackgroundSettings = () => {
                     <div className="flex gap-4">
                         {/* 1. Color Card */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-xs text-text-muted">Color</span>
+                            <span className="text-xs text-text-main">Color</span>
                             <div
                                 ref={colorButtonRef}
                                 onClick={() => {
@@ -256,7 +256,7 @@ export const BackgroundSettings = () => {
 
                         {/* 2. Upload Card */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-xs text-text-muted">Custom</span>
+                            <span className="text-xs text-text-main">Custom</span>
                             <div
                                 onClick={handleCustomSelect}
                                 className={`cursor-pointer w-12 h-12 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 ${isCustom
@@ -268,7 +268,7 @@ export const BackgroundSettings = () => {
                                 {customSource && (
                                     <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
                                 )}
-                                <div className={`flex items-center justify-center p-1.5 text-text-main rounded-full ${customSource ? 'bg-black/40  z-10' : 'bg-transparent'}`}>
+                                <div className={`flex items-center justify-center p-1.5 text-text-highlighted rounded-full ${customSource ? 'bg-black/40  z-10' : 'bg-transparent'}`}>
                                     <CiImageOn size={20} />
                                 </div>
                                 <input
@@ -284,7 +284,7 @@ export const BackgroundSettings = () => {
 
                     {/* Row 2: Presets */}
                     <div className="flex flex-col gap-2">
-                        <span className="text-xs text-text-muted">Presets</span>
+                        <span className="text-xs text-text-main">Presets</span>
                         <div className="flex flex-wrap gap-4">
                             {BACKGROUND_IMAGES.map(img => {
                                 const isActive = isPreset && backgroundImageUrl === img.url;

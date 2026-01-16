@@ -39,7 +39,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs border border-border
                 ${isActive
                     ? 'bg-primary/20 border border-primary'
-                    : 'not-hover:bg-hover-subtle hover:bg-hover text-text-muted hx border-transparent'
+                    : 'not-hover:bg-hover-subtle hover:bg-hover text-text-main hx border-transparent'
                 }
                 ${className}
             `}
@@ -50,8 +50,8 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 className={`
                     absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center shadow-float z-10 transition-all bg-primary
                     ${isActive
-                        ? 'left-[calc(100%-2.75rem)] text-text-main' // Moves to RIGHT
-                        : 'left-1 text-text-muted' // Stays on LEFT
+                        ? 'left-[calc(100%-2.75rem)] text-text-highlighted' // Moves to RIGHT
+                        : 'left-1 text-text-main' // Stays on LEFT
                     }
                 `}
                 animate={isActive ? {
@@ -65,7 +65,7 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                 } : {}}
             >
                 {/* Icon Content */}
-                <div className={`flex items-center justify-center text-text-main`}>
+                <div className={`flex items-center justify-center text-text-highlighted`}>
                     {isActive ? (
                         <FaChevronRight className="w-4 h-4" />
                     ) : (
@@ -91,8 +91,8 @@ export const LookRightButton: React.FC<LookRightButtonProps> = ({
                     className={`
                     tracking-wide whitespace-nowrap transition-colors
                     ${isActive
-                            ? 'text-text-main'
-                            : 'text-text-muted group-hover:text-text-main'
+                            ? 'text-text-highlighted'
+                            : 'text-text-main group-hover:text-text-highlighted'
                         }
                 `}>
                     {label}

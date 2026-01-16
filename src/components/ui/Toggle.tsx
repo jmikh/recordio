@@ -57,7 +57,7 @@ export const Toggle: React.FC<ToggleProps> = ({
                     rounded-full
                     shadow-sm
                     ${value ? 'left-[calc(100%-1.25rem)]' : 'left-1'}
-                    ${value ? 'bg-text-main' : 'bg-text-muted'}
+                    ${value ? 'bg-text-highlighted' : 'bg-text-main'}
                         `}
             />
         </button>

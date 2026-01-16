@@ -29,7 +29,7 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                 group relative w-full h-12 rounded-full transition-colors overflow-hidden font-sans text-xs
                 ${isActive
                     ? 'bg-primary/20 border border-primary'
-                    : 'bg-background text-text-muted border border-transparent hover:bg-hover-subtle'
+                    : 'bg-background text-text-main border border-transparent hover:bg-hover-subtle'
                 }
             `}
         >
@@ -39,7 +39,7 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                 className={`
                     absolute top-1 bottom-1 aspect-square rounded-full flex items-center justify-center z-10 transition-all
                     ${isActive
-                        ? 'left-[calc(100%-2.75rem)] bg-primary text-text-main'
+                        ? 'left-[calc(100%-2.75rem)] bg-primary text-text-highlighted'
                         : 'left-1 text-primary'
                     }
                 `}
@@ -68,8 +68,8 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
                     className={`
                     tracking-wide whitespace-nowrap transition-colors
                     ${isActive
-                            ? 'text-text-main'
-                            : 'text-text-muted group-hover:text-text-main'
+                            ? 'text-text-highlighted'
+                            : 'text-text-main group-hover:text-text-highlighted'
                         }
                 `}>
                     {label}

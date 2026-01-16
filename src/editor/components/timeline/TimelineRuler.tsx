@@ -34,7 +34,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         const textColor = 'rgba(255, 255, 255, 0.6)';
         const tickColor = 'rgba(255, 255, 255, 0.4)';
 
-        ctx.fillStyle = textColor; // text-muted
+        ctx.fillStyle = textColor; // text-main
         ctx.strokeStyle = tickColor; // border-primary (or highlight)
         ctx.font = `10px ${style.getPropertyValue('--font-sans') || 'sans-serif'}`;
         ctx.textBaseline = 'top';

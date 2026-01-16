@@ -37,12 +37,12 @@ export const EffectsSettings = () => {
     };
 
     return (
-        <div className="flex flex-col gap-6 text-sm text-text-muted">
+        <div className="flex flex-col gap-6 text-sm text-text-main">
             {/* ZOOM SETTINGS */}
             {/* Disclaimer for missing user events */}
             {hasNoUserEvents && (
-                <div className="text-xs text-text-muted flex items-start gap-1">
-                    <span className="text-text-muted/40">*</span>
+                <div className="text-xs text-text-main flex items-start gap-1">
+                    <span className="text-text-main/40">*</span>
                     <span>Auto zoom and effects are only available for recordings of Chrome tabs and Chrome windows.</span>
                 </div>
             )}
@@ -74,7 +74,9 @@ export const EffectsSettings = () => {
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
                     showTooltip
-                    units="ms"
+                    valueTransform={(ms) => ms / 1000}
+                    units="s"
+                    decimals={2}
                 />
             </div>
 
@@ -101,8 +103,8 @@ export const EffectsSettings = () => {
                     disabled={viewportMotions.length === 0}
                     className={`w-full py-2 px-4 rounded text-xs transition-colors border flex items-center justify-center gap-2
                         ${viewportMotions.length === 0
-                            ? 'bg-surface text-text-muted/40 border-transparent cursor-not-allowed' // Disabled state
-                            : 'bg-surface hover:bg-surface-elevated text-text-main border-border hover:border-text-muted/40'        // Active state (Neutral)
+                            ? 'bg-surface text-text-main/40 border-transparent cursor-not-allowed' // Disabled state
+                            : 'bg-surface hover:bg-surface-elevated text-text-highlighted border-border hover:border-text-muted/40'        // Active state (Neutral)
                         }
                     `}
                 >
@@ -124,7 +126,7 @@ export const EffectsSettings = () => {
 
                 {/* Mouse Clicks */}
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-muted">Mouse Clicks</span>
+                    <span className="text-sm text-text-main">Mouse Clicks</span>
                     <Toggle
                         value={effectSettings.showMouseClicks}
                         onChange={(val) => handleEffectToggle('showMouseClicks', val)}
@@ -133,7 +135,7 @@ export const EffectsSettings = () => {
 
                 {/* Mouse Drags */}
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-muted">Mouse Drags</span>
+                    <span className="text-sm text-text-main">Mouse Drags</span>
                     <Toggle
                         value={effectSettings.showMouseDrags}
                         onChange={(val) => handleEffectToggle('showMouseDrags', val)}
@@ -142,7 +144,7 @@ export const EffectsSettings = () => {
 
                 {/* Keyboard Clicks */}
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-muted">Keyboard Clicks</span>
+                    <span className="text-sm text-text-main">Keyboard Clicks</span>
                     <Toggle
                         value={effectSettings.showKeyboardClicks}
                         onChange={(val) => handleEffectToggle('showKeyboardClicks', val)}

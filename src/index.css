@@ -60,6 +60,7 @@
    /* ─────────────────────────────────────────────────────────
      Text
      ───────────────────────────────────────────────────────── */
+   --color-text-highlighted: var(--text-highlighted);
    --color-text-main: var(--text-main);
    --color-text-muted: var(--text-muted);
    --color-text-disabled: var(--text-disabled);
@@ -97,8 +98,8 @@
      ============================================================ */
 
    /* Hues */
-   --hue-primary: 265;
-   --hue-secondary: 135;
+   --hue-primary: 280;
+   --hue-secondary: 78;
 
    /* ============================================================
      Layer 2: Semantic Tokens
@@ -146,7 +147,8 @@
    /* ─────────────────────────────────────────────────────────
      6. Text Colors
      ───────────────────────────────────────────────────────── */
-   --text-main: oklch(0.98 0 0);
+   --text-highlighted: oklch(0.98 0 0);
+   --text-main: oklch(0.98 0 0 / 80%);
    --text-muted: oklch(0.98 0 0 / 60%);
    --text-disabled: oklch(0.98 0 0 / 38%);
    --text-on-primary: oklch(0.15 0 0);
@@ -181,7 +183,7 @@
 
    /* Standard Panel */
    .panel-base {
-      @apply bg-surface border border-border rounded-md text-text-main;
+      @apply bg-surface border border-border rounded-md text-text-highlighted;
    }
 
    /* Interactive Item */

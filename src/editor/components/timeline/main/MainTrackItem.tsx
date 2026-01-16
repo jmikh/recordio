@@ -104,7 +104,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                 {/* Group Header */}
                 <div
                     style={{ height: GROUP_HEADER_HEIGHT }}
-                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-start gap-2 text-xs text-text-muted select-none"
+                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-start gap-2 text-xs text-text-main select-none"
                 >
                     {/* Speed - always show (prioritized) */}
                     <span

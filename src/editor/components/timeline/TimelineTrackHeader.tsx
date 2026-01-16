@@ -22,7 +22,7 @@ export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
             className="flex items-center justify-between px-3 border-b border-border bg-surface-elevated box-border"
             style={{ height, minHeight: height }}
         >
-            <span className="text-xs text-text-muted truncate select-none" title={title}>
+            <span className="text-xs text-text-main truncate select-none" title={title}>
                 {title}
             </span>
 
@@ -32,7 +32,7 @@ export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
                         e.stopPropagation();
                         onToggleMute();
                     }}
-                    className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-muted hover:text-text-main'}`}
+                    className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
                     title={isMuted ? "Unmute" : "Mute"}
                 >
                     {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}

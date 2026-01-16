@@ -19,7 +19,7 @@ export const SecondaryButton = forwardRef<HTMLButtonElement, SecondaryButtonProp
                 font-medium
                 transition-colors
                 cursor-pointer
-                disabled:bg-secondary-muted disabled:text-text-muted
+                disabled:bg-secondary-muted disabled:text-text-main
                 ${className}
             `}
                 {...props}

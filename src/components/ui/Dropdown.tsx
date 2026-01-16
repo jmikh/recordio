@@ -91,7 +91,7 @@ export function Dropdown<T>({
                         onClick={() => handleSelect(option)}
                         className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center gap-2 rounded-sm ${isSelected
                             ? 'bg-primary/20 text-primary'
-                            : 'text-text-muted hover:bg-hover hover:text-text-main'
+                            : 'text-text-main hover:bg-hover hover:text-text-highlighted'
                             }`}
                     >
                         {option.icon && <span className="flex-shrink-0">{option.icon}</span>}

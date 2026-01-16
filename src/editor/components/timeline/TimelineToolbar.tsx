@@ -159,12 +159,12 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             </div>
 
             <div className="flex items-center gap-4 bg-surface-raised px-4 py-1 rounded-full border border-border">
-                <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-main">
+                <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-highlighted">
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
                 <div
                     ref={timeDisplayRef}
-                    className="font-mono text-xs text-text-muted min-w-[100px] text-center"
+                    className="font-mono text-xs text-text-main min-w-[100px] text-center"
                 >
                     00:00.0 / {formatSmartTime(totalDurationMs, totalDurationMs)}
                 </div>
@@ -180,7 +180,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 </Button>
                 <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                    className="hover:text-primary transition-colors text-text-muted"
+                    className="hover:text-primary transition-colors text-text-main"
                 >
                     <MdRemove size={14} />
                 </button>
@@ -197,7 +197,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 </div>
                 <button
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                    className="hover:text-primary transition-colors text-text-muted"
+                    className="hover:text-primary transition-colors text-text-main"
                 >
                     <MdAdd size={14} />
                 </button>

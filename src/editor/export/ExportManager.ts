@@ -20,25 +20,22 @@ export class ExportManager {
         sources: Record<string, SourceMetadata>,
         quality: ExportQuality,
         onProgress: (state: ExportProgress) => void
-    ): Promise<void> { // Returns void, triggers download internally
+    ): Promise<void> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
-        // 1. Calculate Dimensions
         const targetHeight = this.getHeightForQuality(quality);
         const aspectRatio = project.settings.outputSize.width / project.settings.outputSize.height;
         const targetWidth = Math.round(targetHeight * aspectRatio);
 
-        // Ensure even dimensions (required by some encoders)
+        // Ensure even dimensions for encoder compatibility
         const width = targetWidth % 2 === 0 ? targetWidth : targetWidth + 1;
         const height = targetHeight % 2 === 0 ? targetHeight : targetHeight + 1;
 
         console.log(`[Export] Starting export at ${width}x${height} (${quality})`);
 
-        // 2. Prepare Render Project (Clone with resize)
         const renderProject = ProjectImpl.scale(project, { width, height });
 
-        // 3. Prepare Muxer & Encoders
         const muxer = new Mp4Muxer.Muxer({
             target: new Mp4Muxer.ArrayBufferTarget(),
             video: {
@@ -79,19 +76,12 @@ export class ExportManager {
             bitrate: 128000
         });
 
-        // 4. Prepare Canvas
         const offscreenCanvas = new OffscreenCanvas(width, height);
-        // We need a context compatible with our Painter. 
-        // Our existing context usage is standard 2D.
         const ctx = offscreenCanvas.getContext('2d') as unknown as CanvasRenderingContext2D;
-        // Note: Types might mismatch between OffscreenCanvasRenderingContext2D and CanvasRenderingContext2D 
-        // but for basic drawing they are compatible.
 
-        // 5. Prepare Resources (Videos & Images)
         const videoElements: Record<string, HTMLVideoElement> = {};
         const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null } = { bg: null, device: null };
 
-        // Helper to load image
         const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
@@ -100,27 +90,21 @@ export class ExportManager {
             img.src = url;
         });
 
-        // Helper to load video
         const loadVideo = (url: string) => new Promise<HTMLVideoElement>((resolve, reject) => {
             const v = document.createElement('video');
             v.crossOrigin = 'anonymous';
-            v.muted = true; // Important for programmatic seeking
+            v.muted = true;
             v.autoplay = false;
             v.playsInline = true;
             v.onloadedmetadata = () => resolve(v);
             v.onerror = reject;
             v.src = url;
-            v.load(); // Trigger load
+            v.load();
         });
 
         try {
-            // Load Background
             const bgSettings = renderProject.settings.background;
             if (bgSettings.type === 'image' && bgSettings.imageUrl) {
-                // Resolve URL if it's a source ID? 
-                // The painter expects loaded images.
-                // Check if background is sourceId in settings?
-                // logic from CanvasContainer:
                 const activeBgSourceId = bgSettings.sourceId;
                 const bgUrl = activeBgSourceId && sources[activeBgSourceId]
                     ? sources[activeBgSourceId].url
@@ -131,8 +115,7 @@ export class ExportManager {
                 }
             }
 
-            // Load Device Frame
-            // Load Device Frame
+
             const deviceFrameSettings = renderProject.settings.screen;
             if (deviceFrameSettings.mode === 'device' && deviceFrameSettings.deviceFrameId) {
                 const frameDef = getDeviceFrame(deviceFrameSettings.deviceFrameId);
@@ -141,71 +124,26 @@ export class ExportManager {
                 }
             }
 
-            // Load Videos
-            // We need to preload all Used video sources.
             const sourceIds = Object.keys(sources);
             for (const id of sourceIds) {
-                if (sources[id].type === 'video' || sources[id].type === 'audio') {
-                    // Audio elements (for audio track) are handled by WebAudio.
-                    // Video elements (for video track) need to be sought.
-                    if (sources[id].type === 'video') {
-                        videoElements[id] = await loadVideo(sources[id].url);
-                    }
+                if (sources[id].type === 'video') {
+                    videoElements[id] = await loadVideo(sources[id].url);
                 }
             }
-
-            // 6. Audio Rendering (OfflineAudioContext)
-            // We render *all* audio ahead of time or in chunks?
-            // WebCodecs AudioEncoder takes AudioData.
-            // Simplest: Render entire timeline to an AudioBuffer, then slice it into chunks?
-            // Max duration? if project is 10 mins, might be large.
-            // Let's try rendering 1 minute chunks or just one buffer if < 5 mins.
 
             const totalDurationMs = this.getTotalDuration(renderProject);
             const totalDurationSec = totalDurationMs / 1000;
             const sampleRate = 44100;
 
-            // Limit: OfflineAudioContext has limits. Chrome ~24h? Length is buffer size.
-            // 44100 * 60 * 10 = 26M samples. Safe.
-
             const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDurationSec), sampleRate);
 
-            // Schedule Sources
             await Promise.all(Object.values(sources).map(async (source) => {
                 if (!source.hasAudio) return;
-                // Fetch ArrayBuffer
                 const response = await fetch(source.url);
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
-                // We need to schedule this source according to the timeline.
-                // We need to know *when* this source plays.
-                // Project structure: screenSourceId is main track.
-                // Does 'sources' map give us timeline usage?
-                // The Project.recording stores the segments? 
-                // Ah, the current project structure is simple:
-                // Single Screen Source + Single Camera Source overlaid?
-                // Or is it a full timeline?
-                // Looking at Project types... `recording.screenSourceId`.
-                // It seems it's one continuous playing of the source from 0 to end?
-                // Wait, `timeline.outputWindows` defines which PARTS of source play.
-                // Gaps are silence.
-
-                // We need to iterate output windows and schedule the source buffer nodes.
-
                 renderProject.timeline.outputWindows.forEach((window: any) => {
-                    // window.startMs -> Output time.
-                    // We need to map Window to Source Time?
-                    // Wait, `outputWindows` map Timeline Time (0..N) to Source Time?
-                    // No, OutputWindow { startMs, endMs }. 
-                    // And we have `timelineOffsetMs`.
-                    // SourceTime = OutputTime - timelineOffsetMs.
-
-                    // So for the Screen Source:
-                    // Source Start = window.startMs - offset.
-                    // Duration = window.endMs - window.startMs.
-
-                    // We create a buffer source.
                     const sourceNode = offlineCtx.createBufferSource();
                     sourceNode.buffer = audioBuffer;
                     sourceNode.connect(offlineCtx.destination);
@@ -220,14 +158,8 @@ export class ExportManager {
                 });
             }));
 
-            // Render Audio
             const renderedAudioBuffer = await offlineCtx.startRendering();
-
-            // Feed Audio to Encoder
             this.processAudioBuffer(renderedAudioBuffer, audioEncoder);
-
-
-            // 7. Video Rendering Loop
             const fps = 30;
             const frameInterval = 1000 / fps;
             const totalFrames = Math.ceil(totalDurationMs / frameInterval);
@@ -253,21 +185,11 @@ export class ExportManager {
                     timeRemainingSeconds: timeRemaining
                 });
 
-                // Seek Videos (Wait for seek completion)
-                // We need to map Output Time -> Source Time
                 const sourceTimeMs = currentTimeMs;
                 await Promise.all(Object.values(videoElements).map(async (v) => {
                     v.currentTime = sourceTimeMs / 1000;
-                    // Wait for 'seeked' event? 
-                    // Usually needed for precise frame capture.
                     await new Promise<void>(r => {
-                        const handl = () => {
-                            v.removeEventListener('seeked', handl);
-                            r();
-                        };
-                        // If already there?
-                        // v.currentTime setter is async in behavior for decoding.
-                        v.addEventListener('seeked', handl, { once: true });
+                        v.addEventListener('seeked', () => r(), { once: true });
                     });
                 }));
 
@@ -285,10 +207,6 @@ export class ExportManager {
                     imageElements.bg
                 );
 
-                // PlaybackRenderer needs `videoRefs` map.
-                // And `state`.
-
-                // We rely on `PlaybackRenderer.render` to update the context.
                 PlaybackRenderer.render({
                     canvas: offscreenCanvas as unknown as HTMLCanvasElement,
                     ctx,
@@ -300,14 +218,11 @@ export class ExportManager {
                     sources: sources,
                     userEvents: {
                         mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: []
-                        // TODO: Pass actual user events!
                     },
                     currentTimeMs: currentTimeMs
                 });
 
 
-                // Create VideoFrame
-                // We can create from OffscreenCanvas
                 const durationMicros = 1000000 / fps;
                 const frame = new VideoFrame(offscreenCanvas, {
                     timestamp: timestampMicros,
@@ -317,11 +232,9 @@ export class ExportManager {
                 videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
                 frame.close();
 
-                // Yield to Event Loop
                 await new Promise(r => setTimeout(r, 0));
             }
 
-            // Finish
             await videoEncoder.flush();
             await audioEncoder.flush();
             muxer.finalize();
@@ -337,7 +250,6 @@ export class ExportManager {
                 throw e;
             }
         } finally {
-            // Cleanup
             this.abortController = null;
         }
     }
@@ -349,11 +261,6 @@ export class ExportManager {
     }
 
     private processAudioBuffer(audioBuffer: AudioBuffer, encoder: AudioEncoder) {
-        // We need to feed planar data to AudioData
-        // WebCodecs expects interleaved? or planar?
-        // AudioData init: { format, sampleRate, numberOfFrames, numberOfChannels, timestamp, data }
-
-        // We split into chunks of e.g. 1 second (44100 frames)
         const totalFrames = audioBuffer.length;
         const channels = audioBuffer.numberOfChannels;
         const sampleRate = audioBuffer.sampleRate;
@@ -361,19 +268,10 @@ export class ExportManager {
 
         for (let frameOffset = 0; frameOffset < totalFrames; frameOffset += chunkSize) {
             const size = Math.min(chunkSize, totalFrames - frameOffset);
-
-            // Create planar data buffer
-            // Float32 format
             const destBuffer = new Float32Array(size * channels);
-            // Copy channel data
-            // AudioData expects Interleaved or Planar?
-            // "s16", "s32", "f32", "u8", "s16-planar", "s32-planar", "f32-planar"
-            // Let's use "f32-planar".
-            // Layout: C1 C1 C1 ... C2 C2 C2 ...
 
             for (let c = 0; c < channels; c++) {
                 const channelData = audioBuffer.getChannelData(c);
-                // Copy segment
                 const segment = channelData.subarray(frameOffset, frameOffset + size);
                 destBuffer.set(segment, c * size);
             }

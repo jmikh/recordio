@@ -67,7 +67,7 @@ export const ColorSettings = ({
     };
 
     return (
-        <div className="p-4 bg-surface-overlay rounded-lg border border-border space-y-4 text-text-main shadow-xl">
+        <div className="p-4 bg-surface-overlay rounded-lg border border-border space-y-4 text-text-highlighted shadow-xl">
             {/* Toggle */}
             <MultiToggle
                 options={[
@@ -93,7 +93,7 @@ export const ColorSettings = ({
                                     : 'border-border hover:border-border-hover'}`}
                                 style={{ backgroundColor: c }}
                             />
-                            <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === i ? 'text-text-primary' : 'text-text-muted'}`}>
+                            <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === i ? 'text-text-primary' : 'text-text-main'}`}>
                                 {i === 0 ? 'Start' : 'End'}
                             </span>
                         </div>
@@ -103,7 +103,7 @@ export const ColorSettings = ({
 
             {/* Color Palette */}
             <div className="space-y-2">
-                <div className="text-[10px] text-text-muted font-semibold">Palette</div>
+                <div className="text-[10px] text-text-main font-semibold">Palette</div>
                 <div className="grid grid-cols-7 gap-1.5">
                     {PRESET_COLORS.map(c => (
                         <button
@@ -128,14 +128,14 @@ export const ColorSettings = ({
 
             {/* Hex Input */}
             <div className="space-y-1">
-                <div className="text-[10px] text-text-muted font-semibold">Hex Color</div>
+                <div className="text-[10px] text-text-main font-semibold">Hex Color</div>
                 <div className="flex bg-surface border border-border rounded px-2 py-1.5 items-center gap-2">
-                    <span className="text-text-muted mr-2 select-none">#</span>
+                    <span className="text-text-main mr-2 select-none">#</span>
                     <input
                         type="text"
                         value={activeColorValue.replace('#', '')}
                         onChange={(e) => handleColorUpdate(`#${e.target.value}`)}
-                        className="bg-transparent border-none outline-none text-xs font-mono text-text-main w-full"
+                        className="bg-transparent border-none outline-none text-xs font-mono text-text-highlighted w-full"
                         maxLength={6}
                     />
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
@@ -146,10 +146,10 @@ export const ColorSettings = ({
             {isGradient && (
                 <div className="border-t border-border pt-4 mt-2">
                     <div className="flex flex-col gap-2 items-center">
-                        <label className="text-[10px] text-text-muted font-semibold">Direction</label>
+                        <label className="text-[10px] text-text-main font-semibold">Direction</label>
                         <div className="relative w-32 h-32 flex items-center justify-center bg-surface rounded-full border border-border shadow-inner mt-2">
                             {/* Center Dot */}
-                            <div className="absolute w-2 h-2 bg-text-muted rounded-full z-10" />
+                            <div className="absolute w-2 h-2 bg-text-main rounded-full z-10" />
 
                             {GRADIENT_DIRECTIONS.filter(d => !!d).map((dir) => {
                                 const isSelected = safeGradient.direction === dir;
@@ -178,7 +178,7 @@ export const ColorSettings = ({
                                         onClick={() => handleDirectionClick(dir)}
                                         className={`absolute w-8 h-8 rounded-full flex items-center justify-center transition-all transform hover:scale-110 ${isSelected
                                             ? 'bg-primary text-primary-fg shadow-primary/50 shadow-md z-20'
-                                            : 'text-text-muted hover:text-text-main hover:bg-surface-elevated'}`}
+                                            : 'text-text-main hover:text-text-highlighted hover:bg-surface-elevated'}`}
                                         style={{
                                             transform: `translate(${x}px, ${y}px)`,
                                         }}

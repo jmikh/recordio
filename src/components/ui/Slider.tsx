@@ -13,6 +13,7 @@ interface SliderProps {
     decimals?: number;
     units?: string;
     label?: string;
+    valueTransform?: (value: number) => number; // Transform storage value to display value
 }
 
 // Configurable Height Constant
@@ -34,7 +35,8 @@ export const Slider: React.FC<SliderProps> = ({
     showTooltip = false,
     decimals = 0,
     units = '',
-    label
+    label,
+    valueTransform = (v: number) => v // Identity function by default
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -140,7 +142,7 @@ export const Slider: React.FC<SliderProps> = ({
                 >
                     {/* Active Track (Left side) */}
                     <div
-                        className="absolute top-0 left-0 bottom-0 bg-text-main rounded-full"
+                        className="absolute top-0 left-0 bottom-0 bg-text-highlighted rounded-full"
                         style={{
                             width: `calc(${fraction} * 100%)`
                         }}
@@ -182,7 +184,7 @@ export const Slider: React.FC<SliderProps> = ({
                         }}
                     >
                         <div className="bg-tertiary text-text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
-                            {value.toFixed(decimals)}{units}
+                            {valueTransform(value).toFixed(decimals)}{units}
                         </div>
                     </div>
                 )}

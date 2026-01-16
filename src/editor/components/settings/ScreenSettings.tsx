@@ -43,7 +43,7 @@ export const ScreenSettings = () => {
                 <Slider
                     label="Padding"
                     min={0}
-                    max={0.2}
+                    max={0.25}
                     value={screenConfig.padding || 0}
                     onPointerDown={startInteraction}
                     onPointerUp={endInteraction}
@@ -54,7 +54,9 @@ export const ScreenSettings = () => {
                         }
                     }))}
                     showTooltip
-                    decimals={2}
+                    valueTransform={(val) => val * 100}
+                    units="%"
+                    decimals={0}
                 />
             </div>
 
@@ -95,7 +97,7 @@ export const ScreenSettings = () => {
                                             className="w-full h-full object-contain p-1"
                                         />
                                     </div>
-                                    <span className={`text-[10px] tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-primary' : 'text-text-muted'
+                                    <span className={`text-[10px] tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-primary' : 'text-text-main'
                                         }`}>
                                         {frame.name}
                                     </span>

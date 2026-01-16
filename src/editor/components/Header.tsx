@@ -22,7 +22,7 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <h1 className="font-bold text-text-main text-sm tracking-wide">RECORDO</h1>
+                    <h1 className="font-bold text-text-highlighted text-sm tracking-wide">RECORDO</h1>
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
@@ -49,7 +49,7 @@ export const Header = () => {
                     <button
                         onClick={() => useUIStore.getState().toggleDebugBar()}
                         title="Toggle Debug Bar"
-                        className="px-2 py-1 text-[10px] text-text-muted hover:text-text-main hover:bg-surface rounded border border-border"
+                        className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
                     >
                         Debug
                     </button>
@@ -61,16 +61,16 @@ export const Header = () => {
                     value={project.name}
                     onChange={(e) => updateProjectName(e.target.value)}
                     maxLength={40}
-                    className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-hover-subtle text-text-muted text-sm text-center border border-border focus:text-text-main hover:bg-hover hover:border-border-highlighted focus:bg-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-muted w-[300px] focus-ring"
+                    className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-hover-subtle text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-hover hover:border-border-highlighted focus:bg-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-main w-[300px] focus-ring"
                     placeholder="Untitled Project"
                 />
 
                 <div className="flex items-center gap-4">
-                    <div className="text-xs text-text-muted flex items-center gap-2">
+                    <div className="text-xs text-text-main flex items-center gap-2">
                         {isSaving ? (
                             <span className="text-primary-fg animate-pulse">Saving...</span>
                         ) : (
-                            <span className="text-text-muted">All changes saved</span>
+                            <span className="text-text-main">All changes saved</span>
                         )}
                     </div>
                     {/* User Profile / Other Actions */}

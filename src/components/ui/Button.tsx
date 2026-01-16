@@ -13,7 +13,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 className={`
                border border-border
                bg-hover-subtle hover:bg-hover
-               text-text-muted hover:text-text-main
+               text-text-main hover:text-text-highlighted
                rounded-sm
                px-2 py-1
                font-sm

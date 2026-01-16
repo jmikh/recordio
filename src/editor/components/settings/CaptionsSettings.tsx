@@ -3,6 +3,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CaptionSegment } from '../../../core/types';
 import { Slider } from '../../../components/ui/Slider';
+import { Toggle } from '../../../components/ui/Toggle';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
@@ -274,7 +275,7 @@ export function CaptionsSettings() {
             {!hasMicrophone ? (
                 <Notice>Microphone was not used for this recording</Notice>
             ) : (
-                <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
+                <p className="text-xs text-text-main font-light">* Currently only supports English</p>
             )}
 
             {/* Generate/Regenerate Buttons - only show if microphone is available */}
@@ -302,17 +303,11 @@ export function CaptionsSettings() {
             {hasMicrophone && (
                 <div className="space-y-3 pb-3 border-b border-border">
                     <div className="flex items-center justify-between">
-                        <label className="text-xs font-medium text-text-muted">Visible</label>
-                        <button
-                            onClick={() => updateSettings({ captions: { ...settings, visible: !settings.visible } })}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.visible ? 'bg-primary' : 'bg-surface-raised'
-                                }`}
-                        >
-                            <span
-                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.visible ? 'translate-x-5' : 'translate-x-1'
-                                    }`}
-                            />
-                        </button>
+                        <label className="text-xs font-medium text-text-main">Visible</label>
+                        <Toggle
+                            value={settings.visible}
+                            onChange={(value) => updateSettings({ captions: { ...settings, visible: value } })}
+                        />
                     </div>
 
                     <Slider
@@ -342,7 +337,7 @@ export function CaptionsSettings() {
             {
                 isTranscribing && (
                     <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-text-muted">
+                        <div className="flex items-center justify-between text-xs text-text-main">
                             <span>Transcribing audio...</span>
                             <span>{Math.round(transcriptionProgress * 100)}%</span>
                         </div>
@@ -381,14 +376,14 @@ export function CaptionsSettings() {
                                             {/* Capsule bar - time + delete */}
                                             <div className="flex items-center justify-between bg-surface-raised border border-border rounded px-3 py-0.5">
                                                 <div className="flex-1 flex items-center justify-center gap-1.5">
-                                                    <span className="text-text-muted font-mono text-[10px]">
+                                                    <span className="text-text-main font-mono text-[10px]">
                                                         {formatTime(outputStart)}
                                                     </span>
                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
                                                         <line x1="5" y1="12" x2="19" y2="12" />
                                                         <polyline points="12 5 19 12 12 19" />
                                                     </svg>
-                                                    <span className="text-text-muted font-mono text-[10px]">
+                                                    <span className="text-text-main font-mono text-[10px]">
                                                         {formatTime(outputEnd)}
                                                     </span>
                                                 </div>
@@ -409,7 +404,7 @@ export function CaptionsSettings() {
                                                     onInput={(e) => handleInput(e, segment.id)}
                                                     onKeyDown={handleKeyDown}
                                                     onBlur={handleBlur}
-                                                    className={`cursor-text transition-colors ${isEditing ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'}`}
+                                                    className={`cursor-text transition-colors ${isEditing ? 'text-text-highlighted' : 'text-text-main group-hover:text-text-highlighted'}`}
                                                     style={{
                                                         lineHeight: 1.4,
                                                         textShadow: '0 1px 2px rgba(0,0,0,0.8)',

@@ -35,11 +35,12 @@ export function drawCaptions(
         return;
     }
 
-    // Drawing Settings
+    // Drawing Settings (scaled based on output width, reference: 1920px)
+    const scale = outputSize.width / 1920;
     const fontSize = settings.size;
-    const paddingX = 32;
-    const paddingY = 16;
-    const cornerRadius = 12;
+    const paddingX = 32 * scale;
+    const paddingY = 16 * scale;
+    const cornerRadius = 12 * scale;
     const marginBottom = outputSize.height * 0.02; // 2% from bottom of canvas
     const maxWidth = outputSize.width * (settings.width / 100); // Use width setting as percentage
 
@@ -107,8 +108,7 @@ export function drawCaptions(
         }
 
         // Move up for next caption (if any)
-        // Next caption's bottom will be above current box top with a 16px gap
-        boxBottomY = boxY - 16;
+        boxBottomY = boxY - (16 * scale);
     }
 
     ctx.restore();
