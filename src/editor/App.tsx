@@ -9,7 +9,7 @@ import { useHistorySync } from './hooks/useHistorySync';
 
 import { ProjectStorage } from '../storage/projectStorage';
 import { ProjectSelector } from './components/ProjectSelector';
-import { ProgressModal } from './components/common/ProgressModal';
+import { ProgressModal } from '../components/ui/ProgressModal';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/Header';

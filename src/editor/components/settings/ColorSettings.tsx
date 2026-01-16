@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
-import { MultiToggle } from '../common/MultiToggle';
+import { MultiToggle } from '../../../components/ui/MultiToggle';
 
 
 const GRADIENT_DIRECTIONS = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'] as const;

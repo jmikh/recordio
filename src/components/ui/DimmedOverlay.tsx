@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Rect } from '../../../core/types';
+import type { Rect } from '../../core/types';
 
 interface DimmedOverlayProps {
     /** The rectangle to "cut out" (transparent hole) */

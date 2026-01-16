@@ -1,21 +1,7 @@
 import { useProjectStore, useProjectData, useProjectHistory } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 import { ExportButton } from './export/ExportButton';
-
-// Icons
-const IconUndo = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 7v6h6" />
-        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-    </svg>
-);
-
-const IconRedo = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 7v6h-6" />
-        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 3.7" />
-    </svg>
-);
+import { FaUndo, FaRedo } from 'react-icons/fa';
 
 export const Header = () => {
     const project = useProjectData();
@@ -39,17 +25,17 @@ export const Header = () => {
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                         >
-                            <IconUndo />
+                            <FaUndo size={14} />
                         </button>
                         <button
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                         >
-                            <IconRedo />
+                            <FaRedo size={14} />
                         </button>
                     </div>
 

@@ -156,7 +156,7 @@
    /* ─────────────────────────────────────────────────────────
      7. Focus Ring
      ───────────────────────────────────────────────────────── */
-   --ring-color: oklch(0.65 0.22 var(--hue-primary));
+   --ring-color: oklch(0.65 0.22 var(--hue-secondary));
    --ring-width: 2px;
    --ring-offset: 2px;
 

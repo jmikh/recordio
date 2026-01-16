@@ -1,9 +1,9 @@
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality } from '../../export/ExportManager';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { Dropdown } from '../common/Dropdown';
-import type { DropdownOption } from '../common/Dropdown';
-import { PrimaryButton } from '../common/PrimaryButton';
+import { Dropdown } from '../../../components/ui/Dropdown';
+import type { DropdownOption } from '../../../components/ui/Dropdown';
+import { PrimaryButton } from '../../../components/ui/PrimaryButton';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
     { value: '360p', label: '360p' },

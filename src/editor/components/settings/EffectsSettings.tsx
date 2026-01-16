@@ -1,9 +1,9 @@
 
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '../common/Slider';
-import { MultiToggle } from '../common/MultiToggle';
-import { Toggle } from '../common/Toggle';
+import { Slider } from '../../../components/ui/Slider';
+import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { Toggle } from '../../../components/ui/Toggle';
 
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
@@ -11,10 +11,11 @@ export const EffectsSettings = () => {
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
     const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
+    const userEvents = useProjectStore(s => s.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-
-
+    // no mouse positions is enough indicator
+    const hasNoUserEvents = userEvents.mousePositions.length === 0
 
     const handleClearZooms = () => {
         // 1. Clear motions
@@ -38,6 +39,14 @@ export const EffectsSettings = () => {
     return (
         <div className="flex flex-col gap-6 text-sm text-text-muted">
             {/* ZOOM SETTINGS */}
+            {/* Disclaimer for missing user events */}
+            {hasNoUserEvents && (
+                <div className="text-xs text-text-muted flex items-start gap-1">
+                    <span className="text-text-muted/40">*</span>
+                    <span>Auto zoom and effects are only available for recordings of Chrome tabs and Chrome windows.</span>
+                </div>
+            )}
+
             {/* Header with Title and Toggle */}
             <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>

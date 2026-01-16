@@ -2,8 +2,8 @@ import React, { useRef, useState } from 'react';
 import { HexColorPicker } from "react-colorful";
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { createPortal } from 'react-dom';
-import { Slider } from '../common/Slider';
-import { MultiToggle } from '../common/MultiToggle';
+import { Slider } from '../../../components/ui/Slider';
+import { MultiToggle } from '../../../components/ui/MultiToggle';
 
 export interface StyleSettings {
     borderRadius: number;

@@ -45,8 +45,9 @@ export const AudioVisualizerWrapper: React.FC<AudioVisualizerWrapperProps> = ({ 
             for (let i = 0; i < bufferLength; i++) {
                 barHeight = (dataArray[i] / 255) * height; // Normalize to canvas height
 
-                // Draw rounded bar
-                ctx.fillStyle = '#A855F7'; // Purple-500
+                // Use primary color from design system
+                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+                ctx.fillStyle = primaryColor || 'oklch(0.58 0.19 265)'; // Fallback to primary
 
                 // Simple rect for now, could be improved
                 ctx.fillRect(x, height - barHeight, barWidth, barHeight);

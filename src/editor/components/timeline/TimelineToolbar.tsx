@@ -4,10 +4,10 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
-import { Slider } from '../common/Slider';
-import { Dropdown } from '../common/Dropdown';
-import type { DropdownOption } from '../common/Dropdown';
-import { Button } from '../common/Button';
+import { Slider } from '../../../components/ui/Slider';
+import { Dropdown } from '../../../components/ui/Dropdown';
+import type { DropdownOption } from '../../../components/ui/Dropdown';
+import { Button } from '../../../components/ui/Button';
 
 
 interface TimelineToolbarProps {
@@ -158,7 +158,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 />
             </div>
 
-            <div className="flex items-center gap-4 bg-background px-4 py-1 rounded-full border border-border">
+            <div className="flex items-center gap-4 bg-surface-raised px-4 py-1 rounded-full border border-border">
                 <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-main">
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>

@@ -12,7 +12,7 @@ import { EventsTrack } from './EventsTrack';
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
-import { Scrollbar } from '../common/Scrollbar';
+import { Scrollbar } from '../../../components/ui/Scrollbar';
 import { useUIStore } from '../../stores/useUIStore';
 
 

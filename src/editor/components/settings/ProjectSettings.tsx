@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import type { Project } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { ProjectCard } from '../common/ProjectCard';
+import { ProjectCard } from '../../../components/ui/ProjectCard';
 
 export const ProjectSettings = () => {
     const { project: activeProject, isSaving } = useProjectStore();

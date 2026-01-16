@@ -55,7 +55,8 @@ export class ProjectImpl {
 
                 captions: {
                     visible: true,
-                    size: 24
+                    size: 24,
+                    width: 75
                 },
 
                 camera: {

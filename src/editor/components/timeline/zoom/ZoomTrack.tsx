@@ -90,6 +90,12 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
+                {/* Full-width overlay bar for zoom track */}
+                <div
+                    className="absolute top-[4px] bottom-[4px] left-0 right-0 bg-surface-overlay rounded-sm"
+                    style={{ zIndex: 1 }}
+                />
+
                 {/* Existing Motions */}
                 {(() => {
                     const motions = timeline.recording.viewportMotions || [];

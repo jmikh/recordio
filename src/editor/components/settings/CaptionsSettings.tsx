@@ -2,14 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CaptionSegment } from '../../../core/types';
-import { Slider } from '../common/Slider';
+import { Slider } from '../../../components/ui/Slider';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
-import { ProgressModal } from '../common/ProgressModal';
-import { PrimaryButton } from '../common/PrimaryButton';
-import { Notice } from '../common/Notice';
-import { XButton } from '../common/XButton';
+import { ProgressModal } from '../../../components/ui/ProgressModal';
+import { PrimaryButton } from '../../../components/ui/PrimaryButton';
+import { Notice } from '../../../components/ui/Notice';
+import { XButton } from '../../../components/ui/XButton';
 
 /**
  * Settings panel for managing captions.
@@ -36,7 +36,7 @@ export function CaptionsSettings() {
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const captions = project.timeline.recording.captions;
-    const settings = project.settings.captions || { visible: true, size: 24 };
+    const settings = project.settings.captions || { visible: true, size: 24, width: 75 };
 
     const timeMapper = useTimeMapper();
 
@@ -322,6 +322,16 @@ export function CaptionsSettings() {
                         max={48}
                         label="Size"
                         units="px"
+                        decimals={0}
+                    />
+
+                    <Slider
+                        value={settings.width}
+                        onChange={(value) => updateSettings({ captions: { ...settings, width: value } })}
+                        min={30}
+                        max={100}
+                        label="Width"
+                        units="%"
                         decimals={0}
                     />
                 </div>

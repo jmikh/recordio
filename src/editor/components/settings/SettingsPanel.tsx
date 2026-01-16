@@ -58,7 +58,7 @@ const IconCaptions = () => (
 );
 
 
-import { Scrollbar } from '../common/Scrollbar';
+import { Scrollbar } from '../../../components/ui/Scrollbar';
 
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('screen');

@@ -41,7 +41,7 @@ export function drawCaptions(
     const paddingY = 16;
     const cornerRadius = 12;
     const marginBottom = outputSize.height * 0.02; // 2% from bottom of canvas
-    const maxWidth = outputSize.width * 0.75; // 75% of canvas width
+    const maxWidth = outputSize.width * (settings.width / 100); // Use width setting as percentage
 
     ctx.save();
 

@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
-import { Slider } from '../common/Slider';
+import { Slider } from '../../../components/ui/Slider';
 // import { ScreenSettings } from './ScreenSettings';
 
 // Helper to convert N, NE, etc. to degrees

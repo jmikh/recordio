@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Project } from '../../../core/types';
+import type { Project } from '../../core/types';
 import { XButton } from './XButton';
 
 interface ProjectCardProps {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
-import { MultiToggle } from '../../editor/components/common/MultiToggle';
+import { MultiToggle, Toggle, Dropdown, Button } from '../../components/ui';
 import permissionGuide from '../../assets/permission-guide.jpg';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
@@ -53,6 +53,15 @@ function App() {
     }, (response: any) => {
       if (response && response.isRecording) {
         setIsRecording(true);
+      }
+    });
+
+    // 4. Disable blur mode when popup opens
+    chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: MSG_TYPES.DISABLE_BLUR_MODE }).catch(() => {
+          // Ignore errors if content script is not loaded
+        });
       }
     });
 
@@ -264,12 +273,12 @@ function App() {
           <img src={permissionGuide} alt="Permission Guide" className="w-full h-auto" />
         </div>
 
-        <button
+        <Button
           onClick={openOptions}
-          className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded transition-colors border border-slate-600"
+          className="w-full py-2 text-sm"
         >
           Open Settings
-        </button>
+        </Button>
 
         <p className="text-xs text-slate-500 mt-4 text-center">
           After enabling, please close and reopen this popup.
@@ -279,9 +288,9 @@ function App() {
   }
 
   return (
-    <div className="w-[320px] bg-slate-900 text-white font-sans overflow-hidden flex flex-col transition-all duration-300">
+    <div className="w-[320px] bg-surface-body text-text-main font-sans overflow-hidden flex flex-col transition-all duration-300">
       <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
-        <h1 className="text-2xl font-bold mb-6 bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold mb-6 text-primary">
           Recordo
         </h1>
 
@@ -325,37 +334,48 @@ function App() {
             )}
 
             {recordingMode === 'tab' && canInjectContentScript !== false && (
-              <button
+              <Button
                 onClick={handleBlurMode}
-                className="w-full mb-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                className="w-full mb-4 py-2 flex items-center justify-center gap-2 text-sm"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /><path d="M10 12h.01" /><path d="M2 2l20 20" /></svg>
                 Blur Elements
-              </button>
+              </Button>
             )}
 
             {/* Audio Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-300 flex items-center gap-2">
+                <span className="text-sm text-text-main flex items-center gap-2">
                   Microphone
                 </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={isAudioEnabled} onChange={(e) => handleAudioToggle(e.target.checked)} className="sr-only peer" />
-                  <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
-                </label>
+                <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
               </div>
               {isAudioEnabled && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                  <select
+                  <Dropdown
+                    options={audioDevices.map(d => ({
+                      value: d.deviceId,
+                      label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          <line x1="12" x2="12" y1="19" y2="22" />
+                        </svg>
+                      )
+                    }))}
                     value={selectedAudioId}
-                    onChange={(e) => setSelectedAudioId(e.target.value)}
-                    className="w-full bg-slate-800 text-xs border border-slate-700 rounded p-2 text-slate-300 outline-none focus:border-purple-500 transition-colors"
-                  >
-                    {audioDevices.map(d => (
-                      <option key={d.deviceId} value={d.deviceId}>{d.label || `Microphone ${d.deviceId.slice(0, 4)}...`}</option>
-                    ))}
-                  </select>
+                    onChange={setSelectedAudioId}
+                    trigger={
+                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                        <span>{audioDevices.find(d => d.deviceId === selectedAudioId)?.label || `Microphone ${selectedAudioId.slice(0, 4)}...`}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    }
+                  />
                   <AudioVisualizerWrapper stream={audioStream} />
                 </div>
               )}
@@ -364,23 +384,33 @@ function App() {
             {/* Video Controls */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-300">Camera</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={isVideoEnabled} onChange={(e) => handleVideoToggle(e.target.checked)} className="sr-only peer" />
-                  <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-600"></div>
-                </label>
+                <span className="text-sm text-text-main">Camera</span>
+                <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
               </div>
               {isVideoEnabled && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                  <select
+                  <Dropdown
+                    options={videoDevices.map(d => ({
+                      value: d.deviceId,
+                      label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m22 8-6 4 6 4V8Z" />
+                          <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
+                        </svg>
+                      )
+                    }))}
                     value={selectedVideoId}
-                    onChange={(e) => setSelectedVideoId(e.target.value)}
-                    className="w-full bg-slate-800 text-xs border border-slate-700 rounded p-2 text-slate-300 outline-none focus:border-pink-500 transition-colors"
-                  >
-                    {videoDevices.map(d => (
-                      <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 4)}...`}</option>
-                    ))}
-                  </select>
+                    onChange={setSelectedVideoId}
+                    trigger={
+                      <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                        <span>{videoDevices.find(d => d.deviceId === selectedVideoId)?.label || `Camera ${selectedVideoId.slice(0, 4)}...`}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    }
+                  />
                   <CameraPreview stream={videoStream} />
                 </div>
               )}
@@ -403,7 +433,7 @@ function App() {
           </button>
         )}
 
-        <p className="mt-6 text-slate-400 text-xs">
+        <p className="mt-6 text-text-muted text-xs">
           {isRecording ? 'Recording in progress...' : 'Ready to capture'}
         </p>
       </div>

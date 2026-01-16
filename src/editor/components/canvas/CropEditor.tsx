@@ -8,8 +8,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/viewMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox } from './BoundingBox';
-import { DimmedOverlay } from '../common/DimmedOverlay';
-import { SecondaryButton } from '../common/SecondaryButton';
+import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
+import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy

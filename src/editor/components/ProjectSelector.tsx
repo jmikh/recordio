@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../../storage/projectStorage';
 import type { Project } from '../../core/types';
 
-import { ProjectCard } from './common/ProjectCard';
+import { ProjectCard } from '../../components/ui/ProjectCard';
 
 interface ProjectSelectorProps {
     error?: string;
