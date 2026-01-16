@@ -394,6 +394,9 @@ export class VideoRecorder {
         }
 
         // 3. Create Screen Source
+        // Screen hasAudio if: system audio exists OR microphone mixed in (single mode)
+        const screenHasAudio = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
+
         const screenSource: SourceMetadata = {
             id: `src-${projectId}-screen`,
             type: 'video',
@@ -401,7 +404,7 @@ export class VideoRecorder {
             eventsUrl: eventsBlobId ? `recordo-blob://${eventsBlobId}` : undefined,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
-            hasAudio: true,
+            hasAudio: screenHasAudio,
             has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0), // Mic baked into screen if no camera
             createdAt: now,
             name: this.config.sourceName || this.mode
@@ -423,7 +426,7 @@ export class VideoRecorder {
                 url: `recordo-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
-                hasAudio: false, // Audio is in screen or mixed separate, but cam stream usually just video if separate
+                hasAudio: Boolean(this.config.hasAudio), // Has microphone audio in dual mode
                 has_microphone: Boolean(this.config.hasAudio), // Mic is on camera track in dual mode
                 createdAt: now,
                 name: 'Camera'

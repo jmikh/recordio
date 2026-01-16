@@ -139,23 +139,28 @@ export class ExportManager {
 
             await Promise.all(Object.values(sources).map(async (source) => {
                 if (!source.hasAudio) return;
-                const response = await fetch(source.url);
-                const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
-                renderProject.timeline.outputWindows.forEach((window: any) => {
-                    const sourceNode = offlineCtx.createBufferSource();
-                    sourceNode.buffer = audioBuffer;
-                    sourceNode.connect(offlineCtx.destination);
+                try {
+                    const response = await fetch(source.url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
-                    const startTime = window.startMs / 1000;
-                    const duration = (window.endMs - window.startMs) / 1000;
-                    const offset = (window.startMs) / 1000;
+                    renderProject.timeline.outputWindows.forEach((window: any) => {
+                        const sourceNode = offlineCtx.createBufferSource();
+                        sourceNode.buffer = audioBuffer;
+                        sourceNode.connect(offlineCtx.destination);
 
-                    if (offset >= 0 && offset < audioBuffer.duration) {
-                        sourceNode.start(startTime, offset, duration);
-                    }
-                });
+                        const startTime = window.startMs / 1000;
+                        const duration = (window.endMs - window.startMs) / 1000;
+                        const offset = (window.startMs) / 1000;
+
+                        if (offset >= 0 && offset < audioBuffer.duration) {
+                            sourceNode.start(startTime, offset, duration);
+                        }
+                    });
+                } catch (error) {
+                    console.warn(`[Export] Failed to decode audio for source ${source.id}:`, error);
+                }
             }));
 
             const renderedAudioBuffer = await offlineCtx.startRendering();

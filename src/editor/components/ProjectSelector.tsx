@@ -58,7 +58,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                 <div className="w-full max-w-4xl p-8 pb-4 flex flex-col gap-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-tertiary">Recordo Projects</h1>
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-tertiary">Recordio Projects</h1>
                             <p className="text-text-main mt-1">Select a project to continue editing</p>
                         </div>
                     </div>
@@ -95,7 +95,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                                     <div className="text-center py-12 text-text-main border border-dashed border-border rounded-xl">
                                         <p className="text-lg mb-2">No projects found.</p>
                                         <p className="text-text-main">
-                                            To create a new project, start a recording via the Recordo extension.
+                                            To create a new project, start a recording via the Recordio extension.
                                         </p>
                                     </div>
                                 ) : (

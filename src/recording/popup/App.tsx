@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
-import { MultiToggle, Toggle, Dropdown, Button } from '../../components/ui';
+import { MultiToggle, Toggle, Dropdown, Button, PrimaryButton } from '../../components/ui';
 import { MdBugReport } from 'react-icons/md';
+import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import permissionGuide from '../../assets/permission-guide.jpg';
 
@@ -266,13 +267,13 @@ function App() {
 
   if (hasPermissionError) {
     return (
-      <div className="w-[320px] bg-slate-900 text-white font-sans overflow-hidden flex flex-col p-4">
-        <h2 className="text-xl font-bold mb-4 text-red-500">Permission Denied</h2>
-        <p className="text-sm text-slate-300 mb-4">
-          Please allow access to your microphone and camera to use Recordo.
+      <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col p-4">
+        <h2 className="text-xl font-bold mb-4 text-destructive">Permission Denied</h2>
+        <p className="text-sm text-text-main mb-4">
+          Please allow access to your microphone and camera to use Recordio.
         </p>
 
-        <div className="mb-4 rounded-lg overflow-hidden border border-slate-700">
+        <div className="mb-4 rounded-lg overflow-hidden border border-border">
           <img src={permissionGuide} alt="Permission Guide" className="w-full h-auto" />
         </div>
 
@@ -283,7 +284,7 @@ function App() {
           Open Settings
         </Button>
 
-        <p className="text-xs text-slate-500 mt-4 text-center">
+        <p className="text-xs text-text-muted mt-4 text-center">
           After enabling, please close and reopen this popup.
         </p>
       </div>
@@ -294,7 +295,7 @@ function App() {
     <div className="w-[320px] bg-surface-body text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
       <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
         <h1 className="text-2xl font-bold mb-6 text-primary">
-          Recordo
+          Recordio
         </h1>
 
         {!isRecording ? (
@@ -326,24 +327,14 @@ function App() {
             </div>
 
             {recordingMode === 'tab' && canInjectContentScript === false && (
-              <div className="w-full bg-red-500/10 border border-red-500/50 rounded-lg p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                <div className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+              <div className="w-full bg-destructive/10 border border-destructive/50 rounded-lg p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
+                <div className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                 </div>
-                <span className="text-xs text-red-200 leading-tight">
-                  Cannot record tab of Chrome own pages. Start Recordo in another tab or use Window or Screen mode instead.
+                <span className="text-xs text-destructive leading-tight">
+                  Cannot record tab of Chrome own pages. Start Recordio in another tab or use Window or Screen mode instead.
                 </span>
               </div>
-            )}
-
-            {recordingMode === 'tab' && canInjectContentScript !== false && (
-              <Button
-                onClick={handleBlurMode}
-                className="w-full mb-4 py-2 flex items-center justify-center gap-2 text-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /><path d="M10 12h.01" /><path d="M2 2l20 20" /></svg>
-                Blur Elements
-              </Button>
             )}
 
             {/* Audio Controls */}
@@ -419,33 +410,37 @@ function App() {
               )}
             </div>
 
-            <button
+            <PrimaryButton
               onClick={startRecording}
               disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
-              className={`mt-2 group relative w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-red-500/50 ${(hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className="mt-4 w-full"
             >
-              <div className="w-5 h-5 bg-white rounded-full group-hover:scale-110 transition-transform" />
-            </button>
+              Start Recording
+            </PrimaryButton>
           </div>
         ) : (
           <button
             onClick={stopRecording}
-            className="group relative w-20 h-20 rounded-full bg-slate-800 border-2 border-red-500 hover:bg-red-900/20 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-red-500/20"
+            className="group relative w-20 h-20 rounded-full bg-surface-raised border-2 border-destructive hover:bg-destructive/10 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-destructive/20"
           >
-            <div className="w-6 h-6 bg-red-500 rounded sm group-hover:scale-90 transition-transform" />
+            <div className="w-6 h-6 bg-destructive rounded sm group-hover:scale-90 transition-transform" />
           </button>
         )}
 
-        <p className="mt-6 text-text-main text-xs">
-          {isRecording ? 'Recording in progress...' : 'Ready to capture'}
-        </p>
-
-        <div className="mt-4">
-          <Button onClick={() => setIsBugReportModalOpen(true)} className="text-xs">
-            <MdBugReport size={18} />
-            <span>Report Bug</span>
-          </Button>
-        </div>
+        {!isRecording && (
+          <div className="mt-4 flex gap-2 w-full">
+            {recordingMode === 'tab' && canInjectContentScript !== false && (
+              <Button onClick={handleBlurMode} className="flex-1">
+                <FiEyeOff />
+                Blur Items
+              </Button>
+            )}
+            <Button onClick={() => setIsBugReportModalOpen(true)} className="flex-1">
+              <MdBugReport />
+              Report Bug
+            </Button>
+          </div>
+        )}
       </div>
       <BugReportModal
         isOpen={isBugReportModalOpen}

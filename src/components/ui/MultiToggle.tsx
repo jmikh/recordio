@@ -63,7 +63,7 @@ export const MultiToggle = <T extends string>({
                             transition-colors duration-200
                             ${isSelected
                                 ? 'text-text-highlighted'
-                                : 'text-text-main hover:text-text-highlighted'
+                                : 'text-text-muted hover:text-text-highlighted'
                             }
                         `}
                     >

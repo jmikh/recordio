@@ -26,7 +26,7 @@ const cleanupEvent = new Event('recordo-cleanup');
 window.dispatchEvent(cleanupEvent);
 
 window.addEventListener('recordo-cleanup', () => {
-    logger.log("[Recordo] Cleaning up old content script instance.");
+    logger.log("[Recordio] Cleaning up old content script instance.");
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;
@@ -36,7 +36,7 @@ window.addEventListener('recordo-cleanup', () => {
 }, { once: true });
 
 // --- Initialization ---
-logger.log("[Recordo] Content script loaded. Checking recording state...");
+logger.log("[Recordio] Content script loaded. Checking recording state...");
 
 chrome.runtime.sendMessage({
     type: MSG_TYPES.GET_RECORDING_STATE,

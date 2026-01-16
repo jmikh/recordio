@@ -275,7 +275,7 @@ export function CaptionsSettings() {
             {!hasMicrophone ? (
                 <Notice>Microphone was not used for this recording</Notice>
             ) : (
-                <p className="text-xs text-text-main font-light">* Currently only supports English</p>
+                <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
             )}
 
             {/* Generate/Regenerate Buttons - only show if microphone is available */}

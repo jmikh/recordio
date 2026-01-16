@@ -1,7 +1,7 @@
 /**
  * @fileoverview Background Service Worker
  * 
- * Orchestrates recording sessions for the Recordo extension.
+ * Orchestrates recording sessions for the Recordio extension.
  * - Routes messages between popup, content scripts, offscreen doc, and controller
  * - Manages session state (start/stop recording, mode selection)
  * - Handles tab capture (tab mode) and desktop capture picker (window/desktop mode)

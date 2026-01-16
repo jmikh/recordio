@@ -48,7 +48,7 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
             <div className="bg-surface-raised rounded-lg p-6 w-full max-w-md border border-border">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">

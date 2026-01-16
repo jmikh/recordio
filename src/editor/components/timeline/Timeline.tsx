@@ -173,7 +173,7 @@ export function Timeline() {
             />
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div className="flex-1 flex bg-surface-raised overflow-hidden relative">
+            <div className="flex-1 flex bg-surface overflow-hidden relative">
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -186,18 +186,11 @@ export function Timeline() {
                     {/* Header: Main Track */}
                     <div className="shrink-0" style={{ height: mainTrackHeight }}>
                         <div className="flex flex-col w-full h-full">
-                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="border-b border-border" />
-                            {!!timeline.recording.cameraSourceId ? (
-                                <TimelineTrackHeader
-                                    title="Screen & Camera"
-                                    height={TRACK_HEIGHT}
-                                />
-                            ) : (
-                                <TimelineTrackHeader
-                                    title="Screen"
-                                    height={TRACK_HEIGHT}
-                                />
-                            )}
+                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="" />
+                            <TimelineTrackHeader
+                                title="Recording"
+                                height={TRACK_HEIGHT}
+                            />
                         </div>
                     </div>
 
@@ -206,7 +199,7 @@ export function Timeline() {
 
                     {/* Header: Zoom */}
                     <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Zoom & Pan" height={ZOOM_TRACK_HEIGHT} />
+                        <TimelineTrackHeader title="Zoom" height={ZOOM_TRACK_HEIGHT} />
                     </div>
 
                     {/* Gap */}
@@ -214,7 +207,7 @@ export function Timeline() {
 
                     {/* Header: Events */}
                     <div className="shrink-0" style={{ height: EVENTS_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Input Events" height={EVENTS_TRACK_HEIGHT} />
+                        <TimelineTrackHeader title="Events" height={EVENTS_TRACK_HEIGHT} />
                     </div>
 
                     {/* Gap */}

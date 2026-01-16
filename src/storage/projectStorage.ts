@@ -3,7 +3,7 @@ import type { ID, Project, SourceMetadata } from '../core/types';
 
 
 
-const DB_NAME = 'RecordoDB';
+const DB_NAME = 'RecordioDB';
 const DB_VERSION = 2; // Incremented for schema change (thumbnails store)
 
 export class ProjectStorage {
@@ -44,7 +44,7 @@ export class ProjectStorage {
             };
 
             request.onerror = (event) => {
-                console.error('RecordoDB open failed:', event);
+                console.error('RecordioDB open failed:', event);
                 reject((event.target as IDBOpenDBRequest).error);
             };
         });

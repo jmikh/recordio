@@ -11,18 +11,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <button
                 ref={ref}
                 className={`
+               flex items-center justify-center gap-2
                border border-border
                bg-hover-subtle hover:bg-hover
                text-text-main hover:text-text-highlighted
+               text-xs
                rounded-sm
-               px-2 py-1
-               font-sm
+               px-2 py-1.5
                transition-colors
                cursor-pointer
                disabled:opacity-50 disabled:cursor-not-allowed
                ${className}
             `}
-                {...props}
+            {...props}
             >
                 {children}
             </button>

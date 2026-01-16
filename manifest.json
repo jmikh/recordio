@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Recordo - Smart Screen Recorder",
+    "name": "Recordio - Smart Screen Recorder",
     "version": "1.0.0",
     "description": "Record screen with intelligent zoom interactions.",
     "permissions": [

@@ -74,11 +74,10 @@ export const Header = () => {
                         )}
                     </div>
                     {/* User Profile / Other Actions */}
+                    <ExportButton />
                     <Button onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
                         <MdBugReport size={18} />
                     </Button>
-                    <ExportButton />
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
                 </div>
             </div>
             <BugReportModal

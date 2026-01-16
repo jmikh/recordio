@@ -2,7 +2,7 @@
 
 ## What Was Implemented
 
-Successfully integrated Sentry bug reporting into your Recordo Chrome extension. Users can now click a button to report bugs, which will be sent to your Sentry dashboard with full context.
+Successfully integrated Sentry bug reporting into your Recordio Chrome extension. Users can now click a button to report bugs, which will be sent to your Sentry dashboard with full context.
 
 ## Files Created/Modified
 
@@ -64,7 +64,7 @@ The Sentry integration is currently set to **production-only** (`enabled: IS_PRO
 
 All bug reports go to your Sentry project:
 - **Dashboard**: https://sentry.io
-- **Project**: Recordo Chrome Extension
+- **Project**: Recordio Chrome Extension
 - **Organization**: Your Sentry account
 
 You'll see:

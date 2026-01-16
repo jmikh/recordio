@@ -18,8 +18,8 @@ export const ProgressModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-background/80 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-surface-elevated border border-border rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-surface-raised border border-border rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
 
                 <div className="flex items-center justify-between">
                     <h2 className="text-text-highlighted font-semibold text-lg">{title}</h2>

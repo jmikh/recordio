@@ -41,9 +41,8 @@ export const EffectsSettings = () => {
             {/* ZOOM SETTINGS */}
             {/* Disclaimer for missing user events */}
             {hasNoUserEvents && (
-                <div className="text-xs text-text-main flex items-start gap-1">
-                    <span className="text-text-main/40">*</span>
-                    <span>Auto zoom and effects are only available for recordings of Chrome tabs and Chrome windows.</span>
+                <div className="text-xs text-text-muted font-thin flex items-start gap-1">
+                    <span>* Auto zoom and effects are only available for recordings of Chrome tabs and Chrome windows.</span>
                 </div>
             )}
 
