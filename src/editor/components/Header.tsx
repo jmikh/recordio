@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import { useProjectStore, useProjectData, useProjectHistory } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 import { ExportButton } from './export/ExportButton';
 import { FaUndo, FaRedo } from 'react-icons/fa';
+import { MdBugReport } from 'react-icons/md';
+import { Button } from '../../components/ui/Button';
+import { BugReportModal } from '../../components/ui/BugReportModal';
 
 export const Header = () => {
+    const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
     const project = useProjectData();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
@@ -21,22 +26,22 @@ export const Header = () => {
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
-                        <button
+                        <Button
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                            className="p-1.5"
                         >
                             <FaUndo size={14} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="p-2 text-text-muted hover:text-text-main hover:bg-surface rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                            className="p-1.5"
                         >
                             <FaRedo size={14} />
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
@@ -48,10 +53,6 @@ export const Header = () => {
                     >
                         Debug
                     </button>
-
-                    <div className="text-[10px] text-text-muted ml-4">
-                        {pastStates.length} / {futureStates.length}
-                    </div>
                 </div>
 
                 {/* Project Name (Centered in Top Row) */}
@@ -73,10 +74,17 @@ export const Header = () => {
                         )}
                     </div>
                     {/* User Profile / Other Actions */}
+                    <Button onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
+                        <MdBugReport size={18} />
+                    </Button>
                     <ExportButton />
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
                 </div>
             </div>
+            <BugReportModal
+                isOpen={isBugReportModalOpen}
+                onClose={() => setIsBugReportModalOpen(false)}
+            />
         </div>
     );
 };

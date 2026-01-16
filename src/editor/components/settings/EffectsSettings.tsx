@@ -83,7 +83,7 @@ export const EffectsSettings = () => {
                 <Slider
                     label="Max Zoom"
                     min={1.1}
-                    max={5}
+                    max={3}
                     value={zoomSettings.maxZoom}
                     onChange={handleMaxZoomChange}
                     onPointerDown={startInteraction}

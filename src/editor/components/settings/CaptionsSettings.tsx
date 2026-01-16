@@ -318,10 +318,11 @@ export function CaptionsSettings() {
                     <Slider
                         value={settings.size}
                         onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
-                        min={16}
-                        max={48}
+                        min={32}
+                        max={64}
                         label="Size"
                         units="px"
+                        showTooltip={true}
                         decimals={0}
                     />
 
@@ -332,6 +333,7 @@ export function CaptionsSettings() {
                         max={100}
                         label="Width"
                         units="%"
+                        showTooltip={true}
                         decimals={0}
                     />
                 </div>

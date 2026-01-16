@@ -13,9 +13,13 @@
  */
 
 import { logger } from '../../utils/logger';
+import { initSentry } from '../../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
 import { BlurManager } from './blurManager';
+
+// Initialize Sentry for error tracking
+initSentry('content');
 
 // Cleanup mechanism for previous instances
 const cleanupEvent = new Event('recordo-cleanup');

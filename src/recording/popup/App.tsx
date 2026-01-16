@@ -3,6 +3,8 @@ import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
 import { MultiToggle, Toggle, Dropdown, Button } from '../../components/ui';
+import { MdBugReport } from 'react-icons/md';
+import { BugReportModal } from '../../components/ui/BugReportModal';
 import permissionGuide from '../../assets/permission-guide.jpg';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
@@ -27,6 +29,7 @@ function App() {
   const [audioPermission, setAudioPermission] = useState<PermissionState>('unknown');
   const [videoPermission, setVideoPermission] = useState<PermissionState>('unknown');
   const [canInjectContentScript, setCanInjectContentScript] = useState<boolean | null>(null);
+  const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
 
   useEffect(() => {
     // 1. Initial State from Storage
@@ -436,7 +439,18 @@ function App() {
         <p className="mt-6 text-text-muted text-xs">
           {isRecording ? 'Recording in progress...' : 'Ready to capture'}
         </p>
+
+        <div className="mt-4">
+          <Button onClick={() => setIsBugReportModalOpen(true)} className="text-xs">
+            <MdBugReport size={18} />
+            <span>Report Bug</span>
+          </Button>
+        </div>
       </div>
+      <BugReportModal
+        isOpen={isBugReportModalOpen}
+        onClose={() => setIsBugReportModalOpen(false)}
+      />
     </div>
   );
 }

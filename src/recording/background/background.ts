@@ -10,9 +10,11 @@
 
 import { type Size } from '../../core/types';
 import { logger } from '../../utils/logger';
+import { initSentry } from '../../utils/sentry';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
-logger.log("Background service worker running");
+// Initialize Sentry for error tracking
+initSentry('background');
 
 // --- State Management ---
 

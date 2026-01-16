@@ -71,7 +71,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 {/* Full-width overlay bar for main track */}
                 <div
                     className="absolute top-0 bottom-0 left-0 right-0 bg-surface-overlay rounded-sm"
-                    style={{ zIndex: 1 }}
+                    style={{ zIndex: 0 }}
                 />
 
                 {timeline.outputWindows.map((w) => {

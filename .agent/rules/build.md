@@ -9,3 +9,4 @@ trigger: always_on
 - Never worry about backward compatability
 - Source Time means the time in video (no gaps), output time is actual time in output after applying windows to source video. we use timeMapper to translate between both
 - only react components files start with capital letter. the rest use camelCase
+- always look at index.css and components/common to use existing styles in compoenents

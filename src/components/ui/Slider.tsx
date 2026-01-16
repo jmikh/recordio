@@ -175,17 +175,15 @@ export const Slider: React.FC<SliderProps> = ({
                 {/* Tooltip */}
                 {showTooltip && isDragging && (
                     <div
-                        className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none z-20"
+                        className="absolute bg-primary bottom-full mb-1 flex flex-col items-center pointer-events-none z-20 rounded-full"
                         style={{
                             left: thumbLeft,
                             transform: `translate(-50%, 0)`
                         }}
                     >
-                        <div className="bg-tertiary text-tertiary-fg text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                        <div className="bg-tertiary text-text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                             {value.toFixed(decimals)}{units}
                         </div>
-                        {/* Connection Line */}
-                        <div className="w-[1px] h-2 bg-tertiary mt-[-1px]" />
                     </div>
                 )}
             </div>
