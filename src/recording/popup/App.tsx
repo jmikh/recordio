@@ -7,7 +7,7 @@ import { MdBugReport } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import permissionGuide from '../../assets/permission-guide.jpg';
-import logo from '../../assets/logo.png';
+import logoFull from '../../assets/logo-full-source.png';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
@@ -295,9 +295,8 @@ function App() {
   return (
     <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
       <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={logo} alt="Recordio Logo" className="w-12 h-12" />
-          <h1 className="text-2xl font-bold text-primary">Recordio</h1>
+        <div className="flex items-center justify-center mb-6">
+          <img src={logoFull} alt="Recordio" className="h-8" />
         </div>
 
         {!isRecording ? (

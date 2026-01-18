@@ -189,9 +189,51 @@ async function main() {
 
     console.log(`✓ ${logoSize}x${logoSize} → logo.png (transparent bg + purple logo)`);
 
+    // Full logo: Horizontal logo with R + "recordio" text
+    const fullLogoSourcePath = path.join(projectRoot, 'src/assets/logo-full-source.png');
+
+    if (fs.existsSync(fullLogoSourcePath)) {
+        const fullLogoOutput = path.join(assetsDir, 'logo-full.png');
+        const fullLogoHeight = 64; // Fixed height, width will auto-scale
+
+        // Get source dimensions to calculate width
+        const fullLogoMetadata = await sharp(fullLogoSourcePath).metadata();
+        const aspectRatio = fullLogoMetadata.width / fullLogoMetadata.height;
+        const fullLogoWidth = Math.round(fullLogoHeight * aspectRatio);
+
+        const purpleRectFull = await sharp({
+            create: {
+                width: fullLogoWidth,
+                height: fullLogoHeight,
+                channels: 4,
+                background: { r, g, b, alpha: 1 }
+            }
+        }).png().toBuffer();
+
+        const resizedFullSource = await sharp(fullLogoSourcePath)
+            .resize(fullLogoWidth, fullLogoHeight, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .toBuffer();
+
+        await sharp(purpleRectFull)
+            .composite([{
+                input: resizedFullSource,
+                blend: 'dest-in'
+            }])
+            .png()
+            .toFile(fullLogoOutput);
+
+        console.log(`✓ ${fullLogoWidth}x${fullLogoHeight} → logo-full.png (horizontal logo with text)`);
+    } else {
+        console.log('ℹ️  Skipping full logo (logo-full-source.png not found)');
+    }
+
     console.log('\n✅ Done!\n');
     console.log('Extension icons: Purple bg + white logo (85% scale, rounded corners)');
-    console.log('App logo: Transparent bg + purple logo\n');
+    console.log('App logo: Transparent bg + purple logo');
+    console.log('Full logo: Horizontal R + "recordio" text\n');
 }
 
 main().catch(err => {
