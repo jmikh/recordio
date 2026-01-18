@@ -7,6 +7,7 @@ import { MdBugReport } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import permissionGuide from '../../assets/permission-guide.jpg';
+import logo from '../../assets/logo.png';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
@@ -292,11 +293,12 @@ function App() {
   }
 
   return (
-    <div className="w-[320px] bg-surface-body text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
+    <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
       <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
-        <h1 className="text-2xl font-bold mb-6 text-primary">
-          Recordio
-        </h1>
+        <div className="flex items-center gap-3 mb-6">
+          <img src={logo} alt="Recordio Logo" className="w-12 h-12" />
+          <h1 className="text-2xl font-bold text-primary">Recordio</h1>
+        </div>
 
         {!isRecording ? (
           <div className="flex flex-col items-center w-full gap-5">
@@ -410,6 +412,21 @@ function App() {
               )}
             </div>
 
+            {!isRecording && (
+              <div className="mt-4 flex gap-2 w-full">
+                {recordingMode === 'tab' && canInjectContentScript !== false && (
+                  <Button onClick={handleBlurMode} className="flex-1">
+                    <FiEyeOff />
+                    Blur Items
+                  </Button>
+                )}
+                <Button onClick={() => setIsBugReportModalOpen(true)} className="flex-1">
+                  <MdBugReport />
+                  Report Bug
+                </Button>
+              </div>
+            )}
+
             <PrimaryButton
               onClick={startRecording}
               disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
@@ -425,21 +442,6 @@ function App() {
           >
             <div className="w-6 h-6 bg-destructive rounded sm group-hover:scale-90 transition-transform" />
           </button>
-        )}
-
-        {!isRecording && (
-          <div className="mt-4 flex gap-2 w-full">
-            {recordingMode === 'tab' && canInjectContentScript !== false && (
-              <Button onClick={handleBlurMode} className="flex-1">
-                <FiEyeOff />
-                Blur Items
-              </Button>
-            )}
-            <Button onClick={() => setIsBugReportModalOpen(true)} className="flex-1">
-              <MdBugReport />
-              Report Bug
-            </Button>
-          </div>
         )}
       </div>
       <BugReportModal

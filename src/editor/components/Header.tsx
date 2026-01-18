@@ -6,6 +6,7 @@ import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
 import { Button } from '../../components/ui/Button';
 import { BugReportModal } from '../../components/ui/BugReportModal';
+import logo from '../../assets/logo.png';
 
 export const Header = () => {
     const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
@@ -22,7 +23,10 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <h1 className="font-bold text-text-highlighted text-sm tracking-wide">RECORDO</h1>
+                    <div className="flex items-center gap-2">
+                        <img src={logo} alt="Recordio Logo" className="w-6 h-6" />
+                        <h1 className="font-bold text-text-highlighted text-sm tracking-wide">RECORDIO</h1>
+                    </div>
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">

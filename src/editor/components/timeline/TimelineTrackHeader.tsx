@@ -22,7 +22,7 @@ export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
             className="flex items-center justify-between px-3 border-b border-border bg-surface-elevated box-border"
             style={{ height, minHeight: height }}
         >
-            <span className="text-xs text-text-main truncate select-none" title={title}>
+            <span className="text-sm text-text-main truncate select-none" title={title}>
                 {title}
             </span>
 

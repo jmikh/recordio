@@ -42,10 +42,11 @@ const Handle: React.FC<HandleProps> = ({
     onPointerDown
 }) => {
     // Fixed styling for consistent appearance
-    const size = 20;
-    const thickness = 2;
-    const length = 10;
-    const color = 'var(--secondary)';
+    const size = 24;
+    const thickness = 3;
+    const length = 16;
+    const color = 'var(--primary)';
+    const inset = 4; // Inset to keep handles visible in fullscreen
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -68,21 +69,21 @@ const Handle: React.FC<HandleProps> = ({
     const isWest = type.includes('w');
 
     if (isNorth) {
-        containerStyle.top = 0;
+        containerStyle.top = inset;
         cornerStyle.top = 0;
         cornerStyle.borderTopWidth = thickness;
     } else {
-        containerStyle.bottom = 0;
+        containerStyle.bottom = inset;
         cornerStyle.bottom = 0;
         cornerStyle.borderBottomWidth = thickness;
     }
 
     if (isWest) {
-        containerStyle.left = 0;
+        containerStyle.left = inset;
         cornerStyle.left = 0;
         cornerStyle.borderLeftWidth = thickness;
     } else {
-        containerStyle.right = 0;
+        containerStyle.right = inset;
         cornerStyle.right = 0;
         cornerStyle.borderRightWidth = thickness;
     }

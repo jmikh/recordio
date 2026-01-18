@@ -9,7 +9,8 @@
     "build:dev": "tsc -b && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "generate-icons": "node scripts/generateIcons.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.0",
@@ -41,6 +42,7 @@
     "globals": "^16.5.0",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.6",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
