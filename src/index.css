@@ -66,6 +66,7 @@
    --color-text-disabled: var(--text-disabled);
    --color-text-primary: var(--text-primary);
    --color-text-on-primary: var(--text-on-primary);
+   --color-text-on-secondary: var(--text-on-secondary);
 
    /* ─────────────────────────────────────────────────────────
      Focus Ring

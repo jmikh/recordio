@@ -48,8 +48,8 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className="bg-surface-raised rounded-lg p-6 w-full max-w-md border border-border">
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+            <div className="bg-surface-raised rounded-lg p-6 w-full border border-border">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <MdBugReport className="text-primary" size={24} />

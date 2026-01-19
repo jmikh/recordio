@@ -183,7 +183,7 @@ export const Slider: React.FC<SliderProps> = ({
                             transform: `translate(-50%, 0)`
                         }}
                     >
-                        <div className="bg-text-on-secondary text-text-on-primary text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                        <div className="text-text-on-secondary text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                             {valueTransform(value).toFixed(decimals)}{units}
                         </div>
                     </div>

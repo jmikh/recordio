@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { AudioVisualizerWrapper } from './components/AudioVisualizerWrapper';
 import { CameraPreview } from './components/CameraPreview';
-import { MultiToggle, Toggle, Dropdown, Button, PrimaryButton } from '../../components/ui';
+import { MultiToggle, Toggle, Dropdown, Button, PrimaryButton, Notice } from '../../components/ui';
 import { MdBugReport } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
@@ -13,6 +13,7 @@ type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingStartTime, setRecordingStartTime] = useState<number>(0);
   const [recordingMode, setRecordingMode] = useState<'tab' | 'window' | 'screen'>('tab');
 
   // Device Lists
@@ -33,12 +34,28 @@ function App() {
   const [canInjectContentScript, setCanInjectContentScript] = useState<boolean | null>(null);
   const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
 
+  // Live timer for recording duration
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
+
+  // Update recording duration every second
+  useEffect(() => {
+    if (!isRecording || !recordingStartTime) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      setRecordingDuration(elapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRecording, recordingStartTime]);
+
   useEffect(() => {
     // 1. Initial State from Storage
     chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE).then((result) => {
       const state = result[STORAGE_KEYS.RECORDING_STATE];
       if (state && (state as any).isRecording) {
         setIsRecording(true);
+        setRecordingStartTime((state as any).startTime || 0);
       }
     });
 
@@ -47,6 +64,7 @@ function App() {
       if (areaName === 'session' && changes[STORAGE_KEYS.RECORDING_STATE]) {
         const newState = changes[STORAGE_KEYS.RECORDING_STATE].newValue;
         setIsRecording(newState?.isRecording || false);
+        setRecordingStartTime(newState?.startTime || 0);
       }
     };
     chrome.storage.onChanged.addListener(storageListener);
@@ -58,6 +76,7 @@ function App() {
     }, (response: any) => {
       if (response && response.isRecording) {
         setIsRecording(true);
+        setRecordingStartTime(response.startTime || 0);
       }
     });
 
@@ -293,14 +312,39 @@ function App() {
   }
 
   return (
-    <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col transition-all duration-300">
-      <div className="p-4 flex flex-col items-center justify-center min-h-[420px]">
-        <div className="flex items-center justify-center mb-6">
-          <img src={logoFull} alt="Recordio" className="h-8" />
+    <div className="relative w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col">
+      {/* Fixed Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <img src={logoFull} alt="Recordio" className="h-6" />
+        <div className="flex items-center gap-1">
+          <Button
+            onClick={handleBlurMode}
+            className="p-1.5"
+            title={
+              recordingMode !== 'tab'
+                ? "Blur mode only available in Tab mode"
+                : canInjectContentScript === false
+                  ? "Cannot blur Chrome-owned pages"
+                  : "Blur Items"
+            }
+            disabled={recordingMode !== 'tab' || canInjectContentScript === false}
+          >
+            <FiEyeOff size={16} />
+          </Button>
+          <Button
+            onClick={() => setIsBugReportModalOpen(true)}
+            className="p-1.5"
+            title="Report Bug"
+          >
+            <MdBugReport size={16} />
+          </Button>
         </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="p-4 flex flex-col">
         {!isRecording ? (
-          <div className="flex flex-col items-center w-full gap-5">
+          <div className="flex flex-col w-full gap-5">
 
             {/* Mode Selection */}
             {/* Mode Selection */}
@@ -328,14 +372,9 @@ function App() {
             </div>
 
             {recordingMode === 'tab' && canInjectContentScript === false && (
-              <div className="w-full bg-destructive/10 border border-destructive/50 rounded-lg p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                <div className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                </div>
-                <span className="text-xs text-destructive leading-tight">
-                  Cannot record tab of Chrome own pages. Start Recordio in another tab or use Window or Screen mode instead.
-                </span>
-              </div>
+              <Notice variant="warning" className="animate-in fade-in slide-in-from-top-1">
+                Cannot record tab of Chrome own pages. Start Recordio in another tab or use Window or Screen mode instead.
+              </Notice>
             )}
 
             {/* Audio Controls */}
@@ -411,20 +450,7 @@ function App() {
               )}
             </div>
 
-            {!isRecording && (
-              <div className="mt-4 flex gap-2 w-full">
-                {recordingMode === 'tab' && canInjectContentScript !== false && (
-                  <Button onClick={handleBlurMode} className="flex-1">
-                    <FiEyeOff />
-                    Blur Items
-                  </Button>
-                )}
-                <Button onClick={() => setIsBugReportModalOpen(true)} className="flex-1">
-                  <MdBugReport />
-                  Report Bug
-                </Button>
-              </div>
-            )}
+
 
             <PrimaryButton
               onClick={startRecording}
@@ -435,12 +461,29 @@ function App() {
             </PrimaryButton>
           </div>
         ) : (
-          <button
-            onClick={stopRecording}
-            className="group relative w-20 h-20 rounded-full bg-surface-raised border-2 border-destructive hover:bg-destructive/10 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-destructive/20"
-          >
-            <div className="w-6 h-6 bg-destructive rounded sm group-hover:scale-90 transition-transform" />
-          </button>
+          <div className="flex flex-col items-center justify-center gap-4 py-6">
+            {/* Recording Status */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
+                <span className="text-sm text-text-highlighted font-medium">Recording</span>
+              </div>
+
+              {/* Live Timer */}
+              <div className="text-3xl font-bold text-text-highlighted tabular-nums">
+                {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:
+                {(recordingDuration % 60).toString().padStart(2, '0')}
+              </div>
+            </div>
+
+            {/* Finish Recording Button */}
+            <PrimaryButton
+              onClick={stopRecording}
+              className="w-full py-2.5 text-base"
+            >
+              Finish Recording
+            </PrimaryButton>
+          </div>
         )}
       </div>
       <BugReportModal

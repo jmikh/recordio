@@ -12,14 +12,14 @@ interface NoticeProps {
  */
 export const Notice = ({ children, variant = 'info', className = '' }: NoticeProps) => {
     const variantStyles = {
-        info: 'text-text-highlighted bg-hover-subtle border-border',
-        warning: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+        info: 'text-text-main bg-hover-subtle border-border',
+        warning: 'text-secondary bg-secondary/10 border-secondary/20',
         error: 'text-red-400 bg-red-500/10 border-red-500/20',
     };
 
     return (
         <div
-            className={`font-normal flex items-start gap-3 text-sm px-4 py-3 rounded-lg border ${variantStyles[variant]} ${className}`}
+            className={`font-normal flex items-start gap-3 text-sm px-4 py-3 rounded-sm border ${variantStyles[variant]} ${className}`}
         >
             {/* Exclamation Icon */}
             <div className="flex-shrink-0 mt-0.5">

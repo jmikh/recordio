@@ -8,7 +8,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 // New Components
 import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
 import { MainTrack, GROUP_HEADER_HEIGHT } from './main/MainTrack';
-import { EventsTrack } from './EventsTrack';
+
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
@@ -18,7 +18,6 @@ import { useUIStore } from '../../stores/useUIStore';
 
 // Constants
 const TRACK_HEIGHT = 40;
-const EVENTS_TRACK_HEIGHT = 20;
 const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.9;
 const HEADER_WIDTH = 125;
 
@@ -67,7 +66,7 @@ export function Timeline() {
 
     // -- Stores --
     const timeline = useProjectTimeline();
-    const userEvents = useProjectStore(s => s.userEvents);
+
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
 
@@ -185,13 +184,10 @@ export function Timeline() {
 
                     {/* Header: Main Track */}
                     <div className="shrink-0" style={{ height: mainTrackHeight }}>
-                        <div className="flex flex-col w-full h-full">
-                            <div style={{ height: GROUP_HEADER_HEIGHT }} className="" />
-                            <TimelineTrackHeader
-                                title="Recording"
-                                height={TRACK_HEIGHT}
-                            />
-                        </div>
+                        <TimelineTrackHeader
+                            title="Recording"
+                            height={mainTrackHeight}
+                        />
                     </div>
 
                     {/* Gap */}
@@ -201,18 +197,6 @@ export function Timeline() {
                     <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
                         <TimelineTrackHeader title="Zoom" height={ZOOM_TRACK_HEIGHT} />
                     </div>
-
-                    {/* Gap */}
-                    <div className="h-2 shrink-0" />
-
-                    {/* Header: Events */}
-                    <div className="shrink-0" style={{ height: EVENTS_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Events" height={EVENTS_TRACK_HEIGHT} />
-                    </div>
-
-                    {/* Gap */}
-                    <div className="h-2 shrink-0" />
-
 
                 </div>
 
@@ -275,13 +259,6 @@ export function Timeline() {
                                     {/* Zoom Track */}
                                     <ZoomTrack
                                         height={ZOOM_TRACK_HEIGHT}
-                                    />
-
-                                    {/* Events Track */}
-                                    <EventsTrack
-                                        events={userEvents}
-                                        timeMapper={timeMapper}
-                                        trackHeight={EVENTS_TRACK_HEIGHT}
                                     />
 
 

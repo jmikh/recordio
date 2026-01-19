@@ -33,10 +33,10 @@ export class ProjectImpl {
                 },
 
                 screen: {
-                    mode: 'border',
-                    padding: 0,
+                    mode: 'device',
+                    padding: 0.1,
                     borderRadius: 16,
-                    borderWidth: 8,
+                    borderWidth: 2,
                     borderColor: '#667eea',
                     deviceFrameId: 'macbook-air-dark',
                     hasShadow: true,
@@ -47,7 +47,7 @@ export class ProjectImpl {
                 background: {
                     type: 'gradient',
                     color: '#6078c4ff',
-                    gradientColors: ['#667eea', '#764ba2'],
+                    gradientColors: ['#95a6f2ff', '#83689dff'],
                     gradientDirection: 'SE',
                     lastColorMode: 'gradient',
                     backgroundBlur: 0

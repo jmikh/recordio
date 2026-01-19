@@ -86,31 +86,32 @@ export class BlurManager {
                 bottom: 24px;
                 left: 50%;
                 transform: translateX(-50%);
-                background-color: #0F172A;
-                color: white;
+                background-color: oklch(0.21 0 0);
+                color: oklch(0.98 0 0 / 80%);
                 padding: 12px 24px;
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                 z-index: 2147483647 !important;
-                font-family: system-ui, -apple-system, sans-serif;
+                font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
                 display: flex;
                 align-items: center;
                 gap: 16px;
-                border: 1px solid #334155;
+                border: 1px solid oklch(1 0 0 / 8%);
                 animation: recordo-fade-in 0.2s ease-out;
             }
             #recordo-blur-toast button {
-                background-color: #3B82F6;
-                color: white;
+                background-color: oklch(0.58 0.19 290);
+                color: oklch(0.98 0 0);
                 border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
+                padding: 8px 16px;
+                border-radius: 8px;
                 font-weight: 500;
                 cursor: pointer;
                 font-size: 14px;
+                transition: background-color 0.2s;
             }
             #recordo-blur-toast button:hover {
-                background-color: #2563EB;
+                background-color: oklch(0.66 0.20 290);
             }
             @keyframes recordo-fade-in {
                 from { opacity: 0; transform: translate(-50%, 10px); }
@@ -129,7 +130,7 @@ export class BlurManager {
         const message = document.createElement('span');
         message.textContent = 'Hover and click elements to blur them.';
         message.style.fontSize = '14px';
-        message.style.color = '#E2E8F0';
+        message.style.color = 'oklch(0.98 0 0 / 80%)';
 
         const doneBtn = document.createElement('button');
         doneBtn.textContent = 'Done';

@@ -67,7 +67,7 @@ export const AudioVisualizerWrapper: React.FC<AudioVisualizerWrapperProps> = ({ 
     if (!stream) return null;
 
     return (
-        <div className="w-full h-12 flex items-center justify-center bg-slate-900/50 rounded-lg overflow-hidden border border-slate-700/50 mt-2">
+        <div className="w-full h-10 flex items-center justify-center bg-surface-overlay rounded-sm overflow-hidden border border-border">
             <canvas
                 ref={canvasRef}
                 width={200}

@@ -53,10 +53,6 @@ export const ProjectSettings = () => {
 
     return (
         <div className="flex flex-col min-h-full text-white">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Projects ({projects.length})</h2>
-            </div>
-
             <div className="flex-1 flex flex-col space-y-2">
                 {isLoading && <div className="text-center text-gray-500 py-4">Loading...</div>}
 
