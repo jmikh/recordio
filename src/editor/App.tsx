@@ -208,7 +208,7 @@ function Editor() {
 
             </div>
 
-            <div id="timeline-container" className="h-64 border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e] flex flex-col">
+            <div id="timeline-container" className="border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e]">
                 <Timeline />
             </div>
         </div>

@@ -479,7 +479,7 @@ function App() {
             {/* Finish Recording Button */}
             <PrimaryButton
               onClick={stopRecording}
-              className="w-full py-2.5 text-base"
+              className="w-full py-2.5"
             >
               Finish Recording
             </PrimaryButton>

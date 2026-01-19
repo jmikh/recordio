@@ -19,7 +19,7 @@ import { useUIStore } from '../../stores/useUIStore';
 // Constants
 const TRACK_HEIGHT = 40;
 const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.9;
-const HEADER_WIDTH = 125;
+const HEADER_WIDTH = 100;
 
 export function Timeline() {
     //console.log('[Rerender] Timeline');
@@ -172,7 +172,7 @@ export function Timeline() {
             />
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div className="flex-1 flex bg-surface overflow-hidden relative">
+            <div className="flex bg-surface overflow-hidden relative">
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -203,7 +203,7 @@ export function Timeline() {
                 {/* RIGHT COLUMN: CONTENT */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
 
-                    <div className="flex-1 relative overflow-hidden w-full h-full">
+                    <div className="relative overflow-hidden w-full">
                         {/* Floating Overlay for Scroll Indication */}
                         <div
                             ref={overlayRef}
