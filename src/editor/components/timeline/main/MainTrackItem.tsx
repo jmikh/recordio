@@ -5,8 +5,6 @@ import { WaveformSegment } from '../WaveformSegment';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../hooks/useAudioAnalysis';
 
-export const GROUP_HEADER_HEIGHT = 24;
-
 interface MainTrackItemProps {
     outputWindow: OutputWindow;
     dragState: DragState | null;
@@ -103,7 +101,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
             <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-secondary' : 'border-primary-muted hover:border-border-primary'}`}>
                 {/* Group Header */}
                 <div
-                    style={{ height: GROUP_HEADER_HEIGHT }}
+                    style={{ height: 24 }}
                     className="bg-surface-elevated border-b border-border px-2 flex items-center justify-start gap-2 text-xs text-text-main select-none"
                 >
                     {/* Speed - always show (prioritized) */}

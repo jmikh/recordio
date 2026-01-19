@@ -158,7 +158,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 />
             </div>
 
-            <div className="flex items-center gap-4 bg-surface-raised px-4 py-1 rounded-full border border-border">
+            <div className="flex items-center gap-4 bg-hover-subtle px-4 py-1 rounded-full border border-border">
                 <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-highlighted">
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>

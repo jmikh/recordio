@@ -150,7 +150,7 @@ export const Scrollbar: React.FC<ScrollbarProps> = ({ container, className, depe
         >
             <div
                 ref={thumbRef}
-                className={`${isHorizontal ? 'h-1.5' : 'w-1.5'} rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary' : 'bg-hover-subtle hover:bg-primary-muted'}`}
+                className={`${isHorizontal ? 'h-1.5' : 'w-1.5'} rounded-full absolute transition-colors duration-150 ${isDragging ? 'bg-primary-highlighted' : 'bg-primary-muted hover:bg-primary'}`}
                 style={{
                     ...(isHorizontal ? {
                         width: thumbWidth,

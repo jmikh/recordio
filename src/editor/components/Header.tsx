@@ -45,15 +45,19 @@ export const Header = () => {
                         </Button>
                     </div>
 
-                    <div className="h-4 w-[1px] bg-border mx-2"></div>
+                    {process.env.NODE_ENV !== 'production' && (
+                        <>
+                            <div className="h-4 w-[1px] bg-border mx-2"></div>
 
-                    <button
-                        onClick={() => useUIStore.getState().toggleDebugBar()}
-                        title="Toggle Debug Bar"
-                        className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
-                    >
-                        Debug
-                    </button>
+                            <button
+                                onClick={() => useUIStore.getState().toggleDebugBar()}
+                                title="Toggle Debug Bar"
+                                className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
+                            >
+                                Debug
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Project Name (Centered in Top Row) */}

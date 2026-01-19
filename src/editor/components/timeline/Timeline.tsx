@@ -7,7 +7,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
 import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
-import { MainTrack, GROUP_HEADER_HEIGHT } from './main/MainTrack';
+import { MainTrack } from './main/MainTrack';
 
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
@@ -17,8 +17,8 @@ import { useUIStore } from '../../stores/useUIStore';
 
 
 // Constants
-const TRACK_HEIGHT = 40;
-const ZOOM_TRACK_HEIGHT = TRACK_HEIGHT * 0.9;
+const MAIN_TRACK_HEIGHT = 60;
+const ZOOM_TRACK_HEIGHT = 40;
 const HEADER_WIDTH = 100;
 
 export function Timeline() {
@@ -70,10 +70,6 @@ export function Timeline() {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
 
-
-    // -- Derived Data --
-    // -- Derived Data --
-    const mainTrackHeight = TRACK_HEIGHT + GROUP_HEADER_HEIGHT;
 
     // Memoize TimeMapper
     const timeMapper = useTimeMapper();
@@ -172,7 +168,7 @@ export function Timeline() {
             />
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div className="flex bg-surface overflow-hidden relative">
+            <div className="flex flex-1 bg-surface overflow-hidden relative">
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -183,15 +179,12 @@ export function Timeline() {
                     <div style={{ height: 24 }} className="border-b border-border shrink-0" />
 
                     {/* Header: Main Track */}
-                    <div className="shrink-0" style={{ height: mainTrackHeight }}>
+                    <div className="shrink-0" style={{ height: MAIN_TRACK_HEIGHT }}>
                         <TimelineTrackHeader
                             title="Recording"
-                            height={mainTrackHeight}
+                            height={MAIN_TRACK_HEIGHT}
                         />
                     </div>
-
-                    {/* Gap */}
-                    <div className="h-2 shrink-0" />
 
                     {/* Header: Zoom */}
                     <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
@@ -203,7 +196,7 @@ export function Timeline() {
                 {/* RIGHT COLUMN: CONTENT */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
 
-                    <div className="relative overflow-hidden w-full">
+                    <div className="relative overflow-hidden w-full flex-1">
                         {/* Floating Overlay for Scroll Indication */}
                         <div
                             ref={overlayRef}
@@ -247,13 +240,13 @@ export function Timeline() {
                                 />
 
                                 {/* Tracks Container */}
-                                <div className="flex flex-col gap-2 relative pl-0">
+                                <div className="flex flex-col relative pl-0">
                                     {/* Main Track */}
                                     <MainTrack
                                         timeline={timeline}
                                         pixelsPerSec={pixelsPerSec}
 
-                                        trackHeight={mainTrackHeight}
+                                        trackHeight={MAIN_TRACK_HEIGHT}
                                     />
 
                                     {/* Zoom Track */}

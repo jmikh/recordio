@@ -55,7 +55,7 @@ export class ProjectImpl {
 
                 captions: {
                     visible: true,
-                    size: 24,
+                    size: 50,
                     width: 75
                 },
 
@@ -66,10 +66,10 @@ export class ProjectImpl {
                     y: 1080 - 325,
                     shape: 'circle',
                     borderRadius: 50,
-                    borderWidth: 2,
+                    borderWidth: 1,
                     borderColor: 'white',
-                    hasShadow: false,
-                    hasGlow: true,
+                    hasShadow: true,
+                    hasGlow: false,
                     zoom: 1
 
                 },

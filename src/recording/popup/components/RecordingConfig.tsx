@@ -2,6 +2,7 @@ import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
 import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '../../../components/ui';
 import { MSG_TYPES } from '../../../recording/shared/messageTypes';
+import { MdMic, MdVideocam } from 'react-icons/md';
 
 interface RecordingConfigProps {
     recordingMode: 'tab' | 'window' | 'screen';
@@ -77,7 +78,8 @@ export function RecordingConfig({
             {/* Audio Controls */}
             <div className="w-full">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-text-highlighted flex items-center gap-2">
+                    <span className="text-sm text-text-main flex items-center gap-2">
+                        <MdMic size={16} />
                         Microphone
                     </span>
                     <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
@@ -88,22 +90,12 @@ export function RecordingConfig({
                             options={audioDevices.map(d => ({
                                 value: d.deviceId,
                                 label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
-                                icon: (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                        <line x1="12" x2="12" y1="19" y2="22" />
-                                    </svg>
-                                )
                             }))}
                             value={selectedAudioId}
                             onChange={setSelectedAudioId}
                             trigger={
-                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-highlighted cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
                                     <span>{audioDevices.find(d => d.deviceId === selectedAudioId)?.label || `Microphone ${selectedAudioId.slice(0, 4)}...`}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="6 9 12 15 18 9" />
-                                    </svg>
                                 </div>
                             }
                         />
@@ -115,7 +107,10 @@ export function RecordingConfig({
             {/* Video Controls */}
             <div className="w-full">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-text-highlighted">Camera</span>
+                    <span className="text-sm text-text-main flex items-center gap-2">
+                        <MdVideocam size={16} />
+                        Camera
+                    </span>
                     <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
                 </div>
                 {isVideoEnabled && (
@@ -124,21 +119,12 @@ export function RecordingConfig({
                             options={videoDevices.map(d => ({
                                 value: d.deviceId,
                                 label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
-                                icon: (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="m22 8-6 4 6 4V8Z" />
-                                        <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
-                                    </svg>
-                                )
                             }))}
                             value={selectedVideoId}
                             onChange={setSelectedVideoId}
                             trigger={
-                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-highlighted cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
+                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
                                     <span>{videoDevices.find(d => d.deviceId === selectedVideoId)?.label || `Camera ${selectedVideoId.slice(0, 4)}...`}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="6 9 12 15 18 9" />
-                                    </svg>
                                 </div>
                             }
                         />

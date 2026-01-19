@@ -148,7 +148,7 @@ function Editor() {
     }
 
     return (
-        <div className="w-full h-screen bg-black flex flex-col overflow-hidden">
+        <div className="w-full h-screen bg-black flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
 
             {/* Header / Toolbar */}
             <Header />
