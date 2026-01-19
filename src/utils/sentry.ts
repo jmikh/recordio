@@ -30,7 +30,7 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
         environment: IS_PRODUCTION ? "production" : "development",
         sendDefaultPii: true,
         enabled: true, // IS_PRODUCTION,
-        release: `recordo@${chrome.runtime.getManifest().version}`,
+        release: `recordio@${chrome.runtime.getManifest().version}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
         beforeSend(event) {
             // Remove any potentially sensitive project data

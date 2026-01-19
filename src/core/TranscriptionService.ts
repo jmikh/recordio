@@ -6,9 +6,8 @@ import type { Captions, CaptionSegment } from './types';
 env.allowRemoteModels = true;
 env.allowLocalModels = false;
 
-// Set your Cloudflare R2 bucket URL as the remote model source
-// Using R2 dev URL for now - replace with custom domain for production
-env.remoteHost = 'https://pub-2a71eeec4abc4fb6a45708185132fdfc.r2.dev/';
+// Custom domain pointing to Cloudflare R2 bucket for production use
+env.remoteHost = 'https://models.recordio.site/';
 env.remotePathTemplate = '{model}/';
 
 // Cache models in browser after download

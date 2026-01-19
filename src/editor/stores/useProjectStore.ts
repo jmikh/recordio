@@ -164,7 +164,7 @@ export const useProjectStore = create<ProjectState>()(
                     const newSource: import('../../core/types').SourceMetadata = {
                         id: sourceId,
                         type,
-                        url: `recordo-blob://${blobId}`, // Internal protocol
+                        url: `recordio-blob://${blobId}`, // Internal protocol
                         createdAt: Date.now(),
                         fileSizeBytes: blob.size,
                         durationMs: 0,

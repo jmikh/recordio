@@ -45,17 +45,17 @@ export class BlurManager {
     }
 
     private injectStyles() {
-        if (document.getElementById('recordo-blur-styles')) return;
+        if (document.getElementById('recordio-blur-styles')) return;
 
         const style = document.createElement('style');
-        style.id = 'recordo-blur-styles';
+        style.id = 'recordio-blur-styles';
         style.textContent = `
-            .recordo-blur {
+            .recordio-blur {
                 filter: blur(8px) !important;
                 user-select: none;
                 pointer-events: auto !important;
             }
-            #recordo-blur-overlay {
+            #recordio-blur-overlay {
                 position: fixed;
                 z-index: 2147483647 !important; /* Max z-index */
                 pointer-events: none;
@@ -66,7 +66,7 @@ export class BlurManager {
                 display: none;
                 box-sizing: border-box;
             }
-            #recordo-blur-label {
+            #recordio-blur-label {
                 position: absolute;
                 top: -28px;
                 left: -2px;
@@ -81,7 +81,7 @@ export class BlurManager {
                 pointer-events: none;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
-            #recordo-blur-toast {
+            #recordio-blur-toast {
                 position: fixed;
                 bottom: 24px;
                 left: 50%;
@@ -97,9 +97,9 @@ export class BlurManager {
                 align-items: center;
                 gap: 16px;
                 border: 1px solid oklch(1 0 0 / 8%);
-                animation: recordo-fade-in 0.2s ease-out;
+                animation: recordio-fade-in 0.2s ease-out;
             }
-            #recordo-blur-toast button {
+            #recordio-blur-toast button {
                 background-color: oklch(0.58 0.19 290);
                 color: oklch(0.98 0 0);
                 border: none;
@@ -110,10 +110,10 @@ export class BlurManager {
                 font-size: 14px;
                 transition: background-color 0.2s;
             }
-            #recordo-blur-toast button:hover {
+            #recordio-blur-toast button:hover {
                 background-color: oklch(0.66 0.20 290);
             }
-            @keyframes recordo-fade-in {
+            @keyframes recordio-fade-in {
                 from { opacity: 0; transform: translate(-50%, 10px); }
                 to { opacity: 1; transform: translate(-50%, 0); }
             }
@@ -125,7 +125,7 @@ export class BlurManager {
         if (this.toast) return;
 
         this.toast = document.createElement('div');
-        this.toast.id = 'recordo-blur-toast';
+        this.toast.id = 'recordio-blur-toast';
 
         const message = document.createElement('span');
         message.textContent = 'Hover and click elements to blur them.';
@@ -152,10 +152,10 @@ export class BlurManager {
         if (this.overlay) return;
 
         this.overlay = document.createElement('div');
-        this.overlay.id = 'recordo-blur-overlay';
+        this.overlay.id = 'recordio-blur-overlay';
 
         this.overlayLabel = document.createElement('div');
-        this.overlayLabel.id = 'recordo-blur-label';
+        this.overlayLabel.id = 'recordio-blur-label';
         this.overlay.appendChild(this.overlayLabel);
 
         document.body.appendChild(this.overlay);
@@ -187,7 +187,7 @@ export class BlurManager {
         if (!this.overlay || !this.overlayLabel) return;
 
         const rect = element.getBoundingClientRect();
-        const isBlurred = element.classList.contains('recordo-blur');
+        const isBlurred = element.classList.contains('recordio-blur');
 
         this.overlay.style.display = 'block';
         this.overlay.style.top = `${rect.top}px`;
@@ -234,7 +234,7 @@ export class BlurManager {
         if (this.overlay && (this.overlay === target || this.overlay.contains(target))) return;
 
         // Redirect to blurred ancestor if exists
-        const closestBlurred = target.closest('.recordo-blur');
+        const closestBlurred = target.closest('.recordio-blur');
         if (closestBlurred) {
             target = closestBlurred as HTMLElement;
         }
@@ -250,7 +250,7 @@ export class BlurManager {
 
     private handleMouseOut(e: MouseEvent) {
         let target = e.target as HTMLElement;
-        const closestBlurred = target.closest('.recordo-blur');
+        const closestBlurred = target.closest('.recordio-blur');
         if (closestBlurred) {
             target = closestBlurred as HTMLElement;
         }
@@ -277,7 +277,7 @@ export class BlurManager {
         if (this.toast && (this.toast === target || this.toast.contains(target))) return;
 
         // Redirect to blurred ancestor if exists
-        const closestBlurred = target.closest('.recordo-blur');
+        const closestBlurred = target.closest('.recordio-blur');
         if (closestBlurred) {
             target = closestBlurred as HTMLElement;
         }
@@ -285,13 +285,13 @@ export class BlurManager {
         e.preventDefault();
         e.stopPropagation();
 
-        if (target.classList.contains('recordo-blur')) {
-            target.classList.remove('recordo-blur');
+        if (target.classList.contains('recordio-blur')) {
+            target.classList.remove('recordio-blur');
         } else {
-            target.classList.add('recordo-blur');
+            target.classList.add('recordio-blur');
             // Remove blur from any children to avoid double-blur
-            const nestedBlurred = target.querySelectorAll('.recordo-blur');
-            nestedBlurred.forEach(el => el.classList.remove('recordo-blur'));
+            const nestedBlurred = target.querySelectorAll('.recordio-blur');
+            nestedBlurred.forEach(el => el.classList.remove('recordio-blur'));
         }
 
         // Update overlay immediately to reflect new state

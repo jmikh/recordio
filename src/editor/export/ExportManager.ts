@@ -84,7 +84,10 @@ export class ExportManager {
 
         const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
+            // Only set crossOrigin for external URLs, not blob: URLs
+            if (!url.startsWith('blob:')) {
+                img.crossOrigin = 'anonymous';
+            }
             img.onload = () => resolve(img);
             img.onerror = reject;
             img.src = url;
@@ -92,7 +95,10 @@ export class ExportManager {
 
         const loadVideo = (url: string) => new Promise<HTMLVideoElement>((resolve, reject) => {
             const v = document.createElement('video');
-            v.crossOrigin = 'anonymous';
+            // Only set crossOrigin for external URLs, not blob: URLs
+            if (!url.startsWith('blob:')) {
+                v.crossOrigin = 'anonymous';
+            }
             v.muted = true;
             v.autoplay = false;
             v.playsInline = true;

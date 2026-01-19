@@ -22,10 +22,10 @@ import { BlurManager } from './blurManager';
 initSentry('content');
 
 // Cleanup mechanism for previous instances
-const cleanupEvent = new Event('recordo-cleanup');
+const cleanupEvent = new Event('recordio-cleanup');
 window.dispatchEvent(cleanupEvent);
 
-window.addEventListener('recordo-cleanup', () => {
+window.addEventListener('recordio-cleanup', () => {
     logger.log("[Recordio] Cleaning up old content script instance.");
     if (eventRecorder) {
         eventRecorder.stop();
@@ -163,19 +163,51 @@ function startCountdown(): Promise<void> {
         Object.assign(overlay.style, {
             position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', zIndex: '2147483647',
-            color: 'white', fontSize: '120px', fontWeight: 'bold', fontFamily: 'sans-serif',
+            backgroundColor: 'oklch(0.15 0.05 260 / 0.85)', zIndex: '2147483647',
             pointerEvents: 'none'
         });
         document.body.appendChild(overlay);
 
+        // Create the countdown number container with ring
+        const countdownContainer = document.createElement('div');
+        const primaryColor = 'oklch(0.58 0.19 290)';
+        Object.assign(countdownContainer.style, {
+            position: 'relative',
+            color: primaryColor,
+            fontSize: '120px',
+            fontWeight: 'bold',
+            fontFamily: 'sans-serif',
+            width: '200px',
+            height: '200px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: `6px solid ${primaryColor}`,
+            borderRadius: '50%'
+        });
+
+        // Create blur background behind the circle
+        const blurBackground = document.createElement('div');
+        Object.assign(blurBackground.style, {
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            backdropFilter: 'blur(40px)',
+            WebkitBackdropFilter: 'blur(40px)',
+            zIndex: '-1'
+        });
+        countdownContainer.appendChild(blurBackground);
+
+        overlay.appendChild(countdownContainer);
+
         let count = 3;
-        overlay.innerText = count.toString();
+        countdownContainer.innerText = count.toString();
 
         const interval = setInterval(() => {
             count--;
             if (count > 0) {
-                overlay.innerText = count.toString();
+                countdownContainer.innerText = count.toString();
             } else {
                 clearInterval(interval);
                 overlay.remove();

@@ -224,10 +224,10 @@ export const CanvasContainer = () => {
                 {/* HIDDEN RESOURCES LAYER */}
                 <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
                     {project.settings.background.type === 'image' && bgUrl && (
-                        <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin="anonymous" />
+                        <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin={bgUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
                     {deviceFrame && (
-                        <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin="anonymous" />
+                        <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin={deviceFrame.imageUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
                     {Object.values(sources).map((source) => {
                         const isMuted = !isPlaying || mutedSources[source.id];
@@ -241,7 +241,6 @@ export const CanvasContainer = () => {
                                 src={source.url}
                                 muted={isMuted}
                                 playsInline
-                                crossOrigin="anonymous"
                             />
                         ) : null;
                     })}

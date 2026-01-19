@@ -68,11 +68,11 @@ export class ProjectStorage {
     }
 
     /**
-     * Loads UserEvents from a URL, handling special 'recordo-blob://' protocol.
+     * Loads UserEvents from a URL, handling special 'recordio-blob://' protocol.
      */
     static async loadEvents(url: string): Promise<any> {
-        if (url.startsWith('recordo-blob://')) {
-            const blobId = url.replace('recordo-blob://', '');
+        if (url.startsWith('recordio-blob://')) {
+            const blobId = url.replace('recordio-blob://', '');
             const blob = await this.getRecordingBlob(blobId);
             if (!blob) throw new Error(`Event blob not found: ${blobId}`);
 
@@ -201,8 +201,8 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
 
-        if (source && source.url && source.url.startsWith('recordo-blob://')) {
-            const blobId = source.url.replace('recordo-blob://', '');
+        if (source && source.url && source.url.startsWith('recordio-blob://')) {
+            const blobId = source.url.replace('recordio-blob://', '');
             const blob = await this.getRecordingBlob(blobId);
             if (blob) {
                 // Hydrate URL for playback

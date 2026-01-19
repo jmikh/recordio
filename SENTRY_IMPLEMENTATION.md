@@ -81,7 +81,7 @@ You'll see:
 - **DSN**: Configured with your actual key
 - **Environment**: `production` or `development` based on build mode
 - **Enabled**: Production only (change to `true` for testing)
-- **Release tracking**: Uses manifest version (`recordo@1.0.0`)
+- **Release tracking**: Uses manifest version (`recordio@1.0.0`)
 - **Sample rate**: 100% in dev, 10% in production
 - **PII**: Enabled for better debugging
 

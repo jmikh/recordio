@@ -400,8 +400,8 @@ export class VideoRecorder {
         const screenSource: SourceMetadata = {
             id: `src-${projectId}-screen`,
             type: 'video',
-            url: `recordo-blob://${screenBlobId}`,
-            eventsUrl: eventsBlobId ? `recordo-blob://${eventsBlobId}` : undefined,
+            url: `recordio-blob://${screenBlobId}`,
+            eventsUrl: eventsBlobId ? `recordio-blob://${eventsBlobId}` : undefined,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
             hasAudio: screenHasAudio,
@@ -423,7 +423,7 @@ export class VideoRecorder {
             cameraSource = {
                 id: `src-${projectId}-camera`,
                 type: 'video',
-                url: `recordo-blob://${camBlobId}`,
+                url: `recordio-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 hasAudio: Boolean(this.config.hasAudio), // Has microphone audio in dual mode
