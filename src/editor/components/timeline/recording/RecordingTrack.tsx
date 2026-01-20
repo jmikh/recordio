@@ -8,17 +8,17 @@ import { getTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
 import { SpeedControl } from './SpeedControl';
-import { MainTrackItem } from './MainTrackItem'; // Imported MainTrackItem
+import { RecordingSegment } from './RecordingSegment';
 
 export const GROUP_HEADER_HEIGHT = 24;
 
-interface MainTrackProps {
+interface RecordingTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
     trackHeight: number;
 }
 
-export const MainTrack: React.FC<MainTrackProps> = ({
+export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     timeline,
     pixelsPerSec,
     trackHeight,
@@ -75,8 +75,8 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     style={{ zIndex: 0 }}
                 />
 
-                {timeline.outputWindows.map((w) => {
-                    const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
+                {timeline.outputWindows.map((seg) => {
+                    const win = (dragState && dragState.windowId === seg.id) ? dragState.currentWindow : seg;
 
                     const speed = win.speed || 1.0;
                     const outputDurationMs = (win.endMs - win.startMs) / speed;
@@ -88,11 +88,11 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                     const isMuted = project.settings.screen?.mute ?? false;
 
                     return (
-                        <MainTrackItem
-                            key={w.id}
-                            outputWindow={w}
+                        <RecordingSegment
+                            key={seg.id}
+                            outputWindow={seg}
                             dragState={dragState}
-                            isSelected={selectedWindowId === w.id}
+                            isSelected={selectedWindowId === seg.id}
                             left={left}
                             width={width}
                             trackContentHeight={trackContentHeight}

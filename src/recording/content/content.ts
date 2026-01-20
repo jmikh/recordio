@@ -12,7 +12,7 @@
  * which forwards them to the active recorder (offscreen or controller).
  */
 
-import { logger } from '../../utils/logger';
+
 import { initSentry } from '../../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
@@ -26,7 +26,7 @@ const cleanupEvent = new Event('recordio-cleanup');
 window.dispatchEvent(cleanupEvent);
 
 window.addEventListener('recordio-cleanup', () => {
-    logger.log("[Recordio] Cleaning up old content script instance.");
+    console.log("[Recordio] Cleaning up old content script instance.");
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;
@@ -36,14 +36,14 @@ window.addEventListener('recordio-cleanup', () => {
 }, { once: true });
 
 // --- Initialization ---
-logger.log("[Recordio] Content script loaded. Checking recording state...");
+console.log("[Recordio] Content script loaded. Checking recording state...");
 
 chrome.runtime.sendMessage({
     type: MSG_TYPES.GET_RECORDING_STATE,
     payload: {}
 }, (response) => {
     if (chrome.runtime.lastError) {
-        logger.warn("[Content] Get State failed (Background not ready?)", chrome.runtime.lastError);
+        console.warn("[Content] Get State failed (Background not ready?)", chrome.runtime.lastError);
         return;
     }
     if (response) {
@@ -107,7 +107,7 @@ function handleCountdown(message: BaseMessage) {
     isPreparing = true;
     currentSessionId = message.payload?.sessionId;
     blurManager.disable(); // Ensure tool UI is gone before recording
-    logger.log("[Content] Preparing recording (Countdown)", currentSessionId);
+    console.log("[Content] Preparing recording (Countdown)", currentSessionId);
     startCountdown().then(() => {
         isPreparing = false;
         // Notify background we are ready with dimensions
@@ -125,10 +125,10 @@ function handleCountdown(message: BaseMessage) {
 }
 
 function handleStateResponse(response: any) {
-    logger.log(`[Content] Init State: Recording=${response.isRecording}`);
+    console.log(`[Content] Init State: Recording=${response.isRecording}`);
 
     if (response.isRecording) {
-        logger.log("[Content] Auto-resuming recording...");
+        console.log("[Content] Auto-resuming recording...");
         startRecording(response.startTime || 0);
     }
 }
@@ -140,7 +140,7 @@ function handleStartRecording(message: any) {
 }
 
 function startRecording(startTime: number) {
-    logger.log("[Content] Starting Recorder...");
+    console.log("[Content] Starting Recorder...");
     if (eventRecorder) {
         eventRecorder.stop();
     }
@@ -148,7 +148,7 @@ function startRecording(startTime: number) {
 }
 
 function handleStopRecording() {
-    logger.log("[Content] Stopping Recording...");
+    console.log("[Content] Stopping Recording...");
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 
-interface WaveformSegmentProps {
+interface StaticAudioWaveProps {
     peaks: number[]; // Full cached peaks for the source
     sourceStartMs: number; // Where this segment starts in source time
     sourceEndMs: number;   // Where this segment ends in source time
@@ -11,7 +11,7 @@ interface WaveformSegmentProps {
 
 const PEAKS_SAMPLES_PER_SEC = 100;
 
-const WaveformSegmentComponent: React.FC<WaveformSegmentProps> = ({
+const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     peaks,
     sourceStartMs,
     sourceEndMs,
@@ -19,7 +19,7 @@ const WaveformSegmentComponent: React.FC<WaveformSegmentProps> = ({
     height,
     color
 }) => {
-    //console.log("WaveformSegment", peaks.length, sourceStartMs, sourceEndMs, width, height, color);
+    //console.log("StaticAudioWave", peaks.length, sourceStartMs, sourceEndMs, width, height, color);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate which slice of peaks to show
@@ -81,4 +81,4 @@ const WaveformSegmentComponent: React.FC<WaveformSegmentProps> = ({
     );
 };
 
-export const WaveformSegment = React.memo(WaveformSegmentComponent);
+export const StaticAudioWave = React.memo(StaticAudioWaveComponent);

@@ -340,7 +340,6 @@ function App() {
           </Button>
           <Button
             onClick={() => setIsBugReportModalOpen(true)}
-            className="p-1.5"
             title="Report Bug"
           >
             <MdBugReport size={16} />

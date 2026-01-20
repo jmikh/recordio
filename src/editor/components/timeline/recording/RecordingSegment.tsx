@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { OutputWindow } from '../../../../core/types';
-import { WaveformSegment } from '../WaveformSegment';
+import { StaticAudioWave } from './StaticAudioWave';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../hooks/useAudioAnalysis';
 
-interface MainTrackItemProps {
+interface RecordingSegmentProps {
     outputWindow: OutputWindow;
     dragState: DragState | null;
     isSelected: boolean;
@@ -26,8 +26,8 @@ interface MainTrackItemProps {
     hasCamera: boolean;
 }
 
-export const MainTrackItem: React.FC<MainTrackItemProps> = ({
-    outputWindow: w,
+export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
+    outputWindow: seg,
     dragState,
     isSelected,
     left,
@@ -43,7 +43,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
     hasCamera,
 }) => {
     // Determine the effective window to display (dragged vs original)
-    const win = (dragState && dragState.windowId === w.id) ? dragState.currentWindow : w;
+    const win = (dragState && dragState.windowId === seg.id) ? dragState.currentWindow : seg;
 
     const sourceStartMs = win.startMs;
     const sourceEndMs = win.endMs;
@@ -94,7 +94,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
             style={{ left: `${left}px`, width: `${width}px` }}
             onClick={(e) => {
                 e.stopPropagation();
-                selectWindow(w.id);
+                selectWindow(seg.id);
             }}
         >
             {/* Visual Window Content (Clipped) */}
@@ -110,7 +110,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
                         onClick={(e) => {
                             e.stopPropagation();
                             setSpeedControlState({
-                                windowId: w.id,
+                                windowId: seg.id,
                                 speed: win.speed || 1.0,
                                 anchorEl: e.currentTarget as HTMLElement
                             });
@@ -138,7 +138,7 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
 
                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
                             {displayMode !== 'none' && (
-                                <WaveformSegment
+                                <StaticAudioWave
                                     peaks={displayPeaks}
                                     sourceStartMs={sourceStartMs}
                                     sourceEndMs={sourceEndMs}
@@ -155,15 +155,15 @@ export const MainTrackItem: React.FC<MainTrackItemProps> = ({
             {/* Resize Handles (Overlay entire group) */}
             <div
                 className="absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-l-lg"
-                onMouseDown={(e) => handleDragStart(e, w.id, 'left')}
+                onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
             />
             <div
                 className="absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-r-lg"
-                onMouseDown={(e) => handleDragStart(e, w.id, 'right')}
+                onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}
             />
 
             {/* Gap Bubble (Portal) */}
-            {dragState && dragState.windowId === w.id && (() => {
+            {dragState && dragState.windowId === seg.id && (() => {
                 const rect = containerRef.current?.getBoundingClientRect();
                 if (!rect) return null;
 

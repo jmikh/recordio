@@ -22,5 +22,11 @@ export default defineConfig(({ mode }) => ({
       },
       output: {},
     },
+    ...(mode === 'production' && {
+      esbuild: {
+        drop: ['console'],
+        pure: ['console.log']
+      }
+    })
   },
 }))

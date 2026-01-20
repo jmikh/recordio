@@ -184,7 +184,7 @@ export class ProjectImpl {
     }
 
     /**
-     * Scales a project's spatial settings to match a new output size.
+     * Scales a project's spatial settings to match a new output size. All pixel related settings must be scaled. (A better approach might to migrate all settings to use relative units)
      * Used for exporting at different resolutions while maintaining proportions.
      */
     static scale(project: Project, newSize: Size): Project {

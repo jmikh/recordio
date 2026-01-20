@@ -1,22 +1,57 @@
 import { useState } from 'react';
 import { useProjectStore, useProjectData, useProjectHistory } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
-import { ExportButton } from './export/ExportButton';
+import { ExportManager } from '../export/ExportManager';
+import type { ExportQuality } from '../export/ExportManager';
+import { Dropdown } from '../../components/ui/Dropdown';
+import type { DropdownOption } from '../../components/ui/Dropdown';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
 import { Button } from '../../components/ui/Button';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import logoFull from '../../assets/logo-full-source.png';
 
+const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
+    { value: '360p', label: '360p' },
+    { value: '720p', label: '720p' },
+    { value: '1080p', label: '1080p' },
+    { value: '4K', label: '4K' },
+];
+
 export const Header = () => {
     const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
     const project = useProjectData();
+    const sources = useProjectStore(s => s.sources);
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
+    const setExportState = useProjectStore(s => s.setExportState);
+    const isExporting = useProjectStore(s => s.exportState.isExporting);
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const pastStates = useProjectHistory(state => state.pastStates);
     const futureStates = useProjectHistory(state => state.futureStates);
+
+    const handleExport = async (quality: ExportQuality) => {
+        if (isExporting) return;
+
+        setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
+
+        const manager = new ExportManager();
+        const onProgress = (state: any) => setExportState(state);
+
+        try {
+            // Assign to global for cancellation (hacky but effective for single active export)
+            (window as any).__activeExportManager = manager;
+
+            await manager.exportProject(project, sources, quality, onProgress);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setExportState({ isExporting: false });
+            (window as any).__activeExportManager = null;
+        }
+    };
 
     return (
         <div className="bg-surface-elevated border-b border-border flex flex-col shrink-0 z-30 select-none">
@@ -79,7 +114,23 @@ export const Header = () => {
                         )}
                     </div>
                     {/* User Profile / Other Actions */}
-                    <ExportButton />
+                    <Dropdown
+                        options={EXPORT_QUALITY_OPTIONS}
+                        value={null as any} // No default selection - this is an action dropdown, not a state selector
+                        onChange={handleExport}
+                        trigger={
+                            <PrimaryButton
+                                className="px-3 py-1.5 text-xs flex items-center gap-2"
+                                disabled={isExporting}
+                            >
+                                <span>Export</span>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </PrimaryButton>
+                        }
+                        direction="down"
+                    />
                     <Button onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
                         <MdBugReport size={18} />
                     </Button>

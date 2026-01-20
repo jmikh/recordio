@@ -29,7 +29,7 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
         integrations: integrations,
         environment: IS_PRODUCTION ? "production" : "development",
         sendDefaultPii: true,
-        enabled: true, // IS_PRODUCTION,
+        enabled: true,
         release: `recordio@${chrome.runtime.getManifest().version}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
         beforeSend(event) {

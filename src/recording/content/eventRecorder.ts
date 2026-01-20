@@ -14,7 +14,6 @@
 
 import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
-import { logger } from '../../utils/logger';
 
 
 /**
@@ -114,7 +113,7 @@ export class EventRecorder {
         this.isRecording = true;
         this.attachListeners();
         this.startPolling();
-        logger.log("[ContentRecorder] Started capturing events.");
+        console.log("[ContentRecorder] Started capturing events.");
     }
 
     public stop() {
@@ -124,7 +123,7 @@ export class EventRecorder {
         this.flushPendingScrollSession();
         this.removeListeners();
         this.stopPolling();
-        logger.log("[ContentRecorder] Stopped capturing events.");
+        console.log("[ContentRecorder] Stopped capturing events.");
     }
 
     private getRelativeTime(): number {

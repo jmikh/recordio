@@ -7,7 +7,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
 import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
-import { MainTrack } from './main/MainTrack';
+import { RecordingTrack } from './recording/RecordingTrack';
 
 import { TimelineTrackHeader } from './TimelineTrackHeader';
 import { useTimelineInteraction } from './useTimelineInteraction';
@@ -242,7 +242,7 @@ export function Timeline() {
                                 {/* Tracks Container */}
                                 <div className="flex flex-col relative pl-0">
                                     {/* Main Track */}
-                                    <MainTrack
+                                    <RecordingTrack
                                         timeline={timeline}
                                         pixelsPerSec={pixelsPerSec}
 

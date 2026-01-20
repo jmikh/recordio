@@ -9,7 +9,6 @@
  */
 
 import { type Size } from '../../core/types';
-import { logger } from '../../utils/logger';
 import { initSentry } from '../../utils/sentry';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
@@ -38,13 +37,13 @@ async function doEnsureState() {
         const result = await chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE);
         if (result[STORAGE_KEYS.RECORDING_STATE]) {
             currentState = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState;
-            logger.log("State restored from storage:", currentState);
+            console.log("State restored from storage:", currentState);
         } else {
             currentState = { ...DEFAULT_STATE };
-            logger.log("No stored state found, using defaults.");
+            console.log("No stored state found, using defaults.");
         }
     } catch (e) {
-        logger.error("Failed to restore state:", e);
+        console.error("Failed to restore state:", e);
         // Fallback to defaults on error to allow extension to function
         currentState = { ...DEFAULT_STATE };
     }
@@ -194,7 +193,7 @@ async function handleStartSession(message: any, sendResponse: Function) {
 
         sendResponse({ success: true });
     } catch (err: any) {
-        logger.error("Error starting recording:", err);
+        console.error("Error starting recording:", err);
         sendResponse({ success: false, error: err.message });
     }
 }
@@ -430,7 +429,7 @@ async function waitForCountdownDone(tabId: number | undefined, sessionId: string
 
 async function handleStopSession(sendResponse: Function) {
     await ensureState(); // Ensure state is loaded
-    logger.log("[Background] Sending STOP_RECORDING");
+    console.log("[Background] Sending STOP_RECORDING");
 
     const finalSessionId = currentState?.currentSessionId;
     // Capture the controller ID from state before we wipe the state
@@ -451,13 +450,13 @@ async function handleStopSession(sendResponse: Function) {
                 response = await chrome.tabs.sendMessage(controllerTabIdToClose, stopVideoMsg);
             }
 
-            logger.log("[Background] Recorder stop response:", response);
+            console.log("[Background] Recorder stop response:", response);
 
             // Open editor
             const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
             chrome.tabs.create({ url: editorUrl });
         } catch (e) {
-            logger.error("Failed to stop video recording: ", e);
+            console.error("Failed to stop video recording: ", e);
         }
     }
     // Cleanup regardless of success
@@ -519,7 +518,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'screen') && currentState.controllerTabId === tabId;
 
     if (isRecordedTab || isControllerTab) {
-        logger.log(`[Background] Detected closure of ${isRecordedTab ? 'recorded tab' : 'controller tab'}. Stopping session.`);
+        console.log(`[Background] Detected closure of ${isRecordedTab ? 'recorded tab' : 'controller tab'}. Stopping session.`);
         handleStopSession(() => { }); // No response needed
     }
 });
