@@ -33,11 +33,7 @@ export const CameraSettings = () => {
         );
     }
 
-    if (!cameraSource) {
-        return (
-            <Notice>Camera was not used for this recording</Notice>
-        );
-    }
+
 
     const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
         let newSettings = { ...cameraConfig, shape: newShape };

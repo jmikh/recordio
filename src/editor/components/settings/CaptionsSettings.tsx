@@ -75,10 +75,10 @@ export function CaptionsSettings() {
             }
         }
 
-        // If no source has microphone, show error
+
+        // If no source has microphone, return early (this shouldn't happen as panel is hidden)
         if (!sourceToTranscribe) {
             console.error('[CaptionsSettings] No microphone audio available for transcription');
-            setTranscriptionState({ transcriptionError: 'No microphone audio found in recording' });
             return;
         }
 
@@ -272,14 +272,10 @@ export function CaptionsSettings() {
     return (
         <div className="space-y-4">
             {/* Notice Section */}
-            {!hasMicrophone ? (
-                <Notice>Microphone was not used for this recording</Notice>
-            ) : (
-                <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
-            )}
+            <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
 
-            {/* Generate/Regenerate Buttons - only show if microphone is available */}
-            {hasMicrophone && !isTranscribing && (
+            {/* Generate/Regenerate Buttons */}
+            {!isTranscribing && (
                 <div className="flex flex-col gap-2">
                     {!captions ? (
                         <PrimaryButton
@@ -299,8 +295,8 @@ export function CaptionsSettings() {
                 </div>
             )}
 
-            {/* Caption Settings - only show if microphone is available */}
-            {hasMicrophone && (
+            {/* Caption Settings */}
+            {(
                 <div className="space-y-3 pb-3 border-b border-border">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-medium text-text-main">Visible</label>

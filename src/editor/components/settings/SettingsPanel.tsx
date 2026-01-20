@@ -59,10 +59,31 @@ const IconCaptions = () => (
 
 
 import { Scrollbar } from '../../../components/ui/Scrollbar';
+import { useProjectStore } from '../../stores/useProjectStore';
 
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('screen');
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
+
+    const project = useProjectStore(s => s.project);
+    const sources = useProjectStore(s => s.sources);
+    const recording = project.timeline.recording;
+    const hasCameraSource = recording.cameraSourceId ? !!sources[recording.cameraSourceId] : false;
+
+    // Check if any source has microphone for captions
+    let hasMicrophone = false;
+    if (recording.cameraSourceId) {
+        const cameraSource = Object.values(sources).find((s: any) => s.id === recording.cameraSourceId);
+        if (cameraSource && cameraSource.has_microphone) {
+            hasMicrophone = true;
+        }
+    }
+    if (!hasMicrophone && recording.screenSourceId) {
+        const screenSource = Object.values(sources).find((s: any) => s.id === recording.screenSourceId);
+        if (screenSource && screenSource.has_microphone) {
+            hasMicrophone = true;
+        }
+    }
 
     return (
         <div className="flex h-full border-r border-border bg-surface">
@@ -86,24 +107,28 @@ export const SettingsPanel = () => {
                     isActive={activeTab === 'screen'}
                     onClick={() => setActiveTab('screen')}
                 />
-                <SettingsButton
-                    label="Webcam"
-                    icon={<IconCamera />}
-                    isActive={activeTab === 'camera'}
-                    onClick={() => setActiveTab('camera')}
-                />
+                {hasCameraSource && (
+                    <SettingsButton
+                        label="Webcam"
+                        icon={<IconCamera />}
+                        isActive={activeTab === 'camera'}
+                        onClick={() => setActiveTab('camera')}
+                    />
+                )}
                 <SettingsButton
                     label="Effects"
                     icon={<IconZoom />}
                     isActive={activeTab === 'zoom'}
                     onClick={() => setActiveTab('zoom')}
                 />
-                <SettingsButton
-                    label="Captions"
-                    icon={<IconCaptions />}
-                    isActive={activeTab === 'captions'}
-                    onClick={() => setActiveTab('captions')}
-                />
+                {hasMicrophone && (
+                    <SettingsButton
+                        label="Captions"
+                        icon={<IconCaptions />}
+                        isActive={activeTab === 'captions'}
+                        onClick={() => setActiveTab('captions')}
+                    />
+                )}
             </div>
 
             {/* Content Area */}
