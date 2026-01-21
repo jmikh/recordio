@@ -10,6 +10,10 @@ import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
 import { Button } from '../../components/ui/Button';
 import { BugReportModal } from '../../components/ui/BugReportModal';
+import { AuthModal } from '../../components/ui/AuthModal';
+import { UserMenu } from '../../components/ui/UserMenu';
+import { UpgradeModal } from '../../components/ui/UpgradeModal';
+import { useUserStore } from '../../stores/useUserStore';
 import logoFull from '../../assets/logo-full-source.png';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
@@ -21,6 +25,10 @@ const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
 
 export const Header = () => {
     const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
+    const { isAuthenticated, isPro, canExportQuality } = useUserStore();
     const project = useProjectData();
     const sources = useProjectStore(s => s.sources);
     const updateProjectName = useProjectStore(s => s.updateProjectName);
@@ -34,6 +42,22 @@ export const Header = () => {
 
     const handleExport = async (quality: ExportQuality) => {
         if (isExporting) return;
+
+        // Check if user can export this quality
+        if (!canExportQuality(quality)) {
+            // User needs Pro subscription for this quality
+            setSelectedQuality(quality);
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
+        // Show watermark warning for free users
+        if (!isPro && (quality === '360p' || quality === '720p')) {
+            const confirmed = window.confirm(
+                'Free exports include a "RECORDIO" watermark.\n\nUpgrade to Pro to remove watermarks and unlock 1080p/4K exports.\n\nContinue with watermark?'
+            );
+            if (!confirmed) return;
+        }
 
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
@@ -131,6 +155,14 @@ export const Header = () => {
                         }
                         direction="down"
                     />
+                    {/* User Authentication */}
+                    {isAuthenticated ? (
+                        <UserMenu />
+                    ) : (
+                        <Button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
+                            Sign In
+                        </Button>
+                    )}
                     <Button onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
                         <MdBugReport size={18} />
                     </Button>
@@ -139,6 +171,15 @@ export const Header = () => {
             <BugReportModal
                 isOpen={isBugReportModalOpen}
                 onClose={() => setIsBugReportModalOpen(false)}
+            />
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+            />
+            <UpgradeModal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                selectedQuality={selectedQuality}
             />
         </div>
     );

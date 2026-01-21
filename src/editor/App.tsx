@@ -14,6 +14,9 @@ import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/Header';
 
+// Auth imports
+import { AuthManager, supabase } from '../auth/AuthManager';
+import { useUserStore } from '../stores/useUserStore';
 
 
 
@@ -39,6 +42,75 @@ function Editor() {
     // Initialization State
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Initialize authentication
+    useEffect(() => {
+        if (!supabase) {
+            console.log('[Auth] Supabase not configured - auth features disabled');
+            return;
+        }
+
+        // Check if this is an OAuth callback (tokens in URL hash)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+
+        if (accessToken) {
+            console.log('[Auth] OAuth callback detected - processing tokens...');
+            // Supabase will automatically process the hash and create a session
+            // Clear the hash after processing to clean up the URL
+            setTimeout(() => {
+                window.location.hash = '';
+                console.log('[Auth] OAuth callback processed, session should be active');
+            }, 1000);
+        }
+
+        // Initialize auth state listener
+        AuthManager.initAuthListener(async (session) => {
+            const { setUser, setSubscription, clearUser } = useUserStore.getState();
+
+            if (session) {
+                // User is logged in
+                console.log('[Auth] User logged in:', session.user.email);
+                setUser(session.user.id, session.user.email || '');
+
+                // Fetch subscription status from database
+                try {
+                    const { data, error } = await supabase!
+                        .from('subscriptions')
+                        .select('*')
+                        .eq('user_id', session.user.id)
+                        .single();
+
+                    if (error) {
+                        // Table might not exist yet or user has no subscription
+                        console.log('[Auth] No subscription found (user is on free plan)');
+                    } else if (data) {
+                        setSubscription({
+                            status: data.status,
+                            planId: data.plan_id,
+                            currentPeriodEnd: new Date(data.current_period_end),
+                            cancelAtPeriodEnd: data.cancel_at_period_end
+                        });
+                        console.log('[Auth] Subscription status:', data.status);
+                    }
+                } catch (error) {
+                    console.log('[Auth] Subscription table not configured yet - user defaults to free plan');
+                }
+            } else {
+                // User is logged out
+                console.log('[Auth] User logged out');
+                clearUser();
+            }
+        });
+
+        // Check initial session
+        AuthManager.getSession().then((session) => {
+            if (session) {
+                const { setUser } = useUserStore.getState();
+                setUser(session.user.id, session.user.email || '');
+            }
+        });
+    }, []);
 
     // Load Project ID from URL
     useEffect(() => {

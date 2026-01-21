@@ -52,3 +52,6 @@ SETTINGS
 
 
 
+SECURITY
+========
+jwt supabase functions

@@ -11,7 +11,8 @@
         "scripting",
         "desktopCapture",
         "tabs",
-        "unlimitedStorage"
+        "unlimitedStorage",
+        "identity"
     ],
     "host_permissions": [
         "<all_urls>"
@@ -39,7 +40,7 @@
         }
     ],
     "content_security_policy": {
-        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://models.recordio.site; object-src 'self'"
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://models.recordio.site https://*.supabase.co; object-src 'self'"
     },
     "web_accessible_resources": []
 }
