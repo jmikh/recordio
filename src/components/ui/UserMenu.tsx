@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaUser, FaSignOutAlt, FaCrown } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt, FaCrown, FaCog } from 'react-icons/fa';
 import { useUserStore } from '../../stores/useUserStore';
 import { AuthManager } from '../../auth/AuthManager';
+import { StripeService } from '../../stripe/StripeService';
 import { Button } from './Button';
 
 export function UserMenu() {
-    const { email, isPro } = useUserStore();
+    const { email, isPro, subscription } = useUserStore();
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +30,24 @@ export function UserMenu() {
     const handleSignOut = async () => {
         await AuthManager.signOut();
         useUserStore.getState().clearUser();
+        setIsOpen(false);
+    };
+
+    const handleManageSubscription = async () => {
+        if (!subscription.stripeCustomerId) {
+            console.error('[UserMenu] No Stripe customer ID found');
+            return;
+        }
+
+        const { url, error } = await StripeService.createPortalSession(subscription.stripeCustomerId);
+
+        if (error || !url) {
+            console.error('[UserMenu] Failed to create portal session:', error);
+            return;
+        }
+
+        // Open Stripe Customer Portal in new tab
+        window.open(url, '_blank');
         setIsOpen(false);
     };
 
@@ -61,6 +80,15 @@ export function UserMenu() {
                     </div>
 
                     <div className="p-2">
+                        {isPro && subscription.stripeCustomerId && (
+                            <button
+                                onClick={handleManageSubscription}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-main hover:text-text-highlighted hover:bg-hover rounded-sm transition-colors mb-1"
+                            >
+                                <FaCog size={12} />
+                                Manage Subscription
+                            </button>
+                        )}
                         <button
                             onClick={handleSignOut}
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-main hover:text-text-highlighted hover:bg-hover rounded-sm transition-colors"

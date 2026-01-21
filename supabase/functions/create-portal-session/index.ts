@@ -7,8 +7,6 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
     httpClient: Stripe.createFetchHttpClient(),
 });
 
-const PRICE_ID = Deno.env.get('STRIPE_PRICE_ID') || '';
-
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -22,7 +20,7 @@ serve(async (req) => {
     try {
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
-            console.error('[Checkout] Missing authorization header');
+            console.error('[Portal] Missing authorization header');
             return new Response(
                 JSON.stringify({ error: 'Unauthorized: Missing auth header' }),
                 { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -38,31 +36,18 @@ serve(async (req) => {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
-            console.error('[Checkout] User verification failed:', userError?.message);
+            console.error('[Portal] User verification failed:', userError?.message);
             return new Response(
                 JSON.stringify({ error: 'Unauthorized: Invalid user' }),
                 { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        const { userId, userEmail, successUrl, cancelUrl } = await req.json();
+        const { customerId, returnUrl } = await req.json();
 
-        if (userId !== user.id) {
-            console.error('[Checkout] User ID mismatch:', userId, 'vs', user.id);
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized: User ID mismatch' }),
-                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        const session = await stripe.checkout.sessions.create({
-            customer_email: userEmail,
-            client_reference_id: userId,
-            line_items: [{ price: PRICE_ID, quantity: 1 }],
-            mode: 'subscription',
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            metadata: { userId },
+        const session = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: returnUrl,
         });
 
         return new Response(
@@ -70,7 +55,7 @@ serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
     } catch (error) {
-        console.error('[Checkout] Error:', error);
+        console.error('[Portal] Error:', error);
         return new Response(
             JSON.stringify({ error: error.message }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }

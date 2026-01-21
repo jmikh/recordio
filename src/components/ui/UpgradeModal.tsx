@@ -30,7 +30,7 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
             // Check if user has active subscription
             const { data } = await supabase
                 .from('subscriptions')
-                .select('status, plan_id, current_period_end, cancel_at_period_end')
+                .select('status, plan_id, current_period_end, cancel_at_period_end, stripe_customer_id')
                 .eq('user_id', userId)
                 .single();
 
@@ -44,7 +44,8 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
                     status: 'active',
                     planId: data.plan_id || '',
                     currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : new Date(),
-                    cancelAtPeriodEnd: data.cancel_at_period_end || false
+                    cancelAtPeriodEnd: data.cancel_at_period_end || false,
+                    stripeCustomerId: data.stripe_customer_id || null
                 });
 
                 // Auto-close after showing success message

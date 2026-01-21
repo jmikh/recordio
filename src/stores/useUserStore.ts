@@ -8,6 +8,7 @@ export interface Subscription {
     planId: string | null;
     currentPeriodEnd: Date | null;
     cancelAtPeriodEnd: boolean;
+    stripeCustomerId: string | null;
 }
 
 export interface UserState {
@@ -40,7 +41,8 @@ export const useUserStore = create<UserState>()(
                 status: null,
                 planId: null,
                 currentPeriodEnd: null,
-                cancelAtPeriodEnd: false
+                cancelAtPeriodEnd: false,
+                stripeCustomerId: null
             },
             isPro: false,
 
@@ -64,7 +66,8 @@ export const useUserStore = create<UserState>()(
                     status: null,
                     planId: null,
                     currentPeriodEnd: null,
-                    cancelAtPeriodEnd: false
+                    cancelAtPeriodEnd: false,
+                    stripeCustomerId: null
                 },
                 isPro: false
             }),

@@ -1,4 +1,4 @@
-import { supabase } from '../auth/AuthManager';
+import { supabase, supabaseAnonKey } from '../auth/AuthManager';
 
 export class StripeService {
     /**
@@ -14,7 +14,13 @@ export class StripeService {
 
             // For Chrome extensions, we can't use chrome-extension:// URLs as redirect targets
             // Users will need to manually return to the extension after payment
-            const redirectUrl = 'http://localhost:3000/payment-success';
+            const redirectUrl = 'https://recordio.site/subscription-success';
+
+            // Get user session token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                return { error: new Error('Not authenticated') };
+            }
 
             // Call Supabase Edge Function to create checkout session
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
@@ -23,6 +29,10 @@ export class StripeService {
                     userEmail,
                     successUrl: redirectUrl,
                     cancelUrl: redirectUrl,
+                },
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                    apikey: supabaseAnonKey
                 }
             });
 
@@ -56,18 +66,30 @@ export class StripeService {
         }
 
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                return { error: new Error('Not authenticated') };
+            }
+
+            const payload = {
+                customerId,
+                returnUrl: window.location.href,
+            };
+
+            const headers = {
+                Authorization: `Bearer ${session.access_token}`,
+                apikey: supabaseAnonKey
+            };
+
             const { data, error } = await supabase.functions.invoke('create-portal-session', {
-                body: {
-                    customerId,
-                    returnUrl: window.location.href,
-                }
+                body: payload,
+                headers
             });
 
             if (error) {
-                console.error('[Stripe] Error creating portal session:', error);
+                console.error('[Stripe] Failed to create portal session:', error);
                 return { error };
             }
-
             return { url: data?.url };
         } catch (error) {
             console.error('[Stripe] Unexpected error:', error);

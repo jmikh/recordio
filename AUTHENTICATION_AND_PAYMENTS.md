@@ -104,7 +104,7 @@ In `src/editor/App.tsx`, the auth state listener:
 3. Server creates Stripe checkout session
 4. Opens checkout in new browser tab
 5. User completes payment
-6. Stripe redirects to success URL (currently `localhost:3000`)
+6. Stripe redirects to success URL (currently `https://recordio.site/subscription-success`)
 7. Extension polls subscription table for updates
 
 ### 2. Server-Side Checkout
@@ -264,10 +264,9 @@ supabase/
 ### 1. Supabase Setup
 
 **Authentication → URL Configuration:**
-- **Site URL:** `http://localhost:3000` (dev) / `https://recordio.com` (prod)
+- **Site URL:** `http://localhost:3000` (dev) / `https://recordio.site` (prod)
 - **Redirect URLs:**
   - `https://<extension-id>.chromiumapp.org/`
-  - `http://localhost:3000/*` (optional, for web)
 
 **Database:**
 - Run `supabase/migrations/subscriptions.sql` to create table
