@@ -51,14 +51,6 @@ export const Header = () => {
             return;
         }
 
-        // Show watermark warning for free users
-        if (!isPro && (quality === '360p' || quality === '720p')) {
-            const confirmed = window.confirm(
-                'Free exports include a "RECORDIO" watermark.\n\nUpgrade to Pro to remove watermarks and unlock 1080p/4K exports.\n\nContinue with watermark?'
-            );
-            if (!confirmed) return;
-        }
-
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
         const manager = new ExportManager();
@@ -68,7 +60,7 @@ export const Header = () => {
             // Assign to global for cancellation (hacky but effective for single active export)
             (window as any).__activeExportManager = manager;
 
-            await manager.exportProject(project, sources, quality, onProgress);
+            await manager.exportProject(project, sources, quality, onProgress, isPro);
         } catch (e) {
             console.error(e);
         } finally {
@@ -86,7 +78,7 @@ export const Header = () => {
                         href="https://recordio.site"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="opacity-70 hover:opacity-100 transition-opacity duration-200"
+                        className="opacity-80 hover:opacity-100 transition-opacity duration-200"
                     >
                         <img src={logoFull} alt="Recordio" className="h-8" />
                     </a>

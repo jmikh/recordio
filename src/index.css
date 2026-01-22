@@ -6,175 +6,176 @@
    ============================================================ */
 
 @theme {
-   /* Typography */
-   --font-sans: 'Satoshi', sans-serif;
+  /* Typography */
+  --font-sans: 'Satoshi', sans-serif;
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Surfaces
      ───────────────────────────────────────────────────────── */
-   --color-surface-body: var(--surface-body);
-   --color-surface: var(--surface-default);
-   --color-surface-raised: var(--surface-raised);
-   --color-surface-overlay: var(--surface-overlay);
+  --color-surface-body: var(--surface-body);
+  --color-surface: var(--surface-default);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Hovers
      ───────────────────────────────────────────────────────── */
-   --color-hover-subtle: var(--hover-subtle);
-   --color-hover: var(--hover);
-   --color-hover-bold: var(--hover-bold);
-   --color-hover-primary: var(--primary-muted);
+  --color-hover-subtle: var(--hover-subtle);
+  --color-hover: var(--hover);
+  --color-hover-bold: var(--hover-bold);
+  --color-hover-primary: var(--primary-muted);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Borders
      ───────────────────────────────────────────────────────── */
-   --color-border: var(--border-default);
-   --color-border-hover: var(--border-hover);
-   --color-border-selected: var(--border-selected);
-   --color-border-primary: var(--border-primary);
+  --color-border: var(--border-default);
+  --color-border-hover: var(--border-hover);
+  --color-border-selected: var(--border-selected);
+  --color-border-primary: var(--border-primary);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Primary
      ───────────────────────────────────────────────────────── */
-   --color-primary: var(--primary);
-   --color-primary-muted: var(--primary-muted);
-   --color-primary-highlighted: var(--primary-highlighted);
-   --color-primary-disabled: var(--primary-disabled);
-   --color-primary-fg: var(--text-on-primary);
+  --color-primary: var(--primary);
+  --color-primary-muted: var(--primary-muted);
+  --color-primary-highlighted: var(--primary-highlighted);
+  --color-primary-disabled: var(--primary-disabled);
+  --color-primary-fg: var(--text-on-primary);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Secondary
      ───────────────────────────────────────────────────────── */
-   --color-secondary: var(--secondary);
-   --color-secondary-muted: var(--secondary-muted);
-   --color-secondary-highlighted: var(--secondary-highlighted);
-   --color-secondary-disabled: var(--secondary-disabled);
-   --color-secondary-fg: var(--text-on-secondary);
+  --color-secondary: var(--secondary);
+  --color-secondary-muted: var(--secondary-muted);
+  --color-secondary-highlighted: var(--secondary-highlighted);
+  --color-secondary-disabled: var(--secondary-disabled);
+  --color-secondary-fg: var(--text-on-secondary);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Semantic States
      ───────────────────────────────────────────────────────── */
-   --color-destructive: var(--destructive);
-   --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Text
      ───────────────────────────────────────────────────────── */
-   --color-text-highlighted: var(--text-highlighted);
-   --color-text-main: var(--text-main);
-   --color-text-muted: var(--text-muted);
-   --color-text-disabled: var(--text-disabled);
-   --color-text-primary: var(--text-primary);
-   --color-text-on-primary: var(--text-on-primary);
-   --color-text-on-secondary: var(--text-on-secondary);
+  --color-text-highlighted: var(--text-highlighted);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-primary: var(--text-primary);
+  --color-text-on-primary: var(--text-on-primary);
+  --color-text-on-secondary: var(--text-on-secondary);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Focus Ring
      ───────────────────────────────────────────────────────── */
-   --color-ring: var(--ring-color);
+  --color-ring: var(--ring-color);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Shadows
      ───────────────────────────────────────────────────────── */
-   --shadow-inner-bold: inset 0 2px 4px oklch(0 0 0 / 30%);
-   --shadow-float: 0 4px 12px oklch(0 0 0 / 50%);
+  --shadow-inner-bold: inset 0 2px 4px oklch(0 0 0 / 30%);
+  --shadow-float: 0 4px 12px oklch(0 0 0 / 50%);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Radius
      ───────────────────────────────────────────────────────── */
-   --radius-sm: 4px;
-   --radius-md: 8px;
-   --radius-lg: 12px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      Spacing
      ───────────────────────────────────────────────────────── */
-   --spacing-header: 48px;
-   --spacing-track: 40px;
+  --spacing-header: 48px;
+  --spacing-track: 40px;
 }
 
 :root {
-   /* ============================================================
+  /* ============================================================
      Layer 1: OKLCH Primitives
      ============================================================ */
 
-   /* Hues */
-   --hue-primary: 290;
-   --hue-secondary: 78;
+  /* Hues */
+  --hue-primary: 290;
+  --hue-secondary: 78;
 
-   /* ============================================================
+  /* ============================================================
      Layer 2: Semantic Tokens
      ============================================================ */
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      1. Surfaces (Body → Surface → Raised → Overlay)
      ───────────────────────────────────────────────────────── */
-   --surface-body: oklch(0.13 0 0);
-   --surface-default: oklch(0.17 0 0);
-   --surface-raised: oklch(0.21 0 0);
-   --surface-overlay: oklch(0.25 0 0);
+  --surface-body: oklch(0.13 0 0);
+  --surface-default: oklch(0.17 0 0);
+  --surface-raised: oklch(0.21 0 0);
+  --surface-overlay: oklch(0.25 0 0);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      2. Hover Backgrounds
      ───────────────────────────────────────────────────────── */
-   --hover-subtle: oklch(1 0 0 / 8%);
-   --hover: oklch(1 0 0 / 12%);
-   --hover-bold: oklch(1 0 0 / 18%);
+  --hover-subtle: oklch(1 0 0 / 8%);
+  --hover: oklch(1 0 0 / 12%);
+  --hover-bold: oklch(1 0 0 / 18%);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      3. Borders (White with transparency)
      ───────────────────────────────────────────────────────── */
-   --border-default: oklch(1 0 0 / 8%);
-   --border-hover: oklch(1 0 0 / 15%);
-   --border-selected: oklch(1 0 0 / 25%);
-   --border-primary: var(--primary);
+  --border-default: oklch(1 0 0 / 8%);
+  --border-hover: oklch(1 0 0 / 15%);
+  --border-selected: oklch(1 0 0 / 25%);
+  --border-primary: var(--primary);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      4. Primary Color Variants
      ───────────────────────────────────────────────────────── */
-   --primary: oklch(0.58 0.19 var(--hue-primary));
-   --primary-muted: oklch(0.45 0.12 var(--hue-primary));
-   --primary-highlighted: oklch(0.66 0.20 var(--hue-primary));
-   --primary-disabled: oklch(0.40 0.08 var(--hue-primary));
+  --primary: oklch(0.58 0.19 var(--hue-primary));
+  --primary-muted: oklch(0.45 0.12 var(--hue-primary));
+  --primary-highlighted: oklch(0.66 0.20 var(--hue-primary));
+  --primary-disabled: oklch(0.40 0.08 var(--hue-primary));
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      5. Secondary Color Variants
      ───────────────────────────────────────────────────────── */
-   --secondary: oklch(0.80 0.15 var(--hue-secondary));
-   --secondary-muted: oklch(0.65 0.10 var(--hue-secondary));
-   --secondary-highlighted: oklch(0.87 0.16 var(--hue-secondary));
-   --secondary-disabled: oklch(0.55 0.06 var(--hue-secondary));
+  --secondary: oklch(0.80 0.15 var(--hue-secondary));
+  --secondary-muted: oklch(0.65 0.10 var(--hue-secondary));
+  --secondary-highlighted: oklch(0.87 0.16 var(--hue-secondary));
+  --secondary-disabled: oklch(0.55 0.06 var(--hue-secondary));
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      6. Text Colors
      ───────────────────────────────────────────────────────── */
-   --text-highlighted: oklch(0.98 0 0);
-   --text-main: oklch(0.98 0 0 / 80%);
-   --text-muted: oklch(0.98 0 0 / 60%);
-   --text-disabled: oklch(0.98 0 0 / 38%);
-   --text-on-primary: oklch(0.98 0 0);
-   --text-on-secondary: oklch(0.15 0 0);
+  --text-highlighted: oklch(0.98 0 0);
+  --text-main: oklch(0.98 0 0 / 80%);
+  --text-muted: oklch(0.98 0 0 / 60%);
+  --text-disabled: oklch(0.98 0 0 / 38%);
+  --text-on-primary: oklch(0.98 0 0);
+  --text-on-secondary: oklch(0.15 0 0);
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      7. Focus Ring
      ───────────────────────────────────────────────────────── */
-   --ring-color: oklch(0.65 0.22 var(--hue-secondary));
-   --ring-width: 2px;
-   --ring-offset: 2px;
+  --ring-color: oklch(0.65 0.22 var(--hue-secondary));
+  --ring-width: 2px;
+  --ring-offset: 2px;
 
-   /* ─────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      8. Semantic States
      ───────────────────────────────────────────────────────── */
-   --destructive: oklch(0.65 0.25 25);
-   --success: oklch(0.70 0.18 155);
+  --destructive: oklch(0.65 0.25 25);
+  --success: oklch(0.70 0.18 155);
 }
 
 
-@layer base {
-   html {
-      font-family: var(--font-sans);
-      font-weight: 500;
-   }
+/* Global font applied outside @layer to ensure it's not tree-shaken */
+html,
+body,
+#root {
+  font-family: 'Satoshi', sans-serif !important;
+  font-weight: 500;
 }
 
 /* ============================================================
@@ -182,85 +183,85 @@
    ============================================================ */
 @layer components {
 
-   /* Standard Panel */
-   .panel-base {
-      @apply bg-surface border border-border rounded-md text-text-highlighted;
-   }
+  /* Standard Panel */
+  .panel-base {
+    @apply bg-surface border border-border rounded-md text-text-highlighted;
+  }
 
-   /* Interactive Item */
-   .item-interactive {
-      @apply hover:bg-hover-subtle transition-colors cursor-pointer;
-   }
+  /* Interactive Item */
+  .item-interactive {
+    @apply hover:bg-hover-subtle transition-colors cursor-pointer;
+  }
 
-   /* Primary Button */
-   .btn-primary {
-      @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium transition-colors;
-   }
+  /* Primary Button */
+  .btn-primary {
+    @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium transition-colors;
+  }
 
-   .btn-primary:hover {
-      @apply bg-primary-highlighted;
-   }
+  .btn-primary:hover {
+    @apply bg-primary-highlighted;
+  }
 
-   .btn-primary:disabled {
-      @apply bg-primary-disabled text-text-disabled cursor-not-allowed;
-   }
+  .btn-primary:disabled {
+    @apply bg-primary-disabled text-text-disabled cursor-not-allowed;
+  }
 
-   /* Focus Ring Utility */
-   .focus-ring:focus-visible {
-      outline: 2px solid transparent;
-      /* High contrast fallback */
-      outline-offset: var(--ring-offset);
-      box-shadow:
-         0 0 0 var(--ring-offset) var(--surface-body),
-         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
-   }
+  /* Focus Ring Utility */
+  .focus-ring:focus-visible {
+    outline: 2px solid transparent;
+    /* High contrast fallback */
+    outline-offset: var(--ring-offset);
+    box-shadow:
+      0 0 0 var(--ring-offset) var(--surface-body),
+      0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
+  }
 
-   /* Active Ring Utility - always visible when applied */
-   .ring-active {
-      outline: 2px solid transparent;
-      outline-offset: var(--ring-offset);
-      box-shadow:
-         0 0 0 var(--ring-offset) var(--surface-body),
-         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
-   }
+  /* Active Ring Utility - always visible when applied */
+  .ring-active {
+    outline: 2px solid transparent;
+    outline-offset: var(--ring-offset);
+    box-shadow:
+      0 0 0 var(--ring-offset) var(--surface-body),
+      0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
+  }
 
-   /* Hide Scrollbar */
-   .scrollbar-hide {
-      scrollbar-width: none;
-      /* Firefox */
-      -ms-overflow-style: none;
-      /* IE and Edge */
-   }
+  /* Hide Scrollbar */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+  }
 
-   .scrollbar-hide::-webkit-scrollbar {
-      display: none;
-      width: 0;
-      height: 0;
-      background: transparent;
-   }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
 }
 
 /* ============================================================
    Animations (Retained)
    ============================================================ */
 @keyframes flashing-glow {
-   0% {
-      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
-      border-color: oklch(from var(--primary) l c h / 80%);
-   }
+  0% {
+    box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
+    border-color: oklch(from var(--primary) l c h / 80%);
+  }
 
-   50% {
-      box-shadow: inset 0 0 20px oklch(from var(--primary) l c h / 90%);
-      border-color: var(--primary);
-   }
+  50% {
+    box-shadow: inset 0 0 20px oklch(from var(--primary) l c h / 90%);
+    border-color: var(--primary);
+  }
 
-   100% {
-      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
-      border-color: oklch(from var(--primary) l c h / 80%);
-   }
+  100% {
+    box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
+    border-color: oklch(from var(--primary) l c h / 80%);
+  }
 }
 
 .bounding-box-glow {
-   animation: flashing-glow 1.5s infinite ease-in-out;
-   border: 2px solid var(--primary);
+  animation: flashing-glow 1.5s infinite ease-in-out;
+  border: 2px solid var(--primary);
 }

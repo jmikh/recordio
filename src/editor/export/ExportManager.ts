@@ -2,8 +2,10 @@ import * as Mp4Muxer from 'mp4-muxer';
 import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
+import { drawWatermark } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import type { Project, SourceMetadata } from '../../core/types';
+import fullLogoPng from '../../assets/fulllogo.png';
 
 export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
 
@@ -19,7 +21,8 @@ export class ExportManager {
         project: Project,
         sources: Record<string, SourceMetadata>,
         quality: ExportQuality,
-        onProgress: (state: ExportProgress) => void
+        onProgress: (state: ExportProgress) => void,
+        isPro: boolean = false
     ): Promise<void> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -80,7 +83,7 @@ export class ExportManager {
         const ctx = offscreenCanvas.getContext('2d') as unknown as CanvasRenderingContext2D;
 
         const videoElements: Record<string, HTMLVideoElement> = {};
-        const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null } = { bg: null, device: null };
+        const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null, watermark: HTMLImageElement | null } = { bg: null, device: null, watermark: null };
 
         const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
@@ -135,6 +138,11 @@ export class ExportManager {
                 if (sources[id].type === 'video') {
                     videoElements[id] = await loadVideo(sources[id].url);
                 }
+            }
+
+            // Load watermark logo for non-pro users
+            if (!isPro) {
+                imageElements.watermark = await loadImage(fullLogoPng);
             }
 
             const totalDurationMs = this.getTotalDuration(renderProject);
@@ -232,6 +240,11 @@ export class ExportManager {
                     },
                     currentTimeMs: currentTimeMs
                 });
+
+                // Draw watermark for non-pro users (last, on top of all layers)
+                if (!isPro && imageElements.watermark) {
+                    drawWatermark(ctx, imageElements.watermark, width);
+                }
 
 
                 const durationMicros = 1000000 / fps;
