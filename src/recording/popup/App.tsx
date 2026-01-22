@@ -6,8 +6,8 @@ import { Button } from '../../components/ui';
 import { MdBugReport } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
+import { LogoLink } from '../../components/ui/LogoLink';
 import permissionGuide from '../../assets/permission-guide.jpg';
-import logoFull from '../../assets/fulllogo.png';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
@@ -294,10 +294,25 @@ function App() {
 
   if (hasPermissionError) {
     return (
-      <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col p-4">
+      <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col p-4 relative">
+        <Button
+          className="absolute top-2 right-2 p-1.5"
+          onClick={() => {
+            setIsAudioEnabled(false);
+            setIsVideoEnabled(false);
+            setAudioPermission('unknown');
+            setVideoPermission('unknown');
+          }}
+          title="Back to menu"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </Button>
         <h2 className="text-xl font-bold mb-4 text-destructive">Permission Denied</h2>
         <p className="text-sm text-text-main mb-4">
-          Please allow access to your microphone and camera to use Recordio.
+          Please allow access to your microphone and camera to use them in Recordio.
         </p>
 
         <div className="mb-4 rounded-lg overflow-hidden border border-border">
@@ -312,7 +327,7 @@ function App() {
         </Button>
 
         <p className="text-xs text-text-muted mt-4 text-center">
-          After enabling, please close and reopen this popup.
+          If the error persists, make sure Chrome has access to your microphone and camera in the OS settings.
         </p>
       </div>
     );
@@ -322,14 +337,7 @@ function App() {
     <div className="relative w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col">
       {/* Fixed Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <a
-          href="https://recordio.site"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="opacity-70 hover:opacity-100 transition-opacity duration-200"
-        >
-          <img src={logoFull} alt="Recordio" className="h-6" />
-        </a>
+        <LogoLink />
         <div className="flex items-center gap-1">
           <Button
             onClick={handleBlurMode}

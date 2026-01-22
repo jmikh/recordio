@@ -94,7 +94,12 @@ export class VideoRecorder {
             if (screenStream) {
                 // Detect if the recorded window is the controller window (current window)
                 // This is used to determine if we need to apply offsets to the recorded events
-                this.detectionResult = await detectControllerWindow(screenStream);
+                // Clone stream for detection to avoid interfering with the main recorder stream
+                const detectionStream = screenStream.clone();
+                this.detectionResult = await detectControllerWindow(detectionStream);
+                // Ensure we stop the cloned tracks after detection
+                detectionStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+
                 console.log("[VideoRecorder] Detection isControllerWindow:", this.detectionResult?.isControllerWindow);
             }
         }
@@ -497,11 +502,11 @@ export class VideoRecorder {
      */
     static getSupportedMimeType(): string {
         const types = [
-            'video/mp4;codecs=avc1,mp4a.40.2', // Standard MP4
-            'video/webm;codecs=h264',          // Standard WebM (H.264)
             'video/webm;codecs=vp9',           // High quality VP9
             'video/webm;codecs=vp8',           // Fallback VP8
-            'video/webm'                       // Generic
+            'video/webm',                       // Generic
+            'video/mp4;codecs=avc1,mp4a.40.2', // Standard MP4 (Moved to bottom)
+            'video/webm;codecs=h264'          // Standard WebM (H.264)
         ];
 
         for (const type of types) {

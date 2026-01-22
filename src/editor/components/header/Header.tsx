@@ -14,7 +14,7 @@ import { AuthModal } from './AuthModal';
 import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
-import logoFull from '../../../assets/fulllogo.png';
+import { LogoLink } from '../../../components/ui/LogoLink';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
     { value: '360p', label: '360p' },
@@ -74,14 +74,7 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <a
-                        href="https://recordio.site"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="opacity-80 hover:opacity-100 transition-opacity duration-200"
-                    >
-                        <img src={logoFull} alt="Recordio" className="h-8" />
-                    </a>
+                    <LogoLink className="mr-2" imgClassName="h-8" />
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
