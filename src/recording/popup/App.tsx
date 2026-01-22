@@ -4,6 +4,7 @@ import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
 import { Button } from '../../components/ui';
 import { MdBugReport, MdArrowBack } from 'react-icons/md';
+import { TbFolder } from 'react-icons/tb';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import { LogoLink } from '../../components/ui/LogoLink';
@@ -277,6 +278,10 @@ function App() {
     chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` });
   };
 
+  const openEditor = () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/editor/index.html') });
+  };
+
   const handleBlurMode = async () => {
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -336,6 +341,13 @@ function App() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <LogoLink />
         <div className="flex items-center gap-1">
+          <Button
+            onClick={openEditor}
+            className="p-1.5"
+            title="Projects"
+          >
+            <TbFolder size={16} />
+          </Button>
           <Button
             onClick={handleBlurMode}
             className="p-1.5"
