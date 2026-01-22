@@ -7,7 +7,7 @@ import { MdBugReport } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import permissionGuide from '../../assets/permission-guide.jpg';
-import logoFull from '../../assets/logo-full-source.png';
+import logoFull from '../../assets/fulllogo.png';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
@@ -322,7 +322,14 @@ function App() {
     <div className="relative w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col">
       {/* Fixed Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <img src={logoFull} alt="Recordio" className="h-6" />
+        <a
+          href="https://recordio.site"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="opacity-70 hover:opacity-100 transition-opacity duration-200"
+        >
+          <img src={logoFull} alt="Recordio" className="h-6" />
+        </a>
         <div className="flex items-center gap-1">
           <Button
             onClick={handleBlurMode}

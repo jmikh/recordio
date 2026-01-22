@@ -27,59 +27,6 @@ export class AuthManager {
     }
 
     /**
-     * Sign in with email/password
-     */
-    static async signIn(email: string, password: string) {
-        if (!supabase) {
-            return { data: null, error: new Error('Supabase not configured') };
-        }
-
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
-
-        if (error) {
-            console.error('[Auth] Sign in error:', error);
-        } else {
-            console.log('[Auth] Sign in successful:', data.user?.email);
-        }
-
-        return { data, error };
-    }
-
-    /**
-     * Sign up with email/password
-     */
-    static async signUp(email: string, password: string) {
-        if (!supabase) {
-            return { data: null, error: new Error('Supabase not configured') };
-        }
-
-        console.log('[Auth] Attempting sign up for:', email);
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password
-        });
-
-        if (error) {
-            console.error('[Auth] Sign up error:', error.message, error);
-        } else {
-            console.log('[Auth] Sign up successful:', data.user?.email);
-
-            if (data.user && !data.session) {
-                console.warn('[Auth] ⚠️ Email confirmation required! Check your email inbox.');
-            }
-
-            if (data.session) {
-                console.log('[Auth] ✅ User is logged in immediately (no email confirmation needed)');
-            }
-        }
-
-        return { data, error };
-    }
-
-    /**
      * Sign out
      */
     static async signOut() {

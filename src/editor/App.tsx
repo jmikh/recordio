@@ -12,11 +12,11 @@ import { ProjectSelector } from './components/ProjectSelector';
 import { ProgressModal } from '../components/ui/ProgressModal';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
-import { Header } from './components/Header';
+import { Header } from './components/header/Header';
 
 // Auth imports
 import { AuthManager, supabase } from '../auth/AuthManager';
-import { useUserStore } from '../stores/useUserStore';
+import { useUserStore } from './stores/useUserStore';
 
 
 
@@ -71,7 +71,12 @@ function Editor() {
             if (session) {
                 // User is logged in
                 console.log('[Auth] User logged in:', session.user.email);
-                setUser(session.user.id, session.user.email || '');
+
+                const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
+                const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
+                const userPicture = avatar_url || picture || null;
+
+                setUser(session.user.id, session.user.email || '', userName, userPicture);
 
                 // Fetch subscription status from database
                 try {
@@ -108,7 +113,11 @@ function Editor() {
         AuthManager.getSession().then((session) => {
             if (session) {
                 const { setUser } = useUserStore.getState();
-                setUser(session.user.id, session.user.email || '');
+                const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
+                const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
+                const userPicture = avatar_url || picture || null;
+
+                setUser(session.user.id, session.user.email || '', userName, userPicture);
             }
         });
     }, []);

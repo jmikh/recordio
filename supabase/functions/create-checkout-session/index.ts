@@ -71,8 +71,21 @@ serve(async (req) => {
         );
     } catch (error) {
         console.error('[Checkout] Error:', error);
+
+        // Return detailed error information for debugging
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorDetails = {
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack?.substring(0, 500) : undefined,
+            hasStripeKey: !!Deno.env.get('STRIPE_SECRET_KEY'),
+            hasPriceId: !!Deno.env.get('STRIPE_PRICE_ID'),
+            priceIdValue: Deno.env.get('STRIPE_PRICE_ID') || '(not set)',
+        };
+
+        console.error('[Checkout] Error details:', errorDetails);
+
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify(errorDetails),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
     }
