@@ -3,7 +3,7 @@ import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
 import { Button } from '../../components/ui';
-import { MdBugReport } from 'react-icons/md';
+import { MdBugReport, MdArrowBack } from 'react-icons/md';
 import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import { LogoLink } from '../../components/ui/LogoLink';
@@ -305,10 +305,7 @@ function App() {
           }}
           title="Back to menu"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+          <MdArrowBack size={16} />
         </Button>
         <h2 className="text-xl font-bold mb-4 text-destructive">Permission Denied</h2>
         <p className="text-sm text-text-main mb-4">

@@ -27,6 +27,18 @@ const BACKGROUND_IMAGES = [
     { name: 'Background 1', url: '/assets/backgrounds/bg1.jpg' },
     { name: 'Background 2', url: '/assets/backgrounds/bg2.jpg' },
     { name: 'Background 3', url: '/assets/backgrounds/bg3.jpg' },
+    { name: 'Background 4', url: '/assets/backgrounds/bg4.jpg' },
+    { name: 'Background 5', url: '/assets/backgrounds/bg5.jpg' },
+    { name: 'Background 6', url: '/assets/backgrounds/bg6.jpg' },
+    { name: 'Background 7', url: '/assets/backgrounds/bg7.jpg' },
+    { name: 'Background 8', url: '/assets/backgrounds/bg8.jpg' },
+    { name: 'Background 9', url: '/assets/backgrounds/bg9.jpg' },
+    { name: 'Background 10', url: '/assets/backgrounds/bg10.jpg' },
+    { name: 'Background 11', url: '/assets/backgrounds/bg11.jpg' },
+    { name: 'Background 12', url: '/assets/backgrounds/bg12.jpg' },
+    { name: 'Background 13', url: '/assets/backgrounds/bg13.jpg' },
+    { name: 'Background 14', url: '/assets/backgrounds/bg14.jpg' },
+    { name: 'Background 15', url: '/assets/backgrounds/bg15.jpg' },
 ];
 
 export const BackgroundSettings = () => {
