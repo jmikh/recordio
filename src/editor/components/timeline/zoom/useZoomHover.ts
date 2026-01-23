@@ -43,7 +43,7 @@ export function useZoomHover(
             return;
         }
 
-        const motions = timeline.recording.viewportMotions || [];
+        const motions = timeline.viewportMotions || [];
 
         // 1. Check if we are inside an existing motion
         const isInside = motions.some((m: ViewportMotion) => {
@@ -109,7 +109,7 @@ export function useZoomHover(
         // Create Motion
         // Determine initial rect
         const startTime = hoverInfo.outputEndTime - hoverInfo.durationMs;
-        const motions = timeline.recording.viewportMotions || [];
+        const motions = timeline.viewportMotions || [];
 
         // Find the closest previous motion
         // We look for a motion that ends at or before our start time

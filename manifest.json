@@ -40,7 +40,7 @@
         }
     ],
     "content_security_policy": {
-        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://models.recordio.site https://*.supabase.co; object-src 'self'"
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://models.recordio.site https://*.supabase.co https://www.google-analytics.com; object-src 'self'"
     },
     "web_accessible_resources": []
 }

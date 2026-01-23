@@ -255,7 +255,7 @@ export const CanvasContainer = () => {
                 {/* CROP OVERLAY (Highest Priority) */}
                 {canvasMode === CanvasMode.CropEdit && (
                     <CropEditor videoSize={(() => {
-                        const screenId = project.timeline.recording.screenSourceId;
+                        const screenId = project.timeline.screenSourceId;
                         const v = internalVideoRefs.current[screenId];
                         return v ? { width: v.videoWidth, height: v.videoHeight } : undefined;
                     })()} />

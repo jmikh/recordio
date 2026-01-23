@@ -55,7 +55,7 @@ export function useZoomDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const motions = timeline.recording.viewportMotions || [];
+        const motions = timeline.viewportMotions || [];
         let targetOutputEndTime = dragState.initialOutputEndTime + deltaTimeMs;
 
         // Get boundaries (excluding self)

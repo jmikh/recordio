@@ -37,7 +37,6 @@ export function drawScreen(
     deviceFrameImg: HTMLImageElement | null // Cached device frame image
 ): { viewMapper: ViewMapper } {
     const { timeline } = project;
-    const { recording } = timeline;
 
     const screenConfig = project.settings.screen || {
         mode: 'device',
@@ -50,9 +49,9 @@ export function drawScreen(
     };
 
     // 1. Resolve Data
-    const screenSource = sources[recording.screenSourceId];
+    const screenSource = sources[timeline.screenSourceId];
     if (!screenSource) {
-        throw new Error(`[drawScreen] Screen source not found: ${recording.screenSourceId}`);
+        throw new Error(`[drawScreen] Screen source not found: ${timeline.screenSourceId}`);
     }
 
     // 2. Use video dimensions if available, otherwise source metadata

@@ -35,14 +35,13 @@ export class PlaybackRenderer {
         const outputSize = project.settings.outputSize;
 
         const { timeline } = project;
-        const { recording } = timeline;
 
         // 2. Calculate Times
         const sourceTimeMs = currentTimeMs;
 
         // 3. Resolve Items
-        const screenSource = sources[recording.screenSourceId];
-        const cameraSource = recording.cameraSourceId ? sources[recording.cameraSourceId] : undefined;
+        const screenSource = sources[timeline.screenSourceId];
+        const cameraSource = timeline.cameraSourceId ? sources[timeline.cameraSourceId] : undefined;
 
         // -----------------------------------------------------------
         // VIEWPORT CALCULATION
@@ -51,7 +50,7 @@ export class PlaybackRenderer {
 
 
         const outputTimeMs = currentTimeMs;
-        const viewportMotions = recording.viewportMotions || [];
+        const viewportMotions = timeline.viewportMotions || [];
 
         effectiveViewport = getViewportStateAtTime(
             viewportMotions,
@@ -117,7 +116,7 @@ export class PlaybackRenderer {
         if (project.settings.captions.visible) {
             drawCaptions(
                 ctx,
-                recording.captions,
+                timeline.captions,
                 project.settings.captions,
                 getTimeMapper(timeline.outputWindows),
                 currentTimeMs,

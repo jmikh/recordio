@@ -48,8 +48,8 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     });
 
     // Prepare Audio Analysis for Screen and Camera
-    const screenSourceId = timeline.recording.screenSourceId;
-    const cameraSourceId = timeline.recording.cameraSourceId;
+    const screenSourceId = timeline.screenSourceId;
+    const cameraSourceId = timeline.cameraSourceId;
 
     const screenSource = sources[screenSourceId];
     const cameraSource = cameraSourceId ? sources[cameraSourceId] : null;
@@ -84,7 +84,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                     const width = coords.msToX(outputDurationMs);
                     currentX += width; // Accumulate for next window
 
-                    const hasCamera = !!timeline.recording.cameraSourceId;
+                    const hasCamera = !!timeline.cameraSourceId;
                     const isMuted = project.settings.screen?.mute ?? false;
 
                     return (

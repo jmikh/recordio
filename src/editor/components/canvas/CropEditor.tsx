@@ -29,7 +29,7 @@ export const renderCropEditor = (
     const { project, sources } = state;
     const outputSize = project.settings.outputSize;
 
-    const screenSource = sources[project.timeline.recording.screenSourceId];
+    const screenSource = sources[project.timeline.screenSourceId];
 
     // Force Full Viewport
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
@@ -91,7 +91,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     // Determine dimensions
     const outputSize = project.settings.outputSize;
-    const screenSource = sources[project.timeline.recording.screenSourceId];
+    const screenSource = sources[project.timeline.screenSourceId];
 
     // We need the ACTUAL source dimensions to map Crop Rect (Source Space) -> Output Space
     // Priority: Prop (Video Element) -> Metadata -> Fallback

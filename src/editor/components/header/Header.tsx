@@ -15,6 +15,7 @@ import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { LogoLink } from '../../../components/ui/LogoLink';
+import { trackExportCompleted } from '../../../core/analytics';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
     { value: '360p', label: '360p' },
@@ -61,6 +62,19 @@ export const Header = () => {
             (window as any).__activeExportManager = manager;
 
             await manager.exportProject(project, sources, quality, onProgress, isPro);
+
+            // Track successful export
+            const totalDurationMs = project.timeline.outputWindows.length > 0
+                ? project.timeline.outputWindows[project.timeline.outputWindows.length - 1].endMs
+                : 0;
+
+            trackExportCompleted({
+                quality,
+                duration_seconds: Math.floor(totalDurationMs / 1000),
+                auto_zoom: project.settings.zoom.autoZoom,
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+            });
         } catch (e) {
             console.error(e);
         } finally {

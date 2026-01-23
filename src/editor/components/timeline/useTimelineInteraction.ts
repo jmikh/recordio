@@ -22,7 +22,7 @@ export function useTimelineInteraction({
     const setPreviewTime = useUIStore(s => s.setPreviewTime);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
 
-    const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions);
+    const viewportMotions = useProjectStore(s => s.project.timeline.viewportMotions);
 
     const timeMapper = useTimeMapper();
 

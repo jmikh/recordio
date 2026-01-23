@@ -23,7 +23,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
             console.log('[Action] updateViewportMotion', id, updates);
         }
         set(state => {
-            const motions = state.project.timeline.recording.viewportMotions;
+            const motions = state.project.timeline.viewportMotions;
             const idx = motions.findIndex(m => m.id === id);
             if (idx === -1) return state;
 
@@ -44,10 +44,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            viewportMotions: nextMotions
-                        }
+                        viewportMotions: nextMotions
                     }
                 }
             };
@@ -57,7 +54,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
     addViewportMotion: (motion) => {
         console.log('[Action] addViewportMotion', motion);
         set(state => {
-            const motions = [...state.project.timeline.recording.viewportMotions, motion]
+            const motions = [...state.project.timeline.viewportMotions, motion]
                 .sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
 
             const nextSettings = {
@@ -72,10 +69,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            viewportMotions: motions
-                        }
+                        viewportMotions: motions
                     }
                 }
             };
@@ -85,7 +79,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
     deleteViewportMotion: (id) => {
         console.log('[Action] deleteViewportMotion', id);
         set(state => {
-            const motions = state.project.timeline.recording.viewportMotions.filter(m => m.id !== id);
+            const motions = state.project.timeline.viewportMotions.filter(m => m.id !== id);
 
             const nextSettings = {
                 ...state.project.settings,
@@ -99,10 +93,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            viewportMotions: motions
-                        }
+                        viewportMotions: motions
                     }
                 }
             };
@@ -118,10 +109,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            viewportMotions: []
-                        }
+                        viewportMotions: []
                     }
                 }
             };

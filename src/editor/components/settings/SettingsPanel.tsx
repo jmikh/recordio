@@ -23,19 +23,18 @@ export const SettingsPanel = () => {
 
     const project = useProjectStore(s => s.project);
     const sources = useProjectStore(s => s.sources);
-    const recording = project.timeline.recording;
-    const hasCameraSource = recording.cameraSourceId ? !!sources[recording.cameraSourceId] : false;
+    const hasCameraSource = project.timeline.cameraSourceId ? !!sources[project.timeline.cameraSourceId] : false;
 
     // Check if any source has microphone for captions
     let hasMicrophone = false;
-    if (recording.cameraSourceId) {
-        const cameraSource = Object.values(sources).find((s: any) => s.id === recording.cameraSourceId);
+    if (project.timeline.cameraSourceId) {
+        const cameraSource = Object.values(sources).find((s: any) => s.id === project.timeline.cameraSourceId);
         if (cameraSource && cameraSource.has_microphone) {
             hasMicrophone = true;
         }
     }
-    if (!hasMicrophone && recording.screenSourceId) {
-        const screenSource = Object.values(sources).find((s: any) => s.id === recording.screenSourceId);
+    if (!hasMicrophone && project.timeline.screenSourceId) {
+        const screenSource = Object.values(sources).find((s: any) => s.id === project.timeline.screenSourceId);
         if (screenSource && screenSource.has_microphone) {
             hasMicrophone = true;
         }

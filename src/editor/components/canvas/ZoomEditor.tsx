@@ -31,7 +31,7 @@ export const renderZoomEditor = (
     const { project, sources, editingZoomId, previewZoomRect } = state;
     const outputSize = project.settings.outputSize;
 
-    const screenSource = sources[project.timeline.recording.screenSourceId];
+    const screenSource = sources[project.timeline.screenSourceId];
 
     // Force Full Viewport (Ignore current Zoom) so user can see context
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
@@ -54,7 +54,7 @@ export const renderZoomEditor = (
     // Render Camera Layer (Relative to Zoom)
     // 1. Get Camera Source and Settings
     const cameraSettings = project.settings.camera;
-    const cameraSourceId = project.timeline.recording.cameraSourceId;
+    const cameraSourceId = project.timeline.cameraSourceId;
     const cameraSource = cameraSourceId ? sources[cameraSourceId] : undefined;
 
     // Only render if we have a camera source and it's enabled
@@ -64,7 +64,7 @@ export const renderZoomEditor = (
             // 2. Determine Zoom Rect (Preview or Committed)
             let zoomRect = previewZoomRect;
             if (!zoomRect && editingZoomId) {
-                const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
+                const motion = project.timeline.viewportMotions.find(m => m.id === editingZoomId);
                 zoomRect = motion?.rect || null;
             }
 
@@ -124,7 +124,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     useEffect(() => {
         if (!editingZoomId) return;
 
-        const motion = project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId);
+        const motion = project.timeline.viewportMotions.find(m => m.id === editingZoomId);
         if (motion) {
             const outputTime = motion.outputEndTimeMs;
             if (outputTime !== -1) {
@@ -136,7 +136,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     // Derived State
     const videoSize = project.settings.outputSize;
     const initialRect = editingZoomId
-        ? project.timeline.recording.viewportMotions.find(m => m.id === editingZoomId)?.rect
+        ? project.timeline.viewportMotions.find(m => m.id === editingZoomId)?.rect
         : null;
 
     // Actions

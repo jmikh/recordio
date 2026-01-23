@@ -75,7 +75,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextMotions = state.project.timeline.recording.viewportMotions;
+            let nextMotions = state.project.timeline.viewportMotions;
 
             // Zoom Logic
             if (state.project.settings.zoom.autoZoom) {
@@ -211,10 +211,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        recording: {
-                            ...tempProject.timeline.recording,
-                            viewportMotions: nextMotions
-                        }
+                        viewportMotions: nextMotions
                     },
                     updatedAt: new Date()
                 }
@@ -248,7 +245,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextMotions = state.project.timeline.recording.viewportMotions;
+            let nextMotions = state.project.timeline.viewportMotions;
 
             if (state.project.settings.zoom.autoZoom) {
                 nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
@@ -266,10 +263,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        recording: {
-                            ...tempProject.timeline.recording,
-                            viewportMotions: nextMotions
-                        }
+                        viewportMotions: nextMotions
                     },
                     updatedAt: new Date()
                 }

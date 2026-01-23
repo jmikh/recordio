@@ -108,7 +108,7 @@ export const useProjectStore = create<ProjectState>()(
 
                     // 4. Fetch Events for the screen source
                     let events: UserEvents = EMPTY_USER_EVENTS;
-                    const screenSourceId = project.timeline.recording.screenSourceId;
+                    const screenSourceId = project.timeline.screenSourceId;
                     const screenSource = sourcesMap[screenSourceId];
 
                     if (screenSource && screenSource.eventsUrl) {
@@ -247,7 +247,7 @@ useProjectStore.subscribe(
 export const useProjectData = () => useProjectStore(s => s.project);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
 export const useProjectSources = () => useProjectStore(s => s.sources);
-export const useRecording = () => useProjectStore(s => s.project.timeline.recording);
+export const useTimeline = () => useProjectStore(s => s.project.timeline);
 export const useProjectHistory = <T,>(
     selector: (state: TemporalState<{ project: Project; uiSnapshot?: Partial<import('./useProjectStore').ProjectState['uiSnapshot']> }>) => T
 ) => useStore(useProjectStore.temporal, selector);

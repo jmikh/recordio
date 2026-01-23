@@ -14,12 +14,12 @@ export const recalculateAutoZooms = (
 ): ViewportMotion[] => {
     // 1. If Auto Zoom is ON, regenerate completely
     if (project.settings.zoom.autoZoom) {
-        const screenSourceId = project.timeline.recording.screenSourceId;
+        const screenSourceId = project.timeline.screenSourceId;
         const sourceMetadata = sources[screenSourceId];
 
         if (!sourceMetadata) {
             console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
-            return project.timeline.recording.viewportMotions;
+            return project.timeline.viewportMotions;
         }
 
         const viewMapper = new ViewMapper(
@@ -39,7 +39,7 @@ export const recalculateAutoZooms = (
         );
     }
 
-    return project.timeline.recording.viewportMotions;
+    return project.timeline.viewportMotions;
 };
 
 

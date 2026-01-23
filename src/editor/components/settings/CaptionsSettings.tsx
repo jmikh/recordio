@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../core/types';
 import { Slider } from '../../../components/ui/Slider';
 import { Toggle } from '../../../components/ui/Toggle';
@@ -11,6 +12,7 @@ import { ProgressModal } from '../../../components/ui/ProgressModal';
 import { PrimaryButton } from '../../../components/ui/PrimaryButton';
 import { Notice } from '../../../components/ui/Notice';
 import { XButton } from '../../../components/ui/XButton';
+import { trackCaptionsGenerated } from '../../../core/analytics';
 
 /**
  * Settings panel for managing captions.
@@ -36,7 +38,7 @@ export function CaptionsSettings() {
     const inputRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    const captions = project.timeline.recording.captions;
+    const captions = project.timeline.captions;
     const settings = project.settings.captions || { visible: true, size: 24, width: 75 };
 
     const timeMapper = useTimeMapper();
@@ -50,8 +52,8 @@ export function CaptionsSettings() {
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
-        const cameraSourceId = state.project.timeline.recording.cameraSourceId;
-        const screenSourceId = state.project.timeline.recording.screenSourceId;
+        const cameraSourceId = state.project.timeline.cameraSourceId;
+        const screenSourceId = state.project.timeline.screenSourceId;
 
         // Determine which source has microphone
         let sourceToTranscribe = null;
@@ -122,6 +124,15 @@ export function CaptionsSettings() {
 
             // Success
             setCaptions(transcriptionData);
+
+            // Track caption generation
+            const { isAuthenticated, isPro } = useUserStore.getState();
+            trackCaptionsGenerated({
+                segment_count: transcriptionData.segments.length,
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+            });
+
             setTranscriptionState({
                 isTranscribing: false,
                 transcriptionProgress: 1
@@ -250,8 +261,8 @@ export function CaptionsSettings() {
 
     // Check if any source has microphone
     const state = useProjectStore.getState();
-    const cameraSourceId = state.project.timeline.recording.cameraSourceId;
-    const screenSourceId = state.project.timeline.recording.screenSourceId;
+    const cameraSourceId = state.project.timeline.cameraSourceId;
+    const screenSourceId = state.project.timeline.screenSourceId;
 
     let hasMicrophone = false;
 

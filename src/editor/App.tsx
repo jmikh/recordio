@@ -193,7 +193,7 @@ function Editor() {
 
     // Derived UI State
     // Check if we have a valid screen source ID to determine if project is "active" / has content
-    const hasActiveProject = !!project.timeline.recording.screenSourceId;
+    const hasActiveProject = !!project.timeline.screenSourceId;
     const projectOutputSize = project.settings.outputSize;
 
     // Calculate Rendered Rect (for overlay positioning)

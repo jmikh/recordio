@@ -76,7 +76,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
             // Recalculate Zooms if necessary conditions met
             // 1. Zoom settings changed
             // 2. Padding changed
-            let nextMotions = state.project.timeline.recording.viewportMotions;
+            let nextMotions = state.project.timeline.viewportMotions;
 
             // Check padding inside the now-merged settings or from updates
             // Using merged settings is safer
@@ -110,10 +110,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                     ...nextProject,
                     timeline: {
                         ...nextProject.timeline,
-                        recording: {
-                            ...nextProject.timeline.recording,
-                            viewportMotions: nextMotions
-                        }
+                        viewportMotions: nextMotions
                     }
                 }
             };

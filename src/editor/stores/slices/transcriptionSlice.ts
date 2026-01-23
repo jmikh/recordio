@@ -33,10 +33,7 @@ export const createTranscriptionSlice: StateCreator<
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    recording: {
-                        ...state.project.timeline.recording,
-                        captions
-                    }
+                    captions
                 },
                 updatedAt: new Date()
             }
@@ -50,10 +47,7 @@ export const createTranscriptionSlice: StateCreator<
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    recording: {
-                        ...state.project.timeline.recording,
-                        captions: undefined
-                    }
+                    captions: undefined
                 },
                 updatedAt: new Date()
             },
@@ -64,7 +58,7 @@ export const createTranscriptionSlice: StateCreator<
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => {
         console.log('[Action] updateCaptionSegment', segmentId, updates);
         set(state => {
-            const captions = state.project.timeline.recording.captions;
+            const captions = state.project.timeline.captions;
             if (!captions) {
                 console.error('[TranscriptionSlice] Cannot update segment - no captions exist');
                 return state;
@@ -87,12 +81,9 @@ export const createTranscriptionSlice: StateCreator<
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            captions: {
-                                ...captions,
-                                segments: updatedSegments
-                            }
+                        captions: {
+                            ...captions,
+                            segments: updatedSegments
                         }
                     },
                     updatedAt: new Date()
@@ -104,7 +95,7 @@ export const createTranscriptionSlice: StateCreator<
     deleteCaptionSegment: (segmentId: string) => {
         console.log('[Action] deleteCaptionSegment', segmentId);
         set(state => {
-            const captions = state.project.timeline.recording.captions;
+            const captions = state.project.timeline.captions;
             if (!captions) {
                 console.error('[TranscriptionSlice] Cannot delete segment - no captions exist');
                 return state;
@@ -117,12 +108,9 @@ export const createTranscriptionSlice: StateCreator<
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        recording: {
-                            ...state.project.timeline.recording,
-                            captions: {
-                                ...captions,
-                                segments: updatedSegments
-                            }
+                        captions: {
+                            ...captions,
+                            segments: updatedSegments
                         }
                     },
                     updatedAt: new Date()

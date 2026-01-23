@@ -12,15 +12,32 @@ const IS_PRODUCTION = import.meta.env.MODE === "production";
 // Global scope instance for capturing errors
 let sentryScope: Scope | null = null;
 
-export function initSentry(context: "editor" | "popup" | "background" | "content") {
-    // Filter integrations that use global state to avoid conflicts with website's Sentry
+export function initSentry(context: "editor" | "popup" | "background" | "content" | "controller" | "offscreen") {
+    // Isolated contexts (extension pages) can safely use global integrations
+    // Content scripts must filter them to avoid conflicts with websites that use Sentry
+    const isIsolatedContext = context === "editor" || context === "popup" || context === "controller" || context === "offscreen";
+
     const integrations = getDefaultIntegrations({}).filter(
         (defaultIntegration) => {
-            return !["BrowserApiErrors", "Breadcrumbs", "GlobalHandlers"].includes(
-                defaultIntegration.name,
-            );
+            // Always filter BrowserApiErrors to avoid monkey-patching browser APIs
+            if (defaultIntegration.name === "BrowserApiErrors") {
+                return false;
+            }
+            // Only filter GlobalHandlers and Breadcrumbs for non-isolated contexts
+            if (!isIsolatedContext && ["Breadcrumbs", "GlobalHandlers"].includes(defaultIntegration.name)) {
+                return false;
+            }
+            return true;
         },
     );
+
+    // Safely get extension version (offscreen documents have limited chrome API access)
+    let extensionVersion = 'unknown';
+    try {
+        extensionVersion = chrome.runtime.getManifest?.()?.version || 'unknown';
+    } catch {
+        // Offscreen documents may not have access to getManifest
+    }
 
     const client = new BrowserClient({
         dsn: SENTRY_DSN,
@@ -30,7 +47,7 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
         environment: IS_PRODUCTION ? "production" : "development",
         sendDefaultPii: true,
         enabled: true,
-        release: `recordio@${chrome.runtime.getManifest().version}`,
+        release: `recordio@${extensionVersion}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
         beforeSend(event) {
             // Remove any potentially sensitive project data

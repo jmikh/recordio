@@ -219,8 +219,14 @@ export interface Timeline {
      */
     outputWindows: OutputWindow[];
 
-    /** The single recording containing source references and events */
-    recording: Recording;
+    /** ID of the screen source for this timeline */
+    screenSourceId: ID;
+    /** Optional ID of the camera source */
+    cameraSourceId?: ID;
+    /** Viewport motion keyframes for zoom/pan effects */
+    viewportMotions: ViewportMotion[];
+    /** Optional caption data from webcam audio */
+    captions?: Captions;
 }
 
 /**
@@ -236,18 +242,7 @@ export interface OutputWindow {
     speed?: number;
 }
 
-/**
- * Represents the recording session data.
- */
-export interface Recording {
-    screenSourceId: ID;
-    cameraSourceId?: ID;
 
-    viewportMotions: ViewportMotion[];
-
-    /** Optional caption data from webcam audio */
-    captions?: Captions;
-}
 
 
 // ==========================================

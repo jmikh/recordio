@@ -1,4 +1,4 @@
-import { type Project, type SourceMetadata, type UserEvents, type Recording, type ID, type Size, type Rect, type ViewportMotion, type CameraSettings, type ScreenSettings } from './types';
+import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ViewportMotion, type CameraSettings, type ScreenSettings } from './types';
 import { calculateZoomSchedule, ViewMapper } from './viewportMotion';
 import { TimeMapper } from './timeMapper';
 
@@ -81,10 +81,8 @@ export class ProjectImpl {
                 // The user must create one via 'createFromSource' or potentially 'add empty'
                 // For now, let's assume a project must have a recording eventually.
                 // We'll init with empty values that need to be populated.
-                recording: {
-                    screenSourceId: '',
-                    viewportMotions: []
-                },
+                screenSourceId: '',
+                viewportMotions: [],
                 outputWindows: []
             }
         };
@@ -138,16 +136,12 @@ export class ProjectImpl {
             timeMapper
         );
 
-        const recording: Recording = {
-            screenSourceId: screenSource.id,
-            cameraSourceId: cameraSource?.id,
-            viewportMotions: viewportMotions
-        };
-
-        // Update timeline with this recording
+        // Update timeline with recording properties
         const updatedTimeline = {
             ...project.timeline,
-            recording: recording,
+            screenSourceId: screenSource.id,
+            cameraSourceId: cameraSource?.id,
+            viewportMotions: viewportMotions,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
             outputWindows: outputWindows
@@ -168,11 +162,11 @@ export class ProjectImpl {
         const ids: Set<ID> = new Set();
 
         // 1. Timeline Sources
-        if (project.timeline.recording.screenSourceId) {
-            ids.add(project.timeline.recording.screenSourceId);
+        if (project.timeline.screenSourceId) {
+            ids.add(project.timeline.screenSourceId);
         }
-        if (project.timeline.recording.cameraSourceId) {
-            ids.add(project.timeline.recording.cameraSourceId);
+        if (project.timeline.cameraSourceId) {
+            ids.add(project.timeline.cameraSourceId);
         }
 
         // 2. Settings Sources (e.g. Background)
@@ -226,7 +220,7 @@ export class ProjectImpl {
             borderWidth: screen.borderWidth * scale,
         });
 
-        const newViewportMotions: ViewportMotion[] = project.timeline.recording.viewportMotions.map(m => ({
+        const newViewportMotions: ViewportMotion[] = project.timeline.viewportMotions.map(m => ({
             ...m,
             rect: scaleRect(m.rect)
         }));
@@ -249,10 +243,7 @@ export class ProjectImpl {
             },
             timeline: {
                 ...project.timeline,
-                recording: {
-                    ...project.timeline.recording,
-                    viewportMotions: newViewportMotions
-                }
+                viewportMotions: newViewportMotions
             }
         };
     }

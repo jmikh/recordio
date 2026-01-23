@@ -10,6 +10,7 @@
 
 import { type Size } from '../../core/types';
 import { initSentry } from '../../utils/sentry';
+import { trackRecordingCompleted } from '../../core/analytics';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
 // Initialize Sentry for error tracking
@@ -451,6 +452,22 @@ async function handleStopSession(sendResponse: Function) {
             }
 
             console.log("[Background] Recorder stop response:", response);
+
+            // Track recording completion
+            const recordingDurationSeconds = currentState?.startTime
+                ? Math.floor((Date.now() - currentState.startTime) / 1000)
+                : 0;
+
+            // Get user state from storage for analytics
+            const userStorage = await chrome.storage.local.get('recordio-user-storage') as { 'recordio-user-storage'?: { state?: { isAuthenticated?: boolean; isPro?: boolean } } };
+            const userState = userStorage['recordio-user-storage']?.state || {};
+
+            trackRecordingCompleted({
+                mode: currentState?.mode || 'tab',
+                duration_seconds: recordingDurationSeconds,
+                is_authenticated: userState.isAuthenticated || false,
+                is_pro: userState.isPro || false,
+            });
 
             // Open editor
             const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;

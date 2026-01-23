@@ -98,7 +98,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                 {/* Existing Motions */}
                 {(() => {
-                    const motions = timeline.recording.viewportMotions || [];
+                    const motions = timeline.viewportMotions || [];
 
                     return motions.map((m, i) => {
                         // Use output time directly

@@ -10,7 +10,7 @@ export const EffectsSettings = () => {
     const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
-    const viewportMotions = useProjectStore(s => s.project.timeline.recording.viewportMotions || []);
+    const viewportMotions = useProjectStore(s => s.project.timeline.viewportMotions || []);
     const userEvents = useProjectStore(s => s.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 

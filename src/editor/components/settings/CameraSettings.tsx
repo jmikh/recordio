@@ -22,8 +22,7 @@ export const CameraSettings = () => {
     const cameraConfig = project.settings.camera;
 
     const sources = useProjectStore(s => s.sources);
-    const recording = project.timeline.recording;
-    const cameraSource = recording.cameraSourceId ? sources[recording.cameraSourceId] : null;
+    const cameraSource = project.timeline.cameraSourceId ? sources[project.timeline.cameraSourceId] : null;
 
     if (!cameraConfig) {
         return (

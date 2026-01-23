@@ -11,6 +11,10 @@
 
 import { VideoRecorder } from '../shared/videoRecorder';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig } from '../shared/messageTypes';
+import { initSentry } from '../../utils/sentry';
+
+// Initialize Sentry for error tracking
+initSentry('controller');
 
 
 
