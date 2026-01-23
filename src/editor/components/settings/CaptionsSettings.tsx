@@ -35,6 +35,7 @@ export function CaptionsSettings() {
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [emptyCaptionsNotice, setEmptyCaptionsNotice] = useState(false);
     const inputRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -133,6 +134,13 @@ export function CaptionsSettings() {
                 is_pro: isPro,
             });
 
+            // Check if captions are empty (no audible speech detected)
+            if (transcriptionData.segments.length === 0) {
+                setEmptyCaptionsNotice(true);
+            } else {
+                setEmptyCaptionsNotice(false);
+            }
+
             setTranscriptionState({
                 isTranscribing: false,
                 transcriptionProgress: 1
@@ -145,9 +153,10 @@ export function CaptionsSettings() {
                 return;
             }
             console.error('[CaptionsSettings] Failed to generate transcription:', error);
+            setEmptyCaptionsNotice(false);
             setTranscriptionState({
                 isTranscribing: false,
-                transcriptionError: error instanceof Error ? error.message : 'Unknown error occurred'
+                transcriptionError: 'Failed to generate captions. Please try again.'
             });
         } finally {
             if (abortControllerRef.current?.signal.aborted) {
@@ -358,13 +367,17 @@ export function CaptionsSettings() {
                 )
             }
 
-            {
-                transcriptionError && (
-                    <Notice variant="error">
-                        {transcriptionError}
-                    </Notice>
-                )
-            }
+            {transcriptionError && (
+                <Notice variant="error">
+                    {transcriptionError}
+                </Notice>
+            )}
+
+            {emptyCaptionsNotice && !transcriptionError && (
+                <Notice variant="info">
+                    No audible speech was detected in the audio. Captions require clear, spoken English to generate.
+                </Notice>
+            )}
 
             {
                 captions && captions.segments.length > 0 && (
