@@ -8,6 +8,7 @@ import { drawCaptions } from '../../../core/painters/captionPainter';
 
 
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
+import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
 
@@ -98,7 +99,29 @@ export class PlaybackRenderer {
                     throw new Error("Mandatory camera settings are missing.");
                 }
 
-                drawWebcam(ctx, video, cameraSource.size, cameraSettings);
+                // Calculate effective camera settings with auto-shrink
+                let effectiveCameraSettings = cameraSettings;
+
+                // Only apply auto-shrink if enabled and not using override (drag preview)
+                if (cameraSettings.autoShrink && !state.overrideCameraSettings) {
+                    const cameraState = getCameraStateAtTime(
+                        viewportMotions,
+                        currentTimeMs,
+                        outputSize,
+                        cameraSettings.shrinkScale ?? 0.5
+                    );
+
+                    if (cameraState.sizeScale < 1.0) {
+                        const anchor = getCameraAnchor(cameraSettings, outputSize);
+                        effectiveCameraSettings = scaleCameraSettings(
+                            cameraSettings,
+                            cameraState.sizeScale,
+                            anchor
+                        );
+                    }
+                }
+
+                drawWebcam(ctx, video, cameraSource.size, effectiveCameraSettings);
             }
         }
 

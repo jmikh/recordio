@@ -4,6 +4,7 @@ import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '../../../components/ui/Slider';
 import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { Toggle } from '../../../components/ui/Toggle';
 import { LookRightButton } from './LookRightButton';
 import { Notice } from '../../../components/ui/Notice';
 import { FaCheck } from 'react-icons/fa';
@@ -23,6 +24,9 @@ export const CameraSettings = () => {
 
     const sources = useProjectStore(s => s.sources);
     const cameraSource = project.timeline.cameraSourceId ? sources[project.timeline.cameraSourceId] : null;
+
+    // Check if there are any zoom motions (needed for auto-shrink feature)
+    const hasZoomMotions = (project.timeline.viewportMotions || []).length > 0;
 
     if (!cameraConfig) {
         return (
@@ -62,7 +66,9 @@ export const CameraSettings = () => {
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
-        zoom = 1
+        cropZoom = 1,
+        autoShrink = false,
+        shrinkScale = 0.5
     } = cameraConfig;
 
     return (
@@ -92,21 +98,56 @@ export const CameraSettings = () => {
                         />
                     </div>
 
-                    {/* Zoom */}
-                    {/* Zoom */}
+                    {/* Crop Zoom - zooms within the camera video feed */}
                     <Slider
-                        label="Zoom"
+                        label="Crop Zoom"
                         min={1}
                         max={3}
-                        value={zoom}
+                        value={cropZoom}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
-                        onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, zoom: val } }))}
+                        onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, cropZoom: val } }))}
                         showTooltip
                         units="x"
                         decimals={1}
                     />
 
+                    <div className="border-t border-gray-700" />
+
+                    {/* Auto-Shrink on Screen Zoom */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-400">Auto-Shrink on Screen Zoom</label>
+                            <Toggle
+                                value={autoShrink}
+                                onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
+                                disabled={!hasZoomMotions}
+                            />
+                        </div>
+
+                        {!hasZoomMotions && (
+                            <p className="text-[10px] text-text-muted italic leading-tight">
+                                * Add screen zoom motions to enable this feature
+                            </p>
+                        )}
+
+                        {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}
+                        {autoShrink && hasZoomMotions && (
+                            <Slider
+                                label="Shrunk Size"
+                                min={0.25}
+                                max={0.75}
+                                value={shrinkScale}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, shrinkScale: val } }))}
+                                showTooltip
+                                units="%"
+                                decimals={0}
+                                valueTransform={(v) => v * 100}
+                            />
+                        )}
+                    </div>
 
                     <div className="border-t border-gray-700" />
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-2 text-center">Border</label>

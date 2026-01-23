@@ -70,8 +70,9 @@ export class ProjectImpl {
                     borderColor: 'white',
                     hasShadow: true,
                     hasGlow: false,
-                    zoom: 1
-
+                    cropZoom: 1,
+                    autoShrink: true,
+                    shrinkScale: 0.5
                 },
             },
             timeline: {
