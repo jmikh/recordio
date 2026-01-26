@@ -6,6 +6,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
+import { SpotlightEditor, renderSpotlightEditor } from './SpotlightEditor';
 import { renderCropEditor, CropEditor } from './CropEditor';
 import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
@@ -18,6 +19,7 @@ export const CanvasContainer = () => {
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
+    const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -39,6 +41,7 @@ export const CanvasContainer = () => {
     // Mutable State for Dragging (60fps preview)
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
     const previewZoomRectRef = useRef<Rect | null>(null);
+    const previewSpotlightRectRef = useRef<Rect | null>(null);
 
     // Loop State
     const animationFrameRef = useRef<number>(0);
@@ -54,7 +57,7 @@ export const CanvasContainer = () => {
 
             const uiState = useUIStore.getState();
             const { project, sources, userEvents } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId } = uiState;
+            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId } = uiState;
 
             if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -147,6 +150,14 @@ export const CanvasContainer = () => {
                         currentTimeMs: effectiveTimeMs,
                         editingZoomId: activeZoomId,
                         previewZoomRect: previewZoomRectRef.current
+                    });
+                } else if (canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId) {
+                    renderSpotlightEditor(resources, {
+                        project,
+                        sources,
+                        currentTimeMs: effectiveTimeMs,
+                        editingSpotlightId: activeSpotlightId,
+                        previewSpotlightRect: previewSpotlightRectRef.current
                     });
                 } else {
                     PlaybackRenderer.render(resources, {
@@ -269,6 +280,11 @@ export const CanvasContainer = () => {
                 {/* CAMERA OVERLAY */}
                 {canvasMode === CanvasMode.CameraEdit && (
                     <CameraEditor cameraRef={previewCameraSettingsRef} />
+                )}
+
+                {/* SPOTLIGHT OVERLAY */}
+                {canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId && (
+                    <SpotlightEditor previewRectRef={previewSpotlightRectRef} />
                 )}
             </div>
         </div>

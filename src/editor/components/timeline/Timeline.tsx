@@ -3,6 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { ZoomTrack } from './zoom/ZoomTrack';
+import { SpotlightTrack } from './spotlight/SpotlightTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -19,6 +20,7 @@ import { useUIStore } from '../../stores/useUIStore';
 // Constants
 const MAIN_TRACK_HEIGHT = 60;
 const ZOOM_TRACK_HEIGHT = 40;
+const SPOTLIGHT_TRACK_HEIGHT = 40;
 const HEADER_WIDTH = 100;
 
 export function Timeline() {
@@ -191,6 +193,11 @@ export function Timeline() {
                         <TimelineTrackHeader title="Zoom" height={ZOOM_TRACK_HEIGHT} />
                     </div>
 
+                    {/* Header: Spotlight */}
+                    <div className="shrink-0" style={{ height: SPOTLIGHT_TRACK_HEIGHT }}>
+                        <TimelineTrackHeader title="Spotlight" height={SPOTLIGHT_TRACK_HEIGHT} />
+                    </div>
+
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
@@ -254,6 +261,10 @@ export function Timeline() {
                                         height={ZOOM_TRACK_HEIGHT}
                                     />
 
+                                    {/* Spotlight Track */}
+                                    <SpotlightTrack
+                                        height={SPOTLIGHT_TRACK_HEIGHT}
+                                    />
 
                                 </div>
 

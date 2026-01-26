@@ -7,6 +7,7 @@ export const CanvasMode = {
     CropEdit: 'cropEdit',
     CameraEdit: 'cameraEdit',
     ZoomEdit: 'zoomEdit',
+    SpotlightEdit: 'spotlightEdit',
     CaptionEdit: 'captionEdit',
 } as const;
 export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
@@ -23,14 +24,16 @@ export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 export interface UIState {
     canvasMode: CanvasMode;
     selectedZoomId: ID | null;
+    selectedSpotlightId: ID | null;
     selectedWindowId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
-    setCanvasMode: (mode: Exclude<CanvasMode, typeof CanvasMode.ZoomEdit>) => void;
+    setCanvasMode: (mode: Exclude<CanvasMode, typeof CanvasMode.ZoomEdit | typeof CanvasMode.SpotlightEdit>) => void;
     setIsResizingWindow: (isResizing: boolean) => void;
     selectWindow: (id: ID | null) => void;
     selectZoom: (id: ID | null) => void;
+    selectSpotlight: (id: ID | null) => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
     // Timeline State
@@ -66,6 +69,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Initial State
     canvasMode: CanvasMode.Preview,
     selectedZoomId: null,
+    selectedSpotlightId: null,
     selectedWindowId: null,
     selectedSettingsPanel: SettingsPanel.Project,
     isResizingWindow: false,
@@ -73,7 +77,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedWindowId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null } : { isPlaying: false })
     }),
     setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
 
@@ -81,12 +85,14 @@ export const useUIStore = create<UIState>((set, get) => ({
         selectedWindowId,
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
+        selectedSpotlightId: null,
     }),
 
     selectZoom: (selectedZoomId) => set((state) => {
         if (selectedZoomId) {
             return {
                 selectedZoomId,
+                selectedSpotlightId: null,
                 selectedWindowId: null,
                 canvasMode: CanvasMode.ZoomEdit,
                 isPlaying: false,
@@ -99,6 +105,25 @@ export const useUIStore = create<UIState>((set, get) => ({
             };
         }
         return { selectedZoomId: null };
+    }),
+
+    selectSpotlight: (selectedSpotlightId) => set((state) => {
+        if (selectedSpotlightId) {
+            return {
+                selectedSpotlightId,
+                selectedZoomId: null,
+                selectedWindowId: null,
+                canvasMode: CanvasMode.SpotlightEdit,
+                isPlaying: false,
+            };
+        }
+        if (state.canvasMode === CanvasMode.SpotlightEdit) {
+            return {
+                selectedSpotlightId: null,
+                canvasMode: CanvasMode.Preview,
+            };
+        }
+        return { selectedSpotlightId: null };
     }),
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
@@ -121,7 +146,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -149,6 +174,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     reset: () => set({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
+        selectedSpotlightId: null,
         selectedWindowId: null,
         selectedSettingsPanel: SettingsPanel.Project,
         timelineContainerRef: null,

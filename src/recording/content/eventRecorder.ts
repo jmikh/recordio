@@ -16,59 +16,6 @@ import { EventType, type MousePositionEvent, type Rect, type Size } from '../../
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 
 
-/**
- * Detects the effective scrollable area by probing the center of the screen.
- * It finds the main content column by walking up from the center element.
- * We look for the "outermost" container that is still smaller than the viewport.
- */
-function getLayoutAwareViewport(): Rect {
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-
-    let el = document.elementFromPoint(cx, cy);
-
-    // Default to full window
-    let bestRect: Rect = {
-        x: 0,
-        y: 0,
-        width: window.innerWidth,
-        height: window.innerHeight
-    };
-    let chosenDiv: Element | null = null;
-    console.log("layoutAwareViewport center element:", el);
-
-    while (el && el !== document.body && el !== document.documentElement) {
-        const rect = el.getBoundingClientRect();
-
-        // Check if wider than 20% but narrower than full viewport
-        // (Use -1 tolerance for full width detection)
-        if (rect.width > window.innerWidth * 0.8) {
-            // Found a full-width container (or close to it). 
-            // Since parents can't be narrower than children usually, 
-            // any previous 'bestRect' was the outermost narrow one.
-            break;
-        }
-
-        if (rect.width > window.innerWidth * 0.2) {
-            // It is a valid candidate (narrower than viewport, but significant size)
-            // We update bestRect and keep going up to find a potentially wider/outer parent
-            // that is still within the narrow constraint.
-            bestRect = {
-                x: rect.left,
-                y: 0, // Assume full height for the scroll track
-                width: rect.width,
-                height: window.innerHeight
-            };
-            chosenDiv = el;
-        }
-
-        el = el.parentElement;
-    }
-
-    console.log("bestRect:", bestRect, chosenDiv);
-    return bestRect;
-}
-
 export class EventRecorder {
     private isRecording = false;
     private startTime = 0;
@@ -143,6 +90,9 @@ export class EventRecorder {
         window.addEventListener('hashchange', this.handleUrlChange);
         window.addEventListener('pagehide', this.handlePageUnload);
 
+        // Focus changes (tab switching, window minimizing, etc.)
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+
         // Initial URL event
         this.sendUrlEvent();
     }
@@ -157,6 +107,7 @@ export class EventRecorder {
         window.removeEventListener('popstate', this.handleUrlChange);
         window.removeEventListener('hashchange', this.handleUrlChange);
         window.removeEventListener('pagehide', this.handlePageUnload);
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
 
     private startPolling() {
@@ -192,8 +143,8 @@ export class EventRecorder {
         };
     }
 
-    private sendMessage(type: string, payload: any) {
-        if (!this.isActive()) return; // Strict active check
+    private sendMessage(type: string, payload: any, skipActiveCheck = false) {
+        if (!skipActiveCheck && !this.isActive()) return; // Strict active check
 
         if (!chrome.runtime?.id) return;
 
@@ -293,11 +244,17 @@ export class EventRecorder {
         // Interaction should flush pending scroll
         this.flushPendingScrollSession();
 
-        const target = e.target as HTMLElement;
+        // Use composedPath to get actual target (handles shadow DOM)
+        const target = (e.composedPath()[0] || e.target) as HTMLElement;
         const tagName = target.tagName;
         const isContentEditable = target.isContentEditable;
 
-        let isInput = isContentEditable || tagName === 'TEXTAREA';
+        // Check for ARIA roles that indicate text input (e.g., Reddit's search uses role="combobox")
+        const role = target.getAttribute('role');
+        const textInputRoles = ['textbox', 'combobox', 'searchbox'];
+        const hasTextInputRole = role && textInputRoles.includes(role);
+
+        let isInput = isContentEditable || tagName === 'TEXTAREA' || hasTextInputRole;
         if (tagName === 'INPUT') {
             const type = (target as HTMLInputElement).type;
             const nonTextInputs = ['checkbox', 'radio', 'button', 'image', 'submit', 'reset', 'range', 'color'];
@@ -344,7 +301,7 @@ export class EventRecorder {
                 const rect = e.target.getBoundingClientRect();
                 targetRect = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
             } else {
-                targetRect = getLayoutAwareViewport();
+                targetRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
             }
 
             this.currentScrollSession = {
@@ -368,12 +325,18 @@ export class EventRecorder {
         this.flushPendingScrollSession();
     }
 
+    private handleVisibilityChange = () => {
+        // Send URL event on both focus gain and focus loss
+        this.flushPendingScrollSession();
+        this.sendUrlEvent();
+    }
+
     private sendUrlEvent() {
         this.sendMessage(EventType.URLCHANGE, {
             timestamp: this.getRelativeTime(),
             mousePos: this.lastMousePos.mousePos,
             url: window.location.href
-        });
+        }, true);
     }
 
     // --- Pollers ---
@@ -436,7 +399,13 @@ export class EventRecorder {
         // Check if editable
         const tagName = activeEl?.tagName;
         const isContentEditable = activeEl?.isContentEditable;
-        let isEditable = isContentEditable || tagName === 'TEXTAREA';
+
+        // Check for ARIA roles that indicate text input (e.g., Reddit's search uses role="combobox")
+        const role = activeEl?.getAttribute?.('role');
+        const textInputRoles = ['textbox', 'combobox', 'searchbox'];
+        const hasTextInputRole = role && textInputRoles.includes(role);
+
+        let isEditable = isContentEditable || tagName === 'TEXTAREA' || hasTextInputRole;
         if (tagName === 'INPUT') {
             const type = (activeEl as HTMLInputElement).type;
             const nonTextInputs = ['checkbox', 'radio', 'button', 'image', 'submit', 'reset', 'range', 'color'];
@@ -459,7 +428,17 @@ export class EventRecorder {
             }
         } else if (isTypingActive && activeEl) {
             // Start Session
-            const rect = activeEl.getBoundingClientRect();
+            // Use the native .form property which handles both nested and form-attribute associations
+            let rectElement: Element = activeEl;
+            const formElement = (activeEl as HTMLInputElement | HTMLTextAreaElement).form;
+            if (formElement) {
+                const formRect = formElement.getBoundingClientRect();
+                // Only use form rect if it has visible dimensions
+                if (formRect.width > 0 && formRect.height > 0) {
+                    rectElement = formElement;
+                }
+            }
+            const rect = rectElement.getBoundingClientRect();
             this.currentTypingSession = {
                 startTime: now,
                 targetRect: this.dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }),
@@ -476,7 +455,7 @@ export class EventRecorder {
                 mousePos: this.lastMousePos.mousePos,
                 targetRect: this.currentTypingSession.targetRect,
                 endTime: now
-            });
+            }, true);
             this.currentTypingSession = null;
         }
     }
@@ -488,7 +467,7 @@ export class EventRecorder {
                 mousePos: this.lastMousePos.mousePos,
                 targetRect: this.currentScrollSession.targetRect,
                 endTime: this.currentScrollSession.lastScrollTime
-            });
+            }, true);
             this.currentScrollSession = null;
         }
     }

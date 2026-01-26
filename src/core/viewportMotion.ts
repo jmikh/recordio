@@ -364,20 +364,10 @@ export function getMustSeeRect(
         targetWidth = Math.max(minWidth, mappedTargetRect.width * 1.1);
         // Clamp to output size if it overflows
         targetWidth = Math.min(outputSize.width, targetWidth);
-        targetHeight = targetWidth / aspectRatio;
+        targetHeight = mappedTargetRect.height;
 
-        // Determine Center
-        // If the target area height fits in our calculated view height, center on the target area.
-        if (mappedTargetRect.height <= targetHeight) {
-            centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
-            centerY = mappedTargetRect.y + mappedTargetRect.height / 2;
-        } else {
-            // Target area is too tall (e.g. long text block or long scroll). Center horizontally, 
-            // but vertically focus on the mouse cursor (where user is interacting)
-            centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
-            const mouseOut = viewMapper.inputToOutputPoint(evt.mousePos);
-            centerY = mouseOut.y;
-        }
+        centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
+        centerY = mappedTargetRect.y + mappedTargetRect.height / 2;
 
     } else if (evt.type === EventType.URLCHANGE) {
         // URL Change -> Full View
@@ -387,7 +377,7 @@ export function getMustSeeRect(
         centerY = targetHeight / 2;
 
     } else {
-        // Click / Hover / Scroll
+        // Click / Hover
         const mouseOut = viewMapper.inputToOutputPoint(evt.mousePos);
         centerX = mouseOut.x;
         centerY = mouseOut.y;

@@ -10,6 +10,8 @@ interface DimmedOverlayProps {
     opacity?: number;
     /** Optional overlay color (default: black) */
     color?: string;
+    /** Border radius as percentage of the smaller dimension (0-50). 0 = rectangle, 50 = circle/pill */
+    borderRadiusPercent?: number;
     /** Additional class names */
     className?: string;
     /** Optional children to render inside the overlay container */
@@ -21,62 +23,67 @@ export const DimmedOverlay: React.FC<DimmedOverlayProps> = ({
     containerSize,
     opacity = 0.6,
     color = 'black',
+    borderRadiusPercent = 0,
     className = '',
     children
 }) => {
-    // Convert to percentages for CSS positioning
-    const toPct = (val: number, ref: number) => (val / ref) * 100;
+    // Calculate border radius in actual units (relative to container)
+    const smallerDimension = Math.min(holeRect.width, holeRect.height);
+    const borderRadiusPx = (borderRadiusPercent / 100) * (smallerDimension / 2);
 
-    const leftPct = toPct(holeRect.x, containerSize.width);
-    const topPct = toPct(holeRect.y, containerSize.height);
-    const widthPct = toPct(holeRect.width, containerSize.width);
-    const heightPct = toPct(holeRect.height, containerSize.height);
-
-    // We use a polygon clip-path to create a "hole" in the fill.
-    // The path goes:
-    // 1. Clockwise around the outer edge (0,0 -> 0,100 -> 100,100 -> 100,0 -> 0,0)
-    // 2. Then cuts IN to the hole start (left, top)
-    // 3. Counter-clockwise around the hole
-    // 4. Back out to the start (0,0)
-    // 
-    // This effectively fills everything *except* the hole.
-
-    const polygon = `polygon(
-        0% 0%, 
-        0% 100%, 
-        100% 100%, 
-        100% 0%, 
-        0% 0%, 
-        ${leftPct}% ${topPct}%, 
-        ${leftPct + widthPct}% ${topPct}%, 
-        ${leftPct + widthPct}% ${topPct + heightPct}%, 
-        ${leftPct}% ${topPct + heightPct}%, 
-        ${leftPct}% ${topPct}%
-    )`;
-
-    // Convert opacity to alpha channel for background color if it's a simple color, 
-    // or just use opacity style. 
-    // If color is 'black' (default), we can use rgba(0,0,0, opacity).
-
-    // Simple implementation: use opacity on the div itself, but that affects children if we had any.
-    // But since this is an overlay, usually we want the "fill" to be semi-transparent.
-    // The clip-path cuts the shape.
+    // Use SVG mask for rounded rectangles
+    // This approach creates an SVG mask where:
+    // - White = visible (dimmed area)
+    // - Black = transparent (the hole)
 
     const bgStyle = color === 'black' ? `rgba(0, 0, 0, ${opacity})` : color;
+
+    // Generate unique ID for the mask
+    const maskId = `dimmed-mask-${React.useId().replace(/:/g, '')}`;
 
     return (
         <div
             className={`absolute inset-0 pointer-events-none ${className}`}
             style={{
                 backgroundColor: bgStyle,
-                clipPath: polygon,
-                // If the user passed a non-black color string that doesn't have alpha, 
-                // we might need to apply opacity via CSS. 
-                // But generally rgba/tailwind classes are better.
-                // For 'black' default we handled it above.
-                opacity: color !== 'black' ? opacity : undefined
+                opacity: color !== 'black' ? opacity : undefined,
+                // Use CSS mask to cut out the hole
+                maskImage: `url(#${maskId})`,
+                WebkitMaskImage: `url(#${maskId})`,
             }}
         >
+            {/* SVG Definition for the mask */}
+            <svg
+                width="100%"
+                height="100%"
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
+            >
+                <defs>
+                    <mask id={maskId}>
+                        {/* White background = visible */}
+                        <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                        {/* Black hole = transparent */}
+                        <rect
+                            x={`${(holeRect.x / containerSize.width) * 100}%`}
+                            y={`${(holeRect.y / containerSize.height) * 100}%`}
+                            width={`${(holeRect.width / containerSize.width) * 100}%`}
+                            height={`${(holeRect.height / containerSize.height) * 100}%`}
+                            rx={borderRadiusPx}
+                            ry={borderRadiusPx}
+                            fill="black"
+                        />
+                    </mask>
+                </defs>
+                {/* Apply the mask to a full-size rect */}
+                <rect
+                    x="0"
+                    y="0"
+                    width="100%"
+                    height="100%"
+                    fill={bgStyle}
+                    mask={`url(#${maskId})`}
+                />
+            </svg>
             {children}
         </div>
     );

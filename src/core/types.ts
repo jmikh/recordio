@@ -101,6 +101,15 @@ export interface ZoomSettings {
     minZoomDurationMs: number;
 }
 
+export interface SpotlightSettings {
+    /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
+    dimOpacity: number;
+    /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */
+    enlargeScale: number;
+    /** Transition duration in milliseconds for fade in/out. Default: 300 */
+    transitionDurationMs: number;
+}
+
 export interface EffectSettings {
     showMouseClicks: boolean;
     showMouseDrags: boolean;
@@ -140,6 +149,9 @@ export interface ProjectSettings {
 
     // Zoom
     zoom: ZoomSettings;
+
+    // Spotlight
+    spotlight: SpotlightSettings;
 
     // Effects
     effects: EffectSettings;
@@ -233,6 +245,8 @@ export interface Timeline {
     cameraSourceId?: ID;
     /** Viewport motion keyframes for zoom/pan effects */
     viewportMotions: ViewportMotion[];
+    /** Spotlight regions for spotlight effect (non-overlapping) */
+    spotlights: Spotlight[];
     /** Optional caption data from webcam audio */
     captions?: Captions;
 }
@@ -263,6 +277,31 @@ export interface ViewportMotion {
     durationMs: TimeMs;
     rect: Rect;
     reason: string;
+    type: 'auto' | 'manual';
+}
+
+// ==========================================
+// SPOTLIGHT
+// ==========================================
+
+/**
+ * A spotlight is a finite-duration effect that dims the background
+ * and enlarges a specific region with smooth transitions.
+ * The spotlight region is defined in SOURCE coordinates (original screen recording).
+ */
+export interface Spotlight {
+    id: ID;
+    /** Output time when the spotlight starts (in output coordinate system) */
+    outputStartTimeMs: TimeMs;
+    /** Output time when the spotlight ends (in output coordinate system) */
+    outputEndTimeMs: TimeMs;
+    /** The rectangle to spotlight (in SOURCE video coordinates) */
+    sourceRect: Rect;
+    /** Border radius as percentage of the smaller dimension (0 = rectangle, 50 = fully circular/pill) */
+    borderRadius: number;
+    /** Optional reason/label for the spotlight */
+    reason?: string;
+    /** How the spotlight was created */
     type: 'auto' | 'manual';
 }
 

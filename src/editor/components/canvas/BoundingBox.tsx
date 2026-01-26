@@ -15,6 +15,10 @@ export interface BoundingBoxProps {
     minSize?: number;
     /** Maximum bounds for the rectangle (default: canvasSize) */
     maxBounds?: { width: number; height: number };
+    /** Constraint bounds - the rectangle must stay within this area (in canvas coordinates) */
+    constraintBounds?: Rect;
+    /** Border radius as percentage of the smaller dimension (0-50). Used for visual preview. */
+    borderRadiusPercent?: number;
     /** Whether to maintain aspect ratio during resize */
     maintainAspectRatio?: boolean;
     /** Callback when drag starts */
@@ -193,6 +197,8 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     canvasSize,
     minSize,
     maxBounds,
+    constraintBounds,
+    borderRadiusPercent = 0,
     maintainAspectRatio = false,
     onDragStart,
     onChange,
@@ -215,8 +221,21 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
 
     // Calculate constraints
     const MIN_SIZE = minSize ?? Math.min(canvasSize.width, canvasSize.height) / 5;
-    const maxW = maxBounds?.width ?? canvasSize.width;
-    const maxH = maxBounds?.height ?? canvasSize.height;
+
+    // Use constraintBounds if provided, otherwise fall back to maxBounds or canvasSize
+    const bounds = constraintBounds ?? {
+        x: 0,
+        y: 0,
+        width: maxBounds?.width ?? canvasSize.width,
+        height: maxBounds?.height ?? canvasSize.height
+    };
+    const minX = bounds.x;
+    const minY = bounds.y;
+    const maxX = bounds.x + bounds.width;
+    const maxY = bounds.y + bounds.height;
+    const maxW = bounds.width;
+    const maxH = bounds.height;
+
     const aspectRatio = maintainAspectRatio ? rect.width / rect.height : undefined;
 
     const handlePointerDown = (e: React.PointerEvent, type: InteractionType) => {
@@ -251,13 +270,13 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         let newRect = { ...initialRect };
 
         if (type === 'move') {
-            // MOVE: Apply delta and clamp to bounds
+            // MOVE: Apply delta and clamp to constraint bounds
             newRect.x += deltaX;
             newRect.y += deltaY;
 
-            // Clamp position
-            newRect.x = Math.max(0, Math.min(newRect.x, maxW - newRect.width));
-            newRect.y = Math.max(0, Math.min(newRect.y, maxH - newRect.height));
+            // Clamp position to constraint bounds
+            newRect.x = Math.max(minX, Math.min(newRect.x, maxX - newRect.width));
+            newRect.y = Math.max(minY, Math.min(newRect.y, maxY - newRect.height));
         } else {
             // RESIZE: Handle each corner
             if (maintainAspectRatio && aspectRatio) {
@@ -342,20 +361,20 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                     if (type === 'ne' || type === 'nw' || type === 'n') newRect.y -= diff;
                 }
 
-                // Clamp to bounds
-                if (newRect.x < 0) {
-                    newRect.width += newRect.x;
-                    newRect.x = 0;
+                // Clamp to constraint bounds
+                if (newRect.x < minX) {
+                    newRect.width += newRect.x - minX;
+                    newRect.x = minX;
                 }
-                if (newRect.y < 0) {
-                    newRect.height += newRect.y;
-                    newRect.y = 0;
+                if (newRect.y < minY) {
+                    newRect.height += newRect.y - minY;
+                    newRect.y = minY;
                 }
-                if (newRect.x + newRect.width > maxW) {
-                    newRect.width = maxW - newRect.x;
+                if (newRect.x + newRect.width > maxX) {
+                    newRect.width = maxX - newRect.x;
                 }
-                if (newRect.y + newRect.height > maxH) {
-                    newRect.height = maxH - newRect.y;
+                if (newRect.y + newRect.height > maxY) {
+                    newRect.height = maxY - newRect.y;
                 }
             }
         }
@@ -376,6 +395,17 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // Convert to percentages for CSS positioning
     const toPct = (val: number, ref: number) => (val / ref) * 100;
 
+    // Calculate border radius in pixels for visual preview
+    // borderRadiusPercent is 0-50% of the smaller dimension
+    const smallerDimension = Math.min(rect.width, rect.height);
+    const borderRadiusPx = (borderRadiusPercent / 100) * (smallerDimension / 2);
+    // Convert to percentage of container for responsive sizing
+    const borderRadiusPctWidth = (borderRadiusPx / rect.width) * 100;
+    const borderRadiusPctHeight = (borderRadiusPx / rect.height) * 100;
+    const borderRadiusCss = borderRadiusPercent > 0
+        ? `${borderRadiusPctWidth}% / ${borderRadiusPctHeight}%`
+        : '0';
+
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
         left: `${toPct(rect.x, canvasSize.width)}%`,
@@ -383,9 +413,10 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         width: `${toPct(rect.width, canvasSize.width)}%`,
         height: `${toPct(rect.height, canvasSize.height)}%`,
         cursor: 'move',
-        // Border handled by CSS class for animation
+        // Border handled by CSS class for animation, radius applied here
         boxSizing: 'border-box',
-        pointerEvents: 'auto', // Ensure interactive even if parent is pointer-events: none
+        borderRadius: borderRadiusCss,
+        pointerEvents: 'auto',
         zIndex: 100,
     };
 

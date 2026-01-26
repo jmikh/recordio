@@ -8,6 +8,8 @@ import { drawCaptions } from '../../../core/painters/captionPainter';
 
 
 import { getViewportStateAtTime } from '../../../core/viewportMotion';
+import { getSpotlightStateAtTime } from '../../../core/spotlightMotion';
+import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
@@ -61,13 +63,15 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
 
         // Render Screen Layer
+        let viewMapper: import('../../../core/viewMapper').ViewMapper | undefined;
+
         if (screenSource) {
             const video = videoRefs[screenSource.id];
             if (!video) {
                 throw new Error(`[PlaybackRenderer] Video element not found for source ${screenSource.id}`);
             }
 
-            const { viewMapper } = drawScreen(
+            const result = drawScreen(
                 ctx,
                 video,
                 project,
@@ -75,6 +79,7 @@ export class PlaybackRenderer {
                 effectiveViewport,
                 resources.deviceFrameImg
             );
+            viewMapper = result.viewMapper;
 
             // Conditionally render effects based on settings
             if (project.settings.effects?.showMouseClicks) {
@@ -135,7 +140,29 @@ export class PlaybackRenderer {
             );
         }
 
-        // Render Captions
+        // Render Spotlight Overlay (after all content, before captions)
+        // Spotlight is defined in source coordinates and mapped to output via viewMapper
+        if (viewMapper) {
+            const spotlightState = getSpotlightStateAtTime(
+                timeline.spotlights || [],
+                project.settings.spotlight,
+                outputTimeMs,
+                effectiveViewport,
+                viewMapper
+            );
+
+            // Pass resources for scaled content rendering
+            const screenVideo = screenSource ? videoRefs[screenSource.id] : undefined;
+            drawSpotlight(ctx, spotlightState, outputSize, screenVideo ? {
+                video: screenVideo,
+                project,
+                sources,
+                effectiveViewport,
+                deviceFrameImg: resources.deviceFrameImg
+            } : undefined);
+        }
+
+        // Render Captions (on top of everything including spotlight)
         if (project.settings.captions.visible) {
             drawCaptions(
                 ctx,

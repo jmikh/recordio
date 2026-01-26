@@ -9,10 +9,24 @@ export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
+    const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
     const viewportMotions = useProjectStore(s => s.project.timeline.viewportMotions || []);
     const userEvents = useProjectStore(s => s.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+
+    // Spotlight handlers
+    const handleDimOpacityChange = (val: number) => {
+        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, dimOpacity: val } }));
+    };
+
+    const handleEnlargeScaleChange = (val: number) => {
+        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, enlargeScale: val } }));
+    };
+
+    const handleTransitionDurationChange = (val: number) => {
+        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, transitionDurationMs: val } }));
+    };
 
     // no mouse positions is enough indicator
     const hasNoUserEvents = userEvents.mousePositions.length === 0
@@ -114,6 +128,58 @@ export const EffectsSettings = () => {
                     </svg>
                     Clear All Zooms
                 </button>
+            </div>
+
+            {/* SEPARATOR */}
+            <div className="border-t border-border"></div>
+
+            {/* SPOTLIGHT SETTINGS */}
+            <div className="flex flex-col gap-4">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Spotlight</label>
+
+                {/* Dim Opacity */}
+                <Slider
+                    label="Dim Opacity"
+                    min={0}
+                    max={1}
+                    value={spotlightSettings.dimOpacity}
+                    onChange={handleDimOpacityChange}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
+                    showTooltip
+                    valueTransform={(val) => val * 100}
+                    units="%"
+                    decimals={0}
+                />
+
+                {/* Enlarge Scale */}
+                <Slider
+                    label="Enlarge Scale"
+                    min={1.0}
+                    max={1.5}
+                    value={spotlightSettings.enlargeScale}
+                    onChange={handleEnlargeScaleChange}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
+                    showTooltip
+                    units="x"
+                    decimals={2}
+                />
+
+                {/* Transition Time */}
+                <Slider
+                    label="Transition Time"
+                    min={0}
+                    max={1000}
+                    value={spotlightSettings.transitionDurationMs}
+                    onChange={handleTransitionDurationChange}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
+                    showTooltip
+                    valueTransform={(ms) => ms / 1000}
+                    units="s"
+                    decimals={2}
+                />
             </div>
 
             {/* SEPARATOR */}

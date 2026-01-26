@@ -26,6 +26,12 @@ export class ProjectImpl {
                     minZoomDurationMs: 200
                 },
 
+                spotlight: {
+                    dimOpacity: 0.5,
+                    enlargeScale: 1.1,
+                    transitionDurationMs: 300
+                },
+
                 effects: {
                     showMouseClicks: true,
                     showMouseDrags: true,
@@ -84,6 +90,7 @@ export class ProjectImpl {
                 // We'll init with empty values that need to be populated.
                 screenSourceId: '',
                 viewportMotions: [],
+                spotlights: [],
                 outputWindows: []
             }
         };

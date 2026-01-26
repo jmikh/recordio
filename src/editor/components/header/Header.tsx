@@ -110,7 +110,7 @@ export const Header = () => {
                         </Button>
                     </div>
 
-                    {process.env.NODE_ENV !== 'production' && (
+                    {import.meta.env.MODE !== 'production' && (
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 
