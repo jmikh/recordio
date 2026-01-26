@@ -128,6 +128,64 @@ export class EventRecorder {
         return document.hasFocus() && document.visibilityState === 'visible';
     }
 
+    /**
+     * Walk down single-child chains to find the "real" visual container.
+     * Stops when hitting:
+     * 1. An element with visible styling (background/border), OR
+     * 2. An element with multiple VISIBLE children (non-zero bounding rect)
+     * This handles cases like Google Search where <form> is huge but the
+     * visible styled container is nested deeply with single-child wrappers.
+     */
+    private findVisualContainer(element: Element, maxDepth = 5): Element {
+        let current = element;
+
+        for (let depth = 0; depth < maxDepth; depth++) {
+            // Check for visual styling
+            const style = window.getComputedStyle(current);
+
+            // Background color (excluding transparent)
+            const bg = style.backgroundColor;
+            const hasBackground = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
+
+            // Background image (includes gradients)
+            const hasBgImage = style.backgroundImage && style.backgroundImage !== 'none';
+
+            // Border
+            const hasBorder = (parseFloat(style.borderWidth) || 0) > 0;
+
+            // Box shadow (very common for modern inputs/containers)
+            const hasBoxShadow = style.boxShadow && style.boxShadow !== 'none';
+
+            // Outline
+            const hasOutline = (parseFloat(style.outlineWidth) || 0) > 0
+                && style.outlineStyle !== 'none';
+
+            if (hasBackground || hasBgImage || hasBorder || hasBoxShadow || hasOutline) {
+                return current;
+            }
+
+            // Count only visible children (non-zero bounding rect)
+            // This filters out script tags, style tags, and zero-sized elements
+            const visibleChildren: Element[] = [];
+            for (const child of current.children) {
+                const rect = child.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    visibleChildren.push(child);
+                }
+            }
+
+            if (visibleChildren.length === 1) {
+                // Single visible child - keep going deeper
+                current = visibleChildren[0];
+            } else {
+                // 0 or multiple visible children - this is our target
+                return current;
+            }
+        }
+
+        return current;
+    }
+
     private dprScalePoint(point: { x: number, y: number }): { x: number, y: number } {
         const dpr = window.devicePixelRatio || 1;
         return { x: point.x * dpr, y: point.y * dpr };
@@ -432,10 +490,13 @@ export class EventRecorder {
             let rectElement: Element = activeEl;
             const formElement = (activeEl as HTMLInputElement | HTMLTextAreaElement).form;
             if (formElement) {
-                const formRect = formElement.getBoundingClientRect();
+                // Find the visual container within the form (handles cases like Google Search
+                // where <form> is huge but the visible styled container is nested)
+                const visualContainer = this.findVisualContainer(formElement);
+                const containerRect = visualContainer.getBoundingClientRect();
                 // Only use form rect if it has visible dimensions
-                if (formRect.width > 0 && formRect.height > 0) {
-                    rectElement = formElement;
+                if (containerRect.width > 0 && containerRect.height > 0) {
+                    rectElement = visualContainer;
                 }
             }
             const rect = rectElement.getBoundingClientRect();

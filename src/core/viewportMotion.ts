@@ -368,6 +368,8 @@ export function getMustSeeRect(
 
         centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
         centerY = mappedTargetRect.y + mappedTargetRect.height / 2;
+        console.log('Target Rect', targetRect);
+        console.log('Mapped Target Rect', mappedTargetRect);
 
     } else if (evt.type === EventType.URLCHANGE) {
         // URL Change -> Full View
