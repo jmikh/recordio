@@ -81,6 +81,7 @@ export class EventRecorder {
         this.isRecording = true;
         this.attachListeners();
         this.startPolling();
+        this.hoveredCardDetector.start();
         console.log("[ContentRecorder] Started capturing events.");
     }
 
@@ -89,7 +90,7 @@ export class EventRecorder {
         this.isRecording = false;
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
-        this.hoveredCardDetector.flush();
+        this.hoveredCardDetector.stop();
         this.hideActiveElementOverlay();
         this.removeListeners();
         this.stopPolling();
@@ -202,13 +203,6 @@ export class EventRecorder {
             timestamp: this.getRelativeTime(),
             mousePos: scaled
         };
-
-        // Get the actual deepest element (traverses into Shadow DOM)
-        const composedPath = e.composedPath();
-        const target = (composedPath[0] || e.target) as Element;
-
-        // Update hovered card detection
-        this.hoveredCardDetector.updateFromTarget(target);
     }
 
     private handlePointerDown = (e: PointerEvent) => {

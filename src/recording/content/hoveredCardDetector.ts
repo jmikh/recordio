@@ -39,6 +39,11 @@ export class HoveredCardDetector {
     private sessionInvalidated: boolean = false;
     private mutationObserver: MutationObserver | null = null;
 
+    // Mouse position tracking
+    private lastMouseX: number = 0;
+    private lastMouseY: number = 0;
+    private isListening: boolean = false;
+
     private onEvent: (event: HoveredCardEvent) => void;
 
     constructor(onEvent: (event: HoveredCardEvent) => void) {
@@ -46,26 +51,114 @@ export class HoveredCardDetector {
     }
 
     /**
-     * Call this on mousemove/hover events to update detection
+     * Start listening for mouse, scroll, and resize events
      */
-    public updateFromTarget(target: Element): void {
-        const result = this.findHoveredCard(target);
+    public start(): void {
+        if (this.isListening) return;
+        this.isListening = true;
 
-        // Get current rect for comparison
-        const currentRect = result?.element.getBoundingClientRect() ?? null;
+        document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
+        window.addEventListener('scroll', this.handleScroll, { capture: true });
+        window.addEventListener('resize', this.handleResize);
 
-        // Check if this is the same card at the same position
-        const isSameCard = result?.element === this.currentCard?.element;
-        const isSamePosition = this.isSamePosition(currentRect, this.currentCardRect);
+        console.log('[HoveredCardDetector] Started listening');
+    }
 
-        if (isSameCard && isSamePosition) {
-            // Same card, same position - just update highlight position if needed
-            this.updateHighlightPosition(result!, currentRect!);
-            return;
+    /**
+     * Stop listening and flush any pending session
+     */
+    public stop(): void {
+        if (!this.isListening) return;
+        this.isListening = false;
+
+        document.removeEventListener('mousemove', this.handleMouseMove, { capture: true });
+        window.removeEventListener('scroll', this.handleScroll, { capture: true });
+        window.removeEventListener('resize', this.handleResize);
+
+        this.flush();
+        console.log('[HoveredCardDetector] Stopped listening');
+    }
+
+    /**
+     * Handle mouse move - update position and check bounds or detect card
+     */
+    private handleMouseMove = (e: MouseEvent): void => {
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+
+        if (this.currentCard && this.currentCardRect) {
+            // Session active - just check if mouse is still within card bounds
+            if (this.isMouseInCardBounds()) {
+                // Still in bounds - update highlight position in case card moved
+                this.updateHighlightPosition(this.currentCard, this.currentCardRect);
+                return;
+            }
+            // Mouse left the card - flush session and fall through to detection
+            this.flushSession();
         }
 
-        // Card or position changed - flush previous session if valid
+        // Get the actual deepest element (traverses into Shadow DOM)
+        const composedPath = e.composedPath();
+        const target = (composedPath[0] || e.target) as Element;
+
+        // No active session or mouse left bounds - detect card at target
+        this.detectCardFromTarget(target);
+    };
+
+    /**
+     * Handle scroll - flush session and re-detect
+     */
+    private handleScroll = (): void => {
+        // Scroll changes element positions, flush current session
         this.flushSession();
+        // Re-detect at current mouse position (using elementFromPoint since we don't have an event)
+        this.detectCardAtMousePosition();
+    };
+
+    /**
+     * Handle resize - flush session (positions changed)
+     */
+    private handleResize = (): void => {
+        this.flushSession();
+    };
+
+    /**
+     * Check if the mouse is still within the current card's bounds
+     */
+    private isMouseInCardBounds(): boolean {
+        if (!this.currentCardRect) return false;
+
+        // Re-get the rect as it may have changed (e.g., animation)
+        const rect = this.currentCard?.element.getBoundingClientRect();
+        if (!rect) return false;
+
+        // Update stored rect
+        this.currentCardRect = rect;
+
+        return this.lastMouseX >= rect.left &&
+            this.lastMouseX <= rect.right &&
+            this.lastMouseY >= rect.top &&
+            this.lastMouseY <= rect.bottom;
+    }
+
+    /**
+     * Detect which card is at the current mouse position (for scroll/resize handlers)
+     */
+    private detectCardAtMousePosition(): void {
+        const target = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
+        if (!target) {
+            this.updateHighlight(null);
+            return;
+        }
+        this.detectCardFromTarget(target);
+    }
+
+    /**
+     * Detect which card contains the given target element
+     */
+    private detectCardFromTarget(target: Element): void {
+        const result = this.findHoveredCard(target);
+        const currentRect = result?.element.getBoundingClientRect() ?? null;
 
         // Start new session
         this.currentCard = result;
@@ -76,18 +169,15 @@ export class HoveredCardDetector {
         // Start observing for overlays if we have a valid card
         if (result) {
             this.startMutationObserver();
+            console.log('[HoveredCard] Detected:', result.element);
         }
 
         // Update visual highlight
         this.updateHighlight(result);
-
-        if (result) {
-            console.log('[HoveredCard] Changed:', result.element);
-        }
     }
 
     /**
-     * Call this when recording stops or on page unload to flush any pending session
+     * Flush any pending session without stopping listeners
      */
     public flush(): void {
         this.flushSession();
@@ -96,17 +186,6 @@ export class HoveredCardDetector {
         this.currentCardRect = null;
         this.sessionStartTime = null;
         this.sessionInvalidated = false;
-    }
-
-    /**
-     * Check if two rects are at the same position (within 1px tolerance)
-     */
-    private isSamePosition(a: DOMRect | null, b: DOMRect | null): boolean {
-        if (!a || !b) return a === b;
-        return Math.abs(a.left - b.left) < 1 &&
-            Math.abs(a.top - b.top) < 1 &&
-            Math.abs(a.width - b.width) < 1 &&
-            Math.abs(a.height - b.height) < 1;
     }
 
     /**
