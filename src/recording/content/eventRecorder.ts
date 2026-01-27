@@ -16,6 +16,9 @@ import { EventType, type MousePositionEvent, type Rect, type Size } from '../../
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 
+// Debug flag - set to true to show purple highlight border on active element
+const DEBUG_SHOW_ACTIVE_ELEMENT = true;
+
 
 export class EventRecorder {
     private isRecording = false;
@@ -143,64 +146,6 @@ export class EventRecorder {
 
     private isActive(): boolean {
         return document.hasFocus() && document.visibilityState === 'visible';
-    }
-
-    /**
-     * Walk down single-child chains to find the "real" visual container.
-     * Stops when hitting:
-     * 1. An element with visible styling (background/border), OR
-     * 2. An element with multiple VISIBLE children (non-zero bounding rect)
-     * This handles cases like Google Search where <form> is huge but the
-     * visible styled container is nested deeply with single-child wrappers.
-     */
-    private findVisualContainer(element: Element, maxDepth = 5): Element {
-        let current = element;
-
-        for (let depth = 0; depth < maxDepth; depth++) {
-            // Check for visual styling
-            const style = window.getComputedStyle(current);
-
-            // Background color (excluding transparent)
-            const bg = style.backgroundColor;
-            const hasBackground = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
-
-            // Background image (includes gradients)
-            const hasBgImage = style.backgroundImage && style.backgroundImage !== 'none';
-
-            // Border
-            const hasBorder = (parseFloat(style.borderWidth) || 0) > 0;
-
-            // Box shadow (very common for modern inputs/containers)
-            const hasBoxShadow = style.boxShadow && style.boxShadow !== 'none';
-
-            // Outline
-            const hasOutline = (parseFloat(style.outlineWidth) || 0) > 0
-                && style.outlineStyle !== 'none';
-
-            if (hasBackground || hasBgImage || hasBorder || hasBoxShadow || hasOutline) {
-                return current;
-            }
-
-            // Count only visible children (non-zero bounding rect)
-            // This filters out script tags, style tags, and zero-sized elements
-            const visibleChildren: Element[] = [];
-            for (const child of current.children) {
-                const rect = child.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    visibleChildren.push(child);
-                }
-            }
-
-            if (visibleChildren.length === 1) {
-                // Single visible child - keep going deeper
-                current = visibleChildren[0];
-            } else {
-                // 0 or multiple visible children - this is our target
-                return current;
-            }
-        }
-
-        return current;
     }
 
     /**
@@ -543,21 +488,14 @@ export class EventRecorder {
                     height: window.innerHeight
                 });
             } else {
-                // Use the native .form property which handles both nested and form-attribute associations
-                let rectElement: Element = activeEl;
-                const formElement = (activeEl as HTMLInputElement | HTMLTextAreaElement).form;
-                if (formElement) {
-                    // Find the visual container within the form (handles cases like Google Search
-                    // where <form> is huge but the visible styled container is nested)
-                    const visualContainer = this.findVisualContainer(formElement);
-                    const containerRect = visualContainer.getBoundingClientRect();
-                    // Only use form rect if it has visible dimensions
-                    if (containerRect.width > 0 && containerRect.height > 0) {
-                        rectElement = visualContainer;
-                    }
+                // Find the first ancestor with border or shadow, with 90% viewport fallback
+                let rectElement: Element = this.findVisualBorderAncestor(activeEl) ?? activeEl;
+                let elemRect = rectElement.getBoundingClientRect();
+                if (elemRect.width > window.innerWidth * 0.9 && rectElement !== activeEl) {
+                    rectElement = activeEl;
+                    elemRect = rectElement.getBoundingClientRect();
                 }
-                const rect = rectElement.getBoundingClientRect();
-                targetRect = this.dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+                targetRect = this.dprScaleRect({ x: elemRect.left, y: elemRect.top, width: elemRect.width, height: elemRect.height });
             }
 
             this.currentTypingSession = {
@@ -621,6 +559,61 @@ export class EventRecorder {
         return `${tl + padding}px ${tr + padding}px ${br + padding}px ${bl + padding}px`;
     }
 
+    /**
+     * Find the first ancestor (including the element itself) that has a visible border or shadow.
+     * Walks up the DOM tree and returns the first element with:
+     * - Border on any side (top, right, bottom, left)
+     * - Box shadow
+     * - Drop shadow (via filter)
+     */
+    private findVisualBorderAncestor(element: Element): Element | null {
+        let current: Element | null = element;
+
+        while (current && current !== document.body && current !== document.documentElement) {
+            const style = window.getComputedStyle(current);
+
+            // Helper to check if a color is not fully transparent
+            const isVisibleColor = (color: string): boolean => {
+                if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return false;
+                // Check for rgba with 0 alpha
+                const rgbaMatch = color.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
+                if (rgbaMatch && parseFloat(rgbaMatch[1]) === 0) return false;
+                return true;
+            };
+
+            // Check for border on any side (must have width > 0, style != none, and visible color)
+            const hasBorderTop = parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== 'none' && isVisibleColor(style.borderTopColor);
+            const hasBorderRight = parseFloat(style.borderRightWidth) > 0 && style.borderRightStyle !== 'none' && isVisibleColor(style.borderRightColor);
+            const hasBorderBottom = parseFloat(style.borderBottomWidth) > 0 && style.borderBottomStyle !== 'none' && isVisibleColor(style.borderBottomColor);
+            const hasBorderLeft = parseFloat(style.borderLeftWidth) > 0 && style.borderLeftStyle !== 'none' && isVisibleColor(style.borderLeftColor);
+            const hasBorder = hasBorderTop || hasBorderRight || hasBorderBottom || hasBorderLeft;
+
+            // Check for box shadow
+            const hasBoxShadow = style.boxShadow && style.boxShadow !== 'none';
+
+            // Check for drop shadow (via filter)
+            const hasDropShadow = style.filter && style.filter.includes('drop-shadow');
+
+            if (hasBorder || hasBoxShadow || hasDropShadow) {
+                return current;
+            }
+
+            // Move to parent, handling Shadow DOM boundaries
+            if (current.parentElement) {
+                current = current.parentElement;
+            } else {
+                const root = current.getRootNode();
+                if (root instanceof ShadowRoot && root.host) {
+                    current = root.host;
+                } else {
+                    current = null;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private updateActiveElementOverlay(activeEl: HTMLElement | null) {
         // Hide overlay if no active element or if it's the body/html
         if (!activeEl || activeEl === document.body || activeEl === document.documentElement) {
@@ -628,7 +621,16 @@ export class EventRecorder {
             return;
         }
 
-        const rect = activeEl.getBoundingClientRect();
+        // Find the first ancestor with border or shadow
+        let targetEl: Element = this.findVisualBorderAncestor(activeEl) ?? activeEl;
+
+        let rect = targetEl.getBoundingClientRect();
+
+        // If the found element is too wide (> 90% viewport), fall back to active element
+        if (rect.width > window.innerWidth * 0.9 && targetEl !== activeEl) {
+            targetEl = activeEl;
+            rect = targetEl.getBoundingClientRect();
+        }
 
         // Hide if element has no visible dimensions
         if (rect.width === 0 || rect.height === 0) {
@@ -636,7 +638,12 @@ export class EventRecorder {
             return;
         }
 
-        // Create or update overlay
+        // Create or update overlay (only if debug flag is enabled)
+        if (!DEBUG_SHOW_ACTIVE_ELEMENT) {
+            this.hideActiveElementOverlay();
+            return;
+        }
+
         if (!this.activeElementOverlay) {
             this.activeElementOverlay = document.createElement('div');
             this.activeElementOverlay.id = 'recordio-active-element-overlay';
@@ -659,8 +666,8 @@ export class EventRecorder {
         this.activeElementOverlay.style.width = `${rect.width + padding * 2}px`;
         this.activeElementOverlay.style.height = `${rect.height + padding * 2}px`;
 
-        // Match border-radius of the element (add padding to maintain curve)
-        this.activeElementOverlay.style.borderRadius = this.getAdjustedBorderRadius(activeEl, padding);
+        // Match border-radius of the target element (add padding to maintain curve)
+        this.activeElementOverlay.style.borderRadius = this.getAdjustedBorderRadius(targetEl, padding);
     }
 
     private hideActiveElementOverlay() {

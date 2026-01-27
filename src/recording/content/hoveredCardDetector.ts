@@ -32,9 +32,12 @@ const MIN_SESSION_DURATION_MS = 2000;
 
 export class HoveredCardDetector {
     private highlightElement: HTMLDivElement | null = null;
+    private invalidatedLabel: HTMLDivElement | null = null;
     private currentCard: DetectionResult | null = null;
     private currentCardRect: DOMRect | null = null;
     private sessionStartTime: number | null = null;
+    private sessionInvalidated: boolean = false;
+    private mutationObserver: MutationObserver | null = null;
 
     private onEvent: (event: HoveredCardEvent) => void;
 
@@ -68,6 +71,12 @@ export class HoveredCardDetector {
         this.currentCard = result;
         this.currentCardRect = currentRect;
         this.sessionStartTime = result ? Date.now() : null;
+        this.sessionInvalidated = false;
+
+        // Start observing for overlays if we have a valid card
+        if (result) {
+            this.startMutationObserver();
+        }
 
         // Update visual highlight
         this.updateHighlight(result);
@@ -86,6 +95,7 @@ export class HoveredCardDetector {
         this.currentCard = null;
         this.currentCardRect = null;
         this.sessionStartTime = null;
+        this.sessionInvalidated = false;
     }
 
     /**
@@ -100,10 +110,19 @@ export class HoveredCardDetector {
     }
 
     /**
-     * Flush the current session if it's been stable for 2+ seconds
+     * Flush the current session if it's been stable for 2+ seconds and not invalidated
      */
     private flushSession(): void {
+        // Stop observing mutations when session ends
+        this.stopMutationObserver();
+
         if (!this.currentCard || !this.sessionStartTime || !this.currentCardRect) {
+            return;
+        }
+
+        // Skip sending if session was invalidated (overlay extended outside card)
+        if (this.sessionInvalidated) {
+            console.log('[HoveredCard] Session invalidated, not sending event');
             return;
         }
 
@@ -125,6 +144,103 @@ export class HoveredCardDetector {
             console.log('[HoveredCard] Session ended:', event);
             this.onEvent(event);
         }
+    }
+
+    /**
+     * Start observing DOM mutations to detect overlays extending outside the card
+     */
+    private startMutationObserver(): void {
+        this.stopMutationObserver();
+
+        if (!this.currentCardRect) return;
+
+        this.mutationObserver = new MutationObserver((mutations) => {
+            // Already invalidated, no need to check further
+            if (this.sessionInvalidated) return;
+
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node instanceof Element) {
+                        // Check the added node and all its descendants
+                        const culprit = this.findExtendingElement(node);
+                        if (culprit) {
+                            this.invalidateSession(culprit);
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        this.mutationObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    /**
+     * Stop the mutation observer
+     */
+    private stopMutationObserver(): void {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+    }
+
+    /**
+     * Recursively find an element (or descendant) that extends outside the card's bounding rect.
+     * Returns the culprit element, or null if none found.
+     */
+    private findExtendingElement(element: Element): Element | null {
+        if (!this.currentCardRect || !this.currentCard) return null;
+
+        // Skip our own highlight elements
+        if (element.id === 'recordio-hovered-card-highlight') return null;
+
+        const elemRect = element.getBoundingClientRect();
+        const cardRect = this.currentCardRect;
+
+        // Skip elements with no dimensions (hidden or not laid out)
+        if (elemRect.width === 0 || elemRect.height === 0) return null;
+
+        // Check if element crosses the card boundary (not fully inside)
+        const crossesBoundary = elemRect.left < cardRect.left ||
+            elemRect.right > cardRect.right ||
+            elemRect.top < cardRect.top ||
+            elemRect.bottom > cardRect.bottom;
+
+        // If this element crosses the card boundary, check if it has an opaque background
+        if (crossesBoundary) {
+            const bgColor = window.getComputedStyle(element).backgroundColor;
+            const hasOpaqueBackground = bgColor !== 'transparent' && bgColor !== 'rgba(0, 0, 0, 0)';
+
+            if (hasOpaqueBackground) {
+                return element;
+            }
+        }
+
+        // Always recursively check children - they could extend beyond parent bounds
+        // via absolute positioning, overflow, transforms, etc.
+        for (const child of element.children) {
+            const culprit = this.findExtendingElement(child);
+            if (culprit) return culprit;
+        }
+
+        return null;
+    }
+
+    /**
+     * Mark the current session as invalidated
+     */
+    private invalidateSession(culpritElement: Element): void {
+        this.sessionInvalidated = true;
+        this.stopMutationObserver();
+        const rect = culpritElement.getBoundingClientRect();
+        console.log('[HoveredCard] Session invalidated - overlay extends outside card boundary. Culprit:', culpritElement, 'Rect:', { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height });
+
+        // Update debug highlight to show invalidated state
+        this.updateInvalidatedLabel();
     }
 
     /**
@@ -314,6 +430,55 @@ export class HoveredCardDetector {
             border-radius: ${adjustedRadius};
         `;
         document.body.appendChild(this.highlightElement);
+
+        // Show invalidated label if session is already invalidated
+        if (this.sessionInvalidated) {
+            this.updateInvalidatedLabel();
+        }
+    }
+
+    /**
+     * Update or create the invalidated label above the highlight
+     */
+    private updateInvalidatedLabel(): void {
+        if (!DEBUG_SHOW_HOVERED_CARD || !this.highlightElement || !this.sessionInvalidated) {
+            this.hideInvalidatedLabel();
+            return;
+        }
+
+        if (!this.invalidatedLabel) {
+            this.invalidatedLabel = document.createElement('div');
+            this.invalidatedLabel.id = 'recordio-hovered-card-invalidated';
+            this.invalidatedLabel.textContent = 'INVALIDATED';
+            this.invalidatedLabel.style.cssText = `
+                position: fixed;
+                background: #dc2626;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                font-family: system-ui, sans-serif;
+                padding: 4px 8px;
+                border-radius: 4px;
+                pointer-events: none;
+                z-index: 2147483647;
+            `;
+            document.body.appendChild(this.invalidatedLabel);
+        }
+
+        // Position above the highlight
+        const highlightRect = this.highlightElement.getBoundingClientRect();
+        this.invalidatedLabel.style.left = `${highlightRect.left}px`;
+        this.invalidatedLabel.style.top = `${highlightRect.top - 28}px`;
+    }
+
+    /**
+     * Hide the invalidated label
+     */
+    private hideInvalidatedLabel(): void {
+        if (this.invalidatedLabel) {
+            this.invalidatedLabel.remove();
+            this.invalidatedLabel = null;
+        }
     }
 
     /**
@@ -334,6 +499,7 @@ export class HoveredCardDetector {
      * Remove the debug highlight
      */
     private hideHighlight(): void {
+        this.hideInvalidatedLabel();
         if (this.highlightElement) {
             this.highlightElement.remove();
             this.highlightElement = null;
