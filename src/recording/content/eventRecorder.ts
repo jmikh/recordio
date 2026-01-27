@@ -14,6 +14,7 @@
 
 import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
+import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 
 
 export class EventRecorder {
@@ -31,6 +32,12 @@ export class EventRecorder {
 
     // Typing Session State
     private currentTypingSession: { startTime: number; targetRect: Rect; element: HTMLElement } | null = null;
+
+    // Active Element Overlay (always visible on focused element)
+    private activeElementOverlay: HTMLDivElement | null = null;
+
+    // Hovered Card Detection
+    private hoveredCardDetector: HoveredCardDetector;
 
     // Scroll Session State
     private currentScrollSession: { startTime: number; targetRect: Rect; lastScrollTime: number } | null = null;
@@ -52,7 +59,18 @@ export class EventRecorder {
 
     constructor(startTime: number) {
         this.startTime = startTime;
+        this.hoveredCardDetector = new HoveredCardDetector((event) => this.handleHoveredCardEvent(event));
         this.start();
+    }
+
+    private handleHoveredCardEvent(event: HoveredCardEvent): void {
+        // Send hovered card event to background
+        this.sendMessage(EventType.HOVERED_CARD, {
+            timestamp: event.startTime - this.startTime,
+            endTime: event.endTime - this.startTime,
+            rect: event.rect,
+            cornerRadius: event.cornerRadius,
+        }, true);
     }
 
     private start() {
@@ -68,6 +86,8 @@ export class EventRecorder {
         this.isRecording = false;
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
+        this.hoveredCardDetector.flush();
+        this.hideActiveElementOverlay();
         this.removeListeners();
         this.stopPolling();
         console.log("[ContentRecorder] Stopped capturing events.");
@@ -92,9 +112,6 @@ export class EventRecorder {
 
         // Focus changes (tab switching, window minimizing, etc.)
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
-
-        // Initial URL event
-        this.sendUrlEvent();
     }
 
     private removeListeners() {
@@ -186,6 +203,18 @@ export class EventRecorder {
         return current;
     }
 
+    /**
+     * Get the deepest active element, traversing into shadow DOMs.
+     * This handles cases like LinkedIn's post composer which uses shadow DOM.
+     */
+    private getDeepActiveElement(): HTMLElement | null {
+        let active = document.activeElement as HTMLElement | null;
+        while (active?.shadowRoot?.activeElement) {
+            active = active.shadowRoot.activeElement as HTMLElement;
+        }
+        return active;
+    }
+
     private dprScalePoint(point: { x: number, y: number }): { x: number, y: number } {
         const dpr = window.devicePixelRatio || 1;
         return { x: point.x * dpr, y: point.y * dpr };
@@ -228,6 +257,13 @@ export class EventRecorder {
             timestamp: this.getRelativeTime(),
             mousePos: scaled
         };
+
+        // Get the actual deepest element (traverses into Shadow DOM)
+        const composedPath = e.composedPath();
+        const target = (composedPath[0] || e.target) as Element;
+
+        // Update hovered card detection
+        this.hoveredCardDetector.updateFromTarget(target);
     }
 
     private handlePointerDown = (e: PointerEvent) => {
@@ -452,7 +488,7 @@ export class EventRecorder {
         if (!this.isActive()) return;
 
         const now = this.getRelativeTime();
-        const activeEl = document.activeElement as HTMLElement;
+        const activeEl = this.getDeepActiveElement();
 
         // Check if editable
         const tagName = activeEl?.tagName;
@@ -470,8 +506,18 @@ export class EventRecorder {
             if (!nonTextInputs.includes(type)) isEditable = true;
         }
 
+        // Detect hidden text capture iframes (Google Docs, etc.) and canvas editors
+        // These use offscreen iframes/elements for keyboard capture while rendering elsewhere
+        let useViewportRect = false;
+        if (tagName === 'IFRAME' || tagName === 'CANVAS') {
+            isEditable = true;
+            useViewportRect = true;
+        }
+
+        // For iframes/canvas, we can't detect keystrokes (they happen inside the iframe)
+        // So we treat focus itself as "typing active" for these elements
         const isTyping = (now - this.lastKeystrokeTime) < 1000;
-        const isTypingActive = isTyping && isEditable;
+        const isTypingActive = useViewportRect ? isEditable : (isTyping && isEditable);
 
         if (this.currentTypingSession) {
             if (!isTypingActive || activeEl !== this.currentTypingSession.element) {
@@ -486,26 +532,43 @@ export class EventRecorder {
             }
         } else if (isTypingActive && activeEl) {
             // Start Session
-            // Use the native .form property which handles both nested and form-attribute associations
-            let rectElement: Element = activeEl;
-            const formElement = (activeEl as HTMLInputElement | HTMLTextAreaElement).form;
-            if (formElement) {
-                // Find the visual container within the form (handles cases like Google Search
-                // where <form> is huge but the visible styled container is nested)
-                const visualContainer = this.findVisualContainer(formElement);
-                const containerRect = visualContainer.getBoundingClientRect();
-                // Only use form rect if it has visible dimensions
-                if (containerRect.width > 0 && containerRect.height > 0) {
-                    rectElement = visualContainer;
+            let targetRect: Rect;
+
+            if (useViewportRect) {
+                // For canvas-based editors with offscreen input elements, use viewport
+                targetRect = this.dprScaleRect({
+                    x: 0,
+                    y: 0,
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                });
+            } else {
+                // Use the native .form property which handles both nested and form-attribute associations
+                let rectElement: Element = activeEl;
+                const formElement = (activeEl as HTMLInputElement | HTMLTextAreaElement).form;
+                if (formElement) {
+                    // Find the visual container within the form (handles cases like Google Search
+                    // where <form> is huge but the visible styled container is nested)
+                    const visualContainer = this.findVisualContainer(formElement);
+                    const containerRect = visualContainer.getBoundingClientRect();
+                    // Only use form rect if it has visible dimensions
+                    if (containerRect.width > 0 && containerRect.height > 0) {
+                        rectElement = visualContainer;
+                    }
                 }
+                const rect = rectElement.getBoundingClientRect();
+                targetRect = this.dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
             }
-            const rect = rectElement.getBoundingClientRect();
+
             this.currentTypingSession = {
                 startTime: now,
-                targetRect: this.dprScaleRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }),
+                targetRect,
                 element: activeEl
             };
         }
+
+        // Always update the active element overlay (regardless of typing)
+        this.updateActiveElementOverlay(activeEl);
     }
 
     private flushPendingTypingSession() {
@@ -520,6 +583,94 @@ export class EventRecorder {
             this.currentTypingSession = null;
         }
     }
+
+    /**
+     * Get adjusted border radius from an element, reading individual corners.
+     * Also checks clip-path: inset(... round X) as a fallback.
+     */
+    private getAdjustedBorderRadius(element: Element, padding: number): string {
+        const style = window.getComputedStyle(element);
+
+        // Read individual corner radii (these always resolve CSS variables properly)
+        let tl = parseFloat(style.borderTopLeftRadius) || 0;
+        let tr = parseFloat(style.borderTopRightRadius) || 0;
+        let br = parseFloat(style.borderBottomRightRadius) || 0;
+        let bl = parseFloat(style.borderBottomLeftRadius) || 0;
+
+        // If no border-radius, check clip-path for inset(...round X) pattern
+        if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
+            const clipPath = style.clipPath;
+            if (clipPath && clipPath.includes('round')) {
+                // Parse: inset(0px round 32px) or inset(0 round 10px 20px 30px 40px)
+                const roundMatch = clipPath.match(/round\s+([\d.]+)(?:px)?\s*([\d.]+)?(?:px)?\s*([\d.]+)?(?:px)?\s*([\d.]+)?(?:px)?/);
+                if (roundMatch) {
+                    const r1 = parseFloat(roundMatch[1]) || 0;
+                    const r2 = roundMatch[2] ? parseFloat(roundMatch[2]) : r1;
+                    const r3 = roundMatch[3] ? parseFloat(roundMatch[3]) : r1;
+                    const r4 = roundMatch[4] ? parseFloat(roundMatch[4]) : r2;
+                    // CSS border-radius order: top-left, top-right, bottom-right, bottom-left
+                    tl = r1;
+                    tr = r2;
+                    br = r3;
+                    bl = r4;
+                }
+            }
+        }
+
+        // Add padding to each corner to maintain the curve
+        return `${tl + padding}px ${tr + padding}px ${br + padding}px ${bl + padding}px`;
+    }
+
+    private updateActiveElementOverlay(activeEl: HTMLElement | null) {
+        // Hide overlay if no active element or if it's the body/html
+        if (!activeEl || activeEl === document.body || activeEl === document.documentElement) {
+            this.hideActiveElementOverlay();
+            return;
+        }
+
+        const rect = activeEl.getBoundingClientRect();
+
+        // Hide if element has no visible dimensions
+        if (rect.width === 0 || rect.height === 0) {
+            this.hideActiveElementOverlay();
+            return;
+        }
+
+        // Create or update overlay
+        if (!this.activeElementOverlay) {
+            this.activeElementOverlay = document.createElement('div');
+            this.activeElementOverlay.id = 'recordio-active-element-overlay';
+            this.activeElementOverlay.style.cssText = `
+                position: fixed;
+                background: transparent;
+                pointer-events: none;
+                z-index: 2147483647;
+                box-sizing: border-box;
+                transition: all 0.1s ease-out;
+                border: 2px solid #8b5cf6;
+            `;
+            document.body.appendChild(this.activeElementOverlay);
+        }
+
+        // Update position (expand by 5px in all directions)
+        const padding = 5;
+        this.activeElementOverlay.style.left = `${rect.left - padding}px`;
+        this.activeElementOverlay.style.top = `${rect.top - padding}px`;
+        this.activeElementOverlay.style.width = `${rect.width + padding * 2}px`;
+        this.activeElementOverlay.style.height = `${rect.height + padding * 2}px`;
+
+        // Match border-radius of the element (add padding to maintain curve)
+        this.activeElementOverlay.style.borderRadius = this.getAdjustedBorderRadius(activeEl, padding);
+    }
+
+    private hideActiveElementOverlay() {
+        if (this.activeElementOverlay) {
+            this.activeElementOverlay.remove();
+            this.activeElementOverlay = null;
+        }
+    }
+
+
 
     private flushPendingScrollSession() {
         if (this.currentScrollSession) {

@@ -216,6 +216,7 @@ export interface UserEvents {
     scrolls: ScrollEvent[];
     typingEvents: TypingEvent[];
     urlChanges: UrlChangeEvent[];
+    hoveredCards: HoveredCardEvent[];
 }
 
 
@@ -330,7 +331,8 @@ export const EventType = {
     HOVER: 'hover',
     MOUSEDRAG: 'mousedrag',
     SCROLL: 'scroll',
-    TYPING: 'typing'
+    TYPING: 'typing',
+    HOVERED_CARD: 'hoveredCard'
 } as const;
 
 export type EventType = typeof EventType[keyof typeof EventType];
@@ -366,12 +368,6 @@ export interface KeyboardEvent extends BaseEvent {
     tagName?: string;
 }
 
-export interface HoverEvent extends BaseEvent {
-    type: typeof EventType.HOVER;
-    endTime: number;
-}
-
-
 export interface ScrollEvent extends BaseEvent {
     type: typeof EventType.SCROLL;
     targetRect: Rect;
@@ -384,9 +380,12 @@ export interface TypingEvent extends BaseEvent {
     endTime: number;
 }
 
-// In UserEvent Union
-export type UserEvent = MouseClickEvent | MousePositionEvent | UrlChangeEvent | KeyboardEvent | HoverEvent | DragEvent | ScrollEvent | TypingEvent;
-
+export interface HoveredCardEvent extends BaseEvent {
+    type: typeof EventType.HOVERED_CARD;
+    rect: Rect;
+    endTime: number;
+    cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
+}
 
 export type BackgroundType = 'solid' | 'image';
 

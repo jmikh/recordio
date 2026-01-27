@@ -201,7 +201,7 @@ function startCountdown(): Promise<void> {
 
         overlay.appendChild(countdownContainer);
 
-        let count = 3;
+        let count = 1;
         countdownContainer.innerText = count.toString();
 
         const interval = setInterval(() => {

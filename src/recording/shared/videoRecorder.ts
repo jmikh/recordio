@@ -49,7 +49,8 @@ export class VideoRecorder {
         drags: [],
         scrolls: [],
         typingEvents: [],
-        urlChanges: []
+        urlChanges: [],
+        hoveredCards: []
     };
 
     // Detection Result (Window Mode)
@@ -226,6 +227,7 @@ export class VideoRecorder {
             case EventType.SCROLL: this.events.scrolls.push(e); break;
             case EventType.TYPING: this.events.typingEvents.push(e); break;
             case EventType.URLCHANGE: this.events.urlChanges.push(e); break;
+            case EventType.HOVERED_CARD: this.events.hoveredCards.push(e); break;
             default:
                 // Unrecognized event type
                 console.warn('[VideoRecorder] Unrecognized event type:', e.type);
@@ -442,7 +444,7 @@ export class VideoRecorder {
         // 5. Create & Save Project
         // Use empty events for calculation if none provided, to avoid crash, but don't save them.
         const effectiveEvents = events || {
-            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: []
+            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: []
         };
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
         await ProjectStorage.saveProject(project);
@@ -487,6 +489,7 @@ export class VideoRecorder {
 
         if (e.mousePos) offsetPoint(e.mousePos);
         if (e.targetRect) offsetRect(e.targetRect);
+        if (e.rect) offsetRect(e.rect); // HoveredCardEvent uses rect
 
         if (e.type === EventType.MOUSEDRAG) {
             if (e.path) {

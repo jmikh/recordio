@@ -17,7 +17,8 @@ const EMPTY_USER_EVENTS: UserEvents = {
     drags: [],
     scrolls: [],
     typingEvents: [],
-    urlChanges: []
+    urlChanges: [],
+    hoveredCards: []
 };
 
 

@@ -41,6 +41,7 @@ const recalculateOutputTimeEvents = (
             return { ...e, timestamp: mappedRange.start, endTime: mappedRange.end };
         }).filter(e => e !== null) as any[],
         urlChanges: mapFn(sourceEvents.urlChanges),
+        hoveredCards: mapFn(sourceEvents.hoveredCards || []),
     };
 };
 
@@ -359,18 +360,11 @@ export function getMustSeeRect(
         const targetRect = evt.targetRect || { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
         const mappedTargetRect = viewMapper.inputToOutputRect(targetRect);
 
-        // Calculate Target Dimensions
-        // Add 10% padding to target rect
-        targetWidth = Math.max(minWidth, mappedTargetRect.width * 1.1);
-        // Clamp to output size if it overflows
-        targetWidth = Math.min(outputSize.width, targetWidth);
+        targetWidth = mappedTargetRect.width;
         targetHeight = mappedTargetRect.height;
 
         centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
         centerY = mappedTargetRect.y + mappedTargetRect.height / 2;
-        console.log('Target Rect', targetRect);
-        console.log('Mapped Target Rect', mappedTargetRect);
-
     } else if (evt.type === EventType.URLCHANGE) {
         // URL Change -> Full View
         targetWidth = outputSize.width;
