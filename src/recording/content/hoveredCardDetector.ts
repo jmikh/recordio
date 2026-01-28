@@ -37,6 +37,8 @@ export class HoveredCardDetector {
     private cardResizeObserver: ResizeObserver | null = null;
     // Timer for changing highlight color after 2 seconds
     private colorChangeTimeout: ReturnType<typeof setTimeout> | null = null;
+    // Timer to detect when mouse goes over an iframe (events stop firing)
+    private mouseInactivityTimeout: ReturnType<typeof setTimeout> | null = null;
 
     // Mouse position tracking
     private lastMouseX: number = 0;
@@ -74,6 +76,11 @@ export class HoveredCardDetector {
         window.removeEventListener('scroll', this.handleScroll, { capture: true });
         window.removeEventListener('resize', this.handleResize);
 
+        if (this.mouseInactivityTimeout) {
+            clearTimeout(this.mouseInactivityTimeout);
+            this.mouseInactivityTimeout = null;
+        }
+
         this.flush();
         console.log('[HoveredCardDetector] Stopped listening');
     }
@@ -85,6 +92,12 @@ export class HoveredCardDetector {
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
 
+        // Clear iframe inactivity check since we got a mouse event
+        if (this.mouseInactivityTimeout) {
+            clearTimeout(this.mouseInactivityTimeout);
+            this.mouseInactivityTimeout = null;
+        }
+
         if (this.currentCard && this.currentCardRect) {
             // Session active - just check if mouse is still within card bounds
             if (this.isMouseInCardBounds()) {
@@ -93,7 +106,7 @@ export class HoveredCardDetector {
                 return;
             }
             // Mouse left the card - flush session and fall through to detection
-            this.flushSession();
+            this.flush();
         }
 
         // Get the actual deepest element (traverses into Shadow DOM)
@@ -102,6 +115,12 @@ export class HoveredCardDetector {
 
         // No active session or mouse left bounds - detect card at target
         this.detectCardFromTarget(target);
+
+        // Start inactivity timer to detect when mouse enters an iframe
+        // (mouse events stop firing when absorbed by cross-origin iframe)
+        this.mouseInactivityTimeout = setTimeout(() => {
+            this.checkIfOverIframe();
+        }, 100);
     };
 
     /**
@@ -109,7 +128,7 @@ export class HoveredCardDetector {
      */
     private handleScroll = (): void => {
         // Scroll changes element positions, flush current session
-        this.flushSession();
+        this.flush();
         // Re-detect at current mouse position (using elementFromPoint since we don't have an event)
         this.detectCardAtMousePosition();
     };
@@ -118,7 +137,7 @@ export class HoveredCardDetector {
      * Handle resize - flush session (positions changed)
      */
     private handleResize = (): void => {
-        this.flushSession();
+        this.flush();
     };
 
     /**
@@ -146,7 +165,7 @@ export class HoveredCardDetector {
     private detectCardAtMousePosition(): void {
         const target = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
         if (!target) {
-            this.updateHighlight(null);
+            this.hideHighlight();
             return;
         }
         this.detectCardFromTarget(target);
@@ -157,64 +176,98 @@ export class HoveredCardDetector {
      */
     private detectCardFromTarget(target: Element): void {
         const result = findElementGroup(target);
-        const currentRect = result?.element.getBoundingClientRect() ?? null;
+        if (!result) {
+            this.flush();
+            return;
+        }
+        this.startCardSession(result);
+    }
 
+    /**
+     * Start a new card session with the given result.
+     * Sets up state, observers, and updates the highlight.
+     */
+    private startCardSession(result: ElementGroupResult): void {
         // Start new session
         this.currentCard = result;
-        this.currentCardRect = currentRect;
-        this.sessionStartTime = result ? Date.now() : null;
+        this.currentCardRect = result.element.getBoundingClientRect();
+        this.sessionStartTime = Date.now();
 
-        // Start observing for overlays if we have a valid card
-        if (result) {
-            this.startSessionObservers();
-            console.log('[HoveredCard] Detected:', result.element);
-        }
+        // Start observing for overlays
+        this.startSessionObservers();
+        console.log('[HoveredCard] Detected:', result.element);
 
         // Update visual highlight
         this.updateHighlight(result);
     }
 
     /**
-     * Flush any pending session without stopping listeners
+     * Check if mouse is over an iframe (called after inactivity timeout).
+     * When mouse enters a cross-origin iframe, mouse events stop firing.
+     * Uses elementFromPoint to detect if we're over an iframe and sets up
+     * the session directly with the iframe's rect (0 border radius).
+     */
+    private checkIfOverIframe(): void {
+        // Skip if we already have an active session
+        if (this.currentCard) return;
+
+        const elementAtPoint = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
+        if (!elementAtPoint) return;
+
+        // Check if the element or any ancestor is an iframe
+        let current: Element | null = elementAtPoint;
+        while (current && current !== document.body && current !== document.documentElement) {
+            if (current.tagName === 'IFRAME') {
+                console.log('[HoveredCard] Found iframe:', current);
+                const iframe = current as HTMLIFrameElement;
+                const iframeResult: ElementGroupResult = {
+                    element: iframe,
+                    effectiveRadius: [0, 0, 0, 0]
+                };
+                this.startCardSession(iframeResult);
+                return;
+            }
+            current = current.parentElement;
+        }
+    }
+
+    /**
+     * Flush any pending session, emit event if stable for 2+ seconds,
+     * stop observers, hide highlight, and clear state.
      */
     public flush(): void {
-        this.flushSession();
+        // Stop observing when session ends
+        this.stopSessionObservers();
+
+        // Emit event if session was stable for 2+ seconds
+        if (this.currentCard && this.sessionStartTime && this.currentCardRect) {
+            console.log('[HoveredCard] Flushing session');
+
+            const duration = Date.now() - this.sessionStartTime;
+            if (duration >= MIN_SESSION_DURATION_MS) {
+                const event: HoveredCardEvent = {
+                    type: 'hoveredCard',
+                    startTime: this.sessionStartTime,
+                    endTime: Date.now(),
+                    rect: {
+                        x: this.currentCardRect.left,
+                        y: this.currentCardRect.top,
+                        width: this.currentCardRect.width,
+                        height: this.currentCardRect.height,
+                    },
+                    cornerRadius: this.currentCard.effectiveRadius,
+                };
+
+                console.log('[HoveredCard] Session ended:', event);
+                this.onEvent(event);
+            }
+        }
+
+        // Hide highlight and clear state
         this.hideHighlight();
         this.currentCard = null;
         this.currentCardRect = null;
         this.sessionStartTime = null;
-    }
-
-    /**
-     * Flush the current session if it's been stable for 2+ seconds
-     */
-    private flushSession(): void {
-        // Stop observing when session ends
-        this.stopSessionObservers();
-
-        if (!this.currentCard || !this.sessionStartTime || !this.currentCardRect) {
-            return;
-        }
-        console.log('[HoveredCard] Flushing session');
-
-        const duration = Date.now() - this.sessionStartTime;
-        if (duration >= MIN_SESSION_DURATION_MS) {
-            const event: HoveredCardEvent = {
-                type: 'hoveredCard',
-                startTime: this.sessionStartTime,
-                endTime: Date.now(),
-                rect: {
-                    x: this.currentCardRect.left,
-                    y: this.currentCardRect.top,
-                    width: this.currentCardRect.width,
-                    height: this.currentCardRect.height,
-                },
-                cornerRadius: this.currentCard.effectiveRadius,
-            };
-
-            console.log('[HoveredCard] Session ended:', event);
-            this.onEvent(event);
-        }
     }
 
     /**
@@ -238,7 +291,7 @@ export class HoveredCardDetector {
                         const culprit = this.findExtendingElement(node);
                         if (culprit) {
                             console.log('[HoveredCard] Overlay extends outside card, flushing session. Culprit:', culprit);
-                            this.flushSession();
+                            this.flush();
                             this.detectCardAtMousePosition();
                             return;
                         }
@@ -267,7 +320,7 @@ export class HoveredCardDetector {
 
             if (sizeChanged || positionChanged) {
                 console.log('[HoveredCard] Card size/position changed, flushing session');
-                this.flushSession();
+                this.flush();
                 // Re-detect at current mouse position
                 this.detectCardAtMousePosition();
             }
