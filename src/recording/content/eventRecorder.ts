@@ -16,6 +16,7 @@ import { EventType, type MousePositionEvent, type Rect, type Size } from '../../
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';
+import { dprScalePoint, dprScaleRect } from './dprUtils';
 
 // Debug flag - set to true to show purple highlight border on active element
 const DEBUG_SHOW_ACTIVE_ELEMENT = true;
@@ -162,20 +163,7 @@ export class EventRecorder {
         return active;
     }
 
-    private dprScalePoint(point: { x: number, y: number }): { x: number, y: number } {
-        const dpr = window.devicePixelRatio || 1;
-        return { x: point.x * dpr, y: point.y * dpr };
-    }
 
-    private dprScaleRect(rect: Rect): Rect {
-        const dpr = window.devicePixelRatio || 1;
-        return {
-            x: rect.x * dpr,
-            y: rect.y * dpr,
-            width: rect.width * dpr,
-            height: rect.height * dpr
-        };
-    }
 
     private sendMessage(type: string, payload: any, skipActiveCheck = false) {
         if (!skipActiveCheck && !this.isActive()) return; // Strict active check
@@ -198,7 +186,7 @@ export class EventRecorder {
 
     private handleMouseMove = (e: MouseEvent) => {
         if (!this.isActive()) return;
-        const scaled = this.dprScalePoint({ x: e.clientX, y: e.clientY });
+        const scaled = dprScalePoint({ x: e.clientX, y: e.clientY });
         this.lastMousePos = {
             type: EventType.MOUSEPOS,
             timestamp: this.getRelativeTime(),
@@ -219,7 +207,7 @@ export class EventRecorder {
             elementMeta = { width: rect.width * dpr, height: rect.height * dpr };
         }
 
-        const scaledPos = this.dprScalePoint({ x: e.clientX, y: e.clientY });
+        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
         this.bufferedMouseDown = {
@@ -242,7 +230,7 @@ export class EventRecorder {
 
         const now = this.getRelativeTime();
         const diff = now - this.bufferedMouseDown.timestamp;
-        const scaledPos = this.dprScalePoint({ x: e.clientX, y: e.clientY });
+        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
 
         const startPt = this.dragPath[0].mousePos;
         const dx = scaledPos.x - startPt.x;
@@ -340,7 +328,7 @@ export class EventRecorder {
 
             this.currentScrollSession = {
                 startTime: now,
-                targetRect: this.dprScaleRect(targetRect),
+                targetRect: dprScaleRect(targetRect),
                 lastScrollTime: now
             };
         } else {
@@ -513,7 +501,7 @@ export class EventRecorder {
             let targetRect: Rect;
 
             if (useViewportRect) {
-                targetRect = this.dprScaleRect({
+                targetRect = dprScaleRect({
                     x: 0,
                     y: 0,
                     width: window.innerWidth,
@@ -521,7 +509,7 @@ export class EventRecorder {
                 });
             } else {
                 const elemRect = rectElement!.getBoundingClientRect();
-                targetRect = this.dprScaleRect({ x: elemRect.left, y: elemRect.top, width: elemRect.width, height: elemRect.height });
+                targetRect = dprScaleRect({ x: elemRect.left, y: elemRect.top, width: elemRect.width, height: elemRect.height });
             }
 
             this.currentTypingSession = {
