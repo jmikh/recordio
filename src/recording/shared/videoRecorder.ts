@@ -489,7 +489,6 @@ export class VideoRecorder {
 
         if (e.mousePos) offsetPoint(e.mousePos);
         if (e.targetRect) offsetRect(e.targetRect);
-        if (e.rect) offsetRect(e.rect); // HoveredCardEvent uses rect
 
         if (e.type === EventType.MOUSEDRAG) {
             if (e.path) {

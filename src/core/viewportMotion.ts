@@ -13,6 +13,7 @@ const HoverMinDurationMs = 1000;
 
 
 // Helper: Recalculate Output Time Events
+// TODO: fix hovered cards ranges
 const recalculateOutputTimeEvents = (
     sourceEvents: UserEvents | null,
     timeMapper: TimeMapper
@@ -42,6 +43,7 @@ const recalculateOutputTimeEvents = (
         }).filter(e => e !== null) as any[],
         urlChanges: mapFn(sourceEvents.urlChanges),
         hoveredCards: mapFn(sourceEvents.hoveredCards || []),
+        allEvents: [], // Not used for output-time events
     };
 };
 

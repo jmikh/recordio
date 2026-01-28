@@ -73,7 +73,7 @@ export class EventRecorder {
         this.sendMessage(EventType.HOVERED_CARD, {
             timestamp: event.startTime - this.startTime,
             endTime: event.endTime - this.startTime,
-            rect: event.rect,
+            targetRect: event.targetRect,
             cornerRadius: event.cornerRadius,
         }, true);
     }

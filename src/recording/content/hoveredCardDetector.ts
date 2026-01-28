@@ -17,7 +17,7 @@ export interface HoveredCardEvent {
     type: 'hoveredCard';
     startTime: number;
     endTime: number;
-    rect: Rect;
+    targetRect: Rect;
     cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
 }
 
@@ -233,7 +233,7 @@ export class HoveredCardDetector {
                     type: 'hoveredCard',
                     startTime: this.sessionStartTime,
                     endTime: Date.now(),
-                    rect: dprScaleRect({
+                    targetRect: dprScaleRect({
                         x: this.currentCardRect.left,
                         y: this.currentCardRect.top,
                         width: this.currentCardRect.width,

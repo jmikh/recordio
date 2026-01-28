@@ -217,6 +217,12 @@ export interface UserEvents {
     typingEvents: TypingEvent[];
     urlChanges: UrlChangeEvent[];
     hoveredCards: HoveredCardEvent[];
+
+    /**
+     * Pre-sorted aggregate of all non-mouse-position events (clicks, typing, drags, scrolls, urlChanges, hoveredCards).
+     * Computed at runtime when events are loaded in useProjectStore. NOT persisted to storage.
+     */
+    allEvents: (MouseClickEvent | KeyboardEvent | DragEvent | ScrollEvent | TypingEvent | UrlChangeEvent | HoveredCardEvent)[];
 }
 
 
@@ -382,7 +388,7 @@ export interface TypingEvent extends BaseEvent {
 
 export interface HoveredCardEvent extends BaseEvent {
     type: typeof EventType.HOVERED_CARD;
-    rect: Rect;
+    targetRect: Rect;
     endTime: number;
     cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
 }

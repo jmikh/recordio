@@ -18,7 +18,8 @@ const EMPTY_USER_EVENTS: UserEvents = {
     scrolls: [],
     typingEvents: [],
     urlChanges: [],
-    hoveredCards: []
+    hoveredCards: [],
+    allEvents: []
 };
 
 
@@ -123,7 +124,18 @@ export const useProjectStore = create<ProjectState>()(
                         }
                     }
 
-                    // 5. Update Store with Events
+                    // 5. Populate allEvents (sorted aggregate of non-mouse-position events)
+                    events.allEvents = [
+                        ...(events.mouseClicks || []),
+                        ...(events.keyboardEvents || []),
+                        ...(events.drags || []),
+                        ...(events.scrolls || []),
+                        ...(events.typingEvents || []),
+                        ...(events.urlChanges || []),
+                        ...(events.hoveredCards || []),
+                    ].sort((a, b) => a.timestamp - b.timestamp);
+
+                    // 6. Update Store with Events
                     set({ userEvents: events });
 
                     // 6. Clear History so we can't undo into valid empty state or previous project
