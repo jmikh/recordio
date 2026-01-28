@@ -59,8 +59,8 @@ export class HoveredCardDetector {
         this.isListening = true;
 
         document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
-        window.addEventListener('scroll', this.handleScroll, { capture: true });
-        window.addEventListener('resize', this.handleResize);
+        window.addEventListener('scroll', this.detectCardAtMousePosition, { capture: true });
+        window.addEventListener('resize', this.detectCardAtMousePosition);
 
         console.log('[HoveredCardDetector] Started listening');
     }
@@ -73,8 +73,8 @@ export class HoveredCardDetector {
         this.isListening = false;
 
         document.removeEventListener('mousemove', this.handleMouseMove, { capture: true });
-        window.removeEventListener('scroll', this.handleScroll, { capture: true });
-        window.removeEventListener('resize', this.handleResize);
+        window.removeEventListener('scroll', this.detectCardAtMousePosition, { capture: true });
+        window.removeEventListener('resize', this.detectCardAtMousePosition);
 
         if (this.mouseInactivityTimeout) {
             clearTimeout(this.mouseInactivityTimeout);
@@ -124,23 +124,6 @@ export class HoveredCardDetector {
     };
 
     /**
-     * Handle scroll - flush session and re-detect
-     */
-    private handleScroll = (): void => {
-        // Scroll changes element positions, flush current session
-        this.flush();
-        // Re-detect at current mouse position (using elementFromPoint since we don't have an event)
-        this.detectCardAtMousePosition();
-    };
-
-    /**
-     * Handle resize - flush session (positions changed)
-     */
-    private handleResize = (): void => {
-        this.flush();
-    };
-
-    /**
      * Check if the mouse is still within the current card's bounds
      */
     private isMouseInCardBounds(): boolean {
@@ -162,10 +145,10 @@ export class HoveredCardDetector {
     /**
      * Detect which card is at the current mouse position (for scroll/resize handlers)
      */
-    private detectCardAtMousePosition(): void {
+    private detectCardAtMousePosition = (): void => {
+        this.flush();
         const target = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
         if (!target) {
-            this.hideHighlight();
             return;
         }
         this.detectCardFromTarget(target);
@@ -291,7 +274,6 @@ export class HoveredCardDetector {
                         const culprit = this.findExtendingElement(node);
                         if (culprit) {
                             console.log('[HoveredCard] Overlay extends outside card, flushing session. Culprit:', culprit);
-                            this.flush();
                             this.detectCardAtMousePosition();
                             return;
                         }
@@ -320,8 +302,6 @@ export class HoveredCardDetector {
 
             if (sizeChanged || positionChanged) {
                 console.log('[HoveredCard] Card size/position changed, flushing session');
-                this.flush();
-                // Re-detect at current mouse position
                 this.detectCardAtMousePosition();
             }
         });
