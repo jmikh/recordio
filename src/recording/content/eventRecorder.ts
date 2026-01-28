@@ -15,6 +15,7 @@
 import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
+import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';
 
 // Debug flag - set to true to show purple highlight border on active element
 const DEBUG_SHOW_ACTIVE_ELEMENT = true;
@@ -469,12 +470,49 @@ export class EventRecorder {
                 });
                 this.currentTypingSession = null;
             }
-        } else if (isTypingActive && activeEl) {
+        }
+
+        // Compute the visual target element for the overlay
+        let rectElement: Element | null = null;
+        if (activeEl) {
+            // Find the first ancestor with border or shadow, with 90% viewport fallback
+            const groupResult = findElementGroup(activeEl, 0); // minSize 0 to find any matching element
+            rectElement = groupResult?.element ?? activeEl;
+            const elemRect = rectElement.getBoundingClientRect();
+
+            // Check if element is offscreen (e.g., Google Docs uses hidden iframes at y: -10000)
+            const isOffscreen = elemRect.bottom < 0 || elemRect.top > window.innerHeight ||
+                elemRect.right < 0 || elemRect.left > window.innerWidth;
+
+            if (isOffscreen) {
+                // Element is offscreen - try to find a visible canvas (for apps like Google Docs)
+                const canvases = document.querySelectorAll('canvas');
+                let foundCanvas = false;
+                for (const canvas of canvases) {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    // Use the canvas if it's visible and has reasonable size
+                    if (canvasRect.width > 100 && canvasRect.height > 100 &&
+                        canvasRect.bottom > 0 && canvasRect.top < window.innerHeight &&
+                        canvasRect.right > 0 && canvasRect.left < window.innerWidth) {
+                        rectElement = canvas;
+                        foundCanvas = true;
+                        break;
+                    }
+                }
+                // If no visible canvas found, don't show overlay
+                if (!foundCanvas) {
+                    rectElement = null;
+                }
+            } else if (elemRect.width > window.innerWidth * 0.9 && rectElement !== activeEl) {
+                rectElement = activeEl;
+            }
+        }
+
+        if (!this.currentTypingSession && isTypingActive && activeEl) {
             // Start Session
             let targetRect: Rect;
 
             if (useViewportRect) {
-                // For canvas-based editors with offscreen input elements, use viewport
                 targetRect = this.dprScaleRect({
                     x: 0,
                     y: 0,
@@ -482,13 +520,7 @@ export class EventRecorder {
                     height: window.innerHeight
                 });
             } else {
-                // Find the first ancestor with border or shadow, with 90% viewport fallback
-                let rectElement: Element = this.findVisualBorderAncestor(activeEl) ?? activeEl;
-                let elemRect = rectElement.getBoundingClientRect();
-                if (elemRect.width > window.innerWidth * 0.9 && rectElement !== activeEl) {
-                    rectElement = activeEl;
-                    elemRect = rectElement.getBoundingClientRect();
-                }
+                const elemRect = rectElement!.getBoundingClientRect();
                 targetRect = this.dprScaleRect({ x: elemRect.left, y: elemRect.top, width: elemRect.width, height: elemRect.height });
             }
 
@@ -500,7 +532,7 @@ export class EventRecorder {
         }
 
         // Always update the active element overlay (regardless of typing)
-        this.updateActiveElementOverlay(activeEl);
+        this.updateActiveElementOverlay(rectElement);
     }
 
     private flushPendingTypingSession() {
@@ -516,124 +548,21 @@ export class EventRecorder {
         }
     }
 
-    /**
-     * Get adjusted border radius from an element, reading individual corners.
-     * Also checks clip-path: inset(... round X) as a fallback.
-     */
-    private getAdjustedBorderRadius(element: Element, padding: number): string {
-        const style = window.getComputedStyle(element);
 
-        // Read individual corner radii (these always resolve CSS variables properly)
-        let tl = parseFloat(style.borderTopLeftRadius) || 0;
-        let tr = parseFloat(style.borderTopRightRadius) || 0;
-        let br = parseFloat(style.borderBottomRightRadius) || 0;
-        let bl = parseFloat(style.borderBottomLeftRadius) || 0;
-
-        // If no border-radius, check clip-path for inset(...round X) pattern
-        if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
-            const clipPath = style.clipPath;
-            if (clipPath && clipPath.includes('round')) {
-                // Parse: inset(0px round 32px) or inset(0 round 10px 20px 30px 40px)
-                const roundMatch = clipPath.match(/round\s+([\d.]+)(?:px)?\s*([\d.]+)?(?:px)?\s*([\d.]+)?(?:px)?\s*([\d.]+)?(?:px)?/);
-                if (roundMatch) {
-                    const r1 = parseFloat(roundMatch[1]) || 0;
-                    const r2 = roundMatch[2] ? parseFloat(roundMatch[2]) : r1;
-                    const r3 = roundMatch[3] ? parseFloat(roundMatch[3]) : r1;
-                    const r4 = roundMatch[4] ? parseFloat(roundMatch[4]) : r2;
-                    // CSS border-radius order: top-left, top-right, bottom-right, bottom-left
-                    tl = r1;
-                    tr = r2;
-                    br = r3;
-                    bl = r4;
-                }
-            }
+    private updateActiveElementOverlay(targetEl: Element | null) {
+        if (!DEBUG_SHOW_ACTIVE_ELEMENT) {
+            return;
         }
-
-        // Add padding to each corner to maintain the curve
-        return `${tl + padding}px ${tr + padding}px ${br + padding}px ${bl + padding}px`;
-    }
-
-    /**
-     * Find the first ancestor (including the element itself) that has a visible border or shadow.
-     * Walks up the DOM tree and returns the first element with:
-     * - Border on any side (top, right, bottom, left)
-     * - Box shadow
-     * - Drop shadow (via filter)
-     */
-    private findVisualBorderAncestor(element: Element): Element | null {
-        let current: Element | null = element;
-
-        while (current && current !== document.body && current !== document.documentElement) {
-            const style = window.getComputedStyle(current);
-
-            // Helper to check if a color is not fully transparent
-            const isVisibleColor = (color: string): boolean => {
-                if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return false;
-                // Check for rgba with 0 alpha
-                const rgbaMatch = color.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
-                if (rgbaMatch && parseFloat(rgbaMatch[1]) === 0) return false;
-                return true;
-            };
-
-            // Check for border on any side (must have width > 0, style != none, and visible color)
-            const hasBorderTop = parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== 'none' && isVisibleColor(style.borderTopColor);
-            const hasBorderRight = parseFloat(style.borderRightWidth) > 0 && style.borderRightStyle !== 'none' && isVisibleColor(style.borderRightColor);
-            const hasBorderBottom = parseFloat(style.borderBottomWidth) > 0 && style.borderBottomStyle !== 'none' && isVisibleColor(style.borderBottomColor);
-            const hasBorderLeft = parseFloat(style.borderLeftWidth) > 0 && style.borderLeftStyle !== 'none' && isVisibleColor(style.borderLeftColor);
-            const hasBorder = hasBorderTop || hasBorderRight || hasBorderBottom || hasBorderLeft;
-
-            // Check for box shadow
-            const hasBoxShadow = style.boxShadow && style.boxShadow !== 'none';
-
-            // Check for drop shadow (via filter)
-            const hasDropShadow = style.filter && style.filter.includes('drop-shadow');
-
-            if (hasBorder || hasBoxShadow || hasDropShadow) {
-                return current;
-            }
-
-            // Move to parent, handling Shadow DOM boundaries
-            if (current.parentElement) {
-                current = current.parentElement;
-            } else {
-                const root = current.getRootNode();
-                if (root instanceof ShadowRoot && root.host) {
-                    current = root.host;
-                } else {
-                    current = null;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private updateActiveElementOverlay(activeEl: HTMLElement | null) {
-        // Hide overlay if no active element or if it's the body/html
-        if (!activeEl || activeEl === document.body || activeEl === document.documentElement) {
+        // Hide overlay if no target element
+        if (!targetEl) {
             this.hideActiveElementOverlay();
             return;
         }
 
-        // Find the first ancestor with border or shadow
-        let targetEl: Element = this.findVisualBorderAncestor(activeEl) ?? activeEl;
-
-        let rect = targetEl.getBoundingClientRect();
-
-        // If the found element is too wide (> 90% viewport), fall back to active element
-        if (rect.width > window.innerWidth * 0.9 && targetEl !== activeEl) {
-            targetEl = activeEl;
-            rect = targetEl.getBoundingClientRect();
-        }
+        const rect = targetEl.getBoundingClientRect();
 
         // Hide if element has no visible dimensions
         if (rect.width === 0 || rect.height === 0) {
-            this.hideActiveElementOverlay();
-            return;
-        }
-
-        // Create or update overlay (only if debug flag is enabled)
-        if (!DEBUG_SHOW_ACTIVE_ELEMENT) {
             this.hideActiveElementOverlay();
             return;
         }
@@ -661,7 +590,9 @@ export class EventRecorder {
         this.activeElementOverlay.style.height = `${rect.height + padding * 2}px`;
 
         // Match border-radius of the target element (add padding to maintain curve)
-        this.activeElementOverlay.style.borderRadius = this.getAdjustedBorderRadius(targetEl, padding);
+        const groupResult = findElementGroup(targetEl, 0);
+        const effectiveRadius = groupResult?.effectiveRadius ?? [0, 0, 0, 0];
+        this.activeElementOverlay.style.borderRadius = cornerRadiusToString(effectiveRadius, padding);
     }
 
     private hideActiveElementOverlay() {
