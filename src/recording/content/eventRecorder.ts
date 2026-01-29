@@ -32,7 +32,6 @@ export class EventRecorder {
         timestamp: 0,
         mousePos: { x: 0, y: 0 }
     };
-    private lastKeystrokeTime = -Infinity;
 
     // Typing Session State
     private currentTypingSession: { startTime: number; targetRect: Rect; element: HTMLElement } | null = null;
@@ -51,13 +50,15 @@ export class EventRecorder {
     private dragStartPos: { x: number; y: number } | null = null;
 
     // Constants
-    private readonly TYPING_POLL_INTERVAL = 100;
     private readonly CLICK_THRESHOLD = 500;
     private readonly DRAG_DISTANCE_THRESHOLD = 5;
     private readonly SCROLL_SESSION_TIMEOUT = 1000;
 
-    // Intervals
-    private typingPollInterval: any = null;
+    // Scroll session timeout handle
+    private scrollSessionTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Focusout handler for current typing session
+    private typingFocusOutHandler: (() => void) | null = null;
 
     constructor(startTime: number) {
         this.startTime = startTime;
@@ -79,7 +80,6 @@ export class EventRecorder {
         if (this.isRecording) return;
         this.isRecording = true;
         this.attachListeners();
-        this.startPolling();
         this.hoveredCardDetector.start();
         console.log("[ContentRecorder] Started capturing events.");
     }
@@ -90,9 +90,8 @@ export class EventRecorder {
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
         this.hoveredCardDetector.stop();
-        this.hideActiveElementOverlay();
+        this.hideTypingOverlay();
         this.removeListeners();
-        this.stopPolling();
         console.log("[ContentRecorder] Stopped capturing events.");
     }
 
@@ -130,33 +129,13 @@ export class EventRecorder {
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
 
-    private startPolling() {
-        this.typingPollInterval = setInterval(this.pollTyping, this.TYPING_POLL_INTERVAL);
-    }
 
-    private stopPolling() {
-        if (this.typingPollInterval) clearInterval(this.typingPollInterval);
-        this.typingPollInterval = null;
-    }
 
     // --- Helpers ---
 
     private isActive(): boolean {
         return document.hasFocus() && document.visibilityState === 'visible';
     }
-
-    /**
-     * Get the deepest active element, traversing into shadow DOMs.
-     * This handles cases like LinkedIn's post composer which uses shadow DOM.
-     */
-    private getDeepActiveElement(): HTMLElement | null {
-        let active = document.activeElement as HTMLElement | null;
-        while (active?.shadowRoot?.activeElement) {
-            active = active.shadowRoot.activeElement as HTMLElement;
-        }
-        return active;
-    }
-
 
 
     private sendMessage(type: string, payload: any, skipActiveCheck = false) {
@@ -195,7 +174,8 @@ export class EventRecorder {
     private handlePointerDown = (e: PointerEvent) => {
         if (!this.isActive()) return;
 
-        // Interaction should flush pending scroll
+        // Interaction should flush pending sessions
+        this.flushPendingTypingSession();
         this.flushPendingScrollSession();
 
         const dpr = window.devicePixelRatio || 1;
@@ -270,12 +250,22 @@ export class EventRecorder {
             if (!nonTextInputs.includes(type)) isInput = true;
         }
 
+        // Detect hidden text capture iframes (Google Docs, etc.) and canvas editors
+        let useViewportRect = false;
+        if (tagName === 'IFRAME' || tagName === 'CANVAS') {
+            isInput = true;
+            useViewportRect = true;
+        }
+
         if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
 
         const isModifier = e.ctrlKey || e.metaKey || e.altKey;
         const isSpecial = ['Enter', 'Tab', 'Escape', 'Backspace', 'Delete'].includes(e.key);
 
-        if (isInput) this.lastKeystrokeTime = this.getRelativeTime();
+        // Start typing session if in an input and not already in a session
+        if (isInput && !this.currentTypingSession) {
+            this.startTypingSession(target, useViewportRect);
+        }
 
         const shouldCapture = !isInput || (isInput && (isModifier || isSpecial));
 
@@ -301,21 +291,46 @@ export class EventRecorder {
     private handleScroll = (e: Event) => {
         if (!this.isActive()) return;
 
+        // Scrolling should flush pending typing session
+        this.flushPendingTypingSession();
+
         const now = this.getRelativeTime();
 
-        // If this is a new session or continuation
-        if (!this.currentScrollSession) {
-            let targetRect: Rect;
-            if (e.target instanceof Element) {
-                const rect = e.target.getBoundingClientRect();
-                targetRect = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
-            } else {
-                targetRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
-            }
+        // Clear existing timeout and set a new one
+        if (this.scrollSessionTimeout) {
+            clearTimeout(this.scrollSessionTimeout);
+        }
+        this.scrollSessionTimeout = setTimeout(() => {
+            this.flushPendingScrollSession();
+        }, this.SCROLL_SESSION_TIMEOUT);
 
+        // Compute target rect for this scroll event
+        let targetRect: Rect;
+        if (e.target instanceof Element) {
+            const rect = e.target.getBoundingClientRect();
+            targetRect = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+        } else {
+            targetRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
+        }
+        const scaledTargetRect = dprScaleRect(targetRect);
+
+        // Check if scroll target changed - flush old session and start new one
+        if (this.currentScrollSession) {
+            const current = this.currentScrollSession.targetRect;
+            const targetChanged = current.x !== scaledTargetRect.x ||
+                current.y !== scaledTargetRect.y ||
+                current.width !== scaledTargetRect.width ||
+                current.height !== scaledTargetRect.height;
+            if (targetChanged) {
+                this.flushPendingScrollSession();
+            }
+        }
+
+        // Start new session or continue existing one
+        if (!this.currentScrollSession) {
             this.currentScrollSession = {
                 startTime: now,
-                targetRect: dprScaleRect(targetRect),
+                targetRect: scaledTargetRect,
                 lastScrollTime: now
             };
         } else {
@@ -336,6 +351,7 @@ export class EventRecorder {
 
     private handleVisibilityChange = () => {
         // Send URL event on both focus gain and focus loss
+        this.flushPendingTypingSession();
         this.flushPendingScrollSession();
         this.sendUrlEvent();
     }
@@ -348,129 +364,80 @@ export class EventRecorder {
         }, true);
     }
 
-    // --- Pollers ---
+    // --- Typing Session Management ---
 
-    private pollTyping = () => {
-        if (!this.isActive()) return;
-
+    private startTypingSession(element: HTMLElement, useViewportRect: boolean) {
         const now = this.getRelativeTime();
 
-        // Check Scroll Session Timeout (moved from pollMouse)
-        if (this.currentScrollSession) {
-            if (now - this.currentScrollSession.lastScrollTime > this.SCROLL_SESSION_TIMEOUT) {
-                this.flushPendingScrollSession();
-            }
-        }
-        const activeEl = this.getDeepActiveElement();
-
-        // Check if editable
-        const tagName = activeEl?.tagName;
-        const isContentEditable = activeEl?.isContentEditable;
-
-        // Check for ARIA roles that indicate text input (e.g., Reddit's search uses role="combobox")
-        const role = activeEl?.getAttribute?.('role');
-        const textInputRoles = ['textbox', 'combobox', 'searchbox'];
-        const hasTextInputRole = role && textInputRoles.includes(role);
-
-        let isEditable = isContentEditable || tagName === 'TEXTAREA' || hasTextInputRole;
-        if (tagName === 'INPUT') {
-            const type = (activeEl as HTMLInputElement).type;
-            const nonTextInputs = ['checkbox', 'radio', 'button', 'image', 'submit', 'reset', 'range', 'color'];
-            if (!nonTextInputs.includes(type)) isEditable = true;
-        }
-
-        // Detect hidden text capture iframes (Google Docs, etc.) and canvas editors
-        // These use offscreen iframes/elements for keyboard capture while rendering elsewhere
-        let useViewportRect = false;
-        if (tagName === 'IFRAME' || tagName === 'CANVAS') {
-            isEditable = true;
-            useViewportRect = true;
-        }
-
-        // For iframes/canvas, we can't detect keystrokes (they happen inside the iframe)
-        // So we treat focus itself as "typing active" for these elements
-        const isTyping = (now - this.lastKeystrokeTime) < 1000;
-        const isTypingActive = useViewportRect ? isEditable : (isTyping && isEditable);
-
-        if (this.currentTypingSession) {
-            if (!isTypingActive || activeEl !== this.currentTypingSession.element) {
-                // End Session
-                this.sendMessage(EventType.TYPING, {
-                    timestamp: this.currentTypingSession.startTime,
-                    mousePos: this.lastMousePos.mousePos,
-                    targetRect: this.currentTypingSession.targetRect,
-                    endTime: now
-                });
-                this.currentTypingSession = null;
-            }
-        }
-
         // Compute the visual target element for the overlay
-        let rectElement: Element | null = null;
-        if (activeEl) {
-            // Find the first ancestor with border or shadow, with 90% viewport fallback
-            const groupResult = findElementGroup(activeEl, 0); // minSize 0 to find any matching element
-            rectElement = groupResult?.element ?? activeEl;
-            const elemRect = rectElement.getBoundingClientRect();
+        let rectElement: Element = element;
 
-            // Check if element is offscreen (e.g., Google Docs uses hidden iframes at y: -10000)
-            const isOffscreen = elemRect.bottom < 0 || elemRect.top > window.innerHeight ||
-                elemRect.right < 0 || elemRect.left > window.innerWidth;
+        // Find the first ancestor with border or shadow, with 90% viewport fallback
+        const groupResult = findElementGroup(element, 0); // minSize 0 to find any matching element
+        rectElement = groupResult?.element ?? element;
+        const elemRect = rectElement.getBoundingClientRect();
 
-            if (isOffscreen) {
-                // Element is offscreen - try to find a visible canvas (for apps like Google Docs)
-                const canvases = document.querySelectorAll('canvas');
-                let foundCanvas = false;
-                for (const canvas of canvases) {
-                    const canvasRect = canvas.getBoundingClientRect();
-                    // Use the canvas if it's visible and has reasonable size
-                    if (canvasRect.width > 100 && canvasRect.height > 100 &&
-                        canvasRect.bottom > 0 && canvasRect.top < window.innerHeight &&
-                        canvasRect.right > 0 && canvasRect.left < window.innerWidth) {
-                        rectElement = canvas;
-                        foundCanvas = true;
-                        break;
-                    }
+        // Check if element is offscreen (e.g., Google Docs uses hidden iframes at y: -10000)
+        const isOffscreen = elemRect.bottom < 0 || elemRect.top > window.innerHeight ||
+            elemRect.right < 0 || elemRect.left > window.innerWidth;
+
+        if (isOffscreen) {
+            // Element is offscreen - try to find a visible canvas (for apps like Google Docs)
+            const canvases = document.querySelectorAll('canvas');
+            for (const canvas of canvases) {
+                const canvasRect = canvas.getBoundingClientRect();
+                // Use the canvas if it's visible and has reasonable size
+                if (canvasRect.width > 100 && canvasRect.height > 100 &&
+                    canvasRect.bottom > 0 && canvasRect.top < window.innerHeight &&
+                    canvasRect.right > 0 && canvasRect.left < window.innerWidth) {
+                    rectElement = canvas;
+                    break;
                 }
-                // If no visible canvas found, don't show overlay
-                if (!foundCanvas) {
-                    rectElement = null;
-                }
-            } else if (elemRect.width > window.innerWidth * 0.9 && rectElement !== activeEl) {
-                rectElement = activeEl;
             }
+        } else if (elemRect.width > window.innerWidth * 0.9 && rectElement !== element) {
+            rectElement = element;
         }
 
-        if (!this.currentTypingSession && isTypingActive && activeEl) {
-            // Start Session
-            let targetRect: Rect;
-
-            if (useViewportRect) {
-                targetRect = dprScaleRect({
-                    x: 0,
-                    y: 0,
-                    width: window.innerWidth,
-                    height: window.innerHeight
-                });
-            } else {
-                const elemRect = rectElement!.getBoundingClientRect();
-                targetRect = dprScaleRect({ x: elemRect.left, y: elemRect.top, width: elemRect.width, height: elemRect.height });
-            }
-
-            this.currentTypingSession = {
-                startTime: now,
-                targetRect,
-                element: activeEl
-            };
+        // Compute target rect
+        let targetRect: Rect;
+        if (useViewportRect) {
+            targetRect = dprScaleRect({
+                x: 0,
+                y: 0,
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+        } else {
+            const finalRect = rectElement.getBoundingClientRect();
+            targetRect = dprScaleRect({ x: finalRect.left, y: finalRect.top, width: finalRect.width, height: finalRect.height });
         }
 
-        // Always update the active element overlay (regardless of typing)
-        this.updateActiveElementOverlay(rectElement);
+        // Set up focusout handler on this specific element
+        this.typingFocusOutHandler = () => {
+            this.flushPendingTypingSession();
+        };
+        element.addEventListener('focusout', this.typingFocusOutHandler, { once: true });
+
+        this.currentTypingSession = {
+            startTime: now,
+            targetRect,
+            element
+        };
+
+        // Show debug overlay
+        this.showTypingOverlay(rectElement);
     }
 
     private flushPendingTypingSession() {
         if (this.currentTypingSession) {
             const now = this.getRelativeTime();
+
+            // Remove focusout listener if still attached
+            if (this.typingFocusOutHandler) {
+                this.currentTypingSession.element.removeEventListener('focusout', this.typingFocusOutHandler);
+                this.typingFocusOutHandler = null;
+            }
+
             this.sendMessage(EventType.TYPING, {
                 timestamp: this.currentTypingSession.startTime,
                 mousePos: this.lastMousePos.mousePos,
@@ -478,27 +445,22 @@ export class EventRecorder {
                 endTime: now
             }, true);
             this.currentTypingSession = null;
+
+            // Hide debug overlay
+            this.hideTypingOverlay();
         }
     }
 
 
-    private updateActiveElementOverlay(targetEl: Element | null) {
-        if (!DEBUG_SHOW_ACTIVE_ELEMENT) {
-            return;
-        }
-        // Hide overlay if no target element
-        if (!targetEl) {
-            this.hideActiveElementOverlay();
-            return;
-        }
+    // --- Debug Overlay (for typing session visualization) ---
+
+    private showTypingOverlay(targetEl: Element) {
+        if (!DEBUG_SHOW_ACTIVE_ELEMENT) return;
 
         const rect = targetEl.getBoundingClientRect();
 
-        // Hide if element has no visible dimensions
-        if (rect.width === 0 || rect.height === 0) {
-            this.hideActiveElementOverlay();
-            return;
-        }
+        // Don't show if element has no visible dimensions
+        if (rect.width === 0 || rect.height === 0) return;
 
         if (!this.activeElementOverlay) {
             this.activeElementOverlay = document.createElement('div');
@@ -528,7 +490,9 @@ export class EventRecorder {
         this.activeElementOverlay.style.borderRadius = cornerRadiusToString(effectiveRadius, padding);
     }
 
-    private hideActiveElementOverlay() {
+    private hideTypingOverlay() {
+        if (!DEBUG_SHOW_ACTIVE_ELEMENT) return;
+
         if (this.activeElementOverlay) {
             this.activeElementOverlay.remove();
             this.activeElementOverlay = null;
@@ -538,6 +502,12 @@ export class EventRecorder {
 
 
     private flushPendingScrollSession() {
+        // Clear the timeout if still pending
+        if (this.scrollSessionTimeout) {
+            clearTimeout(this.scrollSessionTimeout);
+            this.scrollSessionTimeout = null;
+        }
+
         if (this.currentScrollSession) {
             this.sendMessage(EventType.SCROLL, {
                 timestamp: this.currentScrollSession.startTime,
