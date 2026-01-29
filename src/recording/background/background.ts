@@ -436,6 +436,20 @@ async function handleStopSession(sendResponse: Function) {
     // Capture the controller ID from state before we wipe the state
     const controllerTabIdToClose = currentState?.controllerTabId;
 
+    const stopEventsMsg: BaseMessage = {
+        type: MSG_TYPES.STOP_RECORDING_EVENTS,
+        payload: { sessionId: finalSessionId }
+    };
+
+    // broadcast to all tabs safer.
+    // This should happen first to flush any pending events. (though we might still need a wait)
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+        if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { /* ignore */ });
+        }
+    }
+
     if (finalSessionId) {
         try {
             // Send STOP to the appropriate recorder (offscreen or controller)
@@ -478,19 +492,6 @@ async function handleStopSession(sendResponse: Function) {
     }
     // Cleanup regardless of success
 
-
-    const stopEventsMsg: BaseMessage = {
-        type: MSG_TYPES.STOP_RECORDING_EVENTS,
-        payload: { sessionId: finalSessionId }
-    };
-
-    // broadcast to all tabs safer.
-    const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-        if (tab.id) {
-            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { /* ignore */ });
-        }
-    }
 
     await saveState({
         isRecording: false,

@@ -61,6 +61,10 @@ export interface UIState {
     showDebugBar: boolean;
     toggleDebugBar: () => void;
 
+    // Debug Overlays (focus areas on canvas)
+    showDebugOverlays: boolean;
+    toggleDebugOverlays: () => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -171,6 +175,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     showDebugBar: false,
     toggleDebugBar: () => set((state) => ({ showDebugBar: !state.showDebugBar })),
 
+    // Debug Overlays
+    showDebugOverlays: false,
+    toggleDebugOverlays: () => set((state) => ({ showDebugOverlays: !state.showDebugOverlays })),
+
     reset: () => set({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
@@ -186,5 +194,6 @@ export const useUIStore = create<UIState>((set, get) => ({
         // frameTime: 0,
         isResizingWindow: false,
         showDebugBar: false,
+        showDebugOverlays: false,
     })
 }));

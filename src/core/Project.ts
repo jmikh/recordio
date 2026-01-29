@@ -92,7 +92,8 @@ export class ProjectImpl {
                 screenSourceId: '',
                 viewportMotions: [],
                 spotlights: [],
-                outputWindows: []
+                outputWindows: [],
+                focusAreas: []
             }
         };
     }
@@ -138,13 +139,11 @@ export class ProjectImpl {
 
         const timeMapper = new TimeMapper(outputWindows);
         const focusAreas = getAllFocusAreas(screenEvents, timeMapper, screenSource.size);
-        const outputDuration = timeMapper.getOutputDuration();
 
         const viewportMotions = calculateZoomSchedule(
             project.settings.zoom,
             viewMapper,
-            focusAreas,
-            outputDuration
+            focusAreas
         );
 
         // Update timeline with recording properties
@@ -155,7 +154,9 @@ export class ProjectImpl {
             viewportMotions: viewportMotions,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
-            outputWindows: outputWindows
+            outputWindows: outputWindows,
+            // Store computed focus areas for reuse
+            focusAreas: focusAreas
         };
 
         return {

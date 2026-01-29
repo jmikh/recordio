@@ -11,8 +11,7 @@ export * from './viewMapper';
 export function calculateZoomSchedule(
     zoomSettings: ZoomSettings,
     viewMapper: ViewMapper,
-    focusAreas: FocusArea[],
-    outputDuration: number
+    focusAreas: FocusArea[]
 ): ViewportMotion[] {
     const { maxZoom, maxZoomDurationMs, minZoomDurationMs } = zoomSettings;
 
@@ -30,16 +29,8 @@ export function calculateZoomSchedule(
     let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
     let lastMustSeeRect: Rect = lastViewport;
 
-    const ZOOM_TRANSITION_DURATION = maxZoomDurationMs;
-    const IGNORE_EVENTS_BUFFER = 3000;
-    const zoomOutStartTime = Math.max(0, outputDuration - IGNORE_EVENTS_BUFFER);
-
-    // 3. Process each focus area
+    // Process each focus area (start/end buffer logic and final_zoomout now handled by focusManager)
     for (const area of focusAreas) {
-        // Skip events in the ignore zone (last 3 seconds)
-        if (area.timestamp >= zoomOutStartTime) {
-            break;
-        }
 
         // Use the focus area rect directly (already in source coordinates)
         // Map it to output coordinates for viewport calculation
@@ -136,21 +127,8 @@ export function calculateZoomSchedule(
         }
     }
 
-    // 4. Append final zoom out if needed
-    const isFullZoom = Math.abs(lastViewport.width - outputVideoSize.width) < 1;
-
-    if (!isFullZoom) {
-        const zoomOutEndTime = zoomOutStartTime + ZOOM_TRANSITION_DURATION;
-
-        motions.push({
-            id: crypto.randomUUID(),
-            outputEndTimeMs: zoomOutEndTime,
-            durationMs: ZOOM_TRANSITION_DURATION,
-            rect: { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height },
-            reason: 'end_zoomout',
-            type: 'auto'
-        });
-    }
+    // Note: final_zoomout is now emitted by focusManager as a focus area
+    // and will be processed like any other focus area above
 
     return motions;
 }

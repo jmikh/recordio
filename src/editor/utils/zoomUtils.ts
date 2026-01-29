@@ -1,17 +1,37 @@
 
-import type { ID, Project, UserEvents, ViewportMotion } from '../../core/types';
+import type { ID, Project, UserEvents, ViewportMotion, FocusArea } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
 import { getAllFocusAreas } from '../../core/focusManager';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 
-
 /**
- * Helper to recalculate zooms synchronously
+ * Computes focus areas from user events and output windows.
+ * Called when output windows change to update the cached focusAreas in timeline.
  */
-export const recalculateAutoZooms = (
+export const computeFocusAreas = (
     project: Project,
     sources: Record<ID, import('../../core/types').SourceMetadata>,
     events: UserEvents
+): FocusArea[] => {
+    const screenSourceId = project.timeline.screenSourceId;
+    const sourceMetadata = sources[screenSourceId];
+
+    if (!sourceMetadata) {
+        console.warn("Skipping focus area computation: Missing source", screenSourceId);
+        return [];
+    }
+
+    const timeMapper = getTimeMapper(project.timeline.outputWindows);
+    return getAllFocusAreas(events, timeMapper, sourceMetadata.size);
+};
+
+/**
+ * Helper to recalculate zooms synchronously using pre-computed focus areas.
+ * focusAreas should already be stored in project.timeline.focusAreas.
+ */
+export const recalculateAutoZooms = (
+    project: Project,
+    sources: Record<ID, import('../../core/types').SourceMetadata>
 ): ViewportMotion[] => {
     // 1. If Auto Zoom is ON, regenerate completely
     if (project.settings.zoom.autoZoom) {
@@ -19,7 +39,7 @@ export const recalculateAutoZooms = (
         const sourceMetadata = sources[screenSourceId];
 
         if (!sourceMetadata) {
-            console.warn("Skipping zoom recalc: Missing source or events", screenSourceId);
+            console.warn("Skipping zoom recalc: Missing source", screenSourceId);
             return project.timeline.viewportMotions;
         }
 
@@ -30,15 +50,13 @@ export const recalculateAutoZooms = (
             project.settings.screen.crop
         );
 
-        const timeMapper = getTimeMapper(project.timeline.outputWindows);
-        const focusAreas = getAllFocusAreas(events, timeMapper, sourceMetadata.size);
-        const outputDuration = timeMapper.getOutputDuration();
+        // Use pre-computed focus areas from timeline
+        const focusAreas = project.timeline.focusAreas;
 
         return calculateZoomSchedule(
             project.settings.zoom,
             viewMapper,
-            focusAreas,
-            outputDuration
+            focusAreas
         );
     }
 

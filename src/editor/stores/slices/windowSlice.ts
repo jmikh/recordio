@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, ViewportMotion } from '../../../core/types';
-import { recalculateAutoZooms, shiftManualZooms } from '../../utils/zoomUtils';
+import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
 import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {
@@ -67,11 +67,19 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 .map(w => w.id === id ? newWindow : w)
                 .sort((a, b) => a.startMs - b.startMs);
 
+            // Recompute focus areas since output windows changed
+            const nextFocusAreas = computeFocusAreas(
+                { ...state.project, timeline: { ...state.project.timeline, outputWindows: nextOutputWindows } },
+                state.sources,
+                state.userEvents
+            );
+
             const tempProject = {
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    outputWindows: nextOutputWindows
+                    outputWindows: nextOutputWindows,
+                    focusAreas: nextFocusAreas
                 }
             };
 
@@ -79,7 +87,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             // Zoom Logic
             if (state.project.settings.zoom.autoZoom) {
-                nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
+                nextMotions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift Logic
                 // We handle Start and End changes separately if both changed (unlikely in single operation but possible)
@@ -237,18 +245,26 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             const nextOutputWindows = currentWindows.filter(w => w.id !== id);
 
+            // Recompute focus areas since output windows changed
+            const nextFocusAreas = computeFocusAreas(
+                { ...state.project, timeline: { ...state.project.timeline, outputWindows: nextOutputWindows } },
+                state.sources,
+                state.userEvents
+            );
+
             const tempProject = {
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    outputWindows: nextOutputWindows
+                    outputWindows: nextOutputWindows,
+                    focusAreas: nextFocusAreas
                 }
             };
 
             let nextMotions = state.project.timeline.viewportMotions;
 
             if (state.project.settings.zoom.autoZoom) {
-                nextMotions = recalculateAutoZooms(tempProject, state.sources, state.userEvents);
+                nextMotions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift: Delete range
                 // Pivot: outputStartMs

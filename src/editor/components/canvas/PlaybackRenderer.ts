@@ -12,12 +12,9 @@ import { getViewportStateAtTime } from '../../../core/viewportMotion';
 import { getSpotlightStateAtTime } from '../../../core/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
-import { type FocusArea } from '../../../core/focusManager';
+import { type FocusArea } from '../../../core/types';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
-
-// DEBUG: Set to true to render focus area overlay
-const DEBUG_ZOOM_FOCUS_AREAS = true;
 
 export interface RenderResources {
     canvas: HTMLCanvasElement;
@@ -36,7 +33,8 @@ export class PlaybackRenderer {
             userEvents: ProjectState['userEvents'],
             currentTimeMs: number,
             overrideCameraSettings?: CameraSettings,
-            focusAreas?: FocusArea[]
+            focusAreas?: FocusArea[],
+            showDebugOverlays?: boolean
         }
     ) {
         const { ctx, videoRefs } = resources;
@@ -95,8 +93,8 @@ export class PlaybackRenderer {
                 drawDragEffects(ctx, userEvents, sourceTimeMs, effectiveViewport, viewMapper);
             }
 
-            // DEBUG: Render zoom focus areas
-            if (DEBUG_ZOOM_FOCUS_AREAS && state.focusAreas) {
+            // DEBUG: Render zoom focus areas (controlled via DebugBar)
+            if (state.showDebugOverlays && state.focusAreas) {
                 paintZoomDebug(ctx, state.focusAreas, outputTimeMs, effectiveViewport, viewMapper);
             }
         }

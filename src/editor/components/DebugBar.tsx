@@ -7,6 +7,8 @@ export const DebugBar = () => {
     const project = useProjectData();
     const sources = useProjectSources();
     const userEvents = useProjectStore(s => s.userEvents);
+    const showDebugOverlays = useUIStore(s => s.showDebugOverlays);
+    const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
 
     const logFocusAreas = () => {
         const screenSource = sources[project.timeline.screenSourceId];
@@ -62,6 +64,21 @@ export const DebugBar = () => {
                 onClick={logFocusAreas}
             >
                 Log Focus Areas
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-4 bg-gray-700 mx-2" />
+
+            {/* Toggle Button for Debug Overlays */}
+            <button
+                className={`px-2 py-0.5 text-[10px] rounded cursor-pointer border ${showDebugOverlays
+                        ? 'bg-yellow-600 hover:bg-yellow-700 text-yellow-100 border-yellow-500'
+                        : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300 border-gray-600'
+                    }`}
+                onClick={toggleDebugOverlays}
+                title="Toggle focus area debug overlays on canvas"
+            >
+                {showDebugOverlays ? '🔍 Overlays ON' : '🔍 Overlays OFF'}
             </button>
         </div>
     );

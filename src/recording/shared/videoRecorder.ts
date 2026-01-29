@@ -447,6 +447,18 @@ export class VideoRecorder {
         const effectiveEvents = events || {
             mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
+
+        // Populate allEvents (required for FocusManager to calculate focus areas)
+        effectiveEvents.allEvents = [
+            ...(effectiveEvents.mouseClicks || []),
+            ...(effectiveEvents.keyboardEvents || []),
+            ...(effectiveEvents.drags || []),
+            ...(effectiveEvents.scrolls || []),
+            ...(effectiveEvents.typingEvents || []),
+            ...(effectiveEvents.urlChanges || []),
+            ...(effectiveEvents.hoveredCards || []),
+        ].sort((a, b) => a.timestamp - b.timestamp);
+
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
         await ProjectStorage.saveProject(project);
 

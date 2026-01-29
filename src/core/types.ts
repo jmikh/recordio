@@ -234,6 +234,16 @@ export interface UserEvents {
  * A Timeline represents the sequence of events.
  * It contains a single Recording and multiple OutputWindows.
  */
+/**
+ * Represents a focus area for zoom targeting.
+ * Stored in Timeline and computed from user events.
+ */
+export interface FocusArea {
+    timestamp: number;  // Output time when this focus area applies
+    rect: Rect;         // The focus rectangle in source coordinates
+    reason: string;     // Why this focus area was returned (event type, 'hover', or 'inactivity')
+}
+
 export interface Timeline {
     id: ID;
     /** Total duration of the timeline in milliseconds */
@@ -256,6 +266,8 @@ export interface Timeline {
     spotlights: Spotlight[];
     /** Optional caption data from webcam audio */
     captions?: Captions;
+    /** Cached focus areas computed from user events and output windows */
+    focusAreas: FocusArea[];
 }
 
 /**
@@ -390,6 +402,12 @@ export interface HoveredCardEvent extends BaseEvent {
     targetRect: Rect;
     endTime: number;
     cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
+}
+
+export interface HoverEvent extends BaseEvent {
+    type: typeof EventType.HOVER;
+    targetRect: Rect;
+    endTime: number;
 }
 
 export type BackgroundType = 'solid' | 'image';

@@ -52,7 +52,8 @@ export class EventRecorder {
     // Constants
     private readonly CLICK_THRESHOLD = 500;
     private readonly DRAG_DISTANCE_THRESHOLD = 5;
-    private readonly SCROLL_SESSION_TIMEOUT = 1000;
+    // 3 seconds for scroll session timeout
+    private readonly SCROLL_SESSION_TIMEOUT = 3000;
 
     // Scroll session timeout handle
     private scrollSessionTimeout: ReturnType<typeof setTimeout> | null = null;

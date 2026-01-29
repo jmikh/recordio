@@ -1,5 +1,8 @@
-import { EventType, type MousePositionEvent, type Rect, type Size, type UserEvents } from './types';
+import { EventType, type MousePositionEvent, type Rect, type Size, type UserEvents, type FocusArea, type HoverEvent } from './types';
 import { TimeMapper } from './timeMapper';
+
+// Re-export FocusArea from types for backward compatibility
+export type { FocusArea } from './types';
 
 // ============================================================================
 // Focus Manager
@@ -14,18 +17,29 @@ const K_MIN_HOVERED_CARD_DURATION_MS = 3000;
 // Inactivity threshold - if gap between current time and next target >= this, zoom out
 const K_INACTIVITY_THRESHOLD_MS = 3000;
 
+// Buffer timing constants (used for both start and end)
+// Events within this duration from start/end are skipped (or adjusted)
+const K_BUFFER_MS = 3000;
+
+// Range events must extend past this threshold to be included
+// Also defines the trigger zone at end: [duration - K_EXTEND_BUFFER_MS, duration - K_BUFFER_MS)
+const K_EXTEND_BUFFER_MS = 5000; // 3s + 2s buffer
+
 // Size of the hover detection box as a fraction of the larger dimension
 const K_HOVER_BOX_FRACTION = 0.1;
 
-
 /**
- * Return type for getNextFocusArea - contains both when and where to focus
+ * Union type for all targets that can be processed by FocusManager.
+ * Includes explicit events from UserEvents.allEvents and detected HoverEvents.
+ * All events extend BaseEvent; some have additional fields like endTime and targetRect.
  */
-export interface FocusArea {
-    timestamp: number;  // Output time when this focus area applies
-    rect: Rect;         // The focus rectangle in source coordinates
-    reason: string;     // Why this focus area was returned (event type, 'hover', or 'inactivity')
-}
+type FocusTarget = {
+    type: EventType;
+    timestamp: number;
+    mousePos: { x: number; y: number };
+    endTime?: number;
+    targetRect?: Rect;
+};
 
 /**
  * FocusManager handles the sequential emission of focus areas for the zoom schedule.
@@ -47,12 +61,17 @@ class FocusManager {
     private filteredMouseIdx: number;
     private hoverBoxSize: number;
     private readonly fullViewportRect: Rect;
+    private readonly outputDuration: number;
 
     // Pre-processed mouse positions (filtered and remapped to output time)
     private filteredMousePositions: MousePositionEvent[];
 
     // Pending target: when we detect inactivity, we save the target and return full viewport first
-    private pendingTarget: { type: 'event' | 'hover'; data: any } | null = null;
+    private pendingTarget: FocusTarget | null = null;
+
+    // Track when to emit final_zoomout (may be moved earlier by events in trigger zone)
+    private finalZoomoutTime: number;
+    private finalZoomoutEmitted: boolean = false;
 
     constructor(events: UserEvents, timeMapper: TimeMapper, sourceSize: Size) {
         this.events = events;
@@ -62,11 +81,17 @@ class FocusManager {
         this.filteredMouseIdx = 0;
         this.hoverBoxSize = Math.max(sourceSize.width, sourceSize.height) * K_HOVER_BOX_FRACTION;
         this.fullViewportRect = { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height };
+        this.outputDuration = timeMapper.outputDuration;
+
+        // Default final zoomout time (may be adjusted earlier by events in trigger zone)
+        this.finalZoomoutTime = Math.max(0, this.outputDuration - K_BUFFER_MS);
 
         // Pre-compute remapped mouse positions (filter out positions outside output windows)
+        // Also apply start buffer filtering for mouse positions
         this.filteredMousePositions = events.mousePositions
             .map(pos => this.remapEventToOutputTime(pos) as MousePositionEvent | null)
-            .filter((pos): pos is MousePositionEvent => pos !== null);
+            .filter((pos): pos is MousePositionEvent => pos !== null)
+            .filter(pos => pos.timestamp >= K_BUFFER_MS);
     }
 
     /**
@@ -87,11 +112,20 @@ class FocusManager {
         // Find the next target (hover or explicit event)
         const nextTarget = this.findNextTarget();
         if (!nextTarget) {
+            // No more events - emit final_zoomout if not already done
+            if (!this.finalZoomoutEmitted && this.outputDuration > 0) {
+                this.finalZoomoutEmitted = true;
+                return {
+                    timestamp: this.finalZoomoutTime,
+                    rect: this.fullViewportRect,
+                    reason: 'final_zoomout'
+                };
+            }
             return null;
         }
 
         // Check for inactivity gap
-        const targetStartTime = nextTarget.data.timestamp;
+        const targetStartTime = nextTarget.timestamp;
 
         const gap = targetStartTime - this.currentOutputTime;
 
@@ -109,44 +143,95 @@ class FocusManager {
 
     /**
      * Finds the next target (hover or explicit event) after currentOutputTime.
+     * Applies start/end buffer filtering to both events and hovers.
      */
-    private findNextTarget(): { type: 'event' | 'hover'; data: any } | null {
-        // Get the next valid explicit event
-        const nextEvent = this.peekNextValidEvent();
+    private findNextTarget(): FocusTarget | null {
+        const hardCutoffTime = this.outputDuration - K_BUFFER_MS;
+        const triggerZoneStart = this.outputDuration - K_EXTEND_BUFFER_MS;
 
-        // Determine the time limit for hover search
-        const hoverTimeLimit = nextEvent ? nextEvent.timestamp : Number.POSITIVE_INFINITY;
+        while (true) {
+            // Get the next valid explicit event
+            const nextEvent = this.peekNextValidEvent();
 
-        // Try to find a hover before the next explicit event
-        const hover = this.findNextHover(hoverTimeLimit);
+            // Determine the time limit for hover search
+            const hoverTimeLimit = nextEvent ? nextEvent.timestamp : Number.POSITIVE_INFINITY;
 
-        if (hover) {
-            // Found a hover - return it (it's before the explicit event)
-            return { type: 'hover', data: hover };
+            // Try to find a hover before the next explicit event
+            const hover = this.findNextHover(hoverTimeLimit);
+
+            // Pick the earlier target (hover or event)
+            let target: FocusTarget | null = null;
+            if (hover) {
+                target = hover;
+            } else if (nextEvent) {
+                this.allEventsIdx++; // Consume the event
+                target = nextEvent;
+            }
+
+            if (!target) {
+                return null;
+            }
+
+            const timestamp = target.timestamp;
+
+            // === START BUFFER LOGIC ===
+            // Targets starting before K_BUFFER_MS (3s)
+            if (timestamp < K_BUFFER_MS) {
+                const hasEndTime = 'endTime' in target && target.endTime !== undefined;
+
+                if (!hasEndTime) {
+                    // No endTime -> skip entirely, continue to find next target
+                    continue;
+                }
+
+                // Has endTime -> check if it extends past threshold (5s)
+                if (target.endTime !== undefined && target.endTime <= K_EXTEND_BUFFER_MS) {
+                    // Doesn't extend far enough -> skip
+                    continue;
+                }
+
+                // Target extends past threshold -> adjust timestamp to 3s
+                target = { ...target, timestamp: K_BUFFER_MS };
+            }
+
+            // === END BUFFER LOGIC ===
+            // Targets at or after hard cutoff (t-3s) -> skip completely
+            if (target.timestamp >= hardCutoffTime) {
+                continue;
+            }
+
+            // Targets in trigger zone [t-5s, t-3s) -> skip but adjust finalZoomoutTime
+            if (target.timestamp >= triggerZoneStart) {
+                // Move final zoomout earlier to this target's timestamp
+                this.finalZoomoutTime = Math.min(this.finalZoomoutTime, target.timestamp);
+                continue;
+            }
+
+            // Valid target found
+            return target;
         }
-
-        if (nextEvent) {
-            // No hover found, return the explicit event
-            this.allEventsIdx++; // Consume the event
-            return { type: 'event', data: nextEvent };
-        }
-
-        return null;
     }
 
     /**
      * Peeks at the next valid explicit event without consuming it.
      */
-    private peekNextValidEvent(): any | null {
+    private peekNextValidEvent(): FocusTarget | null {
         let idx = this.allEventsIdx;
 
         while (idx < this.events.allEvents.length) {
             const event = this.remapEventToOutputTime(this.events.allEvents[idx]);
 
-            // Skip events before currentOutputTime or not visible
-            if (!event || event.timestamp < this.currentOutputTime) {
+            // Skip events that are not visible in output
+            if (!event) {
                 idx++;
-                this.allEventsIdx = idx; // Consume skipped events
+                this.allEventsIdx = idx;
+                continue;
+            }
+
+            // Skip events before currentOutputTime
+            if (event.timestamp < this.currentOutputTime) {
+                idx++;
+                this.allEventsIdx = idx;
                 continue;
             }
 
@@ -258,10 +343,15 @@ class FocusManager {
                 // Found a valid hover - return bounding box directly
                 this.filteredMouseIdx = validHoverEndIdx + 1;
 
-                return {
+                const hoverEvent: HoverEvent = {
                     type: EventType.HOVER,
                     timestamp: startPos.timestamp,
                     endTime: validHoverEndTime,
+                    // mousePos is the center of the hover region
+                    mousePos: {
+                        x: (minX + maxX) / 2,
+                        y: (minY + maxY) / 2
+                    },
                     targetRect: {
                         x: minX,
                         y: minY,
@@ -269,6 +359,7 @@ class FocusManager {
                         height: maxY - minY
                     }
                 };
+                return hoverEvent;
             }
 
             searchIdx++;
@@ -286,16 +377,15 @@ class FocusManager {
     /**
      * Processes a target (hover or event) and returns its focus area.
      */
-    private processTarget(target: { type: 'event' | 'hover'; data: any }): FocusArea {
-        const data = target.data;
-        const timestamp = data.timestamp;
+    private processTarget(target: FocusTarget): FocusArea {
+        const timestamp = target.timestamp;
 
         // Advance currentOutputTime
         this.currentOutputTime = timestamp + 1;
 
         // For range events, try advancing to endTime - 500 if larger
-        if ('endTime' in data && data.endTime !== undefined) {
-            this.currentOutputTime = Math.max(this.currentOutputTime, data.endTime - 500);
+        if ('endTime' in target && target.endTime !== undefined) {
+            this.currentOutputTime = Math.max(this.currentOutputTime, target.endTime - 500);
         }
 
         // Advance filteredMouseIdx past this event's time
@@ -304,12 +394,12 @@ class FocusManager {
             this.filteredMouseIdx++;
         }
 
-        // Determine the reason string
-        const reason = target.type === 'hover' ? 'hover' : data.type;
+        // Use the type field directly as the reason
+        const reason = target.type;
 
         return {
             timestamp,
-            rect: this.getEventRect(data),
+            rect: this.getEventRect(target),
             reason,
         };
     }
@@ -317,26 +407,29 @@ class FocusManager {
 
 
     /**
-     * Gets the rect for an event. If the event has a targetRect property, returns it.
+     * Gets the rect for a target. If the target has a targetRect property, returns it.
      * Otherwise, returns a 100x100 box centered on the mouse position.
      */
-    private getEventRect(event: any): Rect {
+    private getEventRect(target: FocusTarget): Rect {
         // URL changes should show the full viewport
-        if (event.type === EventType.URLCHANGE) {
+        if (target.type === EventType.URLCHANGE) {
             return this.fullViewportRect;
         }
 
         let rect: Rect;
-        if ('targetRect' in event && event.targetRect) {
-            rect = event.targetRect;
-        } else {
+        if ('targetRect' in target && target.targetRect) {
+            rect = target.targetRect;
+        } else if ('mousePos' in target && target.mousePos) {
             // Fallback: 100x100 box centered on mouse position
             rect = {
-                x: event.mousePos.x - 50,
-                y: event.mousePos.y - 50,
+                x: target.mousePos.x - 50,
+                y: target.mousePos.y - 50,
                 width: 100,
                 height: 100,
             };
+        } else {
+            // No targetRect or mousePos - return full viewport
+            return this.fullViewportRect;
         }
 
         // Clamp rect to viewport bounds
