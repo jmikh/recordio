@@ -50,7 +50,8 @@ export class VideoRecorder {
         scrolls: [],
         typingEvents: [],
         urlChanges: [],
-        hoveredCards: []
+        hoveredCards: [],
+        allEvents: []
     };
 
     // Detection Result (Window Mode)
@@ -444,7 +445,7 @@ export class VideoRecorder {
         // 5. Create & Save Project
         // Use empty events for calculation if none provided, to avoid crash, but don't save them.
         const effectiveEvents = events || {
-            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: []
+            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
         await ProjectStorage.saveProject(project);

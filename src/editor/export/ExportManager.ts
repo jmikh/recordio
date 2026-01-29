@@ -236,7 +236,7 @@ export class ExportManager {
                     project: renderProject,
                     sources: sources,
                     userEvents: {
-                        mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: []
+                        mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
                     },
                     currentTimeMs: currentTimeMs
                 });
