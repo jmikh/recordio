@@ -32,7 +32,6 @@ export class EventRecorder {
         timestamp: 0,
         mousePos: { x: 0, y: 0 }
     };
-    private lastMouseTime = 0;
     private lastKeystrokeTime = -Infinity;
 
     // Typing Session State
@@ -49,17 +48,15 @@ export class EventRecorder {
 
     // Drag State
     private bufferedMouseDown: { event: any, timestamp: number } | null = null;
-    private dragPath: MousePositionEvent[] = [];
+    private dragStartPos: { x: number; y: number } | null = null;
 
     // Constants
-    private readonly MOUSE_POLL_INTERVAL = 100;
     private readonly TYPING_POLL_INTERVAL = 100;
     private readonly CLICK_THRESHOLD = 500;
     private readonly DRAG_DISTANCE_THRESHOLD = 5;
     private readonly SCROLL_SESSION_TIMEOUT = 1000;
 
     // Intervals
-    private mousePollInterval: any = null;
     private typingPollInterval: any = null;
 
     constructor(startTime: number) {
@@ -134,14 +131,11 @@ export class EventRecorder {
     }
 
     private startPolling() {
-        this.mousePollInterval = setInterval(this.pollMouse, this.MOUSE_POLL_INTERVAL);
         this.typingPollInterval = setInterval(this.pollTyping, this.TYPING_POLL_INTERVAL);
     }
 
     private stopPolling() {
-        if (this.mousePollInterval) clearInterval(this.mousePollInterval);
         if (this.typingPollInterval) clearInterval(this.typingPollInterval);
-        this.mousePollInterval = null;
         this.typingPollInterval = null;
     }
 
@@ -186,12 +180,16 @@ export class EventRecorder {
 
     private handleMouseMove = (e: MouseEvent) => {
         if (!this.isActive()) return;
+        const now = this.getRelativeTime();
         const scaled = dprScalePoint({ x: e.clientX, y: e.clientY });
+
         this.lastMousePos = {
             type: EventType.MOUSEPOS,
-            timestamp: this.getRelativeTime(),
+            timestamp: now,
             mousePos: scaled
         };
+
+        this.sendMessage(EventType.MOUSEPOS, this.lastMousePos);
     }
 
     private handlePointerDown = (e: PointerEvent) => {
@@ -218,23 +216,18 @@ export class EventRecorder {
             timestamp: now
         };
 
-        this.dragPath = [{
-            type: EventType.MOUSEPOS,
-            mousePos: scaledPos,
-            timestamp: now
-        }];
+        this.dragStartPos = scaledPos;
     }
 
     private handlePointerUp = (e: PointerEvent) => {
-        if (!this.bufferedMouseDown) return;
+        if (!this.bufferedMouseDown || !this.dragStartPos) return;
 
         const now = this.getRelativeTime();
         const diff = now - this.bufferedMouseDown.timestamp;
         const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
 
-        const startPt = this.dragPath[0].mousePos;
-        const dx = scaledPos.x - startPt.x;
-        const dy = scaledPos.y - startPt.y;
+        const dx = scaledPos.x - this.dragStartPos.x;
+        const dy = scaledPos.y - this.dragStartPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (diff <= this.CLICK_THRESHOLD && dist < this.DRAG_DISTANCE_THRESHOLD) {
@@ -243,21 +236,15 @@ export class EventRecorder {
                 timestamp: this.bufferedMouseDown.timestamp
             });
         } else {
-            this.dragPath.push({
-                type: EventType.MOUSEPOS,
-                mousePos: scaledPos,
-                timestamp: now
-            });
             this.sendMessage(EventType.MOUSEDRAG, {
                 timestamp: this.bufferedMouseDown.timestamp,
                 mousePos: this.bufferedMouseDown.event.mousePos,
-                path: this.dragPath,
                 endTime: now
             });
         }
 
         this.bufferedMouseDown = null;
-        this.dragPath = [];
+        this.dragStartPos = null;
     }
 
     private handleKeyDown = (e: KeyboardEvent) => {
@@ -363,59 +350,17 @@ export class EventRecorder {
 
     // --- Pollers ---
 
-    private lastSentMousePos: { x: number, y: number } | null = null;
-
-    private pollMouse = () => {
+    private pollTyping = () => {
         if (!this.isActive()) return;
 
         const now = this.getRelativeTime();
-        const realNow = Date.now();
 
-        // Check Scroll Session Timeout
+        // Check Scroll Session Timeout (moved from pollMouse)
         if (this.currentScrollSession) {
             if (now - this.currentScrollSession.lastScrollTime > this.SCROLL_SESSION_TIMEOUT) {
                 this.flushPendingScrollSession();
             }
         }
-
-        if (realNow - this.lastMouseTime >= this.MOUSE_POLL_INTERVAL) {
-            this.lastMouseTime = realNow;
-            const currentPos = this.lastMousePos.mousePos;
-
-            // Only send if position changed
-            if (!this.lastSentMousePos ||
-                currentPos.x !== this.lastSentMousePos.x ||
-                currentPos.y !== this.lastSentMousePos.y) {
-
-                this.sendMessage(EventType.MOUSEPOS, {
-                    ...this.lastMousePos,
-                    timestamp: now
-                });
-                this.lastSentMousePos = currentPos;
-            }
-
-            if (this.bufferedMouseDown) {
-                // For drag path, we also want to avoid duplicates
-                const lastPathPoint = this.dragPath.length > 0 ? this.dragPath[this.dragPath.length - 1] : null;
-
-                if (!lastPathPoint ||
-                    lastPathPoint.mousePos.x !== currentPos.x ||
-                    lastPathPoint.mousePos.y !== currentPos.y) {
-
-                    this.dragPath.push({
-                        type: EventType.MOUSEPOS,
-                        mousePos: currentPos,
-                        timestamp: now
-                    });
-                }
-            }
-        }
-    }
-
-    private pollTyping = () => {
-        if (!this.isActive()) return;
-
-        const now = this.getRelativeTime();
         const activeEl = this.getDeepActiveElement();
 
         // Check if editable

@@ -490,14 +490,6 @@ export class VideoRecorder {
 
         if (e.mousePos) offsetPoint(e.mousePos);
         if (e.targetRect) offsetRect(e.targetRect);
-
-        if (e.type === EventType.MOUSEDRAG) {
-            if (e.path) {
-                e.path.forEach((p: any) => { // Drag path is array of MousePositionEvent (BaseEvent)
-                    if (p.mousePos) offsetPoint(p.mousePos);
-                });
-            }
-        }
     }
 
     /**

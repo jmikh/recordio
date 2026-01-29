@@ -12,12 +12,12 @@ import { getViewportStateAtTime } from '../../../core/viewportMotion';
 import { getSpotlightStateAtTime } from '../../../core/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
-import { FocusManager, type FocusArea } from '../../../core/focusManager';
+import { type FocusArea } from '../../../core/focusManager';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
 import type { ProjectState } from '../../stores/useProjectStore';
 
 // DEBUG: Set to true to render focus area overlay
-const DEBUG_ZOOM_FOCUS_AREAS = false;
+const DEBUG_ZOOM_FOCUS_AREAS = true;
 
 export interface RenderResources {
     canvas: HTMLCanvasElement;
@@ -35,7 +35,8 @@ export class PlaybackRenderer {
             sources: ProjectState['sources'],
             userEvents: ProjectState['userEvents'],
             currentTimeMs: number,
-            overrideCameraSettings?: CameraSettings
+            overrideCameraSettings?: CameraSettings,
+            focusAreas?: FocusArea[]
         }
     ) {
         const { ctx, videoRefs } = resources;
@@ -91,20 +92,12 @@ export class PlaybackRenderer {
                 paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
             }
             if (project.settings.effects?.showMouseDrags) {
-                drawDragEffects(ctx, userEvents.drags, sourceTimeMs, effectiveViewport, viewMapper);
+                drawDragEffects(ctx, userEvents, sourceTimeMs, effectiveViewport, viewMapper);
             }
 
             // DEBUG: Render zoom focus areas
-            if (DEBUG_ZOOM_FOCUS_AREAS) {
-                const timeMapper = getTimeMapper(timeline.outputWindows);
-                const focusManager = new FocusManager(userEvents, timeMapper, screenSource.size);
-                const focusAreas: FocusArea[] = [];
-                let focusArea = focusManager.getNextFocusArea();
-                while (focusArea) {
-                    focusAreas.push(focusArea);
-                    focusArea = focusManager.getNextFocusArea();
-                }
-                paintZoomDebug(ctx, focusAreas, outputTimeMs, effectiveViewport, viewMapper);
+            if (DEBUG_ZOOM_FOCUS_AREAS && state.focusAreas) {
+                paintZoomDebug(ctx, state.focusAreas, outputTimeMs, effectiveViewport, viewMapper);
             }
         }
 

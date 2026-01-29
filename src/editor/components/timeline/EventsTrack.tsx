@@ -52,11 +52,7 @@ export const EventsTrack: React.FC<EventsTrackProps> = ({
                 {/* Drags */}
                 {events.drags?.map((d, i) => {
                     const startMs = d.timestamp;
-                    const endMs = (d.endTime !== undefined)
-                        ? d.endTime
-                        : (d.path && d.path.length > 0)
-                            ? d.path[d.path.length - 1].timestamp
-                            : startMs + 500;
+                    const endMs = d.endTime ?? startMs + 500;
 
                     const outputStart = timeMapper.mapSourceToOutputTime(startMs);
                     const outputEnd = timeMapper.mapSourceToOutputTime(endMs);

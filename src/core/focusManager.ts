@@ -1,4 +1,4 @@
-import { EventType, type Rect, type Size, type UserEvents } from './types';
+import { EventType, type MousePositionEvent, type Rect, type Size, type UserEvents } from './types';
 import { TimeMapper } from './timeMapper';
 
 // ============================================================================
@@ -6,7 +6,7 @@ import { TimeMapper } from './timeMapper';
 // ============================================================================
 
 // Minimum hover duration to be considered a valid hover (ms)
-const K_HOVER_MIN_DURATION_MS = 1000;
+const K_HOVER_MIN_DURATION_MS = 2000;
 
 // Minimum hovered card duration to process (ms)
 const K_MIN_HOVERED_CARD_DURATION_MS = 3000;
@@ -16,6 +16,7 @@ const K_INACTIVITY_THRESHOLD_MS = 3000;
 
 // Size of the hover detection box as a fraction of the larger dimension
 const K_HOVER_BOX_FRACTION = 0.1;
+
 
 /**
  * Return type for getNextFocusArea - contains both when and where to focus
@@ -35,15 +36,20 @@ export interface FocusArea {
  * - Processes explicit events (clicks, typing, scrolls, hovered cards)
  * - Detects hover regions from mouse positions between explicit events
  * - Returns full viewport on inactivity (gap >= threshold before next target)
+ * 
+ * NOTE: This class is internal. Use getAllFocusAreas() instead.
  */
-export class FocusManager {
+class FocusManager {
     private events: UserEvents;
     private timeMapper: TimeMapper;
     private currentOutputTime: number;
     private allEventsIdx: number;
-    private mousePositionIdx: number;
+    private filteredMouseIdx: number;
     private hoverBoxSize: number;
     private readonly fullViewportRect: Rect;
+
+    // Pre-processed mouse positions (filtered and remapped to output time)
+    private filteredMousePositions: MousePositionEvent[];
 
     // Pending target: when we detect inactivity, we save the target and return full viewport first
     private pendingTarget: { type: 'event' | 'hover'; data: any } | null = null;
@@ -53,9 +59,14 @@ export class FocusManager {
         this.timeMapper = timeMapper;
         this.currentOutputTime = 0;
         this.allEventsIdx = 0;
-        this.mousePositionIdx = 0;
+        this.filteredMouseIdx = 0;
         this.hoverBoxSize = Math.max(sourceSize.width, sourceSize.height) * K_HOVER_BOX_FRACTION;
         this.fullViewportRect = { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height };
+
+        // Pre-compute remapped mouse positions (filter out positions outside output windows)
+        this.filteredMousePositions = events.mousePositions
+            .map(pos => this.remapEventToOutputTime(pos) as MousePositionEvent | null)
+            .filter((pos): pos is MousePositionEvent => pos !== null);
     }
 
     /**
@@ -156,27 +167,23 @@ export class FocusManager {
     }
 
     /**
-     * Finds the next hover region from mouse positions, up to the time limit.
+     * Finds the next hover region from pre-filtered mouse positions, up to the time limit.
      * A hover is detected when the mouse stays within a small bounding box
      * for at least K_HOVER_MIN_DURATION_MS.
+     * 
+     * Returns targetRect (bounding box) instead of center point.
      */
-    // TODO: optimize!!!!
     private findNextHover(timeLimit: number): any | null {
-        const mousePositions = this.events.mousePositions;
-        let searchIdx = this.mousePositionIdx;
+        const positions = this.filteredMousePositions;
+        let searchIdx = this.filteredMouseIdx;
 
-        while (searchIdx < mousePositions.length) {
-            // Remap mouse position to output time
-            const startPos = this.remapEventToOutputTime(mousePositions[searchIdx]);
-            if (!startPos) {
-                searchIdx++;
-                continue;
-            }
+        while (searchIdx < positions.length) {
+            const startPos = positions[searchIdx];
 
             // Skip positions before currentOutputTime
             if (startPos.timestamp < this.currentOutputTime) {
                 searchIdx++;
-                this.mousePositionIdx = searchIdx;
+                this.filteredMouseIdx = searchIdx;
                 continue;
             }
 
@@ -186,8 +193,7 @@ export class FocusManager {
             }
 
             // Start hover detection at this position
-            let i = searchIdx;
-            let j = i;
+            let j = searchIdx;
             let minX = startPos.mousePos.x;
             let maxX = startPos.mousePos.x;
             let minY = startPos.mousePos.y;
@@ -195,26 +201,21 @@ export class FocusManager {
             let validHoverEndIdx = -1;
             let validHoverEndTime = -1;
             let lastTimestamp = startPos.timestamp;
-            let lastMousePos = startPos.mousePos;
 
-            while (j < mousePositions.length) {
-                const mappedPos = this.remapEventToOutputTime(mousePositions[j]);
-                if (!mappedPos) {
-                    j++;
-                    continue;
-                }
+            while (j < positions.length) {
+                const pos = positions[j];
 
                 // Check for gap between consecutive points
-                const gapFromPrev = mappedPos.timestamp - lastTimestamp;
+                const gapFromPrev = pos.timestamp - lastTimestamp;
                 if (gapFromPrev > K_HOVER_MIN_DURATION_MS) {
                     // Gap too large - hover sequence is broken
                     break;
                 }
 
-                // Stop if we cross the time limit (but we'll check virtual endpoint after)
-                if (mappedPos.timestamp >= timeLimit) break;
+                // Stop if we cross the time limit
+                if (pos.timestamp >= timeLimit) break;
 
-                const p = mappedPos.mousePos;
+                const p = pos.mousePos;
                 const newMinX = Math.min(minX, p.x);
                 const newMaxX = Math.max(maxX, p.x);
                 const newMinY = Math.min(minY, p.y);
@@ -222,18 +223,17 @@ export class FocusManager {
 
                 if ((newMaxX - newMinX) <= this.hoverBoxSize && (newMaxY - newMinY) <= this.hoverBoxSize) {
                     // Still within box
-                    const duration = mappedPos.timestamp - startPos.timestamp;
+                    const duration = pos.timestamp - startPos.timestamp;
                     if (duration >= K_HOVER_MIN_DURATION_MS) {
                         validHoverEndIdx = j;
-                        validHoverEndTime = mappedPos.timestamp;
+                        validHoverEndTime = pos.timestamp;
                     }
 
                     minX = newMinX;
                     maxX = newMaxX;
                     minY = newMinY;
                     maxY = newMaxY;
-                    lastTimestamp = mappedPos.timestamp;
-                    lastMousePos = p;
+                    lastTimestamp = pos.timestamp;
                     j++;
                 } else {
                     break; // Broken box
@@ -241,57 +241,43 @@ export class FocusManager {
             }
 
             // Virtual endpoint: check if hover extends to timeLimit
-            // (treating timeLimit as a virtual point at last seen position)
             if (timeLimit !== Number.POSITIVE_INFINITY) {
                 const gapToTimeLimit = timeLimit - lastTimestamp;
-                // Only extend if gap is not too large
                 if (gapToTimeLimit <= K_HOVER_MIN_DURATION_MS) {
-                    // Virtual point at timeLimit with last mouse position (same position, so box stays valid)
                     const duration = timeLimit - startPos.timestamp;
                     if (duration >= K_HOVER_MIN_DURATION_MS) {
-                        // Use timeLimit as the end time, but keep the last valid index for center calculation
                         validHoverEndTime = timeLimit;
                         if (validHoverEndIdx === -1) {
-                            validHoverEndIdx = j - 1; // Use last valid point for center calc
+                            validHoverEndIdx = j > searchIdx ? j - 1 : searchIdx;
                         }
                     }
                 }
             }
 
             if (validHoverEndIdx !== -1 && validHoverEndTime !== -1) {
-                // Found a valid hover!
-                // Calculate center of hover
-                const points: { x: number; y: number }[] = [];
-                for (let k = i; k <= validHoverEndIdx; k++) {
-                    const mp = this.remapEventToOutputTime(mousePositions[k]);
-                    if (mp) points.push(mp.mousePos);
-                }
-                // Include last mouse position if virtual endpoint was used
-                if (points.length === 0) {
-                    points.push(lastMousePos);
-                }
-                const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-                const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-
-                // Advance mousePositionIdx past this hover
-                this.mousePositionIdx = validHoverEndIdx + 1;
+                // Found a valid hover - return bounding box directly
+                this.filteredMouseIdx = validHoverEndIdx + 1;
 
                 return {
                     type: EventType.HOVER,
                     timestamp: startPos.timestamp,
                     endTime: validHoverEndTime,
-                    mousePos: { x: centerX, y: centerY }
+                    targetRect: {
+                        x: minX,
+                        y: minY,
+                        width: maxX - minX,
+                        height: maxY - minY
+                    }
                 };
             }
 
             searchIdx++;
         }
 
-        // No hover found - advance mousePositionIdx to timeLimit
-        while (this.mousePositionIdx < mousePositions.length) {
-            const mp = this.remapEventToOutputTime(mousePositions[this.mousePositionIdx]);
-            if (mp && mp.timestamp >= timeLimit) break;
-            this.mousePositionIdx++;
+        // No hover found - advance filteredMouseIdx to timeLimit
+        while (this.filteredMouseIdx < positions.length) {
+            if (positions[this.filteredMouseIdx].timestamp >= timeLimit) break;
+            this.filteredMouseIdx++;
         }
 
         return null;
@@ -312,12 +298,10 @@ export class FocusManager {
             this.currentOutputTime = Math.max(this.currentOutputTime, data.endTime - 500);
         }
 
-        // Advance mousePositionIdx past this event's time
-        const mousePositions = this.events.mousePositions;
-        while (this.mousePositionIdx < mousePositions.length) {
-            const mp = this.remapEventToOutputTime(mousePositions[this.mousePositionIdx]);
-            if (mp && mp.timestamp > this.currentOutputTime) break;
-            this.mousePositionIdx++;
+        // Advance filteredMouseIdx past this event's time
+        while (this.filteredMouseIdx < this.filteredMousePositions.length) {
+            if (this.filteredMousePositions[this.filteredMouseIdx].timestamp > this.currentOutputTime) break;
+            this.filteredMouseIdx++;
         }
 
         // Determine the reason string
@@ -337,16 +321,43 @@ export class FocusManager {
      * Otherwise, returns a 100x100 box centered on the mouse position.
      */
     private getEventRect(event: any): Rect {
-        if ('targetRect' in event && event.targetRect) {
-            return event.targetRect;
+        // URL changes should show the full viewport
+        if (event.type === EventType.URLCHANGE) {
+            return this.fullViewportRect;
         }
-        // Fallback: 100x100 box centered on mouse position
-        return {
-            x: event.mousePos.x - 50,
-            y: event.mousePos.y - 50,
-            width: 100,
-            height: 100,
-        };
+
+        let rect: Rect;
+        if ('targetRect' in event && event.targetRect) {
+            rect = event.targetRect;
+        } else {
+            // Fallback: 100x100 box centered on mouse position
+            rect = {
+                x: event.mousePos.x - 50,
+                y: event.mousePos.y - 50,
+                width: 100,
+                height: 100,
+            };
+        }
+
+        // Clamp rect to viewport bounds
+        return this.clampRectToViewport(rect);
+    }
+
+    /**
+     * Clamps a rect to stay within the viewport bounds.
+     */
+    private clampRectToViewport(rect: Rect): Rect {
+        const viewport = this.fullViewportRect;
+
+        // Clamp position to viewport bounds
+        let x = Math.max(0, Math.min(rect.x, viewport.width - 1));
+        let y = Math.max(0, Math.min(rect.y, viewport.height - 1));
+
+        // Clamp width/height so rect doesn't extend past viewport
+        const width = Math.min(rect.width, viewport.width - x);
+        const height = Math.min(rect.height, viewport.height - y);
+
+        return { x, y, width, height };
     }
 
     /**
@@ -383,4 +394,25 @@ export class FocusManager {
             timestamp: outputTime,
         };
     }
+}
+
+/**
+ * Helper function to extract all focus areas from a FocusManager.
+ * Creates a temporary FocusManager and iterates through all focus areas.
+ */
+export function getAllFocusAreas(
+    userEvents: UserEvents,
+    timeMapper: TimeMapper,
+    sourceSize: Size
+): FocusArea[] {
+    const focusManager = new FocusManager(userEvents, timeMapper, sourceSize);
+    const focusAreas: FocusArea[] = [];
+
+    let focusArea = focusManager.getNextFocusArea();
+    while (focusArea) {
+        focusAreas.push(focusArea);
+        focusArea = focusManager.getNextFocusArea();
+    }
+
+    return focusAreas;
 }

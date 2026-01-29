@@ -1,6 +1,7 @@
 import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ViewportMotion, type CameraSettings, type ScreenSettings } from './types';
 import { calculateZoomSchedule, ViewMapper } from './viewportMotion';
 import { TimeMapper } from './timeMapper';
+import { getAllFocusAreas } from './focusManager';
 
 /**
  * Functional logic for Project operations.
@@ -136,12 +137,14 @@ export class ProjectImpl {
         );
 
         const timeMapper = new TimeMapper(outputWindows);
+        const focusAreas = getAllFocusAreas(screenEvents, timeMapper, screenSource.size);
+        const outputDuration = timeMapper.getOutputDuration();
 
         const viewportMotions = calculateZoomSchedule(
             project.settings.zoom,
             viewMapper,
-            screenEvents,
-            timeMapper
+            focusAreas,
+            outputDuration
         );
 
         // Update timeline with recording properties

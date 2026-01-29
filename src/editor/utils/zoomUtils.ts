@@ -1,6 +1,7 @@
 
 import type { ID, Project, UserEvents, ViewportMotion } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
+import { getAllFocusAreas } from '../../core/focusManager';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 
 
@@ -30,12 +31,14 @@ export const recalculateAutoZooms = (
         );
 
         const timeMapper = getTimeMapper(project.timeline.outputWindows);
+        const focusAreas = getAllFocusAreas(events, timeMapper, sourceMetadata.size);
+        const outputDuration = timeMapper.getOutputDuration();
 
         return calculateZoomSchedule(
             project.settings.zoom,
             viewMapper,
-            events,
-            timeMapper
+            focusAreas,
+            outputDuration
         );
     }
 

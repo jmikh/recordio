@@ -1,18 +1,45 @@
-import type { DragEvent, Point, Rect, MousePositionEvent } from '../types';
+import type { DragEvent, Point, Rect, MousePositionEvent, UserEvents } from '../types';
 import type { ViewMapper } from '../viewMapper';
+
+/**
+ * Extracts the mouse positions that fall within the drag time range.
+ * Uses the start position from the drag event and the end position from the last mouse position in range.
+ */
+function getDragPath(
+    drag: DragEvent,
+    mousePositions: MousePositionEvent[]
+): MousePositionEvent[] {
+    // Start with the drag's initial position
+    const path: MousePositionEvent[] = [{
+        type: 'mousepos' as const,
+        timestamp: drag.timestamp,
+        mousePos: drag.mousePos
+    }];
+
+    // Find mouse positions within the drag time range
+    for (const pos of mousePositions) {
+        if (pos.timestamp > drag.timestamp && pos.timestamp <= drag.endTime) {
+            path.push(pos);
+        }
+        // Early exit once we're past the drag end time
+        if (pos.timestamp > drag.endTime) break;
+    }
+
+    return path;
+}
 
 /**
  * Draws drag effects.
  *
  * @param ctx 2D Canvas Context
- * @param dragEvents List of drag events
+ * @param userEvents User events containing drags and mousePositions
  * @param sourceTimeMs Current Source Time
  * @param viewport Current Viewport (Output Space)
  * @param viewMapper Transformation Wrapper
  */
 export function drawDragEffects(
     ctx: CanvasRenderingContext2D,
-    dragEvents: DragEvent[],
+    userEvents: UserEvents,
     sourceTimeMs: number,
     viewport: Rect,
     viewMapper: ViewMapper
@@ -24,18 +51,22 @@ export function drawDragEffects(
     // Calculate current zoom scale
     const zoomScale = viewMapper.getZoomScale(viewport);
 
-    for (const drag of dragEvents) {
-        if (drag.path.length === 0) continue;
+    const { drags, mousePositions } = userEvents;
 
-        const endTimestamp = drag.path[drag.path.length - 1].timestamp;
+    for (const drag of drags) {
+        const endTimestamp = drag.endTime;
 
         if (sourceTimeMs >= drag.timestamp && sourceTimeMs <= endTimestamp + DRAG_LAG_MS) {
+            // Derive the path from mousePositions
+            const path = getDragPath(drag, mousePositions);
+            if (path.length === 0) continue;
+
             // Calculate "Visual Time" (where the cursor appears to be)
             const rawVisualTime = sourceTimeMs - DRAG_LAG_MS;
 
             // Position is clamped to the drag path
             const positionTime = Math.max(drag.timestamp, Math.min(rawVisualTime, endTimestamp));
-            const currentPoint = getPointAtTime(drag.path, positionTime);
+            const currentPoint = getPointAtTime(path, positionTime);
             const screenPoint = viewMapper.projectToScreen(currentPoint, viewport);
 
             // Scale radius by zoom level

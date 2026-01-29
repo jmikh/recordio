@@ -3,6 +3,7 @@ import { useProjectStore, useProjectData, useProjectSources } from '../../stores
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
+import { useFocusAreas } from '../../hooks/useFocusAreas';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
@@ -31,6 +32,11 @@ export const CanvasContainer = () => {
     const timeMapper = useTimeMapper();
     const timeMapperRef = useRef(timeMapper);
     timeMapperRef.current = timeMapper;
+
+    // FocusAreas (for debug painter)
+    const focusAreas = useFocusAreas();
+    const focusAreasRef = useRef(focusAreas);
+    focusAreasRef.current = focusAreas;
 
     // DOM Refs for Resources
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
@@ -165,7 +171,8 @@ export const CanvasContainer = () => {
                         sources,
                         userEvents,
                         currentTimeMs: effectiveTimeMs,
-                        overrideCameraSettings: previewCameraSettingsRef.current || undefined
+                        overrideCameraSettings: previewCameraSettingsRef.current || undefined,
+                        focusAreas: focusAreasRef.current
                     });
                 }
             };
