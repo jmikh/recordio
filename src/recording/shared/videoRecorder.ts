@@ -396,6 +396,17 @@ export class VideoRecorder {
         // 2. Save Events (only if present)
         let eventsBlobId: string | undefined;
         if (events) {
+            // Populate allEvents before saving (required for FocusManager to calculate focus areas)
+            events.allEvents = [
+                ...(events.mouseClicks || []),
+                ...(events.keyboardEvents || []),
+                ...(events.drags || []),
+                ...(events.scrolls || []),
+                ...(events.typingEvents || []),
+                ...(events.urlChanges || []),
+                ...(events.hoveredCards || []),
+            ].sort((a, b) => a.timestamp - b.timestamp);
+
             const eventsBlob = new Blob([JSON.stringify(events)], { type: 'application/json' });
             eventsBlobId = `evt-${projectId}-screen`;
             await ProjectStorage.saveRecordingBlob(eventsBlobId, eventsBlob);
@@ -444,19 +455,10 @@ export class VideoRecorder {
 
         // 5. Create & Save Project
         // Use empty events for calculation if none provided, to avoid crash, but don't save them.
+        // Note: events.allEvents is already populated above before saving
         const effectiveEvents = events || {
             mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
-
-        // Populate allEvents (required for FocusManager to calculate focus areas)
-        effectiveEvents.allEvents = [
-            ...(effectiveEvents.mouseClicks || []),
-            ...(effectiveEvents.drags || []),
-            ...(effectiveEvents.scrolls || []),
-            ...(effectiveEvents.typingEvents || []),
-            ...(effectiveEvents.urlChanges || []),
-            ...(effectiveEvents.hoveredCards || []),
-        ].sort((a, b) => a.timestamp - b.timestamp);
 
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
         await ProjectStorage.saveProject(project);

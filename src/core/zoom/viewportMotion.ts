@@ -1,8 +1,7 @@
-import { type ViewportMotion, type Size, type Rect, type ZoomSettings, EventType } from './types';
-import { ViewMapper } from './viewMapper';
-import { type FocusArea } from './focusManager';
+import { type ViewportMotion, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
+import { ViewMapper } from '../viewMapper';
 
-export * from './viewMapper';
+export * from '../viewMapper';
 
 // ============================================================================
 // Core Abstractions
@@ -127,61 +126,10 @@ export function calculateZoomSchedule(
         }
     }
 
-    // Note: final_zoomout is now emitted by focusManager as a focus area
-    // and will be processed like any other focus area above
-
     return motions;
 }
 
-export function getMustSeeRect(
-    evt: any,
-    maxZoom: number,
-    viewMapper: ViewMapper
-): Rect {
-    const outputSize = viewMapper.outputVideoSize;
-    const aspectRatio = outputSize.width / outputSize.height;
-
-    // Default "Target" size (smaller than full zoom)
-    const minWidth = outputSize.width / (maxZoom * 2);
-    const minHeight = minWidth / aspectRatio;
-
-    let targetWidth = minWidth;
-    let targetHeight = minHeight;
-    let centerX = 0;
-    let centerY = 0;
-
-    if (evt.type === EventType.TYPING || evt.type === EventType.SCROLL) {
-        const targetRect = evt.targetRect || { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
-        const mappedTargetRect = viewMapper.inputToOutputRect(targetRect);
-
-        targetWidth = mappedTargetRect.width;
-        targetHeight = mappedTargetRect.height;
-
-        centerX = mappedTargetRect.x + mappedTargetRect.width / 2;
-        centerY = mappedTargetRect.y + mappedTargetRect.height / 2;
-    } else if (evt.type === EventType.URLCHANGE) {
-        // URL Change -> Full View
-        targetWidth = outputSize.width;
-        targetHeight = outputSize.height;
-        centerX = targetWidth / 2;
-        centerY = targetHeight / 2;
-
-    } else {
-        // Click / Hover
-        const mouseOut = viewMapper.inputToOutputPoint(evt.mousePos);
-        centerX = mouseOut.x;
-        centerY = mouseOut.y;
-    }
-
-    return clampViewport({
-        x: centerX - targetWidth / 2,
-        y: centerY - targetHeight / 2,
-        width: targetWidth,
-        height: targetHeight
-    }, outputSize);
-}
-
-export function getViewport(
+function getViewport(
     mustSeeRect: Rect,
     maxZoom: number,
     viewMapper: ViewMapper
@@ -243,26 +191,21 @@ function clampViewport(viewport: Rect, outputSize: Size): Rect {
     return { x, y, width, height };
 }
 
-
-
-
-
 // ============================================================================
 // Runtime Execution / Interpolation (Output Space)
 // ============================================================================
 
-
 /**
  * Calculates the exact state (x, y, width, height) of the viewport at a given output time.
- * 
- * It replays the sequence of viewport motions up to the requested time, 
+ *
+ * It replays the sequence of viewport motions up to the requested time,
  * handling interpolation between states.
- * 
+ *
  * **Intersection Behavior:**
  * If a new motion starts before the previous motion has completed (an intersection),
- * the previous motion is "interrupted" at the exact start time of the incoming motion. 
- * The calculated viewport state at that moment of interruption becomes the starting 
- * state for the new motion. This ensures continuous, smooth transitions even when 
+ * the previous motion is "interrupted" at the exact start time of the incoming motion.
+ * The calculated viewport state at that moment of interruption becomes the starting
+ * state for the new motion. This ensures continuous, smooth transitions even when
  * events occur rapidly and overlap.
  */
 export function getViewportStateAtTime(
@@ -296,8 +239,8 @@ export function getViewportStateAtTime(
         // It rules until it finishes OR until the next motion starts (interruption)
         const interruptionTime = nextMotion ? nextMotion.startTime : Number.POSITIVE_INFINITY;
 
-        // If the current output time is BEFORE this motion even starts, 
-        // implies we are in a gap before this motion. 
+        // If the current output time is BEFORE this motion even starts,
+        // implies we are in a gap before this motion.
         // We should just return the currentRect (result of previous chain).
         if (outputTimeMs < motion.startTime) {
             return currentRect;
@@ -306,7 +249,7 @@ export function getViewportStateAtTime(
         // We are currently INSIDE or AFTER this motion's start.
 
         // Define the target time we want to simulate to in this step.
-        // It is either the current lookup time (if we found our frame), 
+        // It is either the current lookup time (if we found our frame),
         // or the interruption time (start of next motion).
         const timeLimit = Math.min(outputTimeMs, interruptionTime);
 

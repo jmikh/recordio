@@ -11,6 +11,7 @@
 import { type Size } from '../../core/types';
 import { initSentry } from '../../utils/sentry';
 import { trackRecordingCompleted } from '../../core/analytics';
+import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 
 // Initialize Sentry for error tracking
@@ -66,6 +67,58 @@ async function saveState(newState: Partial<RecordingState>) {
 
     currentState = { ...currentState, ...newState };
     await chrome.storage.session.set({ [STORAGE_KEYS.RECORDING_STATE]: currentState });
+}
+
+// --- Badge Timer Management ---
+
+let badgeTimerIntervalId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Formats elapsed time for badge display.
+ * Uses M:SS format for under 10 minutes, MM:SS for 10+ minutes.
+ */
+function formatRecordingTime(elapsedMs: number): string {
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const paddedSeconds = seconds.toString().padStart(2, '0');
+    return `${minutes}:${paddedSeconds}`;
+}
+
+/**
+ * Updates the badge text with the current recording duration.
+ */
+function updateBadge() {
+    if (!currentState?.isRecording || !currentState.startTime) {
+        return;
+    }
+    const elapsed = Date.now() - currentState.startTime;
+    const text = formatRecordingTime(elapsed);
+    chrome.action.setBadgeText({ text });
+}
+
+/**
+ * Starts the badge timer. Sets the badge background color to secondary (lime green)
+ * and starts updating the badge text every second.
+ */
+function startBadgeTimer() {
+    chrome.action.setBadgeBackgroundColor({ color: SECONDARY_COLOR_HEX });
+    chrome.action.setBadgeTextColor({ color: TEXT_ON_SECONDARY_HEX });
+
+    // Update immediately, then every second
+    updateBadge();
+    badgeTimerIntervalId = setInterval(updateBadge, 1000);
+}
+
+/**
+ * Stops the badge timer and clears the badge.
+ */
+function stopBadgeTimer() {
+    if (badgeTimerIntervalId) {
+        clearInterval(badgeTimerIntervalId);
+        badgeTimerIntervalId = null;
+    }
+    chrome.action.setBadgeText({ text: '' });
 }
 
 // --- Offscreen Setup ---
@@ -297,6 +350,9 @@ async function startTabModeSession(payload: any, sessionId: string) {
         originalTabId: tabId
     });
 
+    // Start badge timer to show recording duration on extension icon
+    startBadgeTimer();
+
     chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
 }
 
@@ -394,6 +450,9 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             originalTabId: originalTabId || null
         });
 
+        // Start badge timer to show recording duration on extension icon
+        startBadgeTimer();
+
     } catch (error) {
         if (openedControllerTabId) {
             closeControllerTab(openedControllerTabId);
@@ -429,6 +488,9 @@ async function waitForCountdownDone(tabId: number | undefined, sessionId: string
 }
 
 async function handleStopSession(sendResponse: Function) {
+    // Stop badge timer first
+    stopBadgeTimer();
+
     await ensureState(); // Ensure state is loaded
     console.log("[Background] Sending STOP_RECORDING");
 

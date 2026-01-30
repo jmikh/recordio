@@ -107,10 +107,16 @@ export class EventRecorder {
         window.addEventListener('keydown', this.handleKeyDown, { capture: true });
         window.addEventListener('scroll', this.handleScroll, { capture: true });
 
-        // URL Changes
+        // URL Changes (popstate for back/forward, hashchange for hash navigation)
         window.addEventListener('popstate', this.handleUrlChange);
         window.addEventListener('hashchange', this.handleUrlChange);
         window.addEventListener('pagehide', this.handlePageUnload);
+
+        // Navigation API (Chrome 102+) - fires for ALL navigations including pushState/replaceState
+        // This works across isolated worlds unlike monkey-patching history
+        if ('navigation' in window) {
+            (window.navigation as EventTarget).addEventListener('navigate', this.handleUrlChange);
+        }
 
         // Focus changes (tab switching, window minimizing, etc.)
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -128,6 +134,11 @@ export class EventRecorder {
         window.removeEventListener('hashchange', this.handleUrlChange);
         window.removeEventListener('pagehide', this.handlePageUnload);
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+
+        // Remove Navigation API listener
+        if ('navigation' in window) {
+            (window.navigation as EventTarget).removeEventListener('navigate', this.handleUrlChange);
+        }
     }
 
 

@@ -1,6 +1,6 @@
 import { useProjectStore, useProjectData, useProjectSources } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
-import { getAllFocusAreas } from '../../core/focusManager';
+import { getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 import { ProjectDebugExporter } from '../debug';
 

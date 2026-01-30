@@ -1,7 +1,6 @@
 import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ViewportMotion, type CameraSettings, type ScreenSettings } from './types';
-import { calculateZoomSchedule, ViewMapper } from './viewportMotion';
+import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './timeMapper';
-import { getAllFocusAreas } from './focusManager';
 
 /**
  * Functional logic for Project operations.

@@ -8,7 +8,7 @@ import { drawCaptions } from '../../../core/painters/captionPainter';
 import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 
 
-import { getViewportStateAtTime } from '../../../core/viewportMotion';
+import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';

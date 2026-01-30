@@ -176,7 +176,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     toggleDebugBar: () => set((state) => ({ showDebugBar: !state.showDebugBar })),
 
     // Debug Overlays
-    showDebugOverlays: false,
+    showDebugOverlays: true,
     toggleDebugOverlays: () => set((state) => ({ showDebugOverlays: !state.showDebugOverlays })),
 
     reset: () => set({

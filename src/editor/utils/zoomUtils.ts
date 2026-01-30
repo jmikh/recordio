@@ -1,7 +1,6 @@
 
 import type { ID, Project, UserEvents, ViewportMotion, FocusArea } from '../../core/types';
-import { calculateZoomSchedule, ViewMapper } from '../../core/viewportMotion';
-import { getAllFocusAreas } from '../../core/focusManager';
+import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 
 /**
