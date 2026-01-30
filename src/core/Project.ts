@@ -20,7 +20,7 @@ export class ProjectImpl {
                 frameRate: 60,
 
                 zoom: {
-                    maxZoom: 1.5,
+                    maxZoom: 2,
                     autoZoom: true,
                     maxZoomDurationMs: 750,
                     minZoomDurationMs: 200
