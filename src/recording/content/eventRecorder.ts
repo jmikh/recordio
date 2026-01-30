@@ -12,7 +12,7 @@
  * Events are sent to background via CAPTURE_USER_EVENT messages.
  */
 
-import { EventType, type MousePositionEvent, type Rect, type Size } from '../../core/types';
+import { EventType, type BaseEvent, type Rect } from '../../core/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';
@@ -27,7 +27,7 @@ export class EventRecorder {
     private startTime = 0;
 
     // State for various event types
-    private lastMousePos: MousePositionEvent = {
+    private lastMousePos: BaseEvent = {
         type: EventType.MOUSEPOS,
         timestamp: 0,
         mousePos: { x: 0, y: 0 }
@@ -46,12 +46,10 @@ export class EventRecorder {
     private currentScrollSession: { startTime: number; targetRect: Rect; lastScrollTime: number } | null = null;
 
     // Drag State
-    private bufferedMouseDown: { event: any, timestamp: number } | null = null;
-    private dragStartPos: { x: number; y: number } | null = null;
+    private dragStartPos: { x: number; y: number; timestamp: number } | null = null;
 
     // Constants
-    private readonly CLICK_THRESHOLD = 500;
-    private readonly DRAG_DISTANCE_THRESHOLD = 5;
+    private readonly DRAG_DISTANCE_THRESHOLD = 50;
     // 3 seconds for scroll session timeout
     private readonly SCROLL_SESSION_TIMEOUT = 3000;
 
@@ -103,6 +101,7 @@ export class EventRecorder {
     private attachListeners() {
         // Use 'true' for capture phase where appropriate to mirror original logic
         document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
+        document.addEventListener('click', this.handleClick, { capture: true });
         document.addEventListener('pointerdown', this.handlePointerDown, { capture: true });
         document.addEventListener('pointerup', this.handlePointerUp, { capture: true });
         window.addEventListener('keydown', this.handleKeyDown, { capture: true });
@@ -119,6 +118,7 @@ export class EventRecorder {
 
     private removeListeners() {
         document.removeEventListener('mousemove', this.handleMouseMove, { capture: true });
+        document.removeEventListener('click', this.handleClick, { capture: true });
         document.removeEventListener('pointerdown', this.handlePointerDown, { capture: true });
         document.removeEventListener('pointerup', this.handlePointerUp, { capture: true });
         window.removeEventListener('keydown', this.handleKeyDown, { capture: true });
@@ -172,59 +172,51 @@ export class EventRecorder {
         this.sendMessage(EventType.MOUSEPOS, this.lastMousePos);
     }
 
-    private handlePointerDown = (e: PointerEvent) => {
+    private handleClick = (e: MouseEvent) => {
         if (!this.isActive()) return;
 
         // Interaction should flush pending sessions
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
 
-        const dpr = window.devicePixelRatio || 1;
-        let elementMeta: Partial<Size> = {};
-        if (e.target instanceof Element) {
-            const rect = e.target.getBoundingClientRect();
-            elementMeta = { width: rect.width * dpr, height: rect.height * dpr };
-        }
+        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
+        const now = this.getRelativeTime();
+
+        this.sendMessage(EventType.CLICK, {
+            mousePos: scaledPos,
+            timestamp: now
+        });
+    }
+
+    private handlePointerDown = (e: PointerEvent) => {
+        if (!this.isActive()) return;
 
         const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
-        this.bufferedMouseDown = {
-            event: {
-                mousePos: scaledPos,
-                ...elementMeta,
-            },
-            timestamp: now
-        };
-
-        this.dragStartPos = scaledPos;
+        // Store drag start position and time
+        this.dragStartPos = { ...scaledPos, timestamp: now };
     }
 
     private handlePointerUp = (e: PointerEvent) => {
-        if (!this.bufferedMouseDown || !this.dragStartPos) return;
+        if (!this.dragStartPos) return;
 
-        const now = this.getRelativeTime();
-        const diff = now - this.bufferedMouseDown.timestamp;
         const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
+        const now = this.getRelativeTime();
 
         const dx = scaledPos.x - this.dragStartPos.x;
         const dy = scaledPos.y - this.dragStartPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (diff <= this.CLICK_THRESHOLD && dist < this.DRAG_DISTANCE_THRESHOLD) {
-            this.sendMessage(EventType.CLICK, {
-                ...this.bufferedMouseDown.event,
-                timestamp: this.bufferedMouseDown.timestamp
-            });
-        } else {
+        // Only emit drag if moved beyond threshold (clicks are handled by click event)
+        if (dist >= this.DRAG_DISTANCE_THRESHOLD) {
             this.sendMessage(EventType.MOUSEDRAG, {
-                timestamp: this.bufferedMouseDown.timestamp,
-                mousePos: this.bufferedMouseDown.event.mousePos,
+                timestamp: this.dragStartPos.timestamp,
+                mousePos: { x: this.dragStartPos.x, y: this.dragStartPos.y },
                 endTime: now
             });
         }
 
-        this.bufferedMouseDown = null;
         this.dragStartPos = null;
     }
 
@@ -361,7 +353,6 @@ export class EventRecorder {
         this.sendMessage(EventType.URLCHANGE, {
             timestamp: this.getRelativeTime(),
             mousePos: this.lastMousePos.mousePos,
-            url: window.location.href
         }, true);
     }
 

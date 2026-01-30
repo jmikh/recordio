@@ -209,20 +209,20 @@ export interface SourceMetadata {
  * Contains raw recorded interactions categorized by type.
  */
 export interface UserEvents {
-    mouseClicks: MouseClickEvent[];
-    mousePositions: MousePositionEvent[]; // mousepos
+    mouseClicks: BaseEvent[];
+    mousePositions: BaseEvent[];
     keyboardEvents: KeyboardEvent[];
     drags: DragEvent[];
-    scrolls: ScrollEvent[];
-    typingEvents: TypingEvent[];
-    urlChanges: UrlChangeEvent[];
+    scrolls: BaseEvent[];
+    typingEvents: BaseEvent[];
+    urlChanges: BaseEvent[];
     hoveredCards: HoveredCardEvent[];
 
     /**
      * Pre-sorted aggregate of all non-mouse-position events (clicks, typing, drags, scrolls, urlChanges, hoveredCards).
      * Computed at runtime when events are loaded in useProjectStore. NOT persisted to storage.
      */
-    allEvents: (MouseClickEvent | KeyboardEvent | DragEvent | ScrollEvent | TypingEvent | UrlChangeEvent | HoveredCardEvent)[];
+    allEvents: BaseEvent[];
 }
 
 
@@ -358,22 +358,11 @@ export interface BaseEvent {
     type: EventType;
     timestamp: number;
     mousePos: Point;
+    targetRect?: Rect;
+    endTime?: number;
 }
 
-export interface MouseClickEvent extends BaseEvent {
-    type: typeof EventType.CLICK;
-}
-
-export interface MousePositionEvent extends BaseEvent {
-    type: typeof EventType.MOUSEPOS;
-}
-
-export interface UrlChangeEvent extends BaseEvent {
-    type: typeof EventType.URLCHANGE;
-    url: string;
-    title?: string;
-}
-
+// KeyboardEvent has unique fields beyond BaseEvent
 export interface KeyboardEvent extends BaseEvent {
     type: typeof EventType.KEYDOWN;
     key: string;
@@ -385,29 +374,12 @@ export interface KeyboardEvent extends BaseEvent {
     tagName?: string;
 }
 
-export interface ScrollEvent extends BaseEvent {
-    type: typeof EventType.SCROLL;
-    targetRect: Rect;
-    endTime: number;
-}
-
-export interface TypingEvent extends BaseEvent {
-    type: typeof EventType.TYPING;
-    targetRect: Rect;
-    endTime: number;
-}
-
+// HoveredCardEvent has unique cornerRadius field
 export interface HoveredCardEvent extends BaseEvent {
     type: typeof EventType.HOVERED_CARD;
     targetRect: Rect;
     endTime: number;
     cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
-}
-
-export interface HoverEvent extends BaseEvent {
-    type: typeof EventType.HOVER;
-    targetRect: Rect;
-    endTime: number;
 }
 
 export type BackgroundType = 'solid' | 'image';

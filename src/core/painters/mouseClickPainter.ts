@@ -1,4 +1,4 @@
-import type { MouseClickEvent, Rect } from '../types';
+import type { BaseEvent, Rect } from '../types';
 import type { ViewMapper } from '../viewMapper';
 
 /**
@@ -12,17 +12,14 @@ import type { ViewMapper } from '../viewMapper';
  */
 export function paintMouseClicks(
     ctx: CanvasRenderingContext2D,
-    events: MouseClickEvent[],
+    events: BaseEvent[],
     currentTime: number,
     viewport: Rect,
     viewMapper: ViewMapper
 ) {
     // Show clicks that happened recently (e.g. within last 500ms)
     const CLICK_DURATION = 500;
-    const MOUSE_BASE_RADIUS = 60;
-
-    // Calculate current zoom scale
-    const zoomScale = viewMapper.getZoomScale(viewport);
+    const MOUSE_BASE_RADIUS = 40;
 
     // Optimisation: We could binary search if sorted, but linear fits for small event counts
     for (const click of events) {
@@ -35,7 +32,7 @@ export function paintMouseClicks(
 
             // Draw Expanding Expanding Circle
             // Scale radius by zoom level
-            const currentRadius = MOUSE_BASE_RADIUS * zoomScale * progress;
+            const currentRadius = MOUSE_BASE_RADIUS * progress;
             const opacity = 0.5 * (1 - progress);
 
             ctx.beginPath();

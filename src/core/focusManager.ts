@@ -1,4 +1,4 @@
-import { EventType, type MousePositionEvent, type Rect, type Size, type UserEvents, type FocusArea, type HoverEvent } from './types';
+import { EventType, type BaseEvent, type Rect, type Size, type UserEvents, type FocusArea } from './types';
 import { TimeMapper } from './timeMapper';
 
 // Re-export FocusArea from types for backward compatibility
@@ -29,19 +29,6 @@ const K_EXTEND_BUFFER_MS = 5000; // 3s + 2s buffer
 const K_HOVER_BOX_FRACTION = 0.1;
 
 /**
- * Union type for all targets that can be processed by FocusManager.
- * Includes explicit events from UserEvents.allEvents and detected HoverEvents.
- * All events extend BaseEvent; some have additional fields like endTime and targetRect.
- */
-type FocusTarget = {
-    type: EventType;
-    timestamp: number;
-    mousePos: { x: number; y: number };
-    endTime?: number;
-    targetRect?: Rect;
-};
-
-/**
  * FocusManager handles the sequential emission of focus areas for the zoom schedule.
  * It maintains internal state tracking the current output time position and emits
  * events in priority order as they occur after that position.
@@ -64,10 +51,10 @@ class FocusManager {
     private readonly outputDuration: number;
 
     // Pre-processed mouse positions (filtered and remapped to output time)
-    private filteredMousePositions: MousePositionEvent[];
+    private filteredMousePositions: BaseEvent[];
 
     // Pending target: when we detect inactivity, we save the target and return full viewport first
-    private pendingTarget: FocusTarget | null = null;
+    private pendingTarget: BaseEvent | null = null;
 
     // Track when to emit final_zoomout (may be moved earlier by events in trigger zone)
     private finalZoomoutTime: number;
@@ -89,8 +76,8 @@ class FocusManager {
         // Pre-compute remapped mouse positions (filter out positions outside output windows)
         // Also apply start buffer filtering for mouse positions
         this.filteredMousePositions = events.mousePositions
-            .map(pos => this.remapEventToOutputTime(pos) as MousePositionEvent | null)
-            .filter((pos): pos is MousePositionEvent => pos !== null)
+            .map(pos => this.remapEventToOutputTime(pos) as BaseEvent | null)
+            .filter((pos): pos is BaseEvent => pos !== null)
             .filter(pos => pos.timestamp >= K_BUFFER_MS);
     }
 
@@ -145,7 +132,7 @@ class FocusManager {
      * Finds the next target (hover or explicit event) after currentOutputTime.
      * Applies start/end buffer filtering to both events and hovers.
      */
-    private findNextTarget(): FocusTarget | null {
+    private findNextTarget(): BaseEvent | null {
         const hardCutoffTime = this.outputDuration - K_BUFFER_MS;
         const triggerZoneStart = this.outputDuration - K_EXTEND_BUFFER_MS;
 
@@ -160,7 +147,7 @@ class FocusManager {
             const hover = this.findNextHover(hoverTimeLimit);
 
             // Pick the earlier target (hover or event)
-            let target: FocusTarget | null = null;
+            let target: BaseEvent | null = null;
             if (hover) {
                 target = hover;
             } else if (nextEvent) {
@@ -215,7 +202,7 @@ class FocusManager {
     /**
      * Peeks at the next valid explicit event without consuming it.
      */
-    private peekNextValidEvent(): FocusTarget | null {
+    private peekNextValidEvent(): BaseEvent | null {
         let idx = this.allEventsIdx;
 
         while (idx < this.events.allEvents.length) {
@@ -343,7 +330,7 @@ class FocusManager {
                 // Found a valid hover - return bounding box directly
                 this.filteredMouseIdx = validHoverEndIdx + 1;
 
-                const hoverEvent: HoverEvent = {
+                const hoverEvent: BaseEvent = {
                     type: EventType.HOVER,
                     timestamp: startPos.timestamp,
                     endTime: validHoverEndTime,
@@ -377,7 +364,7 @@ class FocusManager {
     /**
      * Processes a target (hover or event) and returns its focus area.
      */
-    private processTarget(target: FocusTarget): FocusArea {
+    private processTarget(target: BaseEvent): FocusArea {
         const timestamp = target.timestamp;
 
         // Advance currentOutputTime
@@ -410,7 +397,7 @@ class FocusManager {
      * Gets the rect for a target. If the target has a targetRect property, returns it.
      * Otherwise, returns a 100x100 box centered on the mouse position.
      */
-    private getEventRect(target: FocusTarget): Rect {
+    private getEventRect(target: BaseEvent): Rect {
         // URL changes should show the full viewport
         if (target.type === EventType.URLCHANGE) {
             return this.fullViewportRect;

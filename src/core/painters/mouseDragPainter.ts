@@ -1,4 +1,4 @@
-import type { DragEvent, Point, Rect, MousePositionEvent, UserEvents } from '../types';
+import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../types';
 import type { ViewMapper } from '../viewMapper';
 
 /**
@@ -7,10 +7,10 @@ import type { ViewMapper } from '../viewMapper';
  */
 function getDragPath(
     drag: DragEvent,
-    mousePositions: MousePositionEvent[]
-): MousePositionEvent[] {
+    mousePositions: BaseEvent[]
+): BaseEvent[] {
     // Start with the drag's initial position
-    const path: MousePositionEvent[] = [{
+    const path: BaseEvent[] = [{
         type: 'mousepos' as const,
         timestamp: drag.timestamp,
         mousePos: drag.mousePos
@@ -46,10 +46,7 @@ export function drawDragEffects(
 ) {
     // Add a visual lag (there is a mismatch between the drag events and the screen events)
     const DRAG_LAG_MS = 80;
-    const MOUSE_BASE_RADIUS = 60;
-
-    // Calculate current zoom scale
-    const zoomScale = viewMapper.getZoomScale(viewport);
+    const MOUSE_BASE_RADIUS = 40;
 
     const { drags, mousePositions } = userEvents;
 
@@ -70,7 +67,7 @@ export function drawDragEffects(
             const screenPoint = viewMapper.projectToScreen(currentPoint, viewport);
 
             // Scale radius by zoom level
-            const scaledRadius = MOUSE_BASE_RADIUS * zoomScale;
+            const scaledRadius = MOUSE_BASE_RADIUS;
             const opacity = 0.3;
 
             // Draw Cursor Representative
@@ -82,7 +79,7 @@ export function drawDragEffects(
     }
 }
 
-function getPointAtTime(path: MousePositionEvent[], time: number): Point {
+function getPointAtTime(path: BaseEvent[], time: number): Point {
     // Find segment [p1, p2] where p1.t <= time <= p2.t
     if (path.length === 0) return { x: 0, y: 0 };
     if (time <= path[0].timestamp) return { x: path[0].mousePos.x, y: path[0].mousePos.y };
