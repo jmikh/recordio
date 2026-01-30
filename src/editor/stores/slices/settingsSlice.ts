@@ -84,7 +84,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
 
             // Check for any zoom related changes
             const zoomUpdates = updates.zoom || {};
-            const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.autoZoom !== undefined;
+            const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.isAuto !== undefined;
             const durationChanged = zoomUpdates.maxZoomDurationMs !== undefined &&
                 zoomUpdates.maxZoomDurationMs !== currentSettings.zoom.maxZoomDurationMs;
 
@@ -93,11 +93,11 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
             const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
                 nextSettings.outputSize.height !== currentSettings.outputSize.height;
 
-            if (sizeChanged && !nextSettings.zoom.autoZoom) {
+            if (sizeChanged && !nextSettings.zoom.isAuto) {
                 nextActions = [];
-            } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.autoZoom) {
+            } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.isAuto) {
                 nextActions = recalculateAutoZooms(nextProject, state.sources);
-            } else if (durationChanged && !nextSettings.zoom.autoZoom) {
+            } else if (durationChanged && !nextSettings.zoom.isAuto) {
                 // Manual Zoom Duration Update
                 nextActions = updateManualZoomDuration(
                     nextActions,

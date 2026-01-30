@@ -33,7 +33,7 @@ export const recalculateAutoZooms = (
     sources: Record<ID, import('../../core/types').SourceMetadata>
 ): ZoomAction[] => {
     // 1. If Auto Zoom is ON, regenerate completely
-    if (project.settings.zoom.autoZoom) {
+    if (project.settings.zoom.isAuto) {
         const screenSourceId = project.timeline.screenSourceId;
         const sourceMetadata = sources[screenSourceId];
 

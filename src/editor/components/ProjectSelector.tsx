@@ -5,6 +5,7 @@ import { ProjectDebugImporter } from '../debug';
 
 import { ProjectCard } from '../../components/ui/ProjectCard';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { LogoLink } from '../../components/ui/LogoLink';
 
 interface ProjectSelectorProps {
     error?: string;
@@ -67,7 +68,7 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                 <div className="w-full max-w-4xl p-8 pb-4 flex flex-col gap-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-tertiary">Recordio Projects</h1>
+                            <LogoLink imgClassName="h-8" />
                             <p className="text-text-main mt-1">Select a project to continue editing</p>
                         </div>
                         <PrimaryButton

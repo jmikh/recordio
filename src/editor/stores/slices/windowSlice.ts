@@ -86,7 +86,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             let nextActions = state.project.timeline.zoomActions;
 
             // Zoom Logic
-            if (state.project.settings.zoom.autoZoom) {
+            if (state.project.settings.zoom.isAuto) {
                 nextActions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift Logic
@@ -122,7 +122,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     const durationDelta = newDuration - oldDuration;
 
                     // Handle motions in manual mode
-                    if (!state.project.settings.zoom.autoZoom) {
+                    if (!state.project.settings.zoom.isAuto) {
                         // Split motions into three categories:
                         // 1. Before this window (outputStartMs) - unchanged
                         // 2. Within this window (outputStartMs to outputStartMs + oldDuration) - need adjustment
@@ -263,7 +263,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             let nextActions = state.project.timeline.zoomActions;
 
-            if (state.project.settings.zoom.autoZoom) {
+            if (state.project.settings.zoom.isAuto) {
                 nextActions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift: Delete range

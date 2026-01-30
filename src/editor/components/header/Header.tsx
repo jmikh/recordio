@@ -71,7 +71,7 @@ export const Header = () => {
             trackExportCompleted({
                 quality,
                 duration_seconds: Math.floor(totalDurationMs / 1000),
-                auto_zoom: project.settings.zoom.autoZoom,
+                auto_zoom: project.settings.zoom.isAuto,
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
             });

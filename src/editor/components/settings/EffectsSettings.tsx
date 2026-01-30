@@ -35,7 +35,7 @@ export const EffectsSettings = () => {
         // 1. Clear motions
         clearZoomActions();
         // 2. Disable auto zoom to prevent recalc
-        updateSettings({ zoom: { ...zoomSettings, autoZoom: false } });
+        updateSettings({ zoom: { ...zoomSettings, isAuto: false } });
     };
 
     const handleMaxDurationChange = (val: number) => {
@@ -64,10 +64,10 @@ export const EffectsSettings = () => {
             <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Zoom</label>
                 <MultiToggle
-                    value={zoomSettings.autoZoom ? 'auto' : 'manual'}
+                    value={zoomSettings.isAuto ? 'auto' : 'manual'}
                     onChange={(val: string) => {
                         const isAuto = val === 'auto';
-                        updateSettings({ zoom: { ...zoomSettings, autoZoom: isAuto } });
+                        updateSettings({ zoom: { ...zoomSettings, isAuto: isAuto } });
                     }}
                     options={[
                         { value: 'auto', label: 'Auto' },

@@ -34,7 +34,7 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
             // This prevents recalc from overwriting our manual work
             const nextSettings = {
                 ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, autoZoom: false }
+                zoom: { ...state.project.settings.zoom, isAuto: false }
             };
 
             return {
@@ -59,7 +59,7 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
 
             const nextSettings = {
                 ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, autoZoom: false }
+                zoom: { ...state.project.settings.zoom, isAuto: false }
             };
 
             return {
@@ -83,7 +83,7 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
 
             const nextSettings = {
                 ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, autoZoom: false }
+                zoom: { ...state.project.settings.zoom, isAuto: false }
             };
 
             return {

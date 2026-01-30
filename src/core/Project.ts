@@ -21,7 +21,7 @@ export class ProjectImpl {
 
                 zoom: {
                     maxZoom: 2,
-                    autoZoom: true,
+                    isAuto: true,
                     maxZoomDurationMs: 750,
                     minZoomDurationMs: 200
                 },

@@ -96,7 +96,7 @@ export interface BackgroundSettings {
 
 export interface ZoomSettings {
     maxZoom: number;
-    autoZoom: boolean;
+    isAuto: boolean;
     maxZoomDurationMs: number;
     minZoomDurationMs: number;
 }
