@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow, ViewportMotion } from '../../../core/types';
+import type { ID, OutputWindow, ZoomAction } from '../../../core/types';
 import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
 import { useUIStore } from '../useUIStore';
 
@@ -83,11 +83,11 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextMotions = state.project.timeline.viewportMotions;
+            let nextActions = state.project.timeline.zoomActions;
 
             // Zoom Logic
             if (state.project.settings.zoom.autoZoom) {
-                nextMotions = recalculateAutoZooms(tempProject, state.sources);
+                nextActions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift Logic
                 // We handle Start and End changes separately if both changed (unlikely in single operation but possible)
@@ -101,7 +101,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     const delta = oldStart - newWindow.startMs;
                     // For left-side trim, pivot is at the start of the window in output time
                     const pivot = outputStartMs;
-                    nextMotions = shiftManualZooms(nextMotions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
+                    nextActions = shiftManualZooms(nextActions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
                 }
 
                 // 2. Check End Change (Trimming/Extending from RIGHT)
@@ -112,7 +112,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 if (newWindow.endMs !== oldEnd) {
                     const delta = newWindow.endMs - oldEnd;
                     const pivot = outputStartMs + oldDuration;
-                    nextMotions = shiftManualZooms(nextMotions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
+                    nextActions = shiftManualZooms(nextActions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
                 }
 
                 // 3. Check Speed Change
@@ -129,11 +129,11 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                         // 3. After this window (> outputStartMs + oldDuration) - shift by durationDelta
 
                         const windowOutputEnd = outputStartMs + oldDuration;
-                        const beforeWindow: ViewportMotion[] = [];
-                        const withinWindow: ViewportMotion[] = [];
-                        const afterWindow: ViewportMotion[] = [];
+                        const beforeWindow: ZoomAction[] = [];
+                        const withinWindow: ZoomAction[] = [];
+                        const afterWindow: ZoomAction[] = [];
 
-                        nextMotions.forEach(m => {
+                        nextActions.forEach(m => {
                             if (m.outputEndTimeMs <= outputStartMs) {
                                 beforeWindow.push(m);
                             } else if (m.outputEndTimeMs <= windowOutputEnd) {
@@ -143,8 +143,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                             }
                         });
 
-                        // Adjust motions within the window
-                        let adjustedWithinWindow: ViewportMotion[] = [];
+                        // Adjust actions within the window
+                        let adjustedWithinWindow: ZoomAction[] = [];
 
                         // Speed changes should SCALE the motions, not shift them like trimming
                         // A motion at output time 4s in a 10s window at 1x speed
@@ -202,8 +202,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                             outputEndTimeMs: m.outputEndTimeMs + durationDelta
                         }));
 
-                        // Combine all motions
-                        nextMotions = [
+                        // Combine all actions
+                        nextActions = [
                             ...beforeWindow,
                             ...adjustedWithinWindow,
                             ...shiftedAfterWindow
@@ -219,7 +219,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        viewportMotions: nextMotions
+                        zoomActions: nextActions
                     },
                     updatedAt: new Date()
                 }
@@ -261,16 +261,16 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextMotions = state.project.timeline.viewportMotions;
+            let nextActions = state.project.timeline.zoomActions;
 
             if (state.project.settings.zoom.autoZoom) {
-                nextMotions = recalculateAutoZooms(tempProject, state.sources);
+                nextActions = recalculateAutoZooms(tempProject, state.sources);
             } else {
                 // Manual Shift: Delete range
                 // Pivot: outputStartMs
                 // Delta: -Duration
                 const duration = getWindowDuration(targetWindow);
-                nextMotions = shiftManualZooms(nextMotions, outputStartMs, -duration, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
+                nextActions = shiftManualZooms(nextActions, outputStartMs, -duration, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
             }
 
             return {
@@ -279,7 +279,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        viewportMotions: nextMotions
+                        zoomActions: nextActions
                     },
                     updatedAt: new Date()
                 }

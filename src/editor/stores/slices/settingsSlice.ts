@@ -76,7 +76,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
             // Recalculate Zooms if necessary conditions met
             // 1. Zoom settings changed
             // 2. Padding changed
-            let nextMotions = state.project.timeline.viewportMotions;
+            let nextActions = state.project.timeline.zoomActions;
 
             // Check padding inside the now-merged settings or from updates
             // Using merged settings is safer
@@ -94,13 +94,13 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                 nextSettings.outputSize.height !== currentSettings.outputSize.height;
 
             if (sizeChanged && !nextSettings.zoom.autoZoom) {
-                nextMotions = [];
+                nextActions = [];
             } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.autoZoom) {
-                nextMotions = recalculateAutoZooms(nextProject, state.sources);
+                nextActions = recalculateAutoZooms(nextProject, state.sources);
             } else if (durationChanged && !nextSettings.zoom.autoZoom) {
                 // Manual Zoom Duration Update
-                nextMotions = updateManualZoomDuration(
-                    nextMotions,
+                nextActions = updateManualZoomDuration(
+                    nextActions,
                     nextSettings.zoom.maxZoomDurationMs
                 );
             }
@@ -110,7 +110,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                     ...nextProject,
                     timeline: {
                         ...nextProject.timeline,
-                        viewportMotions: nextMotions
+                        zoomActions: nextActions
                     }
                 }
             };

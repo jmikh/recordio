@@ -1,5 +1,5 @@
 
-import type { ID, Project, UserEvents, ViewportMotion, FocusArea } from '../../core/types';
+import type { ID, Project, UserEvents, ZoomAction, FocusArea } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 
@@ -31,7 +31,7 @@ export const computeFocusAreas = (
 export const recalculateAutoZooms = (
     project: Project,
     sources: Record<ID, import('../../core/types').SourceMetadata>
-): ViewportMotion[] => {
+): ZoomAction[] => {
     // 1. If Auto Zoom is ON, regenerate completely
     if (project.settings.zoom.autoZoom) {
         const screenSourceId = project.timeline.screenSourceId;
@@ -39,7 +39,7 @@ export const recalculateAutoZooms = (
 
         if (!sourceMetadata) {
             console.warn("Skipping zoom recalc: Missing source", screenSourceId);
-            return project.timeline.viewportMotions;
+            return project.timeline.zoomActions;
         }
 
         const viewMapper = new ViewMapper(
@@ -59,7 +59,7 @@ export const recalculateAutoZooms = (
         );
     }
 
-    return project.timeline.viewportMotions;
+    return project.timeline.zoomActions;
 };
 
 
@@ -68,15 +68,15 @@ export const recalculateAutoZooms = (
  * If extending backwards causes a collision with the previous block, it is clamped.
  */
 export const updateManualZoomDuration = (
-    motions: ViewportMotion[],
+    actions: ZoomAction[],
     targetDurationMs: number
-): ViewportMotion[] => {
+): ZoomAction[] => {
     // Sort to handle left-to-right collision logic
-    const sortedMotions = [...motions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
-    const result: ViewportMotion[] = [];
+    const sortedActions = [...actions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+    const result: ZoomAction[] = [];
     let leftBoundary = 0;
 
-    for (const m of sortedMotions) {
+    for (const m of sortedActions) {
         // Calculate ideal start time based on fixed end time
         let newEndTime = m.outputEndTimeMs;
         let newDuration = targetDurationMs;
@@ -107,19 +107,18 @@ export const updateManualZoomDuration = (
  * @param deltaMs The amount of time added (positive) or removed (negative)
  */
 export const shiftManualZooms = (
-    motions: ViewportMotion[],
+    actions: ZoomAction[],
     pivotTimeMs: number,
     deltaMs: number,
     minZoomDurationMs: number,
     maxZoomDurationMs: number
-): ViewportMotion[] => {
-    // Clone to avoid mutation
-    let nextMotions = [...motions];
+): ZoomAction[] => {
+    let nextActions = [...actions];
 
     const absDelta = Math.abs(deltaMs);
 
     if (deltaMs > 0) {
-        return nextMotions.map(m => {
+        return nextActions.map(m => {
             // For simple implementation: if the motion's end time is > pivot, shift it.
             if (m.outputEndTimeMs > pivotTimeMs) {
                 return {
@@ -136,14 +135,14 @@ export const shiftManualZooms = (
 
         // 1. Filter out items that end strictly inside the deleted range
         // Note: Items that *start* inside but *end* outside will be shifted (shortened from start)
-        const candidates = nextMotions.filter(m => {
+        const candidates = nextActions.filter(m => {
             if (m.outputEndTimeMs > deleteRangeStart && m.outputEndTimeMs <= deleteRangeEnd) {
                 return false;
             }
             return true;
         });
 
-        const result: ViewportMotion[] = [];
+        const result: ZoomAction[] = [];
         let leftBoundary = 0;
         console.log("deleteRangeStart", deleteRangeStart);
         console.log("deleteRangeEnd", deleteRangeEnd);

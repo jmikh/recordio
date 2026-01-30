@@ -1,4 +1,4 @@
-import type { ViewportMotion } from '../../../../core/types';
+import type { ZoomAction } from '../../../../core/types';
 
 /**
  * Calculate boundary constraints for a zoom block.
@@ -8,24 +8,24 @@ import type { ViewportMotion } from '../../../../core/types';
  */
 export function getZoomBlockBounds(
     targetMotionId: string | null,
-    motions: ViewportMotion[],
+    actions: ZoomAction[],
     timelineEnd: number
 ): { prevEnd: number; nextStart: number } {
     // Find the current block position to determine what's "before" and "after"
-    const currentMotion = targetMotionId
-        ? motions.find(m => m.id === targetMotionId)
+    const currentAction = targetMotionId
+        ? actions.find(m => m.id === targetMotionId)
         : null;
 
-    // If no current motion, default to finding closest to start
-    const referenceEnd = currentMotion?.outputEndTimeMs ?? 0;
-    const referenceStart = currentMotion
-        ? currentMotion.outputEndTimeMs - currentMotion.durationMs
+    // If no current action, default to finding closest to start
+    const referenceEnd = currentAction?.outputEndTimeMs ?? 0;
+    const referenceStart = currentAction
+        ? currentAction.outputEndTimeMs - currentAction.durationMs
         : 0;
 
     let prevEnd = 0;
     let nextStart = timelineEnd;
 
-    for (const m of motions) {
+    for (const m of actions) {
         if (m.id === targetMotionId) continue;
         const mEnd = m.outputEndTimeMs;
         const mStart = m.outputEndTimeMs - m.durationMs;

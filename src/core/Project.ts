@@ -1,4 +1,4 @@
-import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ViewportMotion, type CameraSettings, type ScreenSettings } from './types';
+import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type CameraSettings, type ScreenSettings } from './types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './timeMapper';
 
@@ -89,7 +89,7 @@ export class ProjectImpl {
                 // For now, let's assume a project must have a recording eventually.
                 // We'll init with empty values that need to be populated.
                 screenSourceId: '',
-                viewportMotions: [],
+                zoomActions: [],
                 spotlights: [],
                 outputWindows: [],
                 focusAreas: []
@@ -103,7 +103,7 @@ export class ProjectImpl {
      * 
      * NOTE: This assumes the UserEvents are already saved externally and referenced by the SourceMetadata.
      * We do NOT copy events into the project anymore.
-     * However, for ViewportMotion calculation (auto-zoom), we NEED the events.
+     * However, for ZoomAction calculation (auto-zoom), we NEED the events.
      * So we pass them in as arguments just for calculation (not storage).
      */
     static createFromSource(
@@ -138,8 +138,7 @@ export class ProjectImpl {
 
         const timeMapper = new TimeMapper(outputWindows);
         const focusAreas = getAllFocusAreas(screenEvents, timeMapper, screenSource.size);
-
-        const viewportMotions = calculateZoomSchedule(
+        const zoomActions = calculateZoomSchedule(
             project.settings.zoom,
             viewMapper,
             focusAreas
@@ -150,7 +149,7 @@ export class ProjectImpl {
             ...project.timeline,
             screenSourceId: screenSource.id,
             cameraSourceId: cameraSource?.id,
-            viewportMotions: viewportMotions,
+            zoomActions: zoomActions,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
             outputWindows: outputWindows,
@@ -231,7 +230,7 @@ export class ProjectImpl {
             borderWidth: screen.borderWidth * scale,
         });
 
-        const newViewportMotions: ViewportMotion[] = project.timeline.viewportMotions.map(m => ({
+        const newZoomActions: ZoomAction[] = project.timeline.zoomActions.map((m: ZoomAction) => ({
             ...m,
             rect: scaleRect(m.rect)
         }));
@@ -254,7 +253,7 @@ export class ProjectImpl {
             },
             timeline: {
                 ...project.timeline,
-                viewportMotions: newViewportMotions
+                zoomActions: newZoomActions
             }
         };
     }

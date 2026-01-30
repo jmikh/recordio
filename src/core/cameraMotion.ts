@@ -1,4 +1,4 @@
-import { type ViewportMotion, type Size, type Rect, type CameraSettings } from './types';
+import { type ZoomAction, type Size, type Rect, type CameraSettings } from './types';
 
 /**
  * Anchor point for camera positioning.
@@ -118,17 +118,17 @@ function applyEasing(t: number): number {
  * @returns The current camera state including scale factor
  */
 export function getCameraStateAtTime(
-    motions: ViewportMotion[],
+    actions: ZoomAction[],
     currentTimeMs: number,
     outputSize: Size,
     shrinkScale: number
 ): CameraMotionState {
-    if (motions.length === 0) {
+    if (actions.length === 0) {
         return { sizeScale: 1.0, isTransitioning: false };
     }
 
     // Find first zoom-in motion (viewport becomes smaller than full screen)
-    const firstZoomIn = motions.find(m => !isFullScreen(m.rect, outputSize));
+    const firstZoomIn = actions.find((m: ZoomAction) => !isFullScreen(m.rect, outputSize));
 
     if (!firstZoomIn) {
         // No zoom-ins found, camera stays full size
@@ -153,7 +153,7 @@ export function getCameraStateAtTime(
 
     // Find first zoom-out to full screen (after a zoom-in has occurred)
     // We look for the first motion that returns to full screen AND comes after the first zoom-in
-    const firstZoomOutToFull = motions.find(m =>
+    const firstZoomOutToFull = actions.find((m: ZoomAction) =>
         isFullScreen(m.rect, outputSize) &&
         m.outputEndTimeMs > zoomInEndMs
     );

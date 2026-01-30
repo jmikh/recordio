@@ -1,13 +1,13 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, ViewportMotion } from '../../../core/types';
+import type { ID, ZoomAction } from '../../../core/types';
 import { useUIStore } from '../useUIStore';
 
-export interface ViewportMotionSlice {
-    updateViewportMotion: (id: ID, motion: Partial<ViewportMotion>) => void;
-    addViewportMotion: (motion: ViewportMotion) => void;
-    deleteViewportMotion: (id: ID) => void;
-    clearViewportMotions: () => void;
+export interface ZoomActionSlice {
+    updateZoomAction: (id: ID, action: Partial<ZoomAction>) => void;
+    addZoomAction: (action: ZoomAction) => void;
+    deleteZoomAction: (id: ID) => void;
+    clearZoomActions: () => void;
 }
 
 // Helper to capture snapshot (excluding DOM refs to avoid circular references)
@@ -17,18 +17,18 @@ const getSnapshot = () => {
     return serializableState;
 };
 
-export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ViewportMotionSlice> = (set, _get, store) => ({
-    updateViewportMotion: (id, updates) => {
+export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomActionSlice> = (set, _get, store) => ({
+    updateZoomAction: (id, updates) => {
         if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateViewportMotion', id, updates);
+            console.log('[Action] updateZoomAction', id, updates);
         }
         set(state => {
-            const motions = state.project.timeline.viewportMotions;
-            const idx = motions.findIndex(m => m.id === id);
+            const actions = state.project.timeline.zoomActions;
+            const idx = actions.findIndex(m => m.id === id);
             if (idx === -1) return state;
 
-            const nextMotions = [...motions];
-            nextMotions[idx] = { ...nextMotions[idx], ...updates };
+            const nextActions = [...actions];
+            nextActions[idx] = { ...nextActions[idx], ...updates };
 
             // FORCE AUTO ZOOM OFF if it was on
             // This prevents recalc from overwriting our manual work
@@ -44,17 +44,17 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        viewportMotions: nextMotions
+                        zoomActions: nextActions
                     }
                 }
             };
         });
     },
 
-    addViewportMotion: (motion) => {
-        console.log('[Action] addViewportMotion', motion);
+    addZoomAction: (action) => {
+        console.log('[Action] addZoomAction', action);
         set(state => {
-            const motions = [...state.project.timeline.viewportMotions, motion]
+            const actions = [...state.project.timeline.zoomActions, action]
                 .sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
 
             const nextSettings = {
@@ -69,17 +69,17 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        viewportMotions: motions
+                        zoomActions: actions
                     }
                 }
             };
         });
     },
 
-    deleteViewportMotion: (id) => {
-        console.log('[Action] deleteViewportMotion', id);
+    deleteZoomAction: (id) => {
+        console.log('[Action] deleteZoomAction', id);
         set(state => {
-            const motions = state.project.timeline.viewportMotions.filter(m => m.id !== id);
+            const actions = state.project.timeline.zoomActions.filter(m => m.id !== id);
 
             const nextSettings = {
                 ...state.project.settings,
@@ -93,15 +93,15 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        viewportMotions: motions
+                        zoomActions: actions
                     }
                 }
             };
         });
     },
 
-    clearViewportMotions: () => {
-        console.log('[Action] clearViewportMotions');
+    clearZoomActions: () => {
+        console.log('[Action] clearZoomActions');
         set(state => {
             return {
                 uiSnapshot: getSnapshot(), // Implicit snapshot
@@ -109,7 +109,7 @@ export const createViewportMotionSlice: StateCreator<ProjectState, [["zustand/su
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        viewportMotions: []
+                        zoomActions: []
                     }
                 }
             };

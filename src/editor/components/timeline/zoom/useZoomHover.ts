@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ViewportMotion } from '../../../../core/types';
+import type { ZoomAction } from '../../../../core/types';
 import type { DragState } from './useZoomDrag';
 // Assuming Project and related types availability
 
@@ -21,7 +21,7 @@ export function useZoomHover(
     setEditingZoom: (id: string | null) => void,
     outputDuration: number
 ) {
-    const addViewportMotion = useProjectStore(s => s.addViewportMotion);
+    const addZoomAction = useProjectStore(s => s.addZoomAction);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
     /**
@@ -43,10 +43,10 @@ export function useZoomHover(
             return;
         }
 
-        const motions = timeline.viewportMotions || [];
+        const actions = timeline.zoomActions || [];
 
-        // 1. Check if we are inside an existing motion
-        const isInside = motions.some((m: ViewportMotion) => {
+        // 1. Check if we are inside an existing action
+        const isInside = actions.some((m: ZoomAction) => {
             const start = m.outputEndTimeMs - m.durationMs;
             const end = m.outputEndTimeMs;
             return mouseOutputTimeMs > start && mouseOutputTimeMs < end;
@@ -59,7 +59,7 @@ export function useZoomHover(
 
         // 2. Calculate Available Duration backwards (to the left)
         let prevEnd = 0;
-        for (const m of motions) {
+        for (const m of actions) {
             if (m.outputEndTimeMs <= mouseOutputTimeMs) {
                 if (m.outputEndTimeMs > prevEnd) {
                     prevEnd = m.outputEndTimeMs;
@@ -109,19 +109,19 @@ export function useZoomHover(
         // Create Motion
         // Determine initial rect
         const startTime = hoverInfo.outputEndTime - hoverInfo.durationMs;
-        const motions = timeline.viewportMotions || [];
+        const actions = timeline.zoomActions || [];
 
         // Find the closest previous motion
         // We look for a motion that ends at or before our start time
         // If multiple, we want the one that ends latest (closest to us)
-        const previousMotion = motions
-            .filter((m: ViewportMotion) => m.outputEndTimeMs <= startTime)
-            .sort((a: ViewportMotion, b: ViewportMotion) => b.outputEndTimeMs - a.outputEndTimeMs)[0];
+        const previousAction = actions
+            .filter((m: ZoomAction) => m.outputEndTimeMs <= startTime)
+            .sort((a: ZoomAction, b: ZoomAction) => b.outputEndTimeMs - a.outputEndTimeMs)[0];
 
         let initialRect;
 
-        if (previousMotion) {
-            initialRect = { ...previousMotion.rect };
+        if (previousAction) {
+            initialRect = { ...previousAction.rect };
         } else {
             // Default to half viewport centered
             const { width, height } = project.settings.outputSize;
@@ -133,7 +133,7 @@ export function useZoomHover(
             };
         }
 
-        const newMotion: ViewportMotion = {
+        const newAction: ZoomAction = {
             id: crypto.randomUUID(),
             outputEndTimeMs: hoverInfo.outputEndTime,
             durationMs: hoverInfo.durationMs,
@@ -142,8 +142,8 @@ export function useZoomHover(
             type: 'manual'
         };
 
-        addViewportMotion(newMotion);
-        setEditingZoom(newMotion.id);
+        addZoomAction(newAction);
+        setEditingZoom(newAction.id);
         setHoverInfo(null);
     };
 

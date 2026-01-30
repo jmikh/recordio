@@ -260,8 +260,8 @@ export interface Timeline {
     screenSourceId: ID;
     /** Optional ID of the camera source */
     cameraSourceId?: ID;
-    /** Viewport motion keyframes for zoom/pan effects */
-    viewportMotions: ViewportMotion[];
+    /** Zoom action keyframes for zoom/pan effects */
+    zoomActions: ZoomAction[];
     /** Spotlight regions for spotlight effect (non-overlapping) */
     spotlights: Spotlight[];
     /** Optional caption data from webcam audio */
@@ -287,10 +287,10 @@ export interface OutputWindow {
 
 
 // ==========================================
-// VIEWPORT MOTIONS
+// ZOOM ACTIONS
 // ==========================================
 
-export interface ViewportMotion {
+export interface ZoomAction {
     id: ID;
     outputEndTimeMs: TimeMs;
     durationMs: TimeMs;

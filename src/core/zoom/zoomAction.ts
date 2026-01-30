@@ -1,4 +1,4 @@
-import { type ViewportMotion, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
+import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
 import { ViewMapper } from '../viewMapper';
 
 export * from '../viewMapper';
@@ -11,7 +11,7 @@ export function calculateZoomSchedule(
     zoomSettings: ZoomSettings,
     viewMapper: ViewMapper,
     focusAreas: FocusArea[]
-): ViewportMotion[] {
+): ZoomAction[] {
     const { maxZoom, maxZoomDurationMs, minZoomDurationMs } = zoomSettings;
 
     if (focusAreas.length === 0) return [];
@@ -23,7 +23,7 @@ export function calculateZoomSchedule(
             (inner.y + inner.height) <= (outer.y + outer.height);
     };
 
-    const motions: ViewportMotion[] = [];
+    const actions: ZoomAction[] = [];
     const outputVideoSize = viewMapper.outputVideoSize;
     let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
     let lastMustSeeRect: Rect = lastViewport;
@@ -57,15 +57,15 @@ export function calculateZoomSchedule(
         const mustSeeFits = isRectContained(mustSeeRect, lastViewport);
         const sizeChanged = Math.abs(targetViewport.width - lastViewport.width) > 0.1;
 
-        let shouldGenerateMotion = (!mustSeeFits || sizeChanged)
+        let shouldGenerateAction = (!mustSeeFits || sizeChanged)
 
-        if (shouldGenerateMotion) {
+        if (shouldGenerateAction) {
             const currentStartOutputTime = area.timestamp - maxZoomDurationMs;
 
-            // Check for intersection with previous motion
-            if (motions.length > 0) {
-                const prevMotion = motions[motions.length - 1];
-                const prevEndOutputTime = prevMotion.outputEndTimeMs;
+            // Check for intersection with previous action
+            if (actions.length > 0) {
+                const prevAction = actions[actions.length - 1];
+                const prevEndOutputTime = prevAction.outputEndTimeMs;
 
                 if (currentStartOutputTime < prevEndOutputTime) {
                     // Intersection detected - try shrinking duration
@@ -73,7 +73,7 @@ export function calculateZoomSchedule(
 
                     if (availableGap >= minZoomDurationMs) {
                         // Shrink duration to fit in the gap
-                        motions.push({
+                        actions.push({
                             id: crypto.randomUUID(),
                             outputEndTimeMs: area.timestamp,
                             durationMs: availableGap,
@@ -93,13 +93,13 @@ export function calculateZoomSchedule(
                         };
 
                         const mergedViewport = getViewport(boundingRect, maxZoom, viewMapper);
-                        prevMotion.rect = mergedViewport;
+                        prevAction.rect = mergedViewport;
                         lastViewport = mergedViewport;
                         lastMustSeeRect = boundingRect;
                     }
                 } else {
                     // No intersection - add normally
-                    motions.push({
+                    actions.push({
                         id: crypto.randomUUID(),
                         outputEndTimeMs: area.timestamp,
                         durationMs: maxZoomDurationMs,
@@ -111,8 +111,8 @@ export function calculateZoomSchedule(
                     lastMustSeeRect = mustSeeRect;
                 }
             } else {
-                // First motion - add normally
-                motions.push({
+                // First action - add normally
+                actions.push({
                     id: crypto.randomUUID(),
                     outputEndTimeMs: area.timestamp,
                     durationMs: maxZoomDurationMs,
@@ -126,7 +126,7 @@ export function calculateZoomSchedule(
         }
     }
 
-    return motions;
+    return actions;
 }
 
 function getViewport(
@@ -198,25 +198,25 @@ function clampViewport(viewport: Rect, outputSize: Size): Rect {
 /**
  * Calculates the exact state (x, y, width, height) of the viewport at a given output time.
  *
- * It replays the sequence of viewport motions up to the requested time,
+ * It replays the sequence of zoom actions up to the requested time,
  * handling interpolation between states.
  *
  * **Intersection Behavior:**
- * If a new motion starts before the previous motion has completed (an intersection),
- * the previous motion is "interrupted" at the exact start time of the incoming motion.
+ * If a new action starts before the previous action has completed (an intersection),
+ * the previous action is "interrupted" at the exact start time of the incoming action.
  * The calculated viewport state at that moment of interruption becomes the starting
- * state for the new motion. This ensures continuous, smooth transitions even when
+ * state for the new action. This ensures continuous, smooth transitions even when
  * events occur rapidly and overlap.
  */
 export function getViewportStateAtTime(
-    motions: ViewportMotion[],
+    actions: ZoomAction[],
     outputTimeMs: number,
     outputSize: Size
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
-    // 1. Prepare valid motions with computed start/end times in Output Space
-    const validMotions = motions
+    // 1. Prepare valid actions with computed start/end times in Output Space
+    const validActions = actions
         .map(m => {
             // OPTIMIZATION: Use cached outputEndTimeMs directly!
             const end = m.outputEndTimeMs;
@@ -231,42 +231,42 @@ export function getViewportStateAtTime(
 
     let currentRect = fullRect;
 
-    for (let i = 0; i < validMotions.length; i++) {
-        const motion = validMotions[i];
-        const nextMotion = validMotions[i + 1];
+    for (let i = 0; i < validActions.length; i++) {
+        const action = validActions[i];
+        const nextAction = validActions[i + 1];
 
-        // The time until which this motion is the "active" governing motion
-        // It rules until it finishes OR until the next motion starts (interruption)
-        const interruptionTime = nextMotion ? nextMotion.startTime : Number.POSITIVE_INFINITY;
+        // The time until which this action is the "active" governing action
+        // It rules until it finishes OR until the next action starts (interruption)
+        const interruptionTime = nextAction ? nextAction.startTime : Number.POSITIVE_INFINITY;
 
-        // If the current output time is BEFORE this motion even starts,
-        // implies we are in a gap before this motion.
+        // If the current output time is BEFORE this action even starts,
+        // implies we are in a gap before this action.
         // We should just return the currentRect (result of previous chain).
-        if (outputTimeMs < motion.startTime) {
+        if (outputTimeMs < action.startTime) {
             return currentRect;
         }
 
-        // We are currently INSIDE or AFTER this motion's start.
+        // We are currently INSIDE or AFTER this action's start.
 
         // Define the target time we want to simulate to in this step.
         // It is either the current lookup time (if we found our frame),
-        // or the interruption time (start of next motion).
+        // or the interruption time (start of next action).
         const timeLimit = Math.min(outputTimeMs, interruptionTime);
 
-        // Calculate progress relative to the motion's FULL duration (to preserve speed/easing curve)
-        const elapsed = timeLimit - motion.startTime;
-        const progress = Math.max(0, Math.min(1, elapsed / motion.durationMs));
+        // Calculate progress relative to the action's FULL duration (to preserve speed/easing curve)
+        const elapsed = timeLimit - action.startTime;
+        const progress = Math.max(0, Math.min(1, elapsed / action.durationMs));
         const eased = applyEasing(progress);
 
-        const interpolated = interpolateRect(currentRect, motion.rect, eased);
+        const interpolated = interpolateRect(currentRect, action.rect, eased);
 
         // If our lookup time was within this segment, we are done!
         if (outputTimeMs <= interruptionTime) {
             return interpolated;
         }
 
-        // Otherwise, we have passed this segment (motion finished or interrupted).
-        // The 'interpolated' rect becomes the starting point for the next motion.
+        // Otherwise, we have passed this segment (action finished or interrupted).
+        // The 'interpolated' rect becomes the starting point for the next action.
         currentRect = interpolated;
     }
 

@@ -98,9 +98,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                 {/* Existing Motions */}
                 {(() => {
-                    const motions = timeline.viewportMotions || [];
+                    const actions = timeline.zoomActions || [];
 
-                    return motions.map((m, i) => {
+                    return actions.map((m: typeof actions[number], i: number) => {
                         // Use output time directly
                         const endX = coords.msToX(m.outputEndTimeMs);
                         const width = coords.msToX(m.durationMs);
@@ -121,7 +121,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             Math.abs(m.rect.height - outputSize.height) < 1;
 
                         if (!isFullScreen) {
-                            const nextM = motions[i + 1];
+                            const nextM = actions[i + 1];
                             const nextStartMs = nextM ? (nextM.outputEndTimeMs - nextM.durationMs) : outputDuration;
 
                             // Only extend if there is a gap or we are at the end

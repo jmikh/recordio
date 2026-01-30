@@ -57,10 +57,10 @@ export class PlaybackRenderer {
 
 
         const outputTimeMs = currentTimeMs;
-        const viewportMotions = timeline.viewportMotions || [];
+        const zoomActions = timeline.zoomActions || [];
 
         effectiveViewport = getViewportStateAtTime(
-            viewportMotions,
+            zoomActions,
             outputTimeMs,
             outputSize
         );
@@ -119,7 +119,7 @@ export class PlaybackRenderer {
                 // Only apply auto-shrink if enabled and not using override (drag preview)
                 if (cameraSettings.autoShrink && !state.overrideCameraSettings) {
                     const cameraState = getCameraStateAtTime(
-                        viewportMotions,
+                        zoomActions,
                         currentTimeMs,
                         outputSize,
                         cameraSettings.shrinkScale ?? 0.5

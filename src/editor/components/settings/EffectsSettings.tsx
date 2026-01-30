@@ -7,11 +7,11 @@ import { Toggle } from '../../../components/ui/Toggle';
 
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const clearViewportMotions = useProjectStore(s => s.clearViewportMotions);
+    const clearZoomActions = useProjectStore(s => s.clearZoomActions);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
-    const viewportMotions = useProjectStore(s => s.project.timeline.viewportMotions || []);
+    const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
     const userEvents = useProjectStore(s => s.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
@@ -33,7 +33,7 @@ export const EffectsSettings = () => {
 
     const handleClearZooms = () => {
         // 1. Clear motions
-        clearViewportMotions();
+        clearZoomActions();
         // 2. Disable auto zoom to prevent recalc
         updateSettings({ zoom: { ...zoomSettings, autoZoom: false } });
     };
@@ -113,9 +113,9 @@ export const EffectsSettings = () => {
             <div className="pt-2">
                 <button
                     onClick={handleClearZooms}
-                    disabled={viewportMotions.length === 0}
+                    disabled={zoomActions.length === 0}
                     className={`w-full py-2 px-4 rounded text-xs transition-colors border flex items-center justify-center gap-2
-                        ${viewportMotions.length === 0
+                        ${zoomActions.length === 0
                             ? 'bg-surface text-text-main/40 border-transparent cursor-not-allowed' // Disabled state
                             : 'bg-surface hover:bg-surface-elevated text-text-highlighted border-border hover:border-text-muted/40'        // Active state (Neutral)
                         }

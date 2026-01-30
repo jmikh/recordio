@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ViewportMotion } from '../../../../core/types';
+import type { ZoomAction } from '../../../../core/types';
 import { getZoomBlockBounds } from './ZoomTrackUtils';
 
 // Actually Project type is likely in core/types or similar. 
@@ -23,25 +23,25 @@ export function useZoomDrag(
     outputDuration: number,
     setEditingZoom: (id: string | null) => void
 ) {
-    const updateViewportMotion = useProjectStore(s => s.updateViewportMotion);
+    const updateZoomAction = useProjectStore(s => s.updateZoomAction);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
 
-    const handleDragStart = (e: React.MouseEvent, type: 'move', motion: ViewportMotion) => {
+    const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction) => {
         e.stopPropagation();
 
-        const outputEndTimeX = coords.msToX(motion.outputEndTimeMs);
+        const outputEndTimeX = coords.msToX(action.outputEndTimeMs);
         if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
         setDragState({
             type,
-            motionId: motion.id,
+            motionId: action.id,
             startX: e.clientX,
-            initialOutputEndTime: motion.outputEndTimeMs,
+            initialOutputEndTime: action.outputEndTimeMs,
         });
         startInteraction();
-        setEditingZoom(motion.id);
+        setEditingZoom(action.id);
     };
 
     /**
@@ -55,13 +55,13 @@ export function useZoomDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const motions = timeline.viewportMotions || [];
+        const actions = timeline.zoomActions || [];
         let targetOutputEndTime = dragState.initialOutputEndTime + deltaTimeMs;
 
         // Get boundaries (excluding self)
         // Use output duration as the boundary for zoom blocks
         const { prevEnd, nextStart } = getZoomBlockBounds(
-            dragState.motionId, motions, outputDuration
+            dragState.motionId, actions, outputDuration
         );
 
         const { minZoomDurationMs, maxZoomDurationMs } = project.settings.zoom;
@@ -76,12 +76,12 @@ export function useZoomDrag(
         const availableSpace = targetOutputEndTime - prevEnd;
         const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
 
-        batchAction(() => updateViewportMotion(dragState.motionId, {
+        batchAction(() => updateZoomAction(dragState.motionId, {
             outputEndTimeMs: targetOutputEndTime,
             durationMs: targetDuration,
             type: 'manual'
         }));
-    }, [dragState, coords, updateViewportMotion, timeline, project.settings.zoom, batchAction, outputDuration]);
+    }, [dragState, coords, updateZoomAction, timeline, project.settings.zoom, batchAction, outputDuration]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
