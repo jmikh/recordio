@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../../storage/projectStorage';
 import type { Project } from '../../core/types';
+import { ProjectDebugImporter } from '../debug';
 
 import { ProjectCard } from '../../components/ui/ProjectCard';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
 
 interface ProjectSelectorProps {
     error?: string;
@@ -50,6 +52,13 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
         }
     };
 
+    const handleImportProject = async () => {
+        const projectId = await ProjectDebugImporter.importFromFilePicker();
+        if (projectId) {
+            fetchProjects(); // Refresh the list to show imported project
+        }
+    };
+
 
     return (
         <div className="w-full h-screen bg-surface flex flex-col overflow-hidden text-text-highlighted">
@@ -61,6 +70,12 @@ export const ProjectSelector = ({ error }: ProjectSelectorProps) => {
                             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-tertiary">Recordio Projects</h1>
                             <p className="text-text-main mt-1">Select a project to continue editing</p>
                         </div>
+                        <PrimaryButton
+                            onClick={handleImportProject}
+                            title="Import a debug project bundle"
+                        >
+                            📦 Import Project
+                        </PrimaryButton>
                     </div>
 
                     {/* Error Message */}

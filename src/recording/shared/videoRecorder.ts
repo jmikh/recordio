@@ -451,7 +451,6 @@ export class VideoRecorder {
         // Populate allEvents (required for FocusManager to calculate focus areas)
         effectiveEvents.allEvents = [
             ...(effectiveEvents.mouseClicks || []),
-            ...(effectiveEvents.keyboardEvents || []),
             ...(effectiveEvents.drags || []),
             ...(effectiveEvents.scrolls || []),
             ...(effectiveEvents.typingEvents || []),

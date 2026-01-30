@@ -2,6 +2,7 @@ import { useProjectStore, useProjectData, useProjectSources } from '../stores/us
 import { useUIStore } from '../stores/useUIStore';
 import { getAllFocusAreas } from '../../core/focusManager';
 import { getTimeMapper } from '../hooks/useTimeMapper';
+import { ProjectDebugExporter } from '../debug';
 
 export const DebugBar = () => {
     const project = useProjectData();
@@ -9,6 +10,14 @@ export const DebugBar = () => {
     const userEvents = useProjectStore(s => s.userEvents);
     const showDebugOverlays = useUIStore(s => s.showDebugOverlays);
     const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
+
+    const handleExportProject = async () => {
+        try {
+            await ProjectDebugExporter.exportProject(project);
+        } catch (error) {
+            console.error('[DebugBar] Export failed:', error);
+        }
+    };
 
     const logFocusAreas = () => {
         const screenSource = sources[project.timeline.screenSourceId];
@@ -49,9 +58,9 @@ export const DebugBar = () => {
             </button>
             <button
                 className="px-2 py-0.5 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-[10px] rounded cursor-pointer border border-purple-800"
-                onClick={() => console.log(sources)}
+                onClick={() => console.log(project.timeline.viewportMotions)}
             >
-                Log Sources
+                Log Zooms
             </button>
             <button
                 className="px-2 py-0.5 bg-orange-900/50 hover:bg-orange-800 text-orange-200 text-[10px] rounded cursor-pointer border border-orange-800"
@@ -72,13 +81,25 @@ export const DebugBar = () => {
             {/* Toggle Button for Debug Overlays */}
             <button
                 className={`px-2 py-0.5 text-[10px] rounded cursor-pointer border ${showDebugOverlays
-                        ? 'bg-yellow-600 hover:bg-yellow-700 text-yellow-100 border-yellow-500'
-                        : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300 border-gray-600'
+                    ? 'bg-yellow-600 hover:bg-yellow-700 text-yellow-100 border-yellow-500'
+                    : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300 border-gray-600'
                     }`}
                 onClick={toggleDebugOverlays}
                 title="Toggle focus area debug overlays on canvas"
             >
                 {showDebugOverlays ? '🔍 Overlays ON' : '🔍 Overlays OFF'}
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-4 bg-gray-700 mx-2" />
+
+            {/* Export Project for Debugging */}
+            <button
+                className="px-2 py-0.5 bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 text-[10px] rounded cursor-pointer border border-cyan-800"
+                onClick={handleExportProject}
+                title="Export project as debug bundle (zip)"
+            >
+                📦 Export Project
             </button>
         </div>
     );
