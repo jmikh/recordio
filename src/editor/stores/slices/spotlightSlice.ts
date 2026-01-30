@@ -1,11 +1,11 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, Spotlight } from '../../../core/types';
+import type { ID, SpotlightAction } from '../../../core/types';
 import { useUIStore } from '../useUIStore';
 
 export interface SpotlightSlice {
-    updateSpotlight: (id: ID, spotlight: Partial<Spotlight>) => void;
-    addSpotlight: (spotlight: Spotlight) => void;
+    updateSpotlight: (id: ID, spotlight: Partial<SpotlightAction>) => void;
+    addSpotlight: (spotlight: SpotlightAction) => void;
     deleteSpotlight: (id: ID) => void;
     clearSpotlights: () => void;
 }
@@ -23,15 +23,15 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             console.log('[Action] updateSpotlight', id, updates);
         }
         set(state => {
-            const spotlights = state.project.timeline.spotlights;
-            const idx = spotlights.findIndex(s => s.id === id);
+            const spotlightActions = state.project.timeline.spotlightActions;
+            const idx = spotlightActions.findIndex(s => s.id === id);
             if (idx === -1) return state;
 
-            const nextSpotlights = [...spotlights];
-            nextSpotlights[idx] = { ...nextSpotlights[idx], ...updates };
+            const nextSpotlightActions = [...spotlightActions];
+            nextSpotlightActions[idx] = { ...nextSpotlightActions[idx], ...updates };
 
             // Sort by start time to maintain order
-            nextSpotlights.sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+            nextSpotlightActions.sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -39,7 +39,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlights: nextSpotlights
+                        spotlightActions: nextSpotlightActions
                     }
                 }
             };
@@ -49,7 +49,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     addSpotlight: (spotlight) => {
         console.log('[Action] addSpotlight', spotlight);
         set(state => {
-            const spotlights = [...state.project.timeline.spotlights, spotlight]
+            const spotlightActions = [...state.project.timeline.spotlightActions, spotlight]
                 .sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
             return {
@@ -58,7 +58,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlights
+                        spotlightActions
                     }
                 }
             };
@@ -68,7 +68,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     deleteSpotlight: (id) => {
         console.log('[Action] deleteSpotlight', id);
         set(state => {
-            const spotlights = state.project.timeline.spotlights.filter(s => s.id !== id);
+            const spotlightActions = state.project.timeline.spotlightActions.filter(s => s.id !== id);
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -76,7 +76,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlights
+                        spotlightActions
                     }
                 }
             };
@@ -92,7 +92,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlights: []
+                        spotlightActions: []
                     }
                 }
             };

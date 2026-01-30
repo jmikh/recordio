@@ -1,4 +1,4 @@
-import type { Spotlight, SpotlightSettings, Size, Rect } from './types';
+import type { SpotlightAction, SpotlightSettings, Size, Rect } from './types';
 import { ViewMapper } from './viewMapper';
 
 // ============================================================================
@@ -17,8 +17,8 @@ export interface SpotlightState {
     scaledRect: Rect | null;
     /** The source rectangle (in source video coordinates) */
     sourceRect: Rect;
-    /** Border radius percentage (0-50) from the spotlight definition */
-    borderRadius: number;
+    /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in SOURCE coordinates) */
+    borderRadius: [number, number, number, number];
     /** Current animated dim value (0 to settings.dimOpacity) */
     dimOpacity: number;
     /** Current animated scale (1.0 to settings.enlargeScale) */
@@ -46,7 +46,7 @@ export interface SpotlightState {
  * 4. Fade out: outputEndTimeMs - transitionDurationMs to outputEndTimeMs
  * 5. After outputEndTimeMs: null (spotlight ended)
  * 
- * @param spotlights - Array of spotlight definitions (should be non-overlapping)
+ * @param spotlightActions - Array of spotlight action definitions (should be non-overlapping)
  * @param settings - Global spotlight settings
  * @param outputTimeMs - Current output time in milliseconds
  * @param viewport - Current viewport in output coordinates
@@ -54,18 +54,18 @@ export interface SpotlightState {
  * @returns SpotlightState if a spotlight is active, null otherwise
  */
 export function getSpotlightStateAtTime(
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     settings: SpotlightSettings,
     outputTimeMs: number,
     viewport: Rect,
     viewMapper: ViewMapper
 ): SpotlightState | null {
-    if (!spotlights || spotlights.length === 0) {
+    if (!spotlightActions || spotlightActions.length === 0) {
         return null;
     }
 
     // Find the active spotlight at this time
-    const activeSpotlight = spotlights.find(
+    const activeSpotlight = spotlightActions.find(
         s => outputTimeMs >= s.outputStartTimeMs && outputTimeMs <= s.outputEndTimeMs
     );
 
@@ -74,8 +74,8 @@ export function getSpotlightStateAtTime(
     }
 
     // Calculate animation progress
-    const { outputStartTimeMs, outputEndTimeMs, sourceRect, borderRadius } = activeSpotlight;
-    const { transitionDurationMs, dimOpacity, enlargeScale } = settings;
+    const { outputStartTimeMs, outputEndTimeMs, sourceRect, borderRadius, scale: spotlightScale } = activeSpotlight;
+    const { transitionDurationMs, dimOpacity } = settings;
 
     const elapsed = outputTimeMs - outputStartTimeMs;
     const remaining = outputEndTimeMs - outputTimeMs;
@@ -99,7 +99,7 @@ export function getSpotlightStateAtTime(
 
     // Interpolate values
     const currentDimOpacity = dimOpacity * easedProgress;
-    const currentScale = 1.0 + (enlargeScale - 1.0) * easedProgress;
+    const currentScale = 1.0 + (spotlightScale - 1.0) * easedProgress;
 
     // Map source rect to screen (output) coordinates using the viewport
     const topLeftScreen = viewMapper.projectToScreen({ x: sourceRect.x, y: sourceRect.y }, viewport);
@@ -218,16 +218,16 @@ export function getMinSpotlightDuration(settings: SpotlightSettings): number {
  * Checks if a spotlight would overlap with any existing spotlights.
  * @param newStart - Start time of the new spotlight
  * @param newEnd - End time of the new spotlight
- * @param spotlights - Existing spotlights to check against
+ * @param spotlightActions - Existing spotlight actions to check against
  * @param excludeId - Optional ID to exclude from overlap check (for editing existing spotlight)
  */
 export function wouldSpotlightOverlap(
     newStart: number,
     newEnd: number,
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     excludeId?: string
 ): boolean {
-    return spotlights.some(s => {
+    return spotlightActions.some(s => {
         if (excludeId && s.id === excludeId) return false;
         // Check for any overlap
         return newStart < s.outputEndTimeMs && newEnd > s.outputStartTimeMs;
@@ -240,12 +240,12 @@ export function wouldSpotlightOverlap(
  */
 export function getValidSpotlightRange(
     clickTimeMs: number,
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     outputDuration: number,
     minDuration: number
 ): { start: number; end: number } | null {
-    // Sort spotlights by start time
-    const sorted = [...spotlights].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+    // Sort spotlight actions by start time
+    const sorted = [...spotlightActions].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
     // Find boundaries around the click position
     let prevEnd = 0;

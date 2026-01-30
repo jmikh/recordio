@@ -153,7 +153,7 @@ export class PlaybackRenderer {
         // Spotlight is defined in source coordinates and mapped to output via viewMapper
         if (viewMapper) {
             const spotlightState = getSpotlightStateAtTime(
-                timeline.spotlights || [],
+                timeline.spotlightActions || [],
                 project.settings.spotlight,
                 outputTimeMs,
                 effectiveViewport,

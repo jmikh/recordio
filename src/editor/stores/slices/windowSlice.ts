@@ -1,7 +1,10 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow, ZoomAction } from '../../../core/types';
+import type { ID, OutputWindow, ZoomAction, SpotlightAction } from '../../../core/types';
 import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
+import { calculateAutoSpotlights } from '../../../core/spotlightScheduler';
+import { ViewMapper } from '../../../core/viewMapper';
+import { TimeMapper } from '../../../core/timeMapper';
 import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {
@@ -213,13 +216,36 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             }
 
 
+            // Recalculate spotlight actions after zoom is updated
+            let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
+            if (tempProject.settings.spotlight.isAuto) {
+                const screenSource = state.sources[tempProject.timeline.screenSourceId];
+                if (screenSource) {
+                    const viewMapper = new ViewMapper(
+                        screenSource.size,
+                        tempProject.settings.outputSize,
+                        tempProject.settings.screen.padding,
+                        tempProject.settings.screen.crop
+                    );
+                    const timeMapper = new TimeMapper(tempProject.timeline.outputWindows);
+                    nextSpotlightActions = calculateAutoSpotlights(
+                        viewMapper,
+                        timeMapper,
+                        state.userEvents.hoveredCards || [],
+                        nextActions,
+                        tempProject.settings.spotlight.enlargeScale
+                    );
+                }
+            }
+
             return {
                 uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        zoomActions: nextActions
+                        zoomActions: nextActions,
+                        spotlightActions: nextSpotlightActions
                     },
                     updatedAt: new Date()
                 }
@@ -273,13 +299,36 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 nextActions = shiftManualZooms(nextActions, outputStartMs, -duration, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
             }
 
+            // Recalculate spotlight actions after zoom is updated
+            let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
+            if (tempProject.settings.spotlight.isAuto) {
+                const screenSource = state.sources[tempProject.timeline.screenSourceId];
+                if (screenSource) {
+                    const viewMapper = new ViewMapper(
+                        screenSource.size,
+                        tempProject.settings.outputSize,
+                        tempProject.settings.screen.padding,
+                        tempProject.settings.screen.crop
+                    );
+                    const timeMapper = new TimeMapper(tempProject.timeline.outputWindows);
+                    nextSpotlightActions = calculateAutoSpotlights(
+                        viewMapper,
+                        timeMapper,
+                        state.userEvents.hoveredCards || [],
+                        nextActions,
+                        tempProject.settings.spotlight.enlargeScale
+                    );
+                }
+            }
+
             return {
                 uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        zoomActions: nextActions
+                        zoomActions: nextActions,
+                        spotlightActions: nextSpotlightActions
                     },
                     updatedAt: new Date()
                 }

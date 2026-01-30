@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { Spotlight, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 import type { DragState } from './useSpotlightDrag';
 import { getValidSpotlightRange, getMinSpotlightDuration } from './SpotlightTrackUtils';
 
@@ -45,10 +45,10 @@ export function useSpotlightHover(
             return;
         }
 
-        const spotlights = timeline.spotlights || [];
+        const spotlightActions = timeline.spotlightActions || [];
 
         // Check if we are inside an existing spotlight
-        const isInside = spotlights.some((s: Spotlight) =>
+        const isInside = spotlightActions.some((s: SpotlightAction) =>
             mouseTimeMs >= s.outputStartTimeMs && mouseTimeMs <= s.outputEndTimeMs
         );
 
@@ -58,7 +58,7 @@ export function useSpotlightHover(
         }
 
         // Find valid range for new spotlight
-        const range = getValidSpotlightRange(mouseTimeMs, spotlights, outputDuration, minDuration);
+        const range = getValidSpotlightRange(mouseTimeMs, spotlightActions, outputDuration, minDuration);
 
         if (!range) {
             setHoverInfo(null);
@@ -110,14 +110,14 @@ export function useSpotlightHover(
             y: height * 0.25
         };
 
-        const newSpotlight: Spotlight = {
+        const newSpotlight: SpotlightAction = {
             id: crypto.randomUUID(),
             outputStartTimeMs: hoverInfo.outputStartTimeMs,
             outputEndTimeMs: hoverInfo.outputEndTimeMs,
             sourceRect: initialSourceRect,
-            borderRadius: 0, // Start with sharp corners
-            reason: 'Manual Spotlight',
-            type: 'manual'
+            borderRadius: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
+            scale: project.settings.spotlight.enlargeScale,
+            reason: 'Manual Spotlight'
         };
 
         addSpotlight(newSpotlight);

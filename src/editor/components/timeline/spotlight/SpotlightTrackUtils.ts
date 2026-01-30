@@ -1,4 +1,4 @@
-import type { Spotlight, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 
 /**
  * Gets the minimum allowed duration for a spotlight.
@@ -13,10 +13,10 @@ export function getMinSpotlightDuration(settings: SpotlightSettings): number {
 export function wouldSpotlightOverlap(
     newStart: number,
     newEnd: number,
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     excludeId?: string
 ): boolean {
-    return spotlights.some(s => {
+    return spotlightActions.some(s => {
         if (excludeId && s.id === excludeId) return false;
         return newStart < s.outputEndTimeMs && newEnd > s.outputStartTimeMs;
     });
@@ -27,10 +27,10 @@ export function wouldSpotlightOverlap(
  */
 export function getSpotlightBounds(
     spotlightId: string,
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     outputDuration: number
 ): { prevEnd: number; nextStart: number } {
-    const sorted = [...spotlights].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+    const sorted = [...spotlightActions].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
     const idx = sorted.findIndex(s => s.id === spotlightId);
 
     if (idx === -1) {
@@ -48,11 +48,11 @@ export function getSpotlightBounds(
  */
 export function getValidSpotlightRange(
     clickTimeMs: number,
-    spotlights: Spotlight[],
+    spotlightActions: SpotlightAction[],
     outputDuration: number,
     minDuration: number
 ): { start: number; end: number } | null {
-    const sorted = [...spotlights].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+    const sorted = [...spotlightActions].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
     let prevEnd = 0;
     let nextStart = outputDuration;

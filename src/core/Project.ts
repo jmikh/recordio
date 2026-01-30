@@ -1,6 +1,7 @@
-import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type CameraSettings, type ScreenSettings } from './types';
+import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings } from './types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './timeMapper';
+import { calculateAutoSpotlights } from './spotlightScheduler';
 
 /**
  * Functional logic for Project operations.
@@ -27,8 +28,9 @@ export class ProjectImpl {
                 },
 
                 spotlight: {
+                    isAuto: true,
                     dimOpacity: 0.5,
-                    enlargeScale: 1.1,
+                    enlargeScale: 1.25,
                     transitionDurationMs: 300
                 },
 
@@ -90,7 +92,7 @@ export class ProjectImpl {
                 // We'll init with empty values that need to be populated.
                 screenSourceId: '',
                 zoomActions: [],
-                spotlights: [],
+                spotlightActions: [],
                 outputWindows: [],
                 focusAreas: []
             }
@@ -144,12 +146,25 @@ export class ProjectImpl {
             focusAreas
         );
 
+        // Calculate Spotlight Schedule (if auto-spotlights enabled)
+        // Spotlights depend on zoom actions (for viewport containment checks)
+        const spotlightActions = project.settings.spotlight.isAuto
+            ? calculateAutoSpotlights(
+                viewMapper,
+                timeMapper,
+                screenEvents.hoveredCards || [],
+                zoomActions,
+                project.settings.spotlight.enlargeScale
+            )
+            : [];
+
         // Update timeline with recording properties
         const updatedTimeline = {
             ...project.timeline,
             screenSourceId: screenSource.id,
             cameraSourceId: cameraSource?.id,
             zoomActions: zoomActions,
+            spotlightActions: spotlightActions,
             durationMs: durationMs,
             // Create a default output window covering the whole duration
             outputWindows: outputWindows,
@@ -235,6 +250,17 @@ export class ProjectImpl {
             rect: scaleRect(m.rect)
         }));
 
+        const newSpotlightActions: SpotlightAction[] = project.timeline.spotlightActions.map((s: SpotlightAction) => ({
+            ...s,
+            sourceRect: scaleRect(s.sourceRect),
+            borderRadius: [
+                s.borderRadius[0] * scale,
+                s.borderRadius[1] * scale,
+                s.borderRadius[2] * scale,
+                s.borderRadius[3] * scale
+            ] as [number, number, number, number]
+        }));
+
         return {
             ...project,
             settings: {
@@ -253,7 +279,8 @@ export class ProjectImpl {
             },
             timeline: {
                 ...project.timeline,
-                zoomActions: newZoomActions
+                zoomActions: newZoomActions,
+                spotlightActions: newSpotlightActions
             }
         };
     }

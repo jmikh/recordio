@@ -102,6 +102,8 @@ export interface ZoomSettings {
 }
 
 export interface SpotlightSettings {
+    /** Whether to automatically generate spotlights from hovered cards. Default: true */
+    isAuto: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
     /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */
@@ -262,8 +264,8 @@ export interface Timeline {
     cameraSourceId?: ID;
     /** Zoom action keyframes for zoom/pan effects */
     zoomActions: ZoomAction[];
-    /** Spotlight regions for spotlight effect (non-overlapping) */
-    spotlights: Spotlight[];
+    /** Spotlight action keyframes for spotlight effect (non-overlapping) */
+    spotlightActions: SpotlightAction[];
     /** Optional caption data from webcam audio */
     captions?: Captions;
     /** Cached focus areas computed from user events and output windows */
@@ -300,15 +302,15 @@ export interface ZoomAction {
 }
 
 // ==========================================
-// SPOTLIGHT
+// SPOTLIGHT ACTIONS
 // ==========================================
 
 /**
- * A spotlight is a finite-duration effect that dims the background
+ * A spotlight action is a finite-duration effect that dims the background
  * and enlarges a specific region with smooth transitions.
  * The spotlight region is defined in SOURCE coordinates (original screen recording).
  */
-export interface Spotlight {
+export interface SpotlightAction {
     id: ID;
     /** Output time when the spotlight starts (in output coordinate system) */
     outputStartTimeMs: TimeMs;
@@ -316,12 +318,12 @@ export interface Spotlight {
     outputEndTimeMs: TimeMs;
     /** The rectangle to spotlight (in SOURCE video coordinates) */
     sourceRect: Rect;
-    /** Border radius as percentage of the smaller dimension (0 = rectangle, 50 = fully circular/pill) */
-    borderRadius: number;
+    /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in SOURCE coordinates) */
+    borderRadius: [number, number, number, number];
+    /** Scale factor for this spotlight (capped to fit within output bounds) */
+    scale: number;
     /** Optional reason/label for the spotlight */
     reason?: string;
-    /** How the spotlight was created */
-    type: 'auto' | 'manual';
 }
 
 /**

@@ -74,6 +74,12 @@ export const DebugBar = () => {
             >
                 Log Focus Areas
             </button>
+            <button
+                className="px-2 py-0.5 bg-amber-900/50 hover:bg-amber-800 text-amber-200 text-[10px] rounded cursor-pointer border border-amber-800"
+                onClick={() => console.log(project.timeline.spotlightActions)}
+            >
+                Log Spotlights
+            </button>
 
             {/* Separator */}
             <div className="w-px h-4 bg-gray-700 mx-2" />

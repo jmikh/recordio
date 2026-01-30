@@ -74,9 +74,9 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
                 {/* Existing Spotlights */}
                 {(() => {
-                    const spotlights = timeline.spotlights || [];
+                    const spotlightActions = timeline.spotlightActions || [];
 
-                    return spotlights.map((s) => {
+                    return spotlightActions.map((s) => {
                         const startX = coords.msToX(s.outputStartTimeMs);
                         const endX = coords.msToX(s.outputEndTimeMs);
                         const width = endX - startX;

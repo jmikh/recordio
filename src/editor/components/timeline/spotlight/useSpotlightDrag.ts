@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { Spotlight, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 import { getSpotlightBounds, getMinSpotlightDuration } from './SpotlightTrackUtils';
 
 export interface DragState {
@@ -31,7 +31,7 @@ export function useSpotlightDrag(
     const handleDragStart = (
         e: React.MouseEvent,
         type: DragState['type'],
-        spotlight: Spotlight
+        spotlight: SpotlightAction
     ) => {
         e.stopPropagation();
 
@@ -52,10 +52,10 @@ export function useSpotlightDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const spotlights = timeline.spotlights || [];
+        const spotlightActions = timeline.spotlightActions || [];
         const { prevEnd, nextStart } = getSpotlightBounds(
             dragState.spotlightId,
-            spotlights,
+            spotlightActions,
             outputDuration
         );
 
@@ -104,8 +104,7 @@ export function useSpotlightDrag(
 
         batchAction(() => updateSpotlight(dragState.spotlightId, {
             outputStartTimeMs: newStart,
-            outputEndTimeMs: newEnd,
-            type: 'manual'
+            outputEndTimeMs: newEnd
         }));
     }, [dragState, coords, updateSpotlight, timeline, minDuration, batchAction, outputDuration]);
 

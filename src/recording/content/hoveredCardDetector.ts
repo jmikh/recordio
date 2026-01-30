@@ -22,7 +22,7 @@ export interface HoveredCardEvent {
 }
 
 // Debug flag - set to true to show pink highlight border
-const DEBUG_SHOW_HOVERED_CARD = true;
+const DEBUG_SHOW_HOVERED_CARD = false;
 
 // Minimum duration (ms) for a hovered card session to be reported
 const MIN_SESSION_DURATION_MS = 2000;

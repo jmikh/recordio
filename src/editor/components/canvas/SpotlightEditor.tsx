@@ -107,7 +107,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     useEffect(() => {
         if (!editingSpotlightId) return;
 
-        const spotlight = project.timeline.spotlights.find(s => s.id === editingSpotlightId);
+        const spotlight = project.timeline.spotlightActions.find(s => s.id === editingSpotlightId);
         if (spotlight) {
             const midTime = (spotlight.outputStartTimeMs + spotlight.outputEndTimeMs) / 2;
             useUIStore.getState().setCurrentTime(midTime);
@@ -118,10 +118,14 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     const outputSize = project.settings.outputSize;
 
     const spotlight = editingSpotlightId
-        ? project.timeline.spotlights.find(s => s.id === editingSpotlightId)
+        ? project.timeline.spotlightActions.find(s => s.id === editingSpotlightId)
         : null;
     const initialSourceRect = spotlight?.sourceRect || null;
-    const initialBorderRadius = spotlight?.borderRadius ?? 0;
+
+    // For the slider, use the max corner radius (all corners shown as one value)
+    const initialBorderRadius = spotlight?.borderRadius
+        ? Math.max(...spotlight.borderRadius)
+        : 0;
 
     // Convert source rect to output rect for editing (using viewMapper)
     const initialOutputRect = useMemo(() => {
@@ -163,7 +167,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
 
         const sourceRect = outputToSourceRect(outputRect);
         batchAction(() => {
-            updateSpotlight(editingSpotlightId, { sourceRect, type: 'manual' });
+            updateSpotlight(editingSpotlightId, { sourceRect });
         });
     };
 
@@ -211,8 +215,10 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         setCurrentBorderRadius(newRadius);
 
         if (editingSpotlightId) {
+            // Apply the same radius to all 4 corners
+            const borderRadius: [number, number, number, number] = [newRadius, newRadius, newRadius, newRadius];
             batchAction(() => {
-                updateSpotlight(editingSpotlightId, { borderRadius: newRadius });
+                updateSpotlight(editingSpotlightId, { borderRadius });
             });
         }
     };
