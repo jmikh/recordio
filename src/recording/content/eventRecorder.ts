@@ -108,18 +108,17 @@ export class EventRecorder {
         window.addEventListener('scroll', this.handleScroll, { capture: true });
 
         // URL Changes (popstate for back/forward, hashchange for hash navigation)
-        window.addEventListener('popstate', this.handleUrlChange);
-        window.addEventListener('hashchange', this.handleUrlChange);
-        window.addEventListener('pagehide', this.handlePageUnload);
+        window.addEventListener('popstate', this.sendUrlEventDirectly);
+        window.addEventListener('hashchange', this.sendUrlEventDirectly);
 
         // Navigation API (Chrome 102+) - fires for ALL navigations including pushState/replaceState
         // This works across isolated worlds unlike monkey-patching history
         if ('navigation' in window) {
-            (window.navigation as EventTarget).addEventListener('navigate', this.handleUrlChange);
+            (window.navigation as EventTarget).addEventListener('navigate', this.sendUrlEventDirectly);
         }
 
         // Focus changes (tab switching, window minimizing, etc.)
-        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        document.addEventListener('visibilitychange', this.sendUrlEventDirectly);
     }
 
     private removeListeners() {
@@ -130,14 +129,13 @@ export class EventRecorder {
         window.removeEventListener('keydown', this.handleKeyDown, { capture: true });
         window.removeEventListener('scroll', this.handleScroll, { capture: true });
 
-        window.removeEventListener('popstate', this.handleUrlChange);
-        window.removeEventListener('hashchange', this.handleUrlChange);
-        window.removeEventListener('pagehide', this.handlePageUnload);
-        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        window.removeEventListener('popstate', this.sendUrlEventDirectly);
+        window.removeEventListener('hashchange', this.sendUrlEventDirectly);
+        document.removeEventListener('visibilitychange', this.sendUrlEventDirectly);
 
         // Remove Navigation API listener
         if ('navigation' in window) {
-            (window.navigation as EventTarget).removeEventListener('navigate', this.handleUrlChange);
+            (window.navigation as EventTarget).removeEventListener('navigate', this.sendUrlEventDirectly);
         }
     }
 
@@ -193,9 +191,20 @@ export class EventRecorder {
         const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
+        // Use composedPath to get actual target element (handles shadow DOM)
+        const target = (e.composedPath()[0] || e.target) as Element;
+        const rect = target.getBoundingClientRect();
+        const targetRect = dprScaleRect({
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height
+        });
+
         this.sendMessage(EventType.CLICK, {
             mousePos: scaledPos,
-            timestamp: now
+            timestamp: now,
+            targetRect
         });
     }
 
@@ -343,26 +352,12 @@ export class EventRecorder {
         }
     }
 
-    private handleUrlChange = () => {
-        this.flushPendingScrollSession();
-        this.sendUrlEvent();
-    }
-
-    private handlePageUnload = () => {
+    private sendUrlEventDirectly = () => {
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
-    }
-
-    private handleVisibilityChange = () => {
-        // Send URL event on both focus gain and focus loss
-        this.flushPendingTypingSession();
-        this.flushPendingScrollSession();
-        this.sendUrlEvent();
-    }
-
-    private sendUrlEvent() {
+        this.hoveredCardDetector.flush();
         this.sendMessage(EventType.URLCHANGE, {
-            timestamp: this.getRelativeTime(),
+            timestamp: this.getRelativeTime() + 1,
             mousePos: this.lastMousePos.mousePos,
         }, true);
     }

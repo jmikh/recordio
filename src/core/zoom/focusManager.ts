@@ -10,7 +10,9 @@ export type { FocusArea } from '../types';
 // ============================================================================
 
 /** If gap between current time and next target >= this, trigger inactivity zoom-out */
-const K_INACTIVITY_THRESHOLD_MS = 3000;
+const K_INACTIVITY_THRESHOLD_MS = 5000;
+/** Wait before starting the inactivity zoom-out */
+const K_INACTIVITY_ZOOM_BUFFER_MS = 2000;
 
 /** Size of the hover detection bounding box (fraction of larger screen dimension) */
 const K_HOVER_BOX_FRACTION = 0.2;
@@ -43,6 +45,7 @@ class FocusManager {
     private readonly fullViewportRect: Rect;
     private readonly clickBoxSize: number;
     private readonly hoverDetector: HoverDetector;
+    private readonly outputDuration: number;
 
     /** Current position in output timeline */
     private currentOutputTime: number = 0;
@@ -60,6 +63,7 @@ class FocusManager {
         const largerDimension = Math.max(sourceSize.width, sourceSize.height);
         this.clickBoxSize = largerDimension * K_CLICK_BOX_FRACTION;
         this.fullViewportRect = { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height };
+        this.outputDuration = timeMapper.outputDuration;
 
         // Pre-compute remapped mouse positions and create hover detector
         const filteredMousePositions = events.mousePositions
@@ -95,7 +99,21 @@ class FocusManager {
         // Find the next target (hover or explicit event)
         const nextTarget = this.findNextTarget();
         if (!nextTarget) {
-            return null;
+            // No more targets - return full viewport zoom-out at the end
+            const endTimestamp = Math.max(
+                this.currentOutputTime,
+                Math.min(this.currentOutputTime + K_INACTIVITY_ZOOM_BUFFER_MS, this.outputDuration - 500)
+            );
+            // Only return null if we've already emitted this final zoom-out
+            if (endTimestamp <= this.currentOutputTime) {
+                return null;
+            }
+            this.currentOutputTime = endTimestamp;
+            return {
+                timestamp: endTimestamp,
+                rect: this.fullViewportRect,
+                reason: 'final_zoomout'
+            };
         }
 
         // Check for inactivity gap (use clamped time for ongoing range events)
@@ -107,7 +125,7 @@ class FocusManager {
             this.pendingTarget = nextTarget;
             this.currentOutputTime = targetStartTime - 1;
             return {
-                timestamp: this.currentOutputTime + 1000,
+                timestamp: this.currentOutputTime + K_INACTIVITY_ZOOM_BUFFER_MS,
                 rect: this.fullViewportRect,
                 reason: 'inactivity'
             };
@@ -198,11 +216,6 @@ class FocusManager {
             this.currentOutputTime = timestamp + 1;
         }
 
-        // For range events, advance to near the end to skip intermediate hovers
-        if ('endTime' in target && target.endTime !== undefined) {
-            this.currentOutputTime = Math.max(this.currentOutputTime, target.endTime - 500);
-        }
-
         // Advance hover detector past this event's time
         this.hoverDetector.advancePast(this.currentOutputTime);
 
@@ -226,13 +239,8 @@ class FocusManager {
         if (target.type === EventType.URLCHANGE) {
             return this.fullViewportRect;
         }
-
         let rect: Rect;
-
-        if ('targetRect' in target && target.targetRect) {
-            rect = target.targetRect;
-        } else if ('mousePos' in target && target.mousePos) {
-            // Fallback: box centered on mouse position
+        if (target.type === EventType.CLICK) {
             const halfSize = this.clickBoxSize / 2;
             rect = {
                 x: target.mousePos.x - halfSize,
@@ -240,8 +248,12 @@ class FocusManager {
                 width: this.clickBoxSize,
                 height: this.clickBoxSize,
             };
+        }
+
+        if ('targetRect' in target && target.targetRect) {
+            rect = target.targetRect;
         } else {
-            // No targetRect or mousePos - return full viewport
+            console.warn('No targetRect found for event', target);
             return this.fullViewportRect;
         }
 
