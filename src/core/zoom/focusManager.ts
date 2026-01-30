@@ -48,7 +48,8 @@ class FocusManager {
     private readonly outputDuration: number;
 
     /** Current position in output timeline */
-    private currentOutputTime: number = 0;
+    // wait 2 seconds before starting to emit events
+    private currentOutputTime: number = 2000;
 
     /** Index into allEvents array */
     private allEventsIdx: number = 0;
@@ -116,14 +117,13 @@ class FocusManager {
             };
         }
 
-        // Check for inactivity gap (use clamped time for ongoing range events)
-        const targetStartTime = Math.max(nextTarget.timestamp, this.currentOutputTime);
-        const gap = targetStartTime - this.currentOutputTime;
+        // Check for inactivity gap
+        const gap = nextTarget.timestamp - this.currentOutputTime;
 
         if (gap >= K_INACTIVITY_THRESHOLD_MS) {
             // Inactivity detected - save target for next call and return full viewport
             this.pendingTarget = nextTarget;
-            this.currentOutputTime = targetStartTime - 1;
+            this.currentOutputTime = nextTarget.timestamp;
             return {
                 timestamp: this.currentOutputTime + K_INACTIVITY_ZOOM_BUFFER_MS,
                 rect: this.fullViewportRect,
@@ -177,10 +177,10 @@ class FocusManager {
             // Skip events that have fully passed
             if (event.timestamp < this.currentOutputTime) {
                 // For range events, only skip if the event has ended
-                if ('endTime' in event && event.endTime !== undefined) {
+                if (event.endTime !== undefined) {
                     if (event.endTime > this.currentOutputTime) {
-                        // Event is still ongoing - return it
-                        return event;
+                        // Event is still ongoing - clamp start time and return it
+                        return { ...event, timestamp: this.currentOutputTime };
                     }
                 }
                 // Point event or range event that has ended - skip
@@ -203,24 +203,25 @@ class FocusManager {
      * Advances internal state to move past this target.
      */
     private processTarget(target: BaseEvent): FocusArea {
-        const timestamp = target.timestamp;
-
         // Save original currentOutputTime for clamping the returned timestamp
         // (for ongoing range events that started before currentOutputTime)
         const originalOutputTime = this.currentOutputTime;
 
         // Advance currentOutputTime based on event type
         if (target.type === EventType.URLCHANGE) {
-            this.currentOutputTime = timestamp + 1000;
+            // Adds buffer after URL change to prevent quick zoom back in.
+            this.currentOutputTime = target.timestamp + 1000;
+        } else if (target.endTime !== undefined) {
+            this.currentOutputTime = target.endTime + 1;
         } else {
-            this.currentOutputTime = timestamp + 1;
+            this.currentOutputTime = target.timestamp + 1;
         }
 
         // Advance hover detector past this event's time
         this.hoverDetector.advancePast(this.currentOutputTime);
 
         return {
-            timestamp: Math.max(timestamp, originalOutputTime),
+            timestamp: Math.max(target.timestamp, originalOutputTime),
             rect: this.getEventRect(target),
             reason: target.type,
         };
@@ -250,7 +251,7 @@ class FocusManager {
             };
         }
 
-        if ('targetRect' in target && target.targetRect) {
+        if (target.targetRect) {
             rect = target.targetRect;
         } else {
             console.warn('No targetRect found for event', target);
@@ -289,7 +290,7 @@ class FocusManager {
         }
 
         // For range events (with endTime), use range mapping
-        if ('endTime' in event && event.endTime !== undefined) {
+        if (event.endTime !== undefined) {
             const outputRange = this.timeMapper.mapSourceRangeToOutputRange(event.timestamp, event.endTime);
             if (!outputRange) {
                 return null;
