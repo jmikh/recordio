@@ -22,7 +22,7 @@ export interface HoveredCardEvent {
 }
 
 // Debug flag - set to true to show pink highlight border
-const DEBUG_SHOW_HOVERED_CARD = false;
+const DEBUG_SHOW_HOVERED_CARD = true;
 
 // Minimum duration (ms) for a hovered card session to be reported
 const MIN_SESSION_DURATION_MS = 2000;
@@ -60,7 +60,7 @@ export class HoveredCardDetector {
         this.isListening = true;
 
         document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
-        window.addEventListener('scroll', this.detectCardAtMousePosition, { capture: true });
+        window.addEventListener('scroll', this.handleScroll, { capture: true });
         window.addEventListener('resize', this.detectCardAtMousePosition);
 
         console.log('[HoveredCardDetector] Started listening');
@@ -74,7 +74,7 @@ export class HoveredCardDetector {
         this.isListening = false;
 
         document.removeEventListener('mousemove', this.handleMouseMove, { capture: true });
-        window.removeEventListener('scroll', this.detectCardAtMousePosition, { capture: true });
+        window.removeEventListener('scroll', this.handleScroll, { capture: true });
         window.removeEventListener('resize', this.detectCardAtMousePosition);
 
         if (this.mouseInactivityTimeout) {
@@ -142,6 +142,31 @@ export class HoveredCardDetector {
             this.lastMouseY >= rect.top &&
             this.lastMouseY <= rect.bottom;
     }
+
+    /**
+     * Handle scroll events - only start detection when no active session
+     * Position changes of active cards are detected by comparing viewport position
+     */
+    private handleScroll = (): void => {
+        if (this.currentCard && this.currentCardRect) {
+            // Active session: check if card position changed in viewport
+            const currentRect = this.currentCard.element.getBoundingClientRect();
+            const threshold = 1; // 1px threshold
+            const positionChanged =
+                Math.abs(currentRect.left - this.currentCardRect.left) > threshold ||
+                Math.abs(currentRect.top - this.currentCardRect.top) > threshold;
+
+            if (positionChanged) {
+                console.log('[HoveredCard] Card viewport position changed on scroll, flushing');
+                this.detectCardAtMousePosition();
+            }
+            // Otherwise, card is still in same position - do nothing
+            return;
+        }
+
+        // No active session: start detection at mouse position
+        this.detectCardAtMousePosition();
+    };
 
     /**
      * Detect which card is at the current mouse position (for scroll/resize handlers)
