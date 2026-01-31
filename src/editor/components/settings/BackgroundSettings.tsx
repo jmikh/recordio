@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
@@ -44,13 +44,12 @@ const BACKGROUND_IMAGES = [
 export const BackgroundSettings = () => {
     const project = useProjectData();
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const addSource = useProjectStore(s => s.addSource);
+    const addBackgroundSource = useProjectStore(s => s.addBackgroundSource);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Defensive check
     if (!project) return null;
 
-    const sources = useProjectSources();
     const { settings } = project;
     const { background } = settings;
     const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection, backgroundBlur } = background;
@@ -133,7 +132,7 @@ export const BackgroundSettings = () => {
         if (!file) return;
 
         try {
-            const newSourceId = await addSource(file, 'image', { name: file.name });
+            const newSourceId = await addBackgroundSource(file);
             updateSettings({
                 background: {
                     type: 'image',
@@ -148,7 +147,8 @@ export const BackgroundSettings = () => {
         }
     };
 
-    const customSource = customBackgroundSourceId ? sources[customBackgroundSourceId] : null;
+    // Custom background URLs are stored in background.imageUrl when uploaded
+    const customSource = customBackgroundSourceId ? { url: background.imageUrl } : null;
 
     // Popover State
     const [showColorPopover, setShowColorPopover] = useState(false);

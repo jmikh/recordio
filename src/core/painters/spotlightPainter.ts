@@ -1,7 +1,6 @@
 import type { Size, Rect, Project } from '../types';
 import type { SpotlightState } from '../spotlight/spotlightMotion';
 import { drawScreen } from './screenPainter';
-import type { ProjectState } from '../../editor/stores/useProjectStore';
 
 /**
  * Resources needed for rendering the scaled spotlight content.
@@ -9,7 +8,6 @@ import type { ProjectState } from '../../editor/stores/useProjectStore';
 export interface SpotlightRenderResources {
     video: HTMLVideoElement;
     project: Project;
-    sources: ProjectState['sources'];
     effectiveViewport: Rect;
     deviceFrameImg: HTMLImageElement | null;
 }
@@ -119,7 +117,7 @@ function drawScaledSpotlightContent(
     radiusPx: [number, number, number, number],
     resources: SpotlightRenderResources
 ): void {
-    const { video, project, sources, effectiveViewport, deviceFrameImg } = resources;
+    const { video, project, effectiveViewport, deviceFrameImg } = resources;
 
     // Calculate spotlight center (from original rect)
     const cx = originalRect.x + originalRect.width / 2;
@@ -159,7 +157,6 @@ function drawScaledSpotlightContent(
         ctx,
         video,
         project,
-        sources,
         effectiveViewport,
         deviceFrameImg
     );

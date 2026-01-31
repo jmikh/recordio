@@ -1,4 +1,4 @@
-import { useProjectStore, useProjectData, useProjectSources } from '../stores/useProjectStore';
+import { useProjectStore, useProjectData, useUserEvents } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 import { getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
@@ -6,8 +6,7 @@ import { ProjectDebugExporter } from '../debug';
 
 export const DebugBar = () => {
     const project = useProjectData();
-    const sources = useProjectSources();
-    const userEvents = useProjectStore(s => s.userEvents);
+    const userEvents = useUserEvents();
     const showDebugOverlays = useUIStore(s => s.showDebugOverlays);
     const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
 
@@ -20,9 +19,9 @@ export const DebugBar = () => {
     };
 
     const logFocusAreas = () => {
-        const screenSource = sources[project.timeline.screenSourceId];
-        if (!screenSource || !userEvents) {
-            console.log('No screen source or events available', { screenSourceId: project.timeline.screenSourceId, sources, userEvents });
+        const screenSource = project.screenSource;
+        if (!screenSource.id || !userEvents) {
+            console.log('No screen source or events available', { screenSource, userEvents });
             return;
         }
 

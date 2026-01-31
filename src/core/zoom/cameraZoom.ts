@@ -1,4 +1,4 @@
-import { type ZoomAction, type Size, type Rect, type CameraSettings } from './types';
+import { type ZoomAction, type Size, type Rect, type CameraSettings } from '../types';
 
 /**
  * Anchor point for camera positioning.

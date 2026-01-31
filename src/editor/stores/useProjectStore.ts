@@ -1,7 +1,7 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, UserEvents } from '../../core/types';
+import type { Project, ID, SourceMetadata } from '../../core/types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
@@ -10,23 +10,9 @@ import { createZoomActionSlice, type ZoomActionSlice } from './slices/zoomAction
 import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSlice';
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 
-const EMPTY_USER_EVENTS: UserEvents = {
-    mouseClicks: [],
-    mousePositions: [],
-    keyboardEvents: [],
-    drags: [],
-    scrolls: [],
-    typingEvents: [],
-    urlChanges: [],
-    hoveredCards: [],
-    allEvents: []
-};
-
 
 export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlice, SpotlightSlice, TranscriptionSlice {
     project: Project;
-    sources: Record<ID, import('../../core/types').SourceMetadata>; // Immutable Library
-    userEvents: UserEvents; // Single set of loaded events (Never null)
     isSaving: boolean;
 
     // Context Awareness for Undo
@@ -36,18 +22,11 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlic
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
-    addSource: (file: Blob, type: 'image' | 'video' | 'audio', metadata?: Partial<import('../../core/types').SourceMetadata>) => Promise<ID>;
-    getSource: (id: ID) => import('../../core/types').SourceMetadata;
+    addBackgroundSource: (file: Blob, metadata?: Partial<SourceMetadata>) => Promise<ID>;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
     toggleSourceMute: (sourceId: ID) => void;
-
-    // Zoom Actions
-    // (Moved to ZoomActionSlice)
-
-    // Timeline Actions
-
 
     // Settings Actions
     updateProjectName: (name: string) => void;
@@ -65,8 +44,6 @@ export const useProjectStore = create<ProjectState>()(
             (set, get, store) => ({
                 // Initialize with a default empty project
                 project: ProjectImpl.create('Untitled Project'),
-                sources: {},
-                userEvents: EMPTY_USER_EVENTS,
                 isSaving: false,
                 mutedSources: {},
 
@@ -87,54 +64,14 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 })),
 
-                // Viewport motions moved to slice
-
                 loadProject: async (project) => {
                     console.log('[Action] loadProject', project.id);
 
-                    // 1. Load Sources (Separately)
-                    const sourcesMap: Record<ID, import('../../core/types').SourceMetadata> = {};
-                    const sourceIds = ProjectImpl.getReferencedSourceIds(project);
-                    await Promise.all(sourceIds.map(async (id) => {
-                        const source = await ProjectStorage.loadSource(id);
-                        if (source) {
-                            sourcesMap[id] = source;
-                        } else {
-                            console.warn(`[loadProject] Source ${id} not found in DB.`);
-                        }
-                    }));
-
-                    // 2. Set Sources FIRST (so project consumers find them)
-                    set({ sources: sourcesMap });
-
-                    // 3. Set Project
+                    // Project now contains embedded sources and events - no separate loading needed
                     set({ project });
 
-                    // 4. Fetch Events for the screen source
-                    let events: UserEvents = EMPTY_USER_EVENTS;
-                    const screenSourceId = project.timeline.screenSourceId;
-                    const screenSource = sourcesMap[screenSourceId];
-
-                    if (screenSource && screenSource.eventsUrl) {
-                        try {
-                            const loaded = await ProjectStorage.loadEvents(screenSource.eventsUrl);
-                            if (loaded) events = loaded;
-                        } catch (e) {
-                            console.error(`Failed to load events for source ${screenSourceId}`, e);
-                        }
-                    }
-
-                    // 5. Update Store with Events
-                    set({ userEvents: events });
-
-                    // 6. Clear History so we can't undo into valid empty state or previous project
+                    // Clear History so we can't undo into valid empty state or previous project
                     useProjectStore.temporal.getState().clear();
-                },
-
-                getSource: (id) => {
-                    const s = get().sources[id];
-                    if (!s) throw new Error(`Source with ID ${id} not found.`);
-                    return s;
                 },
 
                 saveProject: async () => {
@@ -149,7 +86,7 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                addSource: async (blob, type, metadata: Partial<import('../../core/types').SourceMetadata> = {}) => {
+                addBackgroundSource: async (blob) => {
                     const state = get();
                     const projectId = state.project.id;
                     const uuid = crypto.randomUUID();
@@ -159,48 +96,29 @@ export const useProjectStore = create<ProjectState>()(
                     const sourceId = `${projectId}-src-${uuid}`;
                     const blobId = `${projectId}-rec-${uuid}`;
 
-                    console.log(`[Store] Adding Source: ${sourceId} (${type})`);
+                    console.log(`[Store] Adding Background Source: ${sourceId}`);
 
                     // 1. Save Blob (Heavy)
                     await ProjectStorage.saveRecordingBlob(blobId, blob);
 
-                    // 2. Create Source Metadata (Light)
-                    const newSource: import('../../core/types').SourceMetadata = {
-                        id: sourceId,
-                        type,
-                        url: `recordio-blob://${blobId}`, // Internal protocol
-                        createdAt: Date.now(),
-                        fileSizeBytes: blob.size,
-                        durationMs: 0,
-                        size: { width: 0, height: 0 },
-                        hasAudio: false,
-                        has_microphone: false, // Default to false for manually added sources
-                        name: metadata.name || 'Untitled Source',
-                        ...metadata
-                    };
-
-                    // 3. Save Source to DB
-                    await ProjectStorage.saveSource(newSource);
-
-                    // 4. Update Store (State)
-                    // We need to hydrate the URL for immediate playback in the session
-                    const hydratedSource = { ...newSource, url: URL.createObjectURL(blob) };
-
+                    // 2. Store reference in project settings
                     set((state) => ({
-                        sources: {
-                            ...state.sources,
-                            [sourceId]: hydratedSource
-                        },
                         project: {
                             ...state.project,
+                            settings: {
+                                ...state.project.settings,
+                                background: {
+                                    ...state.project.settings.background,
+                                    sourceId: sourceId,
+                                    customSourceId: blobId
+                                }
+                            },
                             updatedAt: new Date()
                         }
                     }));
 
                     return sourceId;
                 },
-
-
 
                 updateProjectName: (name: string) => {
                     console.log('[Action] updateProjectName', name);
@@ -250,8 +168,8 @@ useProjectStore.subscribe(
 
 export const useProjectData = () => useProjectStore(s => s.project);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
-export const useProjectSources = () => useProjectStore(s => s.sources);
 export const useTimeline = () => useProjectStore(s => s.project.timeline);
+export const useUserEvents = () => useProjectStore(s => s.project.userEvents);
 export const useProjectHistory = <T,>(
     selector: (state: TemporalState<{ project: Project; uiSnapshot?: Partial<import('./useProjectStore').ProjectState['uiSnapshot']> }>) => T
 ) => useStore(useProjectStore.temporal, selector);

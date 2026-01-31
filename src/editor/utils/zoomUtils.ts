@@ -1,5 +1,5 @@
 
-import type { ID, Project, UserEvents, ZoomAction, FocusArea } from '../../core/types';
+import type { Project, UserEvents, ZoomAction, FocusArea } from '../../core/types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 
@@ -9,19 +9,17 @@ import { getTimeMapper } from '../hooks/useTimeMapper';
  */
 export const computeFocusAreas = (
     project: Project,
-    sources: Record<ID, import('../../core/types').SourceMetadata>,
     events: UserEvents
 ): FocusArea[] => {
-    const screenSourceId = project.timeline.screenSourceId;
-    const sourceMetadata = sources[screenSourceId];
+    const sourceSize = project.screenSource.size;
 
-    if (!sourceMetadata) {
-        console.warn("Skipping focus area computation: Missing source", screenSourceId);
+    if (!sourceSize || sourceSize.width === 0) {
+        console.warn("Skipping focus area computation: Missing sourceSize");
         return [];
     }
 
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
-    return getAllFocusAreas(events, timeMapper, sourceMetadata.size);
+    return getAllFocusAreas(events, timeMapper, sourceSize);
 };
 
 /**
@@ -29,21 +27,19 @@ export const computeFocusAreas = (
  * focusAreas should already be stored in project.timeline.focusAreas.
  */
 export const recalculateAutoZooms = (
-    project: Project,
-    sources: Record<ID, import('../../core/types').SourceMetadata>
+    project: Project
 ): ZoomAction[] => {
     // 1. If Auto Zoom is ON, regenerate completely
     if (project.settings.zoom.isAuto) {
-        const screenSourceId = project.timeline.screenSourceId;
-        const sourceMetadata = sources[screenSourceId];
+        const sourceSize = project.screenSource.size;
 
-        if (!sourceMetadata) {
-            console.warn("Skipping zoom recalc: Missing source", screenSourceId);
+        if (!sourceSize || sourceSize.width === 0) {
+            console.warn("Skipping zoom recalc: Missing sourceSize");
             return project.timeline.zoomActions;
         }
 
         const viewMapper = new ViewMapper(
-            sourceMetadata.size,
+            sourceSize,
             project.settings.outputSize,
             project.settings.screen.padding,
             project.settings.screen.crop
@@ -61,6 +57,8 @@ export const recalculateAutoZooms = (
 
     return project.timeline.zoomActions;
 };
+
+
 
 
 /**

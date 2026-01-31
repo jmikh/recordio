@@ -73,8 +73,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Recompute focus areas since output windows changed
             const nextFocusAreas = computeFocusAreas(
                 { ...state.project, timeline: { ...state.project.timeline, outputWindows: nextOutputWindows } },
-                state.sources,
-                state.userEvents
+                state.project.userEvents
             );
 
             const tempProject = {
@@ -90,7 +89,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
 
             // Zoom Logic
             if (state.project.settings.zoom.isAuto) {
-                nextActions = recalculateAutoZooms(tempProject, state.sources);
+                nextActions = recalculateAutoZooms(tempProject);
             } else {
                 // Manual Shift Logic
                 // We handle Start and End changes separately if both changed (unlikely in single operation but possible)
@@ -216,13 +215,12 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             }
 
 
-            // Recalculate spotlight actions after zoom is updated
             let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
             if (tempProject.settings.spotlight.isAuto) {
-                const screenSource = state.sources[tempProject.timeline.screenSourceId];
-                if (screenSource) {
+                const sourceSize = tempProject.screenSource.size;
+                if (sourceSize && sourceSize.width > 0) {
                     const viewMapper = new ViewMapper(
-                        screenSource.size,
+                        sourceSize,
                         tempProject.settings.outputSize,
                         tempProject.settings.screen.padding,
                         tempProject.settings.screen.crop
@@ -231,7 +229,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     nextSpotlightActions = calculateAutoSpotlights(
                         viewMapper,
                         timeMapper,
-                        state.userEvents.hoveredCards || [],
+                        state.project.userEvents.hoveredCards || [],
                         nextActions,
                         tempProject.settings.spotlight.enlargeScale
                     );
@@ -274,8 +272,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Recompute focus areas since output windows changed
             const nextFocusAreas = computeFocusAreas(
                 { ...state.project, timeline: { ...state.project.timeline, outputWindows: nextOutputWindows } },
-                state.sources,
-                state.userEvents
+                state.project.userEvents
             );
 
             const tempProject = {
@@ -290,7 +287,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             let nextActions = state.project.timeline.zoomActions;
 
             if (state.project.settings.zoom.isAuto) {
-                nextActions = recalculateAutoZooms(tempProject, state.sources);
+                nextActions = recalculateAutoZooms(tempProject);
             } else {
                 // Manual Shift: Delete range
                 // Pivot: outputStartMs
@@ -302,10 +299,10 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Recalculate spotlight actions after zoom is updated
             let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
             if (tempProject.settings.spotlight.isAuto) {
-                const screenSource = state.sources[tempProject.timeline.screenSourceId];
-                if (screenSource) {
+                const sourceSize = tempProject.screenSource.size;
+                if (sourceSize && sourceSize.width > 0) {
                     const viewMapper = new ViewMapper(
-                        screenSource.size,
+                        sourceSize,
                         tempProject.settings.outputSize,
                         tempProject.settings.screen.padding,
                         tempProject.settings.screen.crop
@@ -314,7 +311,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     nextSpotlightActions = calculateAutoSpotlights(
                         viewMapper,
                         timeMapper,
-                        state.userEvents.hoveredCards || [],
+                        state.project.userEvents.hoveredCards || [],
                         nextActions,
                         tempProject.settings.spotlight.enlargeScale
                     );

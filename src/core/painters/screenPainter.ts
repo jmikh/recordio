@@ -1,4 +1,4 @@
-import type { Project, ID, SourceMetadata, Rect } from '../types';
+import type { Project, Rect } from '../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
@@ -32,12 +32,9 @@ export function drawScreen(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     project: Project,
-    sources: Record<ID, SourceMetadata>,
     effectiveViewport: Rect, // Injected from caller
     deviceFrameImg: HTMLImageElement | null // Cached device frame image
 ): { viewMapper: ViewMapper } {
-    const { timeline } = project;
-
     const screenConfig = project.settings.screen || {
         mode: 'device',
         deviceFrameId: 'macbook-pro',
@@ -48,19 +45,13 @@ export function drawScreen(
         hasGlow: false
     };
 
-    // 1. Resolve Data
-    const screenSource = sources[timeline.screenSourceId];
-    if (!screenSource) {
-        throw new Error(`[drawScreen] Screen source not found: ${timeline.screenSourceId}`);
-    }
-
-    // 2. Use video dimensions if available, otherwise source metadata
+    // 1. Use video dimensions if available, otherwise project's screenSource size
     const inputSize = video.videoWidth && video.videoHeight
         ? { width: video.videoWidth, height: video.videoHeight }
-        : screenSource.size;
+        : project.screenSource.size;
 
     if (!inputSize || inputSize.width === 0) {
-        throw new Error(`[drawScreen] Invalid inputSize for source ${screenSource.id}.`);
+        throw new Error(`[drawScreen] Invalid inputSize for screen.`);
     }
 
     // 3. Resolve View Mapping

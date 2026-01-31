@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { useProjectStore, useProjectData, useProjectSources } from '../../stores/useProjectStore';
+import { useRef, useEffect, useMemo } from 'react';
+import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
@@ -12,7 +12,7 @@ import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
-import type { CameraSettings, Rect } from '../../../core/types';
+import type { CameraSettings, Rect, SourceMetadata } from '../../../core/types';
 
 export const CanvasContainer = () => {
     //console.log('[Rerender] CanvasContainer');
@@ -23,7 +23,19 @@ export const CanvasContainer = () => {
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
-    const sources = useProjectSources();
+
+    // Build sources array from project - now embedded directly
+    const sources = useMemo(() => {
+        const result: Record<string, SourceMetadata> = {};
+        if (project.screenSource.id) {
+            result[project.screenSource.id] = project.screenSource;
+        }
+        if (project.cameraSource?.id) {
+            result[project.cameraSource.id] = project.cameraSource;
+        }
+        return result;
+    }, [project.screenSource, project.cameraSource]);
+
     const isPlaying = useUIStore(s => s.isPlaying);
     const mutedSources = useProjectStore(s => s.mutedSources);
 
@@ -61,8 +73,17 @@ export const CanvasContainer = () => {
             animationFrameRef.current = requestAnimationFrame(tick);
 
             const uiState = useUIStore.getState();
-            const { project, sources, userEvents } = useProjectStore.getState();
+            const { project } = useProjectStore.getState();
             const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId } = uiState;
+
+            // Build sources from project
+            const sources: Record<string, SourceMetadata> = {};
+            if (project.screenSource.id) {
+                sources[project.screenSource.id] = project.screenSource;
+            }
+            if (project.cameraSource?.id) {
+                sources[project.cameraSource.id] = project.cameraSource;
+            }
 
             if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
@@ -145,13 +166,11 @@ export const CanvasContainer = () => {
                 if (canvasMode === CanvasMode.CropEdit) {
                     renderCropEditor(resources, {
                         project,
-                        sources,
                         currentTimeMs: effectiveTimeMs
                     });
                 } else if (canvasMode === CanvasMode.ZoomEdit && activeZoomId) {
                     renderZoomEditor(resources, {
                         project,
-                        sources,
                         currentTimeMs: effectiveTimeMs,
                         editingZoomId: activeZoomId,
                         previewZoomRect: previewZoomRectRef.current
@@ -159,7 +178,6 @@ export const CanvasContainer = () => {
                 } else if (canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId) {
                     renderSpotlightEditor(resources, {
                         project,
-                        sources,
                         currentTimeMs: effectiveTimeMs,
                         editingSpotlightId: activeSpotlightId,
                         previewSpotlightRect: previewSpotlightRectRef.current
@@ -167,8 +185,6 @@ export const CanvasContainer = () => {
                 } else {
                     PlaybackRenderer.render(resources, {
                         project,
-                        sources,
-                        userEvents,
                         currentTimeMs: effectiveTimeMs,
                         overrideCameraSettings: previewCameraSettingsRef.current || undefined,
                         focusAreas: focusAreasRef.current,
@@ -197,10 +213,7 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // RESOURCE HELPERS
     // -----------------------------------------------------------
-    const activeBgSourceId = project.settings.background.sourceId;
-    const bgUrl = activeBgSourceId && sources[activeBgSourceId]
-        ? sources[activeBgSourceId].url
-        : project.settings.background.imageUrl;
+    const bgUrl = project.settings.background.imageUrl;
 
     // Device frame URL for caching
     const deviceFrame = project.settings.screen.mode === 'device'
@@ -249,14 +262,14 @@ export const CanvasContainer = () => {
                     )}
                     {Object.values(sources).map((source) => {
                         const isMuted = !isPlaying || mutedSources[source.id];
-                        return source.url ? (
+                        return source.runtimeUrl ? (
                             <video
                                 key={source.id}
                                 ref={el => {
                                     if (el) internalVideoRefs.current[source.id] = el;
                                     else delete internalVideoRefs.current[source.id];
                                 }}
-                                src={source.url}
+                                src={source.runtimeUrl}
                                 muted={isMuted}
                                 playsInline
                             />
@@ -273,7 +286,7 @@ export const CanvasContainer = () => {
                 {/* CROP OVERLAY (Highest Priority) */}
                 {canvasMode === CanvasMode.CropEdit && (
                     <CropEditor videoSize={(() => {
-                        const screenId = project.timeline.screenSourceId;
+                        const screenId = project.screenSource.id;
                         const v = internalVideoRefs.current[screenId];
                         return v ? { width: v.videoWidth, height: v.videoHeight } : undefined;
                     })()} />

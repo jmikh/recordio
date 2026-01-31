@@ -92,17 +92,15 @@ export function useSpotlightHover(
         if (!hoverInfo) return;
 
         // Get source video size for the initial rect (spotlight is in source coordinates)
-        const screenSourceId = timeline.screenSourceId;
-        const sources = useProjectStore.getState().sources;
-        const screenSource = sources[screenSourceId];
+        const sourceSize = project.settings.screen.sourceSize;
 
-        if (!screenSource) {
-            console.warn('[useSpotlightHover] No screen source found');
+        if (!sourceSize || sourceSize.width === 0) {
+            console.warn('[useSpotlightHover] No sourceSize found');
             return;
         }
 
         // Create initial rect centered at 50% of source video
-        const { width, height } = screenSource.size;
+        const { width, height } = sourceSize;
         const initialSourceRect = {
             width: width * 0.5,
             height: height * 0.5,

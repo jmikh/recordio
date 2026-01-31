@@ -386,51 +386,30 @@ export class VideoRecorder {
         const duration = Date.now() - this.startTime;
         const now = Date.now();
 
-        // 1. Save Screen Recording
+        // 1. Save Screen Recording Blob
         const screenMimeType = this.screenRecorder?.mimeType || 'video/webm';
         console.log(`[VideoRecorder] Saving Screen Blob with MimeType: ${screenMimeType}`);
         const screenBlob = new Blob(this.screenData, { type: screenMimeType });
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
-        // 2. Save Events (only if present)
-        let eventsBlobId: string | undefined;
-        if (events) {
-            // Populate allEvents before saving (required for FocusManager to calculate focus areas)
-            events.allEvents = [
-                ...(events.mouseClicks || []),
-                ...(events.keyboardEvents || []),
-                ...(events.drags || []),
-                ...(events.scrolls || []),
-                ...(events.typingEvents || []),
-                ...(events.urlChanges || []),
-                ...(events.hoveredCards || []),
-            ].sort((a, b) => a.timestamp - b.timestamp);
-
-            const eventsBlob = new Blob([JSON.stringify(events)], { type: 'application/json' });
-            eventsBlobId = `evt-${projectId}-screen`;
-            await ProjectStorage.saveRecordingBlob(eventsBlobId, eventsBlob);
-        }
-
-        // 3. Create Screen Source
         // Screen hasAudio if: system audio exists OR microphone mixed in (single mode)
         const screenHasAudio = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
 
+        // 2. Create Screen Source Metadata (embedded in project, not saved separately)
         const screenSource: SourceMetadata = {
             id: `src-${projectId}-screen`,
             type: 'video',
-            url: `recordio-blob://${screenBlobId}`,
-            eventsUrl: eventsBlobId ? `recordio-blob://${eventsBlobId}` : undefined,
+            storageUrl: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
             hasAudio: screenHasAudio,
-            has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0), // Mic baked into screen if no camera
+            has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
             createdAt: now,
             name: this.config.sourceName || this.mode
         };
-        await ProjectStorage.saveSource(screenSource);
 
-        // 4. Save Camera Recording (If any)
+        // 3. Save Camera Recording Blob (If any)
         let cameraSource: SourceMetadata | undefined;
         if (this.cameraData.length > 0) {
             const camMimeType = this.cameraRecorder?.mimeType || 'video/webm';
@@ -442,24 +421,34 @@ export class VideoRecorder {
             cameraSource = {
                 id: `src-${projectId}-camera`,
                 type: 'video',
-                url: `recordio-blob://${camBlobId}`,
+                storageUrl: `recordio-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
-                hasAudio: Boolean(this.config.hasAudio), // Has microphone audio in dual mode
-                has_microphone: Boolean(this.config.hasAudio), // Mic is on camera track in dual mode
+                hasAudio: Boolean(this.config.hasAudio),
+                has_microphone: Boolean(this.config.hasAudio),
                 createdAt: now,
                 name: 'Camera'
             };
-            await ProjectStorage.saveSource(cameraSource);
         }
 
-        // 5. Create & Save Project
-        // Use empty events for calculation if none provided, to avoid crash, but don't save them.
-        // Note: events.allEvents is already populated above before saving
-        const effectiveEvents = events || {
-            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
+        // 4. Prepare events (populate allEvents for FocusManager)
+        const effectiveEvents: UserEvents = events ? {
+            ...events,
+            allEvents: [
+                ...(events.mouseClicks || []),
+                ...(events.keyboardEvents || []),
+                ...(events.drags || []),
+                ...(events.scrolls || []),
+                ...(events.typingEvents || []),
+                ...(events.urlChanges || []),
+                ...(events.hoveredCards || []),
+            ].sort((a, b) => a.timestamp - b.timestamp)
+        } : {
+            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [],
+            scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
 
+        // 5. Create & Save Project (with embedded sources and events)
         const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
         await ProjectStorage.saveProject(project);
 

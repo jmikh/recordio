@@ -31,7 +31,6 @@ export const Header = () => {
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
     const { isAuthenticated, isPro, canExportQuality } = useUserStore();
     const project = useProjectData();
-    const sources = useProjectStore(s => s.sources);
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
     const setExportState = useProjectStore(s => s.setExportState);
@@ -61,7 +60,7 @@ export const Header = () => {
             // Assign to global for cancellation (hacky but effective for single active export)
             (window as any).__activeExportManager = manager;
 
-            await manager.exportProject(project, sources, quality, onProgress, isPro);
+            await manager.exportProject(project, quality, onProgress, isPro);
 
             // Track successful export
             const totalDurationMs = project.timeline.outputWindows.length > 0

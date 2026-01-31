@@ -1,9 +1,9 @@
 import React, { useMemo, useRef } from 'react';
 import type { Timeline as TimelineType } from '../../../../core/types';
-import { useProjectSources, useProjectStore } from '../../../stores/useProjectStore';
+import { useProjectStore } from '../../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
 import { useClickOutside } from '../../../hooks/useClickOutside';
-import { useUIStore } from '../../../stores/useUIStore'; // Removed unused useUIStore
+import { useUIStore } from '../../../stores/useUIStore';
 import { getTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
@@ -33,8 +33,11 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
         anchorEl: HTMLElement;
     } | null>(null);
 
-    const sources = useProjectSources();
     const containerRef = useRef<HTMLDivElement | null>(null);
+
+    // Get sources directly from project
+    const screenSource = project.screenSource;
+    const cameraSource = project.cameraSource;
 
     // Create TimePixelMapper for coordinate conversions
     const coords = useMemo(() => {
@@ -48,14 +51,8 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     });
 
     // Prepare Audio Analysis for Screen and Camera
-    const screenSourceId = timeline.screenSourceId;
-    const cameraSourceId = timeline.cameraSourceId;
-
-    const screenSource = sources[screenSourceId];
-    const cameraSource = cameraSourceId ? sources[cameraSourceId] : null;
-
-    const screenAudio = useAudioAnalysis(screenSourceId, screenSource?.url);
-    const cameraAudio = useAudioAnalysis(cameraSourceId || '', cameraSource?.url || '');
+    const screenAudio = useAudioAnalysis(screenSource.id, screenSource.runtimeUrl || '');
+    const cameraAudio = useAudioAnalysis(cameraSource?.id || '', cameraSource?.runtimeUrl || '');
 
     const { dragState, handleDragStart } = useWindowDrag(timeline, coords);
 
@@ -84,7 +81,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                     const width = coords.msToX(outputDurationMs);
                     currentX += width; // Accumulate for next window
 
-                    const hasCamera = !!timeline.cameraSourceId;
+                    const hasCamera = !!cameraSource;
                     const isMuted = project.settings.screen?.mute ?? false;
 
                     return (

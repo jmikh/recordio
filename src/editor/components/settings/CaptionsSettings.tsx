@@ -53,29 +53,22 @@ export function CaptionsSettings() {
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
-        const cameraSourceId = state.project.timeline.cameraSourceId;
-        const screenSourceId = state.project.timeline.screenSourceId;
+        const { cameraSource, screenSource } = state.project;
 
         // Determine which source has microphone
-        let sourceToTranscribe = null;
+        let sourceToTranscribe: typeof cameraSource | typeof screenSource | null = null;
         let sourceName = '';
 
         // Check camera source first
-        if (cameraSourceId) {
-            const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
-            if (cameraSource && cameraSource.has_microphone) {
-                sourceToTranscribe = cameraSource;
-                sourceName = 'camera';
-            }
+        if (cameraSource?.has_microphone) {
+            sourceToTranscribe = cameraSource;
+            sourceName = 'camera';
         }
 
         // Fall back to screen source if camera doesn't have microphone
-        if (!sourceToTranscribe && screenSourceId) {
-            const screenSource = Object.values(state.sources).find((s: any) => s.id === screenSourceId);
-            if (screenSource && screenSource.has_microphone) {
-                sourceToTranscribe = screenSource;
-                sourceName = 'screen';
-            }
+        if (!sourceToTranscribe && screenSource?.has_microphone) {
+            sourceToTranscribe = screenSource;
+            sourceName = 'screen';
         }
 
 
@@ -107,7 +100,7 @@ export function CaptionsSettings() {
             });
 
             // Fetch video
-            const response = await fetch(sourceToTranscribe.url);
+            const response = await fetch(sourceToTranscribe.runtimeUrl!);
             if (!response.ok) throw new Error(`Failed to fetch video: ${response.statusText}`);
             const videoBlob = await response.blob();
 
@@ -267,27 +260,6 @@ export function CaptionsSettings() {
     const handleDelete = (segmentId: string) => {
         deleteCaptionSegment(segmentId);
     };
-
-    // Check if any source has microphone
-    const state = useProjectStore.getState();
-    const cameraSourceId = state.project.timeline.cameraSourceId;
-    const screenSourceId = state.project.timeline.screenSourceId;
-
-    let hasMicrophone = false;
-
-    if (cameraSourceId) {
-        const cameraSource = Object.values(state.sources).find((s: any) => s.id === cameraSourceId);
-        if (cameraSource && cameraSource.has_microphone) {
-            hasMicrophone = true;
-        }
-    }
-
-    if (!hasMicrophone && screenSourceId) {
-        const screenSource = Object.values(state.sources).find((s: any) => s.id === screenSourceId);
-        if (screenSource && screenSource.has_microphone) {
-            hasMicrophone = true;
-        }
-    }
 
     return (
         <div className="space-y-4">

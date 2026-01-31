@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { Rect } from '../../../core/types';
-import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 import { BoundingBox, type CornerRadii } from './BoundingBox';
@@ -13,7 +13,6 @@ import { DisplayMapper } from '../../../core/mappers/displayMapper';
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
-import type { ProjectState } from '../../stores/useProjectStore';
 import type { Project } from '../../../core/types';
 
 // ------------------------------------------------------------------
@@ -23,30 +22,28 @@ export const renderSpotlightEditor = (
     resources: RenderResources,
     state: {
         project: Project,
-        sources: ProjectState['sources'],
         currentTimeMs: number,
         editingSpotlightId: string | null,
         previewSpotlightRect: Rect | null
     }
 ) => {
     const { ctx, videoRefs } = resources;
-    const { project, sources } = state;
+    const { project } = state;
     const outputSize = project.settings.outputSize;
 
-    const screenSource = sources[project.timeline.screenSourceId];
+    const screenSource = project.screenSource;
 
     // Force Full Viewport (Ignore current Zoom) so user can see context
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // Render Screen Layer
-    if (screenSource) {
+    if (screenSource.id) {
         const video = videoRefs[screenSource.id];
         if (video) {
             drawScreen(
                 ctx,
                 video,
                 project,
-                sources,
                 effectiveViewport,
                 resources.deviceFrameImg
             );
@@ -55,8 +52,7 @@ export const renderSpotlightEditor = (
 
     // Render Camera Layer
     const cameraSettings = project.settings.camera;
-    const cameraSourceId = project.timeline.cameraSourceId;
-    const cameraSource = cameraSourceId ? sources[cameraSourceId] : undefined;
+    const cameraSource = project.cameraSource;
 
     if (cameraSource && cameraSettings) {
         const video = videoRefs[cameraSource.id];
@@ -77,15 +73,14 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
     const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const project = useProjectStore(s => s.project);
-    const sources = useProjectSources();
 
     // History Batcher
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // ViewMapper for source <-> output coordinate conversion
     const viewMapper = useMemo(() => {
-        const screenSource = sources[project.timeline.screenSourceId];
-        if (!screenSource) return null;
+        const screenSource = project.screenSource;
+        if (!screenSource.id) return null;
 
         return new ViewMapper(
             screenSource.size,
@@ -94,11 +89,10 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             project.settings.screen.crop
         );
     }, [
-        project.timeline.screenSourceId,
+        project.screenSource,
         project.settings.outputSize,
         project.settings.screen.padding,
-        project.settings.screen.crop,
-        sources
+        project.settings.screen.crop
     ]);
 
     // The content rect is where the screen content appears in output coordinates
@@ -137,8 +131,8 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         if (!viewMapper || !screenContentBounds) return outputRect;
 
         // Calculate the inverse mapping: output -> source
-        const screenSource = sources[project.timeline.screenSourceId];
-        if (!screenSource) return outputRect;
+        const screenSource = project.screenSource;
+        if (!screenSource.id) return outputRect;
 
         const effectiveInputSize = project.settings.screen.crop
             ? { width: project.settings.screen.crop.width, height: project.settings.screen.crop.height }

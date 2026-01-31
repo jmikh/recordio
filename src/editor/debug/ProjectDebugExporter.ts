@@ -8,7 +8,6 @@
 import JSZip from 'jszip';
 import type { Project, ID, SourceMetadata } from '../../core/types';
 import { ProjectStorage } from '../../storage/projectStorage';
-import { ProjectImpl } from '../../core/Project';
 
 interface ExportManifest {
     version: 1;
@@ -38,8 +37,11 @@ export class ProjectDebugExporter {
         const projectToExport = await this.dehydrateProject(project);
         zip.file('project.json', JSON.stringify(projectToExport, null, 2));
 
-        // 3. Get all referenced source IDs
-        const sourceIds = ProjectImpl.getReferencedSourceIds(project);
+        // 3. Get all referenced source IDs from embedded sources
+        const sourceIds: ID[] = [project.screenSource.id];
+        if (project.cameraSource) {
+            sourceIds.push(project.cameraSource.id);
+        }
 
         // 4. Export sources and their recordings
         const sourcesFolder = zip.folder('sources');
@@ -58,8 +60,8 @@ export class ProjectDebugExporter {
             sourcesFolder?.file(`${sourceId}.json`, JSON.stringify(source, null, 2));
 
             // Extract and save recording blob
-            if (source.url && source.url.startsWith('recordio-blob://')) {
-                const blobId = source.url.replace('recordio-blob://', '');
+            if (source.storageUrl && source.storageUrl.startsWith('recordio-blob://')) {
+                const blobId = source.storageUrl.replace('recordio-blob://', '');
                 const blob = await ProjectStorage.getRecordingBlob(blobId);
                 if (blob) {
                     const arrayBuffer = await blob.arrayBuffer();

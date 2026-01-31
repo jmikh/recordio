@@ -41,6 +41,13 @@ export interface Project {
     /** URL (blob or remote) to project, or just a generic placeholder if undefined */
     thumbnail?: string;
 
+    /** Screen recording source metadata (always present) */
+    screenSource: SourceMetadata;
+    /** Camera recording source metadata (optional) */
+    cameraSource?: SourceMetadata;
+    /** User interaction events from the recording */
+    userEvents: UserEvents;
+
     /* Unified Settings */
     settings: ProjectSettings;
 
@@ -183,8 +190,16 @@ export interface ProjectSettings {
 export interface SourceMetadata {
     id: ID;
     type: 'video' | 'audio' | 'image';
-    /** URL to the media file (blob or remote) */
-    url: string;
+    /**
+     * Persistent URL to the media file (recordio-blob:// protocol).
+     * This is the storage reference that survives page reloads.
+     */
+    storageUrl: string;
+    /**
+     * Transient runtime URL (blob:// protocol).
+     * Populated on load, used for playback. Never persisted.
+     */
+    runtimeUrl?: string;
 
     // Pointer to the external JSON containing UserEvents
     eventsUrl?: string;
@@ -259,10 +274,6 @@ export interface Timeline {
      */
     outputWindows: OutputWindow[];
 
-    /** ID of the screen source for this timeline */
-    screenSourceId: ID;
-    /** Optional ID of the camera source */
-    cameraSourceId?: ID;
     /** Zoom action keyframes for zoom/pan effects */
     zoomActions: ZoomAction[];
     /** Spotlight action keyframes for spotlight effect (non-overlapping) */

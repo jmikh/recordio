@@ -22,22 +22,15 @@ export const SettingsPanel = () => {
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
 
     const project = useProjectStore(s => s.project);
-    const sources = useProjectStore(s => s.sources);
-    const hasCameraSource = project.timeline.cameraSourceId ? !!sources[project.timeline.cameraSourceId] : false;
+    const hasCameraSource = !!project.cameraSource;
 
     // Check if any source has microphone for captions
     let hasMicrophone = false;
-    if (project.timeline.cameraSourceId) {
-        const cameraSource = Object.values(sources).find((s: any) => s.id === project.timeline.cameraSourceId);
-        if (cameraSource && cameraSource.has_microphone) {
-            hasMicrophone = true;
-        }
+    if (project.cameraSource?.has_microphone) {
+        hasMicrophone = true;
     }
-    if (!hasMicrophone && project.timeline.screenSourceId) {
-        const screenSource = Object.values(sources).find((s: any) => s.id === project.timeline.screenSourceId);
-        if (screenSource && screenSource.has_microphone) {
-            hasMicrophone = true;
-        }
+    if (!hasMicrophone && project.screenSource?.has_microphone) {
+        hasMicrophone = true;
     }
 
     return (

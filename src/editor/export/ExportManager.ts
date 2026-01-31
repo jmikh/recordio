@@ -19,7 +19,6 @@ export class ExportManager {
 
     async exportProject(
         project: Project,
-        sources: Record<string, SourceMetadata>,
         quality: ExportQuality,
         onProgress: (state: ExportProgress) => void,
         isPro: boolean = false
@@ -111,14 +110,16 @@ export class ExportManager {
             v.load();
         });
 
+        // Build sources map from project
+        const sources: SourceMetadata[] = [renderProject.screenSource];
+        if (renderProject.cameraSource) {
+            sources.push(renderProject.cameraSource);
+        }
+
         try {
             const bgSettings = renderProject.settings.background;
             if (bgSettings.type === 'image' && bgSettings.imageUrl) {
-                const activeBgSourceId = bgSettings.sourceId;
-                const bgUrl = activeBgSourceId && sources[activeBgSourceId]
-                    ? sources[activeBgSourceId].url
-                    : bgSettings.imageUrl;
-
+                const bgUrl = bgSettings.imageUrl;
                 if (bgUrl) {
                     imageElements.bg = await loadImage(bgUrl);
                 }
@@ -133,10 +134,10 @@ export class ExportManager {
                 }
             }
 
-            const sourceIds = Object.keys(sources);
-            for (const id of sourceIds) {
-                if (sources[id].type === 'video') {
-                    videoElements[id] = await loadVideo(sources[id].url);
+            // Load video elements for screen and camera sources
+            for (const source of sources) {
+                if (source.type === 'video' && source.runtimeUrl) {
+                    videoElements[source.id] = await loadVideo(source.runtimeUrl);
                 }
             }
 
@@ -151,11 +152,11 @@ export class ExportManager {
 
             const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDurationSec), sampleRate);
 
-            await Promise.all(Object.values(sources).map(async (source) => {
+            await Promise.all(sources.map(async (source) => {
                 if (!source.hasAudio) return;
 
                 try {
-                    const response = await fetch(source.url);
+                    const response = await fetch(source.runtimeUrl!);
                     const arrayBuffer = await response.arrayBuffer();
                     const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
@@ -234,10 +235,6 @@ export class ExportManager {
                     deviceFrameImg: imageElements.device
                 }, {
                     project: renderProject,
-                    sources: sources,
-                    userEvents: {
-                        mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
-                    },
                     currentTimeMs: currentTimeMs
                 });
 

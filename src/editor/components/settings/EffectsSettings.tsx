@@ -12,7 +12,7 @@ export const EffectsSettings = () => {
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
     const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
-    const userEvents = useProjectStore(s => s.userEvents);
+    const userEvents = useProjectStore(s => s.project.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Spotlight handlers

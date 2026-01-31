@@ -86,13 +86,13 @@ export class ProjectStorage {
 
     /**
      * Saves the project to the 'projects' store.
+     * Excludes transient runtimeUrl fields - only storageUrl is persisted.
      */
     static async saveProject(project: Project): Promise<void> {
         const db = await this.getDB();
 
-        // Project contains SourceMetadata which is already lightweight (no heavy events).
-        // We can save directly.
-        const projectToSave = project;
+        // Strip runtimeUrl from sources before saving (it's transient)
+        const projectToSave = this.stripRuntimeUrls(project);
 
         return new Promise((resolve, reject) => {
             const tx = db.transaction('projects', 'readwrite');
@@ -102,6 +102,27 @@ export class ProjectStorage {
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
         });
+    }
+
+    /**
+     * Strips transient runtimeUrl from sources before persisting.
+     */
+    private static stripRuntimeUrls(project: Project): Project {
+        const stripped = { ...project };
+
+        // Strip runtimeUrl from screen source
+        if (stripped.screenSource) {
+            const { runtimeUrl: _r, ...screenRest } = stripped.screenSource;
+            stripped.screenSource = screenRest as typeof stripped.screenSource;
+        }
+
+        // Strip runtimeUrl from camera source
+        if (stripped.cameraSource) {
+            const { runtimeUrl: _r, ...cameraRest } = stripped.cameraSource;
+            stripped.cameraSource = cameraRest as typeof stripped.cameraSource;
+        }
+
+        return stripped;
     }
 
     /**
@@ -120,8 +141,34 @@ export class ProjectStorage {
 
         if (!projectRaw) return null;
 
-        // Re-hydrate sources? 
-        return projectRaw;
+        // Re-hydrate embedded source runtimeUrls
+        const project = { ...projectRaw };
+
+        // Hydrate screen source runtimeUrl
+        if (project.screenSource?.storageUrl?.startsWith('recordio-blob://')) {
+            const blobId = project.screenSource.storageUrl.replace('recordio-blob://', '');
+            const blob = await this.getRecordingBlob(blobId);
+            if (blob) {
+                project.screenSource = {
+                    ...project.screenSource,
+                    runtimeUrl: URL.createObjectURL(blob)
+                };
+            }
+        }
+
+        // Hydrate camera source runtimeUrl
+        if (project.cameraSource?.storageUrl?.startsWith('recordio-blob://')) {
+            const blobId = project.cameraSource.storageUrl.replace('recordio-blob://', '');
+            const blob = await this.getRecordingBlob(blobId);
+            if (blob) {
+                project.cameraSource = {
+                    ...project.cameraSource,
+                    runtimeUrl: URL.createObjectURL(blob)
+                };
+            }
+        }
+
+        return project;
     }
 
     /**
@@ -201,12 +248,12 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
 
-        if (source && source.url && source.url.startsWith('recordio-blob://')) {
-            const blobId = source.url.replace('recordio-blob://', '');
+        if (source && source.storageUrl && source.storageUrl.startsWith('recordio-blob://')) {
+            const blobId = source.storageUrl.replace('recordio-blob://', '');
             const blob = await this.getRecordingBlob(blobId);
             if (blob) {
-                // Hydrate URL for playback
-                source.url = URL.createObjectURL(blob);
+                // Hydrate runtimeUrl for playback
+                source.runtimeUrl = URL.createObjectURL(blob);
             }
         }
         return source;

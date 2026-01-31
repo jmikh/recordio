@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import type { Rect, Project } from '../../../core/types';
-import { useProjectStore, type ProjectState, useProjectData } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -22,15 +22,14 @@ export const renderCropEditor = (
     resources: RenderResources,
     state: {
         project: Project,
-        sources: ProjectState['sources'],
         currentTimeMs: number,
     }
 ) => {
     const { ctx, videoRefs } = resources;
-    const { project, sources } = state;
+    const { project } = state;
     const outputSize = project.settings.outputSize;
 
-    const screenSource = sources[project.timeline.screenSourceId];
+    const screenSource = project.screenSource;
 
     // Force Full Viewport
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
@@ -61,14 +60,13 @@ export const renderCropEditor = (
     };
 
     // Render Screen Layer
-    if (screenSource) {
+    if (screenSource.id) {
         const video = videoRefs[screenSource.id];
         if (video) {
             drawScreen(
                 ctx,
                 video,
                 tempProject,
-                sources,
                 effectiveViewport,
                 null // Device frame not needed in crop edit mode
             );
@@ -85,18 +83,18 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     // Connect to Store
     const project = useProjectData();
     const setCanvasMode = useUIStore(s => s.setCanvasMode);
-    const sources = useProjectStore(s => s.sources);
     const updateSettings = useProjectStore(s => s.updateSettings);
 
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Determine dimensions
     const outputSize = project.settings.outputSize;
-    const screenSource = sources[project.timeline.screenSourceId];
 
     // We need the ACTUAL source dimensions to map Crop Rect (Source Space) -> Output Space
     // Priority: Prop (Video Element) -> Metadata -> Fallback
-    const sourceSize = (screenSource?.size && screenSource.size.width > 0) ? screenSource.size : undefined;
+    const sourceSize = (project.screenSource.size && project.screenSource.size.width > 0)
+        ? project.screenSource.size
+        : undefined;
     const resolvedSize = (videoSize && videoSize.width > 0) ? videoSize : sourceSize;
     const inputSize = resolvedSize || { width: 1920, height: 1080 }; // Final Fallback
 

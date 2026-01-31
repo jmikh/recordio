@@ -11,10 +11,9 @@ import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
-import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
+import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/zoom/cameraZoom';
 import { type FocusArea } from '../../../core/types';
 import type { Project, Rect, CameraSettings } from '../../../core/types';
-import type { ProjectState } from '../../stores/useProjectStore';
 
 export interface RenderResources {
     canvas: HTMLCanvasElement;
@@ -29,8 +28,6 @@ export class PlaybackRenderer {
         resources: RenderResources,
         state: {
             project: Project,
-            sources: ProjectState['sources'],
-            userEvents: ProjectState['userEvents'],
             currentTimeMs: number,
             overrideCameraSettings?: CameraSettings,
             focusAreas?: FocusArea[],
@@ -38,7 +35,8 @@ export class PlaybackRenderer {
         }
     ) {
         const { ctx, videoRefs } = resources;
-        const { project, sources, userEvents, currentTimeMs } = state;
+        const { project, currentTimeMs } = state;
+        const { userEvents } = project;
         const outputSize = project.settings.outputSize;
 
         const { timeline } = project;
@@ -46,15 +44,14 @@ export class PlaybackRenderer {
         // 2. Calculate Times
         const sourceTimeMs = currentTimeMs;
 
-        // 3. Resolve Items
-        const screenSource = sources[timeline.screenSourceId];
-        const cameraSource = timeline.cameraSourceId ? sources[timeline.cameraSourceId] : undefined;
+        // 3. Resolve sources directly from project
+        const screenSource = project.screenSource;
+        const cameraSource = project.cameraSource;
 
         // -----------------------------------------------------------
         // VIEWPORT CALCULATION
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
-
 
         const outputTimeMs = currentTimeMs;
         const zoomActions = timeline.zoomActions || [];
@@ -69,17 +66,12 @@ export class PlaybackRenderer {
         // Render Screen Layer
         let viewMapper: import('../../../core/mappers/viewMapper').ViewMapper | undefined;
 
-        if (screenSource) {
-            const video = videoRefs[screenSource.id];
-            if (!video) {
-                throw new Error(`[PlaybackRenderer] Video element not found for source ${screenSource.id}`);
-            }
-
+        const screenVideo = videoRefs[screenSource.id];
+        if (screenVideo) {
             const result = drawScreen(
                 ctx,
-                video,
+                screenVideo,
                 project,
-                sources,
                 effectiveViewport,
                 resources.deviceFrameImg
             );
@@ -161,11 +153,9 @@ export class PlaybackRenderer {
             );
 
             // Pass resources for scaled content rendering
-            const screenVideo = screenSource ? videoRefs[screenSource.id] : undefined;
             drawSpotlight(ctx, spotlightState, outputSize, screenVideo ? {
                 video: screenVideo,
                 project,
-                sources,
                 effectiveViewport,
                 deviceFrameImg: resources.deviceFrameImg
             } : undefined);

@@ -12,7 +12,6 @@ import { DisplayMapper } from '../../../core/mappers/displayMapper';
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
-import type { ProjectState } from '../../stores/useProjectStore';
 import type { Project } from '../../../core/types';
 
 // ------------------------------------------------------------------
@@ -22,30 +21,28 @@ export const renderZoomEditor = (
     resources: RenderResources,
     state: {
         project: Project,
-        sources: ProjectState['sources'],
         currentTimeMs: number,
         editingZoomId: string | null,
         previewZoomRect: Rect | null
     }
 ) => {
     const { ctx, videoRefs } = resources;
-    const { project, sources, editingZoomId, previewZoomRect } = state;
+    const { project, editingZoomId, previewZoomRect } = state;
     const outputSize = project.settings.outputSize;
 
-    const screenSource = sources[project.timeline.screenSourceId];
+    const screenSource = project.screenSource;
 
     // Force Full Viewport (Ignore current Zoom) so user can see context
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // Render Screen Layer
-    if (screenSource) {
+    if (screenSource.id) {
         const video = videoRefs[screenSource.id];
         if (video) {
             drawScreen(
                 ctx,
                 video,
                 project,
-                sources,
                 effectiveViewport,
                 resources.deviceFrameImg
             );
@@ -55,8 +52,7 @@ export const renderZoomEditor = (
     // Render Camera Layer (Relative to Zoom)
     // 1. Get Camera Source and Settings
     const cameraSettings = project.settings.camera;
-    const cameraSourceId = project.timeline.cameraSourceId;
-    const cameraSource = cameraSourceId ? sources[cameraSourceId] : undefined;
+    const cameraSource = project.cameraSource;
 
     // Only render if we have a camera source and it's enabled
     if (cameraSource && cameraSettings) {

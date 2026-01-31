@@ -21,9 +21,7 @@ export const CameraSettings = () => {
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const cameraConfig = project.settings.camera;
-
-    const sources = useProjectStore(s => s.sources);
-    const cameraSource = project.timeline.cameraSourceId ? sources[project.timeline.cameraSourceId] : null;
+    const cameraSource = project.cameraSource;
 
     if (!cameraConfig) {
         return (
