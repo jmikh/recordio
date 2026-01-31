@@ -1,5 +1,6 @@
 import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
 import { ViewMapper } from '../viewMapper';
+import { rectContainsRect, clampViewportToBounds } from '../geometry';
 
 export * from '../viewMapper';
 
@@ -16,12 +17,7 @@ export function calculateZoomSchedule(
 
     if (focusAreas.length === 0) return [];
 
-    const isRectContained = (inner: Rect, outer: Rect): boolean => {
-        return inner.x >= outer.x &&
-            inner.y >= outer.y &&
-            (inner.x + inner.width) <= (outer.x + outer.width) &&
-            (inner.y + inner.height) <= (outer.y + outer.height);
-    };
+
 
     const actions: ZoomAction[] = [];
     const outputVideoSize = viewMapper.outputVideoSize;
@@ -54,7 +50,7 @@ export function calculateZoomSchedule(
             targetViewport = getViewport(mustSeeRect, maxZoom, viewMapper);
         }
 
-        const mustSeeFits = isRectContained(mustSeeRect, lastViewport);
+        const mustSeeFits = rectContainsRect(lastViewport, mustSeeRect);
         const sizeChanged = Math.abs(targetViewport.width - lastViewport.width) > 0.1;
 
         let shouldGenerateAction = (!mustSeeFits || sizeChanged)
@@ -174,21 +170,7 @@ function getViewport(
         height: viewportHeight
     };
 
-    return clampViewport(viewport, outputSize);
-}
-
-function clampViewport(viewport: Rect, outputSize: Size): Rect {
-    let { x, y, width, height } = viewport;
-
-    const maxX = outputSize.width - width;
-    if (x < 0) x = 0;
-    else if (x > maxX) x = maxX;
-
-    const maxY = outputSize.height - height;
-    if (y < 0) y = 0;
-    else if (y > maxY) y = maxY;
-
-    return { x, y, width, height };
+    return clampViewportToBounds(viewport, outputSize);
 }
 
 // ============================================================================

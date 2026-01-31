@@ -1,6 +1,7 @@
 import { EventType, type BaseEvent, type Rect, type Size, type UserEvents, type FocusArea } from '../types';
 import { TimeMapper } from '../timeMapper';
 import { HoverDetector } from './hoverDetector';
+import { clampRectToBounds, enlargeRect, DEFAULT_ENLARGE_FACTOR } from '../geometry';
 
 // Re-export FocusArea from types for backward compatibility
 export type { FocusArea } from '../types';
@@ -252,28 +253,17 @@ class FocusManager {
         }
 
         if (target.targetRect) {
-            rect = target.targetRect;
+            // Enlarge rect while maintaining center, then clamp to viewport
+            rect = enlargeRect(target.targetRect, DEFAULT_ENLARGE_FACTOR);
         } else {
             console.warn('No targetRect found for event', target);
             return this.fullViewportRect;
         }
 
-        return this.clampRectToViewport(rect);
+        return clampRectToBounds(rect, this.fullViewportRect);
     }
 
-    /**
-     * Clamps a rect to stay within the viewport bounds.
-     */
-    private clampRectToViewport(rect: Rect): Rect {
-        const viewport = this.fullViewportRect;
 
-        const x = Math.max(0, Math.min(rect.x, viewport.width - 1));
-        const y = Math.max(0, Math.min(rect.y, viewport.height - 1));
-        const width = Math.min(rect.width, viewport.width - x);
-        const height = Math.min(rect.height, viewport.height - y);
-
-        return { x, y, width, height };
-    }
 
     // ========================================================================
     // Time Remapping

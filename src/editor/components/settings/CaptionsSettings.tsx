@@ -40,7 +40,7 @@ export function CaptionsSettings() {
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const captions = project.timeline.captions;
-    const settings = project.settings.captions || { visible: true, size: 24, width: 75 };
+    const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true };
 
     const timeMapper = useTimeMapper();
 
@@ -323,6 +323,14 @@ export function CaptionsSettings() {
                         <Toggle
                             value={settings.visible}
                             onChange={(value) => updateSettings({ captions: { ...settings, visible: value } })}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-text-main">Word Highlight</label>
+                        <Toggle
+                            value={settings.wordHighlight ?? true}
+                            onChange={(value) => updateSettings({ captions: { ...settings, wordHighlight: value } })}
                         />
                     </div>
 

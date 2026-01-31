@@ -1,4 +1,5 @@
 import type { Size, Point, Rect } from './types';
+import { getIntersection } from './geometry';
 
 export interface MappedPoint extends Point {
     visible: boolean;
@@ -228,17 +229,4 @@ export class ViewMapper {
             height: bottomRightScreen.y - topLeftScreen.y
         };
     }
-}
-
-// Helper
-function getIntersection(r1: Rect, r2: Rect): Rect | null {
-    const x = Math.max(r1.x, r2.x);
-    const y = Math.max(r1.y, r2.y);
-    const width = Math.min(r1.x + r1.width, r2.x + r2.width) - x;
-    const height = Math.min(r1.y + r1.height, r2.y + r2.height) - y;
-
-    if (width <= 0 || height <= 0) {
-        return null;
-    }
-    return { x, y, width, height };
 }

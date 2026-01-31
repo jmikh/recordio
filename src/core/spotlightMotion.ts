@@ -1,5 +1,6 @@
-import type { SpotlightAction, SpotlightSettings, Size, Rect } from './types';
+import type { SpotlightAction, SpotlightSettings, Rect } from './types';
 import { ViewMapper } from './viewMapper';
+import { scaleRectFromCenter, clampRectToBounds } from './geometry';
 
 // ============================================================================
 // Spotlight State
@@ -128,7 +129,7 @@ export function getSpotlightStateAtTime(
 
     if (isVisible) {
         // Clamp to output bounds
-        const clampedRect = clampRectToOutput(mappedRect, outputSize);
+        const clampedRect = clampRectToBounds(mappedRect, outputSize);
         const scaledRect = scaleRectFromCenter(clampedRect, currentScale);
 
         return {
@@ -172,34 +173,6 @@ function applyEasing(t: number): number {
         : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-/**
- * Scales a rectangle from its center point.
- */
-function scaleRectFromCenter(rect: Rect, scale: number): Rect {
-    const centerX = rect.x + rect.width / 2;
-    const centerY = rect.y + rect.height / 2;
-    const newWidth = rect.width * scale;
-    const newHeight = rect.height * scale;
-
-    return {
-        x: centerX - newWidth / 2,
-        y: centerY - newHeight / 2,
-        width: newWidth,
-        height: newHeight
-    };
-}
-
-/**
- * Clamps a rectangle to stay within output bounds.
- */
-function clampRectToOutput(rect: Rect, outputSize: Size): Rect {
-    const x = Math.max(0, rect.x);
-    const y = Math.max(0, rect.y);
-    const width = Math.min(rect.width, outputSize.width - x);
-    const height = Math.min(rect.height, outputSize.height - y);
-
-    return { x, y, width, height };
-}
 
 // ============================================================================
 // Validation Utilities

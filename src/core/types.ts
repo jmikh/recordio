@@ -122,6 +122,7 @@ export interface CaptionSettings {
     visible: boolean;
     size: number; // Font size in pixels
     width: number; // Maximum width as percentage of canvas width (0-100)
+    wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
 }
 
 /**
