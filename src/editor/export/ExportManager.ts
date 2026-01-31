@@ -118,8 +118,9 @@ export class ExportManager {
 
         try {
             const bgSettings = renderProject.settings.background;
-            if (bgSettings.type === 'image' && bgSettings.imageUrl) {
-                const bgUrl = bgSettings.imageUrl;
+            if (bgSettings.type === 'preset' || bgSettings.type === 'custom') {
+                // Prefer customRuntimeUrl (uploaded), fallback to imageUrl (preset)
+                const bgUrl = bgSettings.customRuntimeUrl || bgSettings.imageUrl;
                 if (bgUrl) {
                     imageElements.bg = await loadImage(bgUrl);
                 }

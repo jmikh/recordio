@@ -52,18 +52,18 @@ export const BackgroundSettings = () => {
 
     const { settings } = project;
     const { background } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, sourceId: backgroundSourceId, customSourceId: customBackgroundSourceId, gradientColors, gradientDirection, backgroundBlur } = background;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customStorageUrl, customRuntimeUrl, gradientColors, gradientDirection, backgroundBlur } = background;
 
     // Helpers to determine active state
     const isSolid = backgroundType === 'solid';
     const isGradient = backgroundType === 'gradient';
     const isColorMode = isSolid || isGradient;
 
-    // Preset active if image mode AND no source ID (implies generic url) AND url matches
-    const isPreset = backgroundType === 'image' && !backgroundSourceId && !!backgroundImageUrl;
+    // Preset active if type is 'preset'
+    const isPreset = backgroundType === 'preset';
 
-    // Custom active if image mode AND source ID present
-    const isCustom = backgroundType === 'image' && !!backgroundSourceId;
+    // Custom active if type is 'custom'
+    const isCustom = backgroundType === 'custom';
 
     // --- Undo/Redo Batching Helpers ---
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -107,19 +107,21 @@ export const BackgroundSettings = () => {
     const handlePresetSelect = (url: string) => {
         updateSettings({
             background: {
-                type: 'image',
+                type: 'preset',
                 imageUrl: url,
-                sourceId: undefined
+                customStorageUrl: undefined,
+                customRuntimeUrl: undefined
             }
         });
     };
 
     const handleCustomSelect = () => {
-        if (customBackgroundSourceId && !isCustom) {
+        if (customStorageUrl && !isCustom) {
+            // Re-select existing custom background
             updateSettings({
                 background: {
-                    type: 'image',
-                    sourceId: customBackgroundSourceId
+                    type: 'custom',
+                    imageUrl: undefined
                 }
             });
         } else {
@@ -132,12 +134,14 @@ export const BackgroundSettings = () => {
         if (!file) return;
 
         try {
-            const newSourceId = await addBackgroundSource(file);
+            // addBackgroundSource now returns { storageUrl, runtimeUrl }
+            const { storageUrl, runtimeUrl } = await addBackgroundSource(file);
             updateSettings({
                 background: {
-                    type: 'image',
-                    sourceId: newSourceId,
-                    customSourceId: newSourceId
+                    type: 'custom',
+                    imageUrl: undefined,
+                    customStorageUrl: storageUrl,
+                    customRuntimeUrl: runtimeUrl
                 }
             });
         } catch (err) {
@@ -147,8 +151,8 @@ export const BackgroundSettings = () => {
         }
     };
 
-    // Custom background URLs are stored in background.imageUrl when uploaded
-    const customSource = customBackgroundSourceId ? { url: background.imageUrl } : null;
+    // URL for rendering custom background thumbnail
+    const customBackgroundUrl = customRuntimeUrl;
 
     // Popover State
     const [showColorPopover, setShowColorPopover] = useState(false);
@@ -277,10 +281,10 @@ export const BackgroundSettings = () => {
                                     }`}
                                 title="Upload Image"
                             >
-                                {customSource && (
-                                    <img src={customSource.url} className="absolute inset-0 w-full h-full object-cover" />
+                                {customBackgroundUrl && (
+                                    <img src={customBackgroundUrl} className="absolute inset-0 w-full h-full object-cover" />
                                 )}
-                                <div className={`flex items-center justify-center p-1.5 text-text-highlighted rounded-full ${customSource ? 'bg-black/40  z-10' : 'bg-transparent'}`}>
+                                <div className={`flex items-center justify-center p-1.5 text-text-highlighted rounded-full ${customBackgroundUrl ? 'bg-black/40  z-10' : 'bg-transparent'}`}>
                                     <CiImageOn size={20} />
                                 </div>
                                 <input
@@ -321,7 +325,7 @@ export const BackgroundSettings = () => {
             {/* Effects */}
             <div className="flex flex-col gap-4 pt-4 border-t border-border">
                 {/* Blur */}
-                {backgroundType === 'image' && (
+                {(backgroundType === 'preset' || backgroundType === 'custom') && (
                     <Slider
                         label="Blur"
                         min={0}

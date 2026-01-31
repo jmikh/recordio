@@ -90,14 +90,17 @@ export interface ScreenSettings extends StyleSettings {
 }
 
 export interface BackgroundSettings {
-    type: 'solid' | 'gradient' | 'image';
+    type: 'solid' | 'gradient' | 'preset' | 'custom';
     color: string;
     gradientColors: [string, string];
     gradientDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
-    imageUrl?: string; // For presets
-    sourceId?: string; // For 'image' type (uploaded)
-    customSourceId?: string; // For 'image' type (uploaded)
-    lastColorMode: 'gradient' | 'solid'; // To remember state
+    /** Static URL for preset backgrounds (type: 'preset') */
+    imageUrl?: string;
+    /** Persistent URL for custom uploads (type: 'custom'). recordio-blob:// protocol. */
+    customStorageUrl?: string;
+    /** Transient blob URL for custom uploads. Populated on load, never saved. */
+    customRuntimeUrl?: string;
+    lastColorMode: 'gradient' | 'solid';
     backgroundBlur: number;
 }
 
@@ -185,7 +188,6 @@ export interface ProjectSettings {
 
 /**
  * Represents a raw media asset (File) that has been imported.
- * Heavy event data is stored externally and referenced via eventsUrl.
  */
 export interface SourceMetadata {
     id: ID;
@@ -200,9 +202,6 @@ export interface SourceMetadata {
      * Populated on load, used for playback. Never persisted.
      */
     runtimeUrl?: string;
-
-    // Pointer to the external JSON containing UserEvents
-    eventsUrl?: string;
 
     // Metadata
     /** Total duration of the source file in milliseconds */
@@ -223,8 +222,8 @@ export interface SourceMetadata {
 // ==========================================
 
 /**
- * Structure of the external JSON file pointed to by SourceMetadata.eventsUrl.
- * Contains raw recorded interactions categorized by type.
+ * User interaction events recorded during screen capture.
+ * Embedded directly in the Project object.
  */
 export interface UserEvents {
     mouseClicks: BaseEvent[];

@@ -6,7 +6,7 @@
  */
 
 import JSZip from 'jszip';
-import type { Project, SourceMetadata } from '../../core/types';
+import type { Project } from '../../core/types';
 import { ProjectStorage } from '../../storage/projectStorage';
 
 interface ExportManifest {
@@ -32,69 +32,31 @@ export class ProjectDebugImporter {
         const manifestText = await manifestFile.async('text');
         const manifest: ExportManifest = JSON.parse(manifestText);
 
-        if (manifest.version !== 1) {
-            throw new Error(`Unsupported export version: ${manifest.version}`);
+        if (manifest.version !== 2) {
+            throw new Error(`Unsupported export version: ${manifest.version}. Only v2 exports are supported.`);
         }
 
         console.log(`[DebugImporter] Importing project: ${manifest.projectName} (${manifest.projectId})`);
 
-        // 2. Import recordings first (blobs)
-        const recordingsFolder = zip.folder('recordings');
-        if (recordingsFolder) {
-            const recordingFiles = Object.keys(zip.files).filter(path =>
-                path.startsWith('recordings/') && path.endsWith('.blob')
-            );
+        // 2. Import all recordings (webm videos and png backgrounds)
+        const recordingFiles = Object.keys(zip.files).filter(path =>
+            path.startsWith('recordings/') && !path.endsWith('/')
+        );
 
-            for (const path of recordingFiles) {
-                const blobId = path.replace('recordings/', '').replace('.blob', '');
-                const fileEntry = zip.file(path);
-                if (fileEntry) {
-                    const arrayBuffer = await fileEntry.async('arraybuffer');
-                    const blob = new Blob([arrayBuffer]);
-                    await ProjectStorage.saveRecordingBlob(blobId, blob);
-                    console.log(`[DebugImporter] Imported recording: ${blobId}`);
-                }
+        for (const path of recordingFiles) {
+            const filename = path.replace('recordings/', '');
+            const blobId = filename.replace(/\.(webm|png)$/, '');
+            const fileEntry = zip.file(path);
+            if (fileEntry) {
+                const arrayBuffer = await fileEntry.async('arraybuffer');
+                const mimeType = filename.endsWith('.webm') ? 'video/webm' : 'image/png';
+                const blob = new Blob([arrayBuffer], { type: mimeType });
+                await ProjectStorage.saveRecordingBlob(blobId, blob);
+                console.log(`[DebugImporter] Imported recording: ${blobId}`);
             }
         }
 
-        // 3. Import events (JSON blobs stored as recordings)
-        const eventsFolder = zip.folder('events');
-        if (eventsFolder) {
-            const eventFiles = Object.keys(zip.files).filter(path =>
-                path.startsWith('events/') && path.endsWith('.json')
-            );
-
-            for (const path of eventFiles) {
-                const eventsBlobId = path.replace('events/', '').replace('.json', '');
-                const fileEntry = zip.file(path);
-                if (fileEntry) {
-                    const text = await fileEntry.async('text');
-                    const blob = new Blob([text], { type: 'application/json' });
-                    await ProjectStorage.saveRecordingBlob(eventsBlobId, blob);
-                    console.log(`[DebugImporter] Imported events: ${eventsBlobId}`);
-                }
-            }
-        }
-
-        // 4. Import sources
-        const sourcesFolder = zip.folder('sources');
-        if (sourcesFolder) {
-            const sourceFiles = Object.keys(zip.files).filter(path =>
-                path.startsWith('sources/') && path.endsWith('.json')
-            );
-
-            for (const path of sourceFiles) {
-                const fileEntry = zip.file(path);
-                if (fileEntry) {
-                    const text = await fileEntry.async('text');
-                    const source: SourceMetadata = JSON.parse(text);
-                    await ProjectStorage.saveSource(source);
-                    console.log(`[DebugImporter] Imported source: ${source.id}`);
-                }
-            }
-        }
-
-        // 5. Import project
+        // 3. Import project (sources and events are embedded)
         const projectFile = zip.file('project.json');
         if (!projectFile) {
             throw new Error('Invalid debug export: missing project.json');
@@ -111,7 +73,7 @@ export class ProjectDebugImporter {
         await ProjectStorage.saveProject(project);
         console.log(`[DebugImporter] Imported project: ${project.id}`);
 
-        // 6. Import thumbnail
+        // 4. Import thumbnail
         const thumbnailFile = zip.file('thumbnail.png');
         if (thumbnailFile) {
             const arrayBuffer = await thumbnailFile.async('arraybuffer');

@@ -1,7 +1,7 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, SourceMetadata } from '../../core/types';
+import type { Project, ID } from '../../core/types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
@@ -22,7 +22,7 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlic
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
-    addBackgroundSource: (file: Blob, metadata?: Partial<SourceMetadata>) => Promise<ID>;
+    addBackgroundSource: (file: Blob) => Promise<{ storageUrl: string; runtimeUrl: string }>;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
@@ -90,34 +90,18 @@ export const useProjectStore = create<ProjectState>()(
                     const state = get();
                     const projectId = state.project.id;
                     const uuid = crypto.randomUUID();
+                    const blobId = `${projectId}-bg-${uuid}`;
 
-                    // ID Strategy: {projectId}-src-{uuid}
-                    // ID Strategy: {projectId}-rec-{uuid} (for blob)
-                    const sourceId = `${projectId}-src-${uuid}`;
-                    const blobId = `${projectId}-rec-${uuid}`;
+                    console.log(`[Store] Adding Background: ${blobId}`);
 
-                    console.log(`[Store] Adding Background Source: ${sourceId}`);
-
-                    // 1. Save Blob (Heavy)
+                    // 1. Save Blob to recordings store
                     await ProjectStorage.saveRecordingBlob(blobId, blob);
 
-                    // 2. Store reference in project settings
-                    set((state) => ({
-                        project: {
-                            ...state.project,
-                            settings: {
-                                ...state.project.settings,
-                                background: {
-                                    ...state.project.settings.background,
-                                    sourceId: sourceId,
-                                    customSourceId: blobId
-                                }
-                            },
-                            updatedAt: new Date()
-                        }
-                    }));
+                    // 2. Create URLs
+                    const storageUrl = `recordio-blob://${blobId}`;
+                    const runtimeUrl = URL.createObjectURL(blob);
 
-                    return sourceId;
+                    return { storageUrl, runtimeUrl };
                 },
 
                 updateProjectName: (name: string) => {

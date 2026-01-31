@@ -1,8 +1,10 @@
 /**
  * ProjectDebugExporter
  * 
- * Exports a complete project (settings, sources, recordings, events, thumbnail)
+ * Exports a complete project (settings, sources, recordings, thumbnail)
  * into a zip file for debugging purposes.
+ * 
+ * Sources and events are now embedded directly in the Project object.
  */
 
 import JSZip from 'jszip';
@@ -10,7 +12,7 @@ import type { Project, ID, SourceMetadata } from '../../core/types';
 import { ProjectStorage } from '../../storage/projectStorage';
 
 interface ExportManifest {
-    version: 1;
+    version: 2;  // Bumped version for new embedded format
     exportedAt: string;
     projectId: ID;
     projectName: string;
@@ -26,103 +28,85 @@ export class ProjectDebugExporter {
 
         // 1. Create manifest
         const manifest: ExportManifest = {
-            version: 1,
+            version: 2,
             exportedAt: new Date().toISOString(),
             projectId: project.id,
             projectName: project.name
         };
         zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
-        // 2. Export project JSON (with internal blob:// URLs converted back to recordio-blob://)
-        const projectToExport = await this.dehydrateProject(project);
+        // 2. Export project JSON (strip runtimeUrl, keep storageUrl)
+        const projectToExport = this.prepareProjectForExport(project);
         zip.file('project.json', JSON.stringify(projectToExport, null, 2));
 
-        // 3. Get all referenced source IDs from embedded sources
-        const sourceIds: ID[] = [project.screenSource.id];
-        if (project.cameraSource) {
-            sourceIds.push(project.cameraSource.id);
-        }
-
-        // 4. Export sources and their recordings
-        const sourcesFolder = zip.folder('sources');
+        // 3. Extract recordings from embedded sources
         const recordingsFolder = zip.folder('recordings');
-        const eventsFolder = zip.folder('events');
 
-        for (const sourceId of sourceIds) {
-            // Load source metadata from DB (unhydrated form)
-            const source = await this.loadSourceUnhydrated(sourceId);
-            if (!source) {
-                console.warn(`[DebugExporter] Source ${sourceId} not found, skipping`);
-                continue;
-            }
+        // Export screen recording
+        await this.exportSourceRecording(project.screenSource, recordingsFolder);
 
-            // Save source metadata
-            sourcesFolder?.file(`${sourceId}.json`, JSON.stringify(source, null, 2));
+        // Export camera recording (if present)
+        if (project.cameraSource) {
+            await this.exportSourceRecording(project.cameraSource, recordingsFolder);
+        }
 
-            // Extract and save recording blob
-            if (source.storageUrl && source.storageUrl.startsWith('recordio-blob://')) {
-                const blobId = source.storageUrl.replace('recordio-blob://', '');
-                const blob = await ProjectStorage.getRecordingBlob(blobId);
-                if (blob) {
-                    const arrayBuffer = await blob.arrayBuffer();
-                    recordingsFolder?.file(`${blobId}.blob`, arrayBuffer);
-                } else {
-                    console.warn(`[DebugExporter] Recording blob ${blobId} not found`);
-                }
-            }
-
-            // Extract and save events
-            if (source.eventsUrl && source.eventsUrl.startsWith('recordio-blob://')) {
-                const eventsBlobId = source.eventsUrl.replace('recordio-blob://', '');
-                const eventsBlob = await ProjectStorage.getRecordingBlob(eventsBlobId);
-                if (eventsBlob) {
-                    const eventsText = await eventsBlob.text();
-                    eventsFolder?.file(`${eventsBlobId}.json`, eventsText);
-                } else {
-                    console.warn(`[DebugExporter] Events blob ${eventsBlobId} not found`);
-                }
+        // Export custom background (if present)
+        if (project.settings.background.customStorageUrl?.startsWith('recordio-blob://')) {
+            const blobId = project.settings.background.customStorageUrl.replace('recordio-blob://', '');
+            const blob = await ProjectStorage.getRecordingBlob(blobId);
+            if (blob) {
+                const arrayBuffer = await blob.arrayBuffer();
+                recordingsFolder?.file(`${blobId}.png`, arrayBuffer);
+                console.log(`[DebugExporter] Exported custom background: ${blobId}`);
             }
         }
 
-        // 5. Export thumbnail
+        // 4. Export thumbnail
         const thumbnailBlob = await ProjectStorage.getThumbnail(projectId);
         if (thumbnailBlob) {
             const arrayBuffer = await thumbnailBlob.arrayBuffer();
             zip.file('thumbnail.png', arrayBuffer);
         }
 
-        // 6. Generate and download zip
+        // 5. Generate and download zip
         const content = await zip.generateAsync({ type: 'blob' });
         this.downloadBlob(content, `${project.name}-debug.zip`);
     }
 
     /**
-     * Load source metadata without hydrating the URL.
-     * We need the original recordio-blob:// URL for export.
+     * Export a source's recording blob to the zip.
      */
-    private static async loadSourceUnhydrated(sourceId: ID): Promise<SourceMetadata | undefined> {
-        const db = await ProjectStorage.getDB();
-        return new Promise<SourceMetadata | undefined>((resolve, reject) => {
-            const tx = db.transaction('sources', 'readonly');
-            const store = tx.objectStore('sources');
-            const req = store.get(sourceId);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
+    private static async exportSourceRecording(
+        source: SourceMetadata,
+        recordingsFolder: JSZip | null
+    ): Promise<void> {
+        if (!source.storageUrl?.startsWith('recordio-blob://')) {
+            console.warn(`[DebugExporter] Source ${source.id} has no valid storageUrl`);
+            return;
+        }
+
+        const blobId = source.storageUrl.replace('recordio-blob://', '');
+        const blob = await ProjectStorage.getRecordingBlob(blobId);
+
+        if (blob) {
+            const arrayBuffer = await blob.arrayBuffer();
+            recordingsFolder?.file(`${blobId}.webm`, arrayBuffer);
+            console.log(`[DebugExporter] Exported recording: ${blobId}`);
+        } else {
+            console.warn(`[DebugExporter] Recording blob ${blobId} not found`);
+        }
     }
 
     /**
-     * Dehydrate a project - convert any blob: URLs back to recordio-blob:// format.
-     * This ensures the export contains the persistent internal protocol URLs.
+     * Prepare project for export by stripping transient runtimeUrl fields.
      */
-    private static async dehydrateProject(project: Project): Promise<Project> {
-        // The project object itself doesn't store blob URLs directly,
-        // but we need to ensure any settings with URLs are handled properly.
-        // For now, the project.settings.background.imageUrl might need handling
-        // if it's a blob: URL, but typically it stores preset URLs or sourceId references.
-
-        // Return a clean copy
-        return JSON.parse(JSON.stringify(project, (_key, value) => {
+    private static prepareProjectForExport(project: Project): Project {
+        // Create a clean copy, stripping runtime URLs and converting Dates
+        return JSON.parse(JSON.stringify(project, (key, value) => {
+            // Skip transient runtime URLs
+            if (key === 'runtimeUrl' || key === 'customRuntimeUrl') {
+                return undefined;
+            }
             // Convert Date objects to ISO strings
             if (value instanceof Date) {
                 return value.toISOString();

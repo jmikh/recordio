@@ -213,7 +213,8 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // RESOURCE HELPERS
     // -----------------------------------------------------------
-    const bgUrl = project.settings.background.imageUrl;
+    // For backgrounds: prefer customRuntimeUrl (uploaded), fallback to imageUrl (preset)
+    const bgUrl = project.settings.background.customRuntimeUrl || project.settings.background.imageUrl;
 
     // Device frame URL for caching
     const deviceFrame = project.settings.screen.mode === 'device'
@@ -254,7 +255,7 @@ export const CanvasContainer = () => {
             >
                 {/* HIDDEN RESOURCES LAYER */}
                 <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
-                    {project.settings.background.type === 'image' && bgUrl && (
+                    {(project.settings.background.type === 'preset' || project.settings.background.type === 'custom') && bgUrl && (
                         <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin={bgUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
                     {deviceFrame && (

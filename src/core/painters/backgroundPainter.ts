@@ -40,8 +40,8 @@ export const drawBackground = (
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, w, h);
     }
-    // 3. Image (Cover Mode)
-    else if (background.type === 'image' && bgImage) {
+    // 3. Image (Cover Mode) - for both preset and custom backgrounds
+    else if ((background.type === 'preset' || background.type === 'custom') && bgImage) {
         if (bgImage.complete && bgImage.naturalWidth > 0) {
             const imgW = bgImage.naturalWidth;
             const imgH = bgImage.naturalHeight;
