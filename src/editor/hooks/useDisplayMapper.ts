@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { DisplayMapper } from '../../core/displayMapper';
+import { DisplayMapper } from '../../core/mappers/displayMapper';
 import type { Size } from '../../core/types';
 
 /**

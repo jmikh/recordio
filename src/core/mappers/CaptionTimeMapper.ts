@@ -1,4 +1,4 @@
-import type { CaptionSegment } from './types';
+import type { CaptionSegment } from '../types';
 import { TimeMapper } from './timeMapper';
 
 /**
@@ -71,5 +71,37 @@ export class CaptionTimeMapper {
         }
 
         return visible;
+    }
+
+    /**
+     * Calculates which word should be highlighted based on elapsed time in segment.
+     * Uses letter count + base value for proportional timing.
+     * 
+     * @param words Array of words in the segment
+     * @param elapsedRatio How far through the segment we are (0-1)
+     * @returns Index of the word that should be highlighted, or -1 if no words
+     */
+    getHighlightedWordIndex(words: string[], elapsedRatio: number): number {
+        if (words.length === 0) return -1;
+        if (words.length === 1) return 0;
+
+        // Base value added to each word's letter count for more even distribution
+        const WORD_BASE_VALUE = 3;
+
+        // Calculate weighted values for each word (letter count + base)
+        const weights = words.map(word => word.length + WORD_BASE_VALUE);
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+        // Find which word we're in based on cumulative thresholds
+        let cumulative = 0;
+        for (let i = 0; i < words.length; i++) {
+            cumulative += weights[i] / totalWeight;
+            if (elapsedRatio < cumulative) {
+                return i;
+            }
+        }
+
+        // Edge case: exactly at 1.0
+        return words.length - 1;
     }
 }

@@ -1,8 +1,8 @@
 import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
-import { ViewMapper } from '../viewMapper';
+import { ViewMapper } from '../mappers/viewMapper';
 import { rectContainsRect, clampViewportToBounds } from '../geometry';
 
-export * from '../viewMapper';
+export * from '../mappers/viewMapper';
 
 // ============================================================================
 // Core Abstractions

@@ -1,5 +1,5 @@
 import type { Size, Rect, Project } from '../types';
-import type { SpotlightState } from '../spotlightMotion';
+import type { SpotlightState } from '../spotlight/spotlightMotion';
 import { drawScreen } from './screenPainter';
 import type { ProjectState } from '../../editor/stores/useProjectStore';
 

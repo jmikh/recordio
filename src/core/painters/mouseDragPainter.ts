@@ -1,5 +1,5 @@
 import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../types';
-import type { ViewMapper } from '../viewMapper';
+import type { ViewMapper } from '../mappers/viewMapper';
 
 /**
  * Extracts the mouse positions that fall within the drag time range.

@@ -7,7 +7,7 @@ import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
-import { DisplayMapper } from '../../../core/displayMapper';
+import { DisplayMapper } from '../../../core/mappers/displayMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';

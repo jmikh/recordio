@@ -1,5 +1,5 @@
 import type { BaseEvent, Rect } from '../types';
-import type { ViewMapper } from '../viewMapper';
+import type { ViewMapper } from '../mappers/viewMapper';
 
 /**
  * Draws click effects.

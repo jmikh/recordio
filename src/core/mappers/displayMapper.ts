@@ -1,4 +1,4 @@
-import type { Rect, Size } from './types';
+import type { Rect, Size } from '../types';
 
 /**
  * Per-corner border radius tuple [topLeft, topRight, bottomRight, bottomLeft].

@@ -1,5 +1,5 @@
-import type { Size, Point, Rect } from './types';
-import { getIntersection } from './geometry';
+import type { Size, Point, Rect } from '../types';
+import { getIntersection } from '../geometry';
 
 export interface MappedPoint extends Point {
     visible: boolean;

@@ -1,4 +1,4 @@
-import { TimeMapper } from '../../core/timeMapper';
+import { TimeMapper } from '../../core/mappers/timeMapper';
 
 /**
  * Utility for converting between timeline pixel positions and time values.

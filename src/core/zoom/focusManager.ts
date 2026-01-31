@@ -1,5 +1,5 @@
 import { EventType, type BaseEvent, type Rect, type Size, type UserEvents, type FocusArea } from '../types';
-import { TimeMapper } from '../timeMapper';
+import { TimeMapper } from '../mappers/timeMapper';
 import { HoverDetector } from './hoverDetector';
 import { clampRectToBounds, enlargeRect, DEFAULT_ENLARGE_FACTOR } from '../geometry';
 
@@ -15,14 +15,8 @@ const K_INACTIVITY_THRESHOLD_MS = 5000;
 /** Wait before starting the inactivity zoom-out */
 const K_INACTIVITY_ZOOM_BUFFER_MS = 2000;
 
-/** Size of the hover detection bounding box (fraction of larger screen dimension) */
-const K_HOVER_BOX_FRACTION = 0.2;
-
 /** Size of the click detection box - fallback when no targetRect (fraction of larger screen dimension) */
 const K_CLICK_BOX_FRACTION = 0.2;
-
-/** Minimum movement required to start a new hover (fraction of larger screen dimension) */
-const K_MIN_HOVER_MOVEMENT_FRACTION = 0.1;
 
 // ============================================================================
 // Focus Manager
@@ -74,8 +68,7 @@ class FocusManager {
 
         this.hoverDetector = new HoverDetector(
             filteredMousePositions,
-            largerDimension * K_HOVER_BOX_FRACTION,
-            largerDimension * K_MIN_HOVER_MOVEMENT_FRACTION
+            largerDimension
         );
     }
 

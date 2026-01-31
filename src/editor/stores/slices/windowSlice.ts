@@ -2,9 +2,9 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, ZoomAction, SpotlightAction } from '../../../core/types';
 import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
-import { calculateAutoSpotlights } from '../../../core/spotlightScheduler';
-import { ViewMapper } from '../../../core/viewMapper';
-import { TimeMapper } from '../../../core/timeMapper';
+import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
+import { ViewMapper } from '../../../core/mappers/viewMapper';
+import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {

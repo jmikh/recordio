@@ -9,7 +9,7 @@ import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 
 
 import { getViewportStateAtTime } from '../../../core/zoom';
-import { getSpotlightStateAtTime } from '../../../core/spotlightMotion';
+import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/cameraMotion';
 import { type FocusArea } from '../../../core/types';
@@ -67,7 +67,7 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
 
         // Render Screen Layer
-        let viewMapper: import('../../../core/viewMapper').ViewMapper | undefined;
+        let viewMapper: import('../../../core/mappers/viewMapper').ViewMapper | undefined;
 
         if (screenSource) {
             const video = videoRefs[screenSource.id];

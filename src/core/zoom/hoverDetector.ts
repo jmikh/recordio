@@ -4,6 +4,12 @@ import { EventType, type BaseEvent, type Point } from '../types';
 // Constants
 // ============================================================================
 
+/** Size of the hover detection bounding box (fraction of larger screen dimension) */
+const K_HOVER_BOX_FRACTION = 0.2;
+
+/** Minimum movement required to start a new hover (fraction of larger screen dimension) */
+const K_MIN_HOVER_MOVEMENT_FRACTION = 0.075;
+
 /** Minimum time mouse must stay in a region to be considered a hover (ms) */
 const K_HOVER_MIN_DURATION_MS = 1000;
 
@@ -62,10 +68,10 @@ export class HoverDetector {
     /** Current search position in the positions array */
     private currentIdx: number = 0;
 
-    constructor(positions: BaseEvent[], hoverBoxSize: number, minMovement: number) {
+    constructor(positions: BaseEvent[], largerDimension: number) {
         this.positions = positions;
-        this.hoverBoxSize = hoverBoxSize;
-        this.minMovement = minMovement;
+        this.hoverBoxSize = largerDimension * K_HOVER_BOX_FRACTION;
+        this.minMovement = largerDimension * K_MIN_HOVER_MOVEMENT_FRACTION;
     }
 
     // ========================================================================

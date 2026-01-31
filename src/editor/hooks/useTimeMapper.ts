@@ -1,6 +1,6 @@
 
 // Helper to get memoized TimeMapper
-import { TimeMapper } from '../../core/timeMapper';
+import { TimeMapper } from '../../core/mappers/timeMapper';
 import type { OutputWindow } from '../../core/types';
 import { useProjectStore } from '../stores/useProjectStore';
 

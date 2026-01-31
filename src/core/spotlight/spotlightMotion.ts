@@ -1,6 +1,6 @@
-import type { SpotlightAction, SpotlightSettings, Rect } from './types';
-import { ViewMapper } from './viewMapper';
-import { scaleRectFromCenter, clampRectToBounds } from './geometry';
+import type { SpotlightAction, SpotlightSettings, Rect } from '../types';
+import { ViewMapper } from '../mappers/viewMapper';
+import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
 
 // ============================================================================
 // Spotlight State

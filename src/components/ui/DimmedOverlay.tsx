@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Rect } from '../../core/types';
-import { DisplayMapper, type CornerRadii } from '../../core/displayMapper';
+import { DisplayMapper, type CornerRadii } from '../../core/mappers/displayMapper';
 
 interface DimmedOverlayProps {
     /** The rectangle to "cut out" (transparent hole) - in output coordinates */

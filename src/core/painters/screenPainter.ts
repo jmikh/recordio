@@ -1,5 +1,5 @@
 import type { Project, ID, SourceMetadata, Rect } from '../types';
-import { ViewMapper } from '../viewMapper';
+import { ViewMapper } from '../mappers/viewMapper';
 import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
 
