@@ -100,6 +100,8 @@ export interface BackgroundSettings {
     customStorageUrl?: string;
     /** Transient blob URL for custom uploads. Populated on load, never saved. */
     customRuntimeUrl?: string;
+    /** ID of the global library entry this background came from. Used for matching. */
+    customLibraryId?: string;
     lastColorMode: 'gradient' | 'solid';
     backgroundBlur: number;
 }

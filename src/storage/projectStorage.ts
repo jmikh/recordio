@@ -4,7 +4,16 @@ import type { ID, Project } from '../core/types';
 
 
 const DB_NAME = 'RecordioDB';
-const DB_VERSION = 3; // Bumped - removed sources store
+const DB_VERSION = 4; // Added customBackgrounds store
+
+/**
+ * Entry in the global custom backgrounds library.
+ */
+export interface CustomBackgroundEntry {
+    id: string;        // bg-{uuid}
+    blob: Blob;
+    createdAt: number; // timestamp
+}
 
 export class ProjectStorage {
     private static dbPromise: Promise<IDBDatabase> | null = null;
@@ -18,7 +27,7 @@ export class ProjectStorage {
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                // 1. Recordings Store (Blobs)
+                // 1. Recordings Store (Blobs - project-specific)
                 if (!db.objectStoreNames.contains('recordings')) {
                     db.createObjectStore('recordings', { keyPath: 'id' });
                 }
@@ -31,6 +40,11 @@ export class ProjectStorage {
                 // 3. Thumbnails Store (Blob storage for project previews)
                 if (!db.objectStoreNames.contains('thumbnails')) {
                     db.createObjectStore('thumbnails', { keyPath: 'id' });
+                }
+
+                // 4. Custom Backgrounds Store (Global library)
+                if (!db.objectStoreNames.contains('customBackgrounds')) {
+                    db.createObjectStore('customBackgrounds', { keyPath: 'id' });
                 }
 
                 // Remove legacy sources store if it exists
@@ -171,6 +185,17 @@ export class ProjectStorage {
                         customRuntimeUrl: URL.createObjectURL(blob)
                     }
                 };
+
+                // Auto-add to library if libraryId is set but not in library
+                const libraryId = project.settings.background.customLibraryId;
+                if (libraryId) {
+                    const existsInLibrary = await this.getCustomBackground(libraryId);
+                    if (!existsInLibrary) {
+                        // Re-add to library with same ID
+                        await this.saveCustomBackgroundWithId(libraryId, blob);
+                        console.log(`[ProjectStorage] Auto-added missing background to library: ${libraryId}`);
+                    }
+                }
             }
         }
 
@@ -279,6 +304,111 @@ export class ProjectStorage {
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    static async deleteRecordingBlob(id: ID): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('recordings', 'readwrite');
+            const store = tx.objectStore('recordings');
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // CUSTOM BACKGROUNDS LIBRARY (Global)
+    // ===========================================
+
+    /**
+     * Save a background image to the global library.
+     * Returns the generated ID.
+     */
+    static async saveCustomBackground(blob: Blob): Promise<string> {
+        const db = await this.getDB();
+        const id = `bg-${crypto.randomUUID()}`;
+        const entry: CustomBackgroundEntry = {
+            id,
+            blob,
+            createdAt: Date.now()
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customBackgrounds', 'readwrite');
+            const store = tx.objectStore('customBackgrounds');
+            const req = store.put(entry);
+            req.onsuccess = () => resolve(id);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Save a background image with a specific ID (for restoring deleted entries).
+     */
+    static async saveCustomBackgroundWithId(id: string, blob: Blob): Promise<void> {
+        const db = await this.getDB();
+        const entry: CustomBackgroundEntry = {
+            id,
+            blob,
+            createdAt: Date.now()
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customBackgrounds', 'readwrite');
+            const store = tx.objectStore('customBackgrounds');
+            const req = store.put(entry);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get all custom backgrounds from the library.
+     * Sorted by createdAt descending (newest first).
+     */
+    static async listCustomBackgrounds(): Promise<CustomBackgroundEntry[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customBackgrounds', 'readonly');
+            const store = tx.objectStore('customBackgrounds');
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const entries = req.result as CustomBackgroundEntry[];
+                // Sort by createdAt descending
+                entries.sort((a, b) => b.createdAt - a.createdAt);
+                resolve(entries);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get a specific custom background by ID.
+     */
+    static async getCustomBackground(id: string): Promise<Blob | undefined> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customBackgrounds', 'readonly');
+            const store = tx.objectStore('customBackgrounds');
+            const req = store.get(id);
+            req.onsuccess = () => resolve(req.result?.blob);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Delete a custom background from the library.
+     */
+    static async deleteCustomBackground(id: string): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customBackgrounds', 'readwrite');
+            const store = tx.objectStore('customBackgrounds');
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
         });
     }
 }

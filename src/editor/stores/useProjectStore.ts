@@ -22,7 +22,14 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlic
     // Actions
     loadProject: (project: Project) => Promise<void>;
     saveProject: () => Promise<void>;
-    addBackgroundSource: (file: Blob) => Promise<{ storageUrl: string; runtimeUrl: string }>;
+
+    // Background Library Actions
+    /** Upload to global library AND select for current project (copy-on-select) */
+    uploadAndSelectBackground: (file: Blob) => Promise<{ libraryId: string; storageUrl: string; runtimeUrl: string }>;
+    /** Select an existing library background for current project (copy-on-select) */
+    selectBackgroundFromLibrary: (libraryId: string) => Promise<{ libraryId: string; storageUrl: string; runtimeUrl: string }>;
+    /** Clear the current project's custom background copy */
+    clearProjectBackground: () => Promise<void>;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
@@ -86,22 +93,57 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                addBackgroundSource: async (blob) => {
+                uploadAndSelectBackground: async (blob) => {
                     const state = get();
                     const projectId = state.project.id;
-                    const uuid = crypto.randomUUID();
-                    const blobId = `${projectId}-bg-${uuid}`;
 
-                    console.log(`[Store] Adding Background: ${blobId}`);
+                    // 1. Save to global library
+                    const libraryId = await ProjectStorage.saveCustomBackground(blob);
+                    console.log(`[Store] Added to library: ${libraryId}`);
 
-                    // 1. Save Blob to recordings store
-                    await ProjectStorage.saveRecordingBlob(blobId, blob);
+                    // 2. Copy to project recordings
+                    const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
+                    await ProjectStorage.saveRecordingBlob(copyId, blob);
+                    console.log(`[Store] Created project copy: ${copyId}`);
 
-                    // 2. Create URLs
-                    const storageUrl = `recordio-blob://${blobId}`;
+                    // 3. Create URLs
+                    const storageUrl = `recordio-blob://${copyId}`;
                     const runtimeUrl = URL.createObjectURL(blob);
 
-                    return { storageUrl, runtimeUrl };
+                    return { libraryId, storageUrl, runtimeUrl };
+                },
+
+                selectBackgroundFromLibrary: async (libraryId) => {
+                    const state = get();
+                    const projectId = state.project.id;
+
+                    // 1. Get blob from library
+                    const blob = await ProjectStorage.getCustomBackground(libraryId);
+                    if (!blob) {
+                        throw new Error(`Background ${libraryId} not found in library`);
+                    }
+
+                    // 2. Copy to project recordings
+                    const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
+                    await ProjectStorage.saveRecordingBlob(copyId, blob);
+                    console.log(`[Store] Created project copy: ${copyId}`);
+
+                    // 3. Create URLs
+                    const storageUrl = `recordio-blob://${copyId}`;
+                    const runtimeUrl = URL.createObjectURL(blob);
+
+                    return { libraryId, storageUrl, runtimeUrl };
+                },
+
+                clearProjectBackground: async () => {
+                    const state = get();
+                    const currentUrl = state.project.settings.background.customStorageUrl;
+
+                    if (currentUrl?.startsWith('recordio-blob://')) {
+                        const blobId = currentUrl.replace('recordio-blob://', '');
+                        await ProjectStorage.deleteRecordingBlob(blobId);
+                        console.log(`[Store] Deleted project background copy: ${blobId}`);
+                    }
                 },
 
                 updateProjectName: (name: string) => {

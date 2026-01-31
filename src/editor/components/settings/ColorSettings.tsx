@@ -67,7 +67,7 @@ export const ColorSettings = ({
     };
 
     return (
-        <div className="p-4 bg-surface-overlay rounded-lg border border-border space-y-4 text-text-highlighted shadow-xl">
+        <div className="p-4  rounded-lg  space-y-4 text-text-highlighted shadow-xl">
             {/* Toggle */}
             <MultiToggle
                 options={[
@@ -80,24 +80,104 @@ export const ColorSettings = ({
 
             {/* Gradient Selector (Only if Gradient) */}
             {isGradient && (
-                <div className="flex gap-4 justify-center py-2">
-                    {safeGradient.colors.map((c, i) => (
+                <div className="flex gap-6 justify-center py-2 items-start">
+                    {/* Start Color */}
+                    <div
+                        onClick={() => setActiveGradientIndex(0)}
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                    >
                         <div
-                            key={i}
-                            onClick={() => setActiveGradientIndex(i as 0 | 1)}
-                            className={`cursor-pointer flex flex-col items-center gap-2`}
-                        >
-                            <div
-                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === i
-                                    ? 'border-ring ring-2 ring-ring/30 scale-110'
-                                    : 'border-border hover:border-border-hover'}`}
-                                style={{ backgroundColor: c }}
-                            />
-                            <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === i ? 'text-text-primary' : 'text-text-main'}`}>
-                                {i === 0 ? 'Start' : 'End'}
-                            </span>
+                            className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 0
+                                ? 'border-ring ring-2 ring-ring/30 scale-110'
+                                : 'border-border hover:border-border-hover'}`}
+                            style={{ backgroundColor: safeGradient.colors[0] }}
+                        />
+                        <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === 0 ? 'text-text-primary' : 'text-text-main'}`}>
+                            Start
+                        </span>
+                    </div>
+
+                    {/* End Color */}
+                    <div
+                        onClick={() => setActiveGradientIndex(1)}
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                    >
+                        <div
+                            className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 1
+                                ? 'border-ring ring-2 ring-ring/30 scale-110'
+                                : 'border-border hover:border-border-hover'}`}
+                            style={{ backgroundColor: safeGradient.colors[1] }}
+                        />
+                        <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === 1 ? 'text-text-primary' : 'text-text-main'}`}>
+                            End
+                        </span>
+                    </div>
+
+                    {/* Direction Circle */}
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="relative w-10 h-10 flex items-center justify-center">
+                            {/* Outer ring with border matching Start/End circles */}
+                            <div className="absolute inset-0 rounded-full border-2 border-border bg-surface shadow-sm" />
+
+                            {/* Direction dots on perimeter - sitting on the border */}
+                            {GRADIENT_DIRECTIONS.filter(d => !!d).map((dir) => {
+                                const isSelected = safeGradient.direction === dir;
+                                const angleMap: Record<string, number> = {
+                                    'N': -90, 'NE': -45, 'E': 0, 'SE': 45,
+                                    'S': 90, 'SW': 135, 'W': 180, 'NW': -135
+                                };
+                                const angle = angleMap[dir];
+                                const radius = 20; // Exactly on the 40px circle's border (half of 40px)
+                                const rad = (angle * Math.PI) / 180;
+                                const x = Math.cos(rad) * radius;
+                                const y = Math.sin(rad) * radius;
+
+                                return (
+                                    <button
+                                        key={dir}
+                                        onClick={() => handleDirectionClick(dir)}
+                                        className={`absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full transition-all z-10 
+                                            hover:w-4 hover:h-4 hover:-ml-2 hover:-mt-2
+                                            ${isSelected
+                                                ? 'bg-primary shadow-sm'
+                                                : 'bg-text-muted hover:bg-text-main'
+                                            }`}
+                                        style={{
+                                            left: '50%',
+                                            top: '50%',
+                                            marginLeft: `${x - 6}px`,
+                                            marginTop: `${y - 6}px`,
+                                        }}
+                                        title={dir}
+                                    />
+                                );
+                            })}
+
+                            {/* Center arrow showing selected direction */}
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-primary z-20 relative"
+                                style={{
+                                    transform: `rotate(${{ 'N': -90, 'NE': -45, 'E': 0, 'SE': 45, 'S': 90, 'SW': 135, 'W': 180, 'NW': -135 }[safeGradient.direction]
+                                        }deg)`
+                                }}
+                            >
+                                <path d="M5 12h14" />
+                                <path d="m12 5 7 7-7 7" />
+                            </svg>
                         </div>
-                    ))}
+                        <span className="text-[10px] font-bold text-text-main">
+                            Direction
+                        </span>
+                    </div>
                 </div>
             )}
 
@@ -142,74 +222,7 @@ export const ColorSettings = ({
                 </div>
             </div>
 
-            {/* Direction Compass (Only if Gradient) */}
-            {isGradient && (
-                <div className="border-t border-border pt-4 mt-2">
-                    <div className="flex flex-col gap-2 items-center">
-                        <label className="text-[10px] text-text-main font-semibold">Direction</label>
-                        <div className="relative w-32 h-32 flex items-center justify-center bg-surface rounded-full border border-border shadow-inner mt-2">
-                            {/* Center Dot */}
-                            <div className="absolute w-2 h-2 bg-text-main rounded-full z-10" />
 
-                            {GRADIENT_DIRECTIONS.filter(d => !!d).map((dir) => {
-                                const isSelected = safeGradient.direction === dir;
-                                // Map direction to rotation angle for visual placement
-                                // Standard Compass: N=0 (Up). But in CSS default is right? 
-                                // Let's use standard CSS absolute positioning with transforms.
-
-                                // Order in array: 'NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'
-                                // We need to map these to degrees:
-                                const angleMap: Record<string, number> = {
-                                    'N': -90, 'NE': -45, 'E': 0, 'SE': 45,
-                                    'S': 90, 'SW': 135, 'W': 180, 'NW': 225
-                                };
-                                const angle = angleMap[dir];
-
-                                // Calculate position on circle
-                                // Radius = 40px?
-                                const radius = 42;
-                                const rad = (angle * Math.PI) / 180;
-                                const x = Math.cos(rad) * radius;
-                                const y = Math.sin(rad) * radius;
-
-                                return (
-                                    <button
-                                        key={dir}
-                                        onClick={() => handleDirectionClick(dir)}
-                                        className={`absolute w-8 h-8 rounded-full flex items-center justify-center transition-all transform hover:scale-110 ${isSelected
-                                            ? 'bg-primary text-primary-fg shadow-primary/50 shadow-md z-20'
-                                            : 'text-text-main hover:text-text-highlighted hover:bg-surface-elevated'}`}
-                                        style={{
-                                            transform: `translate(${x}px, ${y}px)`,
-                                        }}
-                                        title={dir}
-                                    >
-                                        {/* Arrow Icon rotated to point outward (or inward? usually outward or just directional) 
-                                             Let's point OUT from center.
-                                             Base arrow points RIGHT. So rotation = angle.
-                                         */}
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            style={{ transform: `rotate(${angle}deg)` }}
-                                        >
-                                            <path d="M5 12h14" />
-                                            <path d="m12 5 7 7-7 7" />
-                                        </svg>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 
