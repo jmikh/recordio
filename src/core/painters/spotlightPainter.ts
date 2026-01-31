@@ -166,6 +166,7 @@ function drawScaledSpotlightContent(
 
 /**
  * Fallback for drawing rounded rectangle path with 4 independent corner radii.
+ * Uses arcTo for true circular arcs matching CSS border-radius.
  * Radii order: [topLeft, topRight, bottomRight, bottomLeft]
  */
 function drawRoundedRectPathMultiRadius(
@@ -178,15 +179,25 @@ function drawRoundedRectPathMultiRadius(
 ): void {
     const [tl, tr, br, bl] = radii;
 
+    // Start at top-left, after the corner arc
     ctx.moveTo(x + tl, y);
+
+    // Top edge and top-right corner
     ctx.lineTo(x + width - tr, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + tr);
+    ctx.arcTo(x + width, y, x + width, y + tr, tr);
+
+    // Right edge and bottom-right corner
     ctx.lineTo(x + width, y + height - br);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - br, y + height);
+    ctx.arcTo(x + width, y + height, x + width - br, y + height, br);
+
+    // Bottom edge and bottom-left corner
     ctx.lineTo(x + bl, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - bl);
+    ctx.arcTo(x, y + height, x, y + height - bl, bl);
+
+    // Left edge and top-left corner
     ctx.lineTo(x, y + tl);
-    ctx.quadraticCurveTo(x, y, x + tl, y);
+    ctx.arcTo(x, y, x + tl, y, tl);
+
     ctx.closePath();
 }
 

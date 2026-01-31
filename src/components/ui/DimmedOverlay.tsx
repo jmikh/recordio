@@ -1,12 +1,11 @@
 import React from 'react';
 import type { Rect } from '../../core/types';
-import { DisplayMapper, type CornerRadii } from '../../core/mappers/displayMapper';
+import type { CornerRadii } from '../../core/mappers/displayMapper';
+import { useDisplayMapper } from '../../editor/hooks/useDisplayMapper';
 
 interface DimmedOverlayProps {
     /** The rectangle to "cut out" (transparent hole) - in output coordinates */
     holeRect: Rect;
-    /** DisplayMapper instance for coordinate conversions */
-    displayMapper: DisplayMapper;
     /** Optional opacity for the dimmed background (default: 0.6) */
     opacity?: number;
     /** Optional overlay color (default: black) */
@@ -21,13 +20,13 @@ interface DimmedOverlayProps {
 
 export const DimmedOverlay: React.FC<DimmedOverlayProps> = ({
     holeRect,
-    displayMapper,
     opacity = 0.6,
     color = 'black',
     cornerRadii = [0, 0, 0, 0],
     className = '',
     children
 }) => {
+    const displayMapper = useDisplayMapper();
     const bgStyle = color === 'black' ? `rgba(0, 0, 0, ${opacity})` : color;
 
     // Generate unique ID for the mask

@@ -4,6 +4,7 @@ don't poll for typing. use active + first key then flush on clicks or scrolls or
 
 
 
+
 zoom
 ====
 - optimize scroll recording  only need to fetch effective content area once per URL

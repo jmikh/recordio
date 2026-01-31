@@ -67,6 +67,8 @@ export function drawWebcam(
 
     // Scale Style Properties
     const scaledBorderWidth = borderWidth * globalScale;
+
+    // borderRadius is in output pixels, scale it for exports
     const scaledBorderRadius = borderRadius * globalScale;
 
     // Helper to create the path based on shape
@@ -80,17 +82,10 @@ export function drawWebcam(
         } else {
             // Rect or Square
             if (scaledBorderRadius > 0) {
-                // Manually draw rounded rect for compatibility
+                // Use roundRect for true circular arcs matching CSS border-radius
+                // Clamp to half of smaller dimension to avoid overlap
                 const r = Math.min(scaledBorderRadius, width / 2, height / 2);
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + width - r, y);
-                ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-                ctx.lineTo(x + width, y + height - r);
-                ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-                ctx.lineTo(x + r, y + height);
-                ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.roundRect(x, y, width, height, r);
             } else {
                 ctx.rect(x, y, width, height);
             }

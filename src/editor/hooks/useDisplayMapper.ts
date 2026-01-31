@@ -1,53 +1,62 @@
-import { useMemo, useRef } from 'react';
 import { DisplayMapper } from '../../core/mappers/displayMapper';
 import type { Size } from '../../core/types';
+import { useProjectStore } from '../stores/useProjectStore';
+import { useUIStore } from '../stores/useUIStore';
+
+// Module-level cache (similar to useTimeMapper pattern)
+let lastOutputSize: Size | null = null;
+let lastDisplaySize: Size | null = null;
+let lastDisplayMapper: DisplayMapper | null = null;
 
 /**
- * Hook to get a memoized DisplayMapper instance for the current output and display sizes.
+ * Get a memoized DisplayMapper instance for the given sizes.
+ * Uses module-level caching to avoid unnecessary recreations.
+ */
+export const getDisplayMapper = (outputSize: Size, displaySize: Size): DisplayMapper => {
+    // If sizes match and we have a cached instance, reuse it
+    if (
+        lastOutputSize &&
+        lastDisplaySize &&
+        lastDisplayMapper &&
+        lastOutputSize.width === outputSize.width &&
+        lastOutputSize.height === outputSize.height &&
+        lastDisplaySize.width === displaySize.width &&
+        lastDisplaySize.height === displaySize.height
+    ) {
+        return lastDisplayMapper;
+    }
+
+    // Create new instance and cache it
+    lastOutputSize = outputSize;
+    lastDisplaySize = displaySize;
+    lastDisplayMapper = new DisplayMapper(outputSize, displaySize);
+    return lastDisplayMapper;
+};
+
+/**
+ * Hook to get a DisplayMapper instance for coordinate conversions.
  * 
- * @param outputSize The logical output resolution (e.g., project.settings.outputSize)
- * @param displaySize The actual rendered size on screen (e.g., from a container ref)
+ * Gets outputSize from the project store and displaySize (canvasContainerSize) 
+ * from the UI store. This allows any component to get the mapper without 
+ * needing to pass sizes as props.
+ * 
+ * NOTE: The canvas container must set its size via setCanvasContainerSize
+ * for this hook to return accurate mappings.
+ * 
  * @returns A DisplayMapper instance for coordinate conversions
  * 
  * @example
- * const displayMapper = useDisplayMapper(
- *   project.settings.outputSize,
- *   { width: containerRef.current?.clientWidth ?? 0, height: containerRef.current?.clientHeight ?? 0 }
- * );
+ * const displayMapper = useDisplayMapper();
  * 
  * // Convert output rect to display
  * const displayRect = displayMapper.outputToDisplay(spotlightRect);
  * 
- * // Get CSS positioning
- * const cssStyle = displayMapper.outputToPercentCSS(rect);
+ * // Get sizes if needed
+ * const { outputSize, displaySize } = displayMapper;
  */
-export const useDisplayMapper = (outputSize: Size, displaySize: Size): DisplayMapper => {
-    // Cache previous instance to avoid unnecessary recreations
-    const prevRef = useRef<{ output: Size; display: Size; mapper: DisplayMapper } | null>(null);
+export const useDisplayMapper = (): DisplayMapper => {
+    const outputSize = useProjectStore(s => s.project.settings.outputSize);
+    const displaySize = useUIStore(s => s.canvasContainerSize);
 
-    return useMemo(() => {
-        // Check if sizes match previous
-        if (
-            prevRef.current &&
-            prevRef.current.output.width === outputSize.width &&
-            prevRef.current.output.height === outputSize.height &&
-            prevRef.current.display.width === displaySize.width &&
-            prevRef.current.display.height === displaySize.height
-        ) {
-            return prevRef.current.mapper;
-        }
-
-        // Create new mapper
-        const mapper = new DisplayMapper(outputSize, displaySize);
-        prevRef.current = { output: outputSize, display: displaySize, mapper };
-        return mapper;
-    }, [outputSize.width, outputSize.height, displaySize.width, displaySize.height]);
-};
-
-/**
- * Factory function to create a DisplayMapper without React hooks.
- * Useful in non-component contexts.
- */
-export const createDisplayMapper = (outputSize: Size, displaySize: Size): DisplayMapper => {
-    return new DisplayMapper(outputSize, displaySize);
+    return getDisplayMapper(outputSize, displaySize);
 };

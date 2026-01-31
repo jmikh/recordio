@@ -6,7 +6,6 @@ import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
-import { DisplayMapper } from '../../../core/mappers/displayMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
@@ -43,7 +42,7 @@ export const renderCropEditor = (
             ...project.settings.screen,
             crop: undefined, // Force undefined to see full video
             mode: 'border' as const, // Force non-device mode to hide frames
-            borderRadius: 0, // Hide rounding
+            borderRadius: 0, // Hide rounding (pixels)
             borderWidth: 0, // Hide borders
             hasShadow: false, // Hide shadow
             hasGlow: false, // Hide glow
@@ -212,7 +211,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             {/* Dimming Layers */}
             <DimmedOverlay
                 holeRect={renderedRect}
-                displayMapper={new DisplayMapper(outputSize, outputSize)}
             />
 
             {/* Toolbar */}
@@ -260,7 +258,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             <div style={containerStyle}>
                 <BoundingBox
                     rect={relativeRect}
-                    canvasSize={{ width: viewMapper.contentRect.width, height: viewMapper.contentRect.height }}
                     onChange={handleChange}
                     onCommit={() => {
                         endInteraction();

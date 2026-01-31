@@ -8,7 +8,6 @@ import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
-import { DisplayMapper } from '../../../core/mappers/displayMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -290,13 +289,11 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         >
             <DimmedOverlay
                 holeRect={currentOutputRect}
-                displayMapper={new DisplayMapper(outputSize, outputSize)}
                 cornerRadii={currentCornerRadii}
             />
 
             <BoundingBox
                 rect={currentOutputRect}
-                canvasSize={outputSize}
                 constraintBounds={screenContentBounds}
                 maintainAspectRatio={false}
                 onChange={handleRectChange}

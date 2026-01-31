@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { Rect } from '../../../core/types';
-import { DisplayMapper, type CornerRadii } from '../../../core/mappers/displayMapper';
+import type { CornerRadii } from '../../../core/mappers/displayMapper';
+import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 // ------------------------------------------------------------------
 // TYPES
@@ -14,18 +15,20 @@ export type CornerIndex = 0 | 1 | 2 | 3;
 export type { CornerRadii };
 
 export interface BoundingBoxProps {
-    /** Current rectangle in canvas coordinates */
+    /** Current rectangle in output coordinates */
     rect: Rect;
-    /** Canvas dimensions for bounds checking */
-    canvasSize: { width: number; height: number };
-    /** Minimum size constraint (default: canvasSize / 5) */
+    /** Minimum size constraint (default: outputSize / 5) */
     minSize?: number;
-    /** Maximum bounds for the rectangle (default: canvasSize) */
+    /** Maximum bounds for the rectangle (default: outputSize) */
     maxBounds?: { width: number; height: number };
-    /** Constraint bounds - the rectangle must stay within this area (in canvas coordinates) */
+    /** Constraint bounds - the rectangle must stay within this area (in output coordinates) */
     constraintBounds?: Rect;
     /** Whether to maintain aspect ratio during resize */
     maintainAspectRatio?: boolean;
+    /** Minimum aspect ratio (width/height) allowed during free-form resize. E.g., 0.5 = can be 2x taller than wide */
+    minAspectRatio?: number;
+    /** Maximum aspect ratio (width/height) allowed during free-form resize. E.g., 2.0 = can be 2x wider than tall */
+    maxAspectRatio?: number;
     /** Callback when drag starts */
     onDragStart?: () => void;
     /** Callback when rect changes during drag */
@@ -38,10 +41,15 @@ export interface BoundingBoxProps {
     // ---- Corner Radius Editing ----
     /** Enable corner radius editing with draggable handles */
     allowCornerEditing?: boolean;
-    /** Per-corner border radius [tl, tr, br, bl] in output pixels. Default: [0,0,0,0] */
+    /** 
+     * Per-corner border radius [tl, tr, br, bl] in output pixels.
+     * Clamped to half of smaller dimension during rendering.
+     */
     cornerRadii?: CornerRadii;
     /** Whether corners are linked (edit all together). Default: true */
     cornersLinked?: boolean;
+    /** Hide the link/unlink toggle (use when corners are always linked) */
+    hideLinkToggle?: boolean;
     /** Callback when corner radii change during drag */
     onCornerRadiiChange?: (radii: CornerRadii) => void;
     /** Callback when corner radii editing is committed */
@@ -184,22 +192,19 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
     onRadiusCommit,
     onDragStart,
 }) => {
+    const displayMapper = useDisplayMapper();
     const handleSize = 10;
-    const minInset = 48; // Minimum inset from corner when radius is 0
+    const minInsetOutput = 48; // Minimum inset from corner in output pixels
 
     // Calculate max possible radius (half of smaller dimension)
-    const maxRadius = Math.min(rect.width, rect.height) / 2;
-
-    // Position the handle along the corner radius arc
-    // When radius = 0, handle is slightly inside to not interfere with corner handles
-    // When radius = max, handle is at arc center
+    const smallerDimension = Math.min(rect.width, rect.height);
+    const maxRadius = smallerDimension / 2;
     const clampedRadius = Math.min(radius, maxRadius);
 
-    // Calculate handle offset from corner (as percentage of box)
-    // Use max of radius offset or minimum inset
-    const effectiveOffset = Math.max(clampedRadius, minInset);
-    const offsetPct = (effectiveOffset / rect.width) * 100;
-    const offsetPctY = (effectiveOffset / rect.height) * 100;
+    // Calculate handle offset in output pixels, then convert to display pixels
+    const effectiveOffsetOutput = Math.max(clampedRadius, minInsetOutput);
+    const offsetDisplayX = displayMapper.outputToDisplayLength(effectiveOffsetOutput);
+    const offsetDisplayY = displayMapper.outputToDisplayLength(effectiveOffsetOutput);
 
     // Custom cursor SVGs for corner radius editing - curved arc showing the corner direction
     // Thick black stroke with thin white outline (like system cursors)
@@ -215,57 +220,38 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
                       fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round"/>
             </g>
         </svg>`;
-        return `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') 8 8, pointer`;
+        return `url('data:image/svg+xml,${encodeURIComponent(svg)}') 8 8, pointer`;
     };
 
-    // Cursor orientations for each corner - curve opens toward the corner being edited
-    const cursorMap: Record<CornerIndex, string> = {
-        0: createCornerCursor(0),    // Top-left: curve opens toward top-left
-        1: createCornerCursor(90),   // Top-right: curve opens toward top-right
-        2: createCornerCursor(180),  // Bottom-right: curve opens toward bottom-right
-        3: createCornerCursor(270),  // Bottom-left: curve opens toward bottom-left
+    // Each corner needs a different rotation for the cursor
+    const cursorRotations: Record<CornerIndex, number> = {
+        0: 0,    // Top-left: no rotation
+        1: 90,   // Top-right: 90° clockwise
+        2: 180,  // Bottom-right: 180°
+        3: 270   // Bottom-left: 270°
     };
 
-    // Position based on corner
+    // Position based on corner (in display pixels)
+    const cornerStyles: Record<CornerIndex, React.CSSProperties> = {
+        0: { top: offsetDisplayY, left: offsetDisplayX, cursor: createCornerCursor(cursorRotations[0]) },
+        1: { top: offsetDisplayY, right: offsetDisplayX, cursor: createCornerCursor(cursorRotations[1]) },
+        2: { bottom: offsetDisplayY, right: offsetDisplayX, cursor: createCornerCursor(cursorRotations[2]) },
+        3: { bottom: offsetDisplayY, left: offsetDisplayX, cursor: createCornerCursor(cursorRotations[3]) }
+    };
+
     const style: React.CSSProperties = {
         position: 'absolute',
         width: handleSize,
         height: handleSize,
-        backgroundColor: 'white',
         borderRadius: '50%',
-        cursor: cursorMap[corner],
-        zIndex: 20,
-        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        border: '1px solid var(--primary)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-        border: '1.5px solid var(--primary)',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 110,
+        pointerEvents: 'auto',
+        ...cornerStyles[corner]
     };
-
-    // Position handle at the start of the radius curve for each corner
-    switch (corner) {
-        case 0: // Top-left: handle moves along diagonal
-            style.left = `${offsetPct}%`;
-            style.top = `${offsetPctY}%`;
-            break;
-        case 1: // Top-right
-            style.right = `${offsetPct}%`;
-            style.left = 'auto';
-            style.top = `${offsetPctY}%`;
-            style.transform = 'translate(50%, -50%)';
-            break;
-        case 2: // Bottom-right
-            style.right = `${offsetPct}%`;
-            style.left = 'auto';
-            style.bottom = `${offsetPctY}%`;
-            style.top = 'auto';
-            style.transform = 'translate(50%, 50%)';
-            break;
-        case 3: // Bottom-left
-            style.left = `${offsetPct}%`;
-            style.bottom = `${offsetPctY}%`;
-            style.top = 'auto';
-            style.transform = 'translate(-50%, 50%)';
-            break;
-    }
 
     const handlePointerDown = (e: React.PointerEvent) => {
         e.stopPropagation();
@@ -277,36 +263,30 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
         const startRadius = radius;
         const target = e.currentTarget;
 
-        // Get container (bounding box) for scale calculation
-        const container = target.parentElement;
-        if (!container) return;
-        const containerRect = container.getBoundingClientRect();
-
-        // Scale based on the bounding box: output pixels / display pixels
-        const scaleX = rect.width / containerRect.width;
-        const scaleY = rect.height / containerRect.height;
-
         const onMove = (moveE: PointerEvent) => {
-            // Convert screen movement to output coordinates
-            const deltaX = (moveE.clientX - startX) * scaleX;
-            const deltaY = (moveE.clientY - startY) * scaleY;
+            // Get display pixel delta
+            const deltaXDisplay = moveE.clientX - startX;
+            const deltaYDisplay = moveE.clientY - startY;
+
+            // Convert display delta to output pixels using displayMapper
+            const deltaXOutput = displayMapper.displayToOutputLength(deltaXDisplay);
+            const deltaYOutput = displayMapper.displayToOutputLength(deltaYDisplay);
 
             // Project mouse movement onto the diagonal direction for 1:1 tracking
-            // The handle moves along the diagonal, so we project the mouse delta onto (1,1) direction
             const sqrt2 = Math.sqrt(2);
             let radiusDelta = 0;
             switch (corner) {
                 case 0: // Top-left: moving right/down increases
-                    radiusDelta = (deltaX + deltaY) / sqrt2;
+                    radiusDelta = (deltaXOutput + deltaYOutput) / sqrt2;
                     break;
                 case 1: // Top-right: moving left/down increases
-                    radiusDelta = (-deltaX + deltaY) / sqrt2;
+                    radiusDelta = (-deltaXOutput + deltaYOutput) / sqrt2;
                     break;
                 case 2: // Bottom-right: moving left/up increases
-                    radiusDelta = (-deltaX - deltaY) / sqrt2;
+                    radiusDelta = (-deltaXOutput - deltaYOutput) / sqrt2;
                     break;
                 case 3: // Bottom-left: moving right/up increases
-                    radiusDelta = (deltaX - deltaY) / sqrt2;
+                    radiusDelta = (deltaXOutput - deltaYOutput) / sqrt2;
                     break;
             }
 
@@ -395,11 +375,12 @@ const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
 // ------------------------------------------------------------------
 export const BoundingBox: React.FC<BoundingBoxProps> = ({
     rect,
-    canvasSize,
     minSize,
     maxBounds,
     constraintBounds,
     maintainAspectRatio = false,
+    minAspectRatio,
+    maxAspectRatio,
     onDragStart,
     onChange,
     onCommit,
@@ -408,10 +389,15 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     allowCornerEditing = false,
     cornerRadii,
     cornersLinked: controlledLinked,
+    hideLinkToggle = false,
     onCornerRadiiChange,
     onCornerRadiiCommit,
     onCornersLinkedChange,
 }) => {
+    // Get DisplayMapper from hook (contains outputSize and displaySize)
+    const displayMapper = useDisplayMapper();
+    const outputSize = displayMapper.outputSize;
+
     // Internal state for linked mode (used when not controlled)
     const [internalLinked, setInternalLinked] = useState(true);
     const isLinked = controlledLinked ?? internalLinked;
@@ -444,14 +430,14 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [rect]);
 
     // Calculate constraints
-    const MIN_SIZE = minSize ?? Math.min(canvasSize.width, canvasSize.height) / 5;
+    const MIN_SIZE = minSize ?? Math.min(outputSize.width, outputSize.height) / 5;
 
-    // Use constraintBounds if provided, otherwise fall back to maxBounds or canvasSize
+    // Use constraintBounds if provided, otherwise fall back to maxBounds or outputSize
     const bounds = constraintBounds ?? {
         x: 0,
         y: 0,
-        width: maxBounds?.width ?? canvasSize.width,
-        height: maxBounds?.height ?? canvasSize.height
+        width: maxBounds?.width ?? outputSize.width,
+        height: maxBounds?.height ?? outputSize.height
     };
     const minX = bounds.x;
     const minY = bounds.y;
@@ -486,8 +472,8 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
 
         const { type, initialRect, x: startX, y: startY } = startDragRef.current;
 
-        // Calculate scale from screen pixels to canvas coordinates
-        const scale = canvasSize.width / containerRect.width;
+        // Calculate scale from screen pixels to output coordinates using displayMapper
+        const scale = displayMapper.displayToOutputLength(1);
         const deltaX = (e.clientX - startX) * scale;
         const deltaY = (e.clientY - startY) * scale;
 
@@ -555,7 +541,10 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                     newRect.y = bottom - newRect.height;
                 }
             } else {
-                // Free-form resize (no aspect ratio)
+                // Free-form resize (no aspect ratio lock, but may have min/max constraints)
+
+                // Store anchor for constraint adjustments (used when resizing from left side)
+                const right = initialRect.x + initialRect.width;
 
                 // Horizontal logic
                 if (type === 'se' || type === 'ne' || type === 'e') {
@@ -583,6 +572,31 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                     const diff = MIN_SIZE - newRect.height;
                     newRect.height = MIN_SIZE;
                     if (type === 'ne' || type === 'nw' || type === 'n') newRect.y -= diff;
+                }
+
+                // Apply aspect ratio constraints (min/max)
+                const currentAspect = newRect.width / newRect.height;
+
+                if (minAspectRatio !== undefined && currentAspect < minAspectRatio) {
+                    // Too narrow - widen or shorten
+                    // Adjust width to meet minimum aspect ratio
+                    const targetWidth = newRect.height * minAspectRatio;
+                    if (type === 'sw' || type === 'nw' || type === 'w') {
+                        // Anchored on right, adjust x
+                        newRect.x = right - targetWidth;
+                    }
+                    newRect.width = targetWidth;
+                }
+
+                if (maxAspectRatio !== undefined && currentAspect > maxAspectRatio) {
+                    // Too wide - narrow or heighten
+                    // Adjust width to meet maximum aspect ratio
+                    const targetWidth = newRect.height * maxAspectRatio;
+                    if (type === 'sw' || type === 'nw' || type === 'w') {
+                        // Anchored on right, adjust x
+                        newRect.x = right - targetWidth;
+                    }
+                    newRect.width = targetWidth;
                 }
 
                 // Clamp to constraint bounds
@@ -615,12 +629,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             startDragRef.current = null;
         }
     };
-
-    // Create DisplayMapper for coordinate conversions (canvasSize is the output size)
-    const displayMapper = useMemo(
-        () => new DisplayMapper(canvasSize, canvasSize),
-        [canvasSize.width, canvasSize.height]
-    );
 
     // ---- Corner Radius Handlers ----
     const handleCornerRadiusChange = (corner: CornerIndex, newRadius: number) => {
@@ -660,24 +668,36 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     };
 
     // ---- Border Radius CSS Calculation ----
-    // Use DisplayMapper for consistent percentage conversion
+    // Use DisplayMapper to convert output pixels to display pixels
     const borderRadiusCss = useMemo(() => {
         if (allowCornerEditing && localCornerRadii.some(r => r > 0)) {
-            return displayMapper.outputRadiiToPercentCSS(localCornerRadii, rect.width, rect.height);
+            const smallerDimension = Math.min(rect.width, rect.height);
+            const maxRadius = smallerDimension / 2;
+
+            // Clamp radii to half of smaller dimension, then convert to display pixels
+            const clampedRadii: CornerRadii = [
+                Math.min(localCornerRadii[0], maxRadius),
+                Math.min(localCornerRadii[1], maxRadius),
+                Math.min(localCornerRadii[2], maxRadius),
+                Math.min(localCornerRadii[3], maxRadius)
+            ];
+            const displayRadii = displayMapper.outputToDisplayRadii(clampedRadii);
+
+            return `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`;
         }
         return '0';
     }, [allowCornerEditing, localCornerRadii, rect.width, rect.height, displayMapper]);
 
-    // Use DisplayMapper for box positioning
-    const positionCss = displayMapper.outputToPercentCSS(rect);
+    // Convert rect from output to display pixels
+    const displayRect = displayMapper.outputToDisplay(rect);
 
-    // Main box style - shows rounded corners
+    // Main box style - shows rounded corners (all positioning in display pixels)
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
-        left: positionCss.left,
-        top: positionCss.top,
-        width: positionCss.width,
-        height: positionCss.height,
+        left: displayRect.x,
+        top: displayRect.y,
+        width: displayRect.width,
+        height: displayRect.height,
         cursor: 'move',
         boxSizing: 'border-box',
         borderRadius: borderRadiusCss,
@@ -697,6 +717,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
 
     return (
         <div
+            id="bounding-box"
             ref={boxRef}
             style={boxStyle}
             onPointerDown={(e) => handlePointerDown(e, 'move')}
@@ -711,7 +732,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             {children}
 
             {/* Floating Link Toggle Toolbar - positioned above bounding box */}
-            {allowCornerEditing && (
+            {allowCornerEditing && !hideLinkToggle && (
                 <div
                     style={{
                         position: 'absolute',

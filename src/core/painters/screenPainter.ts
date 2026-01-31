@@ -38,7 +38,7 @@ export function drawScreen(
     const screenConfig = project.settings.screen || {
         mode: 'device',
         deviceFrameId: 'macbook-pro',
-        borderRadius: 12,
+        borderRadius: 24,
         borderWidth: 0,
         borderColor: '#ffffff',
         hasShadow: true,
@@ -64,8 +64,7 @@ export function drawScreen(
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
 
     if (renderRects) {
-        // Calculate Scale Factor (Canvas Pixels per Source Pixel)
-        const scale = renderRects.destRect.width / renderRects.sourceRect.width;
+        // Note: borderRadius scaling happens in the Project.scaleToResolution function
 
         // Calculate Project Rect (Full Video on Canvas)
         // Calculate Project Rect (Logical Screen on Canvas)
@@ -118,15 +117,9 @@ export function drawScreen(
                 hasGlow = false
             } = screenConfig;
 
-            const scaledRadius = borderRadius * scale;
-            // const scaledBorder = borderWidth * scale; // Scale border thickness too? Usually better fixed?
-            // Actually, for consistency with Camera, border is fixed pixels. But here we are zooming.
-            // If I zoom in, the border should look the same thickness relative to the screen?
-            // In Figma, if you zoom, border scales.
-            // But usually UI borders are defined in "logical" pixels.
-            // Let's assume passed borderWidth is in logical pixels (at 100%).
-            // But CameraSettings borderWidth is pixels on canvas (absolute).
-            // Let's keep it simple: Use constant borderWidth (pixels on canvas).
+            // borderRadius is in output pixels, clamp to half of smaller dimension
+            const smallerDimension = Math.min(projectedW, projectedH);
+            const scaledRadius = Math.min(borderRadius, smallerDimension / 2);
             const renderBorderWidth = borderWidth;
 
             // --- PASS 1: GLOW ---

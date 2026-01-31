@@ -59,10 +59,32 @@ export const CanvasContainer = () => {
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
     const previewZoomRectRef = useRef<Rect | null>(null);
     const previewSpotlightRectRef = useRef<Rect | null>(null);
+    const aspectWrapperRef = useRef<HTMLDivElement | null>(null);
+
+    // Update canvas container size in UI store for DisplayMapper
+    const setCanvasContainerSize = useUIStore(s => s.setCanvasContainerSize);
 
     // Loop State
     const animationFrameRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
+
+    // Measure container size and update store
+    useEffect(() => {
+        const wrapper = aspectWrapperRef.current;
+        if (!wrapper) return;
+
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    setCanvasContainerSize({ width, height });
+                }
+            }
+        });
+
+        observer.observe(wrapper);
+        return () => observer.disconnect();
+    }, [setCanvasContainerSize]);
 
     // -----------------------------------------------------------
     // RENDER LOOP
@@ -245,6 +267,7 @@ export const CanvasContainer = () => {
 
             {/* ASPECT RATIO WRAPPER */}
             <div
+                ref={aspectWrapperRef}
                 className="relative"
                 style={{
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,

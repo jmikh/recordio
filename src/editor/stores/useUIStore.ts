@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { ID, TimeMs } from '../../core/types';
+import type { ID, TimeMs, Size } from '../../core/types';
 
 export const CanvasMode = {
     Preview: 'preview',
@@ -41,6 +41,10 @@ export interface UIState {
     setTimelineContainerRef: (ref: React.RefObject<HTMLDivElement | null> | null) => void;
     pixelsPerSec: number;
     setPixelsPerSec: (pps: number) => void;
+
+    // Canvas Container Size (for DisplayMapper)
+    canvasContainerSize: Size;
+    setCanvasContainerSize: (size: Size) => void;
 
     // Playback State
     isPlaying: boolean;
@@ -136,6 +140,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     timelineContainerRef: null,
     setTimelineContainerRef: (timelineContainerRef) => set({ timelineContainerRef }),
     pixelsPerSec: 100, // Default zoom level
+
+    // Canvas Container Size (for DisplayMapper)
+    canvasContainerSize: { width: 0, height: 0 },
+    setCanvasContainerSize: (canvasContainerSize) => set({ canvasContainerSize }),
 
     // Playback State
     isPlaying: false,

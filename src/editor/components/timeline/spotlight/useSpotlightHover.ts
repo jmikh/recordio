@@ -92,7 +92,7 @@ export function useSpotlightHover(
         if (!hoverInfo) return;
 
         // Get source video size for the initial rect (spotlight is in source coordinates)
-        const sourceSize = project.settings.screen.sourceSize;
+        const sourceSize = project.screenSource.size;
 
         if (!sourceSize || sourceSize.width === 0) {
             console.warn('[useSpotlightHover] No sourceSize found');

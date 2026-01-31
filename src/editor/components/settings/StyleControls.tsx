@@ -6,7 +6,7 @@ import { MultiToggle } from '../../../components/ui/MultiToggle';
 import { ColorSettings } from './ColorSettings';
 
 export interface StyleSettings {
-    borderRadius: number;
+    borderRadius: number;  // Corner radius in output pixels
     borderWidth: number;
     borderColor: string;
     hasShadow: boolean;
