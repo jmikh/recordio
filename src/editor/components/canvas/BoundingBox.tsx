@@ -194,7 +194,7 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
 }) => {
     const displayMapper = useDisplayMapper();
     const handleSize = 10;
-    const minInsetOutput = 48; // Minimum inset from corner in output pixels
+    const minInsetOutput = 12; // Minimum inset from corner in output pixels
 
     // Calculate max possible radius (half of smaller dimension)
     const smallerDimension = Math.min(rect.width, rect.height);
@@ -202,7 +202,11 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
     const clampedRadius = Math.min(radius, maxRadius);
 
     // Calculate handle offset in output pixels, then convert to display pixels
-    const effectiveOffsetOutput = Math.max(clampedRadius, minInsetOutput);
+    // Clamp offset to stay:
+    // - At least minInsetOutput from the corner (minimum)
+    // - At least minInsetOutput from the center (maximum = maxRadius - minInsetOutput)
+    const maxInsetOutput = maxRadius - minInsetOutput;
+    const effectiveOffsetOutput = Math.max(minInsetOutput, Math.min(clampedRadius, maxInsetOutput));
     const offsetDisplayX = displayMapper.outputToDisplayLength(effectiveOffsetOutput);
     const offsetDisplayY = displayMapper.outputToDisplayLength(effectiveOffsetOutput);
 
@@ -232,11 +236,15 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
     };
 
     // Position based on corner (in display pixels)
+    // Transform direction depends on which CSS property is used:
+    // - left/top: use translate(-50%, -50%) to center at that position
+    // - right: use translate(+50%, ...) since element is positioned from right edge
+    // - bottom: use translate(..., +50%) since element is positioned from bottom edge
     const cornerStyles: Record<CornerIndex, React.CSSProperties> = {
-        0: { top: offsetDisplayY, left: offsetDisplayX, cursor: createCornerCursor(cursorRotations[0]) },
-        1: { top: offsetDisplayY, right: offsetDisplayX, cursor: createCornerCursor(cursorRotations[1]) },
-        2: { bottom: offsetDisplayY, right: offsetDisplayX, cursor: createCornerCursor(cursorRotations[2]) },
-        3: { bottom: offsetDisplayY, left: offsetDisplayX, cursor: createCornerCursor(cursorRotations[3]) }
+        0: { top: offsetDisplayY, left: offsetDisplayX, transform: 'translate(-50%, -50%)', cursor: createCornerCursor(cursorRotations[0]) },
+        1: { top: offsetDisplayY, right: offsetDisplayX, transform: 'translate(50%, -50%)', cursor: createCornerCursor(cursorRotations[1]) },
+        2: { bottom: offsetDisplayY, right: offsetDisplayX, transform: 'translate(50%, 50%)', cursor: createCornerCursor(cursorRotations[2]) },
+        3: { bottom: offsetDisplayY, left: offsetDisplayX, transform: 'translate(-50%, 50%)', cursor: createCornerCursor(cursorRotations[3]) }
     };
 
     const style: React.CSSProperties = {
@@ -247,7 +255,6 @@ const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
         backgroundColor: 'white',
         border: '1px solid var(--primary)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-        transform: 'translate(-50%, -50%)',
         zIndex: 110,
         pointerEvents: 'auto',
         ...cornerStyles[corner]
