@@ -4,6 +4,33 @@ export interface MappedPoint extends Point {
     visible: boolean;
 }
 
+/**
+ * ViewMapper: Maps between Source (input video) coordinates and Output (logical canvas) coordinates.
+ * 
+ * ## Purpose
+ * ViewMapper handles the transformation from the original video frame (Source) to the
+ * logical output canvas (Output), accounting for cropping, aspect ratio fitting, and padding.
+ * 
+ * ## Coordinate Systems
+ * - **Source coordinates**: The original video frame pixels (e.g., 3840x2160 capture).
+ *   Events like clicks and spotlights are recorded in this coordinate system.
+ * - **Output coordinates**: The logical canvas resolution (e.g., 1920x1080).
+ *   This is the standardized coordinate system used for rendering and project data.
+ * 
+ * ## When to Use
+ * - Recording: Converting captured event positions to output coordinates
+ * - Spotlights: Mapping spotlight source rects to output rects
+ * - Video rendering: Calculating source/dest rects for drawImage
+ * - Coordinate normalization: Converting between input and output spaces
+ * 
+ * ## Relationship to DisplayMapper
+ * - ViewMapper: Source → Output (handles cropping, aspect ratio, padding)
+ * - DisplayMapper: Output → Display (handles scale for CSS/DOM rendering)
+ * 
+ * These can be chained: Source → ViewMapper → Output → DisplayMapper → Display
+ * 
+ * @see DisplayMapper for Output → Display coordinate conversions
+ */
 export class ViewMapper {
     inputVideoSize: Size;
     outputVideoSize: Size;

@@ -42,7 +42,7 @@ export function drawSpotlight(
         return;
     }
 
-    const { isVisible, originalRect, scaledRect, borderRadius, sourceRect, dimOpacity, scale } = spotlightState;
+    const { isVisible, originalRect, scaledRect, borderRadius, dimOpacity, scale } = spotlightState;
     const dimColor = `rgba(0, 0, 0, ${dimOpacity})`;
 
     // =========================================================
@@ -62,18 +62,8 @@ export function drawSpotlight(
     // Draw dim overlay with cut-out hole and scaled content
     // =========================================================
 
-    // Calculate the scale from source to output coordinates
-    const scaleX = originalRect.width / sourceRect.width;
-    const scaleY = originalRect.height / sourceRect.height;
-    const avgScale = (scaleX + scaleY) / 2;
-
-    // Convert corner radii from source pixels to output pixels [tl, tr, br, bl]
-    const radiusPx: [number, number, number, number] = [
-        borderRadius[0] * avgScale,
-        borderRadius[1] * avgScale,
-        borderRadius[2] * avgScale,
-        borderRadius[3] * avgScale
-    ];
+    // borderRadius is already in OUTPUT coordinates
+    const radiusPx = borderRadius;
 
     // Save current state
     ctx.save();

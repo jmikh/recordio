@@ -1,17 +1,18 @@
 import React from 'react';
 import type { Rect } from '../../core/types';
+import { DisplayMapper, type CornerRadii } from '../../core/displayMapper';
 
 interface DimmedOverlayProps {
-    /** The rectangle to "cut out" (transparent hole) */
+    /** The rectangle to "cut out" (transparent hole) - in output coordinates */
     holeRect: Rect;
-    /** The total size of the container/canvas */
-    containerSize: { width: number; height: number };
+    /** DisplayMapper instance for coordinate conversions */
+    displayMapper: DisplayMapper;
     /** Optional opacity for the dimmed background (default: 0.6) */
     opacity?: number;
     /** Optional overlay color (default: black) */
     color?: string;
-    /** Border radius as percentage of the smaller dimension (0-50). 0 = rectangle, 50 = circle/pill */
-    borderRadiusPercent?: number;
+    /** Per-corner border radius [tl, tr, br, bl] in output pixels. Default: [0,0,0,0] */
+    cornerRadii?: CornerRadii;
     /** Additional class names */
     className?: string;
     /** Optional children to render inside the overlay container */
@@ -20,66 +21,64 @@ interface DimmedOverlayProps {
 
 export const DimmedOverlay: React.FC<DimmedOverlayProps> = ({
     holeRect,
-    containerSize,
+    displayMapper,
     opacity = 0.6,
     color = 'black',
-    borderRadiusPercent = 0,
+    cornerRadii = [0, 0, 0, 0],
     className = '',
     children
 }) => {
-    // Calculate border radius in actual units (relative to container)
-    const smallerDimension = Math.min(holeRect.width, holeRect.height);
-    const borderRadiusPx = (borderRadiusPercent / 100) * (smallerDimension / 2);
-
-    // Use SVG mask for rounded rectangles
-    // This approach creates an SVG mask where:
-    // - White = visible (dimmed area)
-    // - Black = transparent (the hole)
-
     const bgStyle = color === 'black' ? `rgba(0, 0, 0, ${opacity})` : color;
 
     // Generate unique ID for the mask
     const maskId = `dimmed-mask-${React.useId().replace(/:/g, '')}`;
 
+    // Check if we have any radius
+    const hasRadius = cornerRadii.some(r => r > 0);
+
+    // Get SVG viewBox from DisplayMapper (uses output coordinates)
+    const viewBox = displayMapper.getSvgViewBox();
+    const { outputSize } = displayMapper;
+
     return (
-        <div
-            className={`absolute inset-0 pointer-events-none ${className}`}
-            style={{
-                backgroundColor: bgStyle,
-                opacity: color !== 'black' ? opacity : undefined,
-                // Use CSS mask to cut out the hole
-                maskImage: `url(#${maskId})`,
-                WebkitMaskImage: `url(#${maskId})`,
-            }}
-        >
-            {/* SVG Definition for the mask */}
+        <div className={`absolute inset-0 pointer-events-none ${className}`}>
+            {/* SVG handles the entire dimmed overlay with cutout hole */}
             <svg
                 width="100%"
                 height="100%"
+                viewBox={viewBox}
+                preserveAspectRatio="none"
                 style={{ position: 'absolute', width: '100%', height: '100%' }}
             >
                 <defs>
                     <mask id={maskId}>
                         {/* White background = visible */}
-                        <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                        <rect x="0" y="0" width={outputSize.width} height={outputSize.height} fill="white" />
                         {/* Black hole = transparent */}
-                        <rect
-                            x={`${(holeRect.x / containerSize.width) * 100}%`}
-                            y={`${(holeRect.y / containerSize.height) * 100}%`}
-                            width={`${(holeRect.width / containerSize.width) * 100}%`}
-                            height={`${(holeRect.height / containerSize.height) * 100}%`}
-                            rx={borderRadiusPx}
-                            ry={borderRadiusPx}
-                            fill="black"
-                        />
+                        {hasRadius ? (
+                            // Use path for rounded corners (output coordinates)
+                            <path
+                                d={displayMapper.createRoundedRectPath(holeRect, cornerRadii)}
+                                fill="black"
+                            />
+                        ) : (
+                            // Simple rect when no radius
+                            <rect
+                                x={holeRect.x}
+                                y={holeRect.y}
+                                width={holeRect.width}
+                                height={holeRect.height}
+                                fill="black"
+                            />
+                        )}
                     </mask>
                 </defs>
-                {/* Apply the mask to a full-size rect */}
+                {/* Dimmed background with cutout hole via mask */}
                 <rect
                     x="0"
                     y="0"
-                    width="100%"
-                    height="100%"
+                    width={outputSize.width}
+                    height={outputSize.height}
                     fill={bgStyle}
                     mask={`url(#${maskId})`}
                 />

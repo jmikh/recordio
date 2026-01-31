@@ -3,11 +3,12 @@ import type { Rect } from '../../../core/types';
 import { useProjectStore, useProjectSources } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
-import { BoundingBox } from './BoundingBox';
+import { BoundingBox, type CornerRadii } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 import { ViewMapper } from '../../../core/viewMapper';
+import { DisplayMapper } from '../../../core/displayMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -122,10 +123,8 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         : null;
     const initialSourceRect = spotlight?.sourceRect || null;
 
-    // For the slider, use the max corner radius (all corners shown as one value)
-    const initialBorderRadius = spotlight?.borderRadius
-        ? Math.max(...spotlight.borderRadius)
-        : 0;
+    // borderRadius is now stored in OUTPUT coordinates - no conversion needed
+    const initialCornerRadii: CornerRadii = spotlight?.borderRadius ?? [0, 0, 0, 0];
 
     // Convert source rect to output rect for editing (using viewMapper)
     const initialOutputRect = useMemo(() => {
@@ -185,7 +184,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     const containerRef = useRef<HTMLDivElement>(null);
 
     const [currentOutputRect, setCurrentOutputRect] = useState<Rect>(initialOutputRect || { x: 0, y: 0, width: 0, height: 0 });
-    const [currentBorderRadius, setCurrentBorderRadius] = useState<number>(initialBorderRadius);
+    const [currentCornerRadii, setCurrentCornerRadii] = useState<CornerRadii>(initialCornerRadii);
 
     // Sync state if initialOutputRect changes externally
     useEffect(() => {
@@ -196,8 +195,8 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     }, [initialOutputRect, previewRectRef]);
 
     useEffect(() => {
-        setCurrentBorderRadius(initialBorderRadius);
-    }, [initialBorderRadius]);
+        setCurrentCornerRadii(initialCornerRadii);
+    }, [initialCornerRadii]);
 
     const handleRectChange = (newOutputRect: Rect) => {
         setCurrentOutputRect(newOutputRect);
@@ -211,14 +210,13 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         }
     };
 
-    const handleRadiusChange = (newRadius: number) => {
-        setCurrentBorderRadius(newRadius);
+    const handleCornerRadiiChange = (newRadii: CornerRadii) => {
+        setCurrentCornerRadii(newRadii);
 
         if (editingSpotlightId) {
-            // Apply the same radius to all 4 corners
-            const borderRadius: [number, number, number, number] = [newRadius, newRadius, newRadius, newRadius];
+            // borderRadius is now stored in OUTPUT coordinates - save directly
             batchAction(() => {
-                updateSpotlight(editingSpotlightId, { borderRadius });
+                updateSpotlight(editingSpotlightId, { borderRadius: newRadii });
             });
         }
     };
@@ -298,38 +296,27 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         >
             <DimmedOverlay
                 holeRect={currentOutputRect}
-                containerSize={outputSize}
-                borderRadiusPercent={currentBorderRadius}
+                displayMapper={new DisplayMapper(outputSize, outputSize)}
+                cornerRadii={currentCornerRadii}
             />
 
             <BoundingBox
                 rect={currentOutputRect}
                 canvasSize={outputSize}
                 constraintBounds={screenContentBounds}
-                borderRadiusPercent={currentBorderRadius}
                 maintainAspectRatio={false}
                 onChange={handleRectChange}
                 onCommit={onCommit}
+                // Corner radius editing
+                allowCornerEditing={true}
+                cornerRadii={currentCornerRadii}
+                onCornerRadiiChange={handleCornerRadiiChange}
             />
 
-            {/* Toolbar with Radius Slider */}
+            {/* Toolbar with Delete Button */}
             <div
                 className="absolute top-4 inset-x-0 flex justify-center items-center gap-4 pointer-events-auto z-[1000]"
             >
-                {/* Radius Slider */}
-                <div className="flex items-center gap-2 bg-surface-overlay/90 px-3 py-1.5 rounded shadow">
-                    <span className="text-xs text-text-muted">Radius</span>
-                    <input
-                        type="range"
-                        min={0}
-                        max={50}
-                        value={currentBorderRadius}
-                        onChange={(e) => handleRadiusChange(Number(e.target.value))}
-                        className="w-20 accent-amber-400"
-                    />
-                    <span className="text-xs text-text-muted w-8">{currentBorderRadius}%</span>
-                </div>
-
                 {/* Delete Button */}
                 <SecondaryButton
                     className="text-xs shadow"

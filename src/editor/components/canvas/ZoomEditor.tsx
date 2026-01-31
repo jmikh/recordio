@@ -7,6 +7,7 @@ import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
+import { DisplayMapper } from '../../../core/displayMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -258,7 +259,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         >
             <DimmedOverlay
                 holeRect={currentRect}
-                containerSize={videoSize}
+                displayMapper={new DisplayMapper(videoSize, videoSize)}
             />
 
             <BoundingBox

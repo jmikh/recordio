@@ -6,6 +6,7 @@ import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/viewMapper';
+import { DisplayMapper } from '../../../core/displayMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
@@ -15,7 +16,7 @@ import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 // LOGIC: Render Strategy
 // ------------------------------------------------------------------
 
-const EDITOR_PADDING = 0.0;
+const EDITOR_PADDING = 0.01;
 
 export const renderCropEditor = (
     resources: RenderResources,
@@ -213,7 +214,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             {/* Dimming Layers */}
             <DimmedOverlay
                 holeRect={renderedRect}
-                containerSize={outputSize}
+                displayMapper={new DisplayMapper(outputSize, outputSize)}
             />
 
             {/* Toolbar */}

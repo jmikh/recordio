@@ -111,6 +111,20 @@ class SpotlightScheduler {
         // Transform target rect to output coordinates
         const outputTargetRect = this.viewMapper.inputToOutputRect(card.targetRect);
 
+        // Calculate scale factor from source to output (for corner radius conversion)
+        // Use average of X and Y scale since radii are uniform
+        const scaleX = outputTargetRect.width / card.targetRect.width;
+        const scaleY = outputTargetRect.height / card.targetRect.height;
+        const radiusScale = (scaleX + scaleY) / 2;
+
+        // Convert corner radii from source to output coordinates
+        const outputCornerRadii: [number, number, number, number] = [
+            card.cornerRadius[0] * radiusScale,
+            card.cornerRadius[1] * radiusScale,
+            card.cornerRadius[2] * radiusScale,
+            card.cornerRadius[3] * radiusScale,
+        ];
+
         // Check containment in all viewports
         if (!this.fitsInAllViewports(outputTargetRect, viewports, card, index, outputDuration)) {
             return null;
@@ -123,13 +137,13 @@ class SpotlightScheduler {
         const maxFitScale = this.calculateMaxScale(outputTargetRect, bounds);
         const scale = Math.min(this.enlargeScale, maxFitScale);
 
-        // Create the spotlight action
+        // Create the spotlight action (borderRadius now in OUTPUT coordinates)
         const spotlight: SpotlightAction = {
             id: crypto.randomUUID(),
             outputStartTimeMs: spotlightStartMs,
             outputEndTimeMs: spotlightEndMs,
             sourceRect: card.targetRect,
-            borderRadius: card.cornerRadius,
+            borderRadius: outputCornerRadii,
             scale,
             reason: 'hoveredCard'
         };

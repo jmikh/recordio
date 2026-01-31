@@ -25,9 +25,6 @@ export const CameraSettings = () => {
     const sources = useProjectStore(s => s.sources);
     const cameraSource = project.timeline.cameraSourceId ? sources[project.timeline.cameraSourceId] : null;
 
-    // Check if there are any zoom motions (needed for auto-shrink feature)
-    const hasZoomActions = (project.timeline.zoomActions || []).length > 0;
-
     if (!cameraConfig) {
         return (
             <div className="p-4">
@@ -121,18 +118,13 @@ export const CameraSettings = () => {
                             <Toggle
                                 value={autoShrink}
                                 onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
-                                disabled={!hasZoomActions}
                             />
                         </div>
 
-                        {!hasZoomActions && (
-                            <p className="text-[10px] text-text-muted italic leading-tight">
-                                * Add screen zoom motions to enable this feature
-                            </p>
-                        )}
+
 
                         {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}
-                        {autoShrink && hasZoomActions && (
+                        {autoShrink && (
                             <Slider
                                 label="Shrunk Size"
                                 min={0.25}

@@ -17,7 +17,7 @@ export interface SpotlightState {
     scaledRect: Rect | null;
     /** The source rectangle (in source video coordinates) */
     sourceRect: Rect;
-    /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in SOURCE coordinates) */
+    /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */
     borderRadius: [number, number, number, number];
     /** Current animated dim value (0 to settings.dimOpacity) */
     dimOpacity: number;
