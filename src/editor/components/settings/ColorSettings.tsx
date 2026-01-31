@@ -1,27 +1,10 @@
 import { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { usePaletteStore } from '../../stores/usePaletteStore';
 
 
 const GRADIENT_DIRECTIONS = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'] as const;
-
-const PRESET_COLORS = [
-    // Pastels
-    '#fecaca', // Red-200
-    '#fed7aa', // Orange-200
-    '#fde68a', // Amber-200
-    '#d9f99d', // Lime-200
-    '#bbf7d0', // Green-200
-    '#99f6e4', // Teal-200
-    '#a5f3fc', // Cyan-200
-    '#bae6fd', // Sky-200
-    '#c7d2fe', // Indigo-200
-    '#ddd6fe', // Violet-200
-    '#f5d0fe', // Fuchsia-200
-    '#fbcfe8', // Pink-200
-    '#e2e8f0', // Slate-200
-    '#ffffff'  // White replacement? Or just keep slate.
-];
 
 interface GradientSettings {
     colors: [string, string];
@@ -37,6 +20,8 @@ interface ColorSettingsProps {
     onColorChange: (color: string) => void;
     onGradientColorChange: (index: 0 | 1, color: string) => void;
     onDirectionChange: (dir: GradientSettings['direction']) => void;
+    /** If true, hides the Solid/Gradient toggle and shows only solid color controls */
+    solidOnly?: boolean;
 }
 
 export const ColorSettings = ({
@@ -47,36 +32,71 @@ export const ColorSettings = ({
     onTypeChange,
     onColorChange,
     onGradientColorChange,
-    onDirectionChange
+    onDirectionChange,
+    solidOnly = false
 }: ColorSettingsProps) => {
+    // Global palette store
+    const { palette, updatePaletteColor, resetPalette } = usePaletteStore();
+
     // Gradient State: Which color are we editing? 0 or 1
     const [activeGradientIndex, setActiveGradientIndex] = useState<0 | 1>(0);
+
+    // Palette selection state: which palette color is selected (null = none)
+    const [selectedPaletteIndex, setSelectedPaletteIndex] = useState<number | null>(null);
 
     // Ensuring gradient defaults if undefined for safe rendering
     const safeGradient = gradient || { colors: ['#ffffff', '#000000'] as [string, string], direction: 'S' as const };
 
     // Determine current active color for editing
-    const activeColorValue = isSolid ? color : safeGradient.colors[activeGradientIndex];
+    // In solidOnly mode, always use the solid color
+    const activeColorValue = (isSolid || solidOnly) ? color : safeGradient.colors[activeGradientIndex];
 
+    // Handle color update from picker - updates both active color AND selected palette color
     const handleColorUpdate = (newColor: string) => {
-        if (isSolid) {
+        // Always update the active Start/End color
+        // In solidOnly mode, always update solid color
+        if (isSolid || solidOnly) {
             onColorChange(newColor);
         } else {
             onGradientColorChange(activeGradientIndex, newColor);
+        }
+
+        // If a palette color is selected, also update it in the global store
+        if (selectedPaletteIndex !== null) {
+            updatePaletteColor(selectedPaletteIndex, newColor);
+        }
+    };
+
+    // Handle palette color click - toggle selection and copy color
+    const handlePaletteClick = (index: number) => {
+        if (selectedPaletteIndex === index) {
+            // Already selected - deselect
+            setSelectedPaletteIndex(null);
+        } else {
+            // Select this palette color and copy its value to active color
+            setSelectedPaletteIndex(index);
+            const paletteColor = palette[index];
+            if (isSolid || solidOnly) {
+                onColorChange(paletteColor);
+            } else {
+                onGradientColorChange(activeGradientIndex, paletteColor);
+            }
         }
     };
 
     return (
         <div className="p-4  rounded-lg  space-y-4 text-text-highlighted shadow-xl">
-            {/* Toggle */}
-            <MultiToggle
-                options={[
-                    { value: 'solid', label: 'Solid' },
-                    { value: 'gradient', label: 'Gradient' }
-                ]}
-                value={isSolid ? 'solid' : 'gradient'}
-                onChange={onTypeChange}
-            />
+            {/* Toggle - hidden in solidOnly mode */}
+            {!solidOnly && (
+                <MultiToggle
+                    options={[
+                        { value: 'solid', label: 'Solid' },
+                        { value: 'gradient', label: 'Gradient' }
+                    ]}
+                    value={isSolid ? 'solid' : 'gradient'}
+                    onChange={onTypeChange}
+                />
+            )}
 
             {/* Gradient Selector (Only if Gradient) */}
             {isGradient && (
@@ -183,13 +203,30 @@ export const ColorSettings = ({
 
             {/* Color Palette */}
             <div className="space-y-2">
-                <div className="text-[10px] text-text-main font-semibold">Palette</div>
+                <div className="flex items-center justify-between">
+                    <div className="text-[10px] text-text-main font-semibold">Palette</div>
+                    <button
+                        onClick={() => {
+                            resetPalette();
+                            setSelectedPaletteIndex(null);
+                        }}
+                        className="text-[9px] text-text-muted hover:text-text-main transition-colors"
+                        title="Reset palette to defaults"
+                    >
+                        Reset
+                    </button>
+                </div>
                 <div className="grid grid-cols-7 gap-1.5">
-                    {PRESET_COLORS.map(c => (
+                    {palette.map((c, index) => (
                         <button
-                            key={c}
-                            onClick={() => handleColorUpdate(c)}
-                            className="w-6 h-6 rounded-full border border-border hover:border-border-selected focus:outline-none focus:ring-1 focus:ring-ring/50 transition-transform hover:scale-110"
+                            key={index}
+                            onClick={() => handlePaletteClick(index)}
+                            className={`w-6 h-6 rounded-full border-2 transition-all
+                                ${selectedPaletteIndex === index
+                                    ? 'border-ring ring-2 ring-ring/40 scale-110'
+                                    : 'border-border hover:border-border-hover hover:scale-110'
+                                }
+                                focus:outline-none`}
                             style={{ backgroundColor: c }}
                             title={c}
                         />

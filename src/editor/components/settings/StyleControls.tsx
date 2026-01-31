@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { HexColorPicker } from "react-colorful";
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { createPortal } from 'react-dom';
 import { Slider } from '../../../components/ui/Slider';
 import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { ColorSettings } from './ColorSettings';
 
 export interface StyleSettings {
     borderRadius: number;
@@ -95,31 +95,23 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 {showColorPopover && createPortal(
                     <div
                         ref={popoverRef}
-                        className="fixed z-[9999] p-4 bg-surface-overlay rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-[9999] bg-surface-overlay rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
                         style={{
                             top: popoverPos.top,
                             left: popoverPos.left,
-                            width: '200px'
+                            width: '240px'
                         }}
                     >
-                        <div className="space-y-3">
-                            <div className="text-[10px] text-text-main uppercase font-semibold"></div>
-                            <HexColorPicker
-                                color={borderColor}
-                                onChange={(c) => onChange({ borderColor: c })}
-                                style={{ width: '100%', height: '150px' }}
-                            />
-                            <div className="flex bg-surface border border-border rounded px-2 py-1.5 items-center gap-2">
-                                <span className="text-text-main select-none">#</span>
-                                <input
-                                    type="text"
-                                    value={borderColor.replace('#', '')}
-                                    onChange={(e) => onChange({ borderColor: '#' + e.target.value })}
-                                    className="bg-transparent border-none outline-none text-xs font-mono text-text-highlighted w-full uppercase"
-                                    maxLength={6}
-                                />
-                            </div>
-                        </div>
+                        <ColorSettings
+                            isSolid={true}
+                            isGradient={false}
+                            color={borderColor}
+                            onTypeChange={() => { }}
+                            onColorChange={(c) => onChange({ borderColor: c })}
+                            onGradientColorChange={() => { }}
+                            onDirectionChange={() => { }}
+                            solidOnly={true}
+                        />
                     </div>,
                     document.body
                 )}
