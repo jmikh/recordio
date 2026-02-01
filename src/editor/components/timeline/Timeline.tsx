@@ -3,6 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { ZoomTrack } from './zoom/ZoomTrack';
+import { ZoomLegend } from './zoom/ZoomLegend';
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
@@ -190,7 +191,11 @@ export function Timeline() {
 
                     {/* Header: Zoom */}
                     <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Zoom" height={ZOOM_TRACK_HEIGHT} />
+                        <TimelineTrackHeader
+                            title="Zoom"
+                            height={ZOOM_TRACK_HEIGHT}
+                            infoElement={<ZoomLegend />}
+                        />
                     </div>
 
                     {/* Header: Spotlight */}

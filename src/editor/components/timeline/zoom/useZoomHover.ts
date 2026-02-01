@@ -45,11 +45,16 @@ export function useZoomHover(
 
         const actions = timeline.zoomActions || [];
 
-        // 1. Check if we are inside an existing action
+        // Buffer zone in pixels for keyframe visual size (diamond/square is ~14px wide)
+        const keyframeBufferPx = 10;
+        const keyframeBufferMs = coords.xToMs(keyframeBufferPx);
+
+        // 1. Check if we are inside an existing action OR near a keyframe marker
         const isInside = actions.some((m: ZoomAction) => {
             const start = m.outputEndTimeMs - m.durationMs;
             const end = m.outputEndTimeMs;
-            return mouseOutputTimeMs > start && mouseOutputTimeMs < end;
+            // Include buffer zone after keyframe end for the visual marker
+            return mouseOutputTimeMs > start && mouseOutputTimeMs < (end + keyframeBufferMs);
         });
 
         if (isInside) {

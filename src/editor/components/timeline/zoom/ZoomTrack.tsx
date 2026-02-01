@@ -5,11 +5,25 @@ import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useZoomDrag } from './useZoomDrag';
 import { useZoomHover } from './useZoomHover';
+import { ZoomKeyframe } from './ZoomKeyframe';
+import { TransitionTrail, HoldLine } from './ZoomLines';
+import { calculateZoomScale, formatScaleLabel, isFullViewport } from './ZoomTrackUtils';
+import { ghostKeyframe, ghostTrail } from './ZoomTrackStyles';
+import type { ZoomAction } from '../../../../core/types';
 
 interface ZoomTrackProps {
     height: number;
 }
 
+/**
+ * ZoomTrack renders keyframed zoom/pan transitions on a timeline.
+ * 
+ * Visual elements:
+ * - Diamond keyframes for zoomed states
+ * - Hollow square keyframes for full-viewport (1x) states
+ * - Transition trails (thick lines) leading into keyframes
+ * - Hold lines (semi-transparent) between zoomed keyframes
+ */
 export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
@@ -22,6 +36,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     };
 
     const project = useProjectStore(s => s.project);
+    const outputSize = project.settings.outputSize;
 
     // Memoize TimeMapper and TimePixelMapper for consistent usage
     const timeMapper = useTimeMapper();
@@ -57,21 +72,82 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         outputDuration
     );
 
+    // ------------------------------------------------------------------
+    // COMPUTE LINE SEGMENTS AND KEYFRAMES
+    // ------------------------------------------------------------------
 
-    const timePerStripe = 0.2; // 0.2s per stripe
-    const stripePx = Math.max(4, pixelsPerSec * timePerStripe);
-    const halfStripe = stripePx / 2;
+    const renderElements = useMemo(() => {
+        const actions: ZoomAction[] = timeline.zoomActions || [];
+        const elements: React.ReactNode[] = [];
 
-    // Shared arrow pattern style generator
-    const getArrowPatternStyle = (primaryColor: string, secondaryColor: string): React.CSSProperties => ({
-        backgroundImage: `
-            repeating-linear-gradient(45deg, ${primaryColor}, ${primaryColor} ${halfStripe}px, ${secondaryColor} ${halfStripe}px, ${secondaryColor} ${stripePx}px),
-            repeating-linear-gradient(135deg, ${primaryColor}, ${primaryColor} ${halfStripe}px, ${secondaryColor} ${halfStripe}px, ${secondaryColor} ${stripePx}px)
-        `,
-        backgroundSize: '100% 50%',
-        backgroundPosition: 'top left, bottom left',
-        backgroundRepeat: 'no-repeat'
-    });
+        // Sort actions by output end time for proper sequencing
+        const sortedActions = [...actions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+
+        sortedActions.forEach((action, index) => {
+            const keyframeX = coords.msToX(action.outputEndTimeMs);
+            const trailWidth = coords.msToX(action.durationMs);
+            const trailStartX = keyframeX - trailWidth;
+            const isFullScreen = isFullViewport(action.rect, outputSize);
+            const isSelected = editingZoomId === action.id;
+            const isDragging = dragState?.motionId === action.id;
+            const scale = calculateZoomScale(action.rect, outputSize);
+
+            // 1. Render transition trail leading into this keyframe
+            elements.push(
+                <TransitionTrail
+                    key={`trail-${action.id}`}
+                    left={trailStartX}
+                    width={trailWidth}
+                    isSelected={isSelected}
+                />
+            );
+
+            // 2. Render hold line or no-zoom line extending from this keyframe
+            // to the next action's trail start (or end of timeline)
+            const nextAction = sortedActions[index + 1];
+            const nextTrailStartMs = nextAction
+                ? nextAction.outputEndTimeMs - nextAction.durationMs
+                : outputDuration;
+
+            const lineStartX = keyframeX;
+            const lineEndX = coords.msToX(nextTrailStartMs);
+            const lineWidth = lineEndX - lineStartX;
+
+            if (lineWidth > 0) {
+                if (!isFullScreen) {
+                    // Zoom holds steady between keyframes
+                    // (No line rendered after full-viewport keyframes)
+                    elements.push(
+                        <HoldLine
+                            key={`hold-${action.id}`}
+                            left={lineStartX}
+                            width={lineWidth}
+                            isSelected={isSelected}
+                        />
+                    );
+                }
+            }
+
+            // 3. Render keyframe marker
+            elements.push(
+                <ZoomKeyframe
+                    key={`keyframe-${action.id}`}
+                    left={keyframeX}
+                    isFullViewport={isFullScreen}
+                    scaleLabel={formatScaleLabel(scale)}
+                    isSelected={isSelected}
+                    isDragging={isDragging}
+                    onMouseDown={(e) => handleDragStart(e, 'move', action)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingZoom(action.id);
+                    }}
+                />
+            );
+        });
+
+        return elements;
+    }, [timeline.zoomActions, coords, outputSize, editingZoomId, dragState, outputDuration, handleDragStart]);
 
     // ------------------------------------------------------------------
     // RENDER
@@ -86,110 +162,46 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={handleClick}
         >
-
-
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Full-width overlay bar for zoom track */}
+                {/* Full-width track background bar */}
                 <div
-                    className="absolute top-[4px] bottom-[4px] left-0 right-0 bg-surface-overlay rounded-sm"
+                    className="absolute top-[6px] bottom-[6px] left-0 right-0 bg-surface-overlay rounded-sm"
                     style={{ zIndex: 1 }}
                 />
 
-                {/* Existing Motions */}
-                {(() => {
-                    const actions = timeline.zoomActions || [];
+                {/* Line segments and keyframes */}
+                {renderElements}
 
-                    return actions.map((m: typeof actions[number], i: number) => {
-                        // Use output time directly
-                        const endX = coords.msToX(m.outputEndTimeMs);
-                        const width = coords.msToX(m.durationMs);
-                        const left = endX - width;
-
-                        if (width <= 0) return null;
-
-                        const isSelected = editingZoomId === m.id;
-                        const isDragging = dragState?.motionId === m.id;
-
-                        // Calculate extension to next block
-                        let extensionNode = null;
-                        let extWidth = 0;
-                        const outputSize = project.settings.outputSize;
-                        const isFullScreen = Math.abs(m.rect.x) < 1 &&
-                            Math.abs(m.rect.y) < 1 &&
-                            Math.abs(m.rect.width - outputSize.width) < 1 &&
-                            Math.abs(m.rect.height - outputSize.height) < 1;
-
-                        if (!isFullScreen) {
-                            const nextM = actions[i + 1];
-                            const nextStartMs = nextM ? (nextM.outputEndTimeMs - nextM.durationMs) : outputDuration;
-
-                            // Only extend if there is a gap or we are at the end
-                            const nextStartX = coords.msToX(nextStartMs);
-                            extWidth = nextStartX - endX;
-
-                            if (extWidth > 0) {
-                                extensionNode = (
-                                    <div
-                                        className={`absolute top-[4px] bottom-[4px] pointer-events-none border border-l-0 bg-primary-disabled border-primary-disabled ${isSelected ? 'border-secondary bg-primary-muted' : 'group-hover:border-primary-highlighted'}`}
-                                        style={{
-                                            left: `${endX}px`,
-                                            width: `${extWidth}px`,
-                                            zIndex: 5
-                                        }}
-                                    />
-                                );
-                            }
-                        }
-
-                        return (
-                            <React.Fragment key={m.id}>
-                                <div
-                                    className={`absolute top-[4px] bottom-[4px] group  transition-colors border border-r-4
-                                        ${isSelected ? 'border-secondary' : 'not-hover:border-primary-muted hover:border-primary-highlighted'}
-                                        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-                                        ${isFullScreen ? 'rounded-r-xl' : ''}
-                                    `}
-                                    style={{
-                                        left: `${left}px`,
-                                        width: `${Math.max(width, 2)}px`,
-                                        zIndex: isSelected ? 20 : 10,
-                                        ...getArrowPatternStyle('var(--primary)', 'var(--primary-disabled)')
-                                    }}
-                                    onMouseDown={(e) => handleDragStart(e, 'move', m)}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        console.log('viewportMotion', m);
-                                        setEditingZoom(m.id);
-                                    }}
-                                >
-                                </div>
-                                {extensionNode}
-                            </React.Fragment>
-                        );
-                    });
-                })()}
-
-                {/* Add Zoom Indicator */}
+                {/* Add Zoom Ghost Indicator */}
                 {hoverInfo && !editingZoomId && !dragState && (
-                    <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border border-secondary border border-r-4 flex items-center justify-center"
-                        style={{
-                            // Use calculated width (pixel based on time)
-                            // Position: right aligned to mouse X (hoverInfo.x).
-                            // Left = Right - Width
-                            left: `${hoverInfo.x - hoverInfo.width}px`,
-                            width: `${hoverInfo.width}px`,
-                            ...getArrowPatternStyle('var(--secondary)', 'var(--secondary-disabled)')
-                        }}
-                    >
-                        {/* Add Zoom Label (Above) */}
-                        <div className="absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-secondary pointer-events-none bg-surface-overlay px-1 rounded">
-                            Add Zoom
+                    <>
+                        {/* Ghost transition trail */}
+                        <div
+                            className={ghostTrail.className}
+                            style={{
+                                left: `${hoverInfo.x - hoverInfo.width}px`,
+                                width: `${hoverInfo.width}px`,
+                                height: ghostTrail.height,
+                                opacity: ghostTrail.opacity,
+                            }}
+                        />
+                        {/* Ghost keyframe diamond */}
+                        <div
+                            className={ghostKeyframe.container}
+                            style={{ left: `${hoverInfo.x}px` }}
+                        >
+                            <span className={ghostKeyframe.label}>
+                                Add Zoom
+                            </span>
+                            <div
+                                className={ghostKeyframe.diamond}
+                                style={ghostKeyframe.diamondStyle}
+                            />
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
-        </div >
+        </div>
     );
 };

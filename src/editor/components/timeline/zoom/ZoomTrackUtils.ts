@@ -1,4 +1,38 @@
-import type { ZoomAction } from '../../../../core/types';
+import type { ZoomAction, Rect, Size } from '../../../../core/types';
+
+// NOTE: Style constants are now centralized in ZoomTrackStyles.ts
+
+/**
+ * Calculate the zoom scale factor from a zoom rect.
+ * Scale represents how much the viewport is zoomed in.
+ * @returns Scale value (e.g., 2.5 means 2.5x zoom)
+ */
+export function calculateZoomScale(rect: Rect, outputSize: Size): number {
+    // Scale is output width divided by zoom rect width
+    const scale = outputSize.width / rect.width;
+    return Math.round(scale * 10) / 10; // Round to 1 decimal
+}
+
+/**
+ * Format scale value for display (e.g., "2.5x", "1x")
+ */
+export function formatScaleLabel(scale: number): string {
+    return `${scale}x`;
+}
+
+/**
+ * Check if a zoom rect represents full viewport (no zoom).
+ * Uses a small tolerance for floating-point comparison.
+ */
+export function isFullViewport(rect: Rect, outputSize: Size): boolean {
+    const tolerance = 1;
+    return (
+        Math.abs(rect.x) < tolerance &&
+        Math.abs(rect.y) < tolerance &&
+        Math.abs(rect.width - outputSize.width) < tolerance &&
+        Math.abs(rect.height - outputSize.height) < tolerance
+    );
+}
 
 /**
  * Calculate boundary constraints for a zoom block.

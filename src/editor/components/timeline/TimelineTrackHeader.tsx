@@ -8,6 +8,8 @@ interface TimelineTrackHeaderProps {
     hasAudio?: boolean;
     isMuted?: boolean;
     onToggleMute?: () => void;
+    /** Optional element to show next to the title (e.g., info icon) */
+    infoElement?: React.ReactNode;
 }
 
 export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
@@ -15,16 +17,20 @@ export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
     height,
     hasAudio,
     isMuted,
-    onToggleMute
+    onToggleMute,
+    infoElement
 }) => {
     return (
         <div
             className="flex items-center justify-between px-3 bg-surface"
             style={{ height, minHeight: height }}
         >
-            <span className="text-sm text-text-main truncate select-none" title={title}>
-                {title}
-            </span>
+            <div className="flex items-center gap-1.5">
+                <span className="text-sm text-text-main truncate select-none" title={title}>
+                    {title}
+                </span>
+                {infoElement}
+            </div>
 
             {hasAudio && onToggleMute && (
                 <button
