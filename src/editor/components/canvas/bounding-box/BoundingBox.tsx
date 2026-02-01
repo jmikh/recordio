@@ -130,7 +130,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     });
 
     const { calculateMove } = useMoveLogic({ constraints });
-    const { lockInteraction, unlockInteraction } = useInteractionLock();
+    const { isLocked, lockInteraction, unlockInteraction } = useInteractionLock();
 
     // ------------------------------------------------------------------
     // LOCAL STATE
@@ -153,6 +153,15 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // Ref to track latest corner radii for commit (avoids React batching issues)
     const cornerRadiiRef = useRef<CornerRadii>(localCornerRadii);
     cornerRadiiRef.current = localCornerRadii;
+
+    // Sync cornerRadii from props when not in an active interaction
+    // This implements the "Interaction-Locked Pattern": props are ignored during
+    // drag to prevent visual rebounds, but synced when interaction is complete.
+    React.useEffect(() => {
+        if (!isLocked() && cornerRadii) {
+            setLocalCornerRadii(cornerRadii);
+        }
+    }, [cornerRadii, isLocked]);
 
     // Keep rect ref in sync (needed for move/resize calculations)
     // This is not prop-sync, just keeping ref current with latest rect value
