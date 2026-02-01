@@ -5,6 +5,7 @@ import { TimelineRuler } from './TimelineRuler';
 import { ZoomTrack } from './zoom/ZoomTrack';
 import { ZoomLegend } from './zoom/ZoomLegend';
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
+import { SpotlightLegend } from './spotlight/SpotlightLegend';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -200,7 +201,11 @@ export function Timeline() {
 
                     {/* Header: Spotlight */}
                     <div className="shrink-0" style={{ height: SPOTLIGHT_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader title="Spotlight" height={SPOTLIGHT_TRACK_HEIGHT} />
+                        <TimelineTrackHeader
+                            title="Spotlight"
+                            height={SPOTLIGHT_TRACK_HEIGHT}
+                            infoElement={<SpotlightLegend />}
+                        />
                     </div>
 
                 </div>

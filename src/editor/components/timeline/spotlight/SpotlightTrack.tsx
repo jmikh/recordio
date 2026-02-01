@@ -5,11 +5,25 @@ import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useSpotlightDrag } from './useSpotlightDrag';
 import { useSpotlightHover } from './useSpotlightHover';
+import { SpotlightBlock } from './SpotlightBlock';
+import {
+    ghostSpotlight,
+    FADE_HEIGHT,
+    HOLD_HEIGHT
+} from './SpotlightTrackStyles';
 
 interface SpotlightTrackProps {
     height: number;
 }
 
+/**
+ * SpotlightTrack renders spotlight effects on a timeline.
+ * 
+ * Visual elements:
+ * - Fade In segment (shorter, striped, 45° angle)
+ * - Hold segment (taller, solid fill)
+ * - Fade Out segment (shorter, striped, -45° angle)
+ */
 export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
@@ -21,6 +35,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     };
 
     const project = useProjectStore(s => s.project);
+    const transitionDurationMs = project.settings.spotlight.transitionDurationMs;
 
     // Memoize TimeMapper and TimePixelMapper
     const timeMapper = useTimeMapper();
@@ -52,8 +67,12 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         outputDuration
     );
 
-    // Visual constants
-    const HANDLE_WIDTH = 6;
+    // Calculate fade in/out widths in pixels
+    const fadeWidthPx = coords.msToX(transitionDurationMs);
+
+    // Calculate vertical positions for ghost
+    const fadeY = (height - FADE_HEIGHT) / 2;
+    const holdY = (height - HOLD_HEIGHT) / 2;
 
     return (
         <div
@@ -66,12 +85,6 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Full-width overlay bar for spotlight track */}
-                <div
-                    className="absolute top-[4px] bottom-[4px] left-0 right-0 bg-surface-overlay rounded-sm"
-                    style={{ zIndex: 1 }}
-                />
-
                 {/* Existing Spotlights */}
                 {(() => {
                     const spotlightActions = timeline.spotlightActions || [];
@@ -79,76 +92,93 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                     return spotlightActions.map((s) => {
                         const startX = coords.msToX(s.outputStartTimeMs);
                         const endX = coords.msToX(s.outputEndTimeMs);
-                        const width = endX - startX;
+                        const totalWidth = endX - startX;
 
-                        if (width <= 0) return null;
+                        if (totalWidth <= 0) return null;
 
                         const isSelected = editingSpotlightId === s.id;
                         const isDragging = dragState?.spotlightId === s.id;
 
+                        // Calculate actual fade widths (capped to fit within total width)
+                        const maxFadeWidth = totalWidth / 3;
+                        const actualFadeInWidth = Math.min(fadeWidthPx, maxFadeWidth);
+                        const actualFadeOutWidth = Math.min(fadeWidthPx, maxFadeWidth);
+
                         return (
-                            <div
+                            <SpotlightBlock
                                 key={s.id}
-                                className={`absolute top-[4px] bottom-[4px] group transition-colors rounded-sm
-                                    ${isSelected ? 'border-2 border-amber-400 bg-amber-500/30' : 'border border-amber-600/50 bg-amber-500/20 hover:border-amber-400 hover:bg-amber-500/30'}
-                                    ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-                                `}
-                                style={{
-                                    left: `${startX}px`,
-                                    width: `${Math.max(width, 2)}px`,
-                                    zIndex: isSelected ? 20 : 10,
-                                }}
+                                left={startX}
+                                width={totalWidth}
+                                fadeInWidth={actualFadeInWidth}
+                                fadeOutWidth={actualFadeOutWidth}
+                                isSelected={isSelected}
+                                isDragging={isDragging}
+                                trackHeight={height}
                                 onMouseDown={(e) => handleDragStart(e, 'move', s)}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setEditingSpotlight(s.id);
                                 }}
-                            >
-                                {/* Left resize handle */}
-                                <div
-                                    className="absolute left-0 top-0 bottom-0 cursor-ew-resize hover:bg-amber-400/50"
-                                    style={{ width: HANDLE_WIDTH }}
-                                    onMouseDown={(e) => {
-                                        e.stopPropagation();
-                                        handleDragStart(e, 'resize-start', s);
-                                    }}
-                                />
-
-                                {/* Right resize handle */}
-                                <div
-                                    className="absolute right-0 top-0 bottom-0 cursor-ew-resize hover:bg-amber-400/50"
-                                    style={{ width: HANDLE_WIDTH }}
-                                    onMouseDown={(e) => {
-                                        e.stopPropagation();
-                                        handleDragStart(e, 'resize-end', s);
-                                    }}
-                                />
-
-                                {/* Center label (for wider blocks) */}
-                                {width > 60 && (
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <span className="text-[10px] text-amber-200/70 truncate px-2">
-                                            Spotlight
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
+                                onResizeStartMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    handleDragStart(e, 'resize-start', s);
+                                }}
+                                onResizeEndMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    handleDragStart(e, 'resize-end', s);
+                                }}
+                            />
                         );
                     });
                 })()}
 
-                {/* Add Spotlight Indicator (hover ghost) */}
+                {/* Add Spotlight Ghost Indicator */}
                 {hoverInfo && !editingSpotlightId && !dragState && (
                     <div
-                        className="absolute top-[4px] bottom-[4px] pointer-events-none z-[6] border-2 border-dashed border-amber-400 bg-amber-500/20 rounded-sm flex items-center justify-center"
+                        className={ghostSpotlight.container}
                         style={{
                             left: `${hoverInfo.x}px`,
                             width: `${hoverInfo.width}px`,
+                            height,
                         }}
                     >
-                        <span className="text-[10px] text-amber-200 pointer-events-none bg-surface-overlay/80 px-1 rounded">
-                            + Spotlight
-                        </span>
+                        {/* Ghost Fade In */}
+                        <div
+                            className={ghostSpotlight.fadeIn.className}
+                            style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: fadeY,
+                                width: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                ...ghostSpotlight.fadeIn.getStyle(),
+                            }}
+                        />
+
+                        {/* Ghost Hold */}
+                        <div
+                            className={ghostSpotlight.hold.className}
+                            style={{
+                                position: 'absolute',
+                                left: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                top: holdY,
+                                width: Math.max(0, hoverInfo.width - Math.min(fadeWidthPx, hoverInfo.width / 3) * 2),
+                                ...ghostSpotlight.hold.getStyle(),
+                            }}
+                        >
+                            <span className={ghostSpotlight.label}>+ Spotlight</span>
+                        </div>
+
+                        {/* Ghost Fade Out */}
+                        <div
+                            className={ghostSpotlight.fadeOut.className}
+                            style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: fadeY,
+                                width: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                ...ghostSpotlight.fadeOut.getStyle(),
+                            }}
+                        />
                     </div>
                 )}
             </div>

@@ -1,0 +1,143 @@
+import React from 'react';
+import {
+    fadeInSegment,
+    holdSegment,
+    fadeOutSegment,
+    spotlightContainer,
+    resizeHandle,
+    FADE_HEIGHT,
+    HOLD_HEIGHT
+} from './SpotlightTrackStyles';
+
+interface SpotlightBlockProps {
+    /** Left position in pixels */
+    left: number;
+    /** Total width of the spotlight block in pixels */
+    width: number;
+    /** Width of the fade-in segment in pixels */
+    fadeInWidth: number;
+    /** Width of the fade-out segment in pixels */
+    fadeOutWidth: number;
+    /** Whether this spotlight is selected */
+    isSelected: boolean;
+    /** Whether this spotlight is being dragged */
+    isDragging: boolean;
+    /** Track height for centering */
+    trackHeight: number;
+    /** Mouse down handler for move drag */
+    onMouseDown: (e: React.MouseEvent) => void;
+    /** Click handler for selection */
+    onClick: (e: React.MouseEvent) => void;
+    /** Mouse down handler for left resize */
+    onResizeStartMouseDown: (e: React.MouseEvent) => void;
+    /** Mouse down handler for right resize */
+    onResizeEndMouseDown: (e: React.MouseEvent) => void;
+}
+
+/**
+ * Renders a spotlight block on the timeline with three visual segments:
+ * - Fade In (left): shorter with diagonal stripes pointing inward
+ * - Hold (center): taller with solid fill
+ * - Fade Out (right): shorter with diagonal stripes pointing outward
+ */
+export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
+    left,
+    width,
+    fadeInWidth,
+    fadeOutWidth,
+    isSelected,
+    isDragging,
+    trackHeight,
+    onMouseDown,
+    onClick,
+    onResizeStartMouseDown,
+    onResizeEndMouseDown,
+}) => {
+    // Calculate hold width
+    const holdWidth = Math.max(0, width - fadeInWidth - fadeOutWidth);
+
+    // Calculate vertical centering positions
+    const fadeY = (trackHeight - FADE_HEIGHT) / 2;
+    const holdY = (trackHeight - HOLD_HEIGHT) / 2;
+
+    // Get color classes based on selection state
+    const fadeColorClass = isSelected ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
+    const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
+
+    return (
+        <div
+            className={`${spotlightContainer.base} ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle}`}
+            style={{
+                left: `${left}px`,
+                width: `${width}px`,
+                height: trackHeight,
+                zIndex: isSelected ? 20 : 10,
+            }}
+            onMouseDown={onMouseDown}
+            onClick={onClick}
+        >
+            {/* Fade In Segment */}
+            {fadeInWidth > 0 && (
+                <div
+                    className={`${fadeInSegment.base} ${fadeColorClass}`}
+                    style={{
+                        left: 0,
+                        top: fadeY,
+                        width: fadeInWidth,
+                        ...fadeInSegment.getStyle(isSelected),
+                    }}
+                />
+            )}
+
+            {/* Hold Segment */}
+            {holdWidth > 0 && (
+                <div
+                    className={`${holdSegment.base} ${holdColorClass}`}
+                    style={{
+                        left: fadeInWidth,
+                        top: holdY,
+                        width: holdWidth,
+                        ...holdSegment.getStyle(),
+                    }}
+                />
+            )}
+
+            {/* Fade Out Segment */}
+            {fadeOutWidth > 0 && (
+                <div
+                    className={`${fadeOutSegment.base} ${fadeColorClass}`}
+                    style={{
+                        left: fadeInWidth + holdWidth,
+                        top: fadeY,
+                        width: fadeOutWidth,
+                        ...fadeOutSegment.getStyle(isSelected),
+                    }}
+                />
+            )}
+
+            {/* Left resize handle */}
+            <div
+                className={`${resizeHandle.base} ${resizeHandle.hoverClass}`}
+                style={{
+                    left: 0,
+                    width: resizeHandle.width,
+                    top: fadeY,
+                    height: FADE_HEIGHT,
+                }}
+                onMouseDown={onResizeStartMouseDown}
+            />
+
+            {/* Right resize handle */}
+            <div
+                className={`${resizeHandle.base} ${resizeHandle.hoverClass}`}
+                style={{
+                    right: 0,
+                    width: resizeHandle.width,
+                    top: fadeY,
+                    height: FADE_HEIGHT,
+                }}
+                onMouseDown={onResizeEndMouseDown}
+            />
+        </div>
+    );
+};
