@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { Rect } from '../../../../core/types';
 import type { CornerIndex } from './types';
 import { useDisplayMapper } from '../../../hooks/useDisplayMapper';
@@ -59,6 +59,10 @@ export const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
     onDragStart,
 }) => {
     const displayMapper = useDisplayMapper();
+
+    // Track the current radius during drag to avoid React batching issues
+    const currentRadiusRef = useRef(radius);
+    currentRadiusRef.current = radius;
 
     // Calculate max possible radius (half of smaller dimension)
     const smallerDimension = Math.min(rect.width, rect.height);
@@ -160,6 +164,7 @@ export const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
             }
 
             const newRadius = Math.max(0, Math.min(maxRadius, startRadius + radiusDelta));
+            currentRadiusRef.current = newRadius;
             onRadiusChange(corner, newRadius);
         };
 

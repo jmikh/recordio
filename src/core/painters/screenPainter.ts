@@ -118,14 +118,12 @@ export function drawScreen(
             } = screenConfig;
 
             // borderRadius is in output pixels, clamp to half of smaller dimension
-            const smallerDimension = Math.min(projectedW, projectedH);
-            const scaledRadius = Math.min(borderRadius, smallerDimension / 2);
             const renderBorderWidth = borderWidth;
 
             // --- PASS 1: GLOW ---
             if (hasGlow) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, scaledRadius);
+                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
                 ctx.shadowColor = borderColor;
                 ctx.shadowBlur = GLOW_BLUR;
                 ctx.fillStyle = borderColor;
@@ -142,7 +140,7 @@ export function drawScreen(
             // --- PASS 2: SHADOW ---
             if (hasShadow) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, scaledRadius);
+                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
                 ctx.shadowColor = SHADOW_COLOR;
                 ctx.shadowBlur = SHADOW_BLUR;
                 ctx.shadowOffsetY = SHADOW_OFFSET_Y;
@@ -159,7 +157,7 @@ export function drawScreen(
 
             // --- PASS 3: VIDEO CONTENT (Clipped) ---
             ctx.save();
-            defineScreenPath(ctx, originX, originY, projectedW, projectedH, scaledRadius);
+            defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
             ctx.clip();
             ctx.drawImage(
                 video,
@@ -171,7 +169,7 @@ export function drawScreen(
             // --- PASS 4: BORDER ---
             if (renderBorderWidth > 0) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, scaledRadius);
+                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
                 ctx.lineWidth = renderBorderWidth;
                 ctx.strokeStyle = borderColor;
                 ctx.stroke();

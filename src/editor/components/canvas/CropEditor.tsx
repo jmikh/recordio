@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import type { Rect, Project } from '../../../core/types';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
@@ -7,15 +7,13 @@ import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
-import { BoundingBox } from './BoundingBox';
+import { BoundingBox, type CornerRadii } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
 // ------------------------------------------------------------------
-
-const EDITOR_PADDING = 0.01;
 
 export const renderCropEditor = (
     resources: RenderResources,
@@ -42,11 +40,10 @@ export const renderCropEditor = (
             ...project.settings.screen,
             crop: undefined, // Force undefined to see full video
             mode: 'border' as const, // Force non-device mode to hide frames
-            borderRadius: 0, // Hide rounding (pixels)
+            borderRadius: 0,
             borderWidth: 0, // Hide borders
             hasShadow: false, // Hide shadow
             hasGlow: false, // Hide glow
-            padding: EDITOR_PADDING // Force consistent padding during crop editing
         }
     };
 
@@ -86,6 +83,13 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
+    // Get current border radius for screen (all corners linked)
+    const screenBorderRadius = project.settings.screen.borderRadius ?? 0;
+    const [localBorderRadius, setLocalBorderRadius] = useState(screenBorderRadius);
+    const cornerRadii: CornerRadii = useMemo(() => {
+        return [localBorderRadius, localBorderRadius, localBorderRadius, localBorderRadius];
+    }, [localBorderRadius]);
+
     // Determine dimensions
     const outputSize = project.settings.outputSize;
 
@@ -106,7 +110,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     const viewMapper = new ViewMapper(
         inputSize,
         outputSize,
-        EDITOR_PADDING, // Force same padding as renderCropEditor
+        project.settings.screen.padding,
         undefined // NO CROP for the mapper, because we are mapping onto the full view
     );
 
@@ -171,6 +175,17 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
         batchAction(() => updateSettings({ screen: { crop: newCrop } }));
     };
 
+    // Corner radius handlers for screen border radius
+    const handleCornerRadiiChange = (radii: CornerRadii) => {
+        // All corners are linked, take the first value
+        setLocalBorderRadius(radii[0]);
+    };
+
+    const handleCornerRadiiCommit = (radii: CornerRadii) => {
+        const newRadius = radii[0];
+        batchAction(() => updateSettings({ screen: { borderRadius: newRadius } }));
+    };
+
     // Close when clicking outside the canvas container
     const rootRef = useRef<HTMLDivElement>(null);
     const canvasContainerRef = useRef<HTMLDivElement | null>(null);
@@ -211,6 +226,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             {/* Dimming Layers */}
             <DimmedOverlay
                 holeRect={renderedRect}
+                cornerRadii={cornerRadii}
             />
 
             {/* Toolbar */}
@@ -258,12 +274,24 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
             <div style={containerStyle}>
                 <BoundingBox
                     rect={relativeRect}
+                    constraintBounds={{
+                        x: 0,
+                        y: 0,
+                        width: viewMapper.contentRect.width,
+                        height: viewMapper.contentRect.height
+                    }}
                     onChange={handleChange}
                     onCommit={() => {
                         endInteraction();
-                        // Also sync exact state if needed, but change handled it.
                     }}
                     onDragStart={startInteraction}
+                    // Corner radius editing (all corners linked, no toggle)
+                    allowCornerEditing={true}
+                    cornerRadii={cornerRadii}
+                    cornersLinked={true}
+                    hideLinkToggle={true}
+                    onCornerRadiiChange={handleCornerRadiiChange}
+                    onCornerRadiiCommit={handleCornerRadiiCommit}
                 >
                     {/* Visual Overlay inside the box (Rule of Thirds) */}
                     <div className="absolute inset-0 flex flex-col pointer-events-none opacity-30">

@@ -150,6 +150,10 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // Hover state for showing/hiding radius handles
     const [isHovered, setIsHovered] = useState(false);
 
+    // Ref to track latest corner radii for commit (avoids React batching issues)
+    const cornerRadiiRef = useRef<CornerRadii>(localCornerRadii);
+    cornerRadiiRef.current = localCornerRadii;
+
     // Keep rect ref in sync (needed for move/resize calculations)
     // This is not prop-sync, just keeping ref current with latest rect value
     currentRectRef.current = rect;
@@ -222,8 +226,9 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [isLinked, localCornerRadii, onCornerRadiiChange]);
 
     const handleCornerRadiusCommit = useCallback(() => {
-        onCornerRadiiCommit?.(localCornerRadii);
-    }, [localCornerRadii, onCornerRadiiCommit]);
+        onCornerRadiiCommit?.(cornerRadiiRef.current);
+        unlockInteraction();
+    }, [onCornerRadiiCommit, unlockInteraction]);
 
     const handleCornerRadiusDragStart = useCallback(() => {
         lockInteraction();
