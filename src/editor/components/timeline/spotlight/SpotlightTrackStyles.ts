@@ -22,12 +22,12 @@ export const SEGMENT_RADIUS = 4;
 /**
  * Creates a diagonal stripe pattern for fade segments using CSS variables.
  * @param angle - Stripe angle (45 for fade-in, -45 for fade-out)
- * @param isSelected - Whether the spotlight is selected
+ * @param angle - Stripe angle (-45 for fade-in, 45 for fade-out)
  */
-export function createStripePattern(angle: number, isSelected: boolean): CSSProperties {
-    // Use CSS variables for colors
-    const colorVar = isSelected ? 'var(--secondary)' : 'var(--primary)';
-    const bgColorVar = isSelected ? 'var(--secondary-muted)' : 'var(--primary-muted)';
+export function createStripePattern(angle: number): CSSProperties {
+    // Always use primary colors for stripes
+    const colorVar = 'var(--primary)';
+    const bgColorVar = 'var(--primary-muted)';
 
     return {
         background: `repeating-linear-gradient(
@@ -44,23 +44,25 @@ export function createStripePattern(angle: number, isSelected: boolean): CSSProp
 
 /** Fade In segment (left) - shorter with -45° stripes */
 export const fadeInSegment = {
-    base: 'absolute flex-shrink-0 border-2',
+    base: 'absolute flex-shrink-0 border-2 transition-colors',
     defaultClass: 'border-primary',
     selectedClass: 'border-secondary',
+    hoverClass: 'group-hover:border-primary-highlighted',
     height: FADE_HEIGHT,
-    getStyle: (isSelected: boolean): CSSProperties => ({
+    getStyle: (): CSSProperties => ({
         height: FADE_HEIGHT,
         borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
         borderRight: 'none',
-        ...createStripePattern(-45, isSelected),
+        ...createStripePattern(-45),
     }),
 };
 
-/** Hold segment (center) - taller with solid fill */
+/** Hold segment (center) - taller with solid fill, border when selected */
 export const holdSegment = {
-    base: 'absolute flex-shrink-0',
-    defaultClass: 'bg-primary',
-    selectedClass: 'bg-secondary',
+    base: 'absolute flex-shrink-0 bg-primary transition-colors',
+    defaultClass: '',
+    selectedClass: 'ring-2 ring-secondary',
+    hoverClass: 'group-hover:bg-primary-highlighted',
     height: HOLD_HEIGHT,
     getStyle: (): CSSProperties => ({
         height: HOLD_HEIGHT,
@@ -70,15 +72,16 @@ export const holdSegment = {
 
 /** Fade Out segment (right) - shorter with 45° stripes */
 export const fadeOutSegment = {
-    base: 'absolute flex-shrink-0 border-2',
+    base: 'absolute flex-shrink-0 border-2 transition-colors',
     defaultClass: 'border-primary',
     selectedClass: 'border-secondary',
+    hoverClass: 'group-hover:border-primary-highlighted',
     height: FADE_HEIGHT,
-    getStyle: (isSelected: boolean): CSSProperties => ({
+    getStyle: (): CSSProperties => ({
         height: FADE_HEIGHT,
         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
         borderLeft: 'none',
-        ...createStripePattern(45, isSelected),
+        ...createStripePattern(45),
     }),
 };
 
@@ -100,6 +103,20 @@ export const resizeHandle = {
 
 // ============= GHOST STYLES (Add Spotlight indicator) =============
 
+/** Creates ghost stripe pattern - lighter/more transparent version */
+function createGhostStripePattern(angle: number): CSSProperties {
+    return {
+        background: `repeating-linear-gradient(
+            ${angle}deg,
+            var(--primary) 0px,
+            var(--primary) 2px,
+            transparent 2px,
+            transparent 6px
+        )`,
+        opacity: 0.4,
+    };
+}
+
 export const ghostSpotlight = {
     container: 'absolute pointer-events-none z-[6] flex items-center',
     fadeIn: {
@@ -108,14 +125,15 @@ export const ghostSpotlight = {
             height: FADE_HEIGHT,
             borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
             borderRight: 'none',
-            backgroundColor: 'var(--primary-muted)',
+            ...createGhostStripePattern(-45),
         }),
     },
     hold: {
         className: 'border-2 border-dashed border-primary/60 flex items-center justify-center',
         getStyle: (): CSSProperties => ({
             height: HOLD_HEIGHT,
-            backgroundColor: 'var(--primary-muted)',
+            backgroundColor: 'var(--primary)',
+            opacity: 0.4,
         }),
     },
     fadeOut: {
@@ -124,7 +142,7 @@ export const ghostSpotlight = {
             height: FADE_HEIGHT,
             borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
             borderLeft: 'none',
-            backgroundColor: 'var(--primary-muted)',
+            ...createGhostStripePattern(45),
         }),
     },
     label: 'text-[10px] text-primary pointer-events-none whitespace-nowrap',
@@ -140,7 +158,7 @@ export const legendItem = {
             height: 12,
             borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
             borderRight: 'none',
-            ...createStripePattern(-45, false),
+            ...createStripePattern(-45),
         } as CSSProperties,
     },
     hold: {
@@ -157,7 +175,7 @@ export const legendItem = {
             height: 12,
             borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
             borderLeft: 'none',
-            ...createStripePattern(45, false),
+            ...createStripePattern(45),
         } as CSSProperties,
     },
 };

@@ -3,7 +3,7 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 import type { DragState } from './useSpotlightDrag';
-import { getValidSpotlightRange, getMinSpotlightDuration } from './SpotlightTrackUtils';
+import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration } from './SpotlightTrackUtils';
 
 export interface HoverInfo {
     x: number; // Left position in pixels
@@ -26,9 +26,11 @@ export function useSpotlightHover(
 
     const settings: SpotlightSettings = project.settings.spotlight;
     const minDuration = getMinSpotlightDuration(settings);
+    const defaultDuration = getDefaultSpotlightDuration(settings);
 
     /**
      * Handles hover interactions for 'Add Spotlight' ghost block.
+     * Spotlight starts at mouse position and extends to the right.
      * DISABLED while dragging to prevent interference.
      */
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -57,9 +59,16 @@ export function useSpotlightHover(
             return;
         }
 
-        // Find valid range for new spotlight
-        const range = getValidSpotlightRange(mouseTimeMs, spotlightActions, outputDuration, minDuration);
+        // Find valid range for new spotlight (starts at mouse position)
+        const range = getValidSpotlightRange(
+            mouseTimeMs,
+            spotlightActions,
+            outputDuration,
+            minDuration,
+            defaultDuration
+        );
 
+        // Don't show ghost if no valid range (not enough space)
         if (!range) {
             setHoverInfo(null);
             return;

@@ -64,9 +64,13 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     const fadeColorClass = isSelected ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
     const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
 
+    // Only apply hover effects when not selected
+    const fadeHoverClass = isSelected ? '' : fadeInSegment.hoverClass;
+    const holdHoverClass = isSelected ? '' : holdSegment.hoverClass;
+
     return (
         <div
-            className={`${spotlightContainer.base} ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle}`}
+            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -79,12 +83,12 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Fade In Segment */}
             {fadeInWidth > 0 && (
                 <div
-                    className={`${fadeInSegment.base} ${fadeColorClass}`}
+                    className={`${fadeInSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
                     style={{
                         left: 0,
                         top: fadeY,
                         width: fadeInWidth,
-                        ...fadeInSegment.getStyle(isSelected),
+                        ...fadeInSegment.getStyle(),
                     }}
                 />
             )}
@@ -92,7 +96,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Hold Segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass}`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
                     style={{
                         left: fadeInWidth,
                         top: holdY,
@@ -105,12 +109,12 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Fade Out Segment */}
             {fadeOutWidth > 0 && (
                 <div
-                    className={`${fadeOutSegment.base} ${fadeColorClass}`}
+                    className={`${fadeOutSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
                     style={{
                         left: fadeInWidth + holdWidth,
                         top: fadeY,
                         width: fadeOutWidth,
-                        ...fadeOutSegment.getStyle(isSelected),
+                        ...fadeOutSegment.getStyle(),
                     }}
                 />
             )}

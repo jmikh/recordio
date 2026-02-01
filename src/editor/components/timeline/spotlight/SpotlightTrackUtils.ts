@@ -1,10 +1,25 @@
 import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 
+// Default values for backward compatibility with projects that don't have new fields
+const DEFAULT_MIN_HOLD_MS = 200;
+const DEFAULT_HOLD_MS = 1000;
+
 /**
- * Gets the minimum allowed duration for a spotlight.
+ * Gets the minimum allowed total duration for a spotlight.
+ * Total duration = fadeIn + hold + fadeOut
  */
 export function getMinSpotlightDuration(settings: SpotlightSettings): number {
-    return settings.transitionDurationMs * 2 + 100;
+    const minHold = settings.minHoldDurationMs ?? DEFAULT_MIN_HOLD_MS;
+    return settings.transitionDurationMs * 2 + minHold;
+}
+
+/**
+ * Gets the default total duration for a new spotlight.
+ * Total duration = fadeIn + hold + fadeOut
+ */
+export function getDefaultSpotlightDuration(settings: SpotlightSettings): number {
+    const defaultHold = settings.defaultHoldDurationMs ?? DEFAULT_HOLD_MS;
+    return settings.transitionDurationMs * 2 + defaultHold;
 }
 
 /**
@@ -44,48 +59,67 @@ export function getSpotlightBounds(
 }
 
 /**
- * Finds valid time range for a new spotlight at a given click position.
+ * Finds valid time range for a new spotlight.
+ * 
+ * Smart positioning logic:
+ * 1. PREFERRED: Spotlight starts at/near mouse position and extends right
+ * 2. FALLBACK: If not enough space to the right, but the gap has enough total space,
+ *    anchor the spotlight earlier (shift left) so it fits within the gap
+ * 3. HIDE: Only return null if the total gap is smaller than minDuration
  */
 export function getValidSpotlightRange(
-    clickTimeMs: number,
+    mouseTimeMs: number,
     spotlightActions: SpotlightAction[],
     outputDuration: number,
-    minDuration: number
+    minDuration: number,
+    defaultDuration: number
 ): { start: number; end: number } | null {
+    // Small offset so cursor overlaps with the ghost
+    const CURSOR_OVERLAP_MS = 100;
+
     const sorted = [...spotlightActions].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
+    // Find boundaries around the mouse position (the gap we're in)
     let prevEnd = 0;
     let nextStart = outputDuration;
 
     for (const s of sorted) {
-        if (s.outputEndTimeMs <= clickTimeMs) {
+        if (s.outputEndTimeMs <= mouseTimeMs) {
             prevEnd = s.outputEndTimeMs;
         }
-        if (s.outputStartTimeMs > clickTimeMs && s.outputStartTimeMs < nextStart) {
+        if (s.outputStartTimeMs > mouseTimeMs && s.outputStartTimeMs < nextStart) {
             nextStart = s.outputStartTimeMs;
             break;
         }
     }
 
-    const availableSpace = nextStart - prevEnd;
-    if (availableSpace < minDuration) {
+    // Total available space in this gap
+    const totalGapSize = nextStart - prevEnd;
+
+    // If the entire gap is smaller than minimum duration, can't add spotlight
+    if (totalGapSize < minDuration) {
         return null;
     }
 
-    // Default to minimum * 2 or available space
-    const defaultDuration = Math.min(minDuration * 2, availableSpace);
-    let start = clickTimeMs - defaultDuration / 2;
-    let end = clickTimeMs + defaultDuration / 2;
+    // Start position (at mouse with small overlap offset, clamped to prevEnd)
+    const idealStart = mouseTimeMs - CURSOR_OVERLAP_MS;
+    const start = Math.max(idealStart, prevEnd);
 
-    // Clamp
-    if (start < prevEnd) {
-        start = prevEnd;
-        end = Math.min(start + defaultDuration, nextStart);
-    }
-    if (end > nextStart) {
-        end = nextStart;
-        start = Math.max(end - defaultDuration, prevEnd);
+    // Space available from start position to next boundary
+    const spaceToRight = nextStart - start;
+
+    // PRIORITY 1: Try defaultDuration starting at mouse
+    if (spaceToRight >= defaultDuration) {
+        return { start, end: start + defaultDuration };
     }
 
-    return { start, end };
+    // PRIORITY 2: Shrink to fit available space (still starting at mouse)
+    if (spaceToRight >= minDuration) {
+        return { start, end: nextStart };
+    }
+
+    // PRIORITY 3: Not enough space at mouse position, anchor with minDuration
+    // Position spotlight so it ends at nextStart
+    const anchoredStart = nextStart - minDuration;
+    return { start: Math.max(anchoredStart, prevEnd), end: nextStart };
 }

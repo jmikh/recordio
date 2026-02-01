@@ -46,7 +46,9 @@ const createDefaultSettings = (): ProjectSettings => ({
         isAuto: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
-        transitionDurationMs: 300
+        transitionDurationMs: 300,
+        minHoldDurationMs: 200,
+        defaultHoldDurationMs: 1000
     },
 
     effects: {
