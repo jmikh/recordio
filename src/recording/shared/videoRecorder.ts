@@ -273,8 +273,12 @@ export class VideoRecorder {
         // 4. Get Camera Stream (Dual Mode)
         let cameraStream: MediaStream | null = null;
         if (config.hasCamera) {
-            const constraints = config.videoDeviceId ? { deviceId: { exact: config.videoDeviceId } } : true;
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: constraints });
+            const videoConstraints: MediaTrackConstraints = {
+                ...(config.videoDeviceId && { deviceId: { exact: config.videoDeviceId } }),
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            };
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
             this.activeStreams.push(cameraStream);
         }
 
