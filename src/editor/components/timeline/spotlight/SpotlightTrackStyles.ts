@@ -62,7 +62,7 @@ export const holdSegment = {
     base: 'absolute flex-shrink-0 bg-primary rounded-sm transition-colors z-10',
     defaultClass: '',
     selectedClass: 'ring-2 ring-secondary',
-    hoverClass: 'group-hover:bg-primary-highlighted group-hover:scale-110',
+    hoverClass: 'group-hover:bg-primary-highlighted group-hover:scale-y-110',
     height: HOLD_HEIGHT,
     getStyle: (): CSSProperties => ({
         height: HOLD_HEIGHT,
