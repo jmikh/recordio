@@ -147,7 +147,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-50 pointer-events-none"
+            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] pointer-events-none"
         >
             {/* Background Closer */}
             <div

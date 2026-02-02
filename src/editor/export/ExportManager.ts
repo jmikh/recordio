@@ -142,8 +142,9 @@ export class ExportManager {
                 }
             }
 
-            // Load watermark logo for non-pro users
-            if (!isPro) {
+            // Load watermark logo for non-pro users (only in production)
+            const shouldShowWatermark = !isPro && import.meta.env.MODE === 'production';
+            if (shouldShowWatermark) {
                 imageElements.watermark = await loadImage(fullLogoPng);
             }
 
@@ -239,8 +240,8 @@ export class ExportManager {
                     currentTimeMs: currentTimeMs
                 });
 
-                // Draw watermark for non-pro users (last, on top of all layers)
-                if (!isPro && imageElements.watermark) {
+                // Draw watermark for non-pro users (last, on top of all layers; skipped in dev)
+                if (shouldShowWatermark && imageElements.watermark) {
                     drawWatermark(ctx, imageElements.watermark, width);
                 }
 

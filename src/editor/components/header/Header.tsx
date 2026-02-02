@@ -83,7 +83,7 @@ export const Header = () => {
     };
 
     return (
-        <div className="bg-surface-elevated border-b border-border flex flex-col shrink-0 z-30 select-none">
+        <div className="bg-surface-elevated border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">

@@ -1,18 +1,21 @@
 import React from 'react';
 import { MdVolumeUp, MdVolumeOff } from 'react-icons/md';
 
-//TODO get rid of this and use css class instead
-interface TimelineTrackHeaderProps {
+interface TimelineHeaderCellProps {
     title: string;
     height: number;
     hasAudio?: boolean;
     isMuted?: boolean;
     onToggleMute?: () => void;
-    /** Optional element to show next to the title (e.g., info icon) */
+    /** Optional element to show next to the title (e.g., legend icon) */
     infoElement?: React.ReactNode;
 }
 
-export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
+/**
+ * Unified header cell component for timeline track headers.
+ * Provides consistent height, styling, and layout for all track headers.
+ */
+export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
     title,
     height,
     hasAudio,
@@ -22,7 +25,7 @@ export const TimelineTrackHeader: React.FC<TimelineTrackHeaderProps> = ({
 }) => {
     return (
         <div
-            className="flex items-center justify-between px-3 bg-surface"
+            className="flex items-center justify-between px-3 bg-surface-overlay rounded-sm"
             style={{ height, minHeight: height }}
         >
             <div className="flex items-center gap-1.5">

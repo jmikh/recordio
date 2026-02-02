@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../core/audioConstants';
 
 export interface AudioAnalysisResult {
     peaks: number[]; // Normalized -1..1 or 0..1 depending on usage
@@ -7,7 +8,6 @@ export interface AudioAnalysisResult {
     error: string | null;
 }
 
-const PEAKS_SAMPLES_PER_SEC = 100; // Resolution of the waveform
 const CACHE = new Map<string, AudioAnalysisResult>();
 
 export function useAudioAnalysis(sourceId: string, url: string): AudioAnalysisResult {
@@ -49,7 +49,7 @@ export function useAudioAnalysis(sourceId: string, url: string): AudioAnalysisRe
 
                 // Downsample
                 const totalSamples = channelData.length;
-                const totalPixels = Math.ceil(duration * PEAKS_SAMPLES_PER_SEC);
+                const totalPixels = Math.ceil(duration * AUDIO_PEAKS_SAMPLES_PER_SEC);
                 const sampleSize = Math.floor(totalSamples / totalPixels);
                 const peaks: number[] = [];
 

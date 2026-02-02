@@ -10,7 +10,6 @@ import { useWindowDrag } from './useWindowDrag';
 import { SpeedControl } from './SpeedControl';
 import { RecordingSegment } from './RecordingSegment';
 
-export const GROUP_HEADER_HEIGHT = 24;
 
 interface RecordingTrackProps {
     timeline: TimelineType;
@@ -69,19 +68,12 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
 
     // Calculate layout
     let currentX = 0;
-    const trackContentHeight = Math.max(0, trackHeight - GROUP_HEADER_HEIGHT);
-    trackHeight = trackHeight;
 
     return (
         <div ref={containerRef} className="w-full relative flex" style={{ height: trackHeight }}>
 
             {/* Content Container */}
             <div className="relative flex-1" style={{ height: trackHeight }}>
-                {/* Full-width overlay bar for main track */}
-                <div
-                    className="absolute top-0 bottom-0 left-0 right-0 bg-surface-overlay rounded-sm"
-                    style={{ zIndex: 0 }}
-                />
 
                 {timeline.outputWindows.map((seg) => {
                     const win = (dragState && dragState.windowId === seg.id) ? dragState.currentWindow : seg;
@@ -103,7 +95,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                             isSelected={selectedWindowId === seg.id}
                             left={left}
                             width={width}
-                            trackContentHeight={trackContentHeight}
+                            trackContentHeight={trackHeight}
                             selectWindow={selectWindow}
                             handleDragStart={handleDragStart}
                             setSpeedControlState={setSpeedControlState}

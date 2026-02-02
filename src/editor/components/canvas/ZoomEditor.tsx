@@ -238,7 +238,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-50 text-sm"
+            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm"
             onPointerDown={handleContainerPointerDown}
         >
             <DimmedOverlay

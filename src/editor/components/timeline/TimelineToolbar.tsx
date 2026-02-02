@@ -1,8 +1,8 @@
 import React from 'react';
-import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { getTimeMapper } from '../../hooks/useTimeMapper';
+
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md';
 import { Slider } from '../../../components/ui/Slider';
 import { Dropdown } from '../../../components/ui/Dropdown';
@@ -36,8 +36,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 }) => {
     //console.log('[Rerender] TimelineToolbar');
     // Stores
-    const timeline = useProjectTimeline();
-    const splitWindow = useProjectStore(s => s.splitWindow);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const currentResolution = useProjectStore(s => s.project.settings.outputSize);
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
@@ -64,21 +62,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const batcher = useHistoryBatcher();
 
     // Handlers
-    const handleSplit = () => {
-        const currentTime = useUIStore.getState().currentTimeMs;
-        const timeMapper = getTimeMapper(timeline.outputWindows);
-
-        const result = timeMapper.getWindowAtOutputTime(currentTime);
-        if (!result) return;
-
-        const { window: win, outputStartMs } = result;
-        const outputOffset = currentTime - outputStartMs;
-        const speed = win.speed || 1.0;
-        const sourceOffset = outputOffset * speed;  // Convert output time to source time
-        const splitTime = win.startMs + sourceOffset;
-
-        splitWindow(win.id, splitTime);
-    };
 
     const handleScaleChange = (newScale: number) => {
         setPixelsPerSec(newScale);
@@ -161,13 +144,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     return (
         <div className="h-10 flex items-center px-4 bg-surface-elevated border-b border-border shrink-0 justify-between">
             <div className="flex items-center gap-2">
-                <Button
-                    onClick={handleSplit}
-                    className="px-3 py-1 text-xs"
-                    title="Split at Playhead"
-                >
-                    Split
-                </Button>
 
                 {/* Aspect Ratio Dropdown */}
                 <Dropdown

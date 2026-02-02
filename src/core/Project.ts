@@ -258,9 +258,12 @@ export class ProjectImpl {
             rect: scaleRect(m.rect)
         }));
 
+        // Note: sourceRect is in SOURCE video coordinates (original recording), NOT output coordinates.
+        // The ViewMapper handles the mapping from source to screen at render time.
+        // Only borderRadius (which is in output coordinates) needs to be scaled.
         const newSpotlightActions: SpotlightAction[] = project.timeline.spotlightActions.map((s: SpotlightAction) => ({
             ...s,
-            sourceRect: scaleRect(s.sourceRect),
+            // sourceRect intentionally NOT scaled - it's in source video coords
             borderRadius: [
                 s.borderRadius[0] * scale,
                 s.borderRadius[1] * scale,

@@ -140,7 +140,7 @@ export const ghostSpotlight = {
         }),
     },
     hold: {
-        className: 'bg-secondary rounded-sm',
+        className: 'bg-secondary',
         getStyle: (): CSSProperties => ({
             height: HOLD_HEIGHT,
             opacity: 0.6,

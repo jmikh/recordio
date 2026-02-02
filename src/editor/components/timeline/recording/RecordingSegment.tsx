@@ -99,56 +99,50 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
             }}
         >
             {/* Visual Window Content (Clipped) */}
-            <div className={`absolute inset-0 group border rounded-lg overflow-hidden flex flex-col transition-colors ${isSelected ? 'border-secondary' : 'border-primary-muted hover:border-border-primary'}`}>
-                {/* Group Header */}
-                <div
-                    style={{ height: 24 }}
-                    className="bg-surface-elevated border-b border-border px-2 flex items-center justify-start gap-2 text-xs text-text-main select-none"
-                >
-                    {/* Speed - always show (prioritized) */}
-                    <span
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setSpeedControlState({
-                                windowId: seg.id,
-                                speed: win.speed || 1.0,
-                                anchorEl: e.currentTarget as HTMLElement
-                            });
-                        }}
-                    >
-                        {(() => {
-                            const speed = win.speed || 1.0;
-                            // Format to remove trailing zeros
-                            const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
-                            return `${formatted}x`;
-                        })()}
-                    </span>
+            <div className={`absolute inset-0 group border rounded-lg overflow-hidden border-2 transition-colors ${isSelected ? 'border-secondary' : 'border-primary-muted hover:border-border-primary'}`}>
+                {/* Primary Color Block */}
+                <div className={`absolute inset-0 overflow-hidden transition-all cursor-pointer flex items-center`}>
 
-                    {/* Duration - hide if window too small, less priority than speed */}
-                    {width >= 70 && <span>{(outputDurationMs / 1000).toFixed(1)}s</span>}
-                </div>
+                    {/* Background fill - highlighted when selected or hovering */}
+                    <div className={`absolute inset-0 transition-colors ${isSelected ? 'bg-primary-highlighted' : 'bg-primary group-hover:bg-primary-highlighted'}`} />
 
-                {/* Tracks Area */}
-                <div className="relative flex-1 w-full">
-                    {/* Unified Segment */}
-                    <div className={`absolute left-0 right-0 top-0 bottom-0 overflow-hidden transition-all cursor-pointer box-border flex items-center justify-center`}>
+                    {/* Audio Waveform */}
+                    <div className="absolute inset-0 pointer-events-none flex items-end justify-center overflow-hidden z-10">
+                        {displayMode !== 'none' && (
+                            <StaticAudioWave
+                                peaks={displayPeaks}
+                                sourceStartMs={sourceStartMs}
+                                sourceEndMs={sourceEndMs}
+                                width={width}
+                                height={trackContentHeight}
+                            />
+                        )}
+                    </div>
 
-                        {/* Background fill - highlighted when selected or hovering */}
-                        <div className={`absolute inset-0 transition-colors ${isSelected ? 'bg-primary-highlighted' : 'bg-primary group-hover:bg-primary-highlighted'}`} />
+                    {/* Speed & Duration Labels (overlaid on the block) */}
+                    <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-auto bg-black/40 rounded-lg">
+                        {/* Speed - always show (prioritized) */}
+                        <span
+                            className="cursor-pointer hover:text-secondary transition-colors font-medium"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSpeedControlState({
+                                    windowId: seg.id,
+                                    speed: win.speed || 1.0,
+                                    anchorEl: e.currentTarget as HTMLElement
+                                });
+                            }}
+                        >
+                            {(() => {
+                                const speed = win.speed || 1.0;
+                                // Format to remove trailing zeros
+                                const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
+                                return `${formatted}x`;
+                            })()}
+                        </span>
 
-                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
-                            {displayMode !== 'none' && (
-                                <StaticAudioWave
-                                    peaks={displayPeaks}
-                                    sourceStartMs={sourceStartMs}
-                                    sourceEndMs={sourceEndMs}
-                                    width={width}
-                                    height={trackContentHeight}
-                                    color="rgba(255,255,255,0.7)"
-                                />
-                            )}
-                        </div>
+                        {/* Duration - hide if window too small, less priority than speed */}
+                        {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
                     </div>
                 </div>
             </div>

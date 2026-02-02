@@ -221,7 +221,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     return (
         <div
             ref={rootRef}
-            className="absolute inset-0 z-50 overflow-hidden"
+            className="absolute inset-0 z-[var(--z-index-modal)] overflow-hidden"
         >
             {/* Dimming Layers */}
             <DimmedOverlay

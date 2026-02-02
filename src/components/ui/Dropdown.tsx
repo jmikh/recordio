@@ -127,10 +127,10 @@ export function Dropdown<T>({
                 <>
                     {!usePortal && (
                         <>
-                            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                            <div className="fixed inset-0 z-[var(--z-index-overlay)]" onClick={() => setIsOpen(false)} />
                             <div
                                 className={`absolute ${direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
-                                    } right-0 z-50`}
+                                    } right-0 z-[var(--z-index-dropdown)]`}
                             >
                                 {dropdownContent}
                             </div>

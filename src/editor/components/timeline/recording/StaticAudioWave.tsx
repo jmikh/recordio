@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
+import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../../../core/audioConstants';
 
 interface StaticAudioWaveProps {
     peaks: number[]; // Full cached peaks for the source
@@ -6,10 +7,9 @@ interface StaticAudioWaveProps {
     sourceEndMs: number;   // Where this segment ends in source time
     width: number; // Render width in px
     height: number;
-    color: string;
 }
 
-const PEAKS_SAMPLES_PER_SEC = 100;
+const WAVEFORM_COLOR = 'rgba(255, 255, 255, 1)';
 
 const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     peaks,
@@ -17,16 +17,15 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     sourceEndMs,
     width,
     height,
-    color
 }) => {
     //console.log("StaticAudioWave", peaks.length, sourceStartMs, sourceEndMs, width, height, color);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate which slice of peaks to show
-    // peaks array is 100 per sec.
-    // Index = (ms / 1000) * 100
-    const startIndex = Math.floor((sourceStartMs / 1000) * PEAKS_SAMPLES_PER_SEC);
-    const endIndex = Math.ceil((sourceEndMs / 1000) * PEAKS_SAMPLES_PER_SEC);
+    // peaks array is 25 per sec.
+    // Index = (ms / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC
+    const startIndex = Math.floor((sourceStartMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
+    const endIndex = Math.ceil((sourceEndMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
 
     const visiblePeaks = useMemo(() => {
         // Clamp
@@ -47,26 +46,20 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
         if (visiblePeaks.length === 0) return;
 
         // Drawing params
-        ctx.fillStyle = color;
+        ctx.fillStyle = WAVEFORM_COLOR;
         const barWidth = width / visiblePeaks.length;
-        const gap = barWidth > 2 ? 1 : 0;
-        const effectiveBarWidth = Math.max(0.5, barWidth - gap);
 
-        const centerY = height / 2;
-        const scaleY = height / 2; // Max height from center
+        const scaleY = height * 0.96; // Max height with 4% padding
 
         visiblePeaks.forEach((peak, i) => {
             const x = i * barWidth;
-            const barHeight = peak * scaleY * 0.96; // Scale to 96% of half-height (2% padding)
+            const barHeight = peak * scaleY;
 
-            // Draw Top
-            ctx.fillRect(x, centerY - barHeight, effectiveBarWidth, barHeight);
-
-            // Draw Bottom (Mirrored)
-            ctx.fillRect(x, centerY, effectiveBarWidth, barHeight);
+            // Draw from bottom
+            ctx.fillRect(x, height - barHeight, barWidth, barHeight);
         });
 
-    }, [visiblePeaks, width, height, color]);
+    }, [visiblePeaks, width, height]);
 
 
 
@@ -75,7 +68,7 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
             ref={canvasRef}
             width={width}
             height={height}
-            className="pointer-events-none opacity-50"
+            className="pointer-events-none opacity-40"
             style={{ width, height }}
         />
     );

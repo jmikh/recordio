@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import type { Project } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -110,8 +111,8 @@ export const ProjectSettings = () => {
             </div>
 
             {/* Delete All Confirmation Modal */}
-            {showDeleteAllModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+            {showDeleteAllModal && createPortal(
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
                     <div className="bg-surface-raised rounded-lg p-6 w-full max-w-[400px] border border-border">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-text-highlighted">Delete All Projects</h2>
@@ -141,7 +142,8 @@ export const ProjectSettings = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

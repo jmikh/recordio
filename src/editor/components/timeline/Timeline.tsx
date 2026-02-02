@@ -12,17 +12,17 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
 import { RecordingTrack } from './recording/RecordingTrack';
 
-import { TimelineTrackHeader } from './TimelineTrackHeader';
+import { TimelineHeaderCell } from './TimelineHeaderCell';
+import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { Scrollbar } from '../../../components/ui/Scrollbar';
 import { useUIStore } from '../../stores/useUIStore';
 
 
-// Constants
-const MAIN_TRACK_HEIGHT = 60;
-const ZOOM_TRACK_HEIGHT = 40;
-const SPOTLIGHT_TRACK_HEIGHT = 40;
+// Constants - Unified track height for visual consistency
+const TRACK_HEIGHT = 40;
+const TRACK_GAP = 4; // Gap between track rows
 const HEADER_WIDTH = 100;
 
 export function Timeline() {
@@ -176,34 +176,34 @@ export function Timeline() {
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
-                    className="flex-shrink-0 flex flex-col z-40 border-r border-border"
-                    style={{ width: HEADER_WIDTH }}
+                    className="flex-shrink-0 flex flex-col z-[var(--z-index-overlay)] border-r border-border"
+                    style={{ width: HEADER_WIDTH, gap: TRACK_GAP, paddingTop: TRACK_GAP }}
                 >
                     {/* Spacer for Ruler */}
-                    <div style={{ height: 24 }} className="border-b border-border shrink-0" />
+                    <div style={{ height: 24 - TRACK_GAP }} className="border-b border-border shrink-0" />
 
-                    {/* Header: Main Track */}
-                    <div className="shrink-0" style={{ height: MAIN_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader
+                    {/* Header: Recording */}
+                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                        <TimelineHeaderCell
                             title="Recording"
-                            height={MAIN_TRACK_HEIGHT}
+                            height={TRACK_HEIGHT}
                         />
                     </div>
 
                     {/* Header: Zoom */}
-                    <div className="shrink-0" style={{ height: ZOOM_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader
+                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                        <TimelineHeaderCell
                             title="Zoom"
-                            height={ZOOM_TRACK_HEIGHT}
+                            height={TRACK_HEIGHT}
                             infoElement={<ZoomLegend />}
                         />
                     </div>
 
                     {/* Header: Spotlight */}
-                    <div className="shrink-0" style={{ height: SPOTLIGHT_TRACK_HEIGHT }}>
-                        <TimelineTrackHeader
+                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                        <TimelineHeaderCell
                             title="Spotlight"
-                            height={SPOTLIGHT_TRACK_HEIGHT}
+                            height={TRACK_HEIGHT}
                             infoElement={<SpotlightLegend />}
                         />
                     </div>
@@ -217,7 +217,7 @@ export function Timeline() {
                         {/* Floating Overlay for Scroll Indication */}
                         <div
                             ref={overlayRef}
-                            className="absolute left-0 top-0 bottom-0 w-12 z-30 pointer-events-none"
+                            className="absolute left-0 top-0 bottom-0 w-12 z-[var(--z-index-navbar)] pointer-events-none"
                             style={{
                                 background: 'linear-gradient(to right, rgba(0,0,0,0.5), transparent)',
                                 opacity: 0,
@@ -226,7 +226,7 @@ export function Timeline() {
                         />
                         <div
                             ref={overlayEndRef}
-                            className="absolute right-0 top-0 bottom-0 w-12 z-30 pointer-events-none"
+                            className="absolute right-0 top-0 bottom-0 w-12 z-[var(--z-index-navbar)] pointer-events-none"
                             style={{
                                 background: 'linear-gradient(to left, rgba(0,0,0,0.5), transparent)',
                                 opacity: 0,
@@ -257,31 +257,32 @@ export function Timeline() {
                                 />
 
                                 {/* Tracks Container */}
-                                <div className="flex flex-col relative pl-0">
-                                    {/* Main Track */}
-                                    <RecordingTrack
-                                        timeline={timeline}
-                                        pixelsPerSec={pixelsPerSec}
-
-                                        trackHeight={MAIN_TRACK_HEIGHT}
-                                    />
+                                <div className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP }}>
+                                    {/* Recording Track */}
+                                    <TimelineTrackRow height={TRACK_HEIGHT}>
+                                        <RecordingTrack
+                                            timeline={timeline}
+                                            pixelsPerSec={pixelsPerSec}
+                                            trackHeight={TRACK_HEIGHT}
+                                        />
+                                    </TimelineTrackRow>
 
                                     {/* Zoom Track */}
-                                    <ZoomTrack
-                                        height={ZOOM_TRACK_HEIGHT}
-                                    />
+                                    <TimelineTrackRow height={TRACK_HEIGHT}>
+                                        <ZoomTrack height={TRACK_HEIGHT} />
+                                    </TimelineTrackRow>
 
                                     {/* Spotlight Track */}
-                                    <SpotlightTrack
-                                        height={SPOTLIGHT_TRACK_HEIGHT}
-                                    />
+                                    <TimelineTrackRow height={TRACK_HEIGHT}>
+                                        <SpotlightTrack height={TRACK_HEIGHT} />
+                                    </TimelineTrackRow>
 
                                 </div>
 
                                 {/* Hover Line */}
                                 {hoverTime !== null && (
                                     <div
-                                        className="absolute top-0 bottom-0 w-[1px] bg-white/30 z-40 pointer-events-none"
+                                        className="absolute top-0 bottom-0 w-[1px] bg-white/30 z-[var(--z-index-overlay)] pointer-events-none"
                                         style={{ left: `${(hoverTime / 1000) * pixelsPerSec}px` }}
                                     />
                                 )}

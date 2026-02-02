@@ -6,7 +6,6 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { BoundingBox, type CornerRadii } from './BoundingBox';
 import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
@@ -272,7 +271,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-50 text-sm"
+            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm"
             onPointerDown={handleContainerPointerDown}
         >
             <DimmedOverlay
@@ -292,22 +291,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                 onCornerRadiiChange={handleCornerRadiiChange}
             />
 
-            {/* Toolbar with Delete Button */}
-            <div
-                className="absolute top-4 inset-x-0 flex justify-center items-center gap-4 pointer-events-auto z-[1000]"
-            >
-                {/* Delete Button */}
-                <SecondaryButton
-                    className="text-xs shadow"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        e.nativeEvent.stopImmediatePropagation();
-                        onDelete();
-                    }}
-                >
-                    Delete
-                </SecondaryButton>
-            </div>
+
         </div>
     );
 };

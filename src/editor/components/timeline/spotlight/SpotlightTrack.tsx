@@ -76,7 +76,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
     return (
         <div
-            className="w-full relative bg-surface-elevated select-none flex"
+            className="w-full relative select-none flex"
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}

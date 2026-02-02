@@ -236,7 +236,7 @@ function Editor() {
             <Header />
 
             {showDebugBar && (
-                <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-30 select-none">
+                <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
                     {/* Bottom Row: Debug Tools */}
                     <DebugBar />
                 </div>
@@ -290,7 +290,7 @@ function Editor() {
 
             </div>
 
-            <div id="timeline-container" className="border-t border-[#333] shrink-0 z-20 bg-[#1e1e1e]">
+            <div id="timeline-container" className="border-t border-[#333] shrink-0 z-[var(--z-index-navbar)] bg-[#1e1e1e]">
                 <Timeline />
             </div>
         </div>

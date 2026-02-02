@@ -179,7 +179,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     return (
         <div
-            className="w-full relative bg-surface-elevated select-none flex"
+            className="w-full relative select-none flex"
             style={{ height }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -188,11 +188,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Full-width track background bar */}
-                <div
-                    className="absolute top-[6px] bottom-[6px] left-0 right-0 bg-surface-overlay rounded-sm"
-                    style={{ zIndex: 1 }}
-                />
 
                 {/* Line segments and keyframes */}
                 {renderElements}
