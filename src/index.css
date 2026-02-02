@@ -172,9 +172,10 @@
      9. Z-Index Scale
      ───────────────────────────────────────────────────────── */
    --z-index-base: 1;
-   --z-index-dropdown: 10;
    --z-index-navbar: 20;
    --z-index-overlay: 30;
+   /* Dropdown must be above overlay (click-capture layer) */
+   --z-index-dropdown: 35;
    /* Background behind modals */
    --z-index-modal: 40;
    /* Modal window itself */
