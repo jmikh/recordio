@@ -36,7 +36,9 @@ export function drawSpotlight(
     outputSize: Size,
     renderResources?: SpotlightRenderResources
 ): void {
-    if (!spotlightState || spotlightState.dimOpacity <= 0) {
+    // Skip if no spotlight state OR if there's no visual effect at all
+    // (dimOpacity = 0 means no dimming, scale = 1 means no enlargement)
+    if (!spotlightState || (spotlightState.dimOpacity <= 0 && spotlightState.scale <= 1)) {
         return;
     }
 
