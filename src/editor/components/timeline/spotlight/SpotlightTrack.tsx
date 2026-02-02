@@ -30,6 +30,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
     // UI State
     const editingSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setEditingSpotlight = (id: string | null) => {
         useUIStore.getState().selectSpotlight(id);
     };
@@ -49,12 +50,11 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     }, [timeMapper]);
 
     // Hooks
-    const { dragState, handleDragStart } = useSpotlightDrag(
+    const { dragState, handleDragStart, wasDraggingRef } = useSpotlightDrag(
         timeline,
         project,
         coords,
-        outputDuration,
-        setEditingSpotlight
+        outputDuration
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useSpotlightHover(
@@ -117,7 +117,18 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 onMouseDown={(e) => handleDragStart(e, 'move', s)}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setEditingSpotlight(s.id);
+                                    // Suppress toggle if we just finished dragging
+                                    if (wasDraggingRef.current) {
+                                        wasDraggingRef.current = false;
+                                        return;
+                                    }
+                                    // Toggle: if already selected, deselect; otherwise select
+                                    const willSelect = editingSpotlightId !== s.id;
+                                    setEditingSpotlight(willSelect ? s.id : null);
+                                    // Move CTI to spotlight start when selecting
+                                    if (willSelect) {
+                                        setCurrentTime(s.outputStartTimeMs);
+                                    }
                                 }}
                                 onResizeStartMouseDown={(e) => {
                                     e.stopPropagation();
@@ -142,6 +153,9 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             height,
                         }}
                     >
+                        {/* Label above the ghost */}
+                        <span className={ghostSpotlight.label}>+ Spotlight</span>
+
                         {/* Ghost Fade In */}
                         <div
                             className={ghostSpotlight.fadeIn.className}
@@ -164,9 +178,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 width: Math.max(0, hoverInfo.width - Math.min(fadeWidthPx, hoverInfo.width / 3) * 2),
                                 ...ghostSpotlight.hold.getStyle(),
                             }}
-                        >
-                            <span className={ghostSpotlight.label}>+ Spotlight</span>
-                        </div>
+                        />
 
                         {/* Ghost Fade Out */}
                         <div

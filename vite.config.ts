@@ -4,12 +4,18 @@ import { resolve } from 'path';
 import { crx } from '@crxjs/vite-plugin'
 import manifest from './manifest.json'
 
+// Debug overlay flag: set DEBUG_OVERLAY=true to enable debug visualizations
+const debugOverlay = process.env.DEBUG_OVERLAY === 'true';
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     crx({ manifest }),
   ],
+  define: {
+    __DEBUG_OVERLAY__: debugOverlay,
+  },
   build: {
     minify: mode === 'development' ? false : 'esbuild',
     sourcemap: mode === 'development',

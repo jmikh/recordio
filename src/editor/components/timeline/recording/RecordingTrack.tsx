@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import type { Timeline as TimelineType } from '../../../../core/types';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
@@ -49,6 +49,17 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     useClickOutside(containerRef, () => {
         if (selectedWindowId) selectWindow(null);
     });
+
+    // Escape key to deselect window
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && selectedWindowId) {
+                selectWindow(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedWindowId, selectWindow]);
 
     // Prepare Audio Analysis for Screen and Camera
     const screenAudio = useAudioAnalysis(screenSource.id, screenSource.runtimeUrl || '');

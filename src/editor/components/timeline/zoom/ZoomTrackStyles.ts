@@ -49,7 +49,7 @@ export const squareKeyframe = {
 
 /** Container for keyframe markers */
 export const keyframeContainer = {
-    base: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-10',
+    base: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-20',
     dragging: 'cursor-grabbing',
     idle: 'cursor-grab',
 };
@@ -72,7 +72,7 @@ export const transitionTrail = {
 
 /** Hold line - thin line between zoomed keyframes */
 export const holdLine = {
-    base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-5',
+    base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-[5]',
     default: 'bg-primary',
     selected: 'bg-secondary',
     opacity: 0.5,
@@ -82,8 +82,8 @@ export const holdLine = {
 // ============= GHOST STYLES (Add Zoom indicator) =============
 
 export const ghostKeyframe = {
-    container: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none flex flex-col items-center',
-    label: 'absolute bottom-[calc(100%+4px)] whitespace-nowrap text-[9px] text-secondary',
+    container: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-25 pointer-events-none flex flex-col items-center',
+    label: 'absolute bottom-[calc(100%+6px)] whitespace-nowrap text-[9px] text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none',
     diamond: 'rotate-45 bg-secondary',
     diamondStyle: {
         width: KEYFRAME_SIZE,

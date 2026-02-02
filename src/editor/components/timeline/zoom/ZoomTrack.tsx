@@ -54,12 +54,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // HOOKS (DRAG & HOVER)
     // ------------------------------------------------------------------
 
-    const { dragState, handleDragStart } = useZoomDrag(
+    const { dragState, handleDragStart, wasDraggingRef } = useZoomDrag(
         timeline,
         project,
         coords,
-        outputDuration,
-        setEditingZoom
+        outputDuration
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useZoomHover(
@@ -76,12 +75,26 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // COMPUTE LINE SEGMENTS AND KEYFRAMES
     // ------------------------------------------------------------------
 
+    // Minimum pixel distance between keyframes before hiding all labels
+    const MIN_LABEL_DISTANCE_PX = 40;
+
     const renderElements = useMemo(() => {
         const actions: ZoomAction[] = timeline.zoomActions || [];
         const elements: React.ReactNode[] = [];
 
         // Sort actions by output end time for proper sequencing
         const sortedActions = [...actions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+
+        // Calculate if any consecutive keyframes are too close
+        let hideLabels = false;
+        for (let i = 0; i < sortedActions.length - 1; i++) {
+            const currentX = coords.msToX(sortedActions[i].outputEndTimeMs);
+            const nextX = coords.msToX(sortedActions[i + 1].outputEndTimeMs);
+            if (nextX - currentX < MIN_LABEL_DISTANCE_PX) {
+                hideLabels = true;
+                break;
+            }
+        }
 
         sortedActions.forEach((action, index) => {
             const keyframeX = coords.msToX(action.outputEndTimeMs);
@@ -137,10 +150,17 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                     scaleLabel={formatScaleLabel(scale)}
                     isSelected={isSelected}
                     isDragging={isDragging}
+                    hideLabel={hideLabels}
                     onMouseDown={(e) => handleDragStart(e, 'move', action)}
                     onClick={(e) => {
                         e.stopPropagation();
-                        setEditingZoom(action.id);
+                        // Suppress toggle if we just finished dragging
+                        if (wasDraggingRef.current) {
+                            wasDraggingRef.current = false;
+                            return;
+                        }
+                        // Toggle: if already selected, deselect; otherwise select
+                        setEditingZoom(editingZoomId === action.id ? null : action.id);
                     }}
                 />
             );
@@ -192,7 +212,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             style={{ left: `${hoverInfo.x}px` }}
                         >
                             <span className={ghostKeyframe.label}>
-                                Add Zoom
+                                + Zoom
                             </span>
                             <div
                                 className={ghostKeyframe.diamond}

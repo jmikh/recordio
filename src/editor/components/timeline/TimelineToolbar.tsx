@@ -1,9 +1,9 @@
 import React from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
-import { useUIStore } from '../../stores/useUIStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md';
 import { Slider } from '../../../components/ui/Slider';
 import { Dropdown } from '../../../components/ui/Dropdown';
 import type { DropdownOption } from '../../../components/ui/Dropdown';
@@ -40,6 +40,18 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const splitWindow = useProjectStore(s => s.splitWindow);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const currentResolution = useProjectStore(s => s.project.settings.outputSize);
+    const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
+
+    // Delete actions
+    const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
+    const deleteZoomAction = useProjectStore(s => s.deleteZoomAction);
+    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
+
+    // Selection state
+    const selectedWindowId = useUIStore(s => s.selectedWindowId);
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
+    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
 
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
@@ -77,6 +89,23 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     };
 
     const onTogglePlay = () => setIsPlaying(!isPlaying);
+
+    // Delete button logic
+    const handleDelete = () => {
+        // Can only delete window if it's NOT the last one
+        if (selectedZoomId) {
+            deleteZoomAction(selectedZoomId);
+            setCanvasMode(CanvasMode.Preview);
+        } else if (selectedSpotlightId) {
+            deleteSpotlight(selectedSpotlightId);
+            setCanvasMode(CanvasMode.Preview);
+        } else if (selectedWindowId && outputWindows.length > 1) {
+            removeOutputWindow(selectedWindowId);
+        }
+    };
+
+    const canDeleteWindow = selectedWindowId && outputWindows.length > 1;
+    const isDeleteEnabled = canDeleteWindow || Boolean(selectedZoomId) || Boolean(selectedSpotlightId);
 
     // Helper format
     const formatSmartTime = (ms: number, totalMs: number) => {
@@ -156,6 +185,21 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     }
                     direction="up"
                 />
+
+                {/* Delete Button */}
+                <Button
+                    onClick={handleDelete}
+                    className="px-3 py-1 text-xs flex items-center gap-1"
+                    title={
+                        selectedWindowId && outputWindows.length <= 1
+                            ? "Cannot delete the last window"
+                            : "Delete selected item"
+                    }
+                    disabled={!isDeleteEnabled}
+                >
+                    <MdDelete size={14} />
+                    Delete
+                </Button>
             </div>
 
             <div className="flex items-center gap-4 bg-hover-subtle px-4 py-1 rounded-full border border-border">

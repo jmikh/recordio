@@ -27,15 +27,15 @@ export const SEGMENT_RADIUS = 4;
 export function createStripePattern(angle: number): CSSProperties {
     // Always use primary colors for stripes
     const colorVar = 'var(--primary)';
-    const bgColorVar = 'var(--primary-muted)';
+    const bgColorVar = 'var(--surface-overlay)';
 
     return {
         background: `repeating-linear-gradient(
             ${angle}deg,
             ${colorVar} 0px,
-            ${colorVar} 3px,
-            ${bgColorVar} 3px,
-            ${bgColorVar} 8px
+            ${colorVar} 1px,
+            ${bgColorVar} 1px,
+            ${bgColorVar} 6px
         )`,
     };
 }
@@ -44,7 +44,7 @@ export function createStripePattern(angle: number): CSSProperties {
 
 /** Fade In segment (left) - shorter with -45° stripes */
 export const fadeInSegment = {
-    base: 'absolute flex-shrink-0 border-2 transition-colors',
+    base: 'absolute flex-shrink-0 border-2 transition-colors z-[5]',
     defaultClass: 'border-primary',
     selectedClass: 'border-secondary',
     hoverClass: 'group-hover:border-primary-highlighted',
@@ -59,10 +59,10 @@ export const fadeInSegment = {
 
 /** Hold segment (center) - taller with solid fill, border when selected */
 export const holdSegment = {
-    base: 'absolute flex-shrink-0 bg-primary transition-colors',
+    base: 'absolute flex-shrink-0 bg-primary rounded-sm transition-colors z-10',
     defaultClass: '',
     selectedClass: 'ring-2 ring-secondary',
-    hoverClass: 'group-hover:bg-primary-highlighted',
+    hoverClass: 'group-hover:bg-primary-highlighted group-hover:scale-110',
     height: HOLD_HEIGHT,
     getStyle: (): CSSProperties => ({
         height: HOLD_HEIGHT,
@@ -72,7 +72,7 @@ export const holdSegment = {
 
 /** Fade Out segment (right) - shorter with 45° stripes */
 export const fadeOutSegment = {
-    base: 'absolute flex-shrink-0 border-2 transition-colors',
+    base: 'absolute flex-shrink-0 border-2 transition-colors z-[5]',
     defaultClass: 'border-primary',
     selectedClass: 'border-secondary',
     hoverClass: 'group-hover:border-primary-highlighted',
@@ -94,58 +94,66 @@ export const spotlightContainer = {
     idle: 'cursor-grab',
 };
 
-/** Resize handle styles */
+/** Height of the visible drag handle indicator (taller than fade segments) */
+export const DRAG_HANDLE_HEIGHT = 32;
+
+/** Resize handle styles - hit area for resizing */
 export const resizeHandle = {
-    base: 'absolute top-0 bottom-0 cursor-ew-resize z-10',
-    width: 8,
-    hoverClass: 'hover:bg-white/20',
+    base: 'absolute cursor-ew-resize z-20 flex items-center justify-center',
+    width: 12,
+    height: DRAG_HANDLE_HEIGHT,
+};
+
+/** Visible drag handle indicator that appears on hover */
+export const dragHandleIndicator = {
+    base: 'w-1 rounded-full transition-all duration-150 opacity-0 group-hover:opacity-100',
+    defaultClass: 'bg-primary-highlighted',
+    selectedClass: 'bg-secondary',
+    height: DRAG_HANDLE_HEIGHT,
 };
 
 // ============= GHOST STYLES (Add Spotlight indicator) =============
 
-/** Creates ghost stripe pattern - lighter/more transparent version */
+/** Creates ghost stripe pattern using secondary color */
 function createGhostStripePattern(angle: number): CSSProperties {
     return {
         background: `repeating-linear-gradient(
             ${angle}deg,
-            var(--primary) 0px,
-            var(--primary) 2px,
-            transparent 2px,
+            var(--secondary) 0px,
+            var(--secondary) 1px,
+            transparent 1px,
             transparent 6px
         )`,
-        opacity: 0.4,
+        opacity: 0.6,
     };
 }
 
 export const ghostSpotlight = {
-    container: 'absolute pointer-events-none z-[6] flex items-center',
+    container: 'absolute pointer-events-none z-25 flex items-center',
+    label: 'absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none',
     fadeIn: {
-        className: 'border-2 border-dashed border-primary/60',
+        className: 'bg-secondary/30 border-2 border-secondary border-r-0',
         getStyle: (): CSSProperties => ({
             height: FADE_HEIGHT,
             borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-            borderRight: 'none',
             ...createGhostStripePattern(-45),
         }),
     },
     hold: {
-        className: 'border-2 border-dashed border-primary/60 flex items-center justify-center',
+        className: 'bg-secondary rounded-sm',
         getStyle: (): CSSProperties => ({
             height: HOLD_HEIGHT,
-            backgroundColor: 'var(--primary)',
-            opacity: 0.4,
+            opacity: 0.6,
         }),
     },
     fadeOut: {
-        className: 'border-2 border-dashed border-primary/60',
+        className: 'bg-secondary/30 border-2 border-secondary border-l-0',
         getStyle: (): CSSProperties => ({
             height: FADE_HEIGHT,
             borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-            borderLeft: 'none',
             ...createGhostStripePattern(45),
         }),
     },
-    label: 'text-[10px] text-primary pointer-events-none whitespace-nowrap',
 };
 
 // ============= LEGEND STYLES =============
@@ -157,7 +165,6 @@ export const legendItem = {
             width: 16,
             height: 12,
             borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-            borderRight: 'none',
             ...createStripePattern(-45),
         } as CSSProperties,
     },
@@ -174,7 +181,6 @@ export const legendItem = {
             width: 16,
             height: 12,
             borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-            borderLeft: 'none',
             ...createStripePattern(45),
         } as CSSProperties,
     },

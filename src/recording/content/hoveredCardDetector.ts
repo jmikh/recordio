@@ -21,8 +21,9 @@ export interface HoveredCardEvent {
     cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
 }
 
-// Debug flag - set to true to show pink highlight border
-const DEBUG_SHOW_HOVERED_CARD = true;
+// Debug flag - controlled by DEBUG_OVERLAY build flag
+declare const __DEBUG_OVERLAY__: boolean;
+const DEBUG_SHOW_HOVERED_CARD = __DEBUG_OVERLAY__;
 
 // Minimum duration (ms) for a hovered card session to be reported
 const MIN_SESSION_DURATION_MS = 2000;

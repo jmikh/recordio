@@ -5,8 +5,10 @@ import {
     fadeOutSegment,
     spotlightContainer,
     resizeHandle,
+    dragHandleIndicator,
     FADE_HEIGHT,
-    HOLD_HEIGHT
+    HOLD_HEIGHT,
+    DRAG_HANDLE_HEIGHT
 } from './SpotlightTrackStyles';
 
 interface SpotlightBlockProps {
@@ -121,27 +123,39 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
 
             {/* Left resize handle */}
             <div
-                className={`${resizeHandle.base} ${resizeHandle.hoverClass}`}
+                className={resizeHandle.base}
                 style={{
-                    left: 0,
+                    left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: fadeY,
-                    height: FADE_HEIGHT,
+                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
+                    height: resizeHandle.height,
                 }}
                 onMouseDown={onResizeStartMouseDown}
-            />
+            >
+                {/* Visible drag handle indicator */}
+                <div
+                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: dragHandleIndicator.height }}
+                />
+            </div>
 
             {/* Right resize handle */}
             <div
-                className={`${resizeHandle.base} ${resizeHandle.hoverClass}`}
+                className={resizeHandle.base}
                 style={{
-                    right: 0,
+                    right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: fadeY,
-                    height: FADE_HEIGHT,
+                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
+                    height: resizeHandle.height,
                 }}
                 onMouseDown={onResizeEndMouseDown}
-            />
+            >
+                {/* Visible drag handle indicator */}
+                <div
+                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: dragHandleIndicator.height }}
+                />
+            </div>
         </div>
     );
 };

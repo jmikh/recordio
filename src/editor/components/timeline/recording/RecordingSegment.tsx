@@ -94,7 +94,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
             style={{ left: `${left}px`, width: `${width}px` }}
             onClick={(e) => {
                 e.stopPropagation();
-                selectWindow(seg.id);
+                // Toggle: if already selected, deselect; otherwise select
+                selectWindow(isSelected ? null : seg.id);
             }}
         >
             {/* Visual Window Content (Clipped) */}

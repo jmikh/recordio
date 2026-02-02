@@ -17,6 +17,8 @@ interface ZoomKeyframeProps {
     isSelected: boolean;
     /** Whether this keyframe is being dragged */
     isDragging: boolean;
+    /** Whether to hide the scale label */
+    hideLabel?: boolean;
     /** Mouse down handler for drag initiation */
     onMouseDown: (e: React.MouseEvent) => void;
     /** Click handler for selection */
@@ -34,6 +36,7 @@ export const ZoomKeyframe: React.FC<ZoomKeyframeProps> = ({
     scaleLabel: scaleLabelText,
     isSelected,
     isDragging,
+    hideLabel = false,
     onMouseDown,
     onClick,
 }) => {
@@ -57,10 +60,12 @@ export const ZoomKeyframe: React.FC<ZoomKeyframeProps> = ({
                 style={keyframeStyle.style}
             />
 
-            {/* Scale value below keyframe */}
-            <span className={scaleLabel.className}>
-                {scaleLabelText}
-            </span>
+            {/* Scale value below keyframe - hide for full-viewport (1x) keyframes */}
+            {!hideLabel && !isFullViewport && (
+                <span className={scaleLabel.className}>
+                    {scaleLabelText}
+                </span>
+            )}
         </div>
     );
 };

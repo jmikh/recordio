@@ -204,17 +204,6 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]); // Verify stable refs
 
-    // Close when clicking strictly outside the container
-    useEffect(() => {
-        const handleGlobalPointerDown = (e: PointerEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onCancel();
-            }
-        };
-        window.addEventListener('pointerdown', handleGlobalPointerDown);
-        return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-    }, [onCancel]);
-
     // Click on background moves the zoom box
     const handleContainerPointerDown = (e: React.PointerEvent) => {
         // Only trigger if clicking the container background directly

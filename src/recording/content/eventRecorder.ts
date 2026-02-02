@@ -18,8 +18,9 @@ import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetecto
 import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';
 import { dprScalePoint, dprScaleRect } from './dprUtils';
 
-// Debug flag - set to true to show purple highlight border on active element
-const DEBUG_SHOW_ACTIVE_ELEMENT = true;
+// Debug flag - controlled by DEBUG_OVERLAY build flag
+declare const __DEBUG_OVERLAY__: boolean;
+const DEBUG_SHOW_ACTIVE_ELEMENT = __DEBUG_OVERLAY__;
 
 
 export class EventRecorder {

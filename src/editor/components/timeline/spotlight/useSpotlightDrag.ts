@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
+import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
@@ -17,13 +18,17 @@ export function useSpotlightDrag(
     timeline: any,
     project: any,
     coords: TimePixelMapper,
-    outputDuration: number,
-    setEditingSpotlight: (id: string | null) => void
+    outputDuration: number
 ) {
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
+    const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
+
+    // Track whether actual dragging happened (mouse moved during drag)
+    // Used to suppress toggle behavior after drag operations
+    const wasDraggingRef = useRef(false);
 
     const settings: SpotlightSettings = project.settings.spotlight;
     const minDuration = getMinSpotlightDuration(settings);
@@ -35,6 +40,7 @@ export function useSpotlightDrag(
     ) => {
         e.stopPropagation();
 
+        wasDraggingRef.current = false; // Reset on drag start
         setDragState({
             type,
             spotlightId: spotlight.id,
@@ -43,7 +49,15 @@ export function useSpotlightDrag(
             initialEndTimeMs: spotlight.outputEndTimeMs,
         });
         startInteraction();
-        setEditingSpotlight(spotlight.id);
+        // Note: Selection happens on click, not mousedown, to work with toggle behavior
+
+        // Sync CTI to appropriate edge based on drag type
+        if (type === 'resize-end') {
+            setCurrentTime(spotlight.outputEndTimeMs);
+        } else {
+            // 'move' or 'resize-start' -> follow start time
+            setCurrentTime(spotlight.outputStartTimeMs);
+        }
     };
 
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
@@ -102,11 +116,22 @@ export function useSpotlightDrag(
             newEnd = Math.max(newEnd, newStart + minDuration);
         }
 
+        // Mark that actual dragging happened (suppress click toggle)
+        wasDraggingRef.current = true;
+
         batchAction(() => updateSpotlight(dragState.spotlightId, {
             outputStartTimeMs: newStart,
             outputEndTimeMs: newEnd
         }));
-    }, [dragState, coords, updateSpotlight, timeline, minDuration, batchAction, outputDuration]);
+
+        // Sync CTI to the edge being dragged
+        if (dragState.type === 'resize-end') {
+            setCurrentTime(newEnd);
+        } else {
+            // 'move' or 'resize-start' -> follow start time
+            setCurrentTime(newStart);
+        }
+    }, [dragState, coords, updateSpotlight, timeline, minDuration, batchAction, outputDuration, setCurrentTime]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
@@ -128,6 +153,7 @@ export function useSpotlightDrag(
 
     return {
         dragState,
-        handleDragStart
+        handleDragStart,
+        wasDraggingRef
     };
 }

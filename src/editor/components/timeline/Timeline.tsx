@@ -176,7 +176,7 @@ export function Timeline() {
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
-                    className="flex-shrink-0 flex flex-col z-20 border-r border-border"
+                    className="flex-shrink-0 flex flex-col z-40 border-r border-border"
                     style={{ width: HEADER_WIDTH }}
                 >
                     {/* Spacer for Ruler */}

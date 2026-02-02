@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
@@ -20,13 +20,16 @@ export function useZoomDrag(
     timeline: any, // Typed correctly if possible, else any for now matching usage
     project: any,
     coords: TimePixelMapper,
-    outputDuration: number,
-    setEditingZoom: (id: string | null) => void
+    outputDuration: number
 ) {
     const updateZoomAction = useProjectStore(s => s.updateZoomAction);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
+
+    // Track whether actual dragging happened (mouse moved during drag)
+    // Used to suppress toggle behavior after drag operations
+    const wasDraggingRef = useRef(false);
 
     const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction) => {
         e.stopPropagation();
@@ -34,6 +37,7 @@ export function useZoomDrag(
         const outputEndTimeX = coords.msToX(action.outputEndTimeMs);
         if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
+        wasDraggingRef.current = false; // Reset on drag start
         setDragState({
             type,
             motionId: action.id,
@@ -41,7 +45,7 @@ export function useZoomDrag(
             initialOutputEndTime: action.outputEndTimeMs,
         });
         startInteraction();
-        setEditingZoom(action.id);
+        // Note: Selection happens on click, not mousedown, to work with toggle behavior
     };
 
     /**
@@ -76,6 +80,9 @@ export function useZoomDrag(
         const availableSpace = targetOutputEndTime - prevEnd;
         const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
 
+        // Mark that actual dragging happened (suppress click toggle)
+        wasDraggingRef.current = true;
+
         batchAction(() => updateZoomAction(dragState.motionId, {
             outputEndTimeMs: targetOutputEndTime,
             durationMs: targetDuration,
@@ -103,6 +110,7 @@ export function useZoomDrag(
 
     return {
         dragState,
-        handleDragStart
+        handleDragStart,
+        wasDraggingRef
     };
 }

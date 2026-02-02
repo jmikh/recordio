@@ -237,17 +237,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]);
 
-    // Close when clicking outside
-    useEffect(() => {
-        const handleGlobalPointerDown = (e: PointerEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onCancel();
-            }
-        };
-        window.addEventListener('pointerdown', handleGlobalPointerDown);
-        return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-    }, [onCancel]);
-
     // Click on background moves the spotlight box (in output coordinates)
     const handleContainerPointerDown = (e: React.PointerEvent) => {
         if (e.target !== containerRef.current || !initialOutputRect || !screenContentBounds) return;
