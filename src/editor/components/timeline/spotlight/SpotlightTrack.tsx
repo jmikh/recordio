@@ -30,7 +30,6 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
     // UI State
     const editingSpotlightId = useUIStore(s => s.selectedSpotlightId);
-    const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setEditingSpotlight = (id: string | null) => {
         useUIStore.getState().selectSpotlight(id);
     };
@@ -50,11 +49,12 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     }, [timeMapper]);
 
     // Hooks
-    const { dragState, handleDragStart, wasDraggingRef } = useSpotlightDrag(
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useSpotlightDrag(
         timeline,
         project,
         coords,
-        outputDuration
+        outputDuration,
+        setEditingSpotlight
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useSpotlightHover(
@@ -114,7 +114,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 isSelected={isSelected}
                                 isDragging={isDragging}
                                 trackHeight={height}
-                                onMouseDown={(e) => handleDragStart(e, 'move', s)}
+                                onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     // Suppress toggle if we just finished dragging
@@ -122,21 +122,21 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                         wasDraggingRef.current = false;
                                         return;
                                     }
-                                    // Toggle: if already selected, deselect; otherwise select
-                                    const willSelect = editingSpotlightId !== s.id;
-                                    setEditingSpotlight(willSelect ? s.id : null);
-                                    // Move CTI to spotlight start when selecting
-                                    if (willSelect) {
-                                        setCurrentTime(s.outputStartTimeMs);
+                                    // Toggle: only deselect if it was already selected before mousedown
+                                    // If it wasn't selected, mousedown already selected it, so do nothing
+                                    if (wasSelectedBeforeMousedownRef.current) {
+                                        setEditingSpotlight(null);
+                                    } else {
+                                        // First click - CTI already moved on mousedown via drag handler
                                     }
                                 }}
                                 onResizeStartMouseDown={(e) => {
                                     e.stopPropagation();
-                                    handleDragStart(e, 'resize-start', s);
+                                    handleDragStart(e, 'resize-start', s, isSelected);
                                 }}
                                 onResizeEndMouseDown={(e) => {
                                     e.stopPropagation();
-                                    handleDragStart(e, 'resize-end', s);
+                                    handleDragStart(e, 'resize-end', s, isSelected);
                                 }}
                             />
                         );

@@ -63,10 +63,10 @@ export const scaleLabel = {
 
 /** Transition trail - thicker line leading into a keyframe */
 export const transitionTrail = {
-    base: 'absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none z-10',
+    base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-10',
     default: 'bg-primary',
     selected: 'bg-secondary',
-    opacity: 0.7,
+    opacity: 1,
     height: TRANSITION_HEIGHT,
 };
 
@@ -75,7 +75,7 @@ export const holdLine = {
     base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-[5]',
     default: 'bg-primary',
     selected: 'bg-secondary',
-    opacity: 0.5,
+    opacity: 0.7,
     height: HOLD_HEIGHT,
 };
 
@@ -93,7 +93,7 @@ export const ghostKeyframe = {
 };
 
 export const ghostTrail = {
-    className: 'absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none z-15 bg-secondary',
+    className: 'absolute top-1/2 -translate-y-1/2  pointer-events-none z-15 bg-secondary',
     opacity: 0.5,
     height: TRANSITION_HEIGHT,
 };
@@ -107,7 +107,7 @@ export const legendItem = {
         style: { height: HOLD_HEIGHT } as CSSProperties,
     },
     transitionTrail: {
-        className: 'w-6 bg-primary opacity-70 rounded-full',
+        className: 'w-6 bg-primary opacity-70 ',
         style: { height: TRANSITION_HEIGHT } as CSSProperties,
     },
     diamond: {

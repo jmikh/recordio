@@ -18,7 +18,8 @@ export function useSpotlightDrag(
     timeline: any,
     project: any,
     coords: TimePixelMapper,
-    outputDuration: number
+    outputDuration: number,
+    setEditingSpotlight: (id: string | null) => void
 ) {
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
@@ -30,17 +31,24 @@ export function useSpotlightDrag(
     // Used to suppress toggle behavior after drag operations
     const wasDraggingRef = useRef(false);
 
+    // Track whether item was already selected before mousedown
+    // Used for toggle: if already selected and pure click → deselect
+    const wasSelectedBeforeMousedownRef = useRef(false);
+
     const settings: SpotlightSettings = project.settings.spotlight;
     const minDuration = getMinSpotlightDuration(settings);
 
     const handleDragStart = (
         e: React.MouseEvent,
         type: DragState['type'],
-        spotlight: SpotlightAction
+        spotlight: SpotlightAction,
+        isCurrentlySelected: boolean
     ) => {
         e.stopPropagation();
 
         wasDraggingRef.current = false; // Reset on drag start
+        wasSelectedBeforeMousedownRef.current = isCurrentlySelected; // Track selection state
+
         setDragState({
             type,
             spotlightId: spotlight.id,
@@ -49,7 +57,8 @@ export function useSpotlightDrag(
             initialEndTimeMs: spotlight.outputEndTimeMs,
         });
         startInteraction();
-        // Note: Selection happens on click, not mousedown, to work with toggle behavior
+        // Select on drag start (but refs control toggle behavior on click end)
+        setEditingSpotlight(spotlight.id);
 
         // Sync CTI to appropriate edge based on drag type
         if (type === 'resize-end') {
@@ -154,6 +163,7 @@ export function useSpotlightDrag(
     return {
         dragState,
         handleDragStart,
-        wasDraggingRef
+        wasDraggingRef,
+        wasSelectedBeforeMousedownRef
     };
 }

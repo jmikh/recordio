@@ -54,11 +54,12 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // HOOKS (DRAG & HOVER)
     // ------------------------------------------------------------------
 
-    const { dragState, handleDragStart, wasDraggingRef } = useZoomDrag(
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useZoomDrag(
         timeline,
         project,
         coords,
-        outputDuration
+        outputDuration,
+        setEditingZoom
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useZoomHover(
@@ -151,7 +152,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                     isSelected={isSelected}
                     isDragging={isDragging}
                     hideLabel={hideLabels}
-                    onMouseDown={(e) => handleDragStart(e, 'move', action)}
+                    onMouseDown={(e) => handleDragStart(e, 'move', action, isSelected)}
                     onClick={(e) => {
                         e.stopPropagation();
                         // Suppress toggle if we just finished dragging
@@ -159,8 +160,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             wasDraggingRef.current = false;
                             return;
                         }
-                        // Toggle: if already selected, deselect; otherwise select
-                        setEditingZoom(editingZoomId === action.id ? null : action.id);
+                        // Toggle: only deselect if it was already selected before mousedown
+                        // If it wasn't selected, mousedown already selected it, so do nothing
+                        if (wasSelectedBeforeMousedownRef.current) {
+                            setEditingZoom(null);
+                        }
                     }}
                 />
             );

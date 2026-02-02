@@ -20,7 +20,8 @@ export function useZoomDrag(
     timeline: any, // Typed correctly if possible, else any for now matching usage
     project: any,
     coords: TimePixelMapper,
-    outputDuration: number
+    outputDuration: number,
+    setEditingZoom: (id: string | null) => void
 ) {
     const updateZoomAction = useProjectStore(s => s.updateZoomAction);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -31,13 +32,19 @@ export function useZoomDrag(
     // Used to suppress toggle behavior after drag operations
     const wasDraggingRef = useRef(false);
 
-    const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction) => {
+    // Track whether item was already selected before mousedown
+    // Used for toggle: if already selected and pure click → deselect
+    const wasSelectedBeforeMousedownRef = useRef(false);
+
+    const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction, isCurrentlySelected: boolean) => {
         e.stopPropagation();
 
         const outputEndTimeX = coords.msToX(action.outputEndTimeMs);
         if (outputEndTimeX === -1) return; // Should be impossible if clicked
 
         wasDraggingRef.current = false; // Reset on drag start
+        wasSelectedBeforeMousedownRef.current = isCurrentlySelected; // Track selection state
+
         setDragState({
             type,
             motionId: action.id,
@@ -45,7 +52,8 @@ export function useZoomDrag(
             initialOutputEndTime: action.outputEndTimeMs,
         });
         startInteraction();
-        // Note: Selection happens on click, not mousedown, to work with toggle behavior
+        // Select on drag start (but refs control toggle behavior on click end)
+        setEditingZoom(action.id);
     };
 
     /**
@@ -111,6 +119,7 @@ export function useZoomDrag(
     return {
         dragState,
         handleDragStart,
-        wasDraggingRef
+        wasDraggingRef,
+        wasSelectedBeforeMousedownRef
     };
 }
