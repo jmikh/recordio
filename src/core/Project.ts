@@ -70,11 +70,11 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     background: {
-        type: 'gradient',
+        type: 'color',
         color: '#6078c4ff',
         gradientColors: ['#95a6f2ff', '#83689dff'],
         gradientDirection: 'SE',
-        lastColorMode: 'gradient',
+        colorMode: 'gradient',
         backgroundBlur: 0
     },
 

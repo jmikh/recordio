@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
-import { IoIosColorFilter, IoIosClose } from "react-icons/io";
+import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
+import { XButton } from '../../../components/ui/XButton';
 import { Slider } from '../../../components/ui/Slider';
 import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
 
@@ -81,16 +82,13 @@ export const BackgroundSettings = () => {
 
     const { settings } = project;
     const { background } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customLibraryId, gradientColors, gradientDirection, backgroundBlur, lastColorMode } = background;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customLibraryId, gradientColors, gradientDirection, backgroundBlur, colorMode } = background;
 
     // Helpers to determine active state
-    // Use lastColorMode as fallback when backgroundType is not a color mode (preset/custom)
-    const effectiveColorMode = (backgroundType === 'solid' || backgroundType === 'gradient')
-        ? backgroundType
-        : lastColorMode;
-    const isSolid = effectiveColorMode === 'solid';
-    const isGradient = effectiveColorMode === 'gradient';
-    const isColorMode = backgroundType === 'solid' || backgroundType === 'gradient';
+    // colorMode is always used to determine solid vs gradient when type is 'color'
+    const isSolid = colorMode === 'solid';
+    const isGradient = colorMode === 'gradient';
+    const isColorMode = backgroundType === 'color';
 
     // Preset active if type is 'preset'
     const isPreset = backgroundType === 'preset';
@@ -104,11 +102,11 @@ export const BackgroundSettings = () => {
     // --- Undo/Redo Batching Helpers ---
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    const handleColorTypeChange = (type: 'solid' | 'gradient') => {
+    const handleColorTypeChange = (newColorMode: 'solid' | 'gradient') => {
         updateSettings({
             background: {
-                type,
-                lastColorMode: type
+                type: 'color',
+                colorMode: newColorMode
             }
         });
     };
@@ -229,19 +227,7 @@ export const BackgroundSettings = () => {
     const popoverRef = useRef<HTMLDivElement>(null);
     const colorButtonRef = useRef<HTMLDivElement>(null);
 
-    // Close popover on click outside or scroll
-    useEffect(() => {
-        if (showColorPopover && colorButtonRef.current) {
-            const rect = colorButtonRef.current.getBoundingClientRect();
-            const TOP_OFFSET = -20;
-            const LEFT_OFFSET = 60; // 48px width + gap
 
-            setPopoverPos({
-                top: rect.top + TOP_OFFSET,
-                left: rect.left + LEFT_OFFSET
-            });
-        }
-    }, [showColorPopover]);
 
     useEffect(() => {
         if (!showColorPopover) return;
@@ -281,7 +267,23 @@ export const BackgroundSettings = () => {
                             <span className="text-xs text-text-main">Color</span>
                             <div
                                 ref={colorButtonRef}
-                                onClick={() => setShowColorPopover(v => !v)}
+                                onClick={() => {
+                                    // Set type to 'color' when clicking the color icon
+                                    if (backgroundType !== 'color') {
+                                        updateSettings({ background: { type: 'color' } });
+                                    }
+                                    // Calculate position synchronously before showing popover to avoid flash
+                                    if (!showColorPopover && colorButtonRef.current) {
+                                        const rect = colorButtonRef.current.getBoundingClientRect();
+                                        const TOP_OFFSET = -20;
+                                        const LEFT_OFFSET = 60; // 48px width + gap
+                                        setPopoverPos({
+                                            top: rect.top + TOP_OFFSET,
+                                            left: rect.left + LEFT_OFFSET
+                                        });
+                                    }
+                                    setShowColorPopover(v => !v);
+                                }}
                                 className={`cursor-pointer w-14 h-14 rounded-full flex items-center justify-center overflow-hidden transition-all hover:scale-110 ${isColorMode
                                     ? 'outline outline-2 outline-offset-2 outline-primary'
                                     : 'border border-transparent ring-1 ring-border hover:ring-border-hover'
@@ -343,15 +345,12 @@ export const BackgroundSettings = () => {
                                             >
                                                 {url && <img src={url} alt="Custom background" className="w-full h-full object-cover" />}
                                             </div>
-                                            {/* Delete button - hidden when selected */}
                                             {canDelete && (
-                                                <button
+                                                <XButton
                                                     onClick={(e) => handleLibraryDelete(entry.id, e)}
-                                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                                                     title="Remove from library"
-                                                >
-                                                    <IoIosClose size={16} />
-                                                </button>
+                                                    className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                />
                                             )}
                                         </div>
                                     );

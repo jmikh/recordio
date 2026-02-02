@@ -95,7 +95,7 @@ export interface ScreenSettings extends StyleSettings {
 }
 
 export interface BackgroundSettings {
-    type: 'solid' | 'gradient' | 'preset' | 'custom';
+    type: 'color' | 'preset' | 'custom';
     color: string;
     gradientColors: [string, string];
     gradientDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
@@ -107,7 +107,7 @@ export interface BackgroundSettings {
     customRuntimeUrl?: string;
     /** ID of the global library entry this background came from. Used for matching. */
     customLibraryId?: string;
-    lastColorMode: 'gradient' | 'solid';
+    colorMode: 'gradient' | 'solid';
     backgroundBlur: number;
 }
 

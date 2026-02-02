@@ -11,12 +11,12 @@ export const drawBackground = (
     bgImage: HTMLImageElement | null
 ) => {
     // 1. Solid Color
-    if (background.type === 'solid' && background.color) {
+    if (background.type === 'color' && background.colorMode === 'solid' && background.color) {
         ctx.fillStyle = background.color;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     // 2. Gradient
-    else if (background.type === 'gradient') {
+    else if (background.type === 'color' && background.colorMode === 'gradient') {
         const { gradientColors, gradientDirection } = background;
         const w = canvas.width;
         const h = canvas.height;
