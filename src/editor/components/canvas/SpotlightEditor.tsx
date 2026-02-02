@@ -97,14 +97,13 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     // The content rect is where the screen content appears in output coordinates
     const screenContentBounds = viewMapper?.contentRect;
 
-    // Sync Playback to Spotlight midpoint
+    // Sync Playback to Spotlight start when selected
     useEffect(() => {
         if (!editingSpotlightId) return;
 
         const spotlight = project.timeline.spotlightActions.find(s => s.id === editingSpotlightId);
         if (spotlight) {
-            const midTime = (spotlight.outputStartTimeMs + spotlight.outputEndTimeMs) / 2;
-            useUIStore.getState().setCurrentTime(midTime);
+            useUIStore.getState().setCurrentTime(spotlight.outputStartTimeMs);
         }
     }, [editingSpotlightId]);
 

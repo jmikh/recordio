@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
+import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
 import type { DragState } from './useSpotlightDrag';
@@ -22,6 +23,7 @@ export function useSpotlightHover(
     outputDuration: number
 ) {
     const addSpotlight = useProjectStore(s => s.addSpotlight);
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
     const settings: SpotlightSettings = project.settings.spotlight;
@@ -32,9 +34,14 @@ export function useSpotlightHover(
      * Handles hover interactions for 'Add Spotlight' ghost block.
      * Spotlight starts at mouse position and extends to the right.
      * DISABLED while dragging to prevent interference.
+     * DISABLED when any zoom or spotlight is selected.
      */
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (dragState) return;
+        // No ghost when dragging or when something is selected
+        if (dragState || editingSpotlightId || selectedZoomId) {
+            setHoverInfo(null);
+            return;
+        }
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;

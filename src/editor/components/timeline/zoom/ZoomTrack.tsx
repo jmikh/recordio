@@ -77,7 +77,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // ------------------------------------------------------------------
 
     // Minimum pixel distance between keyframes before hiding all labels
-    const MIN_LABEL_DISTANCE_PX = 40;
+    const MIN_LABEL_DISTANCE_PX = 30;
 
     const renderElements = useMemo(() => {
         const actions: ZoomAction[] = timeline.zoomActions || [];
