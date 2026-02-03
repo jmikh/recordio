@@ -34,7 +34,7 @@ export default defineConfig(function (_a) {
         },
         // Chrome extensions require relative paths for assets
         base: './',
-        build: __assign({ outDir: resolve(__dirname, '../dist'), minify: mode === 'development' ? false : 'esbuild', sourcemap: mode === 'development', rollupOptions: {
+        build: __assign({ outDir: resolve(__dirname, 'dist'), minify: mode === 'development' ? false : 'esbuild', sourcemap: mode === 'development', rollupOptions: {
                 input: {
                     offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
                     controller: resolve(__dirname, 'src/controller/controller.html')
