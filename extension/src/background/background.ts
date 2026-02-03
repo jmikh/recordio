@@ -182,7 +182,7 @@ async function closeControllerTab(tabId: number | null) {
 
 async function openControllerTab(): Promise<number> {
     const tab = await chrome.tabs.create({
-        url: chrome.runtime.getURL('src/recording/controller/controller.html'),
+        url: chrome.runtime.getURL('src/controller/controller.html'),
         active: true,
         pinned: true
     });
@@ -265,7 +265,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
     if (!tabId) throw new Error("Tab ID is required for tab recording");
 
     // 1. Setup Offscreen
-    await setupOffscreenDocument('src/recording/offscreen/offscreen.html');
+    await setupOffscreenDocument('src/offscreen/offscreen.html');
 
     // 2. Get Media Stream ID
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });

@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => ({
     define: {
         __DEBUG_OVERLAY__: debugOverlay,
     },
+    // Chrome extensions require relative paths for assets
+    base: './',
     build: {
         outDir: resolve(__dirname, '../dist'),
         minify: mode === 'development' ? false : 'esbuild',
