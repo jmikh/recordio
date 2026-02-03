@@ -127,10 +127,11 @@ export const EDITOR_ORIGIN_DEV = 'http://localhost:3001';
 
 /** Get the appropriate editor origin based on environment */
 export function getEditorOrigin(): string {
-    // Use Vite's build mode to determine environment:
-    // - `npm run dev` or `npm run build:extension:dev` → import.meta.env.DEV = true
-    // - `npm run build:extension` → import.meta.env.PROD = true
-    if (import.meta.env.DEV) {
+    // __DEV_MODE__ is defined in vite.config.ts based on build mode:
+    // - `npm run dev` or `npm run build:extension:dev` → __DEV_MODE__ = true
+    // - `npm run build:extension` → __DEV_MODE__ = false
+    // @ts-expect-error __DEV_MODE__ is defined by Vite at build time
+    if (__DEV_MODE__) {
         return EDITOR_ORIGIN_DEV;
     }
     return EDITOR_ORIGIN_PROD;

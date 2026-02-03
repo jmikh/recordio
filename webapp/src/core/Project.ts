@@ -58,10 +58,10 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     screen: {
-        mode: 'device',
-        padding: 0.1,
-        borderRadius: 24,       // Corner radius in output pixels
-        borderWidth: 2,
+        mode: 'border',
+        padding: 0.02,
+        borderRadius: 12,       // Corner radius in output pixels
+        borderWidth: 1,
         borderColor: '#667eea',
         deviceFrameId: 'macbook-air-dark',
         hasShadow: true,

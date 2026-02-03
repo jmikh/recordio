@@ -2,8 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [react()],
+
+    define: {
+        __DEV_MODE__: mode === 'development',
+    },
 
     root: __dirname,
 
@@ -43,4 +47,4 @@ export default defineConfig({
 
     // Ensure assets are copied
     publicDir: resolve(__dirname, 'public'),
-});
+}));

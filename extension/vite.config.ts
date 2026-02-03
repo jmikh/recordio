@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
     },
     define: {
         __DEBUG_OVERLAY__: debugOverlay,
+        __DEV_MODE__: mode === 'development',
     },
     // Chrome extensions require relative paths for assets
     base: './',
