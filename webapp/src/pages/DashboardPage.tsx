@@ -7,8 +7,18 @@ import { LogoLink } from '@shared/components';
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
+        // Check for error message in URL
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        if (error) {
+            setErrorMessage(error);
+            // Clear the error from URL without reload
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+
         loadProjects();
     }, []);
 
@@ -43,7 +53,7 @@ export function DashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-surface-base text-text-main">
+        <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
             <header className="border-b border-border px-6 py-4 flex items-center justify-between">
                 <LogoLink />
@@ -51,6 +61,22 @@ export function DashboardPage() {
                     {projects.length} project{projects.length !== 1 ? 's' : ''}
                 </div>
             </header>
+
+            {/* Error Message */}
+            {errorMessage && (
+                <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-3">
+                    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{errorMessage}</span>
+                    <button
+                        onClick={() => setErrorMessage(null)}
+                        className="ml-auto text-red-400 hover:text-red-300"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
 
             {/* Content */}
             <main className="p-6">

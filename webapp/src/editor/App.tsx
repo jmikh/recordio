@@ -8,7 +8,6 @@ import { useHistorySync } from './hooks/useHistorySync';
 
 
 import { ProjectStorage } from '../storage/projectStorage';
-import { ProjectSelector } from './components/ProjectSelector';
 import { ProgressModal } from '@shared/components';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
@@ -41,7 +40,6 @@ function Editor() {
 
     // Initialization State
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     // Initialize authentication
     useEffect(() => {
@@ -129,19 +127,19 @@ function Editor() {
 
         async function init() {
             if (!projectId) {
-                // No project ID - Show Welcome / Empty State
-                setIsLoading(false);
+                // No project ID - redirect to dashboard
+                window.location.href = '/';
                 return;
             }
             try {
                 console.log('Initializing Project:', projectId);
                 const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
+                setIsLoading(false);
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
+                // Redirect to dashboard with error message
+                window.location.href = `/?error=${encodeURIComponent('Project not found')}`;
             }
         }
 
@@ -217,16 +215,19 @@ function Editor() {
         };
     }
 
-
-
-    if (error) {
-        return <ProjectSelector error={error} />;
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="w-full h-screen bg-black flex items-center justify-center">
+                <div className="text-white">Loading Project...</div>
+            </div>
+        );
     }
 
-    // Welcome / Empty State
-    if (!isLoading && !hasActiveProject) {
-        // This is "No Project Loaded" state.
-        return <ProjectSelector />;
+    // No project loaded (shouldn't happen with redirects, but safety fallback)
+    if (!hasActiveProject) {
+        window.location.href = '/';
+        return null;
     }
 
     return (

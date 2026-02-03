@@ -296,62 +296,45 @@ export function useExtensionBridge() {
                                 chunkBytes: data.byteLength,
                             });
 
-                            // DEBUG: Delay last chunk by 10 seconds for UI inspection
-                            // TODO: Remove this when done testing!
-                            const isLastChunk = chunk.index === chunk.total - 1;
-                            const processChunk = () => {
-                                // Store chunk by index (handles out-of-order arrival)
-                                if (chunk.source === 'screen') {
-                                    screenChunksRef.current.set(chunk.index, data);
-                                    screenTotalRef.current = chunk.total; // Update expected total
-                                } else {
-                                    cameraChunksRef.current.set(chunk.index, data);
-                                    cameraTotalRef.current = chunk.total;
-                                }
-
-                                bytesReceived += data.byteLength;
-
-                                // Calculate total chunks received across both sources
-                                const totalChunksReceived = screenChunksRef.current.size + cameraChunksRef.current.size;
-
-                                setStateCallback(prev => ({
-                                    ...prev,
-                                    progress: {
-                                        phase: 'streaming',
-                                        source: chunk.source,
-                                        chunksReceived: totalChunksReceived,
-                                        totalChunks: screenTotalRef.current + cameraTotalRef.current,
-                                        bytesReceived,
-                                        totalBytes,
-                                    },
-                                }));
-
-                                console.log(`[useExtensionBridge] Stored ${chunk.source} chunk ${chunk.index}/${chunk.total - 1} (${screenChunksRef.current.size + cameraChunksRef.current.size} total received)`);
-                            };
-
-                            if (isLastChunk) {
-                                console.log('[useExtensionBridge] DEBUG: Last chunk detected, delaying 10 seconds...');
-                                setTimeout(processChunk, 10000);
+                            // Store chunk by index (handles out-of-order arrival)
+                            if (chunk.source === 'screen') {
+                                screenChunksRef.current.set(chunk.index, data);
+                                screenTotalRef.current = chunk.total; // Update expected total
                             } else {
-                                processChunk();
+                                cameraChunksRef.current.set(chunk.index, data);
+                                cameraTotalRef.current = chunk.total;
                             }
+
+                            bytesReceived += data.byteLength;
+
+                            // Calculate total chunks received across both sources
+                            const totalChunksReceived = screenChunksRef.current.size + cameraChunksRef.current.size;
+
+                            setStateCallback(prev => ({
+                                ...prev,
+                                progress: {
+                                    phase: 'streaming',
+                                    source: chunk.source,
+                                    chunksReceived: totalChunksReceived,
+                                    totalChunks: screenTotalRef.current + cameraTotalRef.current,
+                                    bytesReceived,
+                                    totalBytes,
+                                },
+                            }));
+
+                            console.log(`[useExtensionBridge] Stored ${chunk.source} chunk ${chunk.index}/${chunk.total - 1} (${screenChunksRef.current.size + cameraChunksRef.current.size} total received)`);
                             break;
                         }
 
                         case PORT_MSG.STREAM_COMPLETE:
-                            console.log('[useExtensionBridge] Stream complete signal received, waiting 20s for UI inspection...');
-                            // DEBUG: Wait 20 seconds before completing to allow UI inspection
-                            // TODO: Remove this when done testing!
-                            setTimeout(() => {
-                                console.log('[useExtensionBridge] Stream complete (after delay)', {
-                                    screenChunks: screenChunksRef.current.size,
-                                    expectedScreen: screenTotalRef.current,
-                                    cameraChunks: cameraChunksRef.current.size,
-                                    expectedCamera: cameraTotalRef.current,
-                                });
-                                port.disconnect();
-                                resolve();
-                            }, 12000);
+                            console.log('[useExtensionBridge] Stream complete', {
+                                screenChunks: screenChunksRef.current.size,
+                                expectedScreen: screenTotalRef.current,
+                                cameraChunks: cameraChunksRef.current.size,
+                                expectedCamera: cameraTotalRef.current,
+                            });
+                            port.disconnect();
+                            resolve();
                             break;
 
                         case PORT_MSG.STREAM_ERROR:

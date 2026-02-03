@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
-import { importFromRawRecording } from '../storage/projectStorage';
+import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
 import { LogoLink } from '@shared/components';
 
 type ImportStatus =
     | 'init'
+    | 'checking'
     | 'receiving'
     | 'streaming'
     | 'storing'
@@ -32,7 +33,7 @@ export function ImportPage() {
     const params = new URLSearchParams(window.location.search);
     const recordingId = params.get('id');
 
-    // Start handoff when page loads
+    // Check for existing project and start handoff when page loads
     useEffect(() => {
         if (!recordingId) {
             setStatus('error-no-id');
@@ -42,9 +43,31 @@ export function ImportPage() {
         if (hasStarted) return;
         setHasStarted(true);
 
-        console.log('[ImportPage] Initiating handoff for:', recordingId);
-        requestHandoff(recordingId);
-        setStatus('receiving');
+        // Check if project already exists in local DB
+        const projectId = `proj-${recordingId}`;
+        setStatus('checking');
+
+        ProjectStorage.loadProjectRaw(projectId)
+            .then((existingProject) => {
+                if (existingProject) {
+                    // Project already exists, redirect to editor
+                    console.log('[ImportPage] Project already exists, redirecting:', projectId);
+                    setStatus('success');
+                    setProjectId(projectId);
+                    window.location.href = `/editor?projectId=${projectId}`;
+                } else {
+                    // Project doesn't exist, initiate handoff
+                    console.log('[ImportPage] Project not found, initiating handoff for:', recordingId);
+                    requestHandoff(recordingId);
+                    setStatus('receiving');
+                }
+            })
+            .catch((error) => {
+                console.error('[ImportPage] Error checking for existing project:', error);
+                // Proceed with handoff on error
+                requestHandoff(recordingId);
+                setStatus('receiving');
+            });
     }, [recordingId, hasStarted, requestHandoff]);
 
     // Handle handoff state changes
@@ -89,6 +112,7 @@ export function ImportPage() {
     const getStatusMessage = () => {
         switch (status) {
             case 'init':
+            case 'checking':
             case 'receiving':
             case 'streaming':
             case 'storing':
