@@ -8,18 +8,18 @@
  * - Persists state to chrome.storage.session for service worker restarts
  */
 
-import { type Size } from '../../core/types';
-import { initSentry } from '../../utils/sentry';
-import { trackRecordingCompleted } from '../../core/analytics';
-import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../../utils/colors';
+import { type Size } from '../core/types';
+import { initSentry } from '../utils/sentry';
+import { trackRecordingCompleted } from '../core/analytics';
+import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 import {
     BRIDGE_MSG,
     buildImportUrl,
     type BridgeReadyPayload,
     type HandoffCompletePayload,
-} from '../../shared/types/bridge';
-import type { RawRecording } from '../../shared/types/recording';
+} from '@shared/types/bridge';
+import type { RawRecording } from '@shared/types/recording';
 
 // Initialize Sentry for error tracking
 initSentry('background');
@@ -644,7 +644,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // External Message Handler (from website)
 // ============================================
 
-import { ProjectStorage } from '../../storage/projectStorage';
+import { ProjectStorage } from '../storage/projectStorage';
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     console.log('[Background] External message:', message.type, 'from:', sender.origin);

@@ -11,9 +11,9 @@
  */
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
-import { ProjectStorage } from '../../storage/projectStorage';
-import { ProjectImpl } from '../../core/Project';
-import { EventType, type UserEvents, type Size, type SourceMetadata } from '../../core/types';
+import { ProjectStorage } from '../storage/projectStorage';
+import { ProjectImpl } from '../core/Project';
+import { EventType, type UserEvents, type Size, type SourceMetadata } from '../core/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';

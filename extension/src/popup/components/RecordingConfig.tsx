@@ -1,7 +1,7 @@
 import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
-import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '../../../components/ui';
-import { MSG_TYPES } from '../../../recording/shared/messageTypes';
+import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '../../components/ui';
+import { MSG_TYPES } from '../../shared/messageTypes';
 import { MdMic, MdVideocam } from 'react-icons/md';
 
 interface RecordingConfigProps {

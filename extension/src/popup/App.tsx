@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { MSG_TYPES, STORAGE_KEYS } from '../../recording/shared/messageTypes';
+import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
-import { Button } from '../../components/ui';
+import { Button } from '../components/ui';
 import { MdBugReport, MdArrowBack } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
 import { FiEyeOff } from 'react-icons/fi';
-import { BugReportModal } from '../../components/ui/BugReportModal';
-import { LogoLink } from '../../components/ui/LogoLink';
-import permissionGuide from '../../assets/permission-guide.jpg';
-import { getEditorOrigin } from '../../shared/types/bridge';
+import { BugReportModal } from '../components/ui/BugReportModal';
+import { LogoLink } from '../components/ui/LogoLink';
+import permissionGuide from '../assets/permission-guide.jpg';
+import { getEditorOrigin } from '@shared/types/bridge';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 

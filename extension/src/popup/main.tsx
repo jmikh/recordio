@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import '../../index.css'
+import '../index.css'
 import App from './App.tsx'
-import { initSentry } from '../../utils/sentry'
-import { trackPageView } from '../../core/analytics'
+import { initSentry } from '../utils/sentry'
+import { trackPageView } from '../core/analytics'
 
 // Initialize Sentry for error tracking
 initSentry('popup');

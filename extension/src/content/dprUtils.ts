@@ -5,7 +5,7 @@
  * These utilities scale values to device pixels for video alignment.
  */
 
-import type { Rect } from '../../core/types';
+import type { Rect } from '../core/types';
 
 /**
  * Scale a point by the device pixel ratio.

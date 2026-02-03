@@ -9,7 +9,7 @@
  * Tracks stable hover sessions (2+ seconds) and emits events.
  */
 
-import type { Rect } from '../../core/types';
+import type { Rect } from '../core/types';
 import { findElementGroup, cornerRadiusToString, type ElementGroupResult } from './elementGroupUtils';
 import { dprScaleRect, dprScaleRadius } from './dprUtils';
 

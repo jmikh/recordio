@@ -12,7 +12,7 @@
  * Events are sent to background via CAPTURE_USER_EVENT messages.
  */
 
-import { EventType, type BaseEvent, type Rect } from '../../core/types';
+import { EventType, type BaseEvent, type Rect } from '../core/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';

@@ -13,7 +13,7 @@
  */
 
 
-import { initSentry } from '../../utils/sentry';
+import { initSentry } from '../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
 import { BlurManager } from './blurManager';
