@@ -16,7 +16,6 @@ import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState,
 import {
     BRIDGE_MSG,
     buildImportUrl,
-    type BridgeReadyPayload,
     type HandoffCompletePayload,
 } from '@shared/types/bridge';
 import type { RawRecording } from '@shared/types/recording';
@@ -645,14 +644,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // ============================================
 
 import { ProjectStorage } from '../storage/projectStorage';
+import {
+    PORT_MSG,
+    HANDOFF_PORT_NAME,
+    CHUNK_SIZE,
+    type HandoffRequestPayload,
+    type HandoffMetadataResponse,
+    type HandoffErrorResponse,
+    type StartStreamPayload,
+    type ChunkPayload,
+} from '@shared/types/bridge';
+
+// Cache for pending handoff data (between metadata request and stream)
+const pendingHandoffs = new Map<string, {
+    project: any;
+    screenBlob: Blob;
+    cameraBlob?: Blob;
+}>();
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     console.log('[Background] External message:', message.type, 'from:', sender.origin);
 
     (async () => {
         switch (message.type) {
-            case BRIDGE_MSG.BRIDGE_READY:
-                await handleBridgeReady(message.payload as BridgeReadyPayload, sendResponse);
+            case BRIDGE_MSG.HANDOFF_REQUEST:
+                await handleHandoffRequest(message.payload as HandoffRequestPayload, sendResponse);
                 break;
 
             case BRIDGE_MSG.HANDOFF_COMPLETE:
@@ -661,32 +677,33 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
                 break;
 
             default:
-                sendResponse({ error: 'Unknown message type' });
+                sendResponse({ success: false, error: 'Unknown message type', code: 'UNKNOWN' });
         }
     })();
 
     return true; // Async response
 });
 
-async function handleBridgeReady(payload: BridgeReadyPayload, sendResponse: Function) {
+/**
+ * Handle HANDOFF_REQUEST: Return recording metadata (small payload).
+ * The actual video data will be streamed via Port connection.
+ */
+async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse: Function) {
     const { recordingId } = payload;
-    console.log('[Background] Bridge ready, fetching recording:', recordingId);
+    console.log('[Background] Handoff request, fetching metadata:', recordingId);
 
     try {
         // Load project from extension's ProjectStorage (raw, without hydration)
-        // Service workers can't use URL.createObjectURL, so we use loadProjectRaw
         const project = await ProjectStorage.loadProjectRaw(recordingId);
 
         if (!project) {
             console.error('[Background] Recording not found:', recordingId);
-            sendResponse({
-                type: BRIDGE_MSG.HANDOFF_ERROR,
-                payload: {
-                    recordingId,
-                    error: 'Recording not found',
-                    code: 'NOT_FOUND',
-                },
-            });
+            const errorResponse: HandoffErrorResponse = {
+                success: false,
+                error: 'Recording not found',
+                code: 'NOT_FOUND',
+            };
+            sendResponse(errorResponse);
             return;
         }
 
@@ -705,7 +722,10 @@ async function handleBridgeReady(payload: BridgeReadyPayload, sendResponse: Func
             cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
         }
 
-        // Build RawRecording from Project
+        // Cache blobs for streaming phase
+        pendingHandoffs.set(recordingId, { project, screenBlob, cameraBlob });
+
+        // Build RawRecording metadata
         const rawRecording: RawRecording = {
             id: recordingId,
             name: project.name,
@@ -715,45 +735,144 @@ async function handleBridgeReady(payload: BridgeReadyPayload, sendResponse: Func
             userEvents: project.userEvents,
         };
 
-        // Convert Blobs to ArrayBuffers for message passing
-        // (Blobs cannot be sent through chrome.runtime.sendMessage)
-        const screenArrayBuffer = await screenBlob.arrayBuffer();
-        const cameraArrayBuffer = cameraBlob ? await cameraBlob.arrayBuffer() : undefined;
+        console.log('[Background] Sending metadata:', recordingId,
+            'screen size:', screenBlob.size,
+            'camera size:', cameraBlob?.size || 'none');
 
-        console.log('[Background] Sending recording to website:', recordingId,
-            'screen size:', screenArrayBuffer.byteLength,
-            'camera size:', cameraArrayBuffer?.byteLength || 'none');
+        // Send metadata response (small, under 64MB limit)
+        const response: HandoffMetadataResponse = {
+            success: true,
+            recording: rawRecording,
+            screenVideoSize: screenBlob.size,
+            screenVideoType: screenBlob.type,
+            cameraVideoSize: cameraBlob?.size,
+            cameraVideoType: cameraBlob?.type,
+        };
+        sendResponse(response);
 
-        sendResponse({
-            type: BRIDGE_MSG.HANDOFF_RECORDING,
-            payload: {
-                recording: rawRecording,
-                screenData: {
-                    buffer: Array.from(new Uint8Array(screenArrayBuffer)),
-                    type: screenBlob.type,
-                },
-                cameraData: cameraArrayBuffer ? {
-                    buffer: Array.from(new Uint8Array(cameraArrayBuffer)),
-                    type: cameraBlob!.type,
-                } : undefined,
-            },
-        });
     } catch (error) {
         console.error('[Background] Error fetching recording:', error);
-        sendResponse({
-            type: BRIDGE_MSG.HANDOFF_ERROR,
-            payload: {
-                recordingId,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                code: 'STORAGE_ERROR',
-            },
+        const errorResponse: HandoffErrorResponse = {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            code: 'STORAGE_ERROR',
+        };
+        sendResponse(errorResponse);
+    }
+}
+
+/**
+ * Handle Port connections for streaming video chunks.
+ * Website connects via chrome.runtime.connect(EXTENSION_ID, { name: 'recordio-handoff' })
+ */
+chrome.runtime.onConnectExternal.addListener((port) => {
+    if (port.name !== HANDOFF_PORT_NAME) {
+        console.warn('[Background] Unknown port connection:', port.name);
+        return;
+    }
+
+    console.log('[Background] Port connected for streaming:', port.sender?.origin);
+
+    port.onMessage.addListener(async (message) => {
+        if (message.type === PORT_MSG.START_STREAM) {
+            await handleStartStream(port, message.payload as StartStreamPayload);
+        }
+    });
+
+    port.onDisconnect.addListener(() => {
+        console.log('[Background] Port disconnected');
+    });
+});
+
+/**
+ * Stream video data in chunks via Port.
+ */
+async function handleStartStream(port: chrome.runtime.Port, payload: StartStreamPayload) {
+    const { recordingId } = payload;
+    console.log('[Background] Starting stream for:', recordingId);
+
+    const cached = pendingHandoffs.get(recordingId);
+    if (!cached) {
+        port.postMessage({
+            type: PORT_MSG.STREAM_ERROR,
+            payload: { error: 'Recording not found in cache. Request metadata first.' },
+        });
+        return;
+    }
+
+    const { screenBlob, cameraBlob } = cached;
+
+    try {
+        // Stream screen video chunks
+        await streamBlobChunks(port, screenBlob, 'screen');
+
+        // Stream camera video chunks if present
+        if (cameraBlob) {
+            await streamBlobChunks(port, cameraBlob, 'camera');
+        }
+
+        // Signal completion
+        port.postMessage({
+            type: PORT_MSG.STREAM_COMPLETE,
+            payload: { recordingId },
+        });
+
+        console.log('[Background] Stream complete for:', recordingId);
+
+    } catch (error) {
+        console.error('[Background] Stream error:', error);
+        port.postMessage({
+            type: PORT_MSG.STREAM_ERROR,
+            payload: { error: error instanceof Error ? error.message : 'Unknown error' },
         });
     }
 }
 
+/**
+ * Stream a blob in chunks via Port.
+ */
+async function streamBlobChunks(
+    port: chrome.runtime.Port,
+    blob: Blob,
+    source: 'screen' | 'camera'
+) {
+    const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
+    console.log(`[Background] Streaming ${source}: ${blob.size} bytes in ${totalChunks} chunks`);
+
+    for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, blob.size);
+        const chunk = blob.slice(start, end);
+
+        // Convert chunk to ArrayBuffer, then to number array for structured clone
+        const buffer = await chunk.arrayBuffer();
+        const data = Array.from(new Uint8Array(buffer));
+
+        const chunkPayload: ChunkPayload = {
+            source,
+            index: i,
+            total: totalChunks,
+            data,
+        };
+
+        port.postMessage({
+            type: PORT_MSG.CHUNK,
+            payload: chunkPayload,
+        });
+
+        console.log(`[Background] Sent ${source} chunk ${i + 1}/${totalChunks}`);
+    }
+}
+
+/**
+ * Handle HANDOFF_COMPLETE: Clean up extension storage.
+ */
 async function handleHandoffComplete(payload: HandoffCompletePayload) {
     const { recordingId } = payload;
-    console.log('[Background] Handoff complete, cleaning up extension storage:', recordingId);
+    console.log('[Background] Handoff complete, cleaning up:', recordingId);
+
+    // Clear cache
+    pendingHandoffs.delete(recordingId);
 
     try {
         // Delete from extension storage after successful handoff
@@ -763,3 +882,4 @@ async function handleHandoffComplete(payload: HandoffCompletePayload) {
         console.error('[Background] Failed to delete project:', error);
     }
 }
+

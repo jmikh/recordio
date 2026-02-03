@@ -296,6 +296,31 @@ export const CanvasContainer = () => {
                                 src={source.runtimeUrl}
                                 muted={isMuted}
                                 playsInline
+                                onError={(e) => {
+                                    const video = e.currentTarget;
+                                    const err = video.error;
+                                    console.error('[CanvasContainer] Video error:',
+                                        'sourceId=', source.id,
+                                        'code=', err?.code,
+                                        'message=', err?.message,
+                                        'currentTime=', video.currentTime,
+                                        'duration=', video.duration,
+                                        'readyState=', video.readyState,
+                                        'networkState=', video.networkState
+                                    );
+                                }}
+                                onStalled={() => {
+                                    const video = internalVideoRefs.current[source.id];
+                                    console.warn('[CanvasContainer] Video stalled:', {
+                                        sourceId: source.id,
+                                        currentTime: video?.currentTime,
+                                        buffered: video?.buffered.length ?
+                                            `${video.buffered.start(0)}-${video.buffered.end(video.buffered.length - 1)}` : 'none',
+                                    });
+                                }}
+                                onWaiting={() => {
+                                    console.log('[CanvasContainer] Video waiting for data:', source.id);
+                                }}
                             />
                         ) : null;
                     })}

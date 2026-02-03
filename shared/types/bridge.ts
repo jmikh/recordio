@@ -2,61 +2,111 @@
  * Bridge Types
  * 
  * Types for communication between extension and website via externally_connectable.
+ * 
+ * Protocol Overview:
+ * 1. Website sends HANDOFF_REQUEST via sendMessage → Extension responds with metadata
+ * 2. Website opens Port via chrome.runtime.connect for streaming
+ * 3. Extension streams video chunks via Port (10MB each to stay under 64MB limit)
+ * 4. Website reconstructs blobs and confirms via HANDOFF_COMPLETE
  */
 
 import type { RawRecording } from './recording';
 
 // ============================================
-// Message Types
+// Message Types (sendMessage-based)
 // ============================================
 
 export const BRIDGE_MSG = {
-    /** Sent by website when it's ready to receive a recording */
-    BRIDGE_READY: 'BRIDGE_READY',
-    /** Sent by extension with the full recording data */
-    HANDOFF_RECORDING: 'HANDOFF_RECORDING',
-    /** Sent by website to confirm storage complete */
+    /** Website → Extension: Request recording metadata */
+    HANDOFF_REQUEST: 'HANDOFF_REQUEST',
+    /** Website → Extension: Confirm storage complete, extension can delete */
     HANDOFF_COMPLETE: 'HANDOFF_COMPLETE',
-    /** Sent on error */
-    HANDOFF_ERROR: 'HANDOFF_ERROR',
 } as const;
 
 export type BridgeMessageType = typeof BRIDGE_MSG[keyof typeof BRIDGE_MSG];
 
 // ============================================
-// Payloads
+// Port Message Types (streaming)
 // ============================================
 
-/** Sent by website when ready */
-export interface BridgeReadyPayload {
+export const PORT_MSG = {
+    /** Website → Extension: Start streaming chunks */
+    START_STREAM: 'START_STREAM',
+    /** Extension → Website: A chunk of video data */
+    CHUNK: 'CHUNK',
+    /** Extension → Website: All chunks sent */
+    STREAM_COMPLETE: 'STREAM_COMPLETE',
+    /** Extension → Website: Streaming error */
+    STREAM_ERROR: 'STREAM_ERROR',
+} as const;
+
+export type PortMessageType = typeof PORT_MSG[keyof typeof PORT_MSG];
+
+/** Port name for video streaming */
+export const HANDOFF_PORT_NAME = 'recordio-handoff';
+
+/** Chunk size for streaming (10MB - safe under 64MB limit) */
+export const CHUNK_SIZE = 10 * 1024 * 1024;
+
+// ============================================
+// Payloads for sendMessage
+// ============================================
+
+/** Website → Extension: Request handoff */
+export interface HandoffRequestPayload {
     recordingId: string;
 }
 
-/** Blob data in a serializable format for message passing */
-export interface SerializedBlobData {
-    buffer: number[];  // Uint8Array converted to number array
-    type: string;      // MIME type
-}
-
-/** Sent by extension with the full recording data */
-export interface HandoffRecordingPayload {
+/** Extension → Website: Direct response to HANDOFF_REQUEST */
+export interface HandoffMetadataResponse {
+    success: true;
     recording: RawRecording;
-    // Blobs are sent as serialized data (Blobs can't be sent through chrome.runtime.sendMessage)
-    screenData: SerializedBlobData;
-    cameraData?: SerializedBlobData;
+    screenVideoSize: number;      // bytes
+    screenVideoType: string;      // MIME type
+    cameraVideoSize?: number;     // bytes (optional)
+    cameraVideoType?: string;     // MIME type (optional)
 }
 
-/** Sent by website to confirm storage complete */
+/** Extension → Website: Error response */
+export interface HandoffErrorResponse {
+    success: false;
+    error: string;
+    code: 'NOT_FOUND' | 'STORAGE_ERROR' | 'UNKNOWN';
+}
+
+export type HandoffRequestResponse = HandoffMetadataResponse | HandoffErrorResponse;
+
+/** Website → Extension: Confirm storage complete */
 export interface HandoffCompletePayload {
     recordingId: string;
     projectId: string;
 }
 
-/** Sent on error */
-export interface HandoffErrorPayload {
+// ============================================
+// Payloads for Port streaming
+// ============================================
+
+/** Website → Extension: Start streaming request */
+export interface StartStreamPayload {
     recordingId: string;
+}
+
+/** Extension → Website: A chunk of video data */
+export interface ChunkPayload {
+    source: 'screen' | 'camera';
+    index: number;
+    total: number;
+    data: number[];  // ArrayBuffer as number[] for structured clone
+}
+
+/** Extension → Website: Stream complete */
+export interface StreamCompletePayload {
+    recordingId: string;
+}
+
+/** Extension → Website: Stream error */
+export interface StreamErrorPayload {
     error: string;
-    code: 'NOT_FOUND' | 'STORAGE_ERROR' | 'TIMEOUT' | 'UNKNOWN';
 }
 
 // ============================================

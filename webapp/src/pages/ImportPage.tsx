@@ -6,11 +6,19 @@ import { LogoLink } from '@shared/components';
 type ImportStatus =
     | 'init'
     | 'receiving'
+    | 'streaming'
     | 'storing'
     | 'success'
     | 'error-no-id'
     | 'error-extension'
     | 'error-storage';
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 export function ImportPage() {
     const [status, setStatus] = useState<ImportStatus>('init');
@@ -41,30 +49,19 @@ export function ImportPage() {
 
     // Handle handoff state changes
     useEffect(() => {
-        if (state.status === 'success' && state.data) {
+        // Update status based on bridge state
+        if (state.status === 'streaming') {
+            setStatus('streaming');
+        }
+
+        if (state.status === 'success' && state.recording && state.screenVideo) {
             console.log('[ImportPage] Received recording, storing...');
             setStatus('storing');
 
-            // Reconstruct Blobs from serialized data
-            const screenBlob = new Blob(
-                [new Uint8Array(state.data.screenData.buffer)],
-                { type: state.data.screenData.type }
-            );
-
-            let cameraBlob: Blob | undefined;
-            if (state.data.cameraData) {
-                cameraBlob = new Blob(
-                    [new Uint8Array(state.data.cameraData.buffer)],
-                    { type: state.data.cameraData.type }
-                );
-            }
-
-            console.log('[ImportPage] Reconstructed blobs - screen:', screenBlob.size);
-
             importFromRawRecording(
-                state.data.recording,
-                screenBlob,
-                cameraBlob
+                state.recording,
+                state.screenVideo,
+                state.cameraVideo || undefined
             )
                 .then((project) => {
                     console.log('[ImportPage] Stored as project:', project.id);
@@ -92,7 +89,8 @@ export function ImportPage() {
     const getStatusMessage = () => {
         switch (status) {
             case 'init': return 'Initializing...';
-            case 'receiving': return 'Receiving recording from extension...';
+            case 'receiving': return 'Connecting to extension...';
+            case 'streaming': return 'Transferring recording...';
             case 'storing': return 'Saving to your library...';
             case 'success': return 'Success! Opening editor...';
             case 'error-no-id': return 'No recording ID provided';
@@ -102,12 +100,18 @@ export function ImportPage() {
     };
 
     const isError = status.startsWith('error');
+    const progress = state.progress;
+
+    // Calculate progress percentage
+    const progressPercent = progress && progress.totalBytes > 0
+        ? Math.round((progress.bytesReceived / progress.totalBytes) * 100)
+        : 0;
 
     return (
         <div className="min-h-screen bg-surface-base text-text-main flex flex-col items-center justify-center">
             <LogoLink />
 
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center max-w-md">
                 <div className={`text-lg ${isError ? 'text-red-400' : 'text-text-main'}`}>
                     {getStatusMessage()}
                 </div>
@@ -118,7 +122,37 @@ export function ImportPage() {
                     </div>
                 )}
 
-                {!isError && status !== 'success' && (
+                {/* Progress bar for streaming */}
+                {status === 'streaming' && progress && (
+                    <div className="mt-6 w-full">
+                        {/* Progress bar */}
+                        <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary transition-all duration-300 ease-out"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+
+                        {/* Progress text */}
+                        <div className="mt-2 flex justify-between text-sm text-text-muted">
+                            <span>{progressPercent}%</span>
+                            <span>
+                                {formatBytes(progress.bytesReceived)} / {formatBytes(progress.totalBytes)}
+                            </span>
+                        </div>
+
+                        {/* Chunk info */}
+                        {progress.totalChunks > 0 && (
+                            <div className="mt-1 text-xs text-text-muted">
+                                {progress.source === 'screen' ? '📺 Screen' : '📹 Camera'} •
+                                Chunk {progress.chunksReceived} of {progress.totalChunks}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Loading spinner for non-streaming states */}
+                {!isError && status !== 'success' && status !== 'streaming' && (
                     <div className="mt-4">
                         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
                     </div>
