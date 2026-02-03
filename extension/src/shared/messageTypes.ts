@@ -8,7 +8,7 @@
  * Message flow: Popup → Background → (Offscreen|Controller) + Content
  */
 
-import type { BaseEvent } from '../core/types';
+import type { BaseEvent, Size } from '../core/types';
 
 export type RecorderMode = 'screen' | 'tab' | 'window';
 
@@ -76,7 +76,7 @@ export interface RecordingConfig {
     hasCamera: boolean;
     audioDeviceId?: string; // Microphone
     videoDeviceId?: string; // Camera
-    tabViewportSize?: import('../../core/types').Size; // Target dimensions (for window mode calibration)
+    tabViewportSize?: Size; // Target dimensions (for window mode calibration)
     streamId?: string; // Required for tab recording
     sourceId?: string; // For desktop capture (window/desktop mode)
     sourceName?: string; // Human readable name (e.g. Tab Title)
