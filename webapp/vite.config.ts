@@ -20,7 +20,7 @@ export default defineConfig({
     },
 
     build: {
-        outDir: resolve(__dirname, '../dist-webapp'),
+        outDir: resolve(__dirname, 'dist'),
         emptyOutDir: true,
         rollupOptions: {
             input: {
