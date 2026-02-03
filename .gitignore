@@ -19,6 +19,8 @@ dist-ssr
 .gemini/*
 supabase/.temp/*
 
+dist.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
