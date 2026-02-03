@@ -10,7 +10,7 @@ import {
     type HandoffRecordingPayload,
 } from '../types/bridge';
 
-const EXTENSION_ID = 'gmgegalidbjkafmoiajfiedkmhifoela';
+const EXTENSION_ID = 'lpponocoanighhephabalkejmdbjlhmi';
 
 export interface HandoffState {
     status: 'idle' | 'detecting' | 'requesting' | 'success' | 'error';
