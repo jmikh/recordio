@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Recordio Controller</title>
+    <style>
+        :root {
+            /* OKLCH Design System Colors */
+            --hue-primary: 290;
+            --hue-secondary: 78;
+            --primary: oklch(0.58 0.19 var(--hue-primary));
+            --secondary: oklch(0.80 0.15 var(--hue-secondary));
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+            /* Prevent scrollbars from markers */
+        }
+
+        .status {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #333;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Calibration Markers */
+        .marker {
+            position: fixed;
+            width: 50px;
+            height: 50px;
+            background-color: var(--primary);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .marker-inner {
+            width: 20px;
+            height: 20px;
+            background-color: var(--secondary);
+        }
+
+        .footer-msg {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #aaa;
+            background-color: rgba(26, 26, 46, 0.9);
+            padding: 10px 0;
+            pointer-events: none;
+            /* Let click passthrough if needed, though it's text */
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Markers -->
+    <div class="marker" style="top: 0; left: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="top: 0; right: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="bottom: 0; left: 0;">
+        <div class="marker-inner"></div>
+    </div>
+    <div class="marker" style="bottom: 0; right: 0;">
+        <div class="marker-inner"></div>
+    </div>
+
+    <div class="status" id="status-container">
+        <!-- Initial Message -->
+        <div id="status-waiting">
+            <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">Click "Share" to start recording</p>
+            <p style="opacity: 0.7;">Select a window or screen in the browser prompt</p>
+        </div>
+
+        <!-- Recording Message (Hidden Initially) -->
+        <div id="status-recording" style="display: none;">
+            <div class="spinner"></div>
+            <p style="font-size: 1.2rem; font-weight: bold; color: #e94560;">Recording in progress...</p>
+        </div>
+    </div>
+
+    <div class="footer-msg">
+        Chrome requires this tab to be opened during the lifetime of the recording
+    </div>
+    <script type="module" src="./controller.ts"></script>
+</body>
+
+</html>
