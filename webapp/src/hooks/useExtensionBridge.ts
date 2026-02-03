@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import {
     BRIDGE_MSG,
     type HandoffRecordingPayload,
-} from '../../shared/types/bridge';
+} from '../types/bridge';
 
 const EXTENSION_ID = 'gmgegalidbjkafmoiajfiedkmhifoela';
 

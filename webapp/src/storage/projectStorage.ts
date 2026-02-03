@@ -435,3 +435,67 @@ export class ProjectStorage {
         });
     }
 }
+
+// ============================================
+// Import from RawRecording (for handoff flow)
+// ============================================
+
+import type { SourceMetadata, UserEvents } from '../core/types';
+import { ProjectImpl } from '../core/Project';
+
+interface RawRecording {
+    id: string;
+    name: string;
+    timestamp: number;
+    screenSource: SourceMetadata;
+    cameraSource?: SourceMetadata;
+    userEvents: UserEvents;
+}
+
+export async function importFromRawRecording(
+    recording: RawRecording,
+    screenBlob: Blob,
+    cameraBlob?: Blob
+): Promise<Project> {
+    const projectId = `proj-${recording.id}`;
+
+    // 1. Save blobs
+    const screenBlobId = `rec-${projectId}-screen`;
+    await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
+
+    let cameraBlobId: string | undefined;
+    if (cameraBlob) {
+        cameraBlobId = `rec-${projectId}-camera`;
+        await ProjectStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
+    }
+
+    // 2. Build source metadata with new storage URLs
+    const screenSource: SourceMetadata = {
+        ...recording.screenSource,
+        id: `src-${projectId}-screen`,
+        storageUrl: `recordio-blob://${screenBlobId}`,
+    };
+
+    let cameraSource: SourceMetadata | undefined;
+    if (recording.cameraSource && cameraBlobId) {
+        cameraSource = {
+            ...recording.cameraSource,
+            id: `src-${projectId}-camera`,
+            storageUrl: `recordio-blob://${cameraBlobId}`,
+        };
+    }
+
+    // 3. Create project with default settings
+    const project = ProjectImpl.createFromSource(
+        projectId,
+        screenSource,
+        recording.userEvents,
+        cameraSource
+    );
+
+    // 4. Save project
+    await ProjectStorage.saveProject(project);
+
+    console.log('[ProjectStorage] Imported recording as project:', projectId);
+    return project;
+}

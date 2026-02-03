@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { getAllProjects, deleteProject } from '../storage/projectStorage';
-import type { Project } from '../../shared/types';
-import { ProjectCard } from '../../components/ui/ProjectCard';
-import { LogoLink } from '../../components/ui/LogoLink';
+import { ProjectStorage } from '../storage/projectStorage';
+import type { Project } from '../types';
+import { ProjectCard } from '../components/ui/ProjectCard';
+import { LogoLink } from '../components/ui/LogoLink';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -14,9 +14,9 @@ export function DashboardPage() {
 
     const loadProjects = async () => {
         try {
-            const allProjects = await getAllProjects();
+            const allProjects = await ProjectStorage.listProjects();
             // Sort by updatedAt descending
-            allProjects.sort((a, b) =>
+            allProjects.sort((a: Project, b: Project) =>
                 new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
             );
             setProjects(allProjects);
@@ -35,7 +35,7 @@ export function DashboardPage() {
         if (!confirm('Are you sure you want to delete this project?')) return;
 
         try {
-            await deleteProject(projectId);
+            await ProjectStorage.deleteProject(projectId);
             setProjects(prev => prev.filter(p => p.id !== projectId));
         } catch (error) {
             console.error('Failed to delete project:', error);

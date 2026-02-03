@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording } from '../storage/projectStorage';
-import { LogoLink } from '../../components/ui/LogoLink';
+import { LogoLink } from '../components/ui/LogoLink';
 
 type ImportStatus =
     | 'init'
