@@ -88,14 +88,15 @@ export function ImportPage() {
 
     const getStatusMessage = () => {
         switch (status) {
-            case 'init': return 'Initializing...';
-            case 'receiving': return 'Connecting to extension...';
-            case 'streaming': return 'Transferring recording...';
-            case 'storing': return 'Saving to your library...';
-            case 'success': return 'Success! Opening editor...';
+            case 'init':
+            case 'receiving':
+            case 'streaming':
+            case 'storing':
+                return 'Initializing Project';
+            case 'success': return 'Opening Editor...';
             case 'error-no-id': return 'No recording ID provided';
-            case 'error-extension': return 'Failed to receive recording';
-            case 'error-storage': return 'Failed to save recording';
+            case 'error-extension': return 'Failed to initialize project';
+            case 'error-storage': return 'Failed to save project';
         }
     };
 
@@ -122,10 +123,9 @@ export function ImportPage() {
                     </div>
                 )}
 
-                {/* Progress bar for streaming */}
-                {status === 'streaming' && progress && (
+                {/* Progress bar */}
+                {!isError && status !== 'success' && (
                     <div className="mt-6 w-full">
-                        {/* Progress bar */}
                         <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-primary transition-all duration-300 ease-out"
@@ -133,30 +133,13 @@ export function ImportPage() {
                             />
                         </div>
 
-                        {/* Progress text */}
-                        <div className="mt-2 flex justify-between text-sm text-text-muted">
-                            <span>{progressPercent}%</span>
-                            <span>
-                                {formatBytes(progress.bytesReceived)} / {formatBytes(progress.totalBytes)}
-                            </span>
+                        <div className="mt-2 text-sm text-text-muted text-center">
+                            {progressPercent}%
                         </div>
-
-                        {/* Chunk info */}
-                        {progress.totalChunks > 0 && (
-                            <div className="mt-1 text-xs text-text-muted">
-                                {progress.source === 'screen' ? '📺 Screen' : '📹 Camera'} •
-                                Chunk {progress.chunksReceived} of {progress.totalChunks}
-                            </div>
-                        )}
                     </div>
                 )}
 
-                {/* Loading spinner for non-streaming states */}
-                {!isError && status !== 'success' && status !== 'streaming' && (
-                    <div className="mt-4">
-                        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-                    </div>
-                )}
+
 
                 {isError && (
                     <button

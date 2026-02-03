@@ -1,31 +1,27 @@
 
 // ==========================================
-// CONFIG & SHARED
+// SHARED TYPES (from @shared/types)
 // ==========================================
 
-export type ID = string;
+// Re-export core primitives from shared
+export type { ID, TimeMs, Point, Size, Rect } from '@shared/types/core';
+export type {
+    BaseEvent,
+    KeyboardEvent,
+    HoveredCardEvent,
+    DragEvent,
+    UserEvents
+} from '@shared/types/events';
+export { EventType } from '@shared/types/events';
+export type { SourceMetadata } from '@shared/types/source';
 
-/**
- * Represents time in Milliseconds.
- * All time values in the core engine use this unit.
- */
-export type TimeMs = number;
-
-export interface Point {
-    x: number;
-    y: number;
-}
-
-export interface Size {
-    width: number;
-    height: number;
-}
-
-// The rect point represents the top-left corner.
-export interface Rect extends Point, Size { }
+// Import for use within this file
+import type { ID, TimeMs, Point, Size, Rect } from '@shared/types/core';
+import type { UserEvents } from '@shared/types/events';
+import type { SourceMetadata } from '@shared/types/source';
 
 // ==========================================
-// PROJECT
+// PROJECT (webapp-specific)
 // ==========================================
 
 /**
@@ -194,74 +190,9 @@ export interface ProjectSettings {
 }
 
 // ==========================================
-// SOURCE
-// ==========================================
-
-/**
- * Represents a raw media asset (File) that has been imported.
- */
-export interface SourceMetadata {
-    id: ID;
-    type: 'video' | 'audio' | 'image';
-    /**
-     * Persistent URL to the media file (recordio-blob:// protocol).
-     * This is the storage reference that survives page reloads.
-     */
-    storageUrl: string;
-    /**
-     * Transient runtime URL (blob:// protocol).
-     * Populated on load, used for playback. Never persisted.
-     */
-    runtimeUrl?: string;
-
-    // Metadata
-    /** Total duration of the source file in milliseconds */
-    durationMs: TimeMs;
-    size: Size;
-    /** Frames Per Second (Video only) */
-    fps?: number;
-    hasAudio: boolean;
-    has_microphone: boolean;
-    fileSizeBytes?: number;
-    createdAt?: number;
-    /** Human readable name of the source (e.g. Tab Title or "Desktop") */
-    name: string;
-}
-
-// ==========================================
-// EXTERNAL USER EVENTS
-// ==========================================
-
-/**
- * User interaction events recorded during screen capture.
- * Embedded directly in the Project object.
- */
-export interface UserEvents {
-    mouseClicks: BaseEvent[];
-    mousePositions: BaseEvent[];
-    keyboardEvents: KeyboardEvent[];
-    drags: DragEvent[];
-    scrolls: BaseEvent[];
-    typingEvents: BaseEvent[];
-    urlChanges: BaseEvent[];
-    hoveredCards: HoveredCardEvent[];
-
-    /**
-     * Pre-sorted aggregate of all non-mouse-position events (clicks, typing, drags, scrolls, urlChanges, hoveredCards).
-     * Computed at runtime when events are loaded in useProjectStore. NOT persisted to storage.
-     */
-    allEvents: BaseEvent[];
-}
-
-
-// ==========================================
 // TIMELINE
 // ==========================================
 
-/**
- * A Timeline represents the sequence of events.
- * It contains a single Recording and multiple OutputWindows.
- */
 /**
  * Represents a focus area for zoom targeting.
  * Stored in Timeline and computed from user events.
@@ -348,63 +279,6 @@ export interface SpotlightAction {
     reason?: string;
 }
 
-/**
- * Represents a drag action.
- */
-export interface DragEvent extends BaseEvent {
-    type: typeof EventType.MOUSEDRAG;
-    endTime: number;
-}
-
-// ==========================================
-// USER EVENTS DURING RECORDING
-// ==========================================
-
-// Size is already defined above
-
-// Size is already defined above
-
-export const EventType = {
-    CLICK: 'click',
-    MOUSEPOS: 'mousepos',
-    URLCHANGE: 'urlchange',
-    KEYDOWN: 'keydown',
-    HOVER: 'hover',
-    MOUSEDRAG: 'mousedrag',
-    SCROLL: 'scroll',
-    TYPING: 'typing',
-    HOVERED_CARD: 'hoveredCard'
-} as const;
-
-export type EventType = typeof EventType[keyof typeof EventType];
-
-export interface BaseEvent {
-    type: EventType;
-    timestamp: number;
-    mousePos: Point;
-    targetRect?: Rect;
-    endTime?: number;
-}
-
-// KeyboardEvent has unique fields beyond BaseEvent
-export interface KeyboardEvent extends BaseEvent {
-    type: typeof EventType.KEYDOWN;
-    key: string;
-    code: string;
-    ctrlKey: boolean;
-    metaKey: boolean;
-    shiftKey: boolean;
-    altKey: boolean;
-    tagName?: string;
-}
-
-// HoveredCardEvent has unique cornerRadius field
-export interface HoveredCardEvent extends BaseEvent {
-    type: typeof EventType.HOVERED_CARD;
-    targetRect: Rect;
-    endTime: number;
-    cornerRadius: [number, number, number, number]; // [tl, tr, br, bl]
-}
 
 export type BackgroundType = 'solid' | 'image';
 
