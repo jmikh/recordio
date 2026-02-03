@@ -1,12 +1,13 @@
 
 import type { ID, Project } from '../core/types';
+import { EDITOR_ORIGIN_DEV, EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 // Use different DB for website vs extension
-// Website (localhost:3001 or editor.recordio.site) uses 'recordio-editor'
+// Website (localhost:3001 or app.recordio.cc) uses 'recordio-editor'
 // Extension uses 'RecordioDB'
 const isWebsite = typeof window !== 'undefined' &&
-    (window.location.origin.includes('localhost:3001') ||
-        window.location.origin.includes('editor.recordio.site'));
+    (window.location.origin === EDITOR_ORIGIN_DEV ||
+        window.location.origin === EDITOR_ORIGIN_PROD);
 
 const DB_NAME = isWebsite ? 'recordio-editor' : 'RecordioDB';
 const DB_VERSION = 4; // Added customBackgrounds store

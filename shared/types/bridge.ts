@@ -120,22 +120,18 @@ export const IMPORT_PATH = '/import';
 export const HANDOFF_TIMEOUT_MS = 30000;
 
 /** Origin of the editor website (production) */
-export const EDITOR_ORIGIN_PROD = 'https://editor.recordio.site';
+export const EDITOR_ORIGIN_PROD = 'https://app.recordio.cc';
 
 /** Origin of the editor website (development) */
 export const EDITOR_ORIGIN_DEV = 'http://localhost:3001';
 
 /** Get the appropriate editor origin based on environment */
 export function getEditorOrigin(): string {
-    // In development, use localhost
-    // In production, use the real domain
-    // We detect by checking if we're in a dev build
-    if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {
-        const manifest = chrome.runtime.getManifest();
-        // Development builds typically don't have update_url
-        if (!manifest.update_url) {
-            return EDITOR_ORIGIN_DEV;
-        }
+    // Use Vite's build mode to determine environment:
+    // - `npm run dev` or `npm run build:extension:dev` → import.meta.env.DEV = true
+    // - `npm run build:extension` → import.meta.env.PROD = true
+    if (import.meta.env.DEV) {
+        return EDITOR_ORIGIN_DEV;
     }
     return EDITOR_ORIGIN_PROD;
 }
