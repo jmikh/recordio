@@ -108,7 +108,7 @@ export function ImportPage() {
         : 0;
 
     return (
-        <div className="min-h-screen bg-surface-base text-text-main flex flex-col items-center justify-center">
+        <div className="min-h-screen bg-surface-body text-text-main flex flex-col items-center justify-center">
             <LogoLink />
 
             <div className="mt-8 text-center max-w-md">
