@@ -29,3 +29,6 @@ supabase/.temp/*
 *.njsproj
 *.sln
 *.sw?
+
+# CDN assets (uploaded to R2)
+cdn/

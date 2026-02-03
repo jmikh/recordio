@@ -7,6 +7,18 @@ export default defineConfig({
 
     root: __dirname,
 
+    // Configure ONNX Runtime WASM handling
+    optimizeDeps: {
+        exclude: ['onnxruntime-web', '@huggingface/transformers'],
+    },
+
+    worker: {
+        format: 'es',
+    },
+
+    // Ensure WASM files are handled correctly
+    assetsInclude: ['**/*.wasm'],
+
     resolve: {
         alias: {
             '@': resolve(__dirname, 'src'),

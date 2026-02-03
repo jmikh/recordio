@@ -13,11 +13,8 @@ env.remotePathTemplate = '{model}/';
 // Cache models in browser after download
 env.cacheDir = '.cache/transformers';
 
-// Configure WASM backend - bundle locally since Chrome blocks dynamic .mjs imports
-// @ts-ignore - wasmPaths is not in type definitions
-if (env.backends?.onnx?.wasm) {
-    env.backends.onnx.wasm.wasmPaths = '/wasm/';
-}
+// WASM files are loaded from the default jsdelivr CDN
+// (R2 doesn't support the CORS/Content-Type headers needed for dynamic .mjs imports)
 
 /**
  * Service for transcribing webcam audio using Hugging Face Whisper models.
