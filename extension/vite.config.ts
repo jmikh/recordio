@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => ({
     // Chrome extensions require relative paths for assets
     base: './',
     build: {
-        outDir: resolve(__dirname, '../dist'),
+        outDir: resolve(__dirname, 'dist'),
         minify: mode === 'development' ? false : 'esbuild',
         sourcemap: mode === 'development',
         rollupOptions: {
