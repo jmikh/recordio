@@ -1,5 +1,5 @@
 import { type ComponentProps } from 'react';
-import logoFull from '../../assets/fulllogo.png';
+import logoFull from '@shared/assets/fulllogo.png';
 
 interface LogoProps extends ComponentProps<'a'> {
     className?: string;

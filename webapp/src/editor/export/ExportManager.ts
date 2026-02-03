@@ -5,7 +5,7 @@ import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import type { Project, SourceMetadata } from '../../core/types';
-import fullLogoPng from '../../assets/fulllogo.png';
+import fullLogoPng from '@shared/assets/fulllogo.png';
 
 export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
 
