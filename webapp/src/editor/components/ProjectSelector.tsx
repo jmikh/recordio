@@ -3,9 +3,9 @@ import { ProjectStorage } from '../../storage/projectStorage';
 import type { Project } from '../../core/types';
 import { ProjectDebugImporter } from '../debug';
 
-import { ProjectCard } from '../../components/ui/ProjectCard';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { LogoLink } from '../../components/ui/LogoLink';
+import { ProjectCard } from '../../components/ProjectCard';
+import { PrimaryButton } from '@shared/components';
+import { LogoLink } from '@shared/components';
 
 interface ProjectSelectorProps {
     error?: string;

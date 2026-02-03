@@ -3,18 +3,18 @@ import { useProjectStore, useProjectData, useProjectHistory } from '../../stores
 import { useUIStore } from '../../stores/useUIStore';
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality } from '../../export/ExportManager';
-import { Dropdown } from '../../../components/ui/Dropdown';
-import type { DropdownOption } from '../../../components/ui/Dropdown';
-import { PrimaryButton } from '../../../components/ui/PrimaryButton';
+import { Dropdown } from '@shared/components';
+import type { DropdownOption } from '@shared/components';
+import { PrimaryButton } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
-import { Button } from '../../../components/ui/Button';
-import { BugReportModal } from '../../../components/ui/BugReportModal';
+import { Button } from '@shared/components';
+import { BugReportModal } from '../../../components/BugReportModal';
 import { AuthModal } from './AuthModal';
 import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
-import { LogoLink } from '../../../components/ui/LogoLink';
+import { LogoLink } from '@shared/components';
 import { trackExportCompleted } from '../../../core/analytics';
 
 const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [

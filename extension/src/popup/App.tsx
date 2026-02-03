@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
-import { Button } from '../components/ui';
+import { Button } from '@shared/components';
 import { MdBugReport, MdArrowBack } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
 import { FiEyeOff } from 'react-icons/fi';
-import { BugReportModal } from '../components/ui/BugReportModal';
-import { LogoLink } from '../components/ui/LogoLink';
+import { BugReportModal } from '../components/BugReportModal';
+import { LogoLink } from '@shared/components/LogoLink';
 import permissionGuide from '../assets/permission-guide.jpg';
 import { getEditorOrigin } from '@shared/types/bridge';
 

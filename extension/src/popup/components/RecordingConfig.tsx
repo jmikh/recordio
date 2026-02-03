@@ -1,6 +1,6 @@
 import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
-import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '../../components/ui';
+import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
 import { MdMic, MdVideocam } from 'react-icons/md';
 

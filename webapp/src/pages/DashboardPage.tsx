@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
-import { ProjectCard } from '../components/ui/ProjectCard';
-import { LogoLink } from '../components/ui/LogoLink';
+import { ProjectCard } from '../components/ProjectCard';
+import { LogoLink } from '@shared/components';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);

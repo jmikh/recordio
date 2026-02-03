@@ -3,15 +3,15 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../core/types';
-import { Slider } from '../../../components/ui/Slider';
-import { Toggle } from '../../../components/ui/Toggle';
+import { Slider } from '@shared/components';
+import { Toggle } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { TranscriptionService } from '../../../core/TranscriptionService';
-import { ProgressModal } from '../../../components/ui/ProgressModal';
-import { PrimaryButton } from '../../../components/ui/PrimaryButton';
-import { Notice } from '../../../components/ui/Notice';
-import { XButton } from '../../../components/ui/XButton';
+import { ProgressModal } from '@shared/components';
+import { PrimaryButton } from '@shared/components';
+import { Notice } from '@shared/components';
+import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
 
 /**

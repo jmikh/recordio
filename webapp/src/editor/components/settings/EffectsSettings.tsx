@@ -1,9 +1,9 @@
 
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '../../../components/ui/Slider';
-import { MultiToggle } from '../../../components/ui/MultiToggle';
-import { Toggle } from '../../../components/ui/Toggle';
+import { Slider } from '@shared/components';
+import { MultiToggle } from '@shared/components';
+import { Toggle } from '@shared/components';
 
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);

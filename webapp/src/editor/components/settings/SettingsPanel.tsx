@@ -13,7 +13,7 @@ type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions';
 
 
 
-import { Scrollbar } from '../../../components/ui/Scrollbar';
+import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder } from 'react-icons/tb';
 

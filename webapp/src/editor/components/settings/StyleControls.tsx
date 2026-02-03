@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { createPortal } from 'react-dom';
-import { Slider } from '../../../components/ui/Slider';
-import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { Slider } from '@shared/components';
+import { MultiToggle } from '@shared/components';
 import { ColorSettings } from './ColorSettings';
 
 export interface StyleSettings {

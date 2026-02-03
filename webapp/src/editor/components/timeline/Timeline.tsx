@@ -16,7 +16,7 @@ import { TimelineHeaderCell } from './TimelineHeaderCell';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
-import { Scrollbar } from '../../../components/ui/Scrollbar';
+import { Scrollbar } from '@shared/components';
 import { useUIStore } from '../../stores/useUIStore';
 
 

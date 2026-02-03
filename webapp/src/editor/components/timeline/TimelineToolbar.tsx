@@ -4,10 +4,10 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md';
-import { Slider } from '../../../components/ui/Slider';
-import { Dropdown } from '../../../components/ui/Dropdown';
-import type { DropdownOption } from '../../../components/ui/Dropdown';
-import { Button } from '../../../components/ui/Button';
+import { Slider } from '@shared/components';
+import { Dropdown } from '@shared/components';
+import type { DropdownOption } from '@shared/components';
+import { Button } from '@shared/components';
 
 
 interface TimelineToolbarProps {

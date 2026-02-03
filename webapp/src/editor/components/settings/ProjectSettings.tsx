@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import type { Project } from '../../../core/types';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { ProjectCard } from '../../../components/ui/ProjectCard';
-import { Button } from '../../../components/ui/Button';
-import { XButton } from '../../../components/ui/XButton';
+import { ProjectCard } from '../../../components/ProjectCard';
+import { Button } from '@shared/components';
+import { XButton } from '@shared/components';
 
 export const ProjectSettings = () => {
     const { project: activeProject, isSaving } = useProjectStore();

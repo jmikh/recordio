@@ -5,8 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
-import { XButton } from '../../../components/ui/XButton';
-import { Slider } from '../../../components/ui/Slider';
+import { XButton } from '@shared/components';
+import { Slider } from '@shared/components';
 import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
 
 // Helper to convert N, NE, etc. to degrees

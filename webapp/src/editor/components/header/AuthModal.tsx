@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { AuthManager } from '../../../auth/AuthManager';
-import { XButton } from '../../../components/ui/XButton';
+import { XButton } from '@shared/components';
 
 interface AuthModalProps {
     isOpen: boolean;

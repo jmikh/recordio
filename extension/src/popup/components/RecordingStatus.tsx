@@ -1,4 +1,4 @@
-import { PrimaryButton } from '../../components/ui';
+import { PrimaryButton } from '@shared/components';
 
 interface RecordingStatusProps {
     recordingDuration: number;

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FaCrown, FaCheck, FaTimes } from 'react-icons/fa';
-import { PrimaryButton } from '../../../components/ui/PrimaryButton';
-import { Button } from '../../../components/ui/Button';
-import { XButton } from '../../../components/ui/XButton';
+import { PrimaryButton } from '@shared/components';
+import { Button } from '@shared/components';
+import { XButton } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
 import { supabase } from '../../../auth/AuthManager';

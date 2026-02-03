@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
-import { MultiToggle } from '../../../components/ui/MultiToggle';
+import { MultiToggle } from '@shared/components';
 import { usePaletteStore } from '../../stores/usePaletteStore';
 
 

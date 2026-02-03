@@ -4,9 +4,9 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 import { BoundingBox } from './BoundingBox';
-import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
+import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { SecondaryButton } from '../../../components/ui/SecondaryButton';
+import { SecondaryButton } from '@shared/components';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';

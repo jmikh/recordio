@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 import { BoundingBox, type CornerRadii } from './BoundingBox';
-import { DimmedOverlay } from '../../../components/ui/DimmedOverlay';
+import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 

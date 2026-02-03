@@ -1,10 +1,7 @@
 import { useState, useRef } from 'react';
 import { MdBugReport } from 'react-icons/md';
-import { captureBugReport } from '../../utils/sentry';
-import { Button } from './Button';
-import { PrimaryButton } from './PrimaryButton';
-import { XButton } from './XButton';
-import { Scrollbar } from './Scrollbar';
+import { captureBugReport } from '../utils/sentry';
+import { Button, PrimaryButton, XButton, Scrollbar } from '@shared/components';
 
 interface BugReportModalProps {
     isOpen: boolean;

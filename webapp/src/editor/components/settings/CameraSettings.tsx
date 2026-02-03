@@ -2,11 +2,11 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '../../../components/ui/Slider';
-import { MultiToggle } from '../../../components/ui/MultiToggle';
-import { Toggle } from '../../../components/ui/Toggle';
+import { Slider } from '@shared/components';
+import { MultiToggle } from '@shared/components';
+import { Toggle } from '@shared/components';
 import { LookRightButton } from './LookRightButton';
-import { Notice } from '../../../components/ui/Notice';
+import { Notice } from '@shared/components';
 import { FaCheck } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
 
