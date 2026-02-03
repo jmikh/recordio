@@ -13,6 +13,13 @@ import { initSentry } from '../../utils/sentry';
 import { trackRecordingCompleted } from '../../core/analytics';
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
+import {
+    BRIDGE_MSG,
+    buildImportUrl,
+    type BridgeReadyPayload,
+    type HandoffCompletePayload,
+} from '../../shared/types/bridge';
+import type { RawRecording } from '../../shared/types/recording';
 
 // Initialize Sentry for error tracking
 initSentry('background');
@@ -545,9 +552,9 @@ async function handleStopSession(sendResponse: Function) {
                 is_pro: userState.isPro || false,
             });
 
-            // Open editor
-            const editorUrl = chrome.runtime.getURL('src/editor/index.html') + `?projectId=${finalSessionId || ''}`;
-            chrome.tabs.create({ url: editorUrl });
+            // Open website import page instead of extension editor
+            const importUrl = buildImportUrl(finalSessionId || '');
+            chrome.tabs.create({ url: importUrl });
         } catch (e) {
             console.error("Failed to stop video recording: ", e);
         }
@@ -632,3 +639,127 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     })();
     return true; // We always return true because of the async wrapper
 });
+
+// ============================================
+// External Message Handler (from website)
+// ============================================
+
+import { ProjectStorage } from '../../storage/projectStorage';
+
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    console.log('[Background] External message:', message.type, 'from:', sender.origin);
+
+    (async () => {
+        switch (message.type) {
+            case BRIDGE_MSG.BRIDGE_READY:
+                await handleBridgeReady(message.payload as BridgeReadyPayload, sendResponse);
+                break;
+
+            case BRIDGE_MSG.HANDOFF_COMPLETE:
+                await handleHandoffComplete(message.payload as HandoffCompletePayload);
+                sendResponse({ success: true });
+                break;
+
+            default:
+                sendResponse({ error: 'Unknown message type' });
+        }
+    })();
+
+    return true; // Async response
+});
+
+async function handleBridgeReady(payload: BridgeReadyPayload, sendResponse: Function) {
+    const { recordingId } = payload;
+    console.log('[Background] Bridge ready, fetching recording:', recordingId);
+
+    try {
+        // Load project from extension's ProjectStorage (raw, without hydration)
+        // Service workers can't use URL.createObjectURL, so we use loadProjectRaw
+        const project = await ProjectStorage.loadProjectRaw(recordingId);
+
+        if (!project) {
+            console.error('[Background] Recording not found:', recordingId);
+            sendResponse({
+                type: BRIDGE_MSG.HANDOFF_ERROR,
+                payload: {
+                    recordingId,
+                    error: 'Recording not found',
+                    code: 'NOT_FOUND',
+                },
+            });
+            return;
+        }
+
+        // Get the screen blob
+        const screenBlobId = project.screenSource.storageUrl.replace('recordio-blob://', '');
+        const screenBlob = await ProjectStorage.getRecordingBlob(screenBlobId);
+
+        if (!screenBlob) {
+            throw new Error('Screen blob not found');
+        }
+
+        // Get camera blob if exists
+        let cameraBlob: Blob | undefined;
+        if (project.cameraSource?.storageUrl) {
+            const cameraBlobId = project.cameraSource.storageUrl.replace('recordio-blob://', '');
+            cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
+        }
+
+        // Build RawRecording from Project
+        const rawRecording: RawRecording = {
+            id: recordingId,
+            name: project.name,
+            timestamp: project.createdAt.getTime(),
+            screenSource: project.screenSource,
+            cameraSource: project.cameraSource,
+            userEvents: project.userEvents,
+        };
+
+        // Convert Blobs to ArrayBuffers for message passing
+        // (Blobs cannot be sent through chrome.runtime.sendMessage)
+        const screenArrayBuffer = await screenBlob.arrayBuffer();
+        const cameraArrayBuffer = cameraBlob ? await cameraBlob.arrayBuffer() : undefined;
+
+        console.log('[Background] Sending recording to website:', recordingId,
+            'screen size:', screenArrayBuffer.byteLength,
+            'camera size:', cameraArrayBuffer?.byteLength || 'none');
+
+        sendResponse({
+            type: BRIDGE_MSG.HANDOFF_RECORDING,
+            payload: {
+                recording: rawRecording,
+                screenData: {
+                    buffer: Array.from(new Uint8Array(screenArrayBuffer)),
+                    type: screenBlob.type,
+                },
+                cameraData: cameraArrayBuffer ? {
+                    buffer: Array.from(new Uint8Array(cameraArrayBuffer)),
+                    type: cameraBlob!.type,
+                } : undefined,
+            },
+        });
+    } catch (error) {
+        console.error('[Background] Error fetching recording:', error);
+        sendResponse({
+            type: BRIDGE_MSG.HANDOFF_ERROR,
+            payload: {
+                recordingId,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                code: 'STORAGE_ERROR',
+            },
+        });
+    }
+}
+
+async function handleHandoffComplete(payload: HandoffCompletePayload) {
+    const { recordingId } = payload;
+    console.log('[Background] Handoff complete, cleaning up extension storage:', recordingId);
+
+    try {
+        // Delete from extension storage after successful handoff
+        await ProjectStorage.deleteProject(recordingId);
+        console.log('[Background] Deleted project from extension storage:', recordingId);
+    } catch (error) {
+        console.error('[Background] Failed to delete project:', error);
+    }
+}

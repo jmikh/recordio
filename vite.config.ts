@@ -21,9 +21,9 @@ export default defineConfig(({ mode }) => ({
     sourcemap: mode === 'development',
     rollupOptions: {
       input: {
-        editor: resolve(__dirname, 'src/editor/index.html'),
+        // Editor is now served from the website (editor.recordio.site)
+        // Only build recording-related pages for the extension
         offscreen: resolve(__dirname, 'src/recording/offscreen/offscreen.html'),
-
         controller: resolve(__dirname, 'src/recording/controller/controller.html')
       },
       output: {},

@@ -9,6 +9,7 @@ import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../../components/ui/BugReportModal';
 import { LogoLink } from '../../components/ui/LogoLink';
 import permissionGuide from '../../assets/permission-guide.jpg';
+import { getEditorOrigin } from '../../shared/types/bridge';
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
@@ -279,7 +280,9 @@ function App() {
   };
 
   const openEditor = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/editor/index.html') });
+    // Open the website editor (not the extension page)
+    // Uses getEditorOrigin() which detects dev mode via manifest.update_url
+    chrome.tabs.create({ url: getEditorOrigin() });
   };
 
   const handleBlurMode = async () => {

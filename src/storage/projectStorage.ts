@@ -1,9 +1,14 @@
 
 import type { ID, Project } from '../core/types';
 
+// Use different DB for website vs extension
+// Website (localhost:3001 or editor.recordio.site) uses 'recordio-editor'
+// Extension uses 'RecordioDB'
+const isWebsite = typeof window !== 'undefined' &&
+    (window.location.origin.includes('localhost:3001') ||
+        window.location.origin.includes('editor.recordio.site'));
 
-
-const DB_NAME = 'RecordioDB';
+const DB_NAME = isWebsite ? 'recordio-editor' : 'RecordioDB';
 const DB_VERSION = 4; // Added customBackgrounds store
 
 /**
@@ -200,6 +205,24 @@ export class ProjectStorage {
         }
 
         return project;
+    }
+
+    /**
+     * Loads a project WITHOUT hydrating runtimeUrls.
+     * Use this in service workers where URL.createObjectURL is not available.
+     */
+    static async loadProjectRaw(projectId: ID): Promise<Project | null> {
+        const db = await this.getDB();
+
+        const projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.get(projectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+
+        return projectRaw || null;
     }
 
     /**

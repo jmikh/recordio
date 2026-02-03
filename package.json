@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:editor-web": "vite --config vite.config.editor-web.ts",
     "build": "tsc -b && vite build",
     "build:dev": "tsc -b && vite build --mode development",
+    "build:editor-web": "tsc -b && vite build --config vite.config.editor-web.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
