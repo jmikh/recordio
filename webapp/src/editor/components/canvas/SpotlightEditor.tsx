@@ -3,7 +3,7 @@ import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
-import { BoundingBox, type CornerRadii } from './BoundingBox';
+import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
@@ -282,7 +282,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             <BoundingBox
                 rect={currentOutputRect}
                 constraintBounds={screenContentBounds}
-                maintainAspectRatio={false}
                 onChange={handleRectChange}
                 onCommit={onCommit}
                 // Corner radius editing

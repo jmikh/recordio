@@ -118,7 +118,7 @@ export const Slider: React.FC<SliderProps> = ({
         <div className={`w-full ${className}`}>
             {/* Header row: label on left, value on right */}
             {(label || showTooltip) && (
-                <div className="flex justify-between items-center mb-1">
+                <div className="flex justify-between items-center mb-1.5">
                     {label && (
                         <label className="text-sm text-text-muted">
                             {label}

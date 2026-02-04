@@ -7,7 +7,7 @@ import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 import { useClickOutside } from '../../hooks/useClickOutside';
-import { BoundingBox, type CornerRadii } from './BoundingBox';
+import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { SecondaryButton } from '@shared/components';
 

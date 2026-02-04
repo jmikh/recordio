@@ -7,14 +7,8 @@ interface UseResizeLogicProps {
     minSize: number;
     /** Constraint boundaries */
     constraints: ConstraintEdges;
-    /** If true, maintain initial aspect ratio during resize */
-    maintainAspectRatio: boolean;
-    /** Initial aspect ratio (width/height), required when maintainAspectRatio is true */
-    aspectRatio?: number;
-    /** Minimum aspect ratio constraint (width/height) */
-    minAspectRatio?: number;
-    /** Maximum aspect ratio constraint (width/height) */
-    maxAspectRatio?: number;
+    /** Fixed aspect ratio (width/height) - if null/undefined, free-form resizing is allowed */
+    fixedAspectRatio?: number | null;
 }
 
 /**
@@ -42,10 +36,7 @@ export function getResizeDirection(type: InteractionType): ResizeDirection {
 export function useResizeLogic({
     minSize,
     constraints,
-    maintainAspectRatio,
-    aspectRatio,
-    minAspectRatio,
-    maxAspectRatio,
+    fixedAspectRatio,
 }: UseResizeLogicProps) {
     const { minX, minY, maxX, maxY, maxW, maxH } = constraints;
 
@@ -57,11 +48,8 @@ export function useResizeLogic({
         initialRect: Rect,
         deltaX: number,
         _deltaY: number,
+        aspectRatio: number,
     ): Rect => {
-        if (!aspectRatio) {
-            throw new Error('aspectRatio required for locked resize');
-        }
-
         // Calculate proposed width based on direction
         let proposedWidth = initialRect.width;
         if (type === 'se' || type === 'ne') {
@@ -120,7 +108,7 @@ export function useResizeLogic({
         }
 
         return newRect;
-    }, [aspectRatio, minSize, maxW, maxH]);
+    }, [minSize, maxW, maxH]);
 
     /**
      * Calculate new rect after free-form resize (no aspect ratio lock)
@@ -165,25 +153,6 @@ export function useResizeLogic({
             if (direction.affectsTop) newRect.y -= diff;
         }
 
-        // Apply min/max aspect ratio constraints
-        const currentAspect = newRect.width / newRect.height;
-
-        if (minAspectRatio !== undefined && currentAspect < minAspectRatio) {
-            const targetWidth = newRect.height * minAspectRatio;
-            if (direction.affectsLeft) {
-                newRect.x = right - targetWidth;
-            }
-            newRect.width = targetWidth;
-        }
-
-        if (maxAspectRatio !== undefined && currentAspect > maxAspectRatio) {
-            const targetWidth = newRect.height * maxAspectRatio;
-            if (direction.affectsLeft) {
-                newRect.x = right - targetWidth;
-            }
-            newRect.width = targetWidth;
-        }
-
         // Clamp to constraint bounds
         if (newRect.x < minX) {
             newRect.width += newRect.x - minX;
@@ -201,7 +170,7 @@ export function useResizeLogic({
         }
 
         return newRect;
-    }, [minSize, minAspectRatio, maxAspectRatio, minX, minY, maxX, maxY]);
+    }, [minSize, minX, minY, maxX, maxY]);
 
     /**
      * Main resize function - dispatches to appropriate handler
@@ -212,11 +181,11 @@ export function useResizeLogic({
         deltaX: number,
         deltaY: number,
     ): Rect => {
-        if (maintainAspectRatio && aspectRatio) {
-            return resizeWithAspectLock(type, initialRect, deltaX, deltaY);
+        if (fixedAspectRatio) {
+            return resizeWithAspectLock(type, initialRect, deltaX, deltaY, fixedAspectRatio);
         }
         return resizeFreeForm(type, initialRect, deltaX, deltaY);
-    }, [maintainAspectRatio, aspectRatio, resizeWithAspectLock, resizeFreeForm]);
+    }, [fixedAspectRatio, resizeWithAspectLock, resizeFreeForm]);
 
     return {
         calculateResize,

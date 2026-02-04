@@ -31,12 +31,8 @@ export interface BoundingBoxProps {
     maxBounds?: { width: number; height: number };
     /** Constraint bounds - the rectangle must stay within this area (in output coordinates) */
     constraintBounds?: Rect;
-    /** Whether to maintain aspect ratio during resize */
-    maintainAspectRatio?: boolean;
-    /** Minimum aspect ratio (width/height) allowed during free-form resize */
-    minAspectRatio?: number;
-    /** Maximum aspect ratio (width/height) allowed during free-form resize */
-    maxAspectRatio?: number;
+    /** Fixed aspect ratio (width/height) - if null, free-form resizing is allowed */
+    fixedAspectRatio?: number | null;
     /** Callback when drag starts */
     onDragStart?: () => void;
     /** Callback when rect changes during drag */
@@ -72,9 +68,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     minSize,
     maxBounds,
     constraintBounds,
-    maintainAspectRatio = false,
-    minAspectRatio,
-    maxAspectRatio,
+    fixedAspectRatio = null,
     onDragStart,
     onChange,
     onCommit,
@@ -115,7 +109,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [constraintBounds, maxBounds, outputSize]);
 
     const MIN_SIZE = minSize ?? Math.min(outputSize.width, outputSize.height) / 5;
-    const aspectRatio = maintainAspectRatio ? rect.width / rect.height : undefined;
 
     // ------------------------------------------------------------------
     // LOGIC HOOKS
@@ -123,10 +116,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const { calculateResize } = useResizeLogic({
         minSize: MIN_SIZE,
         constraints,
-        maintainAspectRatio,
-        aspectRatio,
-        minAspectRatio,
-        maxAspectRatio,
+        fixedAspectRatio,
     });
 
     const { calculateMove } = useMoveLogic({ constraints });
@@ -170,22 +160,9 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // ------------------------------------------------------------------
     // MOVE/RESIZE HANDLERS
     // ------------------------------------------------------------------
-    const handlePointerDown = useCallback((e: React.PointerEvent, type: InteractionType) => {
-        e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
 
-        lockInteraction();
-        onDragStart?.();
-
-        dragRef.current = {
-            type,
-            startX: e.clientX,
-            startY: e.clientY,
-            initialRect: { ...currentRectRef.current }
-        };
-    }, [lockInteraction, onDragStart]);
-
-    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // Use refs for window event handlers to avoid stale closures
+    const handleWindowPointerMove = useCallback((e: PointerEvent) => {
         if (!dragRef.current || !boxRef.current) return;
 
         const { type, initialRect, startX, startY } = dragRef.current;
@@ -202,18 +179,60 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             newRect = calculateResize(type, initialRect, deltaX, deltaY);
         }
 
+        console.log('[BoundingBox] pointerMove', { type, deltaX: deltaX.toFixed(1), deltaY: deltaY.toFixed(1), newRect: { w: newRect.width.toFixed(0), h: newRect.height.toFixed(0) } });
         currentRectRef.current = newRect;
         onChange(newRect);
     }, [displayMapper, calculateMove, calculateResize, onChange]);
 
-    const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const handleWindowPointerUp = useCallback(() => {
+        console.log('[BoundingBox] pointerUp', { hasDragRef: !!dragRef.current });
         if (dragRef.current) {
-            e.currentTarget.releasePointerCapture(e.pointerId);
-            onCommit(currentRectRef.current);
+            console.log('[BoundingBox] releasing capture and committing', { finalRect: { w: currentRectRef.current.width.toFixed(0), h: currentRectRef.current.height.toFixed(0) } });
+            try {
+                dragRef.current.capturedElement.releasePointerCapture(dragRef.current.pointerId);
+            } catch (e) {
+                // Pointer capture may already be released
+            }
+            const finalRect = currentRectRef.current;
             dragRef.current = null;
+            setIsDragging(false);
             unlockInteraction();
+            onCommit(finalRect);
         }
     }, [onCommit, unlockInteraction]);
+
+    // Attach/detach window listeners based on drag state
+    const [isDragging, setIsDragging] = useState(false);
+
+    React.useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('pointermove', handleWindowPointerMove);
+            window.addEventListener('pointerup', handleWindowPointerUp);
+            return () => {
+                window.removeEventListener('pointermove', handleWindowPointerMove);
+                window.removeEventListener('pointerup', handleWindowPointerUp);
+            };
+        }
+    }, [isDragging, handleWindowPointerMove, handleWindowPointerUp]);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent, type: InteractionType) => {
+        console.log('[BoundingBox] pointerDown', { type, pointerId: e.pointerId, hasDragRef: !!dragRef.current });
+        e.stopPropagation();
+        e.preventDefault();
+
+        lockInteraction();
+        onDragStart?.();
+
+        dragRef.current = {
+            type,
+            startX: e.clientX,
+            startY: e.clientY,
+            initialRect: { ...currentRectRef.current },
+            capturedElement: e.currentTarget as Element,
+            pointerId: e.pointerId,
+        };
+        setIsDragging(true);
+    }, [lockInteraction, onDragStart]);
 
     // ------------------------------------------------------------------
     // CORNER RADIUS HANDLERS
@@ -284,7 +303,9 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [allowCornerEditing, localCornerRadii, rect.width, rect.height, displayMapper]);
 
     // Convert rect from output to display pixels
-    const displayRect = displayMapper.outputToDisplay(rect);
+    // Use ref during drag for instant visual feedback (avoids 1-frame lag)
+    const activeRect = dragRef.current ? currentRectRef.current : rect;
+    const displayRect = displayMapper.outputToDisplay(activeRect);
 
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
@@ -317,8 +338,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             ref={boxRef}
             style={boxStyle}
             onPointerDown={(e) => handlePointerDown(e, 'move')}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -368,7 +387,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             <Handle type="se" cursor="se-resize" onPointerDown={handlePointerDown} />
 
             {/* Edge Resize Handles (only when aspect ratio not locked) */}
-            {!maintainAspectRatio && (
+            {!fixedAspectRatio && (
                 <>
                     <EdgeHandle type="n" cursor="n-resize" onPointerDown={handlePointerDown} />
                     <EdgeHandle type="s" cursor="s-resize" onPointerDown={handlePointerDown} />

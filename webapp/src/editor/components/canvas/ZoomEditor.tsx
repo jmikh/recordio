@@ -3,7 +3,7 @@ import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
-import { BoundingBox } from './BoundingBox';
+import { BoundingBox } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { SecondaryButton } from '@shared/components';
@@ -217,7 +217,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
             <BoundingBox
                 rect={currentRect}
-                maintainAspectRatio={true}
+                fixedAspectRatio={currentRect.width / currentRect.height}
                 onChange={handleRectChange}
                 onCommit={onCommit}
             />

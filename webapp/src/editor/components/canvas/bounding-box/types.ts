@@ -59,6 +59,10 @@ export interface DragState {
     startX: number;
     startY: number;
     initialRect: Rect;
+    /** The element that captured the pointer (needed for reliable release) */
+    capturedElement: Element;
+    /** The pointer ID that was captured */
+    pointerId: number;
 }
 
 // Re-export for convenience

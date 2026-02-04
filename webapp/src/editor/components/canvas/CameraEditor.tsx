@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CameraSettings, Rect } from '../../../types';
-import { BoundingBox, type CornerRadii } from './BoundingBox';
+import { BoundingBox, type CornerRadii } from './bounding-box';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
@@ -10,8 +10,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 // COMPONENT: Camera Editor Overlay
 // ------------------------------------------------------------------
 
-// Minimum aspect ratio (width/height) - allows camera to be 2x taller than wide
-const MIN_CAMERA_ASPECT_RATIO = 0.5;
+// Minimum size for camera overlay (in output pixels)
+const MIN_CAMERA_SIZE = 100;
 
 interface CameraEditorProps {
     cameraRef: React.MutableRefObject<CameraSettings | null>;
@@ -90,13 +90,11 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // DERIVED VALUES
     // ------------------------------------------------------------------
 
-    // Calculate max aspect ratio from camera source (cannot be wider than the raw camera)
-    const maxCameraAspectRatio = cameraSource && cameraSource.size.height > 0
-        ? cameraSource.size.width / cameraSource.size.height
-        : 16 / 9;
-
     // Only show corner radius handles for rect/square shapes (not circle)
     const showCornerEditing = initialSettings.shape !== 'circle';
+
+    // Square and circle shapes maintain 1:1 aspect ratio
+    const fixedAspectRatio = (initialSettings.shape === 'square' || initialSettings.shape === 'circle') ? 1 : null;
 
     // Get current border radius as CornerRadii array (all corners linked)
     const cornerRadii: CornerRadii = (() => {
@@ -109,12 +107,14 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // ------------------------------------------------------------------
 
     const handleChange = (rect: Rect) => {
+        console.log('[CameraEditor] handleChange', { w: rect.width.toFixed(0), h: rect.height.toFixed(0) });
         const newSettings = { ...currentSettings, ...rect };
         setCurrentSettings(newSettings);
         cameraRef.current = newSettings; // Update canvas live preview
     };
 
     const onCommit = (rect: Rect) => {
+        console.log('[CameraEditor] onCommit', { w: rect.width.toFixed(0), h: rect.height.toFixed(0) });
         // Merge all local changes with rect and commit to store
         const newSettings: CameraSettings = {
             ...currentSettings,
@@ -157,9 +157,8 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             <div className="absolute inset-0 pointer-events-none">
                 <BoundingBox
                     rect={currentSettings}
-                    maintainAspectRatio={false}
-                    minAspectRatio={MIN_CAMERA_ASPECT_RATIO}
-                    maxAspectRatio={maxCameraAspectRatio}
+                    minSize={MIN_CAMERA_SIZE}
+                    fixedAspectRatio={fixedAspectRatio}
                     onChange={handleChange}
                     onCommit={onCommit}
                     onDragStart={startInteraction}
