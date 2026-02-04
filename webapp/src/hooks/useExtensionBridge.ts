@@ -20,7 +20,7 @@ import {
 } from '@shared/types/bridge';
 import type { RawRecording } from '@shared/types/recording';
 
-const EXTENSION_ID = 'lpponocoanighhephabalkejmdbjlhmi';
+const EXTENSION_ID = 'nihlpdaihoacconboieolmmnpnnhedan';
 
 // ============================================
 // Types
