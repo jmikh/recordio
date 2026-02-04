@@ -93,7 +93,37 @@ export class PlaybackRenderer {
 
 
 
-        // Render Webcam Layer
+        // Render Keyboard Overlay
+        if (project.settings.effects?.showKeyboardClicks) {
+            drawKeyboardOverlay(
+                ctx,
+                userEvents.keyboardEvents,
+                sourceTimeMs,
+                outputSize
+            );
+        }
+
+        // Render Spotlight Overlay (after all content, before camera)
+        // Spotlight is defined in source coordinates and mapped to output via viewMapper
+        if (viewMapper) {
+            const spotlightState = getSpotlightStateAtTime(
+                timeline.spotlightActions || [],
+                project.settings.spotlight,
+                outputTimeMs,
+                effectiveViewport,
+                viewMapper
+            );
+
+            // Pass resources for scaled content rendering
+            drawSpotlight(ctx, spotlightState, outputSize, screenVideo ? {
+                video: screenVideo,
+                project,
+                effectiveViewport,
+                deviceFrameImg: resources.deviceFrameImg
+            } : undefined);
+        }
+
+        // Render Webcam Layer (after spotlight, so camera always appears on top)
         if (cameraSource) {
             const video = videoRefs[cameraSource.id];
             if (video) {
@@ -129,36 +159,6 @@ export class PlaybackRenderer {
 
                 drawWebcam(ctx, video, cameraSource.size, effectiveCameraSettings);
             }
-        }
-
-        // Render Keyboard Overlay
-        if (project.settings.effects?.showKeyboardClicks) {
-            drawKeyboardOverlay(
-                ctx,
-                userEvents.keyboardEvents,
-                sourceTimeMs,
-                outputSize
-            );
-        }
-
-        // Render Spotlight Overlay (after all content, before captions)
-        // Spotlight is defined in source coordinates and mapped to output via viewMapper
-        if (viewMapper) {
-            const spotlightState = getSpotlightStateAtTime(
-                timeline.spotlightActions || [],
-                project.settings.spotlight,
-                outputTimeMs,
-                effectiveViewport,
-                viewMapper
-            );
-
-            // Pass resources for scaled content rendering
-            drawSpotlight(ctx, spotlightState, outputSize, screenVideo ? {
-                video: screenVideo,
-                project,
-                effectiveViewport,
-                deviceFrameImg: resources.deviceFrameImg
-            } : undefined);
         }
 
         // Render Captions (on top of everything including spotlight)
