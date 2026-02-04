@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../types';
 import type { DragState } from './useSpotlightDrag';
 import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration } from './SpotlightTrackUtils';
 

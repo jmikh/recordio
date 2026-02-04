@@ -1,5 +1,5 @@
 
-import type { Project, UserEvents, ZoomAction, FocusArea } from '../../core/types';
+import type { Project, UserEvents, ZoomAction, FocusArea } from '../../types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 

@@ -1,4 +1,4 @@
-import type { Rect, FocusArea } from '../types';
+import type { Rect, FocusArea } from '../../types';
 import type { ViewMapper } from '../mappers/viewMapper';
 
 /**

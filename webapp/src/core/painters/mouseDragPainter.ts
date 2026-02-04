@@ -1,4 +1,4 @@
-import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../types';
+import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../../types';
 import type { ViewMapper } from '../mappers/viewMapper';
 
 /**

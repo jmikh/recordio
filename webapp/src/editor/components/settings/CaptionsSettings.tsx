@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
-import type { CaptionSegment } from '../../../core/types';
+import type { CaptionSegment } from '../../../types';
 import { Slider } from '@shared/components';
 import { Toggle } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';

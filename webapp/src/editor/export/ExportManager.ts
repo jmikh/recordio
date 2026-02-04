@@ -4,7 +4,7 @@ import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
-import type { Project, SourceMetadata } from '../../core/types';
+import type { Project, SourceMetadata } from '../../types';
 import fullLogoPng from '@shared/assets/fulllogo.webp';
 
 export type ExportQuality = '360p' | '720p' | '1080p' | '4K';

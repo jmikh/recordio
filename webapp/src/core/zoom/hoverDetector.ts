@@ -1,4 +1,4 @@
-import { EventType, type BaseEvent, type Point } from '../types';
+import { EventType, type BaseEvent, type Point } from '../../types';
 
 // ============================================================================
 // Constants

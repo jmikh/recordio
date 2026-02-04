@@ -1,4 +1,4 @@
-import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
+import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { rectContainsRect, clampViewportToBounds } from '../geometry';
 

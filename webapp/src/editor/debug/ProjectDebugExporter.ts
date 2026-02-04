@@ -8,7 +8,7 @@
  */
 
 import JSZip from 'jszip';
-import type { Project, ID, SourceMetadata } from '../../core/types';
+import type { Project, ID, SourceMetadata } from '../../types';
 import { ProjectStorage } from '../../storage/projectStorage';
 
 interface ExportManifest {

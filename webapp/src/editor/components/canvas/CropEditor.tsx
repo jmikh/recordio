@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import type { Rect, Project } from '../../../core/types';
+import type { Rect, Project } from '../../../types';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { RenderResources } from './PlaybackRenderer';

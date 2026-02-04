@@ -1,7 +1,7 @@
 
 // Helper to get memoized TimeMapper
 import { TimeMapper } from '../../core/mappers/timeMapper';
-import type { OutputWindow } from '../../core/types';
+import type { OutputWindow } from '../../types';
 import { useProjectStore } from '../stores/useProjectStore';
 
 // Module-level cache

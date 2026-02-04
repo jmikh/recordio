@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { UserEvents } from '../../../core/types';
+import type { UserEvents } from '../../../types';
 import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { TimePixelMapper } from '../../utils/timePixelMapper';
 

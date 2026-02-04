@@ -1,4 +1,4 @@
-import type { Captions, Size, CaptionSettings } from '../types';
+import type { Captions, Size, CaptionSettings } from '../../types';
 import { CaptionTimeMapper } from '../mappers/CaptionTimeMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import type { OutputWindow } from '../../../../core/types';
+import type { OutputWindow } from '../../../../types';
 import { StaticAudioWave } from './StaticAudioWave';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../hooks/useAudioAnalysis';

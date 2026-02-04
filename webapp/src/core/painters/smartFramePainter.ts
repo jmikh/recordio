@@ -1,4 +1,4 @@
-import type { DeviceFrame } from '../types';
+import type { DeviceFrame } from '../../types';
 
 export interface SliceSegment {
     start: number; // Percent 0-1

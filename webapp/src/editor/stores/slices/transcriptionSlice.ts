@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
+import type { Captions } from '../../../types';
 
 
 export interface TranscriptionSlice {
@@ -8,7 +9,7 @@ export interface TranscriptionSlice {
     transcriptionError: string | null;
 
     setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
-    setCaptions: (captions: import('../../../core/types').Captions) => void;
+    setCaptions: (captions: Captions) => void;
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
 }

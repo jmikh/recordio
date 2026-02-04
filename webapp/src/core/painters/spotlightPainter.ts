@@ -1,4 +1,4 @@
-import type { Size, Rect, Project } from '../types';
+import type { Size, Rect, Project } from '../../types';
 import type { SpotlightState } from '../spotlight/spotlightMotion';
 import { drawScreen } from './screenPainter';
 

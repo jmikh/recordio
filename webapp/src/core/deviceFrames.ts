@@ -1,4 +1,4 @@
-import type { DeviceFrame, FrameScalingConfig } from './types';
+import type { DeviceFrame, FrameScalingConfig } from '../types';
 
 
 function defineFrame(

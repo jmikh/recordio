@@ -1,4 +1,4 @@
-import type { Project, Rect } from '../types';
+import type { Project, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';

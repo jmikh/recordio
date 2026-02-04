@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, SpotlightAction } from '../../../core/types';
+import type { ID, SpotlightAction } from '../../../types';
 import { useUIStore } from '../useUIStore';
 
 export interface SpotlightSlice {

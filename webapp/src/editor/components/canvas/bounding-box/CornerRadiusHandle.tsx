@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import type { Rect } from '../../../../core/types';
+import type { Rect } from '../../../../types';
 import type { CornerIndex } from './types';
 import { useDisplayMapper } from '../../../hooks/useDisplayMapper';
 import { RADIUS_HANDLE_SIZE, RADIUS_HANDLE_MIN_INSET, Z_INDEX_RADIUS_HANDLE, PRIMARY_COLOR } from './constants';

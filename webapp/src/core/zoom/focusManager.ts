@@ -1,10 +1,10 @@
-import { EventType, type BaseEvent, type Rect, type Size, type UserEvents, type FocusArea } from '../types';
+import { EventType, type BaseEvent, type Rect, type Size, type UserEvents, type FocusArea } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 import { HoverDetector } from './hoverDetector';
 import { clampRectToBounds, enlargeRect, DEFAULT_ENLARGE_FACTOR } from '../geometry';
 
 // Re-export FocusArea from types for backward compatibility
-export type { FocusArea } from '../types';
+export type { FocusArea } from '../../types';
 
 // ============================================================================
 // Constants

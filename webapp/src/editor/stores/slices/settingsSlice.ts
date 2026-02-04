@@ -1,7 +1,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ProjectSettings } from '../../../core/types';
+import type { ProjectSettings } from '../../../types';
 import { isSubset } from '../../utils/subsetMatcher';
 import { recalculateAutoZooms, updateManualZoomDuration } from '../../utils/zoomUtils';
 

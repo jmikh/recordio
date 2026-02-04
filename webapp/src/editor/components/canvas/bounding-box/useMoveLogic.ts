@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Rect } from '../../../../core/types';
+import type { Rect } from '../../../../types';
 import type { ConstraintEdges } from './types';
 
 interface UseMoveLogicProps {

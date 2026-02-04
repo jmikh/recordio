@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomAction } from '../../../../core/types';
+import type { ZoomAction } from '../../../../types';
 import type { DragState } from './useZoomDrag';
 // Assuming Project and related types availability
 

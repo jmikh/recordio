@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomAction } from '../../../../core/types';
+import type { ZoomAction } from '../../../../types';
 import { getZoomBlockBounds } from './ZoomTrackUtils';
 
 // Actually Project type is likely in core/types or similar. 

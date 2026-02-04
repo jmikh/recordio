@@ -1,4 +1,4 @@
-import type { SpotlightAction, SpotlightSettings, Rect } from '../types';
+import type { SpotlightAction, SpotlightSettings, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
 

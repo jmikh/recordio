@@ -1,4 +1,4 @@
-import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from './types';
+import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/spotlightScheduler';

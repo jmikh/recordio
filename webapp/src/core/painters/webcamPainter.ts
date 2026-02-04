@@ -1,4 +1,4 @@
-import type { CameraSettings, Size } from '../types';
+import type { CameraSettings, Size } from '../../types';
 
 const SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';

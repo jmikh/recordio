@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { ID, TimeMs, Size } from '../../core/types';
+import type { ID, TimeMs, Size } from '../../types';
 
 export const CanvasMode = {
     Preview: 'preview',

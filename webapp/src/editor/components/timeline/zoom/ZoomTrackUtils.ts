@@ -1,4 +1,4 @@
-import type { ZoomAction, Rect, Size } from '../../../../core/types';
+import type { ZoomAction, Rect, Size } from '../../../../types';
 
 // NOTE: Style constants are now centralized in ZoomTrackStyles.ts
 

@@ -6,7 +6,7 @@
  */
 
 import JSZip from 'jszip';
-import type { Project } from '../../core/types';
+import type { Project } from '../../types';
 import { ProjectStorage } from '../../storage/projectStorage';
 
 interface ExportManifest {

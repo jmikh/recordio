@@ -5,7 +5,7 @@
  * Spotlights highlight UI elements that the user hovered over for extended periods.
  */
 
-import type { HoveredCardEvent, ZoomAction, SpotlightAction, Rect, Size } from '../types';
+import type { HoveredCardEvent, ZoomAction, SpotlightAction, Rect, Size } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { getViewportStateAtTime } from '../zoom';
 import { TimeMapper } from '../mappers/timeMapper';

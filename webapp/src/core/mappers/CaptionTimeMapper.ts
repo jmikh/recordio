@@ -1,4 +1,4 @@
-import type { CaptionSegment } from '../types';
+import type { CaptionSegment } from '../../types';
 import { TimeMapper } from './timeMapper';
 
 /**

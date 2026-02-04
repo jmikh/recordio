@@ -3,7 +3,7 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../types';
 import { getSpotlightBounds, getMinSpotlightDuration } from './SpotlightTrackUtils';
 
 export interface DragState {

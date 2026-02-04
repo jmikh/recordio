@@ -1,4 +1,4 @@
-import type { Rect } from '../../../../core/types';
+import type { Rect } from '../../../../types';
 import type { CornerRadii } from '../../../../core/mappers/displayMapper';
 
 // ------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import type { Rect } from '../../../core/types';
+import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
@@ -11,7 +11,7 @@ import { ViewMapper } from '../../../core/mappers/viewMapper';
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
-import type { Project } from '../../../core/types';
+import type { Project } from '../../../types';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy (for SpotlightEdit mode)

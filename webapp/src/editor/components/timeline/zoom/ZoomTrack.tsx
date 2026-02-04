@@ -9,7 +9,7 @@ import { ZoomKeyframe } from './ZoomKeyframe';
 import { TransitionTrail, HoldLine } from './ZoomLines';
 import { calculateZoomScale, formatScaleLabel, isFullViewport } from './ZoomTrackUtils';
 import { ghostKeyframe, ghostTrail } from './ZoomTrackStyles';
-import type { ZoomAction } from '../../../../core/types';
+import type { ZoomAction } from '../../../../types';
 
 interface ZoomTrackProps {
     height: number;

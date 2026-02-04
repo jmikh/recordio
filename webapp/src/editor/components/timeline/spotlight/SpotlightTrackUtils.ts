@@ -1,4 +1,4 @@
-import type { SpotlightAction, SpotlightSettings } from '../../../../core/types';
+import type { SpotlightAction, SpotlightSettings } from '../../../../types';
 
 // Default values for backward compatibility with projects that don't have new fields
 const DEFAULT_MIN_HOLD_MS = 200;

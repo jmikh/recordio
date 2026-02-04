@@ -1,4 +1,4 @@
-import type { BaseEvent, Rect } from '../types';
+import type { BaseEvent, Rect } from '../../types';
 import type { ViewMapper } from '../mappers/viewMapper';
 
 /**

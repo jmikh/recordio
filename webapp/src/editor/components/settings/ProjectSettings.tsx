@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../../../storage/projectStorage';
-import type { Project } from '../../../core/types';
+import type { Project } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { ProjectCard } from '../../../components/ProjectCard';
 import { Button } from '@shared/components';

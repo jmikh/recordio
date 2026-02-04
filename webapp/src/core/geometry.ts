@@ -3,7 +3,7 @@
  * These functions are lightweight and have no dependencies on coordinate remapping.
  */
 
-import type { Rect, Point, Size } from './types';
+import type { Rect, Point, Size } from '../types';
 
 // ============================================================================
 // Configuration

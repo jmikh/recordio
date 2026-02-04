@@ -1,5 +1,5 @@
 
-import type { ID, Project } from '../core/types';
+import type { ID, Project } from '../types';
 import { EDITOR_ORIGIN_DEV, EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 // Use different DB for website vs extension
@@ -441,7 +441,7 @@ export class ProjectStorage {
 // Import from RawRecording (for handoff flow)
 // ============================================
 
-import type { SourceMetadata, UserEvents } from '../core/types';
+import type { SourceMetadata, UserEvents } from '../types';
 import { ProjectImpl } from '../core/Project';
 
 interface RawRecording {

@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, ZoomAction } from '../../../core/types';
+import type { ID, ZoomAction } from '../../../types';
 import { useUIStore } from '../useUIStore';
 
 export interface ZoomActionSlice {

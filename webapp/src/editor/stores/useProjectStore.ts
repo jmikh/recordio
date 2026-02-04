@@ -1,7 +1,7 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID } from '../../core/types';
+import type { Project, ID } from '../../types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';

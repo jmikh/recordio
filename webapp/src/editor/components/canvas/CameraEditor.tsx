@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import type { CameraSettings, Rect } from '../../../core/types';
+import type { CameraSettings, Rect } from '../../../types';
 import { BoundingBox, type CornerRadii } from './BoundingBox';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';

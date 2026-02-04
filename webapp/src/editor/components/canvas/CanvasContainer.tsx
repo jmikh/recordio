@@ -12,7 +12,7 @@ import { CameraEditor } from './CameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
-import type { CameraSettings, Rect, SourceMetadata } from '../../../core/types';
+import type { CameraSettings, Rect, SourceMetadata } from '../../../types';
 
 export const CanvasContainer = () => {
     //console.log('[Rerender] CanvasContainer');

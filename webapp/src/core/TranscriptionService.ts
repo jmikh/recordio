@@ -1,5 +1,5 @@
 import { pipeline, Pipeline, env } from '@huggingface/transformers';
-import type { Captions, CaptionSegment } from './types';
+import type { Captions, CaptionSegment } from '../types';
 
 // Configure Transformers.js to download models from Cloudflare CDN
 // Models are cached in browser IndexedDB after first download

@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow, ZoomAction, SpotlightAction } from '../../../core/types';
+import type { ID, OutputWindow, ZoomAction, SpotlightAction } from '../../../types';
 import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
 import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
 import { ViewMapper } from '../../../core/mappers/viewMapper';

@@ -12,8 +12,8 @@ import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/zoom/cameraZoom';
-import { type FocusArea } from '../../../core/types';
-import type { Project, Rect, CameraSettings } from '../../../core/types';
+import { type FocusArea } from '../../../types';
+import type { Project, Rect, CameraSettings } from '../../../types';
 
 export interface RenderResources {
     canvas: HTMLCanvasElement;
