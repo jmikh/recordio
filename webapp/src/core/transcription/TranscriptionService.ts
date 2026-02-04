@@ -100,14 +100,12 @@ export class TranscriptionService {
         onProgress?: (progress: number) => void,
         signal?: AbortSignal
     ): Promise<CaptionSegment[]> {
-        console.log('[Transcription] Decoding audio...');
         onProgress?.(0.1);
 
         const samples = await this.decodeAudio(videoBlob);
 
         if (signal?.aborted) throw new Error('Aborted');
 
-        console.log('[Transcription] Decoded:', samples.length, 'samples');
         onProgress?.(0.2);
 
         const chunks = await this.sendToWorker(
@@ -116,7 +114,7 @@ export class TranscriptionService {
             signal
         );
 
-        console.log('[Transcription] Got', chunks.length, 'chunks');
+
 
         // Convert to CaptionSegments
         const segments: CaptionSegment[] = [];
@@ -133,7 +131,6 @@ export class TranscriptionService {
         }
 
         onProgress?.(1);
-        console.log('[Transcription] Done:', segments.length, 'segments');
         return segments;
     }
 

@@ -4,7 +4,7 @@
  * Receives 16kHz Float32Array, runs Whisper, returns text + timestamps.
  */
 
-import { pipeline, Pipeline, env } from '@huggingface/transformers';
+import { pipeline, Pipeline, uv } from '@huggingface/transformers';
 
 // Configure Transformers.js
 env.allowRemoteModels = true;
@@ -50,7 +50,6 @@ async function transcribe(audioBuffer: ArrayBuffer): Promise<void> {
     aborted = false;
 
     const audioData = new Float32Array(audioBuffer);
-    console.log('[Worker] Audio received:', audioData.length, 'samples');
 
     self.postMessage({ type: 'progress', progress: 0.1 });
 
@@ -63,7 +62,7 @@ async function transcribe(audioBuffer: ArrayBuffer): Promise<void> {
 
     self.postMessage({ type: 'progress', progress: 0.3 });
 
-    console.log('[Worker] Running Whisper...');
+
 
     // Audio is already 16kHz - pass directly to Whisper
     const result = await whisperPipeline(audioData, {
@@ -76,7 +75,7 @@ async function transcribe(audioBuffer: ArrayBuffer): Promise<void> {
 
     self.postMessage({ type: 'progress', progress: 0.9 });
 
-    console.log('[Worker] Done');
+
     self.postMessage({
         type: 'result',
         chunks: (result as any).chunks || []
