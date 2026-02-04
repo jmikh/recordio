@@ -30,6 +30,7 @@ export class PlaybackRenderer {
             project: Project,
             currentTimeMs: number,
             overrideCameraSettings?: CameraSettings,
+            isCameraEditing?: boolean,
             focusAreas?: FocusArea[],
             showDebugOverlays?: boolean
         }
@@ -138,8 +139,8 @@ export class PlaybackRenderer {
                 // Calculate effective camera settings with auto-shrink
                 let effectiveCameraSettings = cameraSettings;
 
-                // Only apply auto-shrink if enabled and not using override (drag preview)
-                if (cameraSettings.autoShrink && !state.overrideCameraSettings) {
+                // Only apply auto-shrink if enabled and not using override (drag preview) and not in camera edit mode
+                if (cameraSettings.autoShrink && !state.overrideCameraSettings && !state.isCameraEditing) {
                     const cameraState = getCameraStateAtTime(
                         zoomActions,
                         currentTimeMs,

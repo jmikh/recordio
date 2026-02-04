@@ -76,7 +76,7 @@ export const CameraSettings = () => {
                         icon={isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight className="w-5 h-5" />}
                         isActive={isEditingCamera}
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                        label={isEditingCamera ? 'Editing...' : 'Edit Position & Size'}
+                        label={isEditingCamera ? 'Editing on Canvas' : 'Edit on Canvas'}
                         className="flex-1"
                     />
                 </div>

@@ -3,7 +3,6 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CameraSettings, Rect } from '../../../types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
-import { useClickOutside } from '../../hooks/useClickOutside';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 // ------------------------------------------------------------------
@@ -62,12 +61,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             cameraRef.current = null;
         };
     }, [initialSettings, cameraRef]);
-
-    // Close on Outside Click
-    useClickOutside(containerRef, () => {
-        setCanvasMode(CanvasMode.Preview);
-        cameraRef.current = null;
-    });
 
     // Close on Escape
     useEffect(() => {
@@ -149,11 +142,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             ref={containerRef}
             className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] pointer-events-none"
         >
-            {/* Background Closer */}
-            <div
-                className="absolute inset-0 pointer-events-auto"
-            />
-
             <div className="absolute inset-0 pointer-events-none">
                 <BoundingBox
                     rect={currentSettings}

@@ -8,6 +8,7 @@ import { CaptionsSettings } from './CaptionsSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
@@ -48,8 +49,23 @@ export const SettingsPanel = () => {
     const navRef = useRef<HTMLElement>(null);
 
     const project = useProjectStore(s => s.project);
+    const canvasMode = useUIStore(s => s.canvasMode);
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
     const hasCameraSource = !!project.cameraSource;
     const hasMicrophone = project.cameraSource?.has_microphone || project.screenSource?.has_microphone;
+
+    // Exit camera edit mode when switching away from camera tab
+    // Enter camera edit mode when switching TO camera tab
+    const handleTabChange = (tab: Tab) => {
+        if (tab === 'camera') {
+            // Entering camera tab - auto-activate camera editing (this also pauses video)
+            setCanvasMode(CanvasMode.CameraEdit);
+        } else if (canvasMode === CanvasMode.CameraEdit) {
+            // Leaving camera tab while in camera edit mode - exit
+            setCanvasMode(CanvasMode.Preview);
+        }
+        setActiveTab(tab);
+    };
 
     const navItems = useMemo(() => {
         const items: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -92,7 +108,7 @@ export const SettingsPanel = () => {
                         <button
                             key={item.id}
                             data-tab={item.id}
-                            onClick={() => setActiveTab(item.id)}
+                            onClick={() => handleTabChange(item.id)}
                             className="flex items-center gap-3 py-2.5 px-3.5 bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-200"
                         >
                             <span className={`flex ${isActive ? 'text-primary' : 'text-text-muted'}`}>

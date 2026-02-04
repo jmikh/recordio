@@ -209,6 +209,7 @@ export const CanvasContainer = () => {
                         project,
                         currentTimeMs: effectiveTimeMs,
                         overrideCameraSettings: previewCameraSettingsRef.current || undefined,
+                        isCameraEditing: canvasMode === CanvasMode.CameraEdit,
                         focusAreas: focusAreasRef.current,
                         showDebugOverlays: uiState.showDebugOverlays
                     });
@@ -265,7 +266,8 @@ export const CanvasContainer = () => {
     // Check if we're in an editor mode that needs the glow
     const isEditorMode = canvasMode === CanvasMode.ZoomEdit ||
         canvasMode === CanvasMode.CropEdit ||
-        canvasMode === CanvasMode.SpotlightEdit;
+        canvasMode === CanvasMode.SpotlightEdit ||
+        canvasMode === CanvasMode.CameraEdit;
 
     return (
         <div className={`relative w-full h-full bg-black flex items-center justify-center p-2`}>
