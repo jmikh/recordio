@@ -262,18 +262,23 @@ export const CanvasContainer = () => {
     // RENDER
     // -----------------------------------------------------------
 
+    // Check if we're in an editor mode that needs the glow
+    const isEditorMode = canvasMode === CanvasMode.ZoomEdit ||
+        canvasMode === CanvasMode.CropEdit ||
+        canvasMode === CanvasMode.SpotlightEdit;
+
     return (
-        <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+        <div className={`relative w-full h-full bg-black flex items-center justify-center p-2`}>
 
             {/* ASPECT RATIO WRAPPER */}
             <div
                 ref={aspectWrapperRef}
-                className="relative"
+                className={`relative ${isEditorMode ? 'canvas-editor-glow' : ''}`}
                 style={{
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     maxHeight: '100%',
                     maxWidth: '100%',
-                    boxShadow: '0 0 0 1px #333'
+                    boxShadow: !isEditorMode ? '0 0 0 2px var(--primary)' : undefined
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}

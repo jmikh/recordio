@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { MultiToggle } from '@shared/components';
 import { usePaletteStore } from '../../stores/usePaletteStore';
-
-
-const GRADIENT_DIRECTIONS = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'] as const;
+import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 interface GradientSettings {
     colors: [string, string];
-    direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+    /** Gradient angle in degrees (0-360). 0 = up, 90 = right, 180 = down, 270 = left */
+    direction: number;
 }
 
 interface ColorSettingsProps {
@@ -19,7 +18,7 @@ interface ColorSettingsProps {
     onTypeChange: (type: 'solid' | 'gradient') => void;
     onColorChange: (color: string) => void;
     onGradientColorChange: (index: 0 | 1, color: string) => void;
-    onDirectionChange: (dir: GradientSettings['direction']) => void;
+    onDirectionChange: (direction: number) => void;
     /** If true, hides the Solid/Gradient toggle and shows only solid color controls */
     solidOnly?: boolean;
 }
@@ -45,7 +44,7 @@ export const ColorSettings = ({
     const [selectedPaletteIndex, setSelectedPaletteIndex] = useState<number | null>(null);
 
     // Ensuring gradient defaults if undefined for safe rendering
-    const safeGradient = gradient || { colors: ['#ffffff', '#000000'] as [string, string], direction: 'S' as const };
+    const safeGradient = gradient || { colors: ['#ffffff', '#000000'] as [string, string], direction: 135 };
 
     // Determine current active color for editing
     // In solidOnly mode, always use the solid color
@@ -100,19 +99,22 @@ export const ColorSettings = ({
 
             {/* Gradient Selector (Only if Gradient) */}
             {isGradient && (
-                <div className="flex gap-6 justify-center py-2 items-start">
+                <div className="flex gap-6 justify-center py-2">
                     {/* Start Color */}
                     <div
                         onClick={() => setActiveGradientIndex(0)}
                         className="cursor-pointer flex flex-col items-center gap-2"
                     >
-                        <div
-                            className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 0
-                                ? 'border-ring ring-2 ring-ring/30 scale-110'
-                                : 'border-border hover:border-border-hover'}`}
-                            style={{ backgroundColor: safeGradient.colors[0] }}
-                        />
-                        <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === 0 ? 'text-text-primary' : 'text-text-main'}`}>
+                        {/* Fixed height wrapper to align circle centers (52px = dial outer size) */}
+                        <div className="h-[52px] flex items-center justify-center">
+                            <div
+                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 0
+                                    ? 'border-ring ring-2 ring-ring/30 scale-110'
+                                    : 'border-border hover:border-border-hover'}`}
+                                style={{ backgroundColor: safeGradient.colors[0] }}
+                            />
+                        </div>
+                        <span className="text-[10px] font-bold text-text-main">
                             Start
                         </span>
                     </div>
@@ -122,82 +124,26 @@ export const ColorSettings = ({
                         onClick={() => setActiveGradientIndex(1)}
                         className="cursor-pointer flex flex-col items-center gap-2"
                     >
-                        <div
-                            className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 1
-                                ? 'border-ring ring-2 ring-ring/30 scale-110'
-                                : 'border-border hover:border-border-hover'}`}
-                            style={{ backgroundColor: safeGradient.colors[1] }}
-                        />
-                        <span className={`text-[10px] font-bold transition-colors ${activeGradientIndex === 1 ? 'text-text-primary' : 'text-text-main'}`}>
+                        {/* Fixed height wrapper to align circle centers (52px = dial outer size) */}
+                        <div className="h-[52px] flex items-center justify-center">
+                            <div
+                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 1
+                                    ? 'border-ring ring-2 ring-ring/30 scale-110'
+                                    : 'border-border hover:border-border-hover'}`}
+                                style={{ backgroundColor: safeGradient.colors[1] }}
+                            />
+                        </div>
+                        <span className="text-[10px] font-bold text-text-main">
                             End
                         </span>
                     </div>
 
-                    {/* Direction Circle */}
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="relative w-10 h-10 flex items-center justify-center">
-                            {/* Outer ring with border matching Start/End circles */}
-                            <div className="absolute inset-0 rounded-full border-2 border-border bg-surface shadow-sm" />
-
-                            {/* Direction dots on perimeter - sitting on the border */}
-                            {GRADIENT_DIRECTIONS.filter(d => !!d).map((dir) => {
-                                const isSelected = safeGradient.direction === dir;
-                                const angleMap: Record<string, number> = {
-                                    'N': -90, 'NE': -45, 'E': 0, 'SE': 45,
-                                    'S': 90, 'SW': 135, 'W': 180, 'NW': -135
-                                };
-                                const angle = angleMap[dir];
-                                const radius = 20; // Exactly on the 40px circle's border (half of 40px)
-                                const rad = (angle * Math.PI) / 180;
-                                const x = Math.cos(rad) * radius;
-                                const y = Math.sin(rad) * radius;
-
-                                return (
-                                    <button
-                                        key={dir}
-                                        onClick={() => handleDirectionClick(dir)}
-                                        className={`absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full transition-all z-10 
-                                            hover:w-4 hover:h-4 hover:-ml-2 hover:-mt-2
-                                            ${isSelected
-                                                ? 'bg-primary shadow-sm'
-                                                : 'bg-text-muted hover:bg-text-main'
-                                            }`}
-                                        style={{
-                                            left: '50%',
-                                            top: '50%',
-                                            marginLeft: `${x - 6}px`,
-                                            marginTop: `${y - 6}px`,
-                                        }}
-                                        title={dir}
-                                    />
-                                );
-                            })}
-
-                            {/* Center arrow showing selected direction */}
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-primary z-20 relative"
-                                style={{
-                                    transform: `rotate(${{ 'N': -90, 'NE': -45, 'E': 0, 'SE': 45, 'S': 90, 'SW': 135, 'W': 180, 'NW': -135 }[safeGradient.direction]
-                                        }deg)`
-                                }}
-                            >
-                                <path d="M5 12h14" />
-                                <path d="m12 5 7 7-7 7" />
-                            </svg>
-                        </div>
-                        <span className="text-[10px] font-bold text-text-main">
-                            Direction
-                        </span>
-                    </div>
+                    {/* Direction Dial */}
+                    <DirectionDial
+                        angle={safeGradient.direction}
+                        gradient={`linear-gradient(${safeGradient.direction}deg, ${safeGradient.colors[0]}, ${safeGradient.colors[1]})`}
+                        onAngleChange={onDirectionChange}
+                    />
                 </div>
             )}
 
@@ -262,8 +208,106 @@ export const ColorSettings = ({
 
         </div>
     );
-
-    function handleDirectionClick(dir: string) {
-        if (dir) onDirectionChange(dir as any);
-    }
 };
+
+// =============================================
+// Direction Dial Component (FloatingHandleDial style)
+// =============================================
+
+interface DirectionDialProps {
+    angle: number;
+    gradient: string;
+    onAngleChange: (angle: number) => void;
+}
+
+function DirectionDial({ angle, gradient, onAngleChange }: DirectionDialProps) {
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+    const [isDragging, setIsDragging] = useState(false);
+    const dialRef = useRef<HTMLDivElement>(null);
+
+    // Inner circle matches Start/End circles (40px = w-10 h-10)
+    const innerSize = 40;
+    // Outer ring adds space for the handle track
+    const outerSize = 52;
+    const handleAngleRad = (angle - 90) * (Math.PI / 180);
+    const handleRadius = outerSize / 2 - 6;
+    const handleX = outerSize / 2 + Math.cos(handleAngleRad) * handleRadius;
+    const handleY = outerSize / 2 + Math.sin(handleAngleRad) * handleRadius;
+
+    const updateAngle = (e: MouseEvent | React.MouseEvent) => {
+        if (!dialRef.current) return;
+        const rect = dialRef.current.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const rad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+        let deg = (rad * 180 / Math.PI + 90 + 360) % 360;
+        batchAction(() => onAngleChange(Math.round(deg)));
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setIsDragging(true);
+        startInteraction();
+        updateAngle(e);
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => isDragging && updateAngle(e);
+        const handleMouseUp = () => {
+            if (isDragging) {
+                setIsDragging(false);
+                endInteraction();
+            }
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging, endInteraction]);
+
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <div
+                ref={dialRef}
+                onMouseDown={handleMouseDown}
+                className="relative flex items-center justify-center rounded-full border-2 border-border bg-surface shadow-sm"
+                style={{
+                    width: outerSize,
+                    height: outerSize,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    userSelect: 'none',
+                }}
+            >
+                {/* Inner gradient circle */}
+                <div
+                    className="rounded-full"
+                    style={{
+                        width: innerSize,
+                        height: innerSize,
+                        background: gradient,
+                    }}
+                />
+
+                {/* Handle on outer ring */}
+                <div
+                    className="absolute rounded-full bg-white shadow-md transition-transform"
+                    style={{
+                        width: 10,
+                        height: 10,
+                        left: handleX - 5,
+                        top: handleY - 5,
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    }}
+                />
+            </div>
+            {/* Degree label - same style as Start/End labels */}
+            <span className="text-[10px] font-bold text-text-main">
+                {angle}°
+            </span>
+        </div>
+    );
+}

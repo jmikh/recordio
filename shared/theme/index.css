@@ -277,3 +277,28 @@ body,
    animation: flashing-glow 1.5s infinite ease-in-out;
    border: 2px solid var(--primary);
 }
+
+/* Canvas Editor Glow - Secondary color border for edit modes */
+@keyframes canvas-editor-glow {
+   0% {
+      box-shadow: 0 0 0 2px var(--secondary),
+         0 0 12px 4px oklch(from var(--secondary) l c h / 40%),
+         0 0 24px 8px oklch(from var(--secondary) l c h / 20%);
+   }
+
+   50% {
+      box-shadow: 0 0 0 2px var(--secondary),
+         0 0 16px 6px oklch(from var(--secondary) l c h / 55%),
+         0 0 32px 12px oklch(from var(--secondary) l c h / 30%);
+   }
+
+   100% {
+      box-shadow: 0 0 0 2px var(--secondary),
+         0 0 12px 4px oklch(from var(--secondary) l c h / 40%),
+         0 0 24px 8px oklch(from var(--secondary) l c h / 20%);
+   }
+}
+
+.canvas-editor-glow {
+   animation: canvas-editor-glow 2s infinite ease-in-out;
+}

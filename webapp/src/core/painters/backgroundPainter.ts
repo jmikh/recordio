@@ -20,18 +20,20 @@ export const drawBackground = (
         const { gradientColors, gradientDirection } = background;
         const w = canvas.width;
         const h = canvas.height;
-        let x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 
-        switch (gradientDirection) {
-            case 'N': x0 = w / 2; y0 = h; x1 = w / 2; y1 = 0; break;
-            case 'NE': x0 = 0; y0 = h; x1 = w; y1 = 0; break;
-            case 'E': x0 = 0; y0 = h / 2; x1 = w; y1 = h / 2; break;
-            case 'SE': x0 = 0; y0 = 0; x1 = w; y1 = h; break; // Top-Left to Bottom-Right
-            case 'S': x0 = w / 2; y0 = 0; x1 = w / 2; y1 = h; break; // Top to Bottom
-            case 'SW': x0 = w; y0 = 0; x1 = 0; y1 = h; break;
-            case 'W': x0 = w; y0 = h / 2; x1 = 0; y1 = h / 2; break;
-            case 'NW': x0 = w; y0 = h; x1 = 0; y1 = 0; break;
-        }
+        // Convert CSS gradient angle to canvas coordinates
+        // CSS: 0° = up, 90° = right, 180° = down, 270° = left
+        // Canvas: calculate start/end points based on angle
+        const angleRad = (gradientDirection - 90) * (Math.PI / 180);
+        const diagonal = Math.sqrt(w * w + h * h) / 2;
+        const centerX = w / 2;
+        const centerY = h / 2;
+
+        // Calculate gradient line endpoints
+        const x0 = centerX - Math.cos(angleRad) * diagonal;
+        const y0 = centerY - Math.sin(angleRad) * diagonal;
+        const x1 = centerX + Math.cos(angleRad) * diagonal;
+        const y1 = centerY + Math.sin(angleRad) * diagonal;
 
         const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
         gradient.addColorStop(0, gradientColors[0]);

@@ -9,20 +9,7 @@ import { XButton } from '@shared/components';
 import { Slider } from '@shared/components';
 import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
 
-// Helper to convert N, NE, etc. to degrees
-const getGradientAngle = (dir: string) => {
-    switch (dir) {
-        case 'N': return 0;
-        case 'NE': return 45;
-        case 'E': return 90;
-        case 'SE': return 135;
-        case 'S': return 180;
-        case 'SW': return 225;
-        case 'W': return 270;
-        case 'NW': return 315;
-        default: return 180;
-    }
-};
+
 
 const BACKGROUND_IMAGES = [
     { name: 'Background 1', url: '/assets/backgrounds/bg1.avif' },
@@ -130,7 +117,7 @@ export const BackgroundSettings = () => {
         }));
     };
 
-    const handleDirectionChange = (direction: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW') => {
+    const handleDirectionChange = (direction: number) => {
         updateSettings({
             background: {
                 gradientDirection: direction
@@ -252,7 +239,7 @@ export const BackgroundSettings = () => {
 
     // Compute dynamic style for color card
     const colorCardStyle = isGradient
-        ? { background: `linear-gradient(${getGradientAngle(gradientDirection)}deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)` }
+        ? { background: `linear-gradient(${gradientDirection}deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)` }
         : { background: backgroundColor };
 
     return (

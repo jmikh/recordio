@@ -94,7 +94,8 @@ export interface BackgroundSettings {
     type: 'color' | 'preset' | 'custom';
     color: string;
     gradientColors: [string, string];
-    gradientDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+    /** Gradient angle in degrees (0-360). 0 = up, 90 = right, 180 = down, 270 = left */
+    gradientDirection: number;
     /** Static URL for preset backgrounds (type: 'preset') */
     imageUrl?: string;
     /** Persistent URL for custom uploads (type: 'custom'). recordio-blob:// protocol. */
