@@ -34,7 +34,7 @@ export function CaptionsSettings() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [emptyCaptionsNotice, setEmptyCaptionsNotice] = useState(false);
-    const inputRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLSpanElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const toastIdRef = useRef<string | null>(null);
 
@@ -219,7 +219,7 @@ export function CaptionsSettings() {
         }
     };
 
-    const handleInput = (e: React.FormEvent<HTMLDivElement>, segmentId: string) => {
+    const handleInput = (e: React.FormEvent<HTMLSpanElement>, segmentId: string) => {
         const text = e.currentTarget.textContent || '';
 
         // Save cursor position before update
@@ -359,78 +359,71 @@ export function CaptionsSettings() {
 
             {
                 captionSegments && captionSegments.length > 0 && (
-                    <div className="space-y-3">
-                        {captionSegments.map(segment => {
-                            // Convert source time to output time for display
-                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-                            const outputStart = outputRange?.start ?? segment.sourceStartMs;
-                            const outputEnd = outputRange?.end ?? segment.sourceEndMs;
-                            const isEditing = editingId === segment.id;
+                    <div
+                        className="bg-surface-overlay rounded-lg p-4"
+                        style={{ paddingTop: '28px' }}
+                    >
+                        <div>
+                            {captionSegments.map(segment => {
+                                // Convert source time to output time for display
+                                const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+                                const outputStart = outputRange?.start ?? segment.sourceStartMs;
+                                const outputEnd = outputRange?.end ?? segment.sourceEndMs;
+                                const isEditing = editingId === segment.id;
 
-                            return (
-                                <div
-                                    key={segment.id}
-                                    className={`group relative flex rounded-lg overflow-hidden cursor-pointer transition-colors duration-200 ${isEditing
-                                        ? 'bg-primary/10'
-                                        : 'bg-surface-overlay hover:bg-hover-subtle'
-                                        }`}
-                                    onClick={() => !isEditing && handleEditStart(segment)}
-                                >
-                                    {/* Left accent bar */}
-                                    <div
-                                        className={`w-[3px] flex-shrink-0 transition-colors duration-200 ${isEditing ? 'bg-primary' : 'bg-transparent group-hover:bg-border'
-                                            }`}
-                                    />
-
-                                    {/* Content area */}
-                                    <div className="flex-1 py-2.5 px-3 min-w-0">
-                                        {/* Time range header */}
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`font-mono text-[10px] transition-colors ${isEditing ? 'text-primary' : 'text-text-muted'}`}>
-                                                    {formatTime(outputStart)}
-                                                </span>
-                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
-                                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                                    <polyline points="12 5 19 12 12 19" />
-                                                </svg>
-                                                <span className={`font-mono text-[10px] transition-colors ${isEditing ? 'text-primary' : 'text-text-muted'}`}>
-                                                    {formatTime(outputEnd)}
-                                                </span>
-                                            </div>
-                                            <XButton
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(segment.id);
+                                return (
+                                    <span
+                                        key={segment.id}
+                                        onClick={() => !isEditing && handleEditStart(segment)}
+                                        className="relative inline"
+                                    >
+                                        {/* Floating timestamp pill - shows on selection */}
+                                        {isEditing && (
+                                            <span
+                                                className="absolute font-mono text-[9px] text-primary-highlighted bg-surface-raised flex items-center gap-1.5 whitespace-nowrap z-10 shadow-float"
+                                                style={{
+                                                    top: '-24px',
+                                                    left: 0,
+                                                    padding: '3px 4px 3px 8px',
+                                                    borderRadius: '4px'
                                                 }}
-                                                title="Delete caption"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                            />
-                                        </div>
+                                            >
+                                                <span>{formatTime(outputStart)} → {formatTime(outputEnd)}</span>
+                                                <XButton
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(segment.id);
+                                                    }}
+                                                    title="Delete caption"
+                                                />
+                                            </span>
+                                        )}
 
-                                        {/* Caption text */}
-                                        <div
+                                        {/* Caption text - inline editable */}
+                                        <span
                                             ref={isEditing ? inputRef : null}
                                             contentEditable={isEditing}
                                             suppressContentEditableWarning
                                             onInput={(e) => handleInput(e, segment.id)}
                                             onKeyDown={handleKeyDown}
                                             onBlur={handleBlur}
-                                            className={`text-xs font-medium transition-colors ${isEditing ? 'text-text-highlighted' : 'text-text-main group-hover:text-text-highlighted'
+                                            className={`text-xs transition-all outline-none ${isEditing
+                                                ? 'text-text-highlighted bg-primary/20 border-b-2 border-primary'
+                                                : 'text-text-muted cursor-pointer hover:text-text-main'
                                                 }`}
                                             style={{
-                                                lineHeight: 1.5,
-                                                whiteSpace: 'pre-wrap',
-                                                wordBreak: 'break-word',
-                                                outline: 'none'
+                                                lineHeight: 2.2,
+                                                padding: isEditing ? '2px 4px' : '2px 0',
+                                                borderRadius: '3px',
                                             }}
                                         >
                                             {segment.text}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                        </span>
+                                        <span> </span>
+                                    </span>
+                                );
+                            })}
+                        </div>
                     </div>
                 )
             }
