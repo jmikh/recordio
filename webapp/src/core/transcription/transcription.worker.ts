@@ -4,7 +4,7 @@
  * Receives 16kHz Float32Array, runs Whisper, returns text + timestamps.
  */
 
-import { pipeline, Pipeline, uv } from '@huggingface/transformers';
+import { pipeline, Pipeline, env } from '@huggingface/transformers';
 
 // Configure Transformers.js
 env.allowRemoteModels = true;

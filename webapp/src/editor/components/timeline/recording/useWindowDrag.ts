@@ -4,6 +4,7 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import { MIN_WINDOW_DURATION_MS } from './constants';
 
 export interface DragState {
     windowId: string;
@@ -30,7 +31,7 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
     // History Batcher
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    const MinWindowDurationMs = 250;
+
 
     useEffect(() => {
         if (!dragState) return;
@@ -54,11 +55,11 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
             if (dragState.type === 'left') {
                 const proposedStart = win.startMs + sourceDeltaMs;
                 // Cannot go before minStart, cannot cross endMs (min dur 100ms)
-                newStartMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MinWindowDurationMs);
+                newStartMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MIN_WINDOW_DURATION_MS);
             } else if (dragState.type === 'right') {
                 const proposedEnd = win.endMs + sourceDeltaMs;
                 // Cannot go past maxEnd, cannot cross startMs
-                newEndMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MinWindowDurationMs);
+                newEndMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MIN_WINDOW_DURATION_MS);
             }
 
             // Only update if values changed
