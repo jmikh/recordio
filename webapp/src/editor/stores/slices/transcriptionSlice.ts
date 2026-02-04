@@ -10,7 +10,7 @@ export interface TranscriptionSlice {
 
     setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
     setCaptionSegments: (segments: CaptionSegment[]) => void;
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => void;
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; outputStartMs: number; outputEndMs: number }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
     deleteAllCaptions: () => void;
 }
@@ -71,7 +71,7 @@ export const createTranscriptionSlice: StateCreator<
         }));
     },
 
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => {
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; outputStartMs: number; outputEndMs: number }>) => {
         console.log('[Action] updateCaptionSegment', segmentId, updates);
         set(state => {
             const captionSegments = state.project.timeline.captionSegments;

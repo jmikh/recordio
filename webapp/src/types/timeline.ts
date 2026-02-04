@@ -11,15 +11,16 @@ import type { ID, TimeMs, Rect } from '@shared/types';
 // ==========================================
 
 /**
- * Represents a single caption segment.
- * Timestamps are in source time (raw video time before windows/speed adjustments).
+ * A transcribed caption segment.
+ * Timestamps are in source timeline time (before window cuts and speed adjustments).
+ * The caption painter uses CaptionTimeMapper to convert to output time at render.
  */
 export interface CaptionSegment {
     id: ID;
     text: string;
-    /** Start time in source video (milliseconds) */
+    /** Start time in source timeline (milliseconds) */
     sourceStartMs: number;
-    /** End time in source video (milliseconds) */
+    /** End time in source timeline (milliseconds) */
     sourceEndMs: number;
 }
 

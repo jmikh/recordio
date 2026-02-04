@@ -5,7 +5,7 @@ import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '@shared/components';
 import { MultiToggle } from '@shared/components';
-import { LookRightButton } from './LookRightButton';
+import { SettingsPanelButton } from './SettingsPanel';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa6';
 
@@ -31,7 +31,7 @@ export const ScreenSettings = () => {
             {/* Area 1: Crop and Padding */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <LookRightButton
+                    <SettingsPanelButton
                         icon={isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-5 h-5" />}
                         isActive={isEditingCrop}
                         onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}

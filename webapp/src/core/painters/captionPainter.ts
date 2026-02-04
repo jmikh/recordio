@@ -9,7 +9,7 @@ const DIM_OPACITY = 0.6;
  * Draws captions at the bottom of the canvas with progressive word highlighting.
  *
  * @param ctx 2D Canvas Context
- * @param captionSegments Caption segments from transcription
+ * @param captionSegments Caption segments from transcription (with source timestamps)
  * @param settings Caption display settings
  * @param timeMapper Time mapper for source-to-output time conversion
  * @param currentTimeMs Current output time
@@ -28,14 +28,14 @@ export function drawCaptions(
         return;
     }
 
-    // Create caption time mapper
+    // Create caption time mapper to convert source time → output time
     const captionTimeMapper = new CaptionTimeMapper(captionSegments, timeMapper);
 
     // Get visible captions at current time (with output ranges)
     const visibleSegments = captionTimeMapper.getVisibleSegments();
-    const visibleCaptions = visibleSegments.filter(segment => {
-        return currentTimeMs >= segment.outputRange.start && currentTimeMs < segment.outputRange.end;
-    });
+    const visibleCaptions = visibleSegments.filter(segment =>
+        currentTimeMs >= segment.outputRange.start && currentTimeMs < segment.outputRange.end
+    );
 
     if (visibleCaptions.length === 0) {
         return;
@@ -64,7 +64,7 @@ export function drawCaptions(
         const text = caption.text;
         const words = text.split(' ').filter(w => w.length > 0);
 
-        // Calculate elapsed ratio within this segment
+        // Calculate elapsed ratio within this segment (using output range)
         const segmentStart = caption.outputRange.start;
         const segmentEnd = caption.outputRange.end;
         const segmentDuration = segmentEnd - segmentStart;

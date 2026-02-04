@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -6,13 +6,13 @@ import type { CaptionSegment } from '../../../types';
 import { Slider } from '@shared/components';
 import { Toggle } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { useTimeMapper } from '../../hooks/useTimeMapper';
-import { TranscriptionService } from '../../../core/TranscriptionService';
-import { ProgressModal } from '@shared/components';
+import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
+import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { PrimaryButton } from '@shared/components';
 import { Notice } from '@shared/components';
 import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
+import { useToast } from '../Toast';
 
 /**
  * Settings panel for managing captions.
@@ -22,10 +22,6 @@ export function CaptionsSettings() {
     const updateSettings = useProjectStore(state => state.updateSettings);
     const updateCaptionSegment = useProjectStore(state => state.updateCaptionSegment);
     const deleteCaptionSegment = useProjectStore(state => state.deleteCaptionSegment);
-    const isTranscribing = useProjectStore(state => state.isTranscribing);
-    const transcriptionProgress = useProjectStore(state => state.transcriptionProgress);
-    const transcriptionError = useProjectStore(state => state.transcriptionError);
-    const setTranscriptionState = useProjectStore(state => state.setTranscriptionState);
     const setCaptionSegments = useProjectStore(state => state.setCaptionSegments);
 
     // UI Store actions
@@ -34,15 +30,20 @@ export function CaptionsSettings() {
     const setCurrentTime = useUIStore(state => state.setCurrentTime);
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
+    const { addToast, updateToast, removeToast } = useToast();
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const [emptyCaptionsNotice, setEmptyCaptionsNotice] = useState(false);
     const inputRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const toastIdRef = useRef<string | null>(null);
 
     const captionSegments = project.timeline.captionSegments;
+    const outputWindows = project.timeline.outputWindows;
     const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true };
 
-    const timeMapper = useTimeMapper();
+    // Create TimeMapper for source→output time conversion
+    const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
 
     // Focus when editing starts
     useEffect(() => {
@@ -81,10 +82,9 @@ export function CaptionsSettings() {
         console.log(`[CaptionsSettings] Using ${sourceName} source for transcription`);
 
         try {
-            console.log('[CaptionsSettings] Starting transcription generation');
-
             // Pause playback
             setIsPlaying(false);
+            setIsTranscribing(true);
 
             // Setup AbortController
             if (abortControllerRef.current) {
@@ -93,25 +93,33 @@ export function CaptionsSettings() {
             abortControllerRef.current = new AbortController();
             const signal = abortControllerRef.current.signal;
 
-            setTranscriptionState({
-                isTranscribing: true,
-                transcriptionProgress: 0,
-                transcriptionError: null
+            // Show progress toast
+            const toastId = addToast({
+                type: 'progress',
+                title: 'Generating Captions',
+                message: 'Loading audio...',
+                progress: 0,
+                onCancel: handleCancel
             });
+            toastIdRef.current = toastId;
 
-            // Fetch video
+            // Fetch source video
             const response = await fetch(sourceToTranscribe.runtimeUrl!);
             if (!response.ok) throw new Error(`Failed to fetch video: ${response.statusText}`);
             const videoBlob = await response.blob();
 
             if (signal.aborted) throw new Error('Aborted');
 
-            // Run transcription
+            updateToast(toastId, { progress: 0.1, message: 'Transcribing audio...' });
+
+            // Run transcription on entire audio (runs in Web Worker)
             const transcriptionService = TranscriptionService.getInstance();
-            const transcriptionData = await transcriptionService.transcribeWebcamAudio(
+            const transcriptionData = await transcriptionService.transcribe(
                 videoBlob,
-                (progress) => {
-                    setTranscriptionState({ transcriptionProgress: progress });
+                (progress: number) => {
+                    // Scale progress: 10% for loading + 90% for transcription
+                    const scaledProgress = 0.1 + (progress * 0.9);
+                    updateToast(toastId, { progress: scaledProgress });
                 },
                 signal
             );
@@ -127,6 +135,13 @@ export function CaptionsSettings() {
                 is_pro: isPro,
             });
 
+            // Show success toast
+            updateToast(toastId, {
+                type: 'success',
+                title: 'Captions Generated',
+                message: `${transcriptionData.length} caption${transcriptionData.length !== 1 ? 's' : ''} created`
+            });
+
             // Check if captions are empty (no audible speech detected)
             if (transcriptionData.length === 0) {
                 setEmptyCaptionsNotice(true);
@@ -134,24 +149,28 @@ export function CaptionsSettings() {
                 setEmptyCaptionsNotice(false);
             }
 
-            setTranscriptionState({
-                isTranscribing: false,
-                transcriptionProgress: 1
-            });
-
         } catch (error: any) {
             if (error.message === 'Aborted') {
                 console.log('[CaptionsSettings] Transcription cancelled');
-                setTranscriptionState({ isTranscribing: false });
+                if (toastIdRef.current) {
+                    removeToast(toastIdRef.current);
+                }
                 return;
             }
             console.error('[CaptionsSettings] Failed to generate transcription:', error);
             setEmptyCaptionsNotice(false);
-            setTranscriptionState({
-                isTranscribing: false,
-                transcriptionError: 'Failed to generate captions. Please try again.'
-            });
+
+            // Show error toast
+            if (toastIdRef.current) {
+                updateToast(toastIdRef.current, {
+                    type: 'error',
+                    title: 'Caption Generation Failed',
+                    message: 'Please try again'
+                });
+            }
         } finally {
+            setIsTranscribing(false);
+            toastIdRef.current = null;
             if (abortControllerRef.current?.signal.aborted) {
                 abortControllerRef.current = null;
             }
@@ -163,6 +182,7 @@ export function CaptionsSettings() {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
+        TranscriptionService.getInstance().abort();
     };
 
     const formatTime = (ms: number) => {
@@ -179,10 +199,10 @@ export function CaptionsSettings() {
         setCanvasMode(CanvasMode.CaptionEdit);
         setIsPlaying(false);
 
-        // Move CTI to the start of the caption in output time
-        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-        if (outputRange) {
-            setCurrentTime(outputRange.start);
+        // Move CTI to the start of the caption (convert source time to output time)
+        const sourceToOutputTime = timeMapper.mapSourceToOutputTime(segment.sourceStartMs);
+        if (sourceToOutputTime !== -1) {
+            setCurrentTime(sourceToOutputTime);
         }
 
         startInteraction();
@@ -330,30 +350,8 @@ export function CaptionsSettings() {
                 </div>
             )}
 
-            {
-                isTranscribing && (
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-text-main">
-                            <span>Transcribing audio...</span>
-                            <span>{Math.round(transcriptionProgress * 100)}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-primary transition-all duration-300"
-                                style={{ width: `${transcriptionProgress * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                )
-            }
 
-            {transcriptionError && (
-                <Notice variant="error">
-                    {transcriptionError}
-                </Notice>
-            )}
-
-            {emptyCaptionsNotice && !transcriptionError && (
+            {emptyCaptionsNotice && (
                 <Notice variant="info">
                     No audible speech was detected in the audio. Captions require clear, spoken English to generate.
                 </Notice>
@@ -361,79 +359,82 @@ export function CaptionsSettings() {
 
             {
                 captionSegments && captionSegments.length > 0 && (
-                    <div className="space-y-5">
-                        <div className="space-y-5">
-                            {(() => {
-                                return captionSegments.map(segment => {
-                                    const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-                                    if (!range) return null;
-                                    const outputStart = range.start;
-                                    const outputEnd = range.end;
-                                    const isEditing = editingId === segment.id;
+                    <div className="space-y-3">
+                        {captionSegments.map(segment => {
+                            // Convert source time to output time for display
+                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+                            const outputStart = outputRange?.start ?? segment.sourceStartMs;
+                            const outputEnd = outputRange?.end ?? segment.sourceEndMs;
+                            const isEditing = editingId === segment.id;
 
-                                    return (
-                                        <div key={segment.id} className="flex flex-col w-full">
-                                            {/* Capsule bar - time + delete */}
-                                            <div className="flex items-center justify-between bg-surface-raised border border-border rounded px-3 py-0.5">
-                                                <div className="flex-1 flex items-center justify-center gap-1.5">
-                                                    <span className="text-text-main font-mono text-[10px]">
-                                                        {formatTime(outputStart)}
-                                                    </span>
-                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
-                                                        <line x1="5" y1="12" x2="19" y2="12" />
-                                                        <polyline points="12 5 19 12 12 19" />
-                                                    </svg>
-                                                    <span className="text-text-main font-mono text-[10px]">
-                                                        {formatTime(outputEnd)}
-                                                    </span>
-                                                </div>
-                                                <XButton
-                                                    onClick={() => handleDelete(segment.id)}
-                                                    title="Delete caption"
-                                                />
-                                            </div>
+                            return (
+                                <div
+                                    key={segment.id}
+                                    className={`group relative flex rounded-lg overflow-hidden cursor-pointer transition-colors duration-200 ${isEditing
+                                        ? 'bg-primary/10'
+                                        : 'bg-surface-overlay hover:bg-hover-subtle'
+                                        }`}
+                                    onClick={() => !isEditing && handleEditStart(segment)}
+                                >
+                                    {/* Left accent bar */}
+                                    <div
+                                        className={`w-[3px] flex-shrink-0 transition-colors duration-200 ${isEditing ? 'bg-primary' : 'bg-transparent group-hover:bg-border'
+                                            }`}
+                                    />
 
-                                            {/* Caption content */}
-                                            <div
-                                                className={`group px-3 py-2 rounded bg-surface-overlay font-medium text-xs w-full border transition-colors ${isEditing ? 'ring-active border-border' : 'border-border hover:border-border-hover hover:bg-hover-subtle'}`}
-                                            >
-                                                <div
-                                                    ref={isEditing ? inputRef : null}
-                                                    contentEditable={isEditing}
-                                                    suppressContentEditableWarning
-                                                    onInput={(e) => handleInput(e, segment.id)}
-                                                    onKeyDown={handleKeyDown}
-                                                    onBlur={handleBlur}
-                                                    className={`cursor-text transition-colors ${isEditing ? 'text-text-highlighted' : 'text-text-main group-hover:text-text-highlighted'}`}
-                                                    style={{
-                                                        lineHeight: 1.4,
-                                                        textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-                                                        whiteSpace: 'pre-wrap',
-                                                        wordBreak: 'break-word',
-                                                        outline: 'none'
-                                                    }}
-                                                    onClick={() => !isEditing && handleEditStart(segment)}
-                                                >
-                                                    {segment.text}
-                                                </div>
+                                    {/* Content area */}
+                                    <div className="flex-1 py-2.5 px-3 min-w-0">
+                                        {/* Time range header */}
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`font-mono text-[10px] transition-colors ${isEditing ? 'text-primary' : 'text-text-muted'}`}>
+                                                    {formatTime(outputStart)}
+                                                </span>
+                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-disabled">
+                                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                                    <polyline points="12 5 19 12 12 19" />
+                                                </svg>
+                                                <span className={`font-mono text-[10px] transition-colors ${isEditing ? 'text-primary' : 'text-text-muted'}`}>
+                                                    {formatTime(outputEnd)}
+                                                </span>
                                             </div>
+                                            <XButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDelete(segment.id);
+                                                }}
+                                                title="Delete caption"
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                            />
                                         </div>
-                                    );
-                                });
-                            })()}
-                        </div>
+
+                                        {/* Caption text */}
+                                        <div
+                                            ref={isEditing ? inputRef : null}
+                                            contentEditable={isEditing}
+                                            suppressContentEditableWarning
+                                            onInput={(e) => handleInput(e, segment.id)}
+                                            onKeyDown={handleKeyDown}
+                                            onBlur={handleBlur}
+                                            className={`text-xs font-medium transition-colors ${isEditing ? 'text-text-highlighted' : 'text-text-main group-hover:text-text-highlighted'
+                                                }`}
+                                            style={{
+                                                lineHeight: 1.5,
+                                                whiteSpace: 'pre-wrap',
+                                                wordBreak: 'break-word',
+                                                outline: 'none'
+                                            }}
+                                        >
+                                            {segment.text}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )
             }
-            {/* Modal is rendered here to share access to handleCancel */}
-            <ProgressModal
-                isOpen={isTranscribing}
-                title="Generating Captions"
-                projectName={project.name}
-                progress={transcriptionProgress}
-                statusText="Processing audio..."
-                onCancel={handleCancel}
-            />
+
         </div >
     );
 }

@@ -204,42 +204,12 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]); // Verify stable refs
 
-    // Click on background moves the zoom box
-    const handleContainerPointerDown = (e: React.PointerEvent) => {
-        // Only trigger if clicking the container background directly
-        if (e.target !== containerRef.current || !initialRect) return;
-
-        if (e.target !== containerRef.current || !initialRect) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-
-        // Center around click
-        const targetX = (offsetX / rect.width) * videoSize.width;
-        const targetY = (offsetY / rect.height) * videoSize.height;
-
-        let newX = targetX - initialRect.width / 2;
-        let newY = targetY - initialRect.height / 2;
-
-        // Clamp
-        if (newX < 0) newX = 0;
-        if (newX + initialRect.width > videoSize.width) newX = videoSize.width - initialRect.width;
-        if (newY < 0) newY = 0;
-        if (newY + initialRect.height > videoSize.height) newY = videoSize.height - initialRect.height;
-
-        const newRect = { ...initialRect, x: newX, y: newY };
-        handleRectChange(newRect); // This now triggers batchAction update
-    };
-
-
     if (!initialRect || !editingZoomId) return null;
 
     return (
         <div
             ref={containerRef}
             className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm"
-            onPointerDown={handleContainerPointerDown}
         >
             <DimmedOverlay
                 holeRect={currentRect}

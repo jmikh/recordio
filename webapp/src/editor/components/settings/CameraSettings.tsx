@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '@shared/components';
 import { MultiToggle } from '@shared/components';
 import { Toggle } from '@shared/components';
-import { LookRightButton } from './LookRightButton';
+import { SettingsPanelButton } from './SettingsPanel';
 import { Notice } from '@shared/components';
 import { FaCheck } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
@@ -70,7 +70,7 @@ export const CameraSettings = () => {
         <div className="space-y-6 relative">
             <div>
                 <div className="flex gap-2 mb-6">
-                    <LookRightButton
+                    <SettingsPanelButton
                         icon={isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight className="w-5 h-5" />}
                         isActive={isEditingCamera}
                         onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}

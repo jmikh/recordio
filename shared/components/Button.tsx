@@ -13,7 +13,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 className={`
                flex items-center justify-center gap-2
                border border-border
-               bg-hover-subtle hover:bg-hover
+               bg-surface-inset hover:bg-hover
                text-text-main hover:text-text-highlighted
                text-xs
                rounded-sm
@@ -23,7 +23,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                disabled:opacity-50 disabled:cursor-not-allowed
                ${className}
             `}
-            {...props}
+                {...props}
             >
                 {children}
             </button>

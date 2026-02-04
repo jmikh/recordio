@@ -93,8 +93,9 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
             className="absolute top-0 bottom-0"
             style={{ left: `${left}px`, width: `${width}px` }}
             onMouseDown={() => {
-                // Just handle selection - let event bubble up to Timeline for CTI movement
-                selectWindow(isSelected ? null : seg.id);
+                // Just handle selection (no deselect on re-click)
+                // Let event bubble up to Timeline for CTI movement
+                selectWindow(seg.id);
             }}
         >
             {/* Visual Window Content (Clipped) */}

@@ -21,6 +21,9 @@ export function useTimelineInteraction({
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setPreviewTime = useUIStore(s => s.setPreviewTime);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
+    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const selectZoom = useUIStore(s => s.selectZoom);
+    const selectSpotlight = useUIStore(s => s.selectSpotlight);
 
     const zoomActions = useProjectStore(s => s.project.timeline.zoomActions);
 
@@ -86,10 +89,14 @@ export function useTimelineInteraction({
     }, [getTimeFromEvent, isCTIScrubbing, isPlaying, canvasMode, setCurrentTime, setPreviewTime]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        // Deselect zoom/spotlight when clicking on timeline to change CTI
+        if (selectedZoomId) selectZoom(null);
+        if (selectedSpotlightId) selectSpotlight(null);
+
         setIsCTIScrubbing(true);
         const { outputTime } = getTimeFromEvent(e);
         setCurrentTime(outputTime);
-    }, [getTimeFromEvent, setCurrentTime]);
+    }, [getTimeFromEvent, setCurrentTime, selectedZoomId, selectedSpotlightId, selectZoom, selectSpotlight]);
 
     const handleMouseLeave = useCallback(() => {
         setHoverTime(null);

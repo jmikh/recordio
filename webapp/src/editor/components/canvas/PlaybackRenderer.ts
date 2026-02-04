@@ -1,5 +1,4 @@
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
@@ -12,6 +11,7 @@ import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/zoom/cameraZoom';
+import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { type FocusArea } from '../../../types';
 import type { Project, Rect, CameraSettings } from '../../../types';
 
@@ -163,11 +163,12 @@ export class PlaybackRenderer {
 
         // Render Captions (on top of everything including spotlight)
         if (project.settings.captions.visible) {
+            const timeMapper = new TimeMapper(timeline.outputWindows);
             drawCaptions(
                 ctx,
                 timeline.captionSegments,
                 project.settings.captions,
-                getTimeMapper(timeline.outputWindows),
+                timeMapper,
                 currentTimeMs,
                 outputSize
             );

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
+import { ToastProvider } from './editor/components/Toast';
 
 export function App() {
     const [path, setPath] = useState(window.location.pathname);
@@ -13,14 +14,22 @@ export function App() {
     }, []);
 
     // Simple routing
-    if (path === '/import' || path.startsWith('/import')) {
-        return <ImportPage />;
-    }
+    const getPage = () => {
+        if (path === '/import' || path.startsWith('/import')) {
+            return <ImportPage />;
+        }
 
-    if (path === '/editor' || path.startsWith('/editor')) {
-        return <EditorPage />;
-    }
+        if (path === '/editor' || path.startsWith('/editor')) {
+            return <EditorPage />;
+        }
 
-    // Default to dashboard
-    return <DashboardPage />;
+        // Default to dashboard
+        return <DashboardPage />;
+    };
+
+    return (
+        <ToastProvider>
+            {getPage()}
+        </ToastProvider>
+    );
 }

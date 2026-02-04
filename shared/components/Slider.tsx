@@ -117,7 +117,7 @@ export const Slider: React.FC<SliderProps> = ({
     return (
         <div className={`w-full ${className}`}>
             {label && (
-                <label className="text-xs text-gray-400 mb-2 block">
+                <label className="text-xs text-text-muted mb-2 block">
                     {label}
                 </label>
             )}
@@ -133,7 +133,7 @@ export const Slider: React.FC<SliderProps> = ({
             >
                 {/* Visual Track - Full Width Background (Inactive part) */}
                 <div
-                    className="absolute left-0 right-0 rounded-full bg-text-disabled"
+                    className="absolute left-0 right-0 rounded-full bg-surface-inset"
                     style={{
                         height: `${TRACK_HEIGHT}px`,
                         left: `${PADDING}px`,
@@ -142,7 +142,7 @@ export const Slider: React.FC<SliderProps> = ({
                 >
                     {/* Active Track (Left side) */}
                     <div
-                        className="absolute top-0 left-0 bottom-0 bg-text-highlighted rounded-full"
+                        className="absolute top-0 left-0 bottom-0 bg-primary rounded-full"
                         style={{
                             width: `calc(${fraction} * 100%)`
                         }}

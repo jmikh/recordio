@@ -35,14 +35,14 @@ export const Toggle: React.FC<ToggleProps> = ({
             className={`
                 relative inline-flex items-center
                 w-10 h-5
-                bg-hover-subtle
                 rounded-full
                 shadow-sm
                 border border-border
                 cursor-pointer
                 transition-colors
+                group
                 disabled:opacity-50 disabled:cursor-not-allowed
-                ${value ? 'bg-primary border hover:bg-primary-highlighted border-primary' : 'hover:bg-hover hover:border-border-hover'}
+                ${value ? 'bg-primary' : 'bg-surface-inset'}
                 ${className}
             `}
             role="switch"
@@ -56,9 +56,11 @@ export const Toggle: React.FC<ToggleProps> = ({
                     w-4 h-4
                     rounded-full
                     shadow-sm
+                    transition-transform
+                    group-hover:scale-110
                     ${value ? 'left-[calc(100%-1.25rem)]' : 'left-1'}
                     ${value ? 'bg-text-highlighted' : 'bg-text-main'}
-                        `}
+                `}
             />
         </button>
     );

@@ -15,6 +15,7 @@
    --color-surface: var(--surface-default);
    --color-surface-raised: var(--surface-raised);
    --color-surface-overlay: var(--surface-overlay);
+   --color-surface-inset: var(--surface-inset);
 
    /* ─────────────────────────────────────────────────────────
      Hovers
@@ -108,10 +109,11 @@
    /* ─────────────────────────────────────────────────────────
      1. Surfaces (Body → Surface → Raised → Overlay)
      ───────────────────────────────────────────────────────── */
-   --surface-body: oklch(0.13 0 0);
-   --surface-default: oklch(0.17 0 0);
-   --surface-raised: oklch(0.21 0 0);
-   --surface-overlay: oklch(0.25 0 0);
+   --surface-body: oklch(0.13 0.01 270);
+   --surface-default: oklch(0.17 0.012 270);
+   --surface-raised: oklch(0.21 0.014 270);
+   --surface-overlay: oklch(0.25 0.016 270);
+   --surface-inset: oklch(0 0 0 / 50%);
 
    /* ─────────────────────────────────────────────────────────
      2. Hover Backgrounds
