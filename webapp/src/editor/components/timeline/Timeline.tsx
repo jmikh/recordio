@@ -243,7 +243,12 @@ export function Timeline() {
                             onMouseDown={handleMouseDown}
                             onMouseLeave={handleMouseLeave}
                             onMouseUp={handleMouseUp}
-                            onClick={() => selectWindow(null)}
+                            onClick={(e) => {
+                                // Only deselect if clicking on empty timeline area, not on segments
+                                if (e.target === e.currentTarget) {
+                                    selectWindow(null);
+                                }
+                            }}
                         >
                             <div
                                 className="relative min-w-full"

@@ -2,7 +2,6 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import type { Timeline as TimelineType } from '../../../../core/types';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
-import { useClickOutside } from '../../../hooks/useClickOutside';
 import { useUIStore } from '../../../stores/useUIStore';
 import { getTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
@@ -43,11 +42,6 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
         const timeMapper = getTimeMapper(timeline.outputWindows);
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeline.outputWindows, pixelsPerSec]);
-
-    // Deselect window when clicking outside this track component
-    useClickOutside(containerRef, () => {
-        if (selectedWindowId) selectWindow(null);
-    });
 
     // Escape key to deselect window
     useEffect(() => {

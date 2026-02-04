@@ -92,9 +92,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
         <div
             className="absolute top-0 bottom-0"
             style={{ left: `${left}px`, width: `${width}px` }}
-            onClick={(e) => {
-                e.stopPropagation();
-                // Toggle: if already selected, deselect; otherwise select
+            onMouseDown={() => {
+                // Just handle selection - let event bubble up to Timeline for CTI movement
                 selectWindow(isSelected ? null : seg.id);
             }}
         >
