@@ -165,7 +165,7 @@ export class PlaybackRenderer {
         if (project.settings.captions.visible) {
             drawCaptions(
                 ctx,
-                timeline.captions,
+                timeline.captionSegments,
                 project.settings.captions,
                 getTimeMapper(timeline.outputWindows),
                 currentTimeMs,

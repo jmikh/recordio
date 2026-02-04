@@ -18,7 +18,7 @@ import {
     buildImportUrl,
     type HandoffCompletePayload,
 } from '@shared/types/bridge';
-import type { RawRecording } from '@shared/types/recording';
+import type { RawRecording } from '@shared/types';
 
 // Initialize Sentry for error tracking
 initSentry('background');

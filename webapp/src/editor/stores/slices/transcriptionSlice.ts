@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { Captions } from '../../../types';
+import type { CaptionSegment } from '../../../types';
 
 
 export interface TranscriptionSlice {
@@ -9,9 +9,10 @@ export interface TranscriptionSlice {
     transcriptionError: string | null;
 
     setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
-    setCaptions: (captions: Captions) => void;
+    setCaptionSegments: (segments: CaptionSegment[]) => void;
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
+    deleteAllCaptions: () => void;
 }
 
 export const createTranscriptionSlice: StateCreator<
@@ -28,27 +29,41 @@ export const createTranscriptionSlice: StateCreator<
         set(updates);
     },
 
-    setCaptions: (captions) => {
+    setCaptionSegments: (segments) => {
         set(state => ({
             project: {
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    captions
+                    captionSegments: segments
+                },
+                settings: {
+                    ...state.project.settings,
+                    captions: {
+                        ...state.project.settings.captions,
+                        generatedAt: new Date()
+                    }
                 },
                 updatedAt: new Date()
             }
         }));
     },
 
-    deleteTranscription: () => {
-        console.log('[Action] deleteTranscription');
+    deleteAllCaptions: () => {
+        console.log('[Action] deleteAllCaptions');
         set(state => ({
             project: {
                 ...state.project,
                 timeline: {
                     ...state.project.timeline,
-                    captions: undefined
+                    captionSegments: []
+                },
+                settings: {
+                    ...state.project.settings,
+                    captions: {
+                        ...state.project.settings.captions,
+                        generatedAt: undefined
+                    }
                 },
                 updatedAt: new Date()
             },
@@ -59,19 +74,19 @@ export const createTranscriptionSlice: StateCreator<
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => {
         console.log('[Action] updateCaptionSegment', segmentId, updates);
         set(state => {
-            const captions = state.project.timeline.captions;
-            if (!captions) {
-                console.error('[TranscriptionSlice] Cannot update segment - no captions exist');
+            const captionSegments = state.project.timeline.captionSegments;
+            if (!captionSegments || captionSegments.length === 0) {
+                console.error('[TranscriptionSlice] Cannot update segment - no caption segments exist');
                 return state;
             }
 
-            const segmentIndex = captions.segments.findIndex(s => s.id === segmentId);
+            const segmentIndex = captionSegments.findIndex(s => s.id === segmentId);
             if (segmentIndex === -1) {
                 console.error('[TranscriptionSlice] Segment not found:', segmentId);
                 return state;
             }
 
-            const updatedSegments = [...captions.segments];
+            const updatedSegments = [...captionSegments];
             updatedSegments[segmentIndex] = {
                 ...updatedSegments[segmentIndex],
                 ...updates
@@ -82,10 +97,7 @@ export const createTranscriptionSlice: StateCreator<
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        captions: {
-                            ...captions,
-                            segments: updatedSegments
-                        }
+                        captionSegments: updatedSegments
                     },
                     updatedAt: new Date()
                 }
@@ -96,23 +108,20 @@ export const createTranscriptionSlice: StateCreator<
     deleteCaptionSegment: (segmentId: string) => {
         console.log('[Action] deleteCaptionSegment', segmentId);
         set(state => {
-            const captions = state.project.timeline.captions;
-            if (!captions) {
-                console.error('[TranscriptionSlice] Cannot delete segment - no captions exist');
+            const captionSegments = state.project.timeline.captionSegments;
+            if (!captionSegments || captionSegments.length === 0) {
+                console.error('[TranscriptionSlice] Cannot delete segment - no caption segments exist');
                 return state;
             }
 
-            const updatedSegments = captions.segments.filter(s => s.id !== segmentId);
+            const updatedSegments = captionSegments.filter(s => s.id !== segmentId);
 
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        captions: {
-                            ...captions,
-                            segments: updatedSegments
-                        }
+                        captionSegments: updatedSegments
                     },
                     updatedAt: new Date()
                 }

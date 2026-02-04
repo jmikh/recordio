@@ -1,11 +1,27 @@
 /**
  * Timeline Types
  * 
- * Timeline, output windows, and temporal actions (zoom, spotlight).
+ * Timeline, output windows, temporal actions (zoom, spotlight), and caption segments.
  */
 
 import type { ID, TimeMs, Rect } from '@shared/types';
-import type { Captions } from './settings/captions';
+
+// ==========================================
+// CAPTION SEGMENTS
+// ==========================================
+
+/**
+ * Represents a single caption segment.
+ * Timestamps are in source time (raw video time before windows/speed adjustments).
+ */
+export interface CaptionSegment {
+    id: ID;
+    text: string;
+    /** Start time in source video (milliseconds) */
+    sourceStartMs: number;
+    /** End time in source video (milliseconds) */
+    sourceEndMs: number;
+}
 
 // ==========================================
 // FOCUS AREAS
@@ -100,8 +116,8 @@ export interface Timeline {
     zoomActions: ZoomAction[];
     /** Spotlight action keyframes for spotlight effect (non-overlapping) */
     spotlightActions: SpotlightAction[];
-    /** Optional caption data from webcam audio */
-    captions?: Captions;
+    /** Caption segments from webcam audio transcription */
+    captionSegments: CaptionSegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
 }

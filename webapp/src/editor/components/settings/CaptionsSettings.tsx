@@ -26,7 +26,7 @@ export function CaptionsSettings() {
     const transcriptionProgress = useProjectStore(state => state.transcriptionProgress);
     const transcriptionError = useProjectStore(state => state.transcriptionError);
     const setTranscriptionState = useProjectStore(state => state.setTranscriptionState);
-    const setCaptions = useProjectStore(state => state.setCaptions);
+    const setCaptionSegments = useProjectStore(state => state.setCaptionSegments);
 
     // UI Store actions
     const setCanvasMode = useUIStore(state => state.setCanvasMode);
@@ -39,7 +39,7 @@ export function CaptionsSettings() {
     const inputRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    const captions = project.timeline.captions;
+    const captionSegments = project.timeline.captionSegments;
     const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true };
 
     const timeMapper = useTimeMapper();
@@ -117,18 +117,18 @@ export function CaptionsSettings() {
             );
 
             // Success
-            setCaptions(transcriptionData);
+            setCaptionSegments(transcriptionData);
 
             // Track caption generation
             const { isAuthenticated, isPro } = useUserStore.getState();
             trackCaptionsGenerated({
-                segment_count: transcriptionData.segments.length,
+                segment_count: transcriptionData.length,
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
             });
 
             // Check if captions are empty (no audible speech detected)
-            if (transcriptionData.segments.length === 0) {
+            if (transcriptionData.length === 0) {
                 setEmptyCaptionsNotice(true);
             } else {
                 setEmptyCaptionsNotice(false);
@@ -269,7 +269,7 @@ export function CaptionsSettings() {
             {/* Generate/Regenerate Buttons */}
             {!isTranscribing && (
                 <div className="flex flex-col gap-2">
-                    {!captions ? (
+                    {captionSegments.length === 0 ? (
                         <PrimaryButton
                             onClick={handleGenerate}
                             className="w-full"
@@ -360,11 +360,11 @@ export function CaptionsSettings() {
             )}
 
             {
-                captions && captions.segments.length > 0 && (
+                captionSegments && captionSegments.length > 0 && (
                     <div className="space-y-5">
                         <div className="space-y-5">
                             {(() => {
-                                return captions.segments.map(segment => {
+                                return captionSegments.map(segment => {
                                     const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
                                     if (!range) return null;
                                     const outputStart = range.start;

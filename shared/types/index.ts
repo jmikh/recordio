@@ -5,17 +5,11 @@
  * Extension-only or webapp-only types should live in their respective packages.
  */
 
-// Core primitives
+// Core primitives, source metadata, and raw recording
 export * from './core';
-
-// Source metadata
-export * from './source';
 
 // User events
 export * from './events';
-
-// Raw recording (handoff format)
-export * from './recording';
 
 // Bridge communication
 export * from './bridge';

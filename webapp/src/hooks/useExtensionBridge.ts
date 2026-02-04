@@ -18,7 +18,7 @@ import {
     type HandoffMetadataResponse,
     type ChunkPayload,
 } from '@shared/types/bridge';
-import type { RawRecording } from '@shared/types/recording';
+import type { RawRecording } from '@shared/types';
 
 const EXTENSION_ID = 'nihlpdaihoacconboieolmmnpnnhedan';
 

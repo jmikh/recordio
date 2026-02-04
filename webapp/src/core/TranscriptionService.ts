@@ -1,5 +1,5 @@
 import { pipeline, Pipeline, env } from '@huggingface/transformers';
-import type { Captions, CaptionSegment } from '../types';
+import type { CaptionSegment } from '../types';
 
 // Configure Transformers.js to download models from Cloudflare CDN
 // Models are cached in browser IndexedDB after first download
@@ -52,13 +52,13 @@ export class TranscriptionService {
      * 
      * @param videoBlob - The webcam video blob
      * @param onProgress - Optional progress callback (0-1)
-     * @returns Transcription data with segments tied to source timestamps
+     * @returns Array of caption segments tied to source timestamps
      */
     async transcribeWebcamAudio(
         videoBlob: Blob,
         onProgress?: (progress: number) => void,
         signal?: AbortSignal
-    ): Promise<Captions> {
+    ): Promise<CaptionSegment[]> {
         try {
             if (signal?.aborted) throw new Error('Aborted');
 
@@ -106,10 +106,7 @@ export class TranscriptionService {
             const segments = this.convertToSegments(result);
             onProgress?.(1.0);
 
-            return {
-                segments,
-                generatedAt: new Date()
-            };
+            return segments;
         } catch (error) {
             console.error('[TranscriptionService] Transcription failed:', error);
             throw error;

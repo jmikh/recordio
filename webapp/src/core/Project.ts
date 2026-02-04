@@ -110,7 +110,8 @@ const createDefaultTimeline = (): Timeline => ({
     zoomActions: [],
     spotlightActions: [],
     outputWindows: [],
-    focusAreas: []
+    focusAreas: [],
+    captionSegments: []
 });
 
 /**
@@ -194,7 +195,8 @@ export class ProjectImpl {
             outputWindows: outputWindows,
             zoomActions: zoomActions,
             spotlightActions: spotlightActions,
-            focusAreas: focusAreas
+            focusAreas: focusAreas,
+            captionSegments: []
         };
 
         return {

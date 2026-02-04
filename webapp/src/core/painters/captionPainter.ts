@@ -1,4 +1,4 @@
-import type { Captions, Size, CaptionSettings } from '../../types';
+import type { Size, CaptionSettings, CaptionSegment } from '../../types';
 import { CaptionTimeMapper } from '../mappers/CaptionTimeMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 
@@ -9,7 +9,7 @@ const DIM_OPACITY = 0.6;
  * Draws captions at the bottom of the canvas with progressive word highlighting.
  *
  * @param ctx 2D Canvas Context
- * @param captions Caption data from transcription
+ * @param captionSegments Caption segments from transcription
  * @param settings Caption display settings
  * @param timeMapper Time mapper for source-to-output time conversion
  * @param currentTimeMs Current output time
@@ -17,19 +17,19 @@ const DIM_OPACITY = 0.6;
  */
 export function drawCaptions(
     ctx: CanvasRenderingContext2D,
-    captions: Captions | undefined,
+    captionSegments: CaptionSegment[],
     settings: CaptionSettings,
     timeMapper: TimeMapper,
     currentTimeMs: number,
     outputSize: Size
 ) {
     // Don't render if captions are disabled or missing
-    if (!settings.visible || !captions || captions.segments.length === 0) {
+    if (!settings.visible || !captionSegments || captionSegments.length === 0) {
         return;
     }
 
     // Create caption time mapper
-    const captionTimeMapper = new CaptionTimeMapper(captions.segments, timeMapper);
+    const captionTimeMapper = new CaptionTimeMapper(captionSegments, timeMapper);
 
     // Get visible captions at current time (with output ranges)
     const visibleSegments = captionTimeMapper.getVisibleSegments();

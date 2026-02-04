@@ -10,7 +10,7 @@
  * 4. Website reconstructs blobs and confirms via HANDOFF_COMPLETE
  */
 
-import type { RawRecording } from './recording';
+import type { RawRecording } from './core';
 
 // ============================================
 // Message Types (sendMessage-based)
