@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdInfoOutline } from 'react-icons/md';
+import { MdInfoOutline, MdEdit } from 'react-icons/md';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -28,9 +28,15 @@ export function CaptionsSettings() {
     const restoreCaptionsFromBaseline = useProjectStore(state => state.restoreCaptionsFromBaseline);
 
     // UI Store actions
+    const canvasMode = useUIStore(state => state.canvasMode);
     const setCanvasMode = useUIStore(state => state.setCanvasMode);
+    const isPlaying = useUIStore(state => state.isPlaying);
     const setIsPlaying = useUIStore(state => state.setIsPlaying);
+    const currentTimeMs = useUIStore(state => state.currentTimeMs);
     const setCurrentTime = useUIStore(state => state.setCurrentTime);
+    const selectedCaptionId = useUIStore(state => state.selectedCaptionId);
+    const selectCaption = useUIStore(state => state.selectCaption);
+    const selectedSettingsPanel = useUIStore(state => state.selectedSettingsPanel);
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const { addToast, updateToast, removeToast } = useToast();
@@ -57,6 +63,38 @@ export function CaptionsSettings() {
             inputRef.current.focus();
         }
     }, [editingId]);
+
+    // Exit edit mode when playback starts
+    useEffect(() => {
+        if (isPlaying && editingId) {
+            setEditingId(null);
+            endInteraction();
+        }
+    }, [isPlaying, editingId, endInteraction]);
+
+    // Auto-select caption during playback (only in preview mode with captions panel)
+    useEffect(() => {
+        if (!isPlaying || canvasMode !== CanvasMode.Preview || selectedSettingsPanel !== 'project') return;
+        if (!captionSegments || captionSegments.length === 0) return;
+
+        // Find segment containing current time
+        const currentSegment = captionSegments.find(segment => {
+            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+            if (!outputRange) return false;
+            return currentTimeMs >= outputRange.start && currentTimeMs <= outputRange.end;
+        });
+
+        if (currentSegment) {
+            if (selectedCaptionId !== currentSegment.id) {
+                selectCaption(currentSegment.id);
+            }
+        } else {
+            // Deselect when not in any segment
+            if (selectedCaptionId) {
+                selectCaption(null);
+            }
+        }
+    }, [isPlaying, currentTimeMs, captionSegments, timeMapper, canvasMode, selectedSettingsPanel, selectedCaptionId, selectCaption]);
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
@@ -198,20 +236,32 @@ export function CaptionsSettings() {
         return `${mins}:${secs.padStart(4, '0')}`;
     };
 
-    const handleEditStart = (segment: CaptionSegment) => {
-        setEditingId(segment.id);
+    // Handle clicking on a caption segment
+    const handleSegmentClick = (segment: CaptionSegment) => {
+        const isSelected = selectedCaptionId === segment.id;
+        const isEditing = editingId === segment.id;
 
-        // Enter CaptionEdit mode and pause
-        setCanvasMode(CanvasMode.CaptionEdit);
-        setIsPlaying(false);
-
-        // Move CTI to the start of the caption (convert source time to output time)
-        const sourceToOutputTime = timeMapper.mapSourceToOutputTime(segment.sourceStartMs);
-        if (sourceToOutputTime !== -1) {
-            setCurrentTime(sourceToOutputTime);
+        if (isEditing) {
+            // Already editing, do nothing (let contentEditable handle it)
+            return;
         }
 
-        startInteraction();
+        if (isSelected) {
+            // Second click on selected segment → enter edit mode
+            setEditingId(segment.id);
+            setCanvasMode(CanvasMode.CaptionEdit);
+            setIsPlaying(false);
+            startInteraction();
+        } else {
+            // First click → select and move CTI (don't pause playback)
+            selectCaption(segment.id);
+
+            // Move CTI to the start of the caption (use output range + 1 to ensure we're inside)
+            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+            if (outputRange) {
+                setCurrentTime(outputRange.start + 1);
+            }
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -278,9 +328,12 @@ export function CaptionsSettings() {
     };
 
     const handleBlur = () => {
-        endInteraction();
-        setEditingId(null);
-        setCanvasMode(CanvasMode.Preview);
+        if (editingId) {
+            setEditingId(null);
+            setCanvasMode(CanvasMode.Preview);
+            endInteraction();
+            // Keep selection when exiting edit mode
+        }
     };
 
     const handleDelete = (segmentId: string) => {
@@ -396,35 +449,14 @@ export function CaptionsSettings() {
                                 const outputStart = outputRange?.start ?? segment.sourceStartMs;
                                 const outputEnd = outputRange?.end ?? segment.sourceEndMs;
                                 const isEditing = editingId === segment.id;
+                                const isSelected = selectedCaptionId === segment.id;
 
                                 return (
                                     <span
                                         key={segment.id}
-                                        onClick={() => !isEditing && handleEditStart(segment)}
+                                        onClick={() => handleSegmentClick(segment)}
                                         className="relative inline"
                                     >
-                                        {/* Floating timestamp pill - shows on selection */}
-                                        {isEditing && (
-                                            <span
-                                                className="absolute font-mono text-[9px] text-primary-highlighted bg-surface-raised flex items-center gap-1.5 whitespace-nowrap z-10 shadow-float"
-                                                style={{
-                                                    top: '-24px',
-                                                    left: 0,
-                                                    padding: '3px 4px 3px 8px',
-                                                    borderRadius: '4px'
-                                                }}
-                                            >
-                                                <span>{formatTime(outputStart)} → {formatTime(outputEnd)}</span>
-                                                <XButton
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDelete(segment.id);
-                                                    }}
-                                                    title="Delete caption"
-                                                />
-                                            </span>
-                                        )}
-
                                         {/* Caption text - inline editable */}
                                         <span
                                             ref={isEditing ? inputRef : null}
@@ -434,13 +466,15 @@ export function CaptionsSettings() {
                                             onKeyDown={handleKeyDown}
                                             onBlur={handleBlur}
                                             className={`text-xs transition-all outline-none ${isEditing
-                                                ? 'text-text-highlighted bg-primary/20 border-b-2 border-primary'
-                                                : 'text-text-muted cursor-pointer hover:text-text-main'
+                                                ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
+                                                : isSelected
+                                                    ? 'text-text-highlighted border-b border-primary cursor-text'
+                                                    : 'text-text-muted cursor-pointer hover:text-text-main'
                                                 }`}
                                             style={{
                                                 lineHeight: 2.2,
                                                 padding: isEditing ? '2px 4px' : '2px 0',
-                                                borderRadius: '3px',
+                                                borderRadius: isEditing ? '3px' : '0',
                                             }}
                                         >
                                             {segment.text}

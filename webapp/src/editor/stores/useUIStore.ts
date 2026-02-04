@@ -26,6 +26,7 @@ export interface UIState {
     selectedZoomId: ID | null;
     selectedSpotlightId: ID | null;
     selectedWindowId: ID | null;
+    selectedCaptionId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
@@ -34,6 +35,7 @@ export interface UIState {
     selectWindow: (id: ID | null) => void;
     selectZoom: (id: ID | null) => void;
     selectSpotlight: (id: ID | null) => void;
+    selectCaption: (id: ID | null) => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
     // Timeline State
@@ -79,6 +81,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedZoomId: null,
     selectedSpotlightId: null,
     selectedWindowId: null,
+    selectedCaptionId: null,
     selectedSettingsPanel: SettingsPanel.Project,
     isResizingWindow: false,
 
@@ -121,6 +124,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedSpotlightId,
                 selectedZoomId: null,
                 selectedWindowId: null,
+                selectedCaptionId: null,
                 canvasMode: CanvasMode.SpotlightEdit,
                 isPlaying: false,
             };
@@ -133,6 +137,8 @@ export const useUIStore = create<UIState>((set, get) => ({
         }
         return { selectedSpotlightId: null };
     }),
+
+    selectCaption: (selectedCaptionId) => set({ selectedCaptionId }),
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
 
@@ -192,6 +198,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         selectedZoomId: null,
         selectedSpotlightId: null,
         selectedWindowId: null,
+        selectedCaptionId: null,
         selectedSettingsPanel: SettingsPanel.Project,
         timelineContainerRef: null,
         pixelsPerSec: 100,
