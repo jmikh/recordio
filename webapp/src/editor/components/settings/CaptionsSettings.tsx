@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { MdInfoOutline } from 'react-icons/md';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -23,6 +25,7 @@ export function CaptionsSettings() {
     const updateCaptionSegment = useProjectStore(state => state.updateCaptionSegment);
     const deleteCaptionSegment = useProjectStore(state => state.deleteCaptionSegment);
     const setCaptionSegments = useProjectStore(state => state.setCaptionSegments);
+    const restoreCaptionsFromBaseline = useProjectStore(state => state.restoreCaptionsFromBaseline);
 
     // UI Store actions
     const setCanvasMode = useUIStore(state => state.setCanvasMode);
@@ -37,6 +40,9 @@ export function CaptionsSettings() {
     const inputRef = useRef<HTMLSpanElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const toastIdRef = useRef<string | null>(null);
+    const infoIconRef = useRef<HTMLSpanElement>(null);
+    const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
@@ -283,27 +289,47 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
-            {/* Notice Section */}
-            <p className="text-xs text-text-muted font-light">* Currently only supports English</p>
-
-            {/* Generate/Regenerate Buttons */}
+            {/* Transcribe/Restore Buttons */}
             {!isTranscribing && (
                 <div className="flex flex-col gap-2">
-                    {captionSegments.length === 0 ? (
+                    {!settings.baselineCaptions?.length ? (
                         <PrimaryButton
                             onClick={handleGenerate}
-                            className="w-full"
+                            className="w-full flex items-center justify-center gap-2"
                         >
-                            Generate Captions
+                            Transcribe
+                            <span
+                                ref={infoIconRef}
+                                className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
+                                onMouseEnter={() => {
+                                    if (infoIconRef.current) {
+                                        const rect = infoIconRef.current.getBoundingClientRect();
+                                        setTooltipPosition({
+                                            left: rect.left + rect.width / 2,
+                                            top: rect.bottom + 8
+                                        });
+                                    }
+                                    setShowInfoTooltip(true);
+                                }}
+                                onMouseLeave={() => setShowInfoTooltip(false)}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MdInfoOutline size={10} className="text-white/80" />
+                            </span>
                         </PrimaryButton>
-                    ) : (
-                        <PrimaryButton
-                            onClick={handleGenerate}
-                            className="w-full"
-                        >
-                            Regenerate Captions
-                        </PrimaryButton>
-                    )}
+                    ) : (() => {
+                        // Only show restore button if captions differ from baseline
+                        const isUnchanged = JSON.stringify(captionSegments) === JSON.stringify(settings.baselineCaptions);
+                        if (isUnchanged) return null;
+                        return (
+                            <PrimaryButton
+                                onClick={() => restoreCaptionsFromBaseline()}
+                                className="w-full"
+                            >
+                                Restore Transcript
+                            </PrimaryButton>
+                        );
+                    })()}
                 </div>
             )}
 
@@ -427,6 +453,23 @@ export function CaptionsSettings() {
                     </div>
                 )
             }
+
+            {/* Info tooltip - rendered via portal */}
+            {showInfoTooltip && createPortal(
+                <div
+                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 max-w-[240px] text-xs text-text-main"
+                    style={{
+                        left: tooltipPosition.left,
+                        top: tooltipPosition.top,
+                        transform: 'translateX(-50%)'
+                    }}
+                    onMouseEnter={() => setShowInfoTooltip(true)}
+                    onMouseLeave={() => setShowInfoTooltip(false)}
+                >
+                    Transcription runs entirely in your browser using local AI. Your audio never leaves your device. Currently supports English only.
+                </div>,
+                document.body
+            )}
 
         </div >
     );

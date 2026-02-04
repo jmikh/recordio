@@ -10,6 +10,7 @@ export interface TranscriptionSlice {
 
     setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
     setCaptionSegments: (segments: CaptionSegment[]) => void;
+    restoreCaptionsFromBaseline: () => void;
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; outputStartMs: number; outputEndMs: number }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
     deleteAllCaptions: () => void;
@@ -41,12 +42,34 @@ export const createTranscriptionSlice: StateCreator<
                     ...state.project.settings,
                     captions: {
                         ...state.project.settings.captions,
+                        baselineCaptions: segments,
                         generatedAt: new Date()
                     }
                 },
                 updatedAt: new Date()
             }
         }));
+    },
+
+    restoreCaptionsFromBaseline: () => {
+        console.log('[Action] restoreCaptionsFromBaseline');
+        set(state => {
+            const baseline = state.project.settings.captions?.baselineCaptions;
+            if (!baseline || baseline.length === 0) {
+                console.warn('[TranscriptionSlice] No baseline captions to restore');
+                return state;
+            }
+            return {
+                project: {
+                    ...state.project,
+                    timeline: {
+                        ...state.project.timeline,
+                        captionSegments: baseline
+                    },
+                    updatedAt: new Date()
+                }
+            };
+        });
     },
 
     deleteAllCaptions: () => {

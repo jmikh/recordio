@@ -5,6 +5,7 @@
  */
 
 import type { ID, Size, Rect } from '@shared/types';
+import type { CaptionSegment } from './timeline';
 
 // ==========================================
 // STYLE (base for camera/screen)
@@ -132,6 +133,8 @@ export interface CaptionSettings {
     size: number; // Font size in pixels
     width: number; // Maximum width as percentage of canvas width (0-100)
     wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
+    /** Baseline captions from last successful transcription (never modified by editing) */
+    baselineCaptions?: CaptionSegment[];
     /** When captions were generated (if any) */
     generatedAt?: Date;
 }
