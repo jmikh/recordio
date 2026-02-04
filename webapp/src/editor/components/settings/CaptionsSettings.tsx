@@ -389,21 +389,17 @@ export function CaptionsSettings() {
             {/* Caption Settings */}
             {(
                 <div className="space-y-3 pb-3 border-b border-border">
-                    <div className="flex items-center justify-between">
-                        <label className="text-xs font-medium text-text-main">Visible</label>
-                        <Toggle
-                            value={settings.visible}
-                            onChange={(value) => updateSettings({ captions: { ...settings, visible: value } })}
-                        />
-                    </div>
+                    <Toggle
+                        label="Visible"
+                        value={settings.visible}
+                        onChange={(value) => updateSettings({ captions: { ...settings, visible: value } })}
+                    />
 
-                    <div className="flex items-center justify-between">
-                        <label className="text-xs font-medium text-text-main">Word Highlight</label>
-                        <Toggle
-                            value={settings.wordHighlight ?? true}
-                            onChange={(value) => updateSettings({ captions: { ...settings, wordHighlight: value } })}
-                        />
-                    </div>
+                    <Toggle
+                        label="Word Highlight"
+                        value={settings.wordHighlight ?? true}
+                        onChange={(value) => updateSettings({ captions: { ...settings, wordHighlight: value } })}
+                    />
 
                     <Slider
                         value={settings.size}

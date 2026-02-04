@@ -119,6 +119,13 @@ export const ColorSettings = ({
                         </span>
                     </div>
 
+                    {/* Direction Dial - now between Start and End */}
+                    <DirectionDial
+                        angle={safeGradient.direction}
+                        gradient={`linear-gradient(${safeGradient.direction}deg, ${safeGradient.colors[0]} -1%, ${safeGradient.colors[1]} 101%)`}
+                        onAngleChange={onDirectionChange}
+                    />
+
                     {/* End Color */}
                     <div
                         onClick={() => setActiveGradientIndex(1)}
@@ -137,13 +144,6 @@ export const ColorSettings = ({
                             End
                         </span>
                     </div>
-
-                    {/* Direction Dial */}
-                    <DirectionDial
-                        angle={safeGradient.direction}
-                        gradient={`linear-gradient(${safeGradient.direction}deg, ${safeGradient.colors[0]}, ${safeGradient.colors[1]})`}
-                        onAngleChange={onDirectionChange}
-                    />
                 </div>
             )}
 

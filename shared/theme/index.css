@@ -113,7 +113,7 @@
    --surface-default: oklch(0.17 0.012 270);
    --surface-raised: oklch(0.21 0.014 270);
    --surface-overlay: oklch(0.25 0.016 270);
-   --surface-inset: oklch(0 0 0 / 50%);
+   --surface-inset: oklch(1 0 0 / 10%);
 
    /* ─────────────────────────────────────────────────────────
      2. Hover Backgrounds

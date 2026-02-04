@@ -116,10 +116,20 @@ export const Slider: React.FC<SliderProps> = ({
 
     return (
         <div className={`w-full ${className}`}>
-            {label && (
-                <label className="text-xs text-text-muted mb-2 block">
-                    {label}
-                </label>
+            {/* Header row: label on left, value on right */}
+            {(label || showTooltip) && (
+                <div className="flex justify-between items-center mb-1">
+                    {label && (
+                        <label className="text-sm text-text-muted">
+                            {label}
+                        </label>
+                    )}
+                    {showTooltip && (
+                        <span className="text-sm text-text-muted">
+                            {valueTransform(value).toFixed(decimals)}{units}
+                        </span>
+                    )}
+                </div>
             )}
 
             <div
@@ -173,21 +183,6 @@ export const Slider: React.FC<SliderProps> = ({
                         }}
                     />
                 </div>
-
-                {/* Tooltip */}
-                {showTooltip && isDragging && (
-                    <div
-                        className="absolute bg-secondary bottom-full mb-1 flex flex-col items-center pointer-events-none z-20 rounded-full"
-                        style={{
-                            left: thumbLeft,
-                            transform: `translate(-50%, 0)`
-                        }}
-                    >
-                        <div className="text-text-on-secondary text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
-                            {valueTransform(value).toFixed(decimals)}{units}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

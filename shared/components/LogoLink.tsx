@@ -9,7 +9,7 @@ interface LogoProps extends ComponentProps<'a'> {
 export const LogoLink = ({ className, imgClassName, ...props }: LogoProps) => {
     return (
         <a
-            href="https://recordio.site"
+            href="https://record.cc"
             target="_blank"
             rel="noopener noreferrer"
             className={`opacity-80 hover:opacity-100 transition-opacity duration-200 ${className || ''}`}

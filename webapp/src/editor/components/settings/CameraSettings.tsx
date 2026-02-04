@@ -20,6 +20,8 @@ export const CameraSettings = () => {
     const isEditingCamera = canvasMode === CanvasMode.CameraEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
+
+
     const cameraConfig = project.settings.camera;
     const cameraSource = project.cameraSource;
 
@@ -109,15 +111,14 @@ export const CameraSettings = () => {
 
                     <div className="border-t border-gray-700" />
 
-                    {/* Auto-Shrink on Screen Zoom */}
+                    {/* Auto Shrink */}
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs text-gray-400">Auto-Shrink on Screen Zoom</label>
-                            <Toggle
-                                value={autoShrink}
-                                onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
-                            />
-                        </div>
+                        <Toggle
+                            label="Auto Shrink"
+                            labelExplanation="Automatically shrinks the camera overlay when screen zoom is active, revealing more of the zoomed content."
+                            value={autoShrink}
+                            onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
+                        />
 
 
 
@@ -159,6 +160,8 @@ export const CameraSettings = () => {
                     />
                 </div>
             </div>
+
+
         </div>
     );
 };

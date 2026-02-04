@@ -189,32 +189,23 @@ export const EffectsSettings = () => {
             <div className="flex flex-col gap-4">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Effects</label>
 
-                {/* Mouse Clicks */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-main">Mouse Clicks</span>
-                    <Toggle
-                        value={effectSettings.showMouseClicks}
-                        onChange={(val) => handleEffectToggle('showMouseClicks', val)}
-                    />
-                </div>
+                <Toggle
+                    label="Mouse Clicks"
+                    value={effectSettings.showMouseClicks}
+                    onChange={(val) => handleEffectToggle('showMouseClicks', val)}
+                />
 
-                {/* Mouse Drags */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-main">Mouse Drags</span>
-                    <Toggle
-                        value={effectSettings.showMouseDrags}
-                        onChange={(val) => handleEffectToggle('showMouseDrags', val)}
-                    />
-                </div>
+                <Toggle
+                    label="Mouse Drags"
+                    value={effectSettings.showMouseDrags}
+                    onChange={(val) => handleEffectToggle('showMouseDrags', val)}
+                />
 
-                {/* Keyboard Clicks */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-main">Keyboard Clicks</span>
-                    <Toggle
-                        value={effectSettings.showKeyboardClicks}
-                        onChange={(val) => handleEffectToggle('showKeyboardClicks', val)}
-                    />
-                </div>
+                <Toggle
+                    label="Keyboard Clicks"
+                    value={effectSettings.showKeyboardClicks}
+                    onChange={(val) => handleEffectToggle('showKeyboardClicks', val)}
+                />
             </div>
         </div>
     );
