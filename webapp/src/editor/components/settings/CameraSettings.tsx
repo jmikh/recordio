@@ -4,7 +4,7 @@ import { StyleControls } from './StyleControls';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '@shared/components';
 import { MultiToggle } from '@shared/components';
-import { Toggle } from '@shared/components';
+import { Toggle, InfoTooltip } from '@shared/components';
 import { SettingsPanelButton } from './SettingsPanel';
 import { Notice } from '@shared/components';
 import { FaCheck } from 'react-icons/fa';
@@ -86,7 +86,7 @@ export const CameraSettings = () => {
                     <div className="space-y-3">
                         <MultiToggle
                             options={[
-                                { value: 'rect', label: 'Rectangle' },
+                                { value: 'rect', label: 'Free' },
                                 { value: 'square', label: 'Square' },
                                 { value: 'circle', label: 'Circle' },
                             ]}
@@ -115,10 +115,14 @@ export const CameraSettings = () => {
                     <div className="space-y-4">
                         <Toggle
                             label="Auto Shrink"
-                            labelExplanation="Automatically shrinks the camera overlay when screen zoom is active, revealing more of the zoomed content."
                             value={autoShrink}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
-                        />
+                        >
+                            <InfoTooltip
+                                description="Automatically shrinks the camera when screen zoom is active."
+                                videoSrc="/assets/demos/autoshrink-demo.mp4"
+                            />
+                        </Toggle>
 
 
 

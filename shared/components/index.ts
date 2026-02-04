@@ -1,5 +1,6 @@
 // Shared UI Components - Barrel Export
 export { Button } from './Button';
+export { InfoTooltip } from './InfoTooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { LogoLink } from './LogoLink';

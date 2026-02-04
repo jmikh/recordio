@@ -1,14 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { MdInfoOutline } from 'react-icons/md';
+import React, { type ReactNode } from 'react';
 
 interface ToggleProps {
     value: boolean;
     onChange: (value: boolean) => void;
     /** Optional label displayed to the left of the toggle */
     label?: string;
-    /** Optional explanation shown in a tooltip when hovering the info icon next to the label */
-    labelExplanation?: string;
+    /** Optional content to render next to the label (e.g., info icon with tooltip) */
+    children?: ReactNode;
     className?: string;
     disabled?: boolean;
 }
@@ -20,15 +18,10 @@ export const Toggle: React.FC<ToggleProps> = ({
     value,
     onChange,
     label,
-    labelExplanation,
+    children,
     className = '',
     disabled = false
 }) => {
-    // Tooltip state for info icon
-    const infoIconRef = useRef<HTMLSpanElement>(null);
-    const [showTooltip, setShowTooltip] = useState(false);
-    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
-
     const handleClick = () => {
         if (!disabled) {
             onChange(!value);
@@ -81,50 +74,13 @@ export const Toggle: React.FC<ToggleProps> = ({
     // If label is provided, wrap in a flex container
     if (label) {
         return (
-            <>
-                <div className={`flex items-center justify-between ${className}`}>
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-sm text-text-muted">{label}</span>
-                        {labelExplanation && (
-                            <span
-                                ref={infoIconRef}
-                                className="flex items-center justify-center cursor-pointer"
-                                onMouseEnter={() => {
-                                    if (infoIconRef.current) {
-                                        const rect = infoIconRef.current.getBoundingClientRect();
-                                        setTooltipPosition({
-                                            left: rect.left + rect.width / 2,
-                                            top: rect.bottom + 8
-                                        });
-                                    }
-                                    setShowTooltip(true);
-                                }}
-                                onMouseLeave={() => setShowTooltip(false)}
-                            >
-                                <MdInfoOutline size={14} className="text-text-muted hover:text-text-highlighted transition-colors" />
-                            </span>
-                        )}
-                    </div>
-                    {toggleButton}
+            <div className={`flex items-center justify-between ${className}`}>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-text-muted">{label}</span>
+                    {children}
                 </div>
-
-                {/* Tooltip - rendered via portal */}
-                {showTooltip && labelExplanation && createPortal(
-                    <div
-                        className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 max-w-[240px] text-xs text-text-main"
-                        style={{
-                            left: tooltipPosition.left,
-                            top: tooltipPosition.top,
-                            transform: 'translateX(-50%)'
-                        }}
-                        onMouseEnter={() => setShowTooltip(true)}
-                        onMouseLeave={() => setShowTooltip(false)}
-                    >
-                        {labelExplanation}
-                    </div>,
-                    document.body
-                )}
-            </>
+                {toggleButton}
+            </div>
         );
     }
 
