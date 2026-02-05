@@ -110,6 +110,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                     className={`
                         text-text-muted
                         transition-transform
+                        hover:text-text-main
                         ${expanded ? 'rotate-180' : 'rotate-0'}
                     `}
                     style={{ transitionDuration: `${ANIMATION_DURATION}ms` }}

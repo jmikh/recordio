@@ -72,19 +72,14 @@ export const EffectsSettings = () => {
             {/* ZOOM SETTINGS */}
             <CollapsibleCard title="Zoom" previewItems={zoomPreviewItems} defaultExpanded>
                 <div className="flex flex-col gap-4">
-                    {/* Header with Auto/Manual Toggle */}
+                    {/* Header with Auto Toggle */}
                     <div className="flex items-center justify-between">
                         <label className="text-sm text-text-muted">Auto</label>
-                        <MultiToggle
-                            value={zoomSettings.isAuto ? 'auto' : 'manual'}
-                            onChange={(val: string) => {
-                                const isAuto = val === 'auto';
-                                updateSettings({ zoom: { ...zoomSettings, isAuto: isAuto } });
+                        <Toggle
+                            value={zoomSettings.isAuto}
+                            onChange={(isAuto) => {
+                                updateSettings({ zoom: { ...zoomSettings, isAuto } });
                             }}
-                            options={[
-                                { value: 'auto', label: 'Auto' },
-                                { value: 'manual', label: 'Manual' }
-                            ]}
                         />
                     </div>
 

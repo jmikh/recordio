@@ -1,10 +1,9 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { StyleControls } from './StyleControls';
+import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '@shared/components';
-import { MultiToggle } from '@shared/components';
+import { Slider, MultiToggle } from '@shared/components';
 import { SettingsPanelButton } from './SettingsPanel';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa6';
@@ -107,28 +106,72 @@ export const ScreenSettings = () => {
                     </div>
                 </div>
 
-                {/* Custom Style Controls */}
+                {/* Custom Style Controls - Inlined */}
                 {screenConfig.mode === 'border' && (
-                    <StyleControls
-                        settings={{
-                            borderRadius: screenConfig.borderRadius,
-                            borderWidth: screenConfig.borderWidth,
-                            borderColor: screenConfig.borderColor,
-                            hasShadow: screenConfig.hasShadow,
-                            hasGlow: screenConfig.hasGlow
-                        }}
-                        onChange={(updates) => batchAction(() => updateSettings({
-                            screen: { ...screenConfig, ...updates }
-                        }))}
-                        onColorPopoverOpen={startInteraction}
-                        onColorPopoverClose={endInteraction}
-                        showRadius={true}
-                        onInteractionStart={startInteraction}
-                        onInteractionEnd={endInteraction}
-                    />
+                    <div className="space-y-4">
+                        {/* Color Picker */}
+                        <ColorButton
+                            color={screenConfig.borderColor}
+                            onChange={(color) => batchAction(() => updateSettings({
+                                screen: { ...screenConfig, borderColor: color }
+                            }))}
+                            onPopoverOpen={startInteraction}
+                            onPopoverClose={endInteraction}
+                        />
+
+                        {/* Rounding Slider */}
+                        <Slider
+                            label="Rounding"
+                            min={0}
+                            max={200}
+                            value={screenConfig.borderRadius}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(val) => batchAction(() => updateSettings({
+                                screen: { ...screenConfig, borderRadius: val }
+                            }))}
+                            showTooltip
+                            units="px"
+                        />
+
+                        {/* Thickness Slider */}
+                        <Slider
+                            label="Thickness"
+                            min={0}
+                            max={20}
+                            value={screenConfig.borderWidth}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(val) => batchAction(() => updateSettings({
+                                screen: { ...screenConfig, borderWidth: val }
+                            }))}
+                            showTooltip
+                            units="px"
+                        />
+
+                        {/* Shadow/Glow Toggle */}
+                        <MultiToggle
+                            options={[
+                                { value: 'shadow', label: 'Shadow' },
+                                { value: 'none', label: 'None' },
+                                { value: 'glow', label: 'Glow' }
+                            ]}
+                            value={screenConfig.hasShadow ? 'shadow' : screenConfig.hasGlow ? 'glow' : 'none'}
+                            onChange={(val) => {
+                                if (val === 'shadow') {
+                                    batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: true, hasGlow: false } }));
+                                } else if (val === 'glow') {
+                                    batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: false, hasGlow: true } }));
+                                } else {
+                                    batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: false, hasGlow: false } }));
+                                }
+                            }}
+                        />
+                    </div>
                 )}
             </div>
         </div>
     );
 
 };
+

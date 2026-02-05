@@ -1,16 +1,10 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { StyleControls } from './StyleControls';
+import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider } from '@shared/components';
-import { MultiToggle } from '@shared/components';
-import { Toggle, InfoTooltip } from '@shared/components';
-import { ActivatedButton } from '@shared/components';
-import { Notice } from '@shared/components';
+import { Slider, MultiToggle, Toggle, InfoTooltip, ActivatedButton, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { FaCheck } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
-
-
 
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -19,8 +13,6 @@ export const CameraSettings = () => {
     const canvasMode = useUIStore(s => s.canvasMode);
     const isEditingCamera = canvasMode === CanvasMode.CameraEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
-
 
     const cameraConfig = project.settings.camera;
     const cameraSource = project.cameraSource;
@@ -32,8 +24,6 @@ export const CameraSettings = () => {
             </div>
         );
     }
-
-
 
     const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
         let newSettings = { ...cameraConfig, shape: newShape };
@@ -58,7 +48,6 @@ export const CameraSettings = () => {
 
     const {
         shape,
-        borderRadius = 0,
         borderWidth = 0,
         borderColor = '#ffffff',
         hasShadow = false,
@@ -67,6 +56,34 @@ export const CameraSettings = () => {
         autoShrink = false,
         shrinkScale = 0.5
     } = cameraConfig;
+
+    // Build preview items for collapsed border state
+    const borderPreviewItems: PreviewItem[] = [];
+
+    // Only show color if there's a visible border or glow effect
+    if (borderWidth > 0 || hasGlow) {
+        borderPreviewItems.push({
+            type: 'custom',
+            content: (
+                <div
+                    className="w-5 h-5 rounded-full border border-border"
+                    style={{ backgroundColor: borderColor }}
+                />
+            )
+        });
+    }
+
+    // Only show pixel count if there's a border
+    if (borderWidth > 0) {
+        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidth)}px` });
+    }
+
+    // Add effect type (shadow/glow) only if enabled
+    if (hasShadow) {
+        borderPreviewItems.push({ type: 'text', content: 'Shadow' });
+    } else if (hasGlow) {
+        borderPreviewItems.push({ type: 'text', content: 'Glow' });
+    }
 
     return (
         <div className="space-y-6 relative">
@@ -128,8 +145,6 @@ export const CameraSettings = () => {
                             />
                         </Toggle>
 
-
-
                         {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}
                         {autoShrink && (
                             <Slider
@@ -148,28 +163,52 @@ export const CameraSettings = () => {
                         )}
                     </div>
 
-                    <div className="border-t border-gray-700" />
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-2 text-center">Border</label>
+                    <CollapsibleCard title="Border" className="rounded-none" previewItems={borderPreviewItems}>
+                        <div className="space-y-4">
+                            {/* Color Picker */}
+                            <ColorButton
+                                color={borderColor}
+                                onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
+                                onPopoverOpen={startInteraction}
+                                onPopoverClose={endInteraction}
+                            />
 
-                    <StyleControls
-                        settings={{
-                            borderRadius,
-                            borderWidth,
-                            borderColor,
-                            hasShadow,
-                            hasGlow
-                        }}
-                        onChange={(updates) => batchAction(() => updateSettings({ camera: { ...cameraConfig, ...updates } }))}
-                        showRadius={false}
-                        onInteractionStart={startInteraction}
-                        onInteractionEnd={endInteraction}
-                        onColorPopoverOpen={startInteraction}
-                        onColorPopoverClose={endInteraction}
-                    />
+                            {/* Thickness Slider */}
+                            <Slider
+                                label="Thickness"
+                                min={0}
+                                max={20}
+                                value={borderWidth}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidth: val } }))}
+                                showTooltip
+                                units="px"
+                            />
+
+                            {/* Shadow/Glow Toggle */}
+                            <MultiToggle
+                                options={[
+                                    { value: 'shadow', label: 'Shadow' },
+                                    { value: 'none', label: 'None' },
+                                    { value: 'glow', label: 'Glow' }
+                                ]}
+                                value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
+                                onChange={(val) => {
+                                    if (val === 'shadow') {
+                                        batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: true, hasGlow: false } }));
+                                    } else if (val === 'glow') {
+                                        batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: true } }));
+                                    } else {
+                                        batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: false } }));
+                                    }
+                                }}
+                            />
+                        </div>
+                    </CollapsibleCard>
                 </div>
             </div>
-
-
         </div>
     );
 };
+
