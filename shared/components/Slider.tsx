@@ -143,7 +143,7 @@ export const Slider: React.FC<SliderProps> = ({
             >
                 {/* Visual Track - Full Width Background (Inactive part) */}
                 <div
-                    className="absolute left-0 right-0 rounded-full bg-surface-inset"
+                    className="absolute left-0 right-0 rounded-full bg-state-inactive"
                     style={{
                         height: `${TRACK_HEIGHT}px`,
                         left: `${PADDING}px`,

@@ -48,7 +48,7 @@ export const Toggle: React.FC<ToggleProps> = ({
                 transition-colors
                 group
                 disabled:opacity-50 disabled:cursor-not-allowed
-                ${value ? 'bg-primary' : 'bg-surface-inset'}
+                ${value ? 'bg-primary' : 'bg-state-inactive'}
                 ${!label ? className : ''}
             `}
             role="switch"

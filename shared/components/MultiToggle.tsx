@@ -35,7 +35,7 @@ export const MultiToggle = <T extends string>({
     return (
         <div
             className={`
-                relative flex items-center bg-surface-inset rounded-sm select-none overflow-hidden shadow-sm
+                relative flex items-center bg-state-inactive rounded-sm select-none overflow-hidden shadow-sm
                 ${className}
             `}
         >

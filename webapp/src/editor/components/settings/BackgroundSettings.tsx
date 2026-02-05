@@ -5,8 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
-import { XButton } from '@shared/components';
-import { Slider } from '@shared/components';
+import { XButton, Slider, CollapsibleCard } from '@shared/components';
+import type { PreviewItem } from '@shared/components';
 import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
 
 
@@ -242,176 +242,204 @@ export const BackgroundSettings = () => {
         ? { background: `linear-gradient(${gradientDirection}deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)` }
         : { background: backgroundColor };
 
+    // Generate preview circle style based on current background
+    const getPreviewStyle = () => {
+        if (backgroundType === 'color') {
+            return colorMode === 'gradient'
+                ? { background: `linear-gradient(${gradientDirection}deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)` }
+                : { background: backgroundColor };
+        } else if (backgroundType === 'preset') {
+            return { backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+        } else if (backgroundType === 'custom' && background.customRuntimeUrl) {
+            return { backgroundImage: `url(${background.customRuntimeUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+        }
+        return { background: backgroundColor };
+    };
+
+    // Build preview items for collapsed state
+    const previewItems: PreviewItem[] = [
+        {
+            type: 'custom',
+            content: (
+                <div
+                    className="w-5 h-5 rounded-full border border-border"
+                    style={getPreviewStyle()}
+                />
+            )
+        }
+    ];
+
+    // Add blur amount for image backgrounds
+    if ((backgroundType === 'preset' || backgroundType === 'custom') && backgroundBlur !== undefined) {
+        previewItems.push({ type: 'text', content: `${Math.round(backgroundBlur)}px blur` });
+    }
+
     return (
-        <div className="flex flex-col gap-4 xrounded-lg  shadow-sm text-sm select-none">
-            {/* Background Picker */}
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col items-start gap-4">
-                    {/* Row 1: Color Card + Upload */}
-                    <div className="flex flex-wrap gap-4 items-end justify-center w-full">
-                        {/* 1. Color Card */}
-                        <div className="flex flex-col items-center gap-2">
-                            <span className="text-xs text-text-main">Color</span>
-                            <div
-                                ref={colorButtonRef}
-                                onClick={() => {
-                                    // Set type to 'color' when clicking the color icon
-                                    if (backgroundType !== 'color') {
-                                        updateSettings({ background: { type: 'color' } });
-                                    }
-                                    // Calculate position synchronously before showing popover to avoid flash
-                                    if (!showColorPopover && colorButtonRef.current) {
-                                        const rect = colorButtonRef.current.getBoundingClientRect();
-                                        const TOP_OFFSET = -20;
-                                        const LEFT_OFFSET = 60; // 48px width + gap
-                                        setPopoverPos({
-                                            top: rect.top + TOP_OFFSET,
-                                            left: rect.left + LEFT_OFFSET
-                                        });
-                                    }
-                                    setShowColorPopover(v => !v);
-                                }}
-                                className={`cursor-pointer w-14 h-14 rounded-full flex items-center justify-center overflow-hidden transition-all hover:scale-110 ${isColorMode
-                                    ? 'outline outline-2 outline-offset-2 outline-primary'
-                                    : 'border border-transparent ring-1 ring-border hover:ring-border-hover'
-                                    }`}
-                                style={colorCardStyle}
-                                title="Color / Gradient"
-                            >
-                                <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
-                                    <IoIosColorFilter size={20} />
-                                </div>
-                            </div>
-
-                        </div>
-
-                        {/* 2. Upload Card */}
-                        <div className="flex flex-col items-center gap-2">
-                            <span className="text-xs text-text-main">Upload</span>
-                            <div
-                                onClick={() => fileInputRef.current?.click()}
-                                className="cursor-pointer w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-state-inactive hover:bg-state-hover"
-                                title="Upload Image"
-                            >
-                                <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">
-                                    <CiImageOn size={20} />
-                                </div>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleUpload}
-                                />
+        <CollapsibleCard title="Background" previewItems={previewItems} defaultExpanded>
+            <div className="flex flex-col gap-4 text-sm select-none">
+                <div className="flex flex-wrap gap-4 items-end justify-center w-full">
+                    {/* 1. Color Card */}
+                    <div className="flex flex-col items-center gap-2">
+                        <span className="text-xs text-text-main">Color</span>
+                        <div
+                            ref={colorButtonRef}
+                            onClick={() => {
+                                // Set type to 'color' when clicking the color icon
+                                if (backgroundType !== 'color') {
+                                    updateSettings({ background: { type: 'color' } });
+                                }
+                                // Calculate position synchronously before showing popover to avoid flash
+                                if (!showColorPopover && colorButtonRef.current) {
+                                    const rect = colorButtonRef.current.getBoundingClientRect();
+                                    const TOP_OFFSET = -20;
+                                    const LEFT_OFFSET = 60; // 48px width + gap
+                                    setPopoverPos({
+                                        top: rect.top + TOP_OFFSET,
+                                        left: rect.left + LEFT_OFFSET
+                                    });
+                                }
+                                setShowColorPopover(v => !v);
+                            }}
+                            className={`cursor-pointer w-14 h-14 rounded-full flex items-center justify-center overflow-hidden transition-all hover:scale-110 ${isColorMode
+                                ? 'outline outline-2 outline-offset-2 outline-primary'
+                                : 'border border-transparent ring-1 ring-border hover:ring-border-hover'
+                                }`}
+                            style={colorCardStyle}
+                            title="Color / Gradient"
+                        >
+                            <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
+                                <IoIosColorFilter size={20} />
                             </div>
                         </div>
+
                     </div>
 
-                    {/* Row 2: Custom Library (if any) */}
-                    {customLibrary.length > 0 && (
-                        <div className="flex flex-col items-center gap-2 w-full">
-                            <span className="text-xs text-text-main">Custom</span>
-                            <div className="flex flex-wrap justify-center gap-4">
-                                {customLibrary.map(entry => {
-                                    const url = libraryUrls[entry.id];
-                                    // Check if this library entry is the one currently selected
-                                    const isActive = selectedLibraryId === entry.id;
-                                    // Can't delete the selected entry
-                                    const canDelete = !isActive;
-                                    return (
-                                        <div
-                                            key={entry.id}
-                                            className="relative group"
-                                        >
-                                            <div
-                                                className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
-                                                    ? 'outline outline-2 outline-offset-2 outline-primary'
-                                                    : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
-                                                onClick={() => handleLibrarySelect(entry.id)}
-                                                title="Select background"
-                                            >
-                                                {url && <img src={url} alt="Custom background" className="w-full h-full object-cover" />}
-                                            </div>
-                                            {canDelete && (
-                                                <XButton
-                                                    onClick={(e) => handleLibraryDelete(entry.id, e)}
-                                                    title="Remove from library"
-                                                    className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                />
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                    {/* 2. Upload Card */}
+                    <div className="flex flex-col items-center gap-2">
+                        <span className="text-xs text-text-main">Upload</span>
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="cursor-pointer w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-state-inactive hover:bg-state-hover"
+                            title="Upload Image"
+                        >
+                            <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">
+                                <CiImageOn size={20} />
                             </div>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleUpload}
+                            />
                         </div>
-                    )}
+                    </div>
+                </div>
 
-                    {/* Row 3: Presets */}
+                {/* Row 2: Custom Library (if any) */}
+                {customLibrary.length > 0 && (
                     <div className="flex flex-col items-center gap-2 w-full">
-                        <span className="text-xs text-text-main">Presets</span>
+                        <span className="text-xs text-text-main">Custom</span>
                         <div className="flex flex-wrap justify-center gap-4">
-                            {BACKGROUND_IMAGES.map(img => {
-                                const isActive = isPreset && backgroundImageUrl === img.url;
+                            {customLibrary.map(entry => {
+                                const url = libraryUrls[entry.id];
+                                // Check if this library entry is the one currently selected
+                                const isActive = selectedLibraryId === entry.id;
+                                // Can't delete the selected entry
+                                const canDelete = !isActive;
                                 return (
                                     <div
-                                        key={img.url}
-                                        className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
-                                            ? 'outline outline-2 outline-offset-2 outline-primary'
-                                            : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
-                                        onClick={() => handlePresetSelect(img.url)}
-                                        title={img.name}
+                                        key={entry.id}
+                                        className="relative group"
                                     >
-                                        <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                        <div
+                                            className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
+                                                ? 'outline outline-2 outline-offset-2 outline-primary'
+                                                : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
+                                            onClick={() => handleLibrarySelect(entry.id)}
+                                            title="Select background"
+                                        >
+                                            {url && <img src={url} alt="Custom background" className="w-full h-full object-cover" />}
+                                        </div>
+                                        {canDelete && (
+                                            <XButton
+                                                onClick={(e) => handleLibraryDelete(entry.id, e)}
+                                                title="Remove from library"
+                                                className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            />
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
                     </div>
-                </div>
-            </div>
+                )}
 
-            {/* Effects */}
-            <div className="flex flex-col gap-4 pt-4 border-t border-border">
-                {/* Blur */}
-                {(backgroundType === 'preset' || backgroundType === 'custom') && (
-                    <Slider
-                        label="Blur"
-                        min={0}
-                        max={50}
-                        value={backgroundBlur || 0}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(val) => batchAction(() => updateSettings({
-                            background: {
-                                backgroundBlur: val
-                            }
-                        }))}
-                        showTooltip
-                        units="px"
-                    />
+                {/* Row 3: Presets */}
+                <div className="flex flex-col items-center gap-2 w-full">
+                    <span className="text-xs text-text-main">Presets</span>
+                    <div className="flex flex-wrap justify-center gap-4">
+                        {BACKGROUND_IMAGES.map(img => {
+                            const isActive = isPreset && backgroundImageUrl === img.url;
+                            return (
+                                <div
+                                    key={img.url}
+                                    className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
+                                        ? 'outline outline-2 outline-offset-2 outline-primary'
+                                        : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
+                                    onClick={() => handlePresetSelect(img.url)}
+                                    title={img.name}
+                                >
+                                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Effects */}
+                <div className="flex flex-col gap-4">
+                    {/* Blur */}
+                    {(backgroundType === 'preset' || backgroundType === 'custom') && (
+                        <Slider
+                            label="Blur"
+                            min={0}
+                            max={50}
+                            value={backgroundBlur || 0}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(val) => batchAction(() => updateSettings({
+                                background: {
+                                    backgroundBlur: val
+                                }
+                            }))}
+                            showTooltip
+                            units="px"
+                        />
+                    )}
+                </div>
+
+                {/* Color Popover (Portal) */}
+                {showColorPopover && createPortal(
+                    <div
+                        ref={popoverRef}
+                        className="fixed z-[9999] bg-surface-overlay border border-border rounded-lg shadow-lg"
+                        style={{ top: popoverPos.top, left: popoverPos.left }}
+                    >
+                        <ColorSettings
+                            isSolid={isSolid}
+                            isGradient={isGradient}
+                            color={backgroundColor}
+                            gradient={{ colors: gradientColors, direction: gradientDirection }}
+                            onTypeChange={handleColorTypeChange}
+                            onColorChange={handleColorChange}
+                            onGradientColorChange={handleGradientColorChange}
+                            onDirectionChange={handleDirectionChange}
+                        />
+                    </div>,
+                    document.body
                 )}
             </div>
-
-            {/* Color Popover (Portal) */}
-            {showColorPopover && createPortal(
-                <div
-                    ref={popoverRef}
-                    className="fixed z-[9999] bg-surface-overlay border border-border rounded-lg shadow-lg"
-                    style={{ top: popoverPos.top, left: popoverPos.left }}
-                >
-                    <ColorSettings
-                        isSolid={isSolid}
-                        isGradient={isGradient}
-                        color={backgroundColor}
-                        gradient={{ colors: gradientColors, direction: gradientDirection }}
-                        onTypeChange={handleColorTypeChange}
-                        onColorChange={handleColorChange}
-                        onGradientColorChange={handleGradientColorChange}
-                        onDirectionChange={handleDirectionChange}
-                    />
-                </div>,
-                document.body
-            )}
-        </div >
+        </CollapsibleCard>
     );
 };

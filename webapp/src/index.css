@@ -106,7 +106,7 @@
 .toast-progress-container {
     margin-top: 10px;
     height: 4px;
-    background: var(--surface-inset);
+    background: var(--state-inactive);
     border-radius: 2px;
     overflow: hidden;
 }

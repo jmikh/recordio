@@ -59,7 +59,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     return (
         <div
             className={`
-                bg-surface-raised border border-border rounded-lg
+                bg-surface-inset rounded-lg
                 overflow-hidden
                 ${className}
             `}
@@ -71,17 +71,16 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                     w-full flex items-center justify-between
                     px-4 py-3
                     text-left
-                    hover:bg-state-hover
                     transition-colors
                     cursor-pointer
                 "
             >
-                <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-text-highlighted">
-                        {title}
-                    </span>
+                <span className="text-sm font-medium text-text-highlighted">
+                    {title}
+                </span>
 
-                    {/* Preview items - only shown when collapsed */}
+                {/* Preview items - only shown when collapsed, right-aligned */}
+                <div className="flex items-center gap-2 ml-auto mr-3">
                     {!expanded && previewItems.length > 0 && (
                         <div className="flex items-center gap-2 text-xs text-text-muted">
                             {previewItems.map((item, index) => (
