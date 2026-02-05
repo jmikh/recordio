@@ -8,7 +8,7 @@ import type { DropdownOption } from '@shared/components';
 import { PrimaryButton } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
-import { Button } from '@shared/components';
+import { DefaultButton } from '@shared/components';
 import { BugReportModal } from '../../../components/BugReportModal';
 import { AuthModal } from './AuthModal';
 import { UserMenu } from './UserMenu';
@@ -91,22 +91,22 @@ export const Header = () => {
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
-                        <Button
+                        <DefaultButton
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
                             className="p-1.5"
                         >
                             <FaUndo size={14} />
-                        </Button>
-                        <Button
+                        </DefaultButton>
+                        <DefaultButton
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
                             className="p-1.5"
                         >
                             <FaRedo size={14} />
-                        </Button>
+                        </DefaultButton>
                     </div>
 
                     {import.meta.env.MODE !== 'production' && (
@@ -130,7 +130,7 @@ export const Header = () => {
                     value={project.name}
                     onChange={(e) => updateProjectName(e.target.value)}
                     maxLength={40}
-                    className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-hover-subtle text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-hover hover:border-border-highlighted focus:bg-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-main w-[300px] focus-ring"
+                    className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-state-inactive text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-state-hover hover:border-border-highlighted focus:bg-state-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-main w-[300px] focus-ring"
                     placeholder="Untitled Project"
                 />
 
@@ -164,13 +164,13 @@ export const Header = () => {
                     {isAuthenticated ? (
                         <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                     ) : (
-                        <Button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
+                        <DefaultButton onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
                             Sign In
-                        </Button>
+                        </DefaultButton>
                     )}
-                    <Button onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
+                    <DefaultButton onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
                         <MdBugReport size={18} />
-                    </Button>
+                    </DefaultButton>
                 </div>
             </div>
             <BugReportModal

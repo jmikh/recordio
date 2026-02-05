@@ -21,26 +21,35 @@ interface SettingsPanelButtonProps {
     onClick: () => void;
     label?: string;
     className?: string;
+    variant?: 'default' | 'primary';
 }
 
 export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
-    icon, isActive, onClick, label, className = ''
-}) => (
-    <button
-        onClick={onClick}
-        className={`
-            group flex items-center gap-4 py-3 px-4 border-none rounded-lg cursor-pointer transition-colors duration-200
-            ${isActive
-                ? 'bg-primary/15 text-primary'
-                : 'bg-hover-subtle text-text-muted hover:bg-hover hover:text-text-main'}
-            ${className}
-        `}
-    >
-        <span className="flex">{icon}</span>
-        {label && <span className="text-base font-medium">{label}</span>}
-        {isActive && <FaChevronRight size={12} className="text-primary ml-auto" />}
-    </button>
-);
+    icon, isActive, onClick, label, className = '', variant = 'default'
+}) => {
+    const isPrimary = variant === 'primary';
+
+    return (
+        <button
+            onClick={onClick}
+            className={`
+                group flex items-center gap-4 py-3 px-4 border-none rounded-lg cursor-pointer transition-colors duration-200
+                ${isPrimary
+                    ? isActive
+                        ? 'bg-primary text-white'
+                        : 'bg-primary/80 text-white hover:bg-primary'
+                    : isActive
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-state-inactive text-text-muted hover:bg-state-hover hover:text-text-main'}
+                ${className}
+            `}
+        >
+            <span className="flex">{icon}</span>
+            {label && <span className="text-base font-medium">{label}</span>}
+            {isActive && <FaChevronRight size={12} className={isPrimary ? 'text-white ml-auto' : 'text-primary ml-auto'} />}
+        </button>
+    );
+};
 
 export const SettingsPanel = () => {
     const [activeTab, setActiveTab] = useState<Tab>('screen');

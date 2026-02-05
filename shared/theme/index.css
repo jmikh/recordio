@@ -18,11 +18,12 @@
    --color-surface-inset: var(--surface-inset);
 
    /* ─────────────────────────────────────────────────────────
-     Hovers
+     Interactive State Overlays
      ───────────────────────────────────────────────────────── */
-   --color-hover-subtle: var(--hover-subtle);
-   --color-hover: var(--hover);
-   --color-hover-bold: var(--hover-bold);
+   --color-state-inactive: var(--state-inactive);
+   --color-state-hover: var(--state-hover);
+   --color-state-active: var(--state-active);
+   --color-state-disabled: var(--state-disabled);
    --color-hover-primary: var(--primary-muted);
 
    /* ─────────────────────────────────────────────────────────
@@ -116,17 +117,18 @@
    --surface-inset: oklch(1 0 0 / 10%);
 
    /* ─────────────────────────────────────────────────────────
-     2. Hover Backgrounds
+     2. Interactive State Overlays
      ───────────────────────────────────────────────────────── */
-   --hover-subtle: oklch(1 0 0 / 8%);
-   --hover: oklch(1 0 0 / 12%);
-   --hover-bold: oklch(1 0 0 / 18%);
+   --state-inactive: oklch(1 0 0 / 8%);
+   --state-hover: oklch(1 0 0 / 12%);
+   --state-active: oklch(1 0 0 / 16%);
+   --state-disabled: oklch(1 0 0 / 4%);
 
    /* ─────────────────────────────────────────────────────────
      3. Borders (White with transparency)
      ───────────────────────────────────────────────────────── */
-   --border-default: oklch(1 0 0 / 8%);
-   --border-hover: oklch(1 0 0 / 15%);
+   --border-default: oklch(1 0 0 / 15%);
+   --border-hover: oklch(1 0 0 / 20%);
    --border-selected: oklch(1 0 0 / 25%);
    --border-primary: var(--primary);
 
@@ -204,7 +206,7 @@ body,
 
    /* Interactive Item */
    .item-interactive {
-      @apply hover:bg-hover-subtle transition-colors cursor-pointer;
+      @apply hover:bg-state-hover transition-colors cursor-pointer;
    }
 
    /* Primary Button */

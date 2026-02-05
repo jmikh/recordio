@@ -12,7 +12,7 @@ interface NoticeProps {
  */
 export const Notice = ({ children, variant = 'info', className = '' }: NoticeProps) => {
     const variantStyles = {
-        info: 'text-text-main bg-hover-subtle border-border',
+        info: 'text-text-main bg-state-inactive border-border',
         warning: 'text-secondary bg-secondary/10 border-secondary/20',
         error: 'text-red-400 bg-red-500/10 border-red-500/20',
     };

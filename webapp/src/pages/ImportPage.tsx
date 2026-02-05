@@ -168,7 +168,7 @@ export function ImportPage() {
                 {isError && (
                     <button
                         onClick={() => window.location.href = '/'}
-                        className="mt-4 px-4 py-2 bg-surface-raised hover:bg-hover rounded-lg text-sm"
+                        className="mt-4 px-4 py-2 bg-surface-raised hover:bg-state-hover rounded-lg text-sm"
                     >
                         Go to Dashboard
                     </button>

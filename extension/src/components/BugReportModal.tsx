@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { MdBugReport } from 'react-icons/md';
 import { captureBugReport } from '../utils/sentry';
-import { Button, PrimaryButton, XButton, Scrollbar } from '@shared/components';
+import { DefaultButton, PrimaryButton, XButton, Scrollbar } from '@shared/components';
 
 interface BugReportModalProps {
     isOpen: boolean;
@@ -102,12 +102,12 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
                         </div>
 
                         <div className="flex gap-2 justify-end">
-                            <Button
+                            <DefaultButton
                                 type="button"
                                 onClick={onClose}
                             >
                                 Cancel
-                            </Button>
+                            </DefaultButton>
                             <PrimaryButton
                                 type="submit"
                                 disabled={!description.trim() || isSubmitting}

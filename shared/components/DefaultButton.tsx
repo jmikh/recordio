@@ -5,7 +5,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     children: React.ReactNode;
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+export const DefaultButton = forwardRef<HTMLButtonElement, ButtonProps>(
     ({ children, className = '', ...props }, ref) => {
         return (
             <button
@@ -13,14 +13,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 className={`
                flex items-center justify-center gap-2
                border border-border
-               bg-surface-inset hover:bg-hover
+               bg-state-inactive hover:bg-state-hover
                text-text-main hover:text-text-highlighted
                text-sm
                rounded-sm
                px-2 py-1.5
                transition-colors
                cursor-pointer
-               disabled:opacity-50 disabled:cursor-not-allowed
+               disabled:opacity-50
                ${className}
             `}
                 {...props}
@@ -31,4 +31,4 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     }
 );
 
-Button.displayName = 'Button';
+DefaultButton.displayName = 'DefaultButton';

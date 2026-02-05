@@ -29,7 +29,7 @@ export const ProjectCard = ({
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
                     ? 'border-border-primary bg-primary/10 scale-[1.02]'
-                    : 'border-border bg-surface-overlay hover:border-border-hover hover:bg-hover-subtle hover:scale-[1.01] hover:shadow-lg'
+                    : 'border-border bg-surface-overlay hover:border-border-hover hover:bg-state-hover hover:scale-[1.01] hover:shadow-lg'
                 }
             `}
         >

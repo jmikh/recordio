@@ -290,7 +290,7 @@ export const BackgroundSettings = () => {
                             <span className="text-xs text-text-main">Upload</span>
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                className="cursor-pointer w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-hover-subtle hover:bg-hover"
+                                className="cursor-pointer w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-state-inactive hover:bg-state-hover"
                                 title="Upload Image"
                             >
                                 <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">

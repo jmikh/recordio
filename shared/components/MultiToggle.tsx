@@ -57,7 +57,7 @@ export const MultiToggle = <T extends string>({
                         key={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-4 min-w-0 rounded-lg 
+                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-1.5 px-4 min-w-0 rounded-lg 
                             text-sm z-10 outline-none cursor-pointer
                             text-center
                             transition-colors duration-200

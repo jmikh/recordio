@@ -117,7 +117,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                             subscription.stripeCustomerId && (
                                 <button
                                     onClick={handleManageSubscription}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-hover rounded-md transition-colors text-left"
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
                                 >
                                     <FaCog size={14} className="text-text-muted" />
                                     Manage Subscription

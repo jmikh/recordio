@@ -7,7 +7,7 @@ import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md'
 import { Slider } from '@shared/components';
 import { Dropdown } from '@shared/components';
 import type { DropdownOption } from '@shared/components';
-import { Button } from '@shared/components';
+import { DefaultButton } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -151,19 +151,19 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     value={currentResolutionObj}
                     onChange={handleResolutionChange}
                     trigger={
-                        <Button
+                        <DefaultButton
                             className="px-3 py-1 text-xs flex items-center gap-1 min-w-[60px] justify-center"
                             title="Change Aspect Ratio"
                         >
                             {currentResolutionObj.label}
                             <span className="text-[10px] opacity-70">▲</span>
-                        </Button>
+                        </DefaultButton>
                     }
                     direction="up"
                 />
 
                 {/* Delete Button */}
-                <Button
+                <DefaultButton
                     onClick={handleDelete}
                     className="px-3 py-1 text-xs flex items-center gap-1"
                     title={
@@ -175,10 +175,10 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 >
                     <MdDelete size={14} />
                     Delete
-                </Button>
+                </DefaultButton>
             </div>
 
-            <div className="flex items-center gap-4 bg-hover-subtle px-4 py-1 rounded-full border border-border">
+            <div className="flex items-center gap-4 bg-state-inactive px-4 py-1 rounded-full border border-border">
                 <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-highlighted">
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
@@ -191,13 +191,13 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-                <Button
+                <DefaultButton
                     onClick={onFit}
                     className="px-2 py-0.5 text-[10px]"
                     title="Fit timeline to screen"
                 >
                     Fit
-                </Button>
+                </DefaultButton>
                 <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                     className="hover:text-primary transition-colors text-text-main"
@@ -212,7 +212,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                         max={MAX_PIXELS_PER_SEC}
                         onPointerDown={batcher.startInteraction}
                         onPointerUp={batcher.endInteraction}
-                        showTooltip
                     />
                 </div>
                 <button

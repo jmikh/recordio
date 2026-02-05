@@ -149,11 +149,11 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
 
             {/* Resize Handles (Overlay entire group) */}
             <div
-                className="absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-l-lg"
+                className="absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize hover:bg-state-active z-20 rounded-l-lg"
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
             />
             <div
-                className="absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize hover:bg-hover-bold z-20 rounded-r-lg"
+                className="absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize hover:bg-state-active z-20 rounded-r-lg"
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}
             />
 

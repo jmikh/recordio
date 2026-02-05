@@ -1,5 +1,8 @@
 // Shared UI Components - Barrel Export
-export { Button } from './Button';
+export { ActivatedButton } from './ActivatedButton';
+export { DefaultButton } from './DefaultButton';
+export { CollapsibleCard } from './CollapsibleCard';
+export type { PreviewItem } from './CollapsibleCard';
 export { InfoTooltip } from './InfoTooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';

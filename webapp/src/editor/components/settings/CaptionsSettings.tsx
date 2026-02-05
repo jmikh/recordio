@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../types';
-import { Slider, Button } from '@shared/components';
+import { Slider, DefaultButton } from '@shared/components';
 import { Toggle } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
@@ -411,7 +411,7 @@ export function CaptionsSettings() {
                                     }}
                                     className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedLanguage === lang.code
                                         ? 'bg-primary/20 text-primary-highlighted'
-                                        : 'text-text-main hover:bg-hover'
+                                        : 'text-text-main hover:bg-state-hover'
                                         }`}
                                 >
                                     {lang.label}
@@ -425,12 +425,12 @@ export function CaptionsSettings() {
             {/* Restore Transcript Button */}
             {!isTranscribing && settings.baselineCaptions?.length &&
                 JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
-                    <Button
+                    <DefaultButton
                         onClick={() => restoreCaptionsFromBaseline()}
                         className="w-full"
                     >
                         Restore Transcript
-                    </Button>
+                    </DefaultButton>
                 )}
 
             {/* Caption Settings */}

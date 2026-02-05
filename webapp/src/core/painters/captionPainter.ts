@@ -64,6 +64,9 @@ export function drawCaptions(
         const text = caption.text;
         const words = text.split(' ').filter(w => w.length > 0);
 
+        // Skip empty captions (user deleted all text)
+        if (words.length === 0) continue;
+
         // Calculate elapsed ratio within this segment (using output range)
         const segmentStart = caption.outputRange.start;
         const segmentEnd = caption.outputRange.end;

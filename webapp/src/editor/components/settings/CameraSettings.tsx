@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider } from '@shared/components';
 import { MultiToggle } from '@shared/components';
 import { Toggle, InfoTooltip } from '@shared/components';
-import { SettingsPanelButton } from './SettingsPanel';
+import { ActivatedButton } from '@shared/components';
 import { Notice } from '@shared/components';
 import { FaCheck } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
@@ -72,13 +72,17 @@ export const CameraSettings = () => {
         <div className="space-y-6 relative">
             <div>
                 <div className="flex gap-2 mb-6">
-                    <SettingsPanelButton
-                        icon={isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight className="w-5 h-5" />}
-                        isActive={isEditingCamera}
-                        onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                        label={isEditingCamera ? 'Editing on Canvas' : 'Edit on Canvas'}
-                        className="flex-1"
-                    />
+                    <div className="flex-1 flex flex-col gap-1">
+                        <ActivatedButton
+                            onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
+                            isActive={isEditingCamera}
+                            className="w-full"
+                        >
+                            {isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight />}
+                            {isEditingCamera ? 'Done' : 'Adjust'}
+                        </ActivatedButton>
+                        <span className="text-xs text-text-disabled text-center">Size, Position, Corner Radius</span>
+                    </div>
                 </div>
 
                 <div className="space-y-6">

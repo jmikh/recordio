@@ -125,7 +125,7 @@ export const Slider: React.FC<SliderProps> = ({
                         </label>
                     )}
                     {showTooltip && (
-                        <span className="text-sm text-text-muted">
+                        <span className="text-xs text-text-muted">
                             {valueTransform(value).toFixed(decimals)}{units}
                         </span>
                     )}
@@ -171,7 +171,7 @@ export const Slider: React.FC<SliderProps> = ({
                 >
                     {/* Hover Halo */}
                     <div
-                        className={`absolute inset-0 rounded-full bg-hover-subtle transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        className={`absolute inset-0 rounded-full bg-state-inactive transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                             }`}
                     />
                     {/* Thumb */}

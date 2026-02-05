@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaCrown, FaCheck, FaTimes } from 'react-icons/fa';
 import { PrimaryButton } from '@shared/components';
-import { Button } from '@shared/components';
+import { DefaultButton } from '@shared/components';
 import { XButton } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
@@ -204,9 +204,9 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
-                    <Button onClick={onClose} className="flex-1" disabled={loading}>
+                    <DefaultButton onClick={onClose} className="flex-1" disabled={loading}>
                         Maybe Later
-                    </Button>
+                    </DefaultButton>
                     <PrimaryButton onClick={handleUpgrade} className="flex-1 py-2" disabled={loading}>
                         <FaCrown className="mr-2" size={14} />
                         {loading ? 'Loading...' : 'Subscribe Now'}
