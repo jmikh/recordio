@@ -29,7 +29,7 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
     <button
         onClick={onClick}
         className={`
-            group flex items-center gap-3 py-2.5 px-4 border-none rounded-lg cursor-pointer transition-colors duration-200
+            group flex items-center gap-4 py-3 px-4 border-none rounded-lg cursor-pointer transition-colors duration-200
             ${isActive
                 ? 'bg-primary/15 text-primary'
                 : 'bg-hover-subtle text-text-muted hover:bg-hover hover:text-text-main'}
@@ -37,7 +37,7 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
         `}
     >
         <span className="flex">{icon}</span>
-        {label && <span className="text-sm font-medium">{label}</span>}
+        {label && <span className="text-base font-medium">{label}</span>}
         {isActive && <FaChevronRight size={12} className="text-primary ml-auto" />}
     </button>
 );
@@ -69,16 +69,16 @@ export const SettingsPanel = () => {
 
     const navItems = useMemo(() => {
         const items: { id: Tab; label: string; icon: React.ReactNode }[] = [
-            { id: 'project', label: 'Projects', icon: <TbFolder size={18} /> },
-            { id: 'background', label: 'Background', icon: <TbBackground size={18} /> },
-            { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={18} /> },
+            { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
+            { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
+            { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
         ];
         if (hasCameraSource) {
-            items.push({ id: 'camera', label: 'Webcam', icon: <TbCamera size={18} /> });
+            items.push({ id: 'camera', label: 'Webcam', icon: <TbCamera size={20} /> });
         }
-        items.push({ id: 'zoom', label: 'Effects', icon: <TbZoomIn size={18} /> });
+        items.push({ id: 'zoom', label: 'Effects', icon: <TbZoomIn size={20} /> });
         if (hasMicrophone) {
-            items.push({ id: 'captions', label: 'Captions', icon: <TbArticle size={18} /> });
+            items.push({ id: 'captions', label: 'Captions', icon: <TbArticle size={20} /> });
         }
         return items;
     }, [hasCameraSource, hasMicrophone]);
@@ -95,7 +95,7 @@ export const SettingsPanel = () => {
     return (
         <div className="flex h-full border-r border-border bg-surface">
             {/* Sidebar Navigation */}
-            <nav ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3">
+            <nav ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
                 {/* Sliding accent bar */}
                 <div
                     className="absolute left-3 w-[3px] h-7 bg-primary transition-all duration-200 ease-out"
@@ -109,12 +109,12 @@ export const SettingsPanel = () => {
                             key={item.id}
                             data-tab={item.id}
                             onClick={() => handleTabChange(item.id)}
-                            className="flex items-center gap-3 py-2.5 px-3.5 bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-200"
+                            className="group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-200"
                         >
-                            <span className={`flex ${isActive ? 'text-primary' : 'text-text-muted'}`}>
+                            <span className={`flex transition-colors ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-main'}`}>
                                 {item.icon}
                             </span>
-                            <span className={`text-sm font-medium ${isActive ? 'text-text-highlighted' : 'text-text-muted'}`}>
+                            <span className={`text-sm font-medium transition-colors ${isActive ? 'text-text-highlighted' : 'text-text-muted group-hover:text-text-main'}`}>
                                 {item.label}
                             </span>
                         </button>

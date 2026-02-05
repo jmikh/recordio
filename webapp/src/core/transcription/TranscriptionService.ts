@@ -6,6 +6,7 @@ const SAMPLE_RATE = 16000;
 interface TranscribeMessage {
     type: 'transcribe';
     audioBuffer: ArrayBuffer;
+    language?: string;
 }
 
 interface AbortMessage {
@@ -98,7 +99,8 @@ export class TranscriptionService {
     async transcribe(
         videoBlob: Blob,
         onProgress?: (progress: number) => void,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        language: string = 'en'
     ): Promise<CaptionSegment[]> {
         onProgress?.(0.1);
 
@@ -111,7 +113,8 @@ export class TranscriptionService {
         const chunks = await this.sendToWorker(
             samples,
             (p) => onProgress?.(0.2 + p * 0.75),
-            signal
+            signal,
+            language
         );
 
 
@@ -137,7 +140,8 @@ export class TranscriptionService {
     private sendToWorker(
         samples: Float32Array,
         onProgress?: (progress: number) => void,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        language: string = 'en'
     ): Promise<Array<{ text: string; timestamp: [number, number | null] }>> {
         const worker = this.initWorker();
         const audioBuffer = samples.buffer.slice(0) as ArrayBuffer;
@@ -176,7 +180,7 @@ export class TranscriptionService {
             worker.addEventListener('message', messageHandler);
 
             worker.postMessage(
-                { type: 'transcribe', audioBuffer } as TranscribeMessage,
+                { type: 'transcribe', audioBuffer, language } as TranscribeMessage,
                 [audioBuffer]
             );
         });

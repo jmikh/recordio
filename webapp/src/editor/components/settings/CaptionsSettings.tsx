@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdInfoOutline, MdEdit } from 'react-icons/md';
+import { MdInfoOutline, MdEdit, MdKeyboardArrowDown } from 'react-icons/md';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../types';
-import { Slider } from '@shared/components';
+import { Slider, Button } from '@shared/components';
 import { Toggle } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
+import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
 import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { PrimaryButton } from '@shared/components';
 import { Notice } from '@shared/components';
@@ -49,6 +50,9 @@ export function CaptionsSettings() {
     const infoIconRef = useRef<HTMLSpanElement>(null);
     const [showInfoTooltip, setShowInfoTooltip] = useState(false);
     const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+    const [selectedLanguage, setSelectedLanguage] = useState('en');
+    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+    const languageDropdownRef = useRef<HTMLDivElement>(null);
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
@@ -63,6 +67,18 @@ export function CaptionsSettings() {
             inputRef.current.focus();
         }
     }, [editingId]);
+
+    // Close language dropdown on click outside
+    useEffect(() => {
+        if (!showLanguageDropdown) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (languageDropdownRef.current && !languageDropdownRef.current.contains(e.target as Node)) {
+                setShowLanguageDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showLanguageDropdown]);
 
     // Exit edit mode when playback starts
     useEffect(() => {
@@ -165,7 +181,8 @@ export function CaptionsSettings() {
                     const scaledProgress = 0.1 + (progress * 0.9);
                     updateToast(toastId, { progress: scaledProgress });
                 },
-                signal
+                signal,
+                selectedLanguage
             );
 
             // Success
@@ -344,47 +361,77 @@ export function CaptionsSettings() {
         <div className="space-y-4">
             {/* Transcribe/Restore Buttons */}
             {!isTranscribing && (
-                <div className="flex flex-col gap-2">
-                    {!settings.baselineCaptions?.length ? (
-                        <PrimaryButton
-                            onClick={handleGenerate}
-                            className="w-full flex items-center justify-center gap-2"
-                        >
-                            Transcribe
-                            <span
-                                ref={infoIconRef}
-                                className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
-                                onMouseEnter={() => {
-                                    if (infoIconRef.current) {
-                                        const rect = infoIconRef.current.getBoundingClientRect();
-                                        setTooltipPosition({
-                                            left: rect.left + rect.width / 2,
-                                            top: rect.bottom + 8
-                                        });
-                                    }
-                                    setShowInfoTooltip(true);
-                                }}
-                                onMouseLeave={() => setShowInfoTooltip(false)}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <MdInfoOutline size={10} className="text-white/80" />
-                            </span>
-                        </PrimaryButton>
-                    ) : (() => {
-                        // Only show restore button if captions differ from baseline
-                        const isUnchanged = JSON.stringify(captionSegments) === JSON.stringify(settings.baselineCaptions);
-                        if (isUnchanged) return null;
-                        return (
-                            <PrimaryButton
-                                onClick={() => restoreCaptionsFromBaseline()}
-                                className="w-full"
-                            >
-                                Restore Transcript
-                            </PrimaryButton>
-                        );
-                    })()}
+                <PrimaryButton
+                    onClick={handleGenerate}
+                    className="w-full flex items-center justify-center gap-2"
+                >
+                    Transcribe
+                    <span
+                        ref={infoIconRef}
+                        className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
+                        onMouseEnter={() => {
+                            if (infoIconRef.current) {
+                                const rect = infoIconRef.current.getBoundingClientRect();
+                                setTooltipPosition({
+                                    left: rect.left + rect.width / 2,
+                                    top: rect.bottom + 8
+                                });
+                            }
+                            setShowInfoTooltip(true);
+                        }}
+                        onMouseLeave={() => setShowInfoTooltip(false)}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <MdInfoOutline size={10} className="text-white/80" />
+                    </span>
+                </PrimaryButton>
+            )}
+
+            {/* Language Dropdown */}
+            {!isTranscribing && (
+                <div ref={languageDropdownRef} className="relative">
+                    <button
+                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-surface-overlay border border-border rounded-md text-sm text-text-main hover:border-border-hover transition-colors"
+                    >
+                        <span>{WHISPER_LANGUAGES.find(l => l.code === selectedLanguage)?.label || 'English'}</span>
+                        <MdKeyboardArrowDown
+                            size={18}
+                            className={`text-text-muted transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`}
+                        />
+                    </button>
+                    {showLanguageDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-overlay border border-border rounded-md shadow-float z-[var(--z-index-dropdown)] max-h-[200px] overflow-y-auto">
+                            {WHISPER_LANGUAGES.map((lang) => (
+                                <button
+                                    key={lang.code}
+                                    onClick={() => {
+                                        setSelectedLanguage(lang.code);
+                                        setShowLanguageDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedLanguage === lang.code
+                                        ? 'bg-primary/20 text-primary-highlighted'
+                                        : 'text-text-main hover:bg-hover'
+                                        }`}
+                                >
+                                    {lang.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
+
+            {/* Restore Transcript Button */}
+            {!isTranscribing && settings.baselineCaptions?.length &&
+                JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
+                    <Button
+                        onClick={() => restoreCaptionsFromBaseline()}
+                        className="w-full"
+                    >
+                        Restore Transcript
+                    </Button>
+                )}
 
             {/* Caption Settings */}
             {(
@@ -496,7 +543,7 @@ export function CaptionsSettings() {
                     onMouseEnter={() => setShowInfoTooltip(true)}
                     onMouseLeave={() => setShowInfoTooltip(false)}
                 >
-                    Transcription runs entirely in your browser using local AI. Your audio never leaves your device. Currently supports English only.
+                    Transcription runs entirely in your browser using local AI. Your audio never leaves your device.
                 </div>,
                 document.body
             )}

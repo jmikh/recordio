@@ -15,7 +15,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                border border-border
                bg-surface-inset hover:bg-hover
                text-text-main hover:text-text-highlighted
-               text-xs
+               text-sm
                rounded-sm
                px-2 py-1.5
                transition-colors

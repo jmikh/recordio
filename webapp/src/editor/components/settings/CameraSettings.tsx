@@ -156,7 +156,7 @@ export const CameraSettings = () => {
                             hasGlow
                         }}
                         onChange={(updates) => batchAction(() => updateSettings({ camera: { ...cameraConfig, ...updates } }))}
-                        showRadius={shape === 'rect' || shape === 'square'}
+                        showRadius={false}
                         onInteractionStart={startInteraction}
                         onInteractionEnd={endInteraction}
                         onColorPopoverOpen={startInteraction}
