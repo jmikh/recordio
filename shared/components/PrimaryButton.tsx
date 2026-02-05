@@ -11,12 +11,14 @@ export const PrimaryButton = forwardRef<HTMLButtonElement, PrimaryButtonProps>(
             <button
                 ref={ref}
                 className={`
+               flex items-center justify-center gap-2
+               h-9
                border border-border
                bg-primary hover:enabled:bg-primary-highlighted
                text-text-on-primary
                text-sm
-               rounded-sm
-               px-2 py-1
+               rounded-[var(--radius-interactive)]
+               px-3
                font-medium
                transition-colors
                cursor-pointer

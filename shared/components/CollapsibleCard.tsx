@@ -69,7 +69,8 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 onClick={handleToggle}
                 className="
                     w-full flex items-center justify-between
-                    px-4 py-3
+                    h-11
+                    px-4
                     text-left
                     transition-colors
                     cursor-pointer

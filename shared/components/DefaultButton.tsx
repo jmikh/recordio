@@ -12,12 +12,13 @@ export const DefaultButton = forwardRef<HTMLButtonElement, ButtonProps>(
                 ref={ref}
                 className={`
                flex items-center justify-center gap-2
+               h-9
                border border-border
                bg-state-inactive hover:bg-state-hover
                text-text-main hover:text-text-highlighted
                text-sm
-               rounded-sm
-               px-2 py-1.5
+               rounded-[var(--radius-interactive)]
+               px-3
                transition-colors
                cursor-pointer
                disabled:opacity-50

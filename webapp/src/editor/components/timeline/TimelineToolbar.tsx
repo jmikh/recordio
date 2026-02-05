@@ -4,10 +4,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md';
-import { Slider } from '@shared/components';
-import { Dropdown } from '@shared/components';
-import type { DropdownOption } from '@shared/components';
-import { DefaultButton } from '@shared/components';
+import { Slider, DefaultButton } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -18,26 +15,13 @@ interface TimelineToolbarProps {
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
 
-interface Resolution {
-    label: string;
-    width: number;
-    height: number;
-}
 
-const RESOLUTIONS: Resolution[] = [
-    { label: '1:1', width: 1080 * 2, height: 1080 * 2 },
-    { label: '4:3', width: 1440 * 2, height: 1080 * 2 },
-    { label: '16:9', width: 1920 * 2, height: 1080 * 2 },
-];
 
 export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
     onFit,
 }) => {
-    //console.log('[Rerender] TimelineToolbar');
     // Stores
-    const updateSettings = useProjectStore(s => s.updateSettings);
-    const currentResolution = useProjectStore(s => s.project.settings.outputSize);
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
 
     // Delete actions
@@ -67,9 +51,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         setPixelsPerSec(newScale);
     };
 
-    const handleResolutionChange = (resolution: Resolution) => {
-        updateSettings({ outputSize: { width: resolution.width, height: resolution.height } });
-    };
+
 
     const onTogglePlay = () => setIsPlaying(!isPlaying);
 
@@ -130,38 +112,10 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         return unsub;
     }, [totalDurationMs]);
 
-    // Get current aspect ratio and resolution
-    const currentResolutionObj = RESOLUTIONS.find(
-        r => r.width === currentResolution?.width && r.height === currentResolution?.height
-    ) || RESOLUTIONS[2]; // Default to 16:9
-
-
-    const resolutionOptions: DropdownOption<Resolution>[] = RESOLUTIONS.map(res => ({
-        value: res,
-        label: res.label,
-    }));
 
     return (
-        <div className="h-10 flex items-center px-4 bg-surface-elevated border-b border-border shrink-0 justify-between">
+        <div className="h-10 flex items-center px-4 bg-surface-default border-b border-border shrink-0 justify-between">
             <div className="flex items-center gap-2">
-
-                {/* Aspect Ratio Dropdown */}
-                <Dropdown
-                    options={resolutionOptions}
-                    value={currentResolutionObj}
-                    onChange={handleResolutionChange}
-                    trigger={
-                        <DefaultButton
-                            className="px-3 py-1 text-xs flex items-center gap-1 min-w-[60px] justify-center"
-                            title="Change Aspect Ratio"
-                        >
-                            {currentResolutionObj.label}
-                            <span className="text-[10px] opacity-70">▲</span>
-                        </DefaultButton>
-                    }
-                    direction="up"
-                />
-
                 {/* Delete Button */}
                 <DefaultButton
                     onClick={handleDelete}

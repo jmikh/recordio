@@ -10,7 +10,6 @@ import { ViewMapper } from '../../../core/mappers/viewMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
 import type { Project } from '../../../types';
 
 // ------------------------------------------------------------------
@@ -48,16 +47,8 @@ export const renderSpotlightEditor = (
         }
     }
 
-    // Render Camera Layer
-    const cameraSettings = project.settings.camera;
-    const cameraSource = project.cameraSource;
-
-    if (cameraSource && cameraSettings) {
-        const video = videoRefs[cameraSource.id];
-        if (video) {
-            drawWebcam(ctx, video, cameraSource.size, cameraSettings);
-        }
-    }
+    // Note: Camera is intentionally not rendered in spotlight edit mode
+    // to avoid visual clutter while editing the spotlight region
 };
 
 // ------------------------------------------------------------------

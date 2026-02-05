@@ -112,14 +112,15 @@ export const EffectsSettings = () => {
                         decimals={1}
                     />
 
-                    {/* Actions */}
-                    <DefaultButton
-                        onClick={handleClearZooms}
-                        disabled={zoomActions.length === 0}
-                        className="w-full"
-                    >
-                        Clear
-                    </DefaultButton>
+                    {/* Actions - only show when there are zooms to clear */}
+                    {zoomActions.length > 0 && (
+                        <DefaultButton
+                            onClick={handleClearZooms}
+                            className="w-full"
+                        >
+                            Clear
+                        </DefaultButton>
+                    )}
                 </div>
             </CollapsibleCard>
 

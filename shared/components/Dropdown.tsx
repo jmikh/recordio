@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Scrollbar } from './Scrollbar';
+import { MdKeyboardArrowDown } from 'react-icons/md';
 
 export interface DropdownOption<T> {
     value: T;
@@ -12,37 +12,53 @@ interface DropdownProps<T> {
     options: DropdownOption<T>[];
     value: T;
     onChange: (value: T) => void;
-    trigger: React.ReactNode;
-    direction?: 'down' | 'up';
-    usePortal?: boolean;
-    anchorEl?: HTMLElement | null;
+    /** Optional label for settings panel style. If not provided, uses compact inline mode */
+    label?: string;
+    /** Placeholder when no value is selected */
+    placeholder?: string;
+    /** Additional class for the container */
     className?: string;
+    /** Use full-width style (default: true) */
+    fullWidth?: boolean;
 }
 
 export function Dropdown<T>({
     options,
     value,
     onChange,
-    trigger,
-    direction = 'down',
-    usePortal = false,
-    anchorEl,
-    className = ''
+    label,
+    placeholder = 'Select...',
+    className = '',
+    fullWidth = true
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const triggerRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Calculate menu position when opening
+    useEffect(() => {
+        if (!isOpen || !dropdownRef.current) return;
+
+        const rect = dropdownRef.current.getBoundingClientRect();
+        setMenuStyle({
+            position: 'fixed',
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
+            zIndex: 9999,
+        });
+    }, [isOpen]);
 
     // Handle click outside to close
     useEffect(() => {
         if (!isOpen) return;
 
         const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
             if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(e.target as Node) &&
-                triggerRef.current &&
-                !triggerRef.current.contains(e.target as Node)
+                dropdownRef.current && !dropdownRef.current.contains(target) &&
+                menuRef.current && !menuRef.current.contains(target)
             ) {
                 setIsOpen(false);
             }
@@ -57,101 +73,94 @@ export function Dropdown<T>({
         setIsOpen(false);
     };
 
-    // Calculate position for portal-based dropdown
-    const getPortalStyle = (): React.CSSProperties => {
-        if (!anchorEl) return {};
+    // Find current label
+    const currentOption = options.find(o => o.value === value);
+    const displayLabel = currentOption?.label || placeholder;
 
-        const rect = anchorEl.getBoundingClientRect();
-
-        if (direction === 'up') {
-            return {
-                bottom: `${window.innerHeight - rect.top + 8}px`,
-                left: `${rect.left}px`,
-            };
-        } else {
-            return {
-                top: `${rect.bottom + 8}px`,
-                left: `${rect.left}px`,
-            };
-        }
-    };
-
-    const optionsContainerRef = useRef<HTMLDivElement>(null);
-
-    const dropdownContent = (
+    const dropdownMenu = (
         <div
-            ref={dropdownRef}
-            className={`bg-surface-overlay border border-border rounded shadow-xl p-1 flex min-w-[120px] ${usePortal ? 'fixed z-[9999]' : ''
-                } ${className}`}
-            style={usePortal ? getPortalStyle() : {}}
+            ref={menuRef}
+            className="bg-surface-overlay border border-border rounded-md shadow-float max-h-[200px] overflow-y-auto"
+            style={menuStyle}
         >
-            <div
-                ref={optionsContainerRef}
-                className="flex flex-col overflow-y-auto max-h-[200px] flex-1"
-            >
-                {options.map((option, index) => {
-                    const isSelected = option.value === value;
+            {options.map((option, index) => {
+                const isSelected = option.value === value;
 
-                    return (
-                        <button
-                            key={index}
-                            onClick={() => handleSelect(option)}
-                            className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center gap-2 rounded-sm ${isSelected
+                return (
+                    <button
+                        key={index}
+                        onClick={() => handleSelect(option)}
+                        className={`
+                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2
+                            ${isSelected
                                 ? 'bg-primary/20 text-primary-highlighted'
-                                : 'text-text-main hover:bg-state-hover hover:text-text-highlighted'
-                                }`}
-                        >
-                            {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                            <span className="flex-1">{option.label}</span>
-                            {isSelected && (
-                                <svg
-                                    width="10"
-                                    height="10"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="flex-shrink-0"
-                                >
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                            )}
-                        </button>
-                    );
-                })}
-            </div>
-            <Scrollbar
-                container={optionsContainerRef.current}
-                orientation="vertical"
-                dependency={options.length}
-            />
+                                : 'text-text-main hover:bg-state-hover'
+                            }
+                        `}
+                    >
+                        {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
+                        <span className="flex-1">{option.label}</span>
+                        {isSelected && (
+                            <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="flex-shrink-0"
+                            >
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        )}
+                    </button>
+                );
+            })}
         </div>
     );
 
     return (
-        <div className="relative">
-            <div ref={triggerRef} onClick={() => setIsOpen(!isOpen)}>
-                {trigger}
-            </div>
+        <div ref={dropdownRef} className={`relative ${fullWidth ? 'w-full' : ''} ${className}`}>
+            {/* Trigger Button */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`
+                    flex items-center justify-between gap-2
+                    h-9
+                    px-3
+                    bg-state-inactive border border-border rounded-[var(--radius-interactive)]
+                    text-sm text-text-main
+                    hover:border-border-hover transition-colors
+                    cursor-pointer
+                    ${fullWidth ? 'w-full' : ''}
+                `}
+            >
+                {label ? (
+                    <>
+                        <span className="text-text-muted">{label}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-text-main">{displayLabel}</span>
+                            <MdKeyboardArrowDown
+                                size={18}
+                                className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <span className="text-text-main">{displayLabel}</span>
+                        <MdKeyboardArrowDown
+                            size={18}
+                            className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        />
+                    </>
+                )}
+            </button>
 
-            {isOpen && (
-                <>
-                    {!usePortal && (
-                        <>
-                            <div className="fixed inset-0 z-[var(--z-index-overlay)]" onClick={() => setIsOpen(false)} />
-                            <div
-                                className={`absolute ${direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
-                                    } right-0 z-[var(--z-index-dropdown)]`}
-                            >
-                                {dropdownContent}
-                            </div>
-                        </>
-                    )}
-                    {usePortal && createPortal(dropdownContent, document.body)}
-                </>
-            )}
+            {/* Portal-rendered dropdown menu */}
+            {isOpen && createPortal(dropdownMenu, document.body)}
         </div>
     );
 }

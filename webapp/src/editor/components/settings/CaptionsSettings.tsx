@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdInfoOutline, MdEdit, MdKeyboardArrowDown } from 'react-icons/md';
+import { MdInfoOutline, MdEdit } from 'react-icons/md';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../types';
-import { Slider, DefaultButton } from '@shared/components';
-import { Toggle } from '@shared/components';
+import { Slider, DefaultButton, CollapsibleCard, Toggle, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
 import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
@@ -51,8 +50,6 @@ export function CaptionsSettings() {
     const [showInfoTooltip, setShowInfoTooltip] = useState(false);
     const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
     const [selectedLanguage, setSelectedLanguage] = useState('en');
-    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-    const languageDropdownRef = useRef<HTMLDivElement>(null);
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
@@ -68,17 +65,7 @@ export function CaptionsSettings() {
         }
     }, [editingId]);
 
-    // Close language dropdown on click outside
-    useEffect(() => {
-        if (!showLanguageDropdown) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (languageDropdownRef.current && !languageDropdownRef.current.contains(e.target as Node)) {
-                setShowLanguageDropdown(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showLanguageDropdown]);
+
 
     // Exit edit mode when playback starts
     useEffect(() => {
@@ -389,37 +376,11 @@ export function CaptionsSettings() {
 
             {/* Language Dropdown */}
             {!isTranscribing && (
-                <div ref={languageDropdownRef} className="relative">
-                    <button
-                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-surface-overlay border border-border rounded-md text-sm text-text-main hover:border-border-hover transition-colors"
-                    >
-                        <span>{WHISPER_LANGUAGES.find(l => l.code === selectedLanguage)?.label || 'English'}</span>
-                        <MdKeyboardArrowDown
-                            size={18}
-                            className={`text-text-muted transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-                    {showLanguageDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-overlay border border-border rounded-md shadow-float z-[var(--z-index-dropdown)] max-h-[200px] overflow-y-auto">
-                            {WHISPER_LANGUAGES.map((lang) => (
-                                <button
-                                    key={lang.code}
-                                    onClick={() => {
-                                        setSelectedLanguage(lang.code);
-                                        setShowLanguageDropdown(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedLanguage === lang.code
-                                        ? 'bg-primary/20 text-primary-highlighted'
-                                        : 'text-text-main hover:bg-state-hover'
-                                        }`}
-                                >
-                                    {lang.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <Dropdown
+                    options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
+                    value={selectedLanguage}
+                    onChange={setSelectedLanguage}
+                />
             )}
 
             {/* Restore Transcript Button */}
@@ -433,9 +394,16 @@ export function CaptionsSettings() {
                     </DefaultButton>
                 )}
 
-            {/* Caption Settings */}
-            {(
-                <div className="space-y-3 pb-3 border-b border-border">
+            {/* Style Settings Card */}
+            <CollapsibleCard
+                title="Style"
+                previewItems={[
+                    { type: 'text', content: `${Math.round(settings.size)}px` },
+                    { type: 'text', content: `${Math.round(settings.width)}%` }
+                ]}
+                defaultExpanded
+            >
+                <div className="flex flex-col gap-4">
                     <Toggle
                         label="Visible"
                         value={settings.visible}
@@ -470,8 +438,7 @@ export function CaptionsSettings() {
                         decimals={0}
                     />
                 </div>
-            )}
-
+            </CollapsibleCard>
 
             {emptyCaptionsNotice && (
                 <Notice variant="info">
@@ -479,57 +446,59 @@ export function CaptionsSettings() {
                 </Notice>
             )}
 
-            {
-                captionSegments && captionSegments.length > 0 && (
-                    <div
-                        className="bg-surface-overlay rounded-lg p-4"
-                        style={{ paddingTop: '28px' }}
-                    >
-                        <div>
-                            {captionSegments.map(segment => {
-                                // Convert source time to output time for display
-                                const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-                                const outputStart = outputRange?.start ?? segment.sourceStartMs;
-                                const outputEnd = outputRange?.end ?? segment.sourceEndMs;
-                                const isEditing = editingId === segment.id;
-                                const isSelected = selectedCaptionId === segment.id;
+            {/* Captions Card - only show when there are segments */}
+            {captionSegments && captionSegments.length > 0 && (
+                <CollapsibleCard
+                    title="Captions"
+                    previewItems={[
+                        { type: 'text', content: `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}` }
+                    ]}
+                    defaultExpanded
+                >
+                    <div>
+                        {captionSegments.map(segment => {
+                            // Convert source time to output time for display
+                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+                            const outputStart = outputRange?.start ?? segment.sourceStartMs;
+                            const outputEnd = outputRange?.end ?? segment.sourceEndMs;
+                            const isEditing = editingId === segment.id;
+                            const isSelected = selectedCaptionId === segment.id;
 
-                                return (
+                            return (
+                                <span
+                                    key={segment.id}
+                                    onClick={() => handleSegmentClick(segment)}
+                                    className="relative inline"
+                                >
+                                    {/* Caption text - inline editable */}
                                     <span
-                                        key={segment.id}
-                                        onClick={() => handleSegmentClick(segment)}
-                                        className="relative inline"
+                                        ref={isEditing ? inputRef : null}
+                                        contentEditable={isEditing}
+                                        suppressContentEditableWarning
+                                        onInput={(e) => handleInput(e, segment.id)}
+                                        onKeyDown={handleKeyDown}
+                                        onBlur={handleBlur}
+                                        className={`text-xs transition-all outline-none ${isEditing
+                                            ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
+                                            : isSelected
+                                                ? 'text-text-highlighted border-b border-primary cursor-text'
+                                                : 'text-text-muted cursor-pointer hover:text-text-main'
+                                            }`}
+                                        style={{
+                                            lineHeight: 2.2,
+                                            padding: isEditing ? '2px 4px' : '2px 0',
+                                            borderRadius: isEditing ? '3px' : '0',
+                                        }}
                                     >
-                                        {/* Caption text - inline editable */}
-                                        <span
-                                            ref={isEditing ? inputRef : null}
-                                            contentEditable={isEditing}
-                                            suppressContentEditableWarning
-                                            onInput={(e) => handleInput(e, segment.id)}
-                                            onKeyDown={handleKeyDown}
-                                            onBlur={handleBlur}
-                                            className={`text-xs transition-all outline-none ${isEditing
-                                                ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
-                                                : isSelected
-                                                    ? 'text-text-highlighted border-b border-primary cursor-text'
-                                                    : 'text-text-muted cursor-pointer hover:text-text-main'
-                                                }`}
-                                            style={{
-                                                lineHeight: 2.2,
-                                                padding: isEditing ? '2px 4px' : '2px 0',
-                                                borderRadius: isEditing ? '3px' : '0',
-                                            }}
-                                        >
-                                            {segment.text}
-                                        </span>
-                                        <span> </span>
+                                        {segment.text}
                                     </span>
-                                );
-                            })}
-                        </div>
+                                    <span> </span>
+                                </span>
+                            );
+                        })}
                     </div>
-                )
-            }
+                </CollapsibleCard>
+            )}
 
             {/* Info tooltip - rendered via portal */}
             {showInfoTooltip && createPortal(

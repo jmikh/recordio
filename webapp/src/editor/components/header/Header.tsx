@@ -5,7 +5,6 @@ import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality } from '../../export/ExportManager';
 import { Dropdown } from '@shared/components';
 import type { DropdownOption } from '@shared/components';
-import { PrimaryButton } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdBugReport } from 'react-icons/md';
 import { DefaultButton } from '@shared/components';
@@ -83,7 +82,7 @@ export const Header = () => {
     };
 
     return (
-        <div className="bg-surface-elevated border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
+        <div className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
@@ -145,20 +144,10 @@ export const Header = () => {
                     {/* User Profile / Other Actions */}
                     <Dropdown
                         options={EXPORT_QUALITY_OPTIONS}
-                        value={null as any} // No default selection - this is an action dropdown, not a state selector
+                        value={null as any}
                         onChange={handleExport}
-                        trigger={
-                            <PrimaryButton
-                                className="px-3 py-1.5 text-xs flex items-center gap-2"
-                                disabled={isExporting}
-                            >
-                                <span>Export</span>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
-                            </PrimaryButton>
-                        }
-                        direction="down"
+                        placeholder="Export"
+                        fullWidth={false}
                     />
                     {/* User Authentication */}
                     {isAuthenticated ? (

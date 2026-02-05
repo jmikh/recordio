@@ -211,7 +211,7 @@ export function Timeline() {
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
-                <div className="flex-1 relative overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-hidden flex flex-col">
 
                     <div className="relative overflow-hidden w-full flex-1">
                         {/* Floating Overlay for Scroll Indication */}
