@@ -126,37 +126,16 @@ export function Dropdown<T>({
             {/* Trigger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`
-                    flex items-center justify-between gap-2
-                    h-9
-                    px-3
-                    bg-state-inactive border border-border rounded-[var(--radius-interactive)]
-                    text-sm text-text-main
-                    hover:border-border-hover transition-colors
-                    cursor-pointer
-                    ${fullWidth ? 'w-full' : ''}
-                `}
+                className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''}`}
             >
-                {label ? (
-                    <>
-                        <span className="text-text-muted">{label}</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-text-main">{displayLabel}</span>
-                            <MdKeyboardArrowDown
-                                size={18}
-                                className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                            />
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <span className="text-text-main">{displayLabel}</span>
-                        <MdKeyboardArrowDown
-                            size={18}
-                            className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        />
-                    </>
-                )}
+                <div className="flex items-center gap-2">
+                    {label && <span className="text-text-muted">{label}</span>}
+                    <span>{displayLabel}</span>
+                </div>
+                <MdKeyboardArrowDown
+                    size={18}
+                    className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
             </button>
 
             {/* Portal-rendered dropdown menu */}

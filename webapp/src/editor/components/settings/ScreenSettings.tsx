@@ -3,7 +3,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, CollapsibleCard, Dropdown, ActivatedButton, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, MultiToggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
 
 interface Resolution {
@@ -125,14 +125,13 @@ export const ScreenSettings = () => {
                     />
 
                     {/* Crop Screen Button */}
-                    <ActivatedButton
-                        isActive={isEditingCrop}
+                    <DefaultButton
                         onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
-                        className="w-full"
+                        className={`w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
                     >
                         <IoCropSharp className="w-4 h-4" />
                         {isEditingCrop ? 'Done Cropping' : 'Crop Screen'}
-                    </ActivatedButton>
+                    </DefaultButton>
 
                     {/* Aspect Ratio Dropdown */}
                     <Dropdown

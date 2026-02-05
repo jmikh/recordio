@@ -81,8 +81,14 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 </span>
 
                 {/* Preview items - only shown when collapsed, right-aligned */}
-                <div className="flex items-center gap-2 ml-auto mr-3">
-                    {!expanded && previewItems.length > 0 && (
+                <div
+                    className={`
+                        flex items-center gap-2 ml-auto mr-3
+                        transition-opacity duration-200
+                        ${expanded ? 'opacity-0' : 'opacity-100'}
+                    `}
+                >
+                    {previewItems.length > 0 && (
                         <div className="flex items-center gap-2 text-xs text-text-muted">
                             {previewItems.map((item, index) => (
                                 <React.Fragment key={index}>

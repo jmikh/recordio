@@ -18,7 +18,7 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
 }) => {
     return (
         <div
-            className={`relative w-full bg-surface-overlay rounded-sm ${className}`}
+            className={`relative w-full bg-surface-raised rounded-sm ${className}`}
             style={{ height }}
         >
             {children}

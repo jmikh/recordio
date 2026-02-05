@@ -265,7 +265,7 @@ function Editor() {
                 <SettingsPanel />
                 <div
                     id="video-player-container"
-                    className="flex-1 flex overflow-hidden relative items-center justify-center bg-body"
+                    className="flex-1 flex overflow-hidden relative items-center justify-center bg-surface"
                 >
                     <div
                         ref={setContainerElement}

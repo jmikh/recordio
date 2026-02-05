@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ColorSettings } from './ColorSettings';
+import { DefaultButton } from '@shared/components/DefaultButton';
 
 interface ColorButtonProps {
     /** Current color value (hex format) */
@@ -24,7 +25,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
 }) => {
     const [showColorPopover, setShowColorPopover] = useState(false);
     const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-    const buttonRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
     const toggleColorPopover = () => {
@@ -67,20 +68,20 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
             {label && (
                 <label className="text-sm text-text-muted">{label}</label>
             )}
-            <div
+            <DefaultButton
                 ref={buttonRef}
                 onClick={toggleColorPopover}
-                className="flex items-center gap-3 p-2 bg-transparent border border-border rounded-lg cursor-pointer hover:border-border-hover transition-colors group"
+                className="justify-start gap-3 px-2"
                 title="Select color"
             >
                 <div
-                    className="w-6 h-6 rounded-full border border-border"
+                    className="w-5 h-5 rounded-full border border-border shrink-0"
                     style={{ backgroundColor: color }}
                 />
-                <span className="text-xs font-mono text-text-muted group-hover:text-text-main transition-colors uppercase">
+                <span className="text-xs font-mono text-text-muted uppercase">
                     {color}
                 </span>
-            </div>
+            </DefaultButton>
 
             {showColorPopover && createPortal(
                 <div

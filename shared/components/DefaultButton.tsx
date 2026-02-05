@@ -10,20 +10,7 @@ export const DefaultButton = forwardRef<HTMLButtonElement, ButtonProps>(
         return (
             <button
                 ref={ref}
-                className={`
-               flex items-center justify-center gap-2
-               h-9
-               border border-border
-               bg-state-inactive hover:bg-state-hover
-               text-text-main hover:text-text-highlighted
-               text-sm
-               rounded-[var(--radius-interactive)]
-               px-3
-               transition-colors
-               cursor-pointer
-               disabled:opacity-50
-               ${className}
-            `}
+                className={`interactive-base flex items-center justify-center gap-2 ${className}`}
                 {...props}
             >
                 {children}

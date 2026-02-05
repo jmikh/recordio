@@ -6,7 +6,6 @@ import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
-import { useClickOutside } from '../../hooks/useClickOutside';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { SecondaryButton } from '@shared/components';
@@ -188,17 +187,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     // Close when clicking outside the canvas container
     const rootRef = useRef<HTMLDivElement>(null);
-    const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        // Store reference to the canvas container (parent of our overlay)
-        canvasContainerRef.current = rootRef.current?.parentElement as HTMLDivElement;
-    }, []);
-
-    useClickOutside(canvasContainerRef, () => {
-        endInteraction();
-        setCanvasMode(CanvasMode.Preview);
-    });
 
     // Start history batch when entering crop mode, end when leaving
     useEffect(() => {

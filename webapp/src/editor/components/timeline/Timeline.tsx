@@ -301,7 +301,7 @@ export function Timeline() {
                         </div>
 
                     </div>
-                    <Scrollbar container={containerEl} dependency={pixelsPerSec} className="border-b-0 border-t" />
+                    <Scrollbar container={containerEl} dependency={pixelsPerSec} className="border-b-0 border-t border-border" />
                 </div>
             </div>
         </div>

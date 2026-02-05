@@ -103,7 +103,7 @@
 
    /* Hues */
    --hue-primary: 290;
-   --hue-secondary: 78;
+   --hue-secondary: 58;
 
    /* ============================================================
      Layer 2: Semantic Tokens
@@ -121,17 +121,17 @@
    /* ─────────────────────────────────────────────────────────
      2. Interactive State Overlays
      ───────────────────────────────────────────────────────── */
-   --state-inactive: oklch(1 0 0 / 6%);
-   --state-hover: oklch(1 0 0 / 12%);
+   --state-inactive: oklch(1 0 0 / 3%);
+   --state-hover: oklch(1 0 0 / 6%);
    --state-active: oklch(1 0 0 / 16%);
    --state-disabled: oklch(1 0 0 / 0%);
 
    /* ─────────────────────────────────────────────────────────
      3. Borders (White with transparency)
      ───────────────────────────────────────────────────────── */
-   --border-default: oklch(1 0 0 / 10%);
-   --border-hover: oklch(1 0 0 / 20%);
-   --border-selected: oklch(1 0 0 / 30%);
+   --border-default: oklch(1 0 0 / 3%);
+   --border-hover: oklch(1 0 0 / 12%);
+   --border-selected: oklch(1 0 0 / 18%);
    --border-primary: var(--primary);
 
    /* ─────────────────────────────────────────────────────────
@@ -211,6 +211,17 @@ body,
       @apply hover:bg-state-hover transition-colors cursor-pointer;
    }
 
+   /* Interactive Base - for buttons, dropdowns, and other clickable controls */
+   .interactive-base {
+      @apply h-9 px-3 bg-state-inactive border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50;
+   }
+
+   /* Interactive Selected State - secondary border with glow */
+   .interactive-selected {
+      @apply border-secondary;
+      box-shadow: 0 0 8px 0 oklch(from var(--secondary) l c h / 40%);
+   }
+
    /* Primary Button */
    .btn-primary {
       @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium transition-colors;
@@ -285,28 +296,9 @@ body,
 }
 
 /* Canvas Editor Glow - Secondary color border for edit modes */
-@keyframes canvas-editor-glow {
-   0% {
-      box-shadow: 0 0 0 2px var(--secondary),
-         0 0 12px 4px oklch(from var(--secondary) l c h / 40%),
-         0 0 24px 8px oklch(from var(--secondary) l c h / 20%);
-   }
-
-   50% {
-      box-shadow: 0 0 0 2px var(--secondary),
-         0 0 16px 6px oklch(from var(--secondary) l c h / 55%),
-         0 0 32px 12px oklch(from var(--secondary) l c h / 30%);
-   }
-
-   100% {
-      box-shadow: 0 0 0 2px var(--secondary),
-         0 0 12px 4px oklch(from var(--secondary) l c h / 40%),
-         0 0 24px 8px oklch(from var(--secondary) l c h / 20%);
-   }
-}
-
 .canvas-editor-glow {
-   animation: canvas-editor-glow 2s infinite ease-in-out;
+   box-shadow: 0 0 0 2px var(--secondary),
+      0 0 12px 2px oklch(from var(--secondary) l c h / 40%);
 }
 
 /* Spin animation for traveling border effects */
