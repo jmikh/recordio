@@ -33,10 +33,16 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             // Sort by start time to maintain order
             nextSpotlightActions.sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
+            // If sourceRect is being changed, set isAuto to false
+            const nextSettings = updates.sourceRect
+                ? { ...state.project.settings, spotlight: { ...state.project.settings.spotlight, isAuto: false } }
+                : state.project.settings;
+
             return {
                 uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
+                    settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
                         spotlightActions: nextSpotlightActions
@@ -52,10 +58,18 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             const spotlightActions = [...state.project.timeline.spotlightActions, spotlight]
                 .sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
 
+            // Manual spotlight addition sets isAuto to false
             return {
                 uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
+                    settings: {
+                        ...state.project.settings,
+                        spotlight: {
+                            ...state.project.settings.spotlight,
+                            isAuto: false
+                        }
+                    },
                     timeline: {
                         ...state.project.timeline,
                         spotlightActions

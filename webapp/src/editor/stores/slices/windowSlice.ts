@@ -1,10 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, ZoomAction, SpotlightAction } from '../../../types';
-import { recalculateAutoZooms, shiftManualZooms, computeFocusAreas } from '../../utils/zoomUtils';
-import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
-import { ViewMapper } from '../../../core/mappers/viewMapper';
-import { TimeMapper } from '../../../core/mappers/timeMapper';
+import { computeFocusAreas, handleZoomWindowChange, handleZoomWindowRemoval } from '../../utils/zoomMutator';
+import { handleSpotlightWindowChange, handleSpotlightWindowRemoval } from '../../utils/spotlightMutator';
 import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {
@@ -16,7 +14,6 @@ export interface WindowSlice {
 
 const getSnapshot = () => {
     const state = useUIStore.getState();
-    // Only capture serializable UI state, exclude refs
     return {
         canvasMode: state.canvasMode,
         selectedZoomId: state.selectedZoomId,
@@ -47,7 +44,6 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const currentWindows = state.project.timeline.outputWindows;
             const windowIndex = currentWindows.findIndex(w => w.id === id);
 
-            // Should not happen, but safe check
             if (windowIndex === -1) return state;
 
             const targetWindow = currentWindows[windowIndex];
@@ -85,156 +81,42 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextActions = state.project.timeline.zoomActions;
+            // Handle zoom changes via mutator
+            const windowChangeParams = {
+                outputStartMs,
+                oldStart,
+                oldEnd,
+                oldSpeed,
+                oldDuration,
+                newWindow,
+                zoomSettings: state.project.settings.zoom
+            };
 
-            // Zoom Logic
-            if (state.project.settings.zoom.isAuto) {
-                nextActions = recalculateAutoZooms(tempProject);
-            } else {
-                // Manual Shift Logic
-                // We handle Start and End changes separately if both changed (unlikely in single operation but possible)
-                // But typically updates has one or the other.
+            const nextActions = handleZoomWindowChange(
+                state.project.timeline.zoomActions,
+                windowChangeParams,
+                state.project.settings.zoom.isAuto,
+                tempProject
+            );
 
-                // 1. Check Start Change (Trimming/Extending from LEFT)
-                // If start moves right (increase): We removed time from the BEGINNING of window.
-                // Output Pivot = outputStartMs.
-                // Delta = oldStart - newStart. (e.g. 100 -> 110 = -10ms)
-                if (newWindow.startMs !== oldStart) {
-                    const delta = oldStart - newWindow.startMs;
-                    // For left-side trim, pivot is at the start of the window in output time
-                    const pivot = outputStartMs;
-                    nextActions = shiftManualZooms(nextActions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
-                }
+            // Handle spotlight changes via mutator
+            const spotlightParams = {
+                outputStartMs,
+                oldStart,
+                oldEnd,
+                oldSpeed,
+                oldDuration,
+                newWindow,
+                spotlightSettings: state.project.settings.spotlight
+            };
 
-                // 2. Check End Change (Trimming/Extending from RIGHT)
-                // If end moves right (increase): We added time to END of window.
-                // Output Pivot = outputStartMs + OldDuration. (The end of the old window)
-                // Delta = newEnd - oldEnd. (e.g. 200 -> 210 = +10ms)
-                // Note: We use OldDuration because that's where the boundary WAS in output time.
-                if (newWindow.endMs !== oldEnd) {
-                    const delta = newWindow.endMs - oldEnd;
-                    const pivot = outputStartMs + oldDuration;
-                    nextActions = shiftManualZooms(nextActions, pivot, delta, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
-                }
-
-                // 3. Check Speed Change
-                // If speed changed, the output duration changes even if start/end didn't change
-                if (updates.speed !== undefined && newWindow.speed !== oldSpeed) {
-                    const newDuration = (newWindow.endMs - newWindow.startMs) / (newWindow.speed || 1.0);
-                    const durationDelta = newDuration - oldDuration;
-
-                    // Handle motions in manual mode
-                    if (!state.project.settings.zoom.isAuto) {
-                        // Split motions into three categories:
-                        // 1. Before this window (outputStartMs) - unchanged
-                        // 2. Within this window (outputStartMs to outputStartMs + oldDuration) - need adjustment
-                        // 3. After this window (> outputStartMs + oldDuration) - shift by durationDelta
-
-                        const windowOutputEnd = outputStartMs + oldDuration;
-                        const beforeWindow: ZoomAction[] = [];
-                        const withinWindow: ZoomAction[] = [];
-                        const afterWindow: ZoomAction[] = [];
-
-                        nextActions.forEach(m => {
-                            if (m.outputEndTimeMs <= outputStartMs) {
-                                beforeWindow.push(m);
-                            } else if (m.outputEndTimeMs <= windowOutputEnd) {
-                                withinWindow.push(m);
-                            } else {
-                                afterWindow.push(m);
-                            }
-                        });
-
-                        // Adjust actions within the window
-                        let adjustedWithinWindow: ZoomAction[] = [];
-
-                        // Speed changes should SCALE the motions, not shift them like trimming
-                        // A motion at output time 4s in a 10s window at 1x speed
-                        // should be at output time 2s in a 5s window at 2x speed
-                        const speedRatio = (newWindow.speed || 1.0) / oldSpeed;
-
-                        let leftBoundary = outputStartMs;
-                        for (const m of withinWindow) {
-                            // Calculate the relative position within the old window (0 to 1)
-                            const relativePosition = (m.outputEndTimeMs - outputStartMs) / oldDuration;
-
-                            // Apply the relative position to the new window duration
-                            const newEndTime = outputStartMs + (relativePosition * newDuration);
-
-                            // Scale the duration proportionally
-                            const scaledDuration = m.durationMs / speedRatio;
-
-                            // Try to use max duration if possible, otherwise use scaled duration
-                            let finalDuration = Math.min(
-                                state.project.settings.zoom.maxZoomDurationMs,
-                                Math.max(scaledDuration, state.project.settings.zoom.minZoomDurationMs)
-                            );
-
-                            // Check if this motion fits without collision
-                            const idealStartTime = newEndTime - finalDuration;
-
-                            if (idealStartTime >= leftBoundary) {
-                                // Fits perfectly
-                                adjustedWithinWindow.push({
-                                    ...m,
-                                    outputEndTimeMs: newEndTime,
-                                    durationMs: finalDuration
-                                });
-                                leftBoundary = newEndTime;
-                            } else {
-                                // Collision with previous motion - shrink duration
-                                const availableSpace = newEndTime - leftBoundary;
-
-                                if (availableSpace >= state.project.settings.zoom.minZoomDurationMs) {
-                                    // Fits with reduced duration
-                                    adjustedWithinWindow.push({
-                                        ...m,
-                                        outputEndTimeMs: newEndTime,
-                                        durationMs: availableSpace
-                                    });
-                                    leftBoundary = newEndTime;
-                                }
-                                // else: drop the motion due to insufficient space
-                            }
-                        }
-
-                        // Shift motions after the window
-                        const shiftedAfterWindow = afterWindow.map(m => ({
-                            ...m,
-                            outputEndTimeMs: m.outputEndTimeMs + durationDelta
-                        }));
-
-                        // Combine all actions
-                        nextActions = [
-                            ...beforeWindow,
-                            ...adjustedWithinWindow,
-                            ...shiftedAfterWindow
-                        ];
-                    }
-                }
-            }
-
-
-            let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
-            if (tempProject.settings.spotlight.isAuto) {
-                const sourceSize = tempProject.screenSource.size;
-                if (sourceSize && sourceSize.width > 0) {
-                    const viewMapper = new ViewMapper(
-                        sourceSize,
-                        tempProject.settings.outputSize,
-                        tempProject.settings.screen.padding,
-                        tempProject.settings.screen.crop
-                    );
-                    const timeMapper = new TimeMapper(tempProject.timeline.outputWindows);
-                    nextSpotlightActions = calculateAutoSpotlights(
-                        viewMapper,
-                        timeMapper,
-                        state.project.userEvents.hoveredCards || [],
-                        nextActions,
-                        tempProject.settings.spotlight.enlargeScale
-                    );
-                }
-            }
+            const nextSpotlightActions = handleSpotlightWindowChange(
+                state.project.timeline.spotlightActions,
+                spotlightParams,
+                state.project.settings.spotlight.isAuto,
+                tempProject,
+                nextActions
+            );
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -284,39 +166,28 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 }
             };
 
-            let nextActions = state.project.timeline.zoomActions;
+            const windowDuration = getWindowDuration(targetWindow);
 
-            if (state.project.settings.zoom.isAuto) {
-                nextActions = recalculateAutoZooms(tempProject);
-            } else {
-                // Manual Shift: Delete range
-                // Pivot: outputStartMs
-                // Delta: -Duration
-                const duration = getWindowDuration(targetWindow);
-                nextActions = shiftManualZooms(nextActions, outputStartMs, -duration, state.project.settings.zoom.minZoomDurationMs, state.project.settings.zoom.maxZoomDurationMs);
-            }
+            // Handle zoom removal via mutator
+            const nextActions = handleZoomWindowRemoval(
+                state.project.timeline.zoomActions,
+                outputStartMs,
+                windowDuration,
+                state.project.settings.zoom,
+                state.project.settings.zoom.isAuto,
+                tempProject
+            );
 
-            // Recalculate spotlight actions after zoom is updated
-            let nextSpotlightActions: SpotlightAction[] = tempProject.timeline.spotlightActions;
-            if (tempProject.settings.spotlight.isAuto) {
-                const sourceSize = tempProject.screenSource.size;
-                if (sourceSize && sourceSize.width > 0) {
-                    const viewMapper = new ViewMapper(
-                        sourceSize,
-                        tempProject.settings.outputSize,
-                        tempProject.settings.screen.padding,
-                        tempProject.settings.screen.crop
-                    );
-                    const timeMapper = new TimeMapper(tempProject.timeline.outputWindows);
-                    nextSpotlightActions = calculateAutoSpotlights(
-                        viewMapper,
-                        timeMapper,
-                        state.project.userEvents.hoveredCards || [],
-                        nextActions,
-                        tempProject.settings.spotlight.enlargeScale
-                    );
-                }
-            }
+            // Handle spotlight removal via mutator
+            const nextSpotlightActions = handleSpotlightWindowRemoval(
+                state.project.timeline.spotlightActions,
+                outputStartMs,
+                windowDuration,
+                state.project.settings.spotlight,
+                state.project.settings.spotlight.isAuto,
+                tempProject,
+                nextActions
+            );
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -338,7 +209,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
         set((state) => {
             // 1. Find the window to split
             const windowIndex = state.project.timeline.outputWindows.findIndex(w => w.id === windowId);
-            if (windowIndex === -1) return state; // No-op if not found
+            if (windowIndex === -1) return state;
 
             const originalWin = state.project.timeline.outputWindows[windowIndex];
 
@@ -353,24 +224,21 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     firstWindowDuration,
                     secondWindowDuration
                 });
-                return state; // No-op if either window would be too small
+                return state;
             }
 
             // 4. Shrink original window
             const shrunkWin = { ...originalWin, endMs: splitTimeMs };
 
             // 5. Create new window
-            // We need a way to generate IDs safely. Using randomUUID for now.
             const newWin: OutputWindow = {
                 id: crypto.randomUUID(),
                 startMs: splitTimeMs,
                 endMs: originalWin.endMs,
-                speed: originalWin.speed  // Preserve speed from original window
+                speed: originalWin.speed
             };
 
             // 4. Construct new window list
-            // We replace the original with shrunk, and append the new one.
-            // Then sort.
             let nextOutputWindows = [...state.project.timeline.outputWindows];
             nextOutputWindows[windowIndex] = shrunkWin;
             nextOutputWindows.push(newWin);

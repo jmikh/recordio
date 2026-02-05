@@ -127,6 +127,17 @@ export const EffectsSettings = () => {
             {/* SPOTLIGHT SETTINGS */}
             <CollapsibleCard title="Spotlight" previewItems={spotlightPreviewItems}>
                 <div className="flex flex-col gap-4">
+                    {/* Auto Toggle */}
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm text-text-muted">Auto</label>
+                        <Toggle
+                            value={spotlightSettings.isAuto}
+                            onChange={(isAuto) => {
+                                updateSettings({ spotlight: { ...spotlightSettings, isAuto } });
+                            }}
+                        />
+                    </div>
+
                     {/* Dim Opacity */}
                     <Slider
                         label="Dim Opacity"

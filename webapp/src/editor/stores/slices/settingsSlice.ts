@@ -3,7 +3,7 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ProjectSettings } from '../../../types';
 import { isSubset } from '../../utils/subsetMatcher';
-import { recalculateAutoZooms, updateManualZoomDuration } from '../../utils/zoomUtils';
+import { recalculateAutoZooms, updateManualZoomDuration } from '../../utils/zoomMutator';
 
 type DeepPartial<T> = {
     [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];

@@ -14,11 +14,11 @@ import { TimeMapper } from '../mappers/timeMapper';
 // Constants
 // ============================================================================
 
-/** Minimum output duration (ms) for a hovered card to qualify for an auto-spotlight */
-const K_MIN_SPOTLIGHT_DURATION_MS = 3000;
-
 /** Buffer (ms) to trim from spotlight start and end to avoid edge effects */
-const K_SPOTLIGHT_BUFFER_MS = 250;
+export const K_SPOTLIGHT_BUFFER_MS = 250;
+
+/** Minimum spotlight duration (ms) */
+export const K_MIN_SPOTLIGHT_DURATION_MS = 2500;
 
 /** Safety margin fraction for viewport bounds (2%) */
 const K_VIEWPORT_MARGIN = 0.98;

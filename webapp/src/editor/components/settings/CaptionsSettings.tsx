@@ -346,53 +346,53 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
-            {/* Transcribe/Restore Buttons */}
+            {/* Transcription Controls Card */}
             {!isTranscribing && (
-                <PrimaryButton
-                    onClick={handleGenerate}
-                    className="w-full flex items-center justify-center gap-2"
-                >
-                    Transcribe
-                    <span
-                        ref={infoIconRef}
-                        className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
-                        onMouseEnter={() => {
-                            if (infoIconRef.current) {
-                                const rect = infoIconRef.current.getBoundingClientRect();
-                                setTooltipPosition({
-                                    left: rect.left + rect.width / 2,
-                                    top: rect.bottom + 8
-                                });
-                            }
-                            setShowInfoTooltip(true);
-                        }}
-                        onMouseLeave={() => setShowInfoTooltip(false)}
-                        onClick={(e) => e.stopPropagation()}
+                <div className="bg-surface-inset rounded-lg p-4 space-y-3">
+                    <PrimaryButton
+                        onClick={handleGenerate}
+                        className="w-full flex items-center justify-center gap-2"
                     >
-                        <MdInfoOutline size={10} className="text-white/80" />
-                    </span>
-                </PrimaryButton>
-            )}
+                        Transcribe
+                        <span
+                            ref={infoIconRef}
+                            className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
+                            onMouseEnter={() => {
+                                if (infoIconRef.current) {
+                                    const rect = infoIconRef.current.getBoundingClientRect();
+                                    setTooltipPosition({
+                                        left: rect.left + rect.width / 2,
+                                        top: rect.bottom + 8
+                                    });
+                                }
+                                setShowInfoTooltip(true);
+                            }}
+                            onMouseLeave={() => setShowInfoTooltip(false)}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <MdInfoOutline size={10} className="text-white/80" />
+                        </span>
+                    </PrimaryButton>
 
-            {/* Language Dropdown */}
-            {!isTranscribing && (
-                <Dropdown
-                    options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
-                    value={selectedLanguage}
-                    onChange={setSelectedLanguage}
-                />
-            )}
+                    {/* Language Dropdown */}
+                    <Dropdown
+                        options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
+                        value={selectedLanguage}
+                        onChange={setSelectedLanguage}
+                    />
 
-            {/* Restore Transcript Button */}
-            {!isTranscribing && settings.baselineCaptions?.length &&
-                JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
-                    <DefaultButton
-                        onClick={() => restoreCaptionsFromBaseline()}
-                        className="w-full"
-                    >
-                        Restore Transcript
-                    </DefaultButton>
-                )}
+                    {/* Restore Transcript Button */}
+                    {settings.baselineCaptions?.length &&
+                        JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
+                            <DefaultButton
+                                onClick={() => restoreCaptionsFromBaseline()}
+                                className="w-full"
+                            >
+                                Restore Transcript
+                            </DefaultButton>
+                        )}
+                </div>
+            )}
 
             {/* Style Settings Card */}
             <CollapsibleCard

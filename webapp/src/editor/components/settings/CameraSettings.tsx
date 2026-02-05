@@ -89,8 +89,8 @@ export const CameraSettings = () => {
     return (
         <div className="flex flex-col gap-3 relative">
             <div className="flex flex-col gap-3">
-                <div className="flex gap-2 mb-3">
-                    <div className="flex-1 flex flex-col gap-1">
+                <div className="bg-surface-inset rounded-lg p-4">
+                    <div className="flex flex-col gap-1">
                         <DefaultButton
                             onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
                             className={`w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
