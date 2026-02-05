@@ -166,9 +166,9 @@ export const ScreenSettings = () => {
                                             onClick={() => updateSettings({
                                                 screen: { ...screenConfig, deviceFrameId: frame.id }
                                             })}
-                                            className={`cursor-pointer w-full aspect-[16/10] rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
+                                            className={`cursor-pointer w-full aspect-[16/10] rounded-md flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
                                                 ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary bg-white'
-                                                : 'ring-1 ring-black/5 hover:ring-black/10 bg-gray-200'
+                                                : 'ring-1 ring-black/5 hover:ring-black/10 bg-white/70 hover:bg-white/85'
                                                 }`}
                                             title={frame.name}
                                         >

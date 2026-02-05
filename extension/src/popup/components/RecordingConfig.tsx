@@ -93,11 +93,6 @@ export function RecordingConfig({
                             }))}
                             value={selectedAudioId}
                             onChange={setSelectedAudioId}
-                            trigger={
-                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
-                                    <span>{audioDevices.find(d => d.deviceId === selectedAudioId)?.label || `Microphone ${selectedAudioId.slice(0, 4)}...`}</span>
-                                </div>
-                            }
                         />
                         <AudioVisualizerWrapper stream={audioStream} />
                     </div>
@@ -122,11 +117,6 @@ export function RecordingConfig({
                             }))}
                             value={selectedVideoId}
                             onChange={setSelectedVideoId}
-                            trigger={
-                                <div className="w-full bg-surface-overlay text-xs border border-border rounded p-2 text-text-main cursor-pointer hover:border-border-hover transition-colors flex items-center justify-between">
-                                    <span>{videoDevices.find(d => d.deviceId === selectedVideoId)?.label || `Camera ${selectedVideoId.slice(0, 4)}...`}</span>
-                                </div>
-                            }
                         />
                         <CameraPreview stream={videoStream} />
                     </div>

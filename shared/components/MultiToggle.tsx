@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 export interface MultiToggleOption<T extends string> {
     value: T;
@@ -13,7 +13,7 @@ interface MultiToggleProps<T extends string> {
     className?: string;
 }
 
-const ANIMATION_DURATION = '500ms';
+const ANIMATION_DURATION = '300ms';
 const ANIMATION_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 export const MultiToggle = <T extends string>({
@@ -22,31 +22,48 @@ export const MultiToggle = <T extends string>({
     onChange,
     className = ''
 }: MultiToggleProps<T>) => {
-    const selectedIndex = options.findIndex(opt => opt.value === value);
-    const count = options.length;
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number; height: number }>({ left: 0, width: 0, height: 0 });
 
-    // Transition styles matching the SettingsButton
-    const transitionStyle = {
+    // Update indicator position when value changes
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const selectedButton = containerRef.current.querySelector(`[data-value="${value}"]`) as HTMLElement;
+        if (selectedButton) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const buttonRect = selectedButton.getBoundingClientRect();
+            setIndicatorStyle({
+                left: buttonRect.left - containerRect.left,
+                width: buttonRect.width,
+                height: buttonRect.height
+            });
+        }
+    }, [value, options]);
+
+    // Transition styles for the indicator
+    const indicatorTransition = {
         transitionDuration: ANIMATION_DURATION,
         transitionTimingFunction: ANIMATION_EASE,
-        transitionProperty: 'all'
+        transitionProperty: 'left, width, height'
     };
 
     return (
         <div
+            ref={containerRef}
             className={`
-                relative flex items-center bg-state-inactive rounded-sm select-none overflow-hidden shadow-sm
+                relative flex items-center justify-center select-none
                 ${className}
             `}
         >
-            {/* Sliding Background Pill */}
+            {/* Sliding Pill Indicator - positioned behind the selected button */}
             <div
                 style={{
-                    ...transitionStyle,
-                    width: `${100 / count}%`,
-                    left: `${(selectedIndex === -1 ? 0 : selectedIndex) * (100 / count)}%`
+                    ...indicatorTransition,
+                    left: indicatorStyle.left,
+                    width: indicatorStyle.width,
+                    height: indicatorStyle.height
                 }}
-                className="absolute inset-y-0 bg-primary border border-primary z-0 rounded-sm"
+                className="absolute top-0 border border-border-primary rounded-full z-0"
             />
 
             {/* Options */}
@@ -55,15 +72,16 @@ export const MultiToggle = <T extends string>({
                 return (
                     <button
                         key={option.value}
+                        data-value={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex-1 flex flex-col items-center justify-center gap-1.5 py-1.5 px-4 min-w-0 rounded-lg 
+                            relative flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-w-0
                             text-sm z-10 outline-none cursor-pointer
                             text-center
                             transition-colors duration-200
                             ${isSelected
-                                ? 'text-text-main'
-                                : 'text-text-muted hover:text-text-main'
+                                ? 'text-main'
+                                : 'text-text-disabled hover:text-text-muted'
                             }
                         `}
                     >

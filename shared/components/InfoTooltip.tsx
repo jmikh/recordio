@@ -54,8 +54,8 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc,
                 createPortal(
                     <div
                         className={`fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float overflow-hidden text-xs text-text-main ${videoSrc
-                                ? 'w-[480px] px-5 py-3 flex flex-col items-center'
-                                : 'max-w-[280px]'
+                            ? 'w-[500px] px-5 py-3 flex flex-col items-center'
+                            : 'max-w-[280px]'
                             }`}
                         style={{
                             left: position.left,
@@ -65,7 +65,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc,
                         onMouseEnter={() => setIsHovered(true)}
                         onMouseLeave={() => setIsHovered(false)}
                     >
-                        {/* Demo Video - fixed width, never shrinks */}
+                        {/* Demo Video - fixed 480px width, never shrinks */}
                         {videoSrc && (
                             <video
                                 src={videoSrc}
@@ -73,7 +73,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc,
                                 loop
                                 muted
                                 playsInline
-                                className="w-full rounded"
+                                width={480}
+                                className="rounded"
+                                style={{ width: 480, minWidth: 480, maxWidth: 480 }}
                             />
                         )}
 

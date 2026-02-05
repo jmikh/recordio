@@ -8,7 +8,6 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
-import { SecondaryButton } from '@shared/components';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
@@ -196,16 +195,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
         };
     }, [startInteraction, endInteraction]);
 
-    // Check if crop is centered
-    const isCentered = Math.abs(currentCrop.x - (inputSize.width - currentCrop.width) / 2) < 1 &&
-        Math.abs(currentCrop.y - (inputSize.height - currentCrop.height) / 2) < 1;
-
-    // Check if crop is full view
-    const isFullView = Math.abs(currentCrop.x) < 1 &&
-        Math.abs(currentCrop.y) < 1 &&
-        Math.abs(currentCrop.width - inputSize.width) < 1 &&
-        Math.abs(currentCrop.height - inputSize.height) < 1;
-
     return (
         <div
             ref={rootRef}
@@ -216,47 +205,6 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
                 holeRect={renderedRect}
                 cornerRadii={cornerRadii}
             />
-
-            {/* Toolbar */}
-            <div
-                className="absolute flex gap-2 pointer-events-auto justify-center z-[200]"
-                style={{
-                    left: `${toPct(viewMapper.contentRect.x, outputSize.width)}%`,
-                    top: `calc(${toPct(viewMapper.contentRect.y, outputSize.height)}% + 8px)`,
-                    width: `${toPct(viewMapper.contentRect.width, outputSize.width)}%`,
-                    padding: 0,
-                }}
-            >
-                <SecondaryButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (isCentered) return;
-
-                        const newX = (inputSize.width - currentCrop.width) / 2;
-                        const newY = (inputSize.height - currentCrop.height) / 2;
-                        const newCrop = { ...currentCrop, x: newX, y: newY };
-
-                        useProjectStore.getState().updateSettings({ screen: { crop: newCrop } });
-                    }}
-                    disabled={isCentered}
-                >
-                    Center
-                </SecondaryButton>
-
-                <SecondaryButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (isFullView) return;
-
-                        const newCrop = { x: 0, y: 0, width: inputSize.width, height: inputSize.height };
-
-                        useProjectStore.getState().updateSettings({ screen: { crop: newCrop } });
-                    }}
-                    disabled={isFullView}
-                >
-                    Full View
-                </SecondaryButton>
-            </div>
 
             {/* Bounding Box Container */}
             <div style={containerStyle}>

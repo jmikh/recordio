@@ -64,12 +64,8 @@ export const SettingsPanel = () => {
     const hasMicrophone = project.cameraSource?.has_microphone || project.screenSource?.has_microphone;
 
     // Exit camera edit mode when switching away from camera tab
-    // Enter camera edit mode when switching TO camera tab
     const handleTabChange = (tab: Tab) => {
-        if (tab === 'camera') {
-            // Entering camera tab - auto-activate camera editing (this also pauses video)
-            setCanvasMode(CanvasMode.CameraEdit);
-        } else if (canvasMode === CanvasMode.CameraEdit) {
+        if (canvasMode === CanvasMode.CameraEdit && tab !== 'camera') {
             // Leaving camera tab while in camera edit mode - exit
             setCanvasMode(CanvasMode.Preview);
         }
