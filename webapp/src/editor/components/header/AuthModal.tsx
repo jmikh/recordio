@@ -64,7 +64,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 font-medium rounded-sm border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 font-medium rounded-sm border border-gray-300 transition-colors disabled:opacity-50 group"
                 >
                     {loading ? (
                         <div className="h-4 w-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin"></div>

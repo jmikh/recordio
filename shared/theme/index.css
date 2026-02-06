@@ -258,7 +258,7 @@ body,
    }
 
    .btn-primary:disabled {
-      @apply bg-primary-disabled text-text-disabled cursor-not-allowed;
+      @apply bg-primary-disabled text-text-disabled;
    }
 
    /* Focus Ring Utility */

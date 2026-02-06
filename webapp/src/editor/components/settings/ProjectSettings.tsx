@@ -136,7 +136,7 @@ export const ProjectSettings = () => {
                             <button
                                 onClick={handleDeleteAll}
                                 disabled={isDeleting}
-                                className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-sm shadow-sm transition-colors disabled:opacity-50"
                             >
                                 {isDeleting ? 'Deleting...' : 'Delete All'}
                             </button>

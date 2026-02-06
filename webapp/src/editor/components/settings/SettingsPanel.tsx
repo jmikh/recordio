@@ -141,7 +141,7 @@ export const SettingsPanel = () => {
                             }}
                             onMouseLeave={() => setHoveredDisabledTab(null)}
                             className={`group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg transition-colors duration-200 ${isDisabled
-                                ? 'cursor-not-allowed opacity-50'
+                                ? 'opacity-50'
                                 : 'cursor-pointer'
                                 }`}
                         >

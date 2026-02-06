@@ -138,7 +138,7 @@ export const Slider: React.FC<SliderProps> = ({
                 style={{ height: `${SLIDER_HEIGHT}px` }}
                 className={`
                     relative w-full touch-none select-none group flex items-center
-                    ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                    ${disabled ? 'opacity-40' : 'cursor-pointer'}
                 `}
             >
                 {/* Visual Track - Full Width Background (Inactive part) */}

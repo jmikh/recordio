@@ -47,7 +47,7 @@ export const Toggle: React.FC<ToggleProps> = ({
                 cursor-pointer
                 transition-colors
                 group
-                disabled:opacity-50 disabled:cursor-not-allowed
+                disabled:opacity-50
                 ${value ? 'bg-primary' : 'bg-state-inactive'}
                 ${!label ? className : ''}
             `}
