@@ -105,100 +105,81 @@
 
 :root {
    /* ============================================================
-     Layer 1: OKLCH Primitives
-     ============================================================ */
+      COMMON TOKENS (Shared by Light and Dark themes)
+      ============================================================ */
 
    /* Hues */
    --hue-primary: 290;
    --hue-secondary: 58;
 
-   /* ============================================================
-     Layer 2: Semantic Tokens
-     ============================================================ */
+   /* Primary Color Variants */
+   --primary: oklch(0.55 0.22 var(--hue-primary));
+   --primary-muted: oklch(0.50 0.15 var(--hue-primary));
+   --primary-highlighted: oklch(0.60 0.24 var(--hue-primary));
+   --primary-disabled: oklch(0.65 0.10 var(--hue-primary));
 
-   /* ─────────────────────────────────────────────────────────
-     1. Surfaces (Body → Surface → Raised → Overlay)
-     ───────────────────────────────────────────────────────── */
+   /* Secondary Color Variants */
+   --secondary: oklch(0.75 0.18 var(--hue-secondary));
+   --secondary-muted: oklch(0.60 0.12 var(--hue-secondary));
+   --secondary-highlighted: oklch(0.80 0.20 var(--hue-secondary));
+   --secondary-disabled: oklch(0.70 0.08 var(--hue-secondary));
+
+   /* Focus Ring */
+   --ring-color: oklch(0.65 0.22 var(--hue-secondary));
+   --ring-width: 2px;
+   --ring-offset: 2px;
+
+   /* Semantic States */
+   --destructive: oklch(0.65 0.25 25);
+   --success: oklch(0.70 0.18 155);
+
+   /* Z-Index Scale */
+   --z-index-base: 1;
+   --z-index-navbar: 20;
+   --z-index-overlay: 30;
+   --z-index-dropdown: 35;
+   --z-index-modal: 40;
+   --z-index-tooltip: 50;
+
+   /* Border that uses primary (shared) */
+   --border-primary: var(--primary);
+
+   /* ============================================================
+      LIGHT THEME TOKENS (Default)
+      ============================================================ */
+
+   /* Surfaces - Creamy off-white */
    --surface-body: oklch(0.93 0.015 75);
    --surface-default: oklch(0.96 0.012 75);
    --surface-raised: oklch(0.98 0.008 75);
    --surface-overlay: oklch(0.98 0.008 75);
    --surface-inset: oklch(0.90 0.018 75);
 
-   /* ─────────────────────────────────────────────────────────
-     2. Interactive State Overlays
-     ───────────────────────────────────────────────────────── */
+   /* Interactive State Overlays - Black transparency */
    --state-inactive: oklch(0 0 0 / 3%);
    --state-hover: oklch(0 0 0 / 6%);
    --state-active: oklch(0 0 0 / 10%);
    --state-disabled: oklch(0 0 0 / 2%);
 
-   /* ─────────────────────────────────────────────────────────
-     3. Borders (White with transparency)
-     ───────────────────────────────────────────────────────── */
+   /* Borders - Black transparency */
    --border-default: oklch(0 0 0 / 8%);
    --border-hover: oklch(0 0 0 / 15%);
    --border-selected: oklch(0 0 0 / 25%);
-   --border-primary: var(--primary);
 
-   /* ─────────────────────────────────────────────────────────
-     4. Primary Color Variants
-     ───────────────────────────────────────────────────────── */
-   --primary: oklch(0.55 0.22 var(--hue-primary));
-   --primary-muted: oklch(0.50 0.15 var(--hue-primary));
-   --primary-highlighted: oklch(0.60 0.24 var(--hue-primary));
-   --primary-disabled: oklch(0.65 0.10 var(--hue-primary));
-
-   /* ─────────────────────────────────────────────────────────
-     5. Secondary Color Variants
-     ───────────────────────────────────────────────────────── */
-   --secondary: oklch(0.75 0.18 var(--hue-secondary));
-   --secondary-muted: oklch(0.60 0.12 var(--hue-secondary));
-   --secondary-highlighted: oklch(0.80 0.20 var(--hue-secondary));
-   --secondary-disabled: oklch(0.70 0.08 var(--hue-secondary));
-
-   /* ─────────────────────────────────────────────────────────
-     6. Text Colors
-     ───────────────────────────────────────────────────────── */
+   /* Text Colors - Dark */
    --text-highlighted: oklch(0.15 0 0);
    --text-main: oklch(0.15 0 0 / 85%);
-   --text-muted: oklch(0.15 0 0 / 60%);
-   --text-disabled: oklch(0.15 0 0 / 38%);
+   --text-muted: oklch(0.15 0 0 / 70%);
+   --text-disabled: oklch(0.15 0 0 / 50%);
    --text-on-primary: oklch(0.98 0 0);
    --text-on-secondary: oklch(0.15 0 0);
-
-   /* ─────────────────────────────────────────────────────────
-     7. Focus Ring
-     ───────────────────────────────────────────────────────── */
-   --ring-color: oklch(0.65 0.22 var(--hue-secondary));
-   --ring-width: 2px;
-   --ring-offset: 2px;
-
-   /* ─────────────────────────────────────────────────────────
-     8. Semantic States
-     ───────────────────────────────────────────────────────── */
-   --destructive: oklch(0.65 0.25 25);
-   --success: oklch(0.70 0.18 155);
-
-   /* ─────────────────────────────────────────────────────────
-     9. Z-Index Scale
-     ───────────────────────────────────────────────────────── */
-   --z-index-base: 1;
-   --z-index-navbar: 20;
-   --z-index-overlay: 30;
-   /* Dropdown must be above overlay (click-capture layer) */
-   --z-index-dropdown: 35;
-   /* Background behind modals */
-   --z-index-modal: 40;
-   /* Modal window itself */
-   --z-index-tooltip: 50;
 }
 
 /* ============================================================
-   Dark Theme Overrides
+   DARK THEME TOKENS (Overrides light theme tokens)
    ============================================================ */
 .dark {
-   /* Surfaces - Original dark theme values */
+   /* Surfaces - Deep grays */
    --surface-body: oklch(0.13 0.01 270);
    --surface-default: oklch(0.17 0.012 270);
    --surface-raised: oklch(0.21 0.014 270);

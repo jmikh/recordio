@@ -243,24 +243,6 @@ function Editor() {
                 </div>
             )}
 
-            <ProgressModal
-                isOpen={isExporting}
-                title="Exporting Project"
-                projectName={project.name}
-                progress={exportProgress}
-                statusText={
-                    timeRemainingSeconds !== null
-                        ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
-                        : 'Estimating time...'
-                }
-                onCancel={() => {
-                    const manager = (window as any).__activeExportManager;
-                    if (manager) {
-                        manager.cancel();
-                    }
-                }}
-            />
-
             <div className="flex-1 flex overflow-hidden">
                 <SettingsPanel />
                 <div
@@ -294,6 +276,24 @@ function Editor() {
             <div id="timeline-container" className="border-t border-border shrink-0 z-[var(--z-index-navbar)] bg-surface">
                 <Timeline />
             </div>
+
+            <ProgressModal
+                isOpen={isExporting}
+                title="Exporting Project"
+                projectName={project.name}
+                progress={exportProgress}
+                statusText={
+                    timeRemainingSeconds !== null
+                        ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
+                        : 'Estimating time...'
+                }
+                onCancel={() => {
+                    const manager = (window as any).__activeExportManager;
+                    if (manager) {
+                        manager.cancel();
+                    }
+                }}
+            />
         </div>
     );
 }

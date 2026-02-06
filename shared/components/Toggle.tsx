@@ -65,7 +65,7 @@ export const Toggle: React.FC<ToggleProps> = ({
                     transition-transform
                     group-hover:scale-110
                     ${value ? 'left-[calc(100%-1.25rem)]' : 'left-1'}
-                    ${value ? 'bg-text-highlighted' : 'bg-text-main'}
+                    ${value ? 'bg-text-on-primary' : 'bg-text-main'}
                 `}
             />
         </button>

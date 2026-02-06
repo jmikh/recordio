@@ -157,7 +157,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                 onClick={handleScissorsClick}
                 onMouseDown={(e) => e.stopPropagation()}
                 onMouseEnter={(e) => e.stopPropagation()}
-                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-main border border-transparent hover:bg-black/80 hover:text-highlighted hover:border-border-hover hover:scale-110 cursor-pointer transition-[opacity,background-color,border-color,color,scale] duration-150 z-[var(--z-index-tooltip)] ${showScissors ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-gray-200 border border-transparent hover:bg-black/80 hover:text-gray-100 hover:border-border-hover hover:scale-110 cursor-pointer transition-[opacity,background-color,border-color,color,scale] duration-150 z-[var(--z-index-tooltip)] ${showScissors ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 style={{ left: `${playheadX}px` }}
                 title="Split at playhead"
             >

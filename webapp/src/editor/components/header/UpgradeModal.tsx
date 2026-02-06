@@ -100,7 +100,7 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
     };
 
     return (
-        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
             <div className="bg-surface-raised rounded-lg p-6 w-full max-w-[500px] border border-border">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
