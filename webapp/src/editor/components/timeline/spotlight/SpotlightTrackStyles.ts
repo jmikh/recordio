@@ -61,12 +61,13 @@ export const fadeInSegment = {
 export const holdSegment = {
     base: 'absolute flex-shrink-0 bg-primary rounded-sm transition-colors z-10',
     defaultClass: '',
-    selectedClass: 'ring-2 ring-secondary',
+    selectedClass: 'border-2 border-secondary',
     hoverClass: 'group-hover:bg-primary-highlighted group-hover:scale-y-110',
     height: HOLD_HEIGHT,
     getStyle: (): CSSProperties => ({
         height: HOLD_HEIGHT,
         borderRadius: 0,
+        boxShadow: 'var(--shadow-segment)',
     }),
 };
 

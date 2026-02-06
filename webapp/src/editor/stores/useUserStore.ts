@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
+export type Theme = 'light' | 'dark';
 
 export interface Subscription {
     status: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
@@ -23,9 +24,13 @@ export interface UserState {
     subscription: Subscription;
     isPro: boolean; // Computed from subscription.status
 
+    // Theme preference
+    theme: Theme;
+
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
+    setTheme: (theme: Theme) => void;
     clearUser: () => void;
 
     // Helper method
@@ -49,6 +54,7 @@ export const useUserStore = create<UserState>()(
                 stripeCustomerId: null
             },
             isPro: false,
+            theme: 'dark',
 
             // Actions
             setUser: (userId, email, name = null, picture = null) => set({
@@ -63,6 +69,16 @@ export const useUserStore = create<UserState>()(
                 subscription,
                 isPro: subscription.status === 'active' || subscription.status === 'trialing'
             }),
+
+            setTheme: (theme) => {
+                // Apply theme class to document
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+                set({ theme });
+            },
 
             clearUser: () => set({
                 userId: null,
@@ -101,8 +117,15 @@ export const useUserStore = create<UserState>()(
                 email: state.email,
                 name: state.name,
                 picture: state.picture,
-                subscription: state.subscription
-            })
+                subscription: state.subscription,
+                theme: state.theme
+            }),
+            onRehydrateStorage: () => (state) => {
+                // Apply persisted theme on load (default is dark)
+                if (state?.theme !== 'light') {
+                    document.documentElement.classList.add('dark');
+                }
+            }
         }
     )
 );

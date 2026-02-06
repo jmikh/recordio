@@ -20,6 +20,7 @@ export const SecondaryButton = forwardRef<HTMLButtonElement, SecondaryButtonProp
                 transition-colors
                 cursor-pointer
                 disabled:bg-secondary-muted disabled:text-text-main
+                shadow-[var(--shadow-sm)]
                 ${className}
             `}
                 {...props}

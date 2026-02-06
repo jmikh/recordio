@@ -23,6 +23,7 @@ export const PrimaryButton = forwardRef<HTMLButtonElement, PrimaryButtonProps>(
                transition-colors
                cursor-pointer
                disabled:bg-primary-disabled disabled:text-text-disabled disabled:cursor-default
+               shadow-[var(--shadow-button)]
                ${className}
             `}
                 {...props}

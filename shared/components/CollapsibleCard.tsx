@@ -63,6 +63,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 overflow-hidden
                 ${className}
             `}
+            style={{ boxShadow: 'var(--shadow-card)' }}
         >
             {/* Header - Always visible */}
             <button

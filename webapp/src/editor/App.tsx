@@ -218,8 +218,8 @@ function Editor() {
     // Loading state
     if (isLoading) {
         return (
-            <div className="w-full h-screen bg-black flex items-center justify-center">
-                <div className="text-white">Loading Project...</div>
+            <div className="w-full h-screen bg-surface-body flex items-center justify-center">
+                <div className="text-text-main">Loading Project...</div>
             </div>
         );
     }
@@ -231,13 +231,13 @@ function Editor() {
     }
 
     return (
-        <div className="w-full h-screen bg-black flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
+        <div className="w-full h-screen bg-surface-body flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
 
             {/* Header / Toolbar */}
             <Header />
 
             {showDebugBar && (
-                <div className="bg-[#252526] border-b border-[#333] flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
+                <div className="bg-surface-overlay border-b border-border flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
                     {/* Bottom Row: Debug Tools */}
                     <DebugBar />
                 </div>
@@ -269,7 +269,7 @@ function Editor() {
                 >
                     <div
                         ref={setContainerElement}
-                        className="relative flex items-center justify-center shadow-2xl"
+                        className="relative flex items-center bg-surface justify-center shadow-2xl"
                         style={{
                             width: '100%',
                             height: '100%',
@@ -279,19 +279,19 @@ function Editor() {
 
                         {hasActiveProject && (
                             <div
-                                className="bg-blue-200"
+                                className="bg-surface"
                                 style={{ position: 'relative', ...renderedStyle }}
                             >
                                 <CanvasContainer />
                             </div>
                         )}
-                        {isLoading && <div className="text-white">Loading Project...</div>}
+                        {isLoading && <div className="text-text-main">Loading Project...</div>}
                     </div>
                 </div>
 
             </div>
 
-            <div id="timeline-container" className="border-t border-[#333] shrink-0 z-[var(--z-index-navbar)] bg-[#1e1e1e]">
+            <div id="timeline-container" className="border-t border-border shrink-0 z-[var(--z-index-navbar)] bg-surface">
                 <Timeline />
             </div>
         </div>

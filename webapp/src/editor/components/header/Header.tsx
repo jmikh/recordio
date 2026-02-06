@@ -6,7 +6,7 @@ import type { ExportQuality } from '../../export/ExportManager';
 import { Dropdown } from '@shared/components';
 import type { DropdownOption } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
-import { MdBugReport } from 'react-icons/md';
+import { MdBugReport, MdDarkMode, MdLightMode } from 'react-icons/md';
 import { DefaultButton } from '@shared/components';
 import { BugReportModal } from '../../../components/BugReportModal';
 import { AuthModal } from './AuthModal';
@@ -28,7 +28,7 @@ export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
-    const { isAuthenticated, isPro, canExportQuality } = useUserStore();
+    const { isAuthenticated, isPro, canExportQuality, theme, setTheme } = useUserStore();
     const project = useProjectData();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
@@ -82,7 +82,7 @@ export const Header = () => {
     };
 
     return (
-        <div className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
+        <div className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
@@ -159,6 +159,12 @@ export const Header = () => {
                     )}
                     <DefaultButton onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
                         <MdBugReport size={18} />
+                    </DefaultButton>
+                    <DefaultButton
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    >
+                        {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
                     </DefaultButton>
                 </div>
             </div>

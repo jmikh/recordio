@@ -63,7 +63,7 @@ export const MultiToggle = <T extends string>({
                     width: indicatorStyle.width,
                     height: indicatorStyle.height
                 }}
-                className="absolute top-0 border border-border-primary rounded-full z-0"
+                className="absolute top-0 border border-border-primary rounded-full z-0 shadow-[var(--shadow-button)]"
             />
 
             {/* Options */}

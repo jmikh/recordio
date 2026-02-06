@@ -176,7 +176,7 @@ export const Slider: React.FC<SliderProps> = ({
                     />
                     {/* Thumb */}
                     <div
-                        className="bg-white rounded-full shadow-sm transition-transform"
+                        className="bg-white rounded-full shadow-[var(--shadow-thumb)] transition-transform"
                         style={{
                             height: `${THUMB_SIZE}px`,
                             width: `${THUMB_SIZE}px`,

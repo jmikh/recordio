@@ -177,7 +177,7 @@ export function Timeline() {
     }, [totalOutputDuration, pixelsPerSec]); // deps that affect width
 
     return (
-        <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans">
+        <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
             {/* 1. Toolbar */}
             <TimelineToolbar
                 totalDurationMs={totalOutputDuration}
@@ -232,7 +232,7 @@ export function Timeline() {
                             ref={overlayRef}
                             className="absolute left-0 top-0 bottom-0 w-12 z-[var(--z-index-navbar)] pointer-events-none"
                             style={{
-                                background: 'linear-gradient(to right, rgba(0,0,0,0.5), transparent)',
+                                background: 'linear-gradient(to right, oklch(0 0 0 / 8%), transparent)',
                                 opacity: 0,
                                 transition: 'opacity 0.1s ease-out'
                             }}
@@ -241,7 +241,7 @@ export function Timeline() {
                             ref={overlayEndRef}
                             className="absolute right-0 top-0 bottom-0 w-12 z-[var(--z-index-navbar)] pointer-events-none"
                             style={{
-                                background: 'linear-gradient(to left, rgba(0,0,0,0.5), transparent)',
+                                background: 'linear-gradient(to left, oklch(0 0 0 / 8%), transparent)',
                                 opacity: 0,
                                 transition: 'opacity 0.1s ease-out'
                             }}
@@ -301,7 +301,7 @@ export function Timeline() {
                                 {/* Hover Line */}
                                 {hoverTime !== null && (
                                     <div
-                                        className="absolute top-0 bottom-0 w-[1px] bg-white/30 z-[var(--z-index-overlay)] pointer-events-none"
+                                        className="absolute top-0 bottom-0 w-[1px] bg-text-muted z-[var(--z-index-overlay)] pointer-events-none"
                                         style={{ left: `${(hoverTime / 1000) * pixelsPerSec}px` }}
                                     />
                                 )}

@@ -270,7 +270,7 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.CameraEdit;
 
     return (
-        <div className={`relative w-full h-full bg-black flex items-center justify-center p-2`}>
+        <div className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
 
             {/* ASPECT RATIO WRAPPER */}
             <div

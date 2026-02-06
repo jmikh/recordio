@@ -29,6 +29,7 @@ export const diamondKeyframe = {
         width: KEYFRAME_SIZE,
         height: KEYFRAME_SIZE,
         borderRadius: 1,
+        boxShadow: 'var(--shadow-segment)',
     } as CSSProperties,
 };
 

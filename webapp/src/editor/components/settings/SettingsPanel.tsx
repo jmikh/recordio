@@ -98,7 +98,7 @@ export const SettingsPanel = () => {
     }, [activeTab, navItems]);
 
     return (
-        <div className="flex h-full border-r border-border bg-surface">
+        <div className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Sidebar Navigation */}
             <nav ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
                 {/* Sliding accent bar */}
