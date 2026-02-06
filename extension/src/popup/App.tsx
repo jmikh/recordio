@@ -3,9 +3,8 @@ import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
 import { DefaultButton } from '@shared/components';
-import { MdBugReport, MdArrowBack } from 'react-icons/md';
+import { MdBugReport, MdArrowBack, MdBlurOn } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
-import { FiEyeOff } from 'react-icons/fi';
 import { BugReportModal } from '../components/BugReportModal';
 import { LogoLink } from '@shared/components/LogoLink';
 import permissionGuide from '../assets/permission-guide.jpg';
@@ -363,7 +362,7 @@ function App() {
             }
             disabled={recordingMode !== 'tab' || canInjectContentScript === false}
           >
-            <FiEyeOff size={16} />
+            <MdBlurOn size={16} />
           </DefaultButton>
           <DefaultButton
             onClick={() => setIsBugReportModalOpen(true)}
