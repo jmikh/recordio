@@ -5,16 +5,16 @@
  * - Manages screen stream (tab capture or desktop capture)
  * - Optional camera stream (dual recording mode)
  * - Audio mixing (system audio + microphone)
- * - Saves recordings and events to ProjectStorage
+ * - Saves RawRecording (lightweight handoff format) to storage
  * 
  * Used by both offscreen.ts (tab mode) and controller.ts (window/desktop mode).
  */
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
-import { ProjectImpl } from '../core/Project';
-import { EventType, type UserEvents, type Size, type SourceMetadata } from '../core/types';
+import { EventType, type UserEvents, type Size, type SourceMetadata } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
+import type { RawRecording } from '@shared/types';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
@@ -452,11 +452,18 @@ export class VideoRecorder {
             scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
 
-        // 5. Create & Save Project (with embedded sources and events)
-        const project = ProjectImpl.createFromSource(projectId, screenSource, effectiveEvents, cameraSource);
-        await ProjectStorage.saveProject(project);
+        // 5. Create & Save RawRecording (lightweight handoff format)
+        const rawRecording: RawRecording = {
+            id: projectId,
+            name: this.config.sourceName || this.mode,
+            timestamp: now,
+            screenSource,
+            cameraSource,
+            userEvents: effectiveEvents,
+        };
+        await ProjectStorage.saveRawRecording(rawRecording);
 
-        console.log(`[VideoRecorder] Project ${projectId} saved successfully.`);
+        console.log(`[VideoRecorder] RawRecording ${projectId} saved successfully.`);
     }
 
 

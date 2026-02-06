@@ -3,13 +3,16 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightAction, SpotlightSettings } from '../../../../types';
-import { getSpotlightBounds, getMinSpotlightDuration } from './SpotlightTrackUtils';
+import type { SpotlightAction } from '../../../../types';
+import type { ResolvedSpotlight } from './SpotlightTrackUtils';
+import { getSpotlightBounds, getMinSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface DragState {
     type: 'move' | 'resize-start' | 'resize-end';
     spotlightId: string;
     startX: number;
+    /** Output-time positions at drag start (resolved from source) */
     initialStartTimeMs: number;
     initialEndTimeMs: number;
 }
@@ -19,24 +22,22 @@ export function useSpotlightDrag(
     project: any,
     coords: TimePixelMapper,
     outputDuration: number,
-    setEditingSpotlight: (id: string | null) => void
+    setEditingSpotlight: (id: string | null) => void,
+    resolvedSpotlights: ResolvedSpotlight[],
+    timeMapper: TimeMapper
 ) {
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
+    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
 
     // Track whether actual dragging happened (mouse moved during drag)
-    // Used to suppress toggle behavior after drag operations
     const wasDraggingRef = useRef(false);
 
     // Track whether item was already selected before mousedown
-    // Used for toggle: if already selected and pure click → deselect
     const wasSelectedBeforeMousedownRef = useRef(false);
-
-    const settings: SpotlightSettings = project.settings.spotlight;
-    const minDuration = getMinSpotlightDuration(settings);
 
     const handleDragStart = (
         e: React.MouseEvent,
@@ -46,26 +47,28 @@ export function useSpotlightDrag(
     ) => {
         e.stopPropagation();
 
-        wasDraggingRef.current = false; // Reset on drag start
-        wasSelectedBeforeMousedownRef.current = isCurrentlySelected; // Track selection state
+        wasDraggingRef.current = false;
+        wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
+
+        // Get resolved output times for this spotlight via mapSourceRangeToOutputRange
+        const range = timeMapper.mapSourceRangeToOutputRange(spotlight.sourceStartTimeMs, spotlight.sourceEndTimeMs);
+        if (!range) return; // Shouldn't happen — only visible spotlights have drag handles
 
         setDragState({
             type,
             spotlightId: spotlight.id,
             startX: e.clientX,
-            initialStartTimeMs: spotlight.outputStartTimeMs,
-            initialEndTimeMs: spotlight.outputEndTimeMs,
+            initialStartTimeMs: range.start,
+            initialEndTimeMs: range.end,
         });
         startInteraction();
-        // Select on drag start (but refs control toggle behavior on click end)
         setEditingSpotlight(spotlight.id);
 
         // Sync CTI to appropriate edge based on drag type
         if (type === 'resize-end') {
-            setCurrentTime(spotlight.outputEndTimeMs);
+            setCurrentTime(range.end);
         } else {
-            // 'move' or 'resize-start' -> follow start time
-            setCurrentTime(spotlight.outputStartTimeMs);
+            setCurrentTime(range.start);
         }
     };
 
@@ -75,10 +78,9 @@ export function useSpotlightDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const spotlightActions = timeline.spotlightActions || [];
         const { prevEnd, nextStart } = getSpotlightBounds(
             dragState.spotlightId,
-            spotlightActions,
+            resolvedSpotlights,
             outputDuration
         );
 
@@ -86,8 +88,9 @@ export function useSpotlightDrag(
         let newEnd = dragState.initialEndTimeMs;
         const currentDuration = newEnd - newStart;
 
+        const minDuration = getMinSpotlightDuration(project.settings.spotlight.transitionDurationMs);
+
         if (dragState.type === 'move') {
-            // Move entire spotlight
             newStart = dragState.initialStartTimeMs + deltaTimeMs;
             newEnd = dragState.initialEndTimeMs + deltaTimeMs;
 
@@ -100,7 +103,6 @@ export function useSpotlightDrag(
                 newEnd = nextStart;
                 newStart = newEnd - currentDuration;
             }
-            // Also clamp to [0, outputDuration]
             if (newStart < 0) {
                 newStart = 0;
                 newEnd = currentDuration;
@@ -110,44 +112,54 @@ export function useSpotlightDrag(
                 newStart = newEnd - currentDuration;
             }
         } else if (dragState.type === 'resize-start') {
-            // Resize from start (left edge)
             newStart = dragState.initialStartTimeMs + deltaTimeMs;
-
-            // Clamp: can't go before prevEnd or make duration < min
             newStart = Math.max(newStart, prevEnd);
             newStart = Math.min(newStart, newEnd - minDuration);
         } else if (dragState.type === 'resize-end') {
-            // Resize from end (right edge)
             newEnd = dragState.initialEndTimeMs + deltaTimeMs;
-
-            // Clamp: can't go past nextStart or make duration < min
             newEnd = Math.min(newEnd, nextStart, outputDuration);
             newEnd = Math.max(newEnd, newStart + minDuration);
         }
 
-        // Mark that actual dragging happened (suppress click toggle)
         wasDraggingRef.current = true;
 
+        // Convert output times back to source times for storage
+        const sourceStart = timeMapper.mapOutputToSourceTime(newStart);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(newEnd);
+
         batchAction(() => updateSpotlight(dragState.spotlightId, {
-            outputStartTimeMs: newStart,
-            outputEndTimeMs: newEnd
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd
         }));
 
         // Sync CTI to the edge being dragged
         if (dragState.type === 'resize-end') {
             setCurrentTime(newEnd);
         } else {
-            // 'move' or 'resize-start' -> follow start time
             setCurrentTime(newStart);
         }
-    }, [dragState, coords, updateSpotlight, timeline, minDuration, batchAction, outputDuration, setCurrentTime]);
+    }, [dragState, coords, updateSpotlight, resolvedSpotlights, batchAction, outputDuration, setCurrentTime, timeMapper]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
+            // On move commit: delete overlapping spotlights (source-time intersection)
+            if (dragState.type === 'move' && wasDraggingRef.current) {
+                const allSpotlights: SpotlightAction[] = timeline.spotlightActions || [];
+                const movedSpotlight = allSpotlights.find((s: SpotlightAction) => s.id === dragState.spotlightId);
+                if (movedSpotlight) {
+                    for (const existing of allSpotlights) {
+                        if (existing.id === dragState.spotlightId) continue;
+                        if (doSourceRangesOverlap(movedSpotlight, existing)) {
+                            deleteSpotlight(existing.id);
+                        }
+                    }
+                }
+            }
+
             setDragState(null);
             endInteraction();
         }
-    }, [dragState, endInteraction]);
+    }, [dragState, endInteraction, timeline, deleteSpotlight]);
 
     useEffect(() => {
         if (dragState) {

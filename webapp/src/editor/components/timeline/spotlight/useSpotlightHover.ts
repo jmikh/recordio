@@ -4,7 +4,9 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightAction, SpotlightSettings } from '../../../../types';
 import type { DragState } from './useSpotlightDrag';
-import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration } from './SpotlightTrackUtils';
+import type { ResolvedSpotlight } from './SpotlightTrackUtils';
+import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
     x: number; // Left position in pixels
@@ -20,14 +22,16 @@ export function useSpotlightHover(
     dragState: DragState | null,
     editingSpotlightId: string | null,
     setEditingSpotlight: (id: string | null) => void,
-    outputDuration: number
+    outputDuration: number,
+    resolvedSpotlights: ResolvedSpotlight[],
+    timeMapper: TimeMapper
 ) {
     const addSpotlight = useProjectStore(s => s.addSpotlight);
+    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
     const settings: SpotlightSettings = project.settings.spotlight;
-    const minDuration = getMinSpotlightDuration(settings);
     const defaultDuration = getDefaultSpotlightDuration(settings);
 
     /**
@@ -54,11 +58,9 @@ export function useSpotlightHover(
             return;
         }
 
-        const spotlightActions = timeline.spotlightActions || [];
-
-        // Check if we are inside an existing spotlight
-        const isInside = spotlightActions.some((s: SpotlightAction) =>
-            mouseTimeMs >= s.outputStartTimeMs && mouseTimeMs <= s.outputEndTimeMs
+        // Check if we are inside an existing (visible) spotlight
+        const isInside = resolvedSpotlights.some(r =>
+            mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
         );
 
         if (isInside) {
@@ -66,12 +68,12 @@ export function useSpotlightHover(
             return;
         }
 
-        // Find valid range for new spotlight (starts at mouse position)
+        // Find valid range for new spotlight (starts at mouse position, using resolved output times)
         const range = getValidSpotlightRange(
             mouseTimeMs,
-            spotlightActions,
+            resolvedSpotlights,
             outputDuration,
-            minDuration,
+            getMinSpotlightDuration(settings.transitionDurationMs),
             defaultDuration
         );
 
@@ -115,6 +117,10 @@ export function useSpotlightHover(
             return;
         }
 
+        // Convert output placement times → source times
+        const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
+
         // Create initial rect centered at 50% of source video
         const { width, height } = sourceSize;
         const initialSourceRect = {
@@ -126,13 +132,21 @@ export function useSpotlightHover(
 
         const newSpotlight: SpotlightAction = {
             id: crypto.randomUUID(),
-            outputStartTimeMs: hoverInfo.outputStartTimeMs,
-            outputEndTimeMs: hoverInfo.outputEndTimeMs,
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
             sourceRect: initialSourceRect,
             borderRadius: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
             scale: project.settings.spotlight.enlargeScale,
             reason: 'Manual Spotlight'
         };
+
+        // Delete any existing spotlights whose source range overlaps the new one
+        const allSpotlights: SpotlightAction[] = timeline.spotlightActions || [];
+        for (const existing of allSpotlights) {
+            if (doSourceRangesOverlap(newSpotlight, existing)) {
+                deleteSpotlight(existing.id);
+            }
+        }
 
         addSpotlight(newSpotlight);
         setEditingSpotlight(newSpotlight.id);

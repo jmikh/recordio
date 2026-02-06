@@ -8,8 +8,8 @@ interface LogoProps extends ComponentProps<'a'> {
     theme?: 'light' | 'dark';
 }
 
-export const LogoLink = ({ className, imgClassName, theme = 'dark', ...props }: LogoProps) => {
-    const logo = theme === 'light' ? logoDark : logoFull;
+export const LogoLink = ({ className, imgClassName, theme = 'light', ...props }: LogoProps) => {
+    const logo = theme === 'dark' ? logoFull : logoDark;
 
     return (
         <a

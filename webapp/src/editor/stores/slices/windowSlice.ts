@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, ZoomAction, SpotlightAction, Project, UserEvents, FocusArea } from '../../../types';
-import { handleSpotlightWindowChange, handleSpotlightWindowRemoval } from '../../utils/spotlightMutator';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
+import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { useUIStore } from '../useUIStore';
 
@@ -52,6 +52,23 @@ export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
     return calculateZoomSchedule(project.settings.zoom, viewMapper, project.timeline.focusAreas, timeMapper);
+};
+
+export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAction[]): SpotlightAction[] => {
+    if (!project.settings.spotlight.isAuto) return project.timeline.spotlightActions;
+    const sourceSize = project.screenSource.size;
+    if (!sourceSize || sourceSize.width === 0) return project.timeline.spotlightActions;
+    const viewMapper = new ViewMapper(
+        sourceSize, project.settings.outputSize,
+        project.settings.screen.padding, project.settings.screen.crop
+    );
+    const timeMapper = getTimeMapper(project.timeline.outputWindows);
+    return calculateAutoSpotlights(
+        viewMapper, timeMapper,
+        project.userEvents.hoveredCards || [],
+        zoomActions, project.settings.zoom,
+        project.settings.spotlight.enlargeScale
+    );
 };
 
 export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], WindowSlice> = (set, _get, store) => ({
@@ -107,24 +124,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 ? recalculateAutoZooms(tempProject)
                 : state.project.timeline.zoomActions;
 
-            // Handle spotlight changes via mutator
-            const spotlightParams = {
-                outputStartMs,
-                oldStart,
-                oldEnd,
-                oldSpeed,
-                oldDuration,
-                newWindow,
-                spotlightSettings: state.project.settings.spotlight
-            };
-
-            const nextSpotlightActions = handleSpotlightWindowChange(
-                state.project.timeline.spotlightActions,
-                spotlightParams,
-                state.project.settings.spotlight.isAuto,
-                tempProject,
-                nextActions
-            );
+            // Spotlight: auto recalculates, manual stays as-is (source time anchored)
+            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -179,18 +180,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 ? recalculateAutoZooms(tempProject)
                 : state.project.timeline.zoomActions;
 
-            const windowDuration = getWindowDuration(targetWindow);
-
-            // Handle spotlight removal via mutator
-            const nextSpotlightActions = handleSpotlightWindowRemoval(
-                state.project.timeline.spotlightActions,
-                outputStartMs,
-                windowDuration,
-                state.project.settings.spotlight,
-                state.project.settings.spotlight.isAuto,
-                tempProject,
-                nextActions
-            );
+            // Spotlight: auto recalculates, manual stays as-is (source time anchored)
+            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 uiSnapshot: getSnapshot(),
@@ -293,24 +284,8 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 ? recalculateAutoZooms(tempProject)
                 : [];
 
-            // Recalculate spotlights if auto mode
-            const nextSpotlightActions = state.project.settings.spotlight.isAuto
-                ? handleSpotlightWindowChange(
-                    [],
-                    {
-                        outputStartMs: 0,
-                        oldStart: 0,
-                        oldEnd: 0,
-                        oldSpeed: 1,
-                        oldDuration: 0,
-                        newWindow: sortedWindows[0],
-                        spotlightSettings: state.project.settings.spotlight
-                    },
-                    true,
-                    tempProject,
-                    nextActions
-                )
-                : []; // Clear manual spotlights
+            // Spotlight: auto recalculates, manual cleared (full timeline rebuild)
+            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 uiSnapshot: getSnapshot(),

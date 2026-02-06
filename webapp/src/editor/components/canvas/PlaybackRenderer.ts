@@ -115,7 +115,8 @@ export class PlaybackRenderer {
                 project.settings.spotlight,
                 outputTimeMs,
                 effectiveViewport,
-                viewMapper
+                viewMapper,
+                timeMapper
             );
 
             // Pass resources for scaled content rendering

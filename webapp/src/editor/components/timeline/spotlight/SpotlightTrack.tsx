@@ -6,6 +6,7 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useSpotlightDrag } from './useSpotlightDrag';
 import { useSpotlightHover } from './useSpotlightHover';
 import { SpotlightBlock } from './SpotlightBlock';
+import { resolveSpotlightOutputTimes, getMinSpotlightDuration } from './SpotlightTrackUtils';
 import {
     ghostSpotlight,
     FADE_HEIGHT,
@@ -48,13 +49,23 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         return timeMapper.getOutputDuration();
     }, [timeMapper]);
 
+    // Resolve spotlights from source time → output time
+    const resolvedSpotlights = useMemo(() => {
+        const all = resolveSpotlightOutputTimes(timeline.spotlightActions || [], timeMapper);
+        // Filter out spotlights below minimum visible duration
+        const minDuration = getMinSpotlightDuration(transitionDurationMs);
+        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration);
+    }, [timeline.spotlightActions, timeMapper]);
+
     // Hooks
     const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useSpotlightDrag(
         timeline,
         project,
         coords,
         outputDuration,
-        setEditingSpotlight
+        setEditingSpotlight,
+        resolvedSpotlights,
+        timeMapper
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useSpotlightHover(
@@ -64,7 +75,9 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         dragState,
         editingSpotlightId,
         setEditingSpotlight,
-        outputDuration
+        outputDuration,
+        resolvedSpotlights,
+        timeMapper
     );
 
     // Calculate fade in/out widths in pixels
@@ -85,63 +98,57 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Existing Spotlights */}
-                {(() => {
-                    const spotlightActions = timeline.spotlightActions || [];
+                {/* Existing Spotlights (rendered using resolved output times) */}
+                {resolvedSpotlights.map((r) => {
+                    const startX = coords.msToX(r.outputStartTimeMs);
+                    const endX = coords.msToX(r.outputEndTimeMs);
+                    const totalWidth = endX - startX;
 
-                    return spotlightActions.map((s) => {
-                        const startX = coords.msToX(s.outputStartTimeMs);
-                        const endX = coords.msToX(s.outputEndTimeMs);
-                        const totalWidth = endX - startX;
+                    if (totalWidth <= 0) return null;
 
-                        if (totalWidth <= 0) return null;
+                    const isSelected = editingSpotlightId === r.spotlight.id;
+                    const isDragging = dragState?.spotlightId === r.spotlight.id;
 
-                        const isSelected = editingSpotlightId === s.id;
-                        const isDragging = dragState?.spotlightId === s.id;
+                    // Fade widths are always exactly the transition duration
+                    // (min duration guarantee ensures they fit)
 
-                        // Calculate actual fade widths (capped to fit within total width)
-                        const maxFadeWidth = totalWidth / 3;
-                        const actualFadeInWidth = Math.min(fadeWidthPx, maxFadeWidth);
-                        const actualFadeOutWidth = Math.min(fadeWidthPx, maxFadeWidth);
-
-                        return (
-                            <SpotlightBlock
-                                key={s.id}
-                                left={startX}
-                                width={totalWidth}
-                                fadeInWidth={actualFadeInWidth}
-                                fadeOutWidth={actualFadeOutWidth}
-                                isSelected={isSelected}
-                                isDragging={isDragging}
-                                trackHeight={height}
-                                onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Suppress toggle if we just finished dragging
-                                    if (wasDraggingRef.current) {
-                                        wasDraggingRef.current = false;
-                                        return;
-                                    }
-                                    // Toggle: only deselect if it was already selected before mousedown
-                                    // If it wasn't selected, mousedown already selected it, so do nothing
-                                    if (wasSelectedBeforeMousedownRef.current) {
-                                        setEditingSpotlight(null);
-                                    } else {
-                                        // First click - CTI already moved on mousedown via drag handler
-                                    }
-                                }}
-                                onResizeStartMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    handleDragStart(e, 'resize-start', s, isSelected);
-                                }}
-                                onResizeEndMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    handleDragStart(e, 'resize-end', s, isSelected);
-                                }}
-                            />
-                        );
-                    });
-                })()}
+                    return (
+                        <SpotlightBlock
+                            key={r.spotlight.id}
+                            left={startX}
+                            width={totalWidth}
+                            fadeInWidth={fadeWidthPx}
+                            fadeOutWidth={fadeWidthPx}
+                            isSelected={isSelected}
+                            isDragging={isDragging}
+                            trackHeight={height}
+                            onMouseDown={(e) => handleDragStart(e, 'move', r.spotlight, isSelected)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                // Suppress toggle if we just finished dragging
+                                if (wasDraggingRef.current) {
+                                    wasDraggingRef.current = false;
+                                    return;
+                                }
+                                // Toggle: only deselect if it was already selected before mousedown
+                                // If it wasn't selected, mousedown already selected it, so do nothing
+                                if (wasSelectedBeforeMousedownRef.current) {
+                                    setEditingSpotlight(null);
+                                } else {
+                                    // First click - CTI already moved on mousedown via drag handler
+                                }
+                            }}
+                            onResizeStartMouseDown={(e) => {
+                                e.stopPropagation();
+                                handleDragStart(e, 'resize-start', r.spotlight, isSelected);
+                            }}
+                            onResizeEndMouseDown={(e) => {
+                                e.stopPropagation();
+                                handleDragStart(e, 'resize-end', r.spotlight, isSelected);
+                            }}
+                        />
+                    );
+                })}
 
                 {/* Add Spotlight Ghost Indicator */}
                 {hoverInfo && !editingSpotlightId && !dragState && (

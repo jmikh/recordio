@@ -31,7 +31,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             nextSpotlightActions[idx] = { ...nextSpotlightActions[idx], ...updates };
 
             // Sort by start time to maintain order
-            nextSpotlightActions.sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+            nextSpotlightActions.sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
             // If sourceRect is being changed, set isAuto to false
             const nextSettings = updates.sourceRect
@@ -56,7 +56,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
         console.log('[Action] addSpotlight', spotlight);
         set(state => {
             const spotlightActions = [...state.project.timeline.spotlightActions, spotlight]
-                .sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
+                .sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
             // Manual spotlight addition sets isAuto to false
             return {

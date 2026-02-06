@@ -18,7 +18,7 @@ import { TimeMapper } from '../mappers/timeMapper';
 export const K_SPOTLIGHT_BUFFER_MS = 250;
 
 /** Minimum spotlight duration (ms) */
-export const K_MIN_SPOTLIGHT_DURATION_MS = 2500;
+export const K_MIN_AUTO_SPOTLIGHT_DURATION_MS = 2500;
 
 /** Safety margin fraction for viewport bounds (2%) */
 const K_VIEWPORT_MARGIN = 0.98;
@@ -99,17 +99,24 @@ class SpotlightScheduler {
 
         // Check minimum duration
         const outputDuration = outputRange.end - outputRange.start;
-        if (outputDuration < K_MIN_SPOTLIGHT_DURATION_MS) {
-            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - duration ${outputDuration}ms < ${K_MIN_SPOTLIGHT_DURATION_MS}ms threshold`);
+        if (outputDuration < K_MIN_AUTO_SPOTLIGHT_DURATION_MS) {
+            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - duration ${outputDuration}ms < ${K_MIN_AUTO_SPOTLIGHT_DURATION_MS}ms threshold`);
             return null;
         }
 
-        // Calculate the effective time range with buffers
-        const spotlightStartMs = outputRange.start + K_SPOTLIGHT_BUFFER_MS;
-        const spotlightEndMs = outputRange.end - K_SPOTLIGHT_BUFFER_MS;
+        // Calculate the effective time range with buffers (in source time)
+        const spotlightSourceStartMs = card.timestamp + K_SPOTLIGHT_BUFFER_MS;
+        const spotlightSourceEndMs = card.endTime - K_SPOTLIGHT_BUFFER_MS;
 
-        // Get all viewports during the spotlight duration
-        const viewports = this.getViewportsForTimeRange(spotlightStartMs, spotlightEndMs);
+        // Re-map the buffered range to output for viewport checks
+        const bufferedOutputRange = this.timeMapper.mapSourceRangeToOutputRange(spotlightSourceStartMs, spotlightSourceEndMs);
+        if (!bufferedOutputRange) {
+            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - buffered range not visible`);
+            return null;
+        }
+
+        // Get all viewports during the spotlight duration (in output time)
+        const viewports = this.getViewportsForTimeRange(bufferedOutputRange.start, bufferedOutputRange.end);
 
         // Transform target rect to output coordinates
         const outputTargetRect = this.viewMapper.inputToOutputRect(card.targetRect);
@@ -140,11 +147,11 @@ class SpotlightScheduler {
         const maxFitScale = this.calculateMaxScale(outputTargetRect, bounds);
         const scale = Math.min(this.enlargeScale, maxFitScale);
 
-        // Create the spotlight action (borderRadius now in OUTPUT coordinates)
+        // Create the spotlight action with SOURCE times
         const spotlight: SpotlightAction = {
             id: crypto.randomUUID(),
-            outputStartTimeMs: spotlightStartMs,
-            outputEndTimeMs: spotlightEndMs,
+            sourceStartTimeMs: spotlightSourceStartMs,
+            sourceEndTimeMs: spotlightSourceEndMs,
             sourceRect: card.targetRect,
             borderRadius: outputCornerRadii,
             scale,

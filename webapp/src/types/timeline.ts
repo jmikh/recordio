@@ -80,10 +80,10 @@ export interface ZoomAction {
  */
 export interface SpotlightAction {
     id: ID;
-    /** Output time when the spotlight starts (in output coordinate system) */
-    outputStartTimeMs: TimeMs;
-    /** Output time when the spotlight ends (in output coordinate system) */
-    outputEndTimeMs: TimeMs;
+    /** Source time when the spotlight starts (in source coordinate system) */
+    sourceStartTimeMs: TimeMs;
+    /** Source time when the spotlight ends (in source coordinate system) */
+    sourceEndTimeMs: TimeMs;
     /** The rectangle to spotlight (in SOURCE video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */

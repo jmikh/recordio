@@ -8,7 +8,7 @@
  * Message flow: Popup → Background → (Offscreen|Controller) + Content
  */
 
-import type { BaseEvent, Size } from '../core/types';
+import type { BaseEvent, Size } from '@shared/types';
 
 export type RecorderMode = 'screen' | 'tab' | 'window';
 

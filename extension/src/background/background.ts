@@ -8,9 +8,9 @@
  * - Persists state to chrome.storage.session for service worker restarts
  */
 
-import { type Size } from '../core/types';
+import { type Size } from '@shared/types';
 import { initSentry } from '../utils/sentry';
-import { trackRecordingCompleted } from '../core/analytics';
+import { trackRecordingCompleted } from '../utils/analytics';
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 import {
@@ -657,7 +657,7 @@ import {
 
 // Cache for pending handoff data (between metadata request and stream)
 const pendingHandoffs = new Map<string, {
-    project: any;
+    recording: RawRecording;
     screenBlob: Blob;
     cameraBlob?: Blob;
 }>();
@@ -693,10 +693,10 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
     console.log('[Background] Handoff request, fetching metadata:', recordingId);
 
     try {
-        // Load project from extension's ProjectStorage (raw, without hydration)
-        const project = await ProjectStorage.loadProjectRaw(recordingId);
+        // Load RawRecording directly from storage
+        const recording = await ProjectStorage.loadRawRecording(recordingId);
 
-        if (!project) {
+        if (!recording) {
             console.error('[Background] Recording not found:', recordingId);
             const errorResponse: HandoffErrorResponse = {
                 success: false,
@@ -708,7 +708,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
         }
 
         // Get the screen blob
-        const screenBlobId = project.screenSource.storageUrl.replace('recordio-blob://', '');
+        const screenBlobId = recording.screenSource.storageUrl.replace('recordio-blob://', '');
         const screenBlob = await ProjectStorage.getRecordingBlob(screenBlobId);
 
         if (!screenBlob) {
@@ -717,23 +717,13 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
 
         // Get camera blob if exists
         let cameraBlob: Blob | undefined;
-        if (project.cameraSource?.storageUrl) {
-            const cameraBlobId = project.cameraSource.storageUrl.replace('recordio-blob://', '');
+        if (recording.cameraSource?.storageUrl) {
+            const cameraBlobId = recording.cameraSource.storageUrl.replace('recordio-blob://', '');
             cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
         }
 
         // Cache blobs for streaming phase
-        pendingHandoffs.set(recordingId, { project, screenBlob, cameraBlob });
-
-        // Build RawRecording metadata
-        const rawRecording: RawRecording = {
-            id: recordingId,
-            name: project.name,
-            timestamp: project.createdAt.getTime(),
-            screenSource: project.screenSource,
-            cameraSource: project.cameraSource,
-            userEvents: project.userEvents,
-        };
+        pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob });
 
         console.log('[Background] Sending metadata:', recordingId,
             'screen size:', screenBlob.size,
@@ -742,7 +732,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
         // Send metadata response (small, under 64MB limit)
         const response: HandoffMetadataResponse = {
             success: true,
-            recording: rawRecording,
+            recording,
             screenVideoSize: screenBlob.size,
             screenVideoType: screenBlob.type,
             cameraVideoSize: cameraBlob?.size,
@@ -876,10 +866,10 @@ async function handleHandoffComplete(payload: HandoffCompletePayload) {
 
     try {
         // Delete from extension storage after successful handoff
-        await ProjectStorage.deleteProject(recordingId);
-        console.log('[Background] Deleted project from extension storage:', recordingId);
+        await ProjectStorage.deleteRawRecording(recordingId);
+        console.log('[Background] Deleted recording from extension storage:', recordingId);
     } catch (error) {
-        console.error('[Background] Failed to delete project:', error);
+        console.error('[Background] Failed to delete recording:', error);
     }
 }
 

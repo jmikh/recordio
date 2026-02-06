@@ -6,6 +6,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 
 import { type RenderResources } from './PlaybackRenderer';
@@ -87,13 +88,19 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     // The content rect is where the screen content appears in output coordinates
     const screenContentBounds = viewMapper?.contentRect;
 
+    // TimeMapper for source→output conversion
+    const timeMapper = useTimeMapper();
+
     // Sync Playback to Spotlight start when selected
     useEffect(() => {
         if (!editingSpotlightId) return;
 
         const spotlight = project.timeline.spotlightActions.find(s => s.id === editingSpotlightId);
         if (spotlight) {
-            useUIStore.getState().setCurrentTime(spotlight.outputStartTimeMs);
+            const outputRange = timeMapper.mapSourceRangeToOutputRange(spotlight.sourceStartTimeMs, spotlight.sourceEndTimeMs);
+            if (outputRange) {
+                useUIStore.getState().setCurrentTime(outputRange.start);
+            }
         }
     }, [editingSpotlightId]);
 

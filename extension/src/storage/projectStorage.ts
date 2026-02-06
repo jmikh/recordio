@@ -1,5 +1,10 @@
 
-import type { ID, Project } from '../core/types';
+import type { ID, RawRecording } from '@shared/types';
+
+// Project is a webapp-only type. The extension storage layer keeps these methods
+// for the Universal Storage Layer (webapp reads from the same IndexedDB), but the
+// extension itself only creates/reads RawRecording objects.
+type Project = any;
 import { EDITOR_ORIGIN_DEV, EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 // Use different DB for website vs extension
@@ -339,6 +344,72 @@ export class ProjectStorage {
             const req = store.delete(id);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // RAW RECORDING (Extension-only)
+    // ===========================================
+
+    /**
+     * Saves a RawRecording to the 'projects' store.
+     * The extension saves recordings in this lightweight format
+     * instead of creating a full Project.
+     */
+    static async saveRawRecording(recording: RawRecording): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readwrite');
+            const store = tx.objectStore('projects');
+            const req = store.put(recording);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Loads a RawRecording by ID from the 'projects' store.
+     */
+    static async loadRawRecording(id: string): Promise<RawRecording | null> {
+        const db = await this.getDB();
+        const result = await new Promise<RawRecording | undefined>((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.get(id);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+        return result || null;
+    }
+
+    /**
+     * Deletes a RawRecording and its associated blobs.
+     */
+    static async deleteRawRecording(recordingId: string): Promise<void> {
+        const db = await this.getDB();
+
+        const tx = db.transaction(['projects', 'recordings'], 'readwrite');
+
+        // 1. Delete the recording entry
+        tx.objectStore('projects').delete(recordingId);
+
+        // 2. Delete associated blobs (scan for recordingId in key)
+        const recordingsStore = tx.objectStore('recordings');
+        const recordingsReq = recordingsStore.openCursor();
+        recordingsReq.onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+            if (cursor) {
+                const key = cursor.key.toString();
+                if (key.includes(recordingId)) {
+                    cursor.delete();
+                }
+                cursor.continue();
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
         });
     }
 

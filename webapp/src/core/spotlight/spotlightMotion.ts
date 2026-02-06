@@ -1,6 +1,8 @@
 import type { SpotlightAction, SpotlightSettings, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
+import { TimeMapper } from '../mappers/timeMapper';
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
+import { getMinSpotlightDuration } from '../../editor/components/timeline/spotlight/SpotlightTrackUtils';
 
 // ============================================================================
 // Spotlight State
@@ -33,12 +35,8 @@ export interface SpotlightState {
 /**
  * Calculates the spotlight state at a specific output time.
  * 
- * The spotlight is defined in SOURCE coordinates (original screen recording).
- * It is mapped to OUTPUT coordinates based on the current viewport.
- * 
- * If the spotlight region is outside the viewport:
- * - Dimming still applies (isVisible = false but dimOpacity > 0)
- * - No hole is cut out (originalRect = null)
+ * Spotlights are stored in SOURCE time. They are resolved to output time
+ * via TimeMapper at render time (same pattern as zooms).
  * 
  * Animation phases:
  * 1. Before outputStartTimeMs: null (no spotlight)
@@ -46,40 +44,49 @@ export interface SpotlightState {
  * 3. Hold: between fade in and fade out
  * 4. Fade out: outputEndTimeMs - transitionDurationMs to outputEndTimeMs
  * 5. After outputEndTimeMs: null (spotlight ended)
- * 
- * @param spotlightActions - Array of spotlight action definitions (should be non-overlapping)
- * @param settings - Global spotlight settings
- * @param outputTimeMs - Current output time in milliseconds
- * @param viewport - Current viewport in output coordinates
- * @param viewMapper - ViewMapper for source-to-output coordinate transformation
- * @returns SpotlightState if a spotlight is active, null otherwise
  */
 export function getSpotlightStateAtTime(
     spotlightActions: SpotlightAction[],
     settings: SpotlightSettings,
     outputTimeMs: number,
     viewport: Rect,
-    viewMapper: ViewMapper
+    viewMapper: ViewMapper,
+    timeMapper: TimeMapper
 ): SpotlightState | null {
     if (!spotlightActions || spotlightActions.length === 0) {
         return null;
     }
 
-    // Find the active spotlight at this time
-    const activeSpotlight = spotlightActions.find(
-        s => outputTimeMs >= s.outputStartTimeMs && outputTimeMs <= s.outputEndTimeMs
-    );
+    // Find the active spotlight at this time by resolving source → output
+    let activeSpotlight: SpotlightAction | null = null;
+    let resolvedStart = 0;
+    let resolvedEnd = 0;
+
+    for (const s of spotlightActions) {
+        const range = timeMapper.mapSourceRangeToOutputRange(s.sourceStartTimeMs, s.sourceEndTimeMs);
+        if (!range) continue;
+
+        // Skip spotlights below minimum visible duration
+        if (range.end - range.start < getMinSpotlightDuration(settings.transitionDurationMs)) continue;
+
+        if (outputTimeMs >= range.start && outputTimeMs <= range.end) {
+            activeSpotlight = s;
+            resolvedStart = range.start;
+            resolvedEnd = range.end;
+            break;
+        }
+    }
 
     if (!activeSpotlight) {
         return null;
     }
 
     // Calculate animation progress
-    const { outputStartTimeMs, outputEndTimeMs, sourceRect, borderRadius, scale: spotlightScale } = activeSpotlight;
+    const { sourceRect, borderRadius, scale: spotlightScale } = activeSpotlight;
     const { transitionDurationMs, dimOpacity } = settings;
 
-    const elapsed = outputTimeMs - outputStartTimeMs;
-    const remaining = outputEndTimeMs - outputTimeMs;
+    const elapsed = outputTimeMs - resolvedStart;
+    const remaining = resolvedEnd - outputTimeMs;
 
     let animationProgress: number;
 
@@ -117,7 +124,6 @@ export function getSpotlightStateAtTime(
     };
 
     // Check if the spotlight is visible in the viewport
-    // A spotlight is visible if its mapped rect has positive dimensions and overlaps with the output area
     const outputSize = viewMapper.outputVideoSize;
     const isVisible =
         mappedRect.width > 0 &&
@@ -171,89 +177,4 @@ function applyEasing(t: number): number {
     return t < 0.5
         ? 4 * t * t * t
         : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-
-// ============================================================================
-// Validation Utilities
-// ============================================================================
-
-/**
- * Gets the minimum allowed duration for a spotlight based on settings.
- * Must allow for full fade-in, some hold time, and fade-out.
- */
-export function getMinSpotlightDuration(settings: SpotlightSettings): number {
-    // 2x transition + 100ms buffer for hold
-    return settings.transitionDurationMs * 2 + 100;
-}
-
-/**
- * Checks if a spotlight would overlap with any existing spotlights.
- * @param newStart - Start time of the new spotlight
- * @param newEnd - End time of the new spotlight
- * @param spotlightActions - Existing spotlight actions to check against
- * @param excludeId - Optional ID to exclude from overlap check (for editing existing spotlight)
- */
-export function wouldSpotlightOverlap(
-    newStart: number,
-    newEnd: number,
-    spotlightActions: SpotlightAction[],
-    excludeId?: string
-): boolean {
-    return spotlightActions.some(s => {
-        if (excludeId && s.id === excludeId) return false;
-        // Check for any overlap
-        return newStart < s.outputEndTimeMs && newEnd > s.outputStartTimeMs;
-    });
-}
-
-/**
- * Finds valid time boundaries for a new spotlight at a given position.
- * Returns null if no valid position exists (completely blocked).
- */
-export function getValidSpotlightRange(
-    clickTimeMs: number,
-    spotlightActions: SpotlightAction[],
-    outputDuration: number,
-    minDuration: number
-): { start: number; end: number } | null {
-    // Sort spotlight actions by start time
-    const sorted = [...spotlightActions].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
-
-    // Find boundaries around the click position
-    let prevEnd = 0;
-    let nextStart = outputDuration;
-
-    for (const s of sorted) {
-        if (s.outputEndTimeMs <= clickTimeMs) {
-            prevEnd = s.outputEndTimeMs;
-        }
-        if (s.outputStartTimeMs > clickTimeMs && s.outputStartTimeMs < nextStart) {
-            nextStart = s.outputStartTimeMs;
-            break;
-        }
-    }
-
-    // Check if there's enough space for minimum duration
-    const availableSpace = nextStart - prevEnd;
-    if (availableSpace < minDuration) {
-        return null;
-    }
-
-    // Center the default spotlight duration around click point
-    const defaultDuration = Math.min(minDuration * 2, availableSpace);
-    let start = clickTimeMs - defaultDuration / 2;
-    let end = clickTimeMs + defaultDuration / 2;
-
-    // Clamp to boundaries
-    if (start < prevEnd) {
-        start = prevEnd;
-        end = Math.min(start + defaultDuration, nextStart);
-    }
-    if (end > nextStart) {
-        end = nextStart;
-        start = Math.max(end - defaultDuration, prevEnd);
-    }
-
-    return { start, end };
 }
