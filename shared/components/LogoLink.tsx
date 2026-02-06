@@ -1,25 +1,26 @@
 import { type ComponentProps } from 'react';
-import logoFull from '@shared/assets/fulllogo.webp';
 import logoDark from '@shared/assets/fulllogo-dark.webp';
+import logoLight from '@shared/assets/fulllogo-light.webp';
 
 interface LogoProps extends ComponentProps<'a'> {
     className?: string;
     imgClassName?: string;
-    theme?: 'light' | 'dark';
 }
 
-export const LogoLink = ({ className, imgClassName, theme = 'light', ...props }: LogoProps) => {
-    const logo = theme === 'dark' ? logoFull : logoDark;
+export const LogoLink = ({ className, imgClassName, ...props }: LogoProps) => {
+    const imgClass = imgClassName || 'h-6';
 
     return (
         <a
             href="https://recordio.cc"
             target="_blank"
             rel="noopener noreferrer"
-            className={`opacity-80 hover:opacity-100 transition-opacity duration-200 ${className || ''}`}
+            className={`opacity-90 hover:opacity-100 transition-opacity duration-200 ${className || ''}`}
             {...props}
         >
-            <img src={logo} alt="Recordio" className={imgClassName || "h-6"} />
+            {/* Light theme: show light logo. Dark theme (.dark ancestor): show dark logo */}
+            <img src={logoLight} alt="Recordio" className={`${imgClass} dark:hidden`} />
+            <img src={logoDark} alt="Recordio" className={`${imgClass} hidden dark:block`} />
         </a>
     );
 };

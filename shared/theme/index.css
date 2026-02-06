@@ -153,7 +153,7 @@
    --surface-body: oklch(0.93 0.015 75);
    --surface-default: oklch(0.96 0.012 75);
    --surface-raised: oklch(0.98 0.008 75);
-   --surface-overlay: oklch(0.98 0.008 75);
+   --surface-overlay: oklch(97.364% 0.01569 73.569);
    --surface-inset: oklch(0.96 0.012 75);
 
    /* Interactive State Overlays - Black transparency */
