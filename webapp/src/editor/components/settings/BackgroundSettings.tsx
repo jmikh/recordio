@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
@@ -36,6 +37,10 @@ export const BackgroundSettings = () => {
     const selectBackgroundFromLibrary = useProjectStore(s => s.selectBackgroundFromLibrary);
     const clearProjectBackground = useProjectStore(s => s.clearProjectBackground);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Collapsible visibility state
+    const showCollapsibleBackground = useUIStore(s => s.showCollapsibleBackground);
+    const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
     // Custom backgrounds library state
     const [customLibrary, setCustomLibrary] = useState<CustomBackgroundEntry[]>([]);
@@ -275,7 +280,12 @@ export const BackgroundSettings = () => {
     }
 
     return (
-        <CollapsibleCard title="Background" previewItems={previewItems} defaultExpanded>
+        <CollapsibleCard
+            title="Background"
+            previewItems={previewItems}
+            isExpanded={showCollapsibleBackground}
+            onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBackground', v)}
+        >
             <div className="flex flex-col gap-4 text-sm select-none">
                 <div className="flex flex-wrap gap-4 items-end justify-center w-full">
                     {/* 1. Color Card */}

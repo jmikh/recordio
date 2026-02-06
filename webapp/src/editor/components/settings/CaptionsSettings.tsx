@@ -38,6 +38,11 @@ export function CaptionsSettings() {
     const selectCaption = useUIStore(state => state.selectCaption);
     const selectedSettingsPanel = useUIStore(state => state.selectedSettingsPanel);
 
+    // Collapsible visibility state
+    const showCollapsibleCaptionStyle = useUIStore(state => state.showCollapsibleCaptionStyle);
+    const showCollapsibleCaptionPosition = useUIStore(state => state.showCollapsibleCaptionPosition);
+    const setCollapsibleVisibility = useUIStore(state => state.setCollapsibleVisibility);
+
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const { addToast, updateToast, removeToast } = useToast();
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -382,7 +387,7 @@ export function CaptionsSettings() {
                     />
 
                     {/* Restore Transcript Button */}
-                    {settings.baselineCaptions?.length &&
+                    {settings.baselineCaptions && settings.baselineCaptions.length > 0 &&
                         JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
                             <DefaultButton
                                 onClick={() => restoreCaptionsFromBaseline()}
@@ -401,7 +406,8 @@ export function CaptionsSettings() {
                     { type: 'text', content: `${Math.round(settings.size)}px` },
                     { type: 'text', content: `${Math.round(settings.width)}%` }
                 ]}
-                defaultExpanded
+                isExpanded={showCollapsibleCaptionStyle}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionStyle', v)}
             >
                 <div className="flex flex-col gap-4">
                     <Toggle
@@ -453,7 +459,8 @@ export function CaptionsSettings() {
                     previewItems={[
                         { type: 'text', content: `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}` }
                     ]}
-                    defaultExpanded
+                    isExpanded={showCollapsibleCaptionPosition}
+                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
                 >
                     <div>
                         {captionSegments.map(segment => {

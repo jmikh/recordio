@@ -10,6 +10,7 @@ export interface WindowSlice {
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
     removeOutputWindow: (id: ID) => void;
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
+    setOutputWindows: (windows: OutputWindow[]) => void;
 }
 
 const getSnapshot = () => {
@@ -251,6 +252,85 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     timeline: {
                         ...state.project.timeline,
                         outputWindows: nextOutputWindows
+                    },
+                    updatedAt: new Date()
+                }
+            };
+        });
+    },
+
+    setOutputWindows: (windows) => {
+        console.log('[Action] setOutputWindows', windows.length);
+        set((state) => {
+            // Validate: at least one window required
+            if (windows.length === 0) {
+                console.warn('[setOutputWindows] At least one window required');
+                return state;
+            }
+
+            // Sort by start time
+            const sortedWindows = [...windows].sort((a, b) => a.startMs - b.startMs);
+
+            // Recompute focus areas
+            const nextFocusAreas = computeFocusAreas(
+                { ...state.project, timeline: { ...state.project.timeline, outputWindows: sortedWindows } },
+                state.project.userEvents
+            );
+
+            const tempProject = {
+                ...state.project,
+                timeline: {
+                    ...state.project.timeline,
+                    outputWindows: sortedWindows,
+                    focusAreas: nextFocusAreas
+                }
+            };
+
+            // Recalculate zooms if auto mode
+            const nextActions = state.project.settings.zoom.isAuto
+                ? handleZoomWindowChange(
+                    [], // Start fresh for auto mode
+                    {
+                        outputStartMs: 0,
+                        oldStart: 0,
+                        oldEnd: 0,
+                        oldSpeed: 1,
+                        oldDuration: 0,
+                        newWindow: sortedWindows[0],
+                        zoomSettings: state.project.settings.zoom
+                    },
+                    true,
+                    tempProject
+                )
+                : []; // Clear manual zooms since timeline structure changed completely
+
+            // Recalculate spotlights if auto mode
+            const nextSpotlightActions = state.project.settings.spotlight.isAuto
+                ? handleSpotlightWindowChange(
+                    [],
+                    {
+                        outputStartMs: 0,
+                        oldStart: 0,
+                        oldEnd: 0,
+                        oldSpeed: 1,
+                        oldDuration: 0,
+                        newWindow: sortedWindows[0],
+                        spotlightSettings: state.project.settings.spotlight
+                    },
+                    true,
+                    tempProject,
+                    nextActions
+                )
+                : []; // Clear manual spotlights
+
+            return {
+                uiSnapshot: getSnapshot(),
+                project: {
+                    ...tempProject,
+                    timeline: {
+                        ...tempProject.timeline,
+                        zoomActions: nextActions,
+                        spotlightActions: nextSpotlightActions
                     },
                     updatedAt: new Date()
                 }

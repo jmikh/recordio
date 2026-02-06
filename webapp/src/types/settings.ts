@@ -173,3 +173,4 @@ export interface ProjectSettings {
     // Captions
     captions: CaptionSettings;
 }
+

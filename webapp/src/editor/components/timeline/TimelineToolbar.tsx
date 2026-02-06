@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { useToast } from '../Toast';
+import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
+import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
-import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete } from 'react-icons/md';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete, MdContentCut, MdRefresh } from 'react-icons/md';
 import { Slider, DefaultButton } from '@shared/components';
 
 
@@ -45,6 +48,29 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     // History Batcher
     const batcher = useHistoryBatcher();
 
+    // Toast for AutoCut feedback
+    const { addToast, updateToast, removeToast } = useToast();
+
+    // AutoCut: Get user events and sources for audio analysis
+    const userEvents = useProjectStore(s => s.project.userEvents);
+    const screenSource = useProjectStore(s => s.project.screenSource);
+    const cameraSource = useProjectStore(s => s.project.cameraSource);
+    const setOutputWindows = useProjectStore(s => s.setOutputWindows);
+    const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);
+
+    // AutoCut loading state
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // AutoCut Visibility Logic:
+    // 1. Camera exists and has microphone
+    // OR
+    // 2. Camera doesn't exist (or no mic), Screen has microphone, and User Events exist
+    const cameraHasMic = cameraSource?.has_microphone && cameraSource?.runtimeUrl;
+    const screenHasMic = screenSource.has_microphone && screenSource.runtimeUrl;
+    const hasUserEvents = userEvents.mousePositions.length > 0;
+
+    const showAutoCut = (cameraHasMic) || (screenHasMic && hasUserEvents);
+
     // Handlers
 
     const handleScaleChange = (newScale: number) => {
@@ -66,6 +92,81 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             setCanvasMode(CanvasMode.Preview);
         } else if (selectedWindowId && outputWindows.length > 1) {
             removeOutputWindow(selectedWindowId);
+        }
+    };
+
+    // AutoCut handler (async VAD analysis)
+    const handleAutoCut = async () => {
+        if (isAnalyzing) return;
+
+        setIsAnalyzing(true);
+
+        // Show progress toast
+        const toastId = addToast({
+            type: 'progress',
+            title: 'Analyzing audio...',
+            message: 'Detecting speech segments'
+        });
+
+        try {
+            // Select audio source: Prefer Camera if it has mic, otherwise Screen if it has mic
+            const cameraHasMic = cameraSource?.has_microphone && cameraSource?.runtimeUrl;
+            const screenHasMic = screenSource.has_microphone && screenSource.runtimeUrl;
+
+            const audioUrl = cameraHasMic
+                ? (cameraSource?.runtimeUrl || '')
+                : (screenHasMic ? (screenSource.runtimeUrl || '') : '');
+
+            const hasAudio = Boolean(audioUrl);
+
+            let speechSegments: { startMs: number; endMs: number }[] = [];
+
+            if (hasAudio) {
+                // Audio exists - use VAD
+                speechSegments = await getCachedSpeechSegments(audioUrl);
+
+                if (speechSegments.length === 0) {
+                    // VAD found no speech with audio present - something's wrong
+                    throw new Error('VAD detected no speech in audio. The audio may be silent or there may be an issue with the analysis.');
+                }
+            }
+            // If no audio, speechSegments stays empty and we rely on events only
+
+            // Run AutoCut analysis
+            const { windows, totalRemovedMs } = analyzeForAutoCut(
+                speechSegments,
+                userEvents,
+                sourceDurationMs
+            );
+
+            if (windows.length > 0) {
+                setOutputWindows(windows);
+
+                // Show success toast
+                const seconds = (totalRemovedMs / 1000).toFixed(1);
+                if (totalRemovedMs > 0) {
+                    updateToast(toastId, {
+                        type: 'success',
+                        title: `Trimmed ${seconds}s of silence`
+                    });
+                } else {
+                    updateToast(toastId, {
+                        type: 'info',
+                        title: 'No silence detected'
+                    });
+                }
+            } else {
+                removeToast(toastId);
+            }
+        } catch (error) {
+            console.error('AutoCut failed:', error);
+            updateToast(toastId, {
+                type: 'error',
+                title: 'AutoCut failed',
+                message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        } finally {
+            setIsAnalyzing(false);
         }
     };
 
@@ -94,7 +195,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         const updateTimeDisplay = () => {
             if (timeDisplayRef.current) {
                 const time = useUIStore.getState().currentTimeMs;
-                timeDisplayRef.current.textContent = `${formatSmartTime(Math.max(0, time), totalDurationMs)} / ${formatSmartTime(totalDurationMs, totalDurationMs)}`;
+                timeDisplayRef.current.textContent = formatSmartTime(Math.max(0, time), totalDurationMs);
             }
         };
 
@@ -102,11 +203,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         updateTimeDisplay();
 
         const unsub = useUIStore.subscribe((state) => {
-            // Only update if playing or time changed significantly? No, just update.
-            // But we can check if string changed to avoid DOM touch if needed. 
-            // DOM textContent set is cheap enough.
             if (timeDisplayRef.current) {
-                timeDisplayRef.current.textContent = `${formatSmartTime(Math.max(0, state.currentTimeMs), totalDurationMs)} / ${formatSmartTime(totalDurationMs, totalDurationMs)}`;
+                timeDisplayRef.current.textContent = formatSmartTime(Math.max(0, state.currentTimeMs), totalDurationMs);
             }
         });
         return unsub;
@@ -114,7 +212,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
 
     return (
-        <div className="h-10 flex items-center px-4 bg-surface-default border-b border-border shrink-0 justify-between">
+        <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
             <div className="flex items-center gap-2">
                 {/* Delete Button */}
                 <DefaultButton
@@ -130,17 +228,53 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     <MdDelete size={14} />
                     Delete
                 </DefaultButton>
+
+                {/* AutoCut Button */}
+                {showAutoCut && (
+                    <DefaultButton
+                        onClick={handleAutoCut}
+                        className="px-3 py-1 text-xs flex items-center gap-1"
+                        title="Remove silent/inactive segments"
+                        disabled={isAnalyzing}
+                    >
+                        <MdContentCut size={14} />
+                        AutoCut
+                    </DefaultButton>
+                )}
+
+                {/* Reset Windows Button */}
+                <DefaultButton
+                    onClick={() => {
+                        setOutputWindows([{
+                            id: crypto.randomUUID(),
+                            startMs: 0,
+                            endMs: sourceDurationMs,
+                            speed: 1.0
+                        }]);
+                    }}
+                    className="px-3 py-1 text-xs flex items-center gap-1"
+                    title="Reset to single window"
+                >
+                    <MdRefresh size={14} />
+                    Reset
+                </DefaultButton>
             </div>
 
             <div className="flex items-center gap-4 bg-state-inactive px-4 py-1 rounded-full border border-border">
                 <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-highlighted">
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
-                <div
-                    ref={timeDisplayRef}
-                    className="font-mono text-xs text-text-main min-w-[100px] text-center"
-                >
-                    00:00.0 / {formatSmartTime(totalDurationMs, totalDurationMs)}
+                <div className="flex items-baseline gap-1.5">
+                    <div
+                        ref={timeDisplayRef}
+                        className="font-mono text-sm text-text-main tabular-nums"
+                    >
+                        00:00.0
+                    </div>
+                    <span className="text-xs text-text-muted">/</span>
+                    <div className="font-mono text-xs text-text-muted tabular-nums">
+                        {formatSmartTime(totalDurationMs, totalDurationMs)}
+                    </div>
                 </div>
             </div>
 

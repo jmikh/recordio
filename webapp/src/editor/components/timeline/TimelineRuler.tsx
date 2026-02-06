@@ -72,7 +72,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
     }, [totalWidth, pixelsPerSec, height]);
 
     return (
-        <div className="sticky top-0 z-[var(--z-index-overlay)] bg-surface border-b border-border">
+        <div className="sticky top-0 z-[var(--z-index-overlay)] bg-surface border-t border-b border-border">
             <canvas ref={canvasRef} className="block pointer-events-none" style={{ height: `${height}px` }} />
         </div>
     );

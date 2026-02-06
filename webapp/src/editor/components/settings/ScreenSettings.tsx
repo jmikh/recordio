@@ -26,6 +26,11 @@ export const ScreenSettings = () => {
     const isEditingCrop = canvasMode === CanvasMode.CropEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
+    // Collapsible visibility state
+    const showCollapsibleSize = useUIStore(s => s.showCollapsibleSize);
+    const showCollapsibleFrame = useUIStore(s => s.showCollapsibleFrame);
+    const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
+
     const screenConfig = project.settings.screen;
 
     const handleModeChange = (mode: 'device' | 'border') => {
@@ -102,7 +107,12 @@ export const ScreenSettings = () => {
     return (
         <div className="flex flex-col gap-3">
             {/* Area 1: Size Settings */}
-            <CollapsibleCard title="Size" previewItems={sizePreviewItems}>
+            <CollapsibleCard
+                title="Size"
+                previewItems={sizePreviewItems}
+                isExpanded={showCollapsibleSize}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSize', v)}
+            >
                 <div className="space-y-4">
                     {/* Padding Slider */}
                     <Slider
@@ -144,7 +154,12 @@ export const ScreenSettings = () => {
             </CollapsibleCard>
 
             {/* Area 2: Frame Settings */}
-            <CollapsibleCard title="Frame" previewItems={framePreviewItems}>
+            <CollapsibleCard
+                title="Frame"
+                previewItems={framePreviewItems}
+                isExpanded={showCollapsibleFrame}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleFrame', v)}
+            >
                 <div className="space-y-4">
                     <MultiToggle
                         options={[

@@ -71,6 +71,24 @@ export interface UIState {
     showDebugOverlays: boolean;
     toggleDebugOverlays: () => void;
 
+    // Collapsible Card Visibility
+    // -- Effects Settings
+    showCollapsibleZoom: boolean;
+    showCollapsibleSpotlight: boolean;
+    showCollapsibleEffects: boolean;
+    // -- Background Settings
+    showCollapsibleBackground: boolean;
+    // -- Screen Settings
+    showCollapsibleSize: boolean;
+    showCollapsibleFrame: boolean;
+    // -- Camera Settings
+    showCollapsibleShape: boolean;
+    showCollapsibleBorder: boolean;
+    // -- Captions Settings
+    showCollapsibleCaptionStyle: boolean;
+    showCollapsibleCaptionPosition: boolean;
+    setCollapsibleVisibility: (key: string, value: boolean) => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -193,6 +211,24 @@ export const useUIStore = create<UIState>((set, get) => ({
     showDebugOverlays: false,
     toggleDebugOverlays: () => set((state) => ({ showDebugOverlays: !state.showDebugOverlays })),
 
+    // Collapsible Card Visibility
+    // -- Effects Settings
+    showCollapsibleZoom: true, // Default expanded
+    showCollapsibleSpotlight: false,
+    showCollapsibleEffects: false,
+    // -- Background Settings
+    showCollapsibleBackground: true, // Default expanded
+    // -- Screen Settings
+    showCollapsibleSize: false,
+    showCollapsibleFrame: false,
+    // -- Camera Settings
+    showCollapsibleShape: true, // Default expanded
+    showCollapsibleBorder: false,
+    // -- Captions Settings
+    showCollapsibleCaptionStyle: true, // Default expanded
+    showCollapsibleCaptionPosition: false,
+    setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
+
     reset: () => set({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
@@ -210,5 +246,16 @@ export const useUIStore = create<UIState>((set, get) => ({
         isResizingWindow: false,
         showDebugBar: false,
         showDebugOverlays: false,
+        // Collapsible Card Visibility
+        showCollapsibleZoom: true,
+        showCollapsibleSpotlight: false,
+        showCollapsibleEffects: false,
+        showCollapsibleBackground: true,
+        showCollapsibleSize: false,
+        showCollapsibleFrame: false,
+        showCollapsibleShape: true,
+        showCollapsibleBorder: false,
+        showCollapsibleCaptionStyle: true,
+        showCollapsibleCaptionPosition: false,
     })
 }));

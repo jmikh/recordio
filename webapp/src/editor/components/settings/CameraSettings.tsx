@@ -15,6 +15,11 @@ export const CameraSettings = () => {
     const isEditingCamera = canvasMode === CanvasMode.CameraEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
+    // Collapsible visibility state
+    const showCollapsibleShape = useUIStore(s => s.showCollapsibleShape);
+    const showCollapsibleBorder = useUIStore(s => s.showCollapsibleBorder);
+    const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
+
     const cameraConfig = project.settings.camera;
     const cameraSource = project.cameraSource;
 
@@ -116,7 +121,8 @@ export const CameraSettings = () => {
                         },
                         { type: 'text', content: `${cropZoom.toFixed(1)}x` }
                     ]}
-                    defaultExpanded
+                    isExpanded={showCollapsibleShape}
+                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleShape', v)}
                 >
                     <div className="flex flex-col gap-4">
                         {/* Shape */}
@@ -175,7 +181,12 @@ export const CameraSettings = () => {
                     </div>
                 </CollapsibleCard>
 
-                <CollapsibleCard title="Border" previewItems={borderPreviewItems}>
+                <CollapsibleCard
+                    title="Border"
+                    previewItems={borderPreviewItems}
+                    isExpanded={showCollapsibleBorder}
+                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBorder', v)}
+                >
                     <div className="space-y-4">
                         {/* Color Picker */}
                         <ColorButton

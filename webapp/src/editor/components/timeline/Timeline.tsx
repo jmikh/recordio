@@ -68,6 +68,19 @@ export function Timeline() {
         }
     };
 
+    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const maxScroll = container.scrollWidth - container.clientWidth;
+
+        // Only handle horizontal scrolling if the timeline is scrollable
+        if (maxScroll > 0) {
+            e.preventDefault();
+            container.scrollLeft += e.deltaY;
+        }
+    };
+
     // -- Stores --
     const timeline = useProjectTimeline();
 
@@ -239,6 +252,7 @@ export function Timeline() {
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                             ref={setContainerRef}
                             onScroll={handleScroll}
+                            onWheel={handleWheel}
                             onMouseMove={handleMouseMove}
                             onMouseDown={handleMouseDown}
                             onMouseLeave={handleMouseLeave}

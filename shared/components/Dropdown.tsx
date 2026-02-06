@@ -80,7 +80,7 @@ export function Dropdown<T>({
     const dropdownMenu = (
         <div
             ref={menuRef}
-            className="bg-surface-overlay border border-border rounded-md shadow-float max-h-[200px] overflow-y-auto"
+            className="bg-surface-overlay border border-border rounded-lg shadow-float max-h-[200px] overflow-y-auto py-1 px-1 scrollbar-thin"
             style={menuStyle}
         >
             {options.map((option, index) => {
@@ -91,7 +91,7 @@ export function Dropdown<T>({
                         key={index}
                         onClick={() => handleSelect(option)}
                         className={`
-                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2
+                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 rounded-md
                             ${isSelected
                                 ? 'bg-primary/20 text-primary-highlighted'
                                 : 'text-text-main hover:bg-state-hover'

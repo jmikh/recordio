@@ -7,11 +7,11 @@
 
 import { pipeline, Pipeline, env } from '@huggingface/transformers';
 
-// Configure Transformers.js - default to our CDN
+// Configure Transformers.js - use Hugging Face Hub for all models
 env.allowRemoteModels = true;
 env.allowLocalModels = false;
-env.remoteHost = 'https://models.recordio.site/';
-env.remotePathTemplate = '{model}/';
+env.remoteHost = 'https://huggingface.co/';
+env.remotePathTemplate = '{model}/resolve/main/';
 
 // Model names
 const MODEL_NAME_EN = 'Xenova/whisper-base.en';
@@ -46,16 +46,7 @@ async function loadModel(language: string): Promise<void> {
     isLoading = true;
 
     try {
-        // Use our CDN for English, Hugging Face CDN for multilingual
-        if (language === 'en') {
-            env.remoteHost = 'https://models.recordio.site/';
-            env.remotePathTemplate = '{model}/';
-        } else {
-            env.remoteHost = 'https://huggingface.co/';
-            env.remotePathTemplate = '{model}/resolve/main/';
-        }
-
-        // @ts-ignore
+        // @ts-ignore - Hugging Face Hub configured at module level
         whisperPipeline = await pipeline('automatic-speech-recognition', modelName);
         currentModelName = modelName;
     } finally {

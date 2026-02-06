@@ -213,7 +213,7 @@ body,
 
    /* Interactive Base - for buttons, dropdowns, and other clickable controls */
    .interactive-base {
-      @apply h-9 px-3 bg-state-inactive border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50;
+      @apply h-9 px-3 bg-state-inactive border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-state-inactive disabled:hover:text-text-main;
    }
 
    /* Interactive Selected State - secondary border with glow */
@@ -267,6 +267,30 @@ body,
       width: 0;
       height: 0;
       background: transparent;
+   }
+
+   /* Thin Scrollbar - Dark Theme */
+   .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-selected) transparent;
+   }
+
+   .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+   }
+
+   .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+   }
+
+   .scrollbar-thin::-webkit-scrollbar-thumb {
+      background-color: var(--border-selected);
+      border-radius: 99px;
+   }
+
+   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background-color: var(--text-disabled);
    }
 }
 

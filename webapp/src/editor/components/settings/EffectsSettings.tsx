@@ -1,5 +1,6 @@
 
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, DefaultButton, type PreviewItem } from '@shared/components';
 import { FaTrash } from 'react-icons/fa';
@@ -13,6 +14,12 @@ export const EffectsSettings = () => {
     const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
     const userEvents = useProjectStore(s => s.project.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+
+    // Collapsible visibility state
+    const showCollapsibleZoom = useUIStore(s => s.showCollapsibleZoom);
+    const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
+    const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
+    const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
     // Spotlight handlers
     const handleDimOpacityChange = (val: number) => {
@@ -70,7 +77,12 @@ export const EffectsSettings = () => {
             )}
 
             {/* ZOOM SETTINGS */}
-            <CollapsibleCard title="Zoom" previewItems={zoomPreviewItems} defaultExpanded>
+            <CollapsibleCard
+                title="Zoom"
+                previewItems={zoomPreviewItems}
+                isExpanded={showCollapsibleZoom}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleZoom', v)}
+            >
                 <div className="flex flex-col gap-4">
                     {/* Header with Auto Toggle */}
                     <div className="flex items-center justify-between">
@@ -125,7 +137,12 @@ export const EffectsSettings = () => {
             </CollapsibleCard>
 
             {/* SPOTLIGHT SETTINGS */}
-            <CollapsibleCard title="Spotlight" previewItems={spotlightPreviewItems}>
+            <CollapsibleCard
+                title="Spotlight"
+                previewItems={spotlightPreviewItems}
+                isExpanded={showCollapsibleSpotlight}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSpotlight', v)}
+            >
                 <div className="flex flex-col gap-4">
                     {/* Auto Toggle */}
                     <div className="flex items-center justify-between">
@@ -185,7 +202,11 @@ export const EffectsSettings = () => {
             </CollapsibleCard>
 
             {/* EFFECT SETTINGS */}
-            <CollapsibleCard title="Effects">
+            <CollapsibleCard
+                title="Effects"
+                isExpanded={showCollapsibleEffects}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleEffects', v)}
+            >
                 <div className="flex flex-col gap-4">
                     <Toggle
                         label="Mouse Clicks"
