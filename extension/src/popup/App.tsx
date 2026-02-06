@@ -353,14 +353,7 @@ function App() {
           <DefaultButton
             onClick={handleBlurMode}
             className="p-1.5"
-            title={
-              recordingMode !== 'tab'
-                ? "Blur mode only available in Tab mode"
-                : canInjectContentScript === false
-                  ? "Cannot blur Chrome-owned pages"
-                  : "Blur Items"
-            }
-            disabled={recordingMode !== 'tab' || canInjectContentScript === false}
+            title="Blur Items"
           >
             <MdBlurOn size={16} />
           </DefaultButton>

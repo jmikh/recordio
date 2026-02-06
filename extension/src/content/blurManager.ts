@@ -205,11 +205,11 @@ export class BlurManager {
         }
 
         if (isBlurred) {
-            // Already blurred: Green theme
-            this.overlay.style.borderColor = '#9FDB95';
-            this.overlay.style.backgroundColor = 'rgba(159, 219, 149, 0.05)';
-            this.overlayLabel.style.backgroundColor = '#9FDB95';
-            this.overlayLabel.style.color = '#020617'; // Slate 950
+            // Already blurred: Secondary theme
+            this.overlay.style.borderColor = 'oklch(0.75 0.18 58)';
+            this.overlay.style.backgroundColor = 'oklch(0.75 0.18 58 / 0.05)';
+            this.overlayLabel.style.backgroundColor = 'oklch(0.75 0.18 58)';
+            this.overlayLabel.style.color = 'oklch(0.15 0 0)';
             this.overlayLabel.textContent = 'Click to unblur';
         } else {
             // Not blurred: Purple theme
