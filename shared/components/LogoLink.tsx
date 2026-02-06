@@ -1,6 +1,7 @@
 import { type ComponentProps } from 'react';
 import logoDark from '@shared/assets/fulllogo-dark.webp';
 import logoLight from '@shared/assets/fulllogo-light.webp';
+import './LogoLink.css';
 
 interface LogoProps extends ComponentProps<'a'> {
     className?: string;
@@ -19,8 +20,8 @@ export const LogoLink = ({ className, imgClassName, ...props }: LogoProps) => {
             {...props}
         >
             {/* Light theme: show light logo. Dark theme (.dark ancestor): show dark logo */}
-            <img src={logoLight} alt="Recordio" className={`${imgClass} dark:hidden`} />
-            <img src={logoDark} alt="Recordio" className={`${imgClass} hidden dark:block`} />
+            <img src={logoLight} alt="Recordio" className={`logo-for-light ${imgClass}`} />
+            <img src={logoDark} alt="Recordio" className={`logo-for-dark ${imgClass}`} />
         </a>
     );
 };

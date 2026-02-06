@@ -1,0 +1,12 @@
+/* LogoLink: CSS-based theme logo switching */
+.logo-for-dark {
+    display: none;
+}
+
+.dark .logo-for-light {
+    display: none;
+}
+
+.dark .logo-for-dark {
+    display: block;
+}
