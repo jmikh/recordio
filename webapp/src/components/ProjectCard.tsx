@@ -25,11 +25,11 @@ export const ProjectCard = ({
         <div
             onClick={() => !isDeleting && onOpen(project)}
             className={`
-                group relative flex flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
+                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
-                    ? 'border-border-primary bg-primary/10 scale-[1.02]'
-                    : 'border-border bg-surface-overlay hover:border-border-hover hover:bg-state-hover hover:scale-[1.01] hover:shadow-lg'
+                    ? 'border-border-primary scale-[1.02]'
+                    : 'border-border hover:border-border-hover hover:bg-state-hover hover:scale-[1.01] hover:shadow-lg'
                 }
             `}
         >
