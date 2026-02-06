@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
@@ -12,6 +12,7 @@ import { ProgressModal } from '@shared/components';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
+import { useToast } from './components/Toast';
 
 // Auth imports
 import { AuthManager, supabase } from '../auth/AuthManager';
@@ -40,6 +41,7 @@ function Editor() {
 
     // Initialization State
     const [isLoading, setIsLoading] = useState(true);
+    const hasShownCreationToast = useRef(false);
 
     // Initialize authentication
     useEffect(() => {
@@ -120,6 +122,9 @@ function Editor() {
         });
     }, []);
 
+    // Toast hook for project creation notifications
+    const { addToast } = useToast();
+
     // Load Project ID from URL
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -136,6 +141,36 @@ function Editor() {
                 const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
                 setIsLoading(false);
+
+                // Show creation toast only if project was created in the last 10 seconds
+                const projectAge = Date.now() - new Date(loadedProject.createdAt).getTime();
+                const isNewlyCreated = projectAge < 10000; // 10 seconds
+
+                if (isNewlyCreated && !hasShownCreationToast.current) {
+                    hasShownCreationToast.current = true;
+                    const hasUserEvents = loadedProject.userEvents.mousePositions.length > 0;
+                    if (hasUserEvents) {
+                        const zoomCount = loadedProject.timeline.zoomActions.length;
+                        const spotlightCount = loadedProject.timeline.spotlightActions.length;
+
+                        // Build message conditionally - only show counts > 0
+                        const parts: string[] = [];
+                        if (zoomCount > 0) parts.push(`${zoomCount} zoom${zoomCount !== 1 ? 's' : ''}`);
+                        if (spotlightCount > 0) parts.push(`${spotlightCount} spotlight${spotlightCount !== 1 ? 's' : ''}`);
+
+                        addToast({
+                            type: 'success',
+                            title: 'Recording Ready!',
+                            message: parts.length > 0 ? `Generated ${parts.join(' and ')}` : undefined,
+                        });
+                    } else {
+                        addToast({
+                            type: 'info',
+                            title: 'No Auto Effects Generated',
+                            message: 'Recordio can only capture interactions of recordings of the current Chrome window.',
+                        });
+                    }
+                }
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
                 // Redirect to dashboard with error message

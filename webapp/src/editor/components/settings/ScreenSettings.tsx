@@ -5,6 +5,7 @@ import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
+import { FaCheck } from 'react-icons/fa';
 
 interface Resolution {
     label: string;
@@ -139,8 +140,8 @@ export const ScreenSettings = () => {
                         onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
                         className={`w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
                     >
-                        <IoCropSharp className="w-4 h-4" />
-                        {isEditingCrop ? 'Done Cropping' : 'Crop Screen'}
+                        {isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-4 h-4" />}
+                        {isEditingCrop ? 'Done' : 'Crop Screen'}
                     </DefaultButton>
 
                     {/* Aspect Ratio Dropdown */}

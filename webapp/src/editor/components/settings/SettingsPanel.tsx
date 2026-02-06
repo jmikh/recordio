@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
@@ -57,6 +58,10 @@ export const SettingsPanel = () => {
     const [accentTop, setAccentTop] = useState(0);
     const navRef = useRef<HTMLElement>(null);
 
+    // Tooltip state for disabled tabs
+    const [hoveredDisabledTab, setHoveredDisabledTab] = useState<string | null>(null);
+    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+
     const project = useProjectStore(s => s.project);
     const canvasMode = useUIStore(s => s.canvasMode);
     const setCanvasMode = useUIStore(s => s.setCanvasMode);
@@ -73,18 +78,26 @@ export const SettingsPanel = () => {
     };
 
     const navItems = useMemo(() => {
-        const items: { id: Tab; label: string; icon: React.ReactNode }[] = [
+        const items: { id: Tab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
             { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
             { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
             { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
+            { id: 'zoom', label: 'Effects', icon: <TbZoomIn size={20} /> },
+            {
+                id: 'camera',
+                label: 'Webcam',
+                icon: <TbCamera size={20} />,
+                disabled: !hasCameraSource,
+                disabledTooltip: 'No webcam detected'
+            },
+            {
+                id: 'captions',
+                label: 'Captions',
+                icon: <TbArticle size={20} />,
+                disabled: !hasMicrophone,
+                disabledTooltip: 'No microphone detected'
+            },
         ];
-        if (hasCameraSource) {
-            items.push({ id: 'camera', label: 'Webcam', icon: <TbCamera size={20} /> });
-        }
-        items.push({ id: 'zoom', label: 'Effects', icon: <TbZoomIn size={20} /> });
-        if (hasMicrophone) {
-            items.push({ id: 'captions', label: 'Captions', icon: <TbArticle size={20} /> });
-        }
         return items;
     }, [hasCameraSource, hasMicrophone]);
 
@@ -109,17 +122,43 @@ export const SettingsPanel = () => {
 
                 {navItems.map((item) => {
                     const isActive = activeTab === item.id;
+                    const isDisabled = item.disabled;
+
                     return (
                         <button
                             key={item.id}
                             data-tab={item.id}
-                            onClick={() => handleTabChange(item.id)}
-                            className="group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg cursor-pointer transition-colors duration-200"
+                            onClick={() => !isDisabled && handleTabChange(item.id)}
+                            onMouseEnter={(e) => {
+                                if (isDisabled && item.disabledTooltip) {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setTooltipPosition({
+                                        left: rect.right + 8,
+                                        top: rect.top + rect.height / 2
+                                    });
+                                    setHoveredDisabledTab(item.id);
+                                }
+                            }}
+                            onMouseLeave={() => setHoveredDisabledTab(null)}
+                            className={`group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg transition-colors duration-200 ${isDisabled
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'cursor-pointer'
+                                }`}
                         >
-                            <span className={`flex transition-colors ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-main'}`}>
+                            <span className={`flex transition-colors ${isDisabled
+                                ? 'text-text-disabled'
+                                : isActive
+                                    ? 'text-primary'
+                                    : 'text-text-muted group-hover:text-text-main'
+                                }`}>
                                 {item.icon}
                             </span>
-                            <span className={`text-sm font-medium transition-colors ${isActive ? 'text-text-highlighted' : 'text-text-muted group-hover:text-text-main'}`}>
+                            <span className={`text-sm font-medium transition-colors ${isDisabled
+                                ? 'text-text-disabled'
+                                : isActive
+                                    ? 'text-text-highlighted'
+                                    : 'text-text-muted group-hover:text-text-main'
+                                }`}>
                                 {item.label}
                             </span>
                         </button>
@@ -153,6 +192,21 @@ export const SettingsPanel = () => {
                     <img key={frame.id} src={frame.thumbnailUrl} alt="" />
                 ))}
             </div>
+
+            {/* Disabled tab tooltip - rendered via portal */}
+            {hoveredDisabledTab && createPortal(
+                <div
+                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 text-xs text-text-main whitespace-nowrap"
+                    style={{
+                        left: tooltipPosition.left,
+                        top: tooltipPosition.top,
+                        transform: 'translateY(-50%)'
+                    }}
+                >
+                    {navItems.find(item => item.id === hoveredDisabledTab)?.disabledTooltip}
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

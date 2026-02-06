@@ -3,12 +3,14 @@ import { useUIStore } from '../stores/useUIStore';
 import { getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
 import { ProjectDebugExporter } from '../debug';
+import { useToast } from './Toast';
 
 export const DebugBar = () => {
     const project = useProjectData();
     const userEvents = useUserEvents();
     const showDebugOverlays = useUIStore(s => s.showDebugOverlays);
     const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
+    const { addToast, updateToast } = useToast();
 
     const handleExportProject = async () => {
         try {
@@ -105,6 +107,54 @@ export const DebugBar = () => {
                 title="Export project as debug bundle (zip)"
             >
                 📦 Export Project
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-4 bg-gray-700 mx-2" />
+
+            {/* Toast Demo Buttons */}
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mr-1">Toasts</span>
+            <button
+                className="px-2 py-0.5 bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 text-[10px] rounded cursor-pointer border border-emerald-800"
+                onClick={() => addToast({ type: 'success', title: 'Success Toast', message: 'This is a success message' })}
+            >
+                Success
+            </button>
+            <button
+                className="px-2 py-0.5 bg-sky-900/50 hover:bg-sky-800 text-sky-200 text-[10px] rounded cursor-pointer border border-sky-800"
+                onClick={() => addToast({ type: 'info', title: 'Info Toast', message: 'This is an info message' })}
+            >
+                Info
+            </button>
+            <button
+                className="px-2 py-0.5 bg-red-900/50 hover:bg-red-800 text-red-200 text-[10px] rounded cursor-pointer border border-red-800"
+                onClick={() => addToast({ type: 'error', title: 'Error Toast', message: 'This is an error message' })}
+            >
+                Error
+            </button>
+            <button
+                className="px-2 py-0.5 bg-violet-900/50 hover:bg-violet-800 text-violet-200 text-[10px] rounded cursor-pointer border border-violet-800"
+                onClick={() => {
+                    const id = addToast({ type: 'progress', title: 'Progress Toast', message: 'Processing...', progress: 0 });
+                    let p = 0;
+                    const interval = setInterval(() => {
+                        p += 0.1;
+                        if (p >= 1) {
+                            clearInterval(interval);
+                            updateToast(id, { type: 'success', title: 'Complete!', progress: undefined });
+                        } else {
+                            updateToast(id, { progress: p });
+                        }
+                    }, 300);
+                }}
+            >
+                Progress
+            </button>
+            <button
+                className="px-2 py-0.5 bg-rose-900/50 hover:bg-rose-800 text-rose-200 text-[10px] rounded cursor-pointer border border-rose-800"
+                onClick={() => addToast({ type: 'info', title: 'No Auto Effects', message: 'Recordio can only capture Chrome window interactions.' })}
+            >
+                Branding
             </button>
         </div>
     );

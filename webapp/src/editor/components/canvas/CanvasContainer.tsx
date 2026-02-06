@@ -214,6 +214,16 @@ export const CanvasContainer = () => {
                         showDebugOverlays: uiState.showDebugOverlays
                     });
                 }
+
+                // Thumbnail capture (after rendering is complete)
+                if (pendingThumbnailCaptureRef.current) {
+                    pendingThumbnailCaptureRef.current = false;
+                    canvas.toBlob((blob) => {
+                        if (blob) ProjectStorage.saveThumbnail(project.id, blob).catch(console.warn);
+                    }, 'image/jpeg', 0.5);
+                    // Schedule next capture in 60s
+                    scheduleThumbnailCapture(60000);
+                }
             };
         };
 
@@ -244,19 +254,23 @@ export const CanvasContainer = () => {
         ? getDeviceFrame(project.settings.screen.deviceFrameId)
         : undefined;
 
-    // Thumbnail Logic
+    // Thumbnail Capture Flag (set by timer, captured at end of render loop)
+    const pendingThumbnailCaptureRef = useRef(false);
+    const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scheduleThumbnailCapture = (delayMs: number) => {
+        if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
+        thumbnailTimerRef.current = setTimeout(() => {
+            pendingThumbnailCaptureRef.current = true;
+        }, delayMs);
+    };
+
+    // Start thumbnail capture schedule
     useEffect(() => {
-        const captureThumbnail = () => {
-            // ... existing thumbnail logic
-            const canvas = canvasRef.current;
-            if (!canvas || !project || !project.id) return;
-            canvas.toBlob((blob) => {
-                if (blob) ProjectStorage.saveThumbnail(project.id, blob).catch(console.warn);
-            }, 'image/jpeg', 0.5);
+        scheduleThumbnailCapture(3000); // Initial capture after 3s
+        return () => {
+            if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
         };
-        const initialTimer = setTimeout(captureThumbnail, 3000);
-        const interval = setInterval(captureThumbnail, 60000);
-        return () => { clearTimeout(initialTimer); clearInterval(interval); };
     }, [project?.id]);
 
     // -----------------------------------------------------------

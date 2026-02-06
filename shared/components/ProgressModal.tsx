@@ -1,3 +1,5 @@
+import { Modal } from './Modal';
+
 interface ProgressModalProps {
     isOpen: boolean;
     title: string;
@@ -15,12 +17,9 @@ export const ProgressModal = ({
     statusText,
     onCancel
 }: ProgressModalProps) => {
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 z-[var(--z-index-modal)] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-surface-raised border border-border rounded-lg shadow-2xl p-6 max-w-md w-full flex flex-col gap-4">
-
+        <Modal isOpen={isOpen} maxWidth="max-w-md">
+            <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-text-highlighted font-semibold text-lg">{title}</h2>
                     <div className="spinner w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -52,8 +51,7 @@ export const ProgressModal = ({
                         Cancel
                     </button>
                 </div>
-
             </div>
-        </div>
+        </Modal>
     );
 };

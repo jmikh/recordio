@@ -2,7 +2,7 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, DefaultButton, type PreviewItem } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, DefaultButton, InfoTooltip, type PreviewItem } from '@shared/components';
 import { FaTrash } from 'react-icons/fa';
 
 export const EffectsSettings = () => {
@@ -14,6 +14,9 @@ export const EffectsSettings = () => {
     const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
     const userEvents = useProjectStore(s => s.project.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+
+    // Check if user events exist (Chrome tab/window vs desktop)
+    const hasUserEvents = userEvents.mousePositions.length > 0;
 
     // Collapsible visibility state
     const showCollapsibleZoom = useUIStore(s => s.showCollapsibleZoom);
@@ -34,8 +37,8 @@ export const EffectsSettings = () => {
         batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, transitionDurationMs: val } }));
     };
 
-    // no mouse positions is enough indicator
-    const hasNoUserEvents = userEvents.mousePositions.length === 0
+    // Tooltip message for disabled auto toggles
+    const autoDisabledTooltip = "Auto effects require mouse events, which are only captured during Chrome tab and window recordings.";
 
     const handleClearZooms = () => {
         // 1. Clear motions
@@ -69,12 +72,6 @@ export const EffectsSettings = () => {
 
     return (
         <div className="flex flex-col gap-3 text-sm text-text-main">
-            {/* Disclaimer for missing user events */}
-            {hasNoUserEvents && (
-                <div className="text-xs text-text-main flex items-start gap-1">
-                    <span>* Auto zoom and effects are only available for recordings of Chrome tabs and Chrome windows.</span>
-                </div>
-            )}
 
             {/* ZOOM SETTINGS */}
             <CollapsibleCard
@@ -86,12 +83,18 @@ export const EffectsSettings = () => {
                 <div className="flex flex-col gap-4">
                     {/* Header with Auto Toggle */}
                     <div className="flex items-center justify-between">
-                        <label className="text-sm text-text-muted">Auto</label>
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-sm text-text-muted">Auto</label>
+                            {!hasUserEvents && (
+                                <InfoTooltip description={autoDisabledTooltip} />
+                            )}
+                        </div>
                         <Toggle
                             value={zoomSettings.isAuto}
                             onChange={(isAuto) => {
                                 updateSettings({ zoom: { ...zoomSettings, isAuto } });
                             }}
+                            disabled={!hasUserEvents}
                         />
                     </div>
 
@@ -146,12 +149,18 @@ export const EffectsSettings = () => {
                 <div className="flex flex-col gap-4">
                     {/* Auto Toggle */}
                     <div className="flex items-center justify-between">
-                        <label className="text-sm text-text-muted">Auto</label>
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-sm text-text-muted">Auto</label>
+                            {!hasUserEvents && (
+                                <InfoTooltip description={autoDisabledTooltip} />
+                            )}
+                        </div>
                         <Toggle
                             value={spotlightSettings.isAuto}
                             onChange={(isAuto) => {
                                 updateSettings({ spotlight: { ...spotlightSettings, isAuto } });
                             }}
+                            disabled={!hasUserEvents}
                         />
                     </div>
 

@@ -154,6 +154,15 @@ export class ProjectImpl {
 
         const settings = createDefaultSettings();
 
+        // Detect if user events were captured (Chrome tab/window vs desktop)
+        const hasUserEvents = userEvents.mousePositions.length > 0;
+
+        // Disable auto effects if no user events
+        if (!hasUserEvents) {
+            settings.zoom.isAuto = false;
+            settings.spotlight.isAuto = false;
+        }
+
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
 
@@ -172,14 +181,16 @@ export class ProjectImpl {
 
         const timeMapper = new TimeMapper(outputWindows);
         const focusAreas = getAllFocusAreas(userEvents, timeMapper, screenSource.size);
-        const zoomActions = calculateZoomSchedule(
-            settings.zoom,
-            viewMapper,
-            focusAreas
-        );
+        const zoomActions = hasUserEvents
+            ? calculateZoomSchedule(
+                settings.zoom,
+                viewMapper,
+                focusAreas
+            )
+            : [];
 
-        // Calculate Spotlight Schedule (if auto-spotlights enabled)
-        const spotlightActions = settings.spotlight.isAuto
+        // Calculate Spotlight Schedule (if auto-spotlights enabled and has events)
+        const spotlightActions = (settings.spotlight.isAuto && hasUserEvents)
             ? calculateAutoSpotlights(
                 viewMapper,
                 timeMapper,

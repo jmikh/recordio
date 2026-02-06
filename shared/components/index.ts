@@ -6,6 +6,7 @@ export { InfoTooltip } from './InfoTooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { LogoLink } from './LogoLink';
+export { Modal } from './Modal';
 export { MultiToggle } from './MultiToggle';
 export { Notice } from './Notice';
 export { PrimaryButton } from './PrimaryButton';

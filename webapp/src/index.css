@@ -6,7 +6,7 @@
 /* Toast System */
 .toast-container {
     position: fixed;
-    top: 24px;
+    top: 64px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10000;
@@ -18,7 +18,7 @@
 
 .toast {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     padding: 14px 16px;
     min-width: 320px;
@@ -29,6 +29,12 @@
     box-shadow: 0 8px 32px oklch(0% 0 0 / 0.3);
     pointer-events: auto;
     animation: toast-slide-in 0.3s ease-out;
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.toast-exiting {
+    opacity: 0;
+    transform: translateY(-100%);
 }
 
 @keyframes toast-slide-in {
