@@ -5,5 +5,6 @@ export { getAllFocusAreas, type FocusArea } from './focusManager';
 export {
     calculateZoomSchedule,
     getViewportStateAtTime,
+    prepareZoomActionsForInterpolation,
     ViewMapper
 } from './zoomAction';

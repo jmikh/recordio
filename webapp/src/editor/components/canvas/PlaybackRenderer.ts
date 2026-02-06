@@ -56,11 +56,14 @@ export class PlaybackRenderer {
 
         const outputTimeMs = currentTimeMs;
         const zoomActions = timeline.zoomActions || [];
+        const timeMapper = new TimeMapper(timeline.outputWindows);
 
         effectiveViewport = getViewportStateAtTime(
             zoomActions,
             outputTimeMs,
-            outputSize
+            outputSize,
+            timeMapper,
+            project.settings.zoom
         );
         // -----------------------------------------------------------
 
@@ -145,7 +148,9 @@ export class PlaybackRenderer {
                         zoomActions,
                         currentTimeMs,
                         outputSize,
-                        cameraSettings.shrinkScale ?? 0.5
+                        cameraSettings.shrinkScale ?? 0.5,
+                        timeMapper,
+                        project.settings.zoom
                     );
 
                     if (cameraState.sizeScale < 1.0) {

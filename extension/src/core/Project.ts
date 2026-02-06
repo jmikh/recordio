@@ -174,7 +174,8 @@ export class ProjectImpl {
         const zoomActions = calculateZoomSchedule(
             settings.zoom,
             viewMapper,
-            focusAreas
+            focusAreas,
+            timeMapper
         );
 
         // Calculate Spotlight Schedule (if auto-spotlights enabled)
@@ -184,6 +185,7 @@ export class ProjectImpl {
                 timeMapper,
                 userEvents.hoveredCards || [],
                 zoomActions,
+                settings.zoom,
                 settings.spotlight.enlargeScale
             )
             : [];

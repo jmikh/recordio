@@ -317,8 +317,9 @@ export interface OutputWindow {
 
 export interface ZoomAction {
     id: ID;
-    outputEndTimeMs: TimeMs;
-    durationMs: TimeMs;
+    /** Source time when zoom reaches target state (in source coordinate system) */
+    sourceEndTimeMs: TimeMs;
+    /** Duration is now derived dynamically from settings and available space */
     rect: Rect;
     reason: string;
     type: 'auto' | 'manual';

@@ -110,6 +110,7 @@
 
    /* Hues */
    --hue-primary: 290;
+   /* 290 */
    --hue-secondary: 58;
 
    /* Primary Color Variants */
@@ -168,7 +169,7 @@
 
    /* Text Colors - Dark */
    --text-highlighted: oklch(0.15 0 0);
-   --text-main: oklch(0.15 0 0 / 85%);
+   --text-main: oklch(0.15 0 0 / 80%);
    --text-muted: oklch(0.15 0 0 / 70%);
    --text-disabled: oklch(0.15 0 0 / 50%);
    --text-on-primary: oklch(0.98 0 0);

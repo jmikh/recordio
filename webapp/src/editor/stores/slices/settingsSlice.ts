@@ -3,7 +3,7 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ProjectSettings } from '../../../types';
 import { isSubset } from '../../utils/subsetMatcher';
-import { recalculateAutoZooms, updateManualZoomDuration } from '../../utils/zoomMutator';
+import { recalculateAutoZooms } from './windowSlice';
 
 type DeepPartial<T> = {
     [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
@@ -85,25 +85,17 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
             // Check for any zoom related changes
             const zoomUpdates = updates.zoom || {};
             const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.isAuto !== undefined;
-            const durationChanged = zoomUpdates.maxZoomDurationMs !== undefined &&
-                zoomUpdates.maxZoomDurationMs !== currentSettings.zoom.maxZoomDurationMs;
-
-
             // Check for output size changes
             const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
                 nextSettings.outputSize.height !== currentSettings.outputSize.height;
 
             if (sizeChanged && !nextSettings.zoom.isAuto) {
+                // When output size changes with manual zooms, clear them since rects are invalid
                 nextActions = [];
             } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.isAuto) {
                 nextActions = recalculateAutoZooms(nextProject);
-            } else if (durationChanged && !nextSettings.zoom.isAuto) {
-                // Manual Zoom Duration Update
-                nextActions = updateManualZoomDuration(
-                    nextActions,
-                    nextSettings.zoom.maxZoomDurationMs
-                );
             }
+            // Duration changes no longer require action - duration is derived dynamically
 
             return {
                 project: {

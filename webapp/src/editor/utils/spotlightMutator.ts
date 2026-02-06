@@ -52,6 +52,7 @@ export const recalculateAutoSpotlights = (
             timeMapper,
             project.userEvents.hoveredCards || [],
             zoomActions,
+            project.settings.zoom,
             project.settings.spotlight.enlargeScale
         );
     }

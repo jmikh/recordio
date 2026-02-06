@@ -1,65 +1,66 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
+import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomAction } from '../../../../types';
-import { getZoomBlockBounds } from './ZoomTrackUtils';
-
-// Actually Project type is likely in core/types or similar. 
-// Checking imports in ZoomTrack.tsx: import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
-// It uses `project` from `useProjectStore`.
+import type { ZoomAction, ZoomSettings } from '../../../../types';
+import { getZoomBlockBounds, prepareZoomActionsForUI, type PreparedZoomAction } from './ZoomTrackUtils';
 
 export interface DragState {
     type: 'move';
     motionId: string;
     startX: number;
-    initialOutputEndTime: number; // Anchor in Output Time
+    initialOutputEndTime: number; // Anchor in Output Time (for drag calculations)
+    initialSourceEndTime: number; // Original source time (for conversions)
 }
 
 export function useZoomDrag(
-    timeline: any, // Typed correctly if possible, else any for now matching usage
+    timeline: any,
     project: any,
     coords: TimePixelMapper,
     outputDuration: number,
-    setEditingZoom: (id: string | null) => void
+    setEditingZoom: (id: string | null) => void,
+    preparedActions: PreparedZoomAction[]
 ) {
     const updateZoomAction = useProjectStore(s => s.updateZoomAction);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+    const timeMapper = useTimeMapper();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
 
     // Track whether actual dragging happened (mouse moved during drag)
-    // Used to suppress toggle behavior after drag operations
     const wasDraggingRef = useRef(false);
 
     // Track whether item was already selected before mousedown
-    // Used for toggle: if already selected and pure click → deselect
     const wasSelectedBeforeMousedownRef = useRef(false);
 
     const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction, isCurrentlySelected: boolean) => {
         e.stopPropagation();
 
-        const outputEndTimeX = coords.msToX(action.outputEndTimeMs);
-        if (outputEndTimeX === -1) return; // Should be impossible if clicked
+        // Find the prepared action to get its output time
+        const preparedAction = preparedActions.find(p => p.id === action.id);
+        if (!preparedAction) return;
 
-        wasDraggingRef.current = false; // Reset on drag start
-        wasSelectedBeforeMousedownRef.current = isCurrentlySelected; // Track selection state
+        const outputEndTimeX = coords.msToX(preparedAction.outputEndTime);
+        if (outputEndTimeX === -1) return;
+
+        wasDraggingRef.current = false;
+        wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
 
         setDragState({
             type,
             motionId: action.id,
             startX: e.clientX,
-            initialOutputEndTime: action.outputEndTimeMs,
+            initialOutputEndTime: preparedAction.outputEndTime,
+            initialSourceEndTime: action.sourceEndTimeMs,
         });
         startInteraction();
-        // Select on drag start (but refs control toggle behavior on click end)
         setEditingZoom(action.id);
     };
 
     /**
-     * Handles the actual dragging logic (Move).
-     * Attached to window to track mouse movements outside the track area.
-     * Prevents overlap with adjacent blocks and dynamically adjusts duration.
+     * Handles the actual dragging logic.
+     * Works in output time for UI interactions, then converts to source time for storage.
      */
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         if (!dragState) return;
@@ -67,36 +68,36 @@ export function useZoomDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const actions = timeline.zoomActions || [];
         let targetOutputEndTime = dragState.initialOutputEndTime + deltaTimeMs;
 
-        // Get boundaries (excluding self)
-        // Use output duration as the boundary for zoom blocks
-        const { prevEnd, nextStart } = getZoomBlockBounds(
-            dragState.motionId, actions, outputDuration
+        // Get boundaries using prepared actions (in output time)
+        const { prevEnd, nextEnd } = getZoomBlockBounds(
+            dragState.motionId, preparedActions, outputDuration
         );
 
-        const { minZoomDurationMs, maxZoomDurationMs } = project.settings.zoom;
+        const { minZoomDurationMs } = project.settings.zoom;
 
-        // Clamp sourceEndTime to boundaries
-        // Left: must leave room for at least minZoomDurationMs
+        // Clamp output end time to boundaries
+        // Left: must leave room for at least minZoomDurationMs (our own transition)
         targetOutputEndTime = Math.max(targetOutputEndTime, prevEnd + minZoomDurationMs);
-        // Right: cannot exceed next block start or output duration
-        targetOutputEndTime = Math.min(targetOutputEndTime, nextStart, outputDuration);
+        // Right: leave room for next zoom's transition, or output duration
+        const rightBoundary = nextEnd < outputDuration
+            ? nextEnd - minZoomDurationMs
+            : outputDuration;
+        targetOutputEndTime = Math.min(targetOutputEndTime, rightBoundary);
 
-        // Calculate duration based on available space
-        const availableSpace = targetOutputEndTime - prevEnd;
-        const targetDuration = Math.max(minZoomDurationMs, Math.min(maxZoomDurationMs, availableSpace));
+        // Convert target output time back to source time
+        const targetSourceEndTime = timeMapper.mapOutputToSourceTime(targetOutputEndTime);
+        if (targetSourceEndTime === -1) return; // Invalid time
 
-        // Mark that actual dragging happened (suppress click toggle)
+        // Mark that actual dragging happened
         wasDraggingRef.current = true;
 
         batchAction(() => updateZoomAction(dragState.motionId, {
-            outputEndTimeMs: targetOutputEndTime,
-            durationMs: targetDuration,
+            sourceEndTimeMs: targetSourceEndTime,
             type: 'manual'
         }));
-    }, [dragState, coords, updateZoomAction, timeline, project.settings.zoom, batchAction, outputDuration]);
+    }, [dragState, coords, updateZoomAction, preparedActions, project.settings.zoom, batchAction, outputDuration, timeMapper]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {

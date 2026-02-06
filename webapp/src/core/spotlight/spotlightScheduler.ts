@@ -5,9 +5,9 @@
  * Spotlights highlight UI elements that the user hovered over for extended periods.
  */
 
-import type { HoveredCardEvent, ZoomAction, SpotlightAction, Rect, Size } from '../../types';
+import type { HoveredCardEvent, ZoomAction, SpotlightAction, Rect, Size, ZoomSettings } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
-import { getViewportStateAtTime } from '../zoom';
+import { getViewportStateAtTime, prepareZoomActionsForInterpolation } from '../zoom';
 import { TimeMapper } from '../mappers/timeMapper';
 
 // ============================================================================
@@ -40,6 +40,7 @@ class SpotlightScheduler {
     private readonly viewMapper: ViewMapper;
     private readonly timeMapper: TimeMapper;
     private readonly zoomActions: ZoomAction[];
+    private readonly zoomSettings: ZoomSettings;
     private readonly enlargeScale: number;
     private readonly outputSize: Size;
 
@@ -47,11 +48,13 @@ class SpotlightScheduler {
         viewMapper: ViewMapper,
         timeMapper: TimeMapper,
         zoomActions: ZoomAction[],
+        zoomSettings: ZoomSettings,
         enlargeScale: number
     ) {
         this.viewMapper = viewMapper;
         this.timeMapper = timeMapper;
         this.zoomActions = zoomActions;
+        this.zoomSettings = zoomSettings;
         this.enlargeScale = enlargeScale;
         this.outputSize = viewMapper.outputVideoSize;
     }
@@ -167,16 +170,17 @@ class SpotlightScheduler {
         const viewports: Rect[] = [];
 
         // Viewport at start
-        viewports.push(getViewportStateAtTime(this.zoomActions, startMs, this.outputSize));
+        viewports.push(getViewportStateAtTime(this.zoomActions, startMs, this.outputSize, this.timeMapper, this.zoomSettings));
 
         // Viewport at end
-        viewports.push(getViewportStateAtTime(this.zoomActions, endMs, this.outputSize));
+        viewports.push(getViewportStateAtTime(this.zoomActions, endMs, this.outputSize, this.timeMapper, this.zoomSettings));
 
-        // Viewports at any zoom action start times within the range
-        for (const action of this.zoomActions) {
-            const actionStartMs = action.outputEndTimeMs - action.durationMs;
+        // Viewports at any zoom action start times (derived from source time) within the range
+        const preparedActions = prepareZoomActionsForInterpolation(this.zoomActions, this.timeMapper, this.zoomSettings);
+        for (const action of preparedActions) {
+            const actionStartMs = action.outputStartTime;
             if (actionStartMs > startMs && actionStartMs < endMs) {
-                viewports.push(getViewportStateAtTime(this.zoomActions, actionStartMs, this.outputSize));
+                viewports.push(getViewportStateAtTime(this.zoomActions, actionStartMs, this.outputSize, this.timeMapper, this.zoomSettings));
             }
         }
 
@@ -304,8 +308,9 @@ export const calculateAutoSpotlights = (
     timeMapper: TimeMapper,
     hoveredCards: HoveredCardEvent[],
     zoomActions: ZoomAction[],
+    zoomSettings: ZoomSettings,
     enlargeScale: number
 ): SpotlightAction[] => {
-    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomActions, enlargeScale);
+    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomActions, zoomSettings, enlargeScale);
     return scheduler.processCards(hoveredCards);
 };

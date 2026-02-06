@@ -55,7 +55,7 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
         console.log('[Action] addZoomAction', action);
         set(state => {
             const actions = [...state.project.timeline.zoomActions, action]
-                .sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+                .sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
 
             const nextSettings = {
                 ...state.project.settings,

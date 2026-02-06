@@ -38,8 +38,8 @@ export function useTimelineInteraction({
         if (selectedZoomId) {
             const action = zoomActions?.find(m => m.id === selectedZoomId);
             if (action) {
-                // Use cached output time
-                const outputTime = action.outputEndTimeMs;
+                // Convert source time to output time
+                const outputTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
                 if (outputTime !== -1) {
                     setCurrentTime(outputTime);
                 }

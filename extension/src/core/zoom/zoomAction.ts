@@ -1,5 +1,6 @@
 import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusArea } from '../types';
 import { ViewMapper } from '../mappers/viewMapper';
+import { TimeMapper } from '../mappers/timeMapper';
 import { rectContainsRect, clampViewportToBounds } from '../geometry';
 
 export * from '../mappers/viewMapper';
@@ -8,25 +9,37 @@ export * from '../mappers/viewMapper';
 // Core Abstractions
 // ============================================================================
 
+/**
+ * Calculates zoom actions from focus areas.
+ * 
+ * Focus areas are in output time. In the extension during initial project creation,
+ * output time = source time (no cuts yet). Zoom actions store sourceEndTimeMs.
+ * Duration is derived dynamically based on settings and spacing.
+ * 
+ * @param zoomSettings - Zoom settings including maxZoom, minZoomDurationMs, maxZoomDurationMs
+ * @param viewMapper - Mapper for source to output coordinate transformation
+ * @param focusAreas - Focus areas computed from user events (in output time)
+ * @param timeMapper - TimeMapper to convert output time back to source time
+ * @returns Array of zoom actions with sourceEndTimeMs
+ */
 export function calculateZoomSchedule(
     zoomSettings: ZoomSettings,
     viewMapper: ViewMapper,
-    focusAreas: FocusArea[]
+    focusAreas: FocusArea[],
+    timeMapper: TimeMapper
 ): ZoomAction[] {
     const { maxZoom, maxZoomDurationMs, minZoomDurationMs } = zoomSettings;
 
     if (focusAreas.length === 0) return [];
 
-
-
     const actions: ZoomAction[] = [];
     const outputVideoSize = viewMapper.outputVideoSize;
     let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
     let lastMustSeeRect: Rect = lastViewport;
+    let lastOutputEndTime = 0;
 
-    // Process each focus area (start/end buffer logic and final_zoomout now handled by focusManager)
+    // Process each focus area (focus areas are in output time)
     for (const area of focusAreas) {
-
         // Use the focus area rect directly (already in source coordinates)
         // Map it to output coordinates for viewport calculation
         const mappedFocusRect = viewMapper.inputToOutputRect(area.rect);
@@ -36,8 +49,6 @@ export function calculateZoomSchedule(
         let targetViewport: Rect;
 
         // If the focus area spans the full source viewport, zoom fully out.
-        // This is a cinematic decision: when the system indicates "full view",
-        // we commit fully to showing everything rather than a partial zoom.
         const isFullViewport =
             Math.abs(area.rect.width - viewMapper.inputVideoSize.width) < 1 &&
             Math.abs(area.rect.height - viewMapper.inputVideoSize.height) < 1;
@@ -53,71 +64,49 @@ export function calculateZoomSchedule(
         const mustSeeFits = rectContainsRect(lastViewport, mustSeeRect);
         const sizeChanged = Math.abs(targetViewport.width - lastViewport.width) > 0.1;
 
-        let shouldGenerateAction = (!mustSeeFits || sizeChanged)
+        let shouldGenerateAction = (!mustSeeFits || sizeChanged);
 
         if (shouldGenerateAction) {
-            const currentStartOutputTime = area.timestamp - maxZoomDurationMs;
+            const outputEndTime = area.timestamp; // Focus area timestamp is in output time
+            const availableGap = outputEndTime - lastOutputEndTime;
 
-            // Check for intersection with previous action
-            if (actions.length > 0) {
-                const prevAction = actions[actions.length - 1];
-                const prevEndOutputTime = prevAction.outputEndTimeMs;
+            // Only add action if there's enough gap for minimum duration
+            if (availableGap >= minZoomDurationMs) {
+                // Convert output end time to source time
+                const sourceEndTimeMs = timeMapper.mapOutputToSourceTime(outputEndTime);
 
-                if (currentStartOutputTime < prevEndOutputTime) {
-                    // Intersection detected - try shrinking duration
-                    const availableGap = area.timestamp - prevEndOutputTime;
-
-                    if (availableGap >= minZoomDurationMs) {
-                        // Shrink duration to fit in the gap
-                        actions.push({
-                            id: crypto.randomUUID(),
-                            outputEndTimeMs: area.timestamp,
-                            durationMs: availableGap,
-                            rect: targetViewport,
-                            reason: area.reason,
-                            type: 'auto'
-                        });
-                        lastViewport = targetViewport;
-                        lastMustSeeRect = mustSeeRect;
-                    } else {
-                        // Not enough gap - merge zooms
-                        const boundingRect: Rect = {
-                            x: Math.min(lastMustSeeRect.x, mustSeeRect.x),
-                            y: Math.min(lastMustSeeRect.y, mustSeeRect.y),
-                            width: Math.max(lastMustSeeRect.x + lastMustSeeRect.width, mustSeeRect.x + mustSeeRect.width) - Math.min(lastMustSeeRect.x, mustSeeRect.x),
-                            height: Math.max(lastMustSeeRect.y + lastMustSeeRect.height, mustSeeRect.y + mustSeeRect.height) - Math.min(lastMustSeeRect.y, mustSeeRect.y)
-                        };
-
-                        const mergedViewport = getViewport(boundingRect, maxZoom, viewMapper);
-                        prevAction.rect = mergedViewport;
-                        lastViewport = mergedViewport;
-                        lastMustSeeRect = boundingRect;
-                    }
-                } else {
-                    // No intersection - add normally
-                    actions.push({
-                        id: crypto.randomUUID(),
-                        outputEndTimeMs: area.timestamp,
-                        durationMs: maxZoomDurationMs,
-                        rect: targetViewport,
-                        reason: area.reason,
-                        type: 'auto'
-                    });
-                    lastViewport = targetViewport;
-                    lastMustSeeRect = mustSeeRect;
+                // Skip if the output time doesn't map to a valid source time
+                if (sourceEndTimeMs === -1) {
+                    continue;
                 }
-            } else {
-                // First action - add normally
+
                 actions.push({
                     id: crypto.randomUUID(),
-                    outputEndTimeMs: area.timestamp,
-                    durationMs: maxZoomDurationMs,
+                    sourceEndTimeMs,
                     rect: targetViewport,
                     reason: area.reason,
                     type: 'auto'
                 });
+
                 lastViewport = targetViewport;
                 lastMustSeeRect = mustSeeRect;
+                lastOutputEndTime = outputEndTime;
+            } else {
+                // Not enough gap - merge zooms
+                if (actions.length > 0) {
+                    const prevAction = actions[actions.length - 1];
+                    const boundingRect: Rect = {
+                        x: Math.min(lastMustSeeRect.x, mustSeeRect.x),
+                        y: Math.min(lastMustSeeRect.y, mustSeeRect.y),
+                        width: Math.max(lastMustSeeRect.x + lastMustSeeRect.width, mustSeeRect.x + mustSeeRect.width) - Math.min(lastMustSeeRect.x, mustSeeRect.x),
+                        height: Math.max(lastMustSeeRect.y + lastMustSeeRect.height, mustSeeRect.y + mustSeeRect.height) - Math.min(lastMustSeeRect.y, mustSeeRect.y)
+                    };
+
+                    const mergedViewport = getViewport(boundingRect, maxZoom, viewMapper);
+                    prevAction.rect = mergedViewport;
+                    lastViewport = mergedViewport;
+                    lastMustSeeRect = boundingRect;
+                }
             }
         }
     }
@@ -138,7 +127,6 @@ function getViewport(
     const minViewportHeight = minViewportWidth / aspectRatio;
 
     // Calculate viewport size needed to contain mustSeeRect while maintaining aspect ratio
-    // Check which dimension is more constraining
     const widthBasedHeight = mustSeeRect.width / aspectRatio;
     const heightBasedWidth = mustSeeRect.height * aspectRatio;
 
@@ -146,11 +134,9 @@ function getViewport(
     let viewportHeight: number;
 
     if (widthBasedHeight >= mustSeeRect.height) {
-        // Width is the constraining dimension
         viewportWidth = mustSeeRect.width;
         viewportHeight = widthBasedHeight;
     } else {
-        // Height is the constraining dimension
         viewportWidth = heightBasedWidth;
         viewportHeight = mustSeeRect.height;
     }
@@ -178,6 +164,65 @@ function getViewport(
 // ============================================================================
 
 /**
+ * Prepared zoom action with computed output times and duration.
+ * Used internally for viewport interpolation.
+ */
+interface PreparedZoomAction extends ZoomAction {
+    outputEndTime: number;
+    outputStartTime: number;
+    duration: number;
+}
+
+/**
+ * Prepares zoom actions for interpolation by converting source times to output times
+ * and calculating dynamic durations.
+ * 
+ * Duration is calculated as: min(maxZoomDurationMs, gap to previous zoom)
+ * clamped to at least minZoomDurationMs.
+ */
+export function prepareZoomActionsForInterpolation(
+    actions: ZoomAction[],
+    timeMapper: TimeMapper,
+    zoomSettings: ZoomSettings
+): PreparedZoomAction[] {
+    const { maxZoomDurationMs, minZoomDurationMs } = zoomSettings;
+
+    // Convert source times to output times and filter out invisible zooms
+    const visibleActions = actions
+        .map(action => {
+            const outputEndTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
+            return { action, outputEndTime };
+        })
+        .filter(({ outputEndTime }) => outputEndTime !== -1)
+        .sort((a, b) => a.outputEndTime - b.outputEndTime);
+
+    const prepared: PreparedZoomAction[] = [];
+    let prevOutputEndTime = 0;
+
+    for (const { action, outputEndTime } of visibleActions) {
+        // Calculate available space before this zoom
+        const availableSpace = outputEndTime - prevOutputEndTime;
+
+        // Duration: use maxZoomDurationMs, but clamp to available space
+        const duration = Math.max(
+            minZoomDurationMs,
+            Math.min(maxZoomDurationMs, availableSpace)
+        );
+
+        prepared.push({
+            ...action,
+            outputEndTime,
+            outputStartTime: outputEndTime - duration,
+            duration
+        });
+
+        prevOutputEndTime = outputEndTime;
+    }
+
+    return prepared;
+}
+
+/**
  * Calculates the exact state (x, y, width, height) of the viewport at a given output time.
  *
  * It replays the sequence of zoom actions up to the requested time,
@@ -185,59 +230,54 @@ function getViewport(
  *
  * **Intersection Behavior:**
  * If a new action starts before the previous action has completed (an intersection),
- * the previous action is "interrupted" at the exact start time of the incoming action.
+ * the previous action is \"interrupted\" at the exact start time of the incoming action.
  * The calculated viewport state at that moment of interruption becomes the starting
  * state for the new action. This ensures continuous, smooth transitions even when
  * events occur rapidly and overlap.
+ * 
+ * @param actions - Zoom actions with sourceEndTimeMs
+ * @param outputTimeMs - Output time to calculate viewport for
+ * @param outputSize - Output video size
+ * @param timeMapper - TimeMapper for source to output time conversion
+ * @param zoomSettings - Zoom settings for duration calculation
  */
 export function getViewportStateAtTime(
     actions: ZoomAction[],
     outputTimeMs: number,
-    outputSize: Size
+    outputSize: Size,
+    timeMapper: TimeMapper,
+    zoomSettings: ZoomSettings
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
-    // 1. Prepare valid actions with computed start/end times in Output Space
-    const validActions = actions
-        .map(m => {
-            // OPTIMIZATION: Use cached outputEndTimeMs directly!
-            const end = m.outputEndTimeMs;
+    // Prepare actions with output times and calculated durations
+    const preparedActions = prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings);
 
-            return {
-                ...m,
-                endTime: end,
-                startTime: end - m.durationMs
-            };
-        })
-        .sort((a, b) => a.startTime - b.startTime); // Ensure chronological order
+    if (preparedActions.length === 0) {
+        return fullRect;
+    }
 
     let currentRect = fullRect;
 
-    for (let i = 0; i < validActions.length; i++) {
-        const action = validActions[i];
-        const nextAction = validActions[i + 1];
+    for (let i = 0; i < preparedActions.length; i++) {
+        const action = preparedActions[i];
+        const nextAction = preparedActions[i + 1];
 
         // The time until which this action is the "active" governing action
-        // It rules until it finishes OR until the next action starts (interruption)
-        const interruptionTime = nextAction ? nextAction.startTime : Number.POSITIVE_INFINITY;
+        const interruptionTime = nextAction ? nextAction.outputStartTime : Number.POSITIVE_INFINITY;
 
         // If the current output time is BEFORE this action even starts,
-        // implies we are in a gap before this action.
-        // We should just return the currentRect (result of previous chain).
-        if (outputTimeMs < action.startTime) {
+        // we are in a gap before this action.
+        if (outputTimeMs < action.outputStartTime) {
             return currentRect;
         }
 
         // We are currently INSIDE or AFTER this action's start.
-
-        // Define the target time we want to simulate to in this step.
-        // It is either the current lookup time (if we found our frame),
-        // or the interruption time (start of next action).
         const timeLimit = Math.min(outputTimeMs, interruptionTime);
 
-        // Calculate progress relative to the action's FULL duration (to preserve speed/easing curve)
-        const elapsed = timeLimit - action.startTime;
-        const progress = Math.max(0, Math.min(1, elapsed / action.durationMs));
+        // Calculate progress relative to the action's FULL duration
+        const elapsed = timeLimit - action.outputStartTime;
+        const progress = Math.max(0, Math.min(1, elapsed / action.duration));
         const eased = applyEasing(progress);
 
         const interpolated = interpolateRect(currentRect, action.rect, eased);
@@ -247,8 +287,7 @@ export function getViewportStateAtTime(
             return interpolated;
         }
 
-        // Otherwise, we have passed this segment (action finished or interrupted).
-        // The 'interpolated' rect becomes the starting point for the next action.
+        // Otherwise, we have passed this segment
         currentRect = interpolated;
     }
 

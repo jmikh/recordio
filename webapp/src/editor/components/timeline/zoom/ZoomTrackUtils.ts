@@ -1,6 +1,28 @@
-import type { ZoomAction, Rect, Size } from '../../../../types';
+import type { ZoomAction, Rect, Size, ZoomSettings } from '../../../../types';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { prepareZoomActionsForInterpolation } from '../../../../core/zoom';
 
 // NOTE: Style constants are now centralized in ZoomTrackStyles.ts
+
+/**
+ * Prepared zoom action with computed output times and duration for UI rendering.
+ */
+export interface PreparedZoomAction extends ZoomAction {
+    outputEndTime: number;
+    outputStartTime: number;
+    duration: number;
+}
+
+/**
+ * Prepares zoom actions for UI rendering by converting source times to output times.
+ */
+export function prepareZoomActionsForUI(
+    actions: ZoomAction[],
+    timeMapper: TimeMapper,
+    zoomSettings: ZoomSettings
+): PreparedZoomAction[] {
+    return prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings) as PreparedZoomAction[];
+}
 
 /**
  * Calculate the zoom scale factor from a zoom rect.
@@ -35,44 +57,41 @@ export function isFullViewport(rect: Rect, outputSize: Size): boolean {
 }
 
 /**
- * Calculate boundary constraints for a zoom block.
+ * Calculate boundary constraints for a zoom block using prepared actions.
  * Returns the end of the previous block (or 0) and the start of the next block (or timelineEnd).
  * 
  * This scans all other blocks to find the closest ones in either direction.
  */
 export function getZoomBlockBounds(
     targetMotionId: string | null,
-    actions: ZoomAction[],
+    preparedActions: PreparedZoomAction[],
     timelineEnd: number
-): { prevEnd: number; nextStart: number } {
+): { prevEnd: number; nextEnd: number } {
     // Find the current block position to determine what's "before" and "after"
     const currentAction = targetMotionId
-        ? actions.find(m => m.id === targetMotionId)
+        ? preparedActions.find(m => m.id === targetMotionId)
         : null;
 
     // If no current action, default to finding closest to start
-    const referenceEnd = currentAction?.outputEndTimeMs ?? 0;
-    const referenceStart = currentAction
-        ? currentAction.outputEndTimeMs - currentAction.durationMs
-        : 0;
+    const referenceEnd = currentAction?.outputEndTime ?? 0;
+    const referenceStart = currentAction?.outputStartTime ?? 0;
 
     let prevEnd = 0;
-    let nextStart = timelineEnd;
+    let nextEnd = timelineEnd;
 
-    for (const m of actions) {
+    for (const m of preparedActions) {
         if (m.id === targetMotionId) continue;
-        const mEnd = m.outputEndTimeMs;
-        const mStart = m.outputEndTimeMs - m.durationMs;
+        const mEnd = m.outputEndTime;
 
-        // A block is "previous" if it's entirely before our current start
+        // A block is "previous" if it ends before our current start
         if (mEnd <= referenceStart && mEnd > prevEnd) {
             prevEnd = mEnd;
         }
-        // A block is "next" if it starts at or after our current end
-        if (mStart >= referenceEnd && mStart < nextStart) {
-            nextStart = mStart;
+        // A block is "next" if it ends after our current end (find the closest one)
+        if (mEnd > referenceEnd && mEnd < nextEnd) {
+            nextEnd = mEnd;
         }
     }
 
-    return { prevEnd, nextStart };
+    return { prevEnd, nextEnd };
 }

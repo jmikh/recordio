@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 import { BoundingBox } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
@@ -107,6 +108,7 @@ export const renderZoomEditor = (
 export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect | null> }> = ({ previewRectRef }) => {
     // Connect to Stores
     const editingZoomId = useUIStore(s => s.selectedZoomId);
+    const timeMapper = useTimeMapper();
 
     // Actions
     const updateZoomAction = useProjectStore(s => s.updateZoomAction);
@@ -122,12 +124,13 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
         const action = project.timeline.zoomActions.find(m => m.id === editingZoomId);
         if (action) {
-            const outputTime = action.outputEndTimeMs;
+            // Convert source time to output time
+            const outputTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
             if (outputTime !== -1) {
                 useUIStore.getState().setCurrentTime(outputTime);
             }
         }
-    }, [editingZoomId]); // Reduced dependency to avoid loops
+    }, [editingZoomId, timeMapper, project.timeline.zoomActions]);
 
     // Derived State
     const videoSize = project.settings.outputSize;

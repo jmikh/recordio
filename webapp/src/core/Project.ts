@@ -185,7 +185,8 @@ export class ProjectImpl {
             ? calculateZoomSchedule(
                 settings.zoom,
                 viewMapper,
-                focusAreas
+                focusAreas,
+                timeMapper
             )
             : [];
 
@@ -196,6 +197,7 @@ export class ProjectImpl {
                 timeMapper,
                 userEvents.hoveredCards || [],
                 zoomActions,
+                settings.zoom,
                 settings.spotlight.enlargeScale
             )
             : [];

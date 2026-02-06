@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
+import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomAction } from '../../../../types';
 import type { DragState } from './useZoomDrag';
-// Assuming Project and related types availability
+import type { PreparedZoomAction } from './ZoomTrackUtils';
 
 export interface HoverInfo {
     x: number;
     outputEndTime: number;
-    durationMs: number;
     width: number;
 }
 
@@ -20,16 +20,17 @@ export function useZoomHover(
     dragState: DragState | null,
     editingZoomId: string | null,
     setEditingZoom: (id: string | null) => void,
-    outputDuration: number
+    outputDuration: number,
+    preparedActions: PreparedZoomAction[]
 ) {
     const addZoomAction = useProjectStore(s => s.addZoomAction);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const timeMapper = useTimeMapper();
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
     /**
      * Handles hover interactions for 'Add Zoom' ghost block.
-     * DISABLED while dragging to prevent interference/ghost blocks appearing during drag.
-     * DISABLED when any zoom or spotlight is selected.
+     * Uses prepared actions (with computed output times) for collision detection.
      */
     const handleMouseMove = (e: React.MouseEvent) => {
         // No ghost when dragging or when something is selected
@@ -50,16 +51,14 @@ export function useZoomHover(
             return;
         }
 
-        const actions = timeline.zoomActions || [];
-
         // Buffer zone in pixels for keyframe visual size (diamond/square is ~14px wide)
         const keyframeBufferPx = 10;
         const keyframeBufferMs = coords.xToMs(keyframeBufferPx);
 
         // 1. Check if we are inside an existing action OR near a keyframe marker
-        const isInside = actions.some((m: ZoomAction) => {
-            const start = m.outputEndTimeMs - m.durationMs;
-            const end = m.outputEndTimeMs;
+        const isInside = preparedActions.some((m: PreparedZoomAction) => {
+            const start = m.outputStartTime;
+            const end = m.outputEndTime;
             // Include buffer zone after keyframe end for the visual marker
             return mouseOutputTimeMs > start && mouseOutputTimeMs < (end + keyframeBufferMs);
         });
@@ -71,10 +70,10 @@ export function useZoomHover(
 
         // 2. Calculate Available Duration backwards (to the left)
         let prevEnd = 0;
-        for (const m of actions) {
-            if (m.outputEndTimeMs <= mouseOutputTimeMs) {
-                if (m.outputEndTimeMs > prevEnd) {
-                    prevEnd = m.outputEndTimeMs;
+        for (const m of preparedActions) {
+            if (m.outputEndTime <= mouseOutputTimeMs) {
+                if (m.outputEndTime > prevEnd) {
+                    prevEnd = m.outputEndTime;
                 }
             }
         }
@@ -82,22 +81,21 @@ export function useZoomHover(
         const defaultDur = project.settings.zoom.maxZoomDurationMs;
         const availableDuration = mouseOutputTimeMs - prevEnd;
 
-        // Clamp duration
-        let actualDuration = Math.min(defaultDur, availableDuration);
+        // Calculate width for display (duration is derived from available space)
+        let displayDuration = Math.min(defaultDur, availableDuration);
         let outputEndTime = mouseOutputTimeMs;
 
-        if (actualDuration < project.settings.zoom.minZoomDurationMs) {
-            actualDuration = project.settings.zoom.minZoomDurationMs;
-            outputEndTime = prevEnd + actualDuration;
+        if (displayDuration < project.settings.zoom.minZoomDurationMs) {
+            displayDuration = project.settings.zoom.minZoomDurationMs;
+            outputEndTime = prevEnd + displayDuration;
         }
 
         // Calculate visual width and position
-        const width = coords.msToX(actualDuration);
+        const width = coords.msToX(displayDuration);
         const constrainedX = coords.msToX(outputEndTime);
 
         setHoverInfo({
             x: constrainedX,
-            durationMs: actualDuration,
             outputEndTime,
             width,
         });
@@ -118,24 +116,22 @@ export function useZoomHover(
 
         if (!hoverInfo) return;
 
-        // Create Motion
-        // Determine initial rect
-        const startTime = hoverInfo.outputEndTime - hoverInfo.durationMs;
-        const actions = timeline.zoomActions || [];
+        // Convert output time to source time for storage
+        const sourceEndTimeMs = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTime);
+        if (sourceEndTimeMs === -1) return; // Invalid time
 
-        // Find the closest previous motion
-        // We look for a motion that ends at or before our start time
-        // If multiple, we want the one that ends latest (closest to us)
-        const previousAction = actions
-            .filter((m: ZoomAction) => m.outputEndTimeMs <= startTime)
-            .sort((a: ZoomAction, b: ZoomAction) => b.outputEndTimeMs - a.outputEndTimeMs)[0];
+        // Find the closest previous action to inherit rect from
+        const startTime = hoverInfo.outputEndTime - project.settings.zoom.maxZoomDurationMs;
+        const previousAction = preparedActions
+            .filter((m: PreparedZoomAction) => m.outputEndTime <= startTime)
+            .sort((a: PreparedZoomAction, b: PreparedZoomAction) => b.outputEndTime - a.outputEndTime)[0];
 
         let initialRect;
 
         if (previousAction) {
             initialRect = { ...previousAction.rect };
         } else {
-            // Default to half viewport centered
+            // Default to 75% viewport centered
             const { width, height } = project.settings.outputSize;
             initialRect = {
                 width: width * 0.75,
@@ -147,8 +143,7 @@ export function useZoomHover(
 
         const newAction: ZoomAction = {
             id: crypto.randomUUID(),
-            outputEndTimeMs: hoverInfo.outputEndTime,
-            durationMs: hoverInfo.durationMs,
+            sourceEndTimeMs,
             reason: 'Manual Zoom',
             rect: initialRect,
             type: 'manual'

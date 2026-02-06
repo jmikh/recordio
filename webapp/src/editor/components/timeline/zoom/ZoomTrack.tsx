@@ -7,7 +7,7 @@ import { useZoomDrag } from './useZoomDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomKeyframe } from './ZoomKeyframe';
 import { TransitionTrail, HoldLine } from './ZoomLines';
-import { calculateZoomScale, formatScaleLabel, isFullViewport } from './ZoomTrackUtils';
+import { calculateZoomScale, formatScaleLabel, isFullViewport, prepareZoomActionsForUI } from './ZoomTrackUtils';
 import { ghostKeyframe, ghostTrail } from './ZoomTrackStyles';
 import type { ZoomAction } from '../../../../types';
 
@@ -37,6 +37,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     const project = useProjectStore(s => s.project);
     const outputSize = project.settings.outputSize;
+    const zoomSettings = project.settings.zoom;
 
     // Memoize TimeMapper and TimePixelMapper for consistent usage
     const timeMapper = useTimeMapper();
@@ -50,6 +51,15 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         return timeMapper.getOutputDuration();
     }, [timeMapper]);
 
+    // Prepare zoom actions with computed output times and durations
+    const preparedActions = useMemo(() => {
+        return prepareZoomActionsForUI(
+            timeline.zoomActions || [],
+            timeMapper,
+            zoomSettings
+        );
+    }, [timeline.zoomActions, timeMapper, zoomSettings]);
+
     // ------------------------------------------------------------------
     // HOOKS (DRAG & HOVER)
     // ------------------------------------------------------------------
@@ -59,7 +69,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         project,
         coords,
         outputDuration,
-        setEditingZoom
+        setEditingZoom,
+        preparedActions
     );
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useZoomHover(
@@ -69,7 +80,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         dragState,
         editingZoomId,
         setEditingZoom,
-        outputDuration
+        outputDuration,
+        preparedActions
     );
 
     // ------------------------------------------------------------------
@@ -80,17 +92,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const MIN_LABEL_DISTANCE_PX = 30;
 
     const renderElements = useMemo(() => {
-        const actions: ZoomAction[] = timeline.zoomActions || [];
         const elements: React.ReactNode[] = [];
 
-        // Sort actions by output end time for proper sequencing
-        const sortedActions = [...actions].sort((a, b) => a.outputEndTimeMs - b.outputEndTimeMs);
+        // Sort prepared actions by output end time for proper sequencing
+        const sortedActions = [...preparedActions].sort((a, b) => a.outputEndTime - b.outputEndTime);
 
         // Calculate if any consecutive keyframes are too close
         let hideLabels = false;
         for (let i = 0; i < sortedActions.length - 1; i++) {
-            const currentX = coords.msToX(sortedActions[i].outputEndTimeMs);
-            const nextX = coords.msToX(sortedActions[i + 1].outputEndTimeMs);
+            const currentX = coords.msToX(sortedActions[i].outputEndTime);
+            const nextX = coords.msToX(sortedActions[i + 1].outputEndTime);
             if (nextX - currentX < MIN_LABEL_DISTANCE_PX) {
                 hideLabels = true;
                 break;
@@ -98,8 +109,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         }
 
         sortedActions.forEach((action, index) => {
-            const keyframeX = coords.msToX(action.outputEndTimeMs);
-            const trailWidth = coords.msToX(action.durationMs);
+            const keyframeX = coords.msToX(action.outputEndTime);
+            const trailWidth = coords.msToX(action.duration);
             const trailStartX = keyframeX - trailWidth;
             const isFullScreen = isFullViewport(action.rect, outputSize);
             const isSelected = editingZoomId === action.id;
@@ -120,7 +131,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             // to the next action's trail start (or end of timeline)
             const nextAction = sortedActions[index + 1];
             const nextTrailStartMs = nextAction
-                ? nextAction.outputEndTimeMs - nextAction.durationMs
+                ? nextAction.outputStartTime
                 : outputDuration;
 
             const lineStartX = keyframeX;
@@ -130,7 +141,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             if (lineWidth > 0) {
                 if (!isFullScreen) {
                     // Zoom holds steady between keyframes
-                    // (No line rendered after full-viewport keyframes)
                     elements.push(
                         <HoldLine
                             key={`hold-${action.id}`}
@@ -142,7 +152,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 }
             }
 
-            // 3. Render keyframe marker
+            // 3. Render keyframe marker - need to find original action for handleDragStart
+            const originalAction = timeline.zoomActions.find((a: ZoomAction) => a.id === action.id);
+            if (!originalAction) return;
+
             elements.push(
                 <ZoomKeyframe
                     key={`keyframe-${action.id}`}
@@ -152,7 +165,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                     isSelected={isSelected}
                     isDragging={isDragging}
                     hideLabel={hideLabels}
-                    onMouseDown={(e) => handleDragStart(e, 'move', action, isSelected)}
+                    onMouseDown={(e) => handleDragStart(e, 'move', originalAction, isSelected)}
                     onClick={(e) => {
                         e.stopPropagation();
                         // Suppress toggle if we just finished dragging
@@ -161,7 +174,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             return;
                         }
                         // Toggle: only deselect if it was already selected before mousedown
-                        // If it wasn't selected, mousedown already selected it, so do nothing
                         if (wasSelectedBeforeMousedownRef.current) {
                             setEditingZoom(null);
                         }
@@ -171,7 +183,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         });
 
         return elements;
-    }, [timeline.zoomActions, coords, outputSize, editingZoomId, dragState, outputDuration, handleDragStart]);
+    }, [preparedActions, coords, outputSize, editingZoomId, dragState, outputDuration, handleDragStart, timeline.zoomActions]);
 
     // ------------------------------------------------------------------
     // RENDER
