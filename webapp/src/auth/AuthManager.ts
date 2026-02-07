@@ -64,7 +64,7 @@ export class AuthManager {
 
     /**
      * OAuth sign in (Google, GitHub, etc.)
-     * Uses chrome.identity.launchWebAuthFlow for Chrome extensions
+     * Uses standard browser redirect flow
      */
     static async signInWithProvider(provider: 'google' | 'github'): Promise<{ data: any; error: Error | null }> {
         if (!supabase) {
@@ -74,85 +74,24 @@ export class AuthManager {
         try {
             console.log('[Auth] Starting OAuth with', provider);
 
-            // Chrome extensions use a special redirect URL format
-            const redirectUrl = `https://${chrome.runtime.id}.chromiumapp.org/`;
-            console.log('[Auth] Redirect URL:', redirectUrl);
-
-            // Get OAuth URL from Supabase
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
-                    skipBrowserRedirect: true,
-                    redirectTo: redirectUrl,
+                    redirectTo: window.location.href,
                     queryParams: {
                         access_type: 'offline',
-                        prompt: 'consent'  // Force Google to show consent screen
-                    }
-                }
+                        prompt: 'consent',
+                    },
+                },
             });
 
-            if (error || !data.url) {
-                console.error('[Auth] Failed to get OAuth URL:', error);
+            if (error) {
+                console.error('[Auth] OAuth error:', error);
                 return { data: null, error };
             }
 
-            console.log('[Auth] Launching web auth flow...');
-
-            // Launch OAuth flow using Chrome Identity API
-            return new Promise((resolve) => {
-                chrome.identity.launchWebAuthFlow(
-                    {
-                        url: data.url,
-                        interactive: true
-                    },
-                    async (redirectUrl) => {
-                        if (chrome.runtime.lastError) {
-                            console.error('[Auth] OAuth error:', chrome.runtime.lastError);
-                            resolve({
-                                data: null,
-                                error: new Error(chrome.runtime.lastError.message)
-                            });
-                            return;
-                        }
-
-                        if (!redirectUrl) {
-                            resolve({ data: null, error: new Error('No redirect URL') });
-                            return;
-                        }
-
-                        console.log('[Auth] OAuth callback received');
-
-                        // Extract tokens from redirect URL hash
-                        const url = new URL(redirectUrl);
-                        const hashParams = new URLSearchParams(url.hash.substring(1));
-
-                        const access_token = hashParams.get('access_token');
-                        const refresh_token = hashParams.get('refresh_token');
-
-                        if (!access_token) {
-                            console.error('[Auth] No access token in redirect');
-                            resolve({ data: null, error: new Error('No access token received') });
-                            return;
-                        }
-
-                        console.log('[Auth] Tokens received, setting session...');
-
-                        // Set the session using the tokens
-                        const { error: sessionError } = await supabase.auth.setSession({
-                            access_token,
-                            refresh_token: refresh_token || ''
-                        });
-
-                        if (sessionError) {
-                            console.error('[Auth] Failed to set session:', sessionError);
-                            resolve({ data: null, error: sessionError });
-                        } else {
-                            console.log('[Auth] OAuth successful!');
-                            resolve({ data, error: null });
-                        }
-                    }
-                );
-            });
+            // Browser will redirect automatically to the OAuth provider
+            return { data, error: null };
         } catch (error) {
             console.error('[Auth] OAuth error:', error);
             return { data: null, error: error as Error };
