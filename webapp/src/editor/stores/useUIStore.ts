@@ -176,6 +176,9 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedZoomId: null,
                 selectedSpotlightId: null,
                 selectedWindowId: null,
+                selectedSettingsPanel: SettingsPanel.Project,
+                settingsPanelActiveTab: 'captions' as SettingsPanelTab,
+                showCollapsibleCaptionPosition: true,
             };
         }
         return { selectedCaptionId: null };
