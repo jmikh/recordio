@@ -18,7 +18,7 @@ import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { Scrollbar } from '@shared/components';
-import { useUIStore } from '../../stores/useUIStore';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 
 // Constants - Unified track height for visual consistency
@@ -123,13 +123,14 @@ export function Timeline() {
 
 
 
-    // --- Deletion Listener ---
+    // --- Global Key Listeners (Delete + Escape) ---
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectWindow = useUIStore(s => s.selectWindow);
     const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
     const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
     const selectCaption = useUIStore(s => s.selectCaption);
     const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
+    const setCanvasMode = useUIStore(s => s.setCanvasMode);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -148,11 +149,24 @@ export function Timeline() {
                     selectCaption(null);
                 }
             }
+
+            // Escape — deselect everything and return to Preview
+            if (e.key === 'Escape') {
+                // Don't interfere if user is in a text field
+                const active = document.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) {
+                    (active as HTMLElement).blur();
+                }
+
+                if (selectedWindowId) selectWindow(null);
+                if (selectedCaptionId) selectCaption(null);
+                setCanvasMode(CanvasMode.Preview);
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, setCanvasMode]);
 
     // Initial check for overlays
     useEffect(() => {

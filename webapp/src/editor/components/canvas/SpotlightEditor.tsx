@@ -113,7 +113,10 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     const initialSourceRect = spotlight?.sourceRect || null;
 
     // borderRadius is now stored in OUTPUT coordinates - no conversion needed
-    const initialCornerRadii: CornerRadii = spotlight?.borderRadius ?? [0, 0, 0, 0];
+    const initialCornerRadii: CornerRadii = useMemo(
+        () => spotlight?.borderRadius ?? [0, 0, 0, 0],
+        [spotlight?.borderRadius]
+    );
 
     // Convert source rect to output rect for editing (using viewMapper)
     const initialOutputRect = useMemo(() => {

@@ -504,7 +504,8 @@ export function CaptionsSettings() {
                                         onInput={(e) => handleInput(e, segment.id)}
                                         onKeyDown={handleKeyDown}
                                         onBlur={handleBlur}
-                                        className={`text-xs transition-all outline-none ${isEditing
+                                        data-placeholder="[empty]"
+                                        className={`text-xs transition-all outline-none editable-placeholder ${isEditing
                                             ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
                                             : 'text-text-muted cursor-pointer hover:text-text-main'
                                             }`}
@@ -517,7 +518,7 @@ export function CaptionsSettings() {
                                     >
                                         {isEditing
                                             ? (segment.text || '')
-                                            : (segment.text || <span className="italic text-text-disabled">[empty]</span>)
+                                            : (segment.text || '')
                                         }
                                     </span>
                                     <span> </span>

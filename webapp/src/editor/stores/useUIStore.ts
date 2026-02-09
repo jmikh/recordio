@@ -133,6 +133,8 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedWindowId: null,
                 selectedCaptionId: null,
                 canvasMode: CanvasMode.ZoomEdit,
+                settingsPanelActiveTab: 'zoom' as SettingsPanelTab,
+                showCollapsibleZoom: true,
                 isPlaying: false,
             };
         }
@@ -153,6 +155,8 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedWindowId: null,
                 selectedCaptionId: null,
                 canvasMode: CanvasMode.SpotlightEdit,
+                settingsPanelActiveTab: 'zoom' as SettingsPanelTab,
+                showCollapsibleSpotlight: true,
                 isPlaying: false,
             };
         }

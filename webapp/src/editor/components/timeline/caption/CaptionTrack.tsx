@@ -108,6 +108,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
+                            text={r.segment.text || '[empty]'}
                             onMouseDown={(e) => handleDragStart(e, 'move', r.segment, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();

@@ -316,6 +316,20 @@ body,
    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
       background-color: var(--text-disabled);
    }
+
+   /* Placeholder for contentEditable elements */
+   .editable-placeholder:empty {
+      min-width: 40px;
+      display: inline-block;
+      cursor: text;
+   }
+
+   .editable-placeholder:empty::before {
+      content: attr(data-placeholder);
+      color: var(--text-disabled);
+      font-style: italic;
+      pointer-events: none;
+   }
 }
 
 /* ============================================================

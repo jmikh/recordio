@@ -3,6 +3,7 @@ export { DefaultButton } from './DefaultButton';
 export { CollapsibleCard } from './CollapsibleCard';
 export type { PreviewItem } from './CollapsibleCard';
 export { InfoTooltip } from './InfoTooltip';
+export { Tooltip } from './Tooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { LogoLink } from './LogoLink';

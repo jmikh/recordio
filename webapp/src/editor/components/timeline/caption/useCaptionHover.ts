@@ -9,7 +9,6 @@ import {
     getValidCaptionRange,
     K_MIN_CAPTION_DURATION_MS,
     K_DEFAULT_CAPTION_DURATION_MS,
-    doCaptionSourceRangesOverlap,
 } from './CaptionTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
@@ -29,7 +28,7 @@ export function useCaptionHover(
     resolvedCaptions: ResolvedCaption[],
     timeMapper: TimeMapper
 ) {
-    const setCaptionSegments = useProjectStore(s => s.setCaptionSegments);
+    const addCaptionSegment = useProjectStore(s => s.addCaptionSegment);
     const selectCaption = useUIStore(s => s.selectCaption);
     const [hoverInfo, setHoverInfo] = useState<CaptionHoverInfo | null>(null);
 
@@ -112,14 +111,7 @@ export function useCaptionHover(
             sourceEndMs: sourceEnd,
         };
 
-        // Build the updated segment list, removing any overlapping captions
-        const allCaptions: CaptionSegment[] = timeline.captionSegments || [];
-        const updatedSegments = [
-            ...allCaptions.filter((s: CaptionSegment) => !doCaptionSourceRangesOverlap(newCaption, s)),
-            newCaption,
-        ].sort((a: CaptionSegment, b: CaptionSegment) => a.sourceStartMs - b.sourceStartMs);
-
-        setCaptionSegments(updatedSegments);
+        addCaptionSegment(newCaption);
         selectCaption(newCaption.id);
         setHoverInfo(null);
     };

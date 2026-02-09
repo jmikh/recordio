@@ -45,17 +45,6 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeline.outputWindows, pixelsPerSec]);
 
-    // Escape key to deselect window
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && selectedWindowId) {
-                selectWindow(null);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, selectWindow]);
-
     // Prepare Audio Analysis for Screen and Camera
     const screenAudio = useAudioAnalysis(screenSource.id, screenSource.runtimeUrl || '');
     const cameraAudio = useAudioAnalysis(cameraSource?.id || '', cameraSource?.runtimeUrl || '');

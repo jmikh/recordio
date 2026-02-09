@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     captionBlock,
     captionContainer,
@@ -19,6 +20,8 @@ interface CaptionBlockProps {
     isDragging: boolean;
     /** Track height for centering */
     trackHeight: number;
+    /** Caption text to display in tooltip */
+    text: string;
     /** Mouse down handler for move drag */
     onMouseDown: (e: React.MouseEvent) => void;
     /** Click handler for selection */
@@ -39,6 +42,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
     isSelected,
     isDragging,
     trackHeight,
+    text,
     onMouseDown,
     onClick,
     onResizeStartMouseDown,
@@ -48,66 +52,98 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
     const colorClass = isSelected ? captionBlock.selectedClass : captionBlock.defaultClass;
     const hoverClass = isSelected ? '' : captionBlock.hoverClass;
 
+    // Tooltip hover state
+    const [isHovered, setIsHovered] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({ left: 0, top: 0 });
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isHovered && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setTooltipPos({
+                left: rect.left + rect.width / 2,
+                top: rect.top - 8,
+            });
+        }
+    }, [isHovered]);
+
     return (
-        <div
-            className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle}`}
-            style={{
-                left: `${left}px`,
-                width: `${width}px`,
-                height: trackHeight,
-                zIndex: isSelected ? 20 : 10,
-            }}
-            onMouseDown={onMouseDown}
-            onClick={onClick}
-        >
-            {/* Caption Block */}
+        <>
             <div
-                className={`${captionBlock.base} ${colorClass} ${hoverClass}`}
+                ref={containerRef}
+                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle}`}
                 style={{
-                    left: 0,
-                    top: blockY,
-                    width: '100%',
-                    ...captionBlock.getStyle(),
+                    left: `${left}px`,
+                    width: `${width}px`,
+                    height: trackHeight,
+                    zIndex: isSelected ? 20 : 10,
                 }}
+                onMouseDown={onMouseDown}
+                onClick={onClick}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
             >
-                {width >= 20 && (
-                    <span className="text-[9px]  font-bold text-text-on-primary select-none pointer-events-none mx-auto">C</span>
-                )}
+                {/* Caption Block */}
+                <div
+                    className={`${captionBlock.base} ${colorClass} ${hoverClass}`}
+                    style={{
+                        left: 0,
+                        top: blockY,
+                        width: '100%',
+                        ...captionBlock.getStyle(),
+                    }}
+                >
+                </div>
+
+                {/* Left resize handle */}
+                <div
+                    className={resizeHandle.base}
+                    style={{
+                        left: -resizeHandle.width / 2,
+                        width: resizeHandle.width,
+                        top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
+                        height: resizeHandle.height,
+                    }}
+                    onMouseDown={onResizeStartMouseDown}
+                >
+                    <div
+                        className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                        style={{ height: dragHandleIndicator.height }}
+                    />
+                </div>
+
+                {/* Right resize handle */}
+                <div
+                    className={resizeHandle.base}
+                    style={{
+                        right: -resizeHandle.width / 2,
+                        width: resizeHandle.width,
+                        top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
+                        height: resizeHandle.height,
+                    }}
+                    onMouseDown={onResizeEndMouseDown}
+                >
+                    <div
+                        className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                        style={{ height: dragHandleIndicator.height }}
+                    />
+                </div>
             </div>
 
-            {/* Left resize handle */}
-            <div
-                className={resizeHandle.base}
-                style={{
-                    left: -resizeHandle.width / 2,
-                    width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
-                }}
-                onMouseDown={onResizeStartMouseDown}
-            >
+            {/* Tooltip — portal-rendered to escape stacking contexts */}
+            {isHovered && !isSelected && text && createPortal(
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
-                />
-            </div>
-
-            {/* Right resize handle */}
-            <div
-                className={resizeHandle.base}
-                style={{
-                    right: -resizeHandle.width / 2,
-                    width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
-                }}
-                onMouseDown={onResizeEndMouseDown}
-            >
-                <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
-                />
-            </div>
-        </div>
+                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float text-xs text-text-main max-w-[280px] px-3 py-2 pointer-events-none"
+                    style={{
+                        left: tooltipPos.left,
+                        top: tooltipPos.top,
+                        transform: 'translate(-50%, -100%)',
+                    }}
+                >
+                    {text}
+                </div>,
+                document.body
+            )}
+        </>
     );
 };
