@@ -10,10 +10,11 @@ import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
-type Tab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions';
+
 
 // Reusable button for settings panel actions (e.g., "Crop Screen", "Edit Camera")
 interface SettingsPanelButtonProps {
@@ -53,7 +54,8 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
 };
 
 export const SettingsPanel = () => {
-    const [activeTab, setActiveTab] = useState<Tab>('screen');
+    const activeTab = useUIStore(s => s.settingsPanelActiveTab);
+    const setActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
     const [accentTop, setAccentTop] = useState(0);
     const navRef = useRef<HTMLElement>(null);
@@ -69,7 +71,7 @@ export const SettingsPanel = () => {
     const hasMicrophone = project.cameraSource?.has_microphone || project.screenSource?.has_microphone;
 
     // Exit camera edit mode when switching away from camera tab
-    const handleTabChange = (tab: Tab) => {
+    const handleTabChange = (tab: SettingsPanelTab) => {
         if (canvasMode === CanvasMode.CameraEdit && tab !== 'camera') {
             // Leaving camera tab while in camera edit mode - exit
             setCanvasMode(CanvasMode.Preview);
@@ -78,7 +80,7 @@ export const SettingsPanel = () => {
     };
 
     const navItems = useMemo(() => {
-        const items: { id: Tab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
+        const items: { id: SettingsPanelTab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
             { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
             { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
             { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },

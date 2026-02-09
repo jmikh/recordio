@@ -6,6 +6,7 @@ import { ZoomTrack } from './zoom/ZoomTrack';
 import { ZoomLegend } from './zoom/ZoomLegend';
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
 import { SpotlightLegend } from './spotlight/SpotlightLegend';
+import { CaptionTrack } from './caption/CaptionTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -126,21 +127,32 @@ export function Timeline() {
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectWindow = useUIStore(s => s.selectWindow);
     const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
+    const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
+    const selectCaption = useUIStore(s => s.selectCaption);
+    const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (!selectedWindowId) return;
-
             // Delete or Backspace
             if (e.key === 'Delete' || e.key === 'Backspace') {
-                e.preventDefault();
-                removeOutputWindow(selectedWindowId);
+                // Don't delete if user is editing text
+                const active = document.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) return;
+
+                if (selectedWindowId) {
+                    e.preventDefault();
+                    removeOutputWindow(selectedWindowId);
+                } else if (selectedCaptionId) {
+                    e.preventDefault();
+                    deleteCaptionSegment(selectedCaptionId);
+                    selectCaption(null);
+                }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -221,6 +233,16 @@ export function Timeline() {
                         />
                     </div>
 
+                    {/* Header: Captions (conditional) */}
+                    {(timeline.captionSegments?.length > 0) && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineHeaderCell
+                                title="Captions"
+                                height={TRACK_HEIGHT}
+                            />
+                        </div>
+                    )}
+
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
@@ -295,6 +317,13 @@ export function Timeline() {
                                     <TimelineTrackRow height={TRACK_HEIGHT}>
                                         <SpotlightTrack height={TRACK_HEIGHT} />
                                     </TimelineTrackRow>
+
+                                    {/* Caption Track (conditional) */}
+                                    {(timeline.captionSegments?.length > 0) && (
+                                        <TimelineTrackRow height={TRACK_HEIGHT}>
+                                            <CaptionTrack height={TRACK_HEIGHT} />
+                                        </TimelineTrackRow>
+                                    )}
 
                                 </div>
 

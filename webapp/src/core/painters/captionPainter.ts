@@ -61,11 +61,8 @@ export function drawCaptions(
     let boxBottomY = outputSize.height - marginBottom;
 
     for (const caption of visibleCaptions) {
-        const text = caption.text;
+        const text = caption.text || '[empty]';
         const words = text.split(' ').filter(w => w.length > 0);
-
-        // Skip empty captions (user deleted all text)
-        if (words.length === 0) continue;
 
         // Calculate elapsed ratio within this segment (using output range)
         const segmentStart = caption.outputRange.start;

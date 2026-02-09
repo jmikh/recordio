@@ -52,6 +52,7 @@ export function CaptionsSettings() {
     const abortControllerRef = useRef<AbortController | null>(null);
     const toastIdRef = useRef<string | null>(null);
     const infoIconRef = useRef<HTMLSpanElement>(null);
+    const captionsContainerRef = useRef<HTMLDivElement>(null);
     const [showInfoTooltip, setShowInfoTooltip] = useState(false);
     const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
     const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -79,6 +80,28 @@ export function CaptionsSettings() {
             endInteraction();
         }
     }, [isPlaying, editingId, endInteraction]);
+
+    // Scroll selected caption into view and auto-enter edit mode when selected from timeline
+    useEffect(() => {
+        if (!selectedCaptionId) return;
+        // Auto-enter edit mode
+        if (editingId !== selectedCaptionId) {
+            setEditingId(selectedCaptionId);
+            startInteraction();
+        }
+        if (!captionsContainerRef.current) return;
+        // Auto-expand the captions card so the segment is visible
+        if (!showCollapsibleCaptionPosition) {
+            setCollapsibleVisibility('showCollapsibleCaptionPosition', true);
+        }
+        // Defer scroll to allow DOM to update after expansion
+        requestAnimationFrame(() => {
+            const el = captionsContainerRef.current?.querySelector(`[data-caption-id="${selectedCaptionId}"]`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }, [selectedCaptionId]);
 
     // Auto-select caption during playback (only in preview mode with captions panel)
     useEffect(() => {
@@ -247,7 +270,6 @@ export function CaptionsSettings() {
 
     // Handle clicking on a caption segment
     const handleSegmentClick = (segment: CaptionSegment) => {
-        const isSelected = selectedCaptionId === segment.id;
         const isEditing = editingId === segment.id;
 
         if (isEditing) {
@@ -255,21 +277,17 @@ export function CaptionsSettings() {
             return;
         }
 
-        if (isSelected) {
-            // Second click on selected segment → enter edit mode
-            setEditingId(segment.id);
-            setCanvasMode(CanvasMode.CaptionEdit);
-            setIsPlaying(false);
-            startInteraction();
-        } else {
-            // First click → select and move CTI (don't pause playback)
-            selectCaption(segment.id);
+        // Select, move CTI, and enter edit mode immediately
+        selectCaption(segment.id);
+        setEditingId(segment.id);
+        setCanvasMode(CanvasMode.CaptionEdit);
+        setIsPlaying(false);
+        startInteraction();
 
-            // Move CTI to the start of the caption (use output range + 1 to ensure we're inside)
-            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-            if (outputRange) {
-                setCurrentTime(outputRange.start + 1);
-            }
+        // Move CTI to the start of the caption
+        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+        if (outputRange) {
+            setCurrentTime(outputRange.start + 1);
         }
     };
 
@@ -462,18 +480,19 @@ export function CaptionsSettings() {
                     isExpanded={showCollapsibleCaptionPosition}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
                 >
-                    <div>
+                    <div ref={captionsContainerRef}>
                         {captionSegments.map(segment => {
                             // Convert source time to output time for display
                             const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
                             const outputStart = outputRange?.start ?? segment.sourceStartMs;
                             const outputEnd = outputRange?.end ?? segment.sourceEndMs;
-                            const isEditing = editingId === segment.id;
                             const isSelected = selectedCaptionId === segment.id;
+                            const isEditing = isSelected || editingId === segment.id;
 
                             return (
                                 <span
                                     key={segment.id}
+                                    data-caption-id={segment.id}
                                     onClick={() => handleSegmentClick(segment)}
                                     className="relative inline"
                                 >
@@ -487,17 +506,19 @@ export function CaptionsSettings() {
                                         onBlur={handleBlur}
                                         className={`text-xs transition-all outline-none ${isEditing
                                             ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
-                                            : isSelected
-                                                ? 'text-text-highlighted border-b border-primary cursor-text'
-                                                : 'text-text-muted cursor-pointer hover:text-text-main'
+                                            : 'text-text-muted cursor-pointer hover:text-text-main'
                                             }`}
                                         style={{
                                             lineHeight: 2.2,
                                             padding: isEditing ? '2px 4px' : '2px 0',
                                             borderRadius: isEditing ? '3px' : '0',
+                                            minWidth: isEditing ? '20px' : undefined,
                                         }}
                                     >
-                                        {segment.text}
+                                        {isEditing
+                                            ? (segment.text || '')
+                                            : (segment.text || <span className="italic text-text-disabled">[empty]</span>)
+                                        }
                                     </span>
                                     <span> </span>
                                 </span>

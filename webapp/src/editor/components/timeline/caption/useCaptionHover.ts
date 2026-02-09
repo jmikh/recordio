@@ -1,0 +1,133 @@
+import { useState } from 'react';
+import { useProjectStore } from '../../../stores/useProjectStore';
+import { useUIStore } from '../../../stores/useUIStore';
+import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import type { CaptionSegment } from '../../../../types';
+import type { CaptionDragState } from './useCaptionDrag';
+import type { ResolvedCaption } from './CaptionTrackUtils';
+import {
+    getValidCaptionRange,
+    K_MIN_CAPTION_DURATION_MS,
+    K_DEFAULT_CAPTION_DURATION_MS,
+    doCaptionSourceRangesOverlap,
+} from './CaptionTrackUtils';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+
+export interface CaptionHoverInfo {
+    x: number;
+    outputStartTimeMs: number;
+    outputEndTimeMs: number;
+    width: number;
+}
+
+export function useCaptionHover(
+    timeline: any,
+    coords: TimePixelMapper,
+    dragState: CaptionDragState | null,
+    selectedCaptionId: string | null,
+    outputDuration: number,
+    resolvedCaptions: ResolvedCaption[],
+    timeMapper: TimeMapper
+) {
+    const setCaptionSegments = useProjectStore(s => s.setCaptionSegments);
+    const selectCaption = useUIStore(s => s.selectCaption);
+    const [hoverInfo, setHoverInfo] = useState<CaptionHoverInfo | null>(null);
+
+    /**
+     * Ghost hover for 'Add Caption'.
+     * Disabled while dragging or when a caption is selected.
+     */
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (dragState || selectedCaptionId) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const mouseTimeMs = coords.xToMs(x);
+
+        if (mouseTimeMs > outputDuration || mouseTimeMs < 0) {
+            setHoverInfo(null);
+            return;
+        }
+
+        // Check if inside an existing caption
+        const isInside = resolvedCaptions.some(r =>
+            mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
+        );
+
+        if (isInside) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const range = getValidCaptionRange(
+            mouseTimeMs,
+            resolvedCaptions,
+            outputDuration,
+            K_MIN_CAPTION_DURATION_MS,
+            K_DEFAULT_CAPTION_DURATION_MS,
+        );
+
+        if (!range) {
+            setHoverInfo(null);
+            return;
+        }
+
+        const width = coords.msToX(range.end - range.start);
+        const leftX = coords.msToX(range.start);
+
+        setHoverInfo({
+            x: leftX,
+            outputStartTimeMs: range.start,
+            outputEndTimeMs: range.end,
+            width,
+        });
+    };
+
+    const handleMouseLeave = () => {
+        if (!dragState) setHoverInfo(null);
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (dragState) return;
+
+        if (selectedCaptionId) {
+            selectCaption(null);
+            return;
+        }
+
+        if (!hoverInfo) return;
+
+        // Convert output times → source times
+        const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
+
+        const newCaption: CaptionSegment = {
+            id: crypto.randomUUID(),
+            text: '',
+            sourceStartMs: sourceStart,
+            sourceEndMs: sourceEnd,
+        };
+
+        // Build the updated segment list, removing any overlapping captions
+        const allCaptions: CaptionSegment[] = timeline.captionSegments || [];
+        const updatedSegments = [
+            ...allCaptions.filter((s: CaptionSegment) => !doCaptionSourceRangesOverlap(newCaption, s)),
+            newCaption,
+        ].sort((a: CaptionSegment, b: CaptionSegment) => a.sourceStartMs - b.sourceStartMs);
+
+        setCaptionSegments(updatedSegments);
+        selectCaption(newCaption.id);
+        setHoverInfo(null);
+    };
+
+    return {
+        hoverInfo,
+        handleMouseMove,
+        handleMouseLeave,
+        handleClick,
+    };
+}

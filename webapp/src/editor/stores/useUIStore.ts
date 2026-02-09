@@ -21,6 +21,8 @@ export const SettingsPanel = {
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
+export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions';
+
 export interface UIState {
     canvasMode: CanvasMode;
     selectedZoomId: ID | null;
@@ -37,6 +39,10 @@ export interface UIState {
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
+
+    // Settings Panel Active Tab (lifted from SettingsPanel local state)
+    settingsPanelActiveTab: SettingsPanelTab;
+    setSettingsPanelActiveTab: (tab: SettingsPanelTab) => void;
 
     // Timeline State
     timelineContainerRef: React.RefObject<HTMLDivElement | null> | null;
@@ -101,6 +107,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedWindowId: null,
     selectedCaptionId: null,
     selectedSettingsPanel: SettingsPanel.Project,
+    settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
 
     // Actions
@@ -115,6 +122,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         canvasMode: CanvasMode.Preview,
         selectedZoomId: null,
         selectedSpotlightId: null,
+        selectedCaptionId: null,
     }),
 
     selectZoom: (selectedZoomId) => set((state) => {
@@ -123,6 +131,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedZoomId,
                 selectedSpotlightId: null,
                 selectedWindowId: null,
+                selectedCaptionId: null,
                 canvasMode: CanvasMode.ZoomEdit,
                 isPlaying: false,
             };
@@ -156,9 +165,20 @@ export const useUIStore = create<UIState>((set, get) => ({
         return { selectedSpotlightId: null };
     }),
 
-    selectCaption: (selectedCaptionId) => set({ selectedCaptionId }),
+    selectCaption: (selectedCaptionId) => set((state) => {
+        if (selectedCaptionId) {
+            return {
+                selectedCaptionId,
+                selectedZoomId: null,
+                selectedSpotlightId: null,
+                selectedWindowId: null,
+            };
+        }
+        return { selectedCaptionId: null };
+    }),
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
+    setSettingsPanelActiveTab: (settingsPanelActiveTab) => set({ settingsPanelActiveTab }),
 
     // Timeline State
     timelineContainerRef: null,
@@ -236,6 +256,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         selectedWindowId: null,
         selectedCaptionId: null,
         selectedSettingsPanel: SettingsPanel.Project,
+        settingsPanelActiveTab: 'screen' as SettingsPanelTab,
         timelineContainerRef: null,
         pixelsPerSec: 100,
         isPlaying: false,

@@ -172,7 +172,7 @@
    --text-main: oklch(0.15 0 0 / 80%);
    --text-muted: oklch(0.15 0 0 / 70%);
    --text-disabled: oklch(0.15 0 0 / 50%);
-   --text-on-primary: oklch(0.98 0 0);
+   --text-on-primary: oklch(87.003% 0.00438 16);
    --text-on-secondary: oklch(0.15 0 0);
 }
 
@@ -203,8 +203,6 @@
    --text-main: oklch(0.98 0 0 / 80%);
    --text-muted: oklch(0.98 0 0 / 60%);
    --text-disabled: oklch(0.98 0 0 / 38%);
-   --text-on-primary: oklch(0.98 0 0);
-   --text-on-secondary: oklch(0.15 0 0);
 
    /* Shadows - Slightly stronger for dark background */
    --shadow-panel: 0 1px 3px oklch(0 0 0 / 20%), 0 0 0 1px oklch(1 0 0 / 5%);
