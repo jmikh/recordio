@@ -1,7 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, SpotlightAction } from '../../../types';
-import { useUIStore } from '../useUIStore';
 
 export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightAction>) => void;
@@ -9,13 +8,6 @@ export interface SpotlightSlice {
     deleteSpotlight: (id: ID) => void;
     clearSpotlights: () => void;
 }
-
-// Helper to capture snapshot (excluding DOM refs to avoid circular references)
-const getSnapshot = () => {
-    const state = useUIStore.getState();
-    const { timelineContainerRef, ...serializableState } = state;
-    return serializableState;
-};
 
 export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SpotlightSlice> = (set, _get, store) => ({
     updateSpotlight: (id, updates) => {
@@ -39,7 +31,6 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                 : state.project.settings;
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     settings: nextSettings,
@@ -60,7 +51,6 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
 
             // Manual spotlight addition sets isAuto to false
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     settings: {
@@ -85,7 +75,6 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             const spotlightActions = state.project.timeline.spotlightActions.filter(s => s.id !== id);
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     timeline: {
@@ -101,7 +90,6 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
         console.log('[Action] clearSpotlights');
         set(state => {
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     timeline: {

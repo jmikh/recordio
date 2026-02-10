@@ -5,6 +5,20 @@ import { TimeMapper } from '../mappers/timeMapper';
 /** Opacity for non-highlighted words */
 const DIM_OPACITY = 0.6;
 
+/** Default caption text color */
+const DEFAULT_TEXT_COLOR = '#ffffff';
+
+/**
+ * Convert hex color string + opacity to rgba() for canvas rendering.
+ */
+function hexToRgba(hex: string, opacity: number): string {
+    const clean = hex.replace('#', '');
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
 /**
  * Draws captions at the bottom of the canvas with progressive word highlighting.
  *
@@ -118,6 +132,7 @@ export function drawCaptions(
         ctx.shadowOffsetY = 1;
 
         // Draw each line with per-word opacity
+        const textColor = settings.color || DEFAULT_TEXT_COLOR;
         let lineY = boxY + paddingY + lineHeight / 2;
         for (const lineInfo of wrappedLines) {
             drawLineWithHighlight(
@@ -126,7 +141,8 @@ export function drawCaptions(
                 centerX,
                 lineY,
                 highlightedWordIndex,
-                highlightEnabled
+                highlightEnabled,
+                textColor
             );
             lineY += lineHeight;
         }
@@ -197,7 +213,8 @@ function drawLineWithHighlight(
     centerX: number,
     y: number,
     highlightedWordIndex: number,
-    highlightEnabled: boolean
+    highlightEnabled: boolean,
+    textColor: string
 ) {
     const { words } = lineInfo;
     if (words.length === 0) return;
@@ -216,7 +233,7 @@ function drawLineWithHighlight(
 
         // Set opacity based on highlight state (all full opacity if highlighting disabled)
         const opacity = !highlightEnabled || isHighlighted ? 1 : DIM_OPACITY;
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.fillStyle = hexToRgba(textColor, opacity);
 
         ctx.fillText(word, currentX, y);
 

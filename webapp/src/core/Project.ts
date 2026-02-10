@@ -81,7 +81,8 @@ const createDefaultSettings = (): ProjectSettings => ({
     captions: {
         visible: true,
         size: 50,
-        width: 75
+        width: 75,
+        color: '#ffffff'
     },
 
     camera: {

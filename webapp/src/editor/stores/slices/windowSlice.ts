@@ -4,31 +4,13 @@ import type { ID, OutputWindow, ZoomAction, SpotlightAction, Project, UserEvents
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
 import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { useUIStore } from '../useUIStore';
 
 export interface WindowSlice {
-
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
     removeOutputWindow: (id: ID) => void;
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
     setOutputWindows: (windows: OutputWindow[]) => void;
 }
-
-const getSnapshot = () => {
-    const state = useUIStore.getState();
-    return {
-        canvasMode: state.canvasMode,
-        selectedZoomId: state.selectedZoomId,
-        selectedWindowId: state.selectedWindowId,
-        selectedSettingsPanel: state.selectedSettingsPanel,
-        isResizingWindow: state.isResizingWindow,
-        pixelsPerSec: state.pixelsPerSec,
-        isPlaying: state.isPlaying,
-        currentTimeMs: state.currentTimeMs,
-        previewTimeMs: state.previewTimeMs,
-        showDebugBar: state.showDebugBar
-    };
-};
 
 const getWindowDuration = (w: OutputWindow) => {
     const speed = w.speed || 1.0;
@@ -128,7 +110,6 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -184,7 +165,6 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {
@@ -239,7 +219,6 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             nextOutputWindows.sort((a, b) => a.startMs - b.startMs);
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     timeline: {
@@ -288,7 +267,6 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...tempProject,
                     timeline: {

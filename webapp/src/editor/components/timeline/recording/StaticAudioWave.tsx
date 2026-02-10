@@ -5,11 +5,18 @@ interface StaticAudioWaveProps {
     peaks: number[]; // Full cached peaks for the source
     sourceStartMs: number; // Where this segment starts in source time
     sourceEndMs: number;   // Where this segment ends in source time
-    width: number; // Render width in px
+    width: number; // Full segment render width in px
     height: number;
+    /** Scroll offset of the timeline container */
+    scrollLeft?: number;
+    /** Visible width of the timeline container */
+    containerWidth?: number;
+    /** Left position of this segment inside the scrollable area */
+    segmentLeft?: number;
 }
 
 const WAVEFORM_COLOR = 'rgba(255, 255, 255, 1)';
+const BUFFER = 200; // extra px each side for smooth scroll
 
 const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     peaks,
@@ -17,18 +24,17 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     sourceEndMs,
     width,
     height,
+    scrollLeft = 0,
+    containerWidth = 0,
+    segmentLeft = 0,
 }) => {
-    //console.log("StaticAudioWave", peaks.length, sourceStartMs, sourceEndMs, width, height, color);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate which slice of peaks to show
-    // peaks array is 25 per sec.
-    // Index = (ms / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC
     const startIndex = Math.floor((sourceStartMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
     const endIndex = Math.ceil((sourceEndMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
 
     const visiblePeaks = useMemo(() => {
-        // Clamp
         const start = Math.max(0, startIndex);
         const end = Math.min(peaks.length, endIndex);
         return peaks.slice(start, end);
@@ -40,36 +46,56 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Clear
-        ctx.clearRect(0, 0, width, height);
+        if (visiblePeaks.length === 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
 
-        if (visiblePeaks.length === 0) return;
+        // Viewport-aware: compute which portion of this segment is visible
+        const viewportWidth = containerWidth || window.innerWidth;
+        const viewStart = Math.max(0, scrollLeft - segmentLeft - BUFFER);
+        const viewEnd = Math.min(width, scrollLeft - segmentLeft + viewportWidth + BUFFER);
 
-        // Drawing params
+        // If the segment is entirely off-screen, skip rendering
+        if (viewEnd <= 0 || viewStart >= width) {
+            canvas.width = 0;
+            canvas.height = 0;
+            return;
+        }
+
+        const clampedStart = Math.max(0, viewStart);
+        const clampedEnd = Math.min(width, viewEnd);
+        const canvasWidth = clampedEnd - clampedStart;
+
+        canvas.width = canvasWidth;
+        canvas.height = height;
+        canvas.style.width = `${canvasWidth}px`;
+        canvas.style.height = `${height}px`;
+        canvas.style.transform = `translateX(${clampedStart}px)`;
+
+        ctx.clearRect(0, 0, canvasWidth, height);
         ctx.fillStyle = WAVEFORM_COLOR;
+
         const barWidth = width / visiblePeaks.length;
+        const scaleY = height * 0.96;
 
-        const scaleY = height * 0.96; // Max height with 4% padding
+        // Only draw bars that fall within the visible canvas
+        const firstBar = Math.max(0, Math.floor(clampedStart / barWidth));
+        const lastBar = Math.min(visiblePeaks.length - 1, Math.ceil(clampedEnd / barWidth));
 
-        visiblePeaks.forEach((peak, i) => {
-            const x = i * barWidth;
-            const barHeight = peak * scaleY;
-
-            // Draw from bottom
+        for (let i = firstBar; i <= lastBar; i++) {
+            const x = i * barWidth - clampedStart; // position relative to canvas origin
+            const barHeight = visiblePeaks[i] * scaleY;
             ctx.fillRect(x, height - barHeight, barWidth, barHeight);
-        });
+        }
 
-    }, [visiblePeaks, width, height]);
-
-
+    }, [visiblePeaks, width, height, scrollLeft, containerWidth, segmentLeft]);
 
     return (
         <canvas
             ref={canvasRef}
-            width={width}
-            height={height}
-            className="pointer-events-none opacity-40"
-            style={{ width, height }}
+            className="pointer-events-none opacity-40 absolute left-0 top-0"
+            style={{ height }}
         />
     );
 };

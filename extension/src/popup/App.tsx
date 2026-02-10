@@ -3,9 +3,8 @@ import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
 import { DefaultButton } from '@shared/components';
-import { MdBugReport, MdArrowBack, MdBlurOn } from 'react-icons/md';
+import { MdArrowBack, MdBlurOn } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
-import { BugReportModal } from '../components/BugReportModal';
 import { LogoLink } from '@shared/components/LogoLink';
 import permissionGuide from '../assets/permission-guide.jpg';
 import { getEditorOrigin } from '@shared/types/bridge';
@@ -33,7 +32,7 @@ function App() {
   const [audioPermission, setAudioPermission] = useState<PermissionState>('unknown');
   const [videoPermission, setVideoPermission] = useState<PermissionState>('unknown');
   const [canInjectContentScript, setCanInjectContentScript] = useState<boolean | null>(null);
-  const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
+
 
   // Live timer for recording duration
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
@@ -357,12 +356,7 @@ function App() {
           >
             <MdBlurOn size={16} />
           </DefaultButton>
-          <DefaultButton
-            onClick={() => setIsBugReportModalOpen(true)}
-            title="Report Bug"
-          >
-            <MdBugReport size={16} />
-          </DefaultButton>
+
         </div>
       </div>
 
@@ -395,10 +389,7 @@ function App() {
           />
         )}
       </div>
-      <BugReportModal
-        isOpen={isBugReportModalOpen}
-        onClose={() => setIsBugReportModalOpen(false)}
-      />
+
     </div>
   );
 }

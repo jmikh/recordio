@@ -6,9 +6,27 @@ interface TimelineRulerProps {
     pixelsPerSec: number;
     height?: number;
     headerWidth?: number;
+    scrollLeft?: number;
+    containerWidth?: number;
 }
 
-export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixelsPerSec, height = 24, headerWidth = 0 }) => {
+/**
+ * Viewport-aware timeline ruler.
+ *
+ * Instead of creating a single canvas spanning the full timeline width
+ * (which crashes the browser for long recordings when the pixel dimensions
+ * exceed ~65 535 px), we size the canvas to the visible viewport plus a
+ * small buffer and translate it with CSS so it lines up with the scroll
+ * position.  The drawing loop only emits ticks inside this window.
+ */
+export const TimelineRuler: React.FC<TimelineRulerProps> = ({
+    totalWidth,
+    pixelsPerSec,
+    height = 24,
+    headerWidth = 0,
+    scrollLeft = 0,
+    containerWidth = 0,
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -18,24 +36,33 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        // Don't use window.innerWidth directly without offset, and remove buffer
-        const width = Math.max(totalWidth, window.innerWidth - headerWidth);
 
-        canvas.width = width * dpr;
+        // Full logical width of the ruler
+        const fullWidth = Math.max(totalWidth, (containerWidth || window.innerWidth) - headerWidth);
+
+        // Viewport-aware: only render the visible portion + buffer
+        const BUFFER = 200; // extra px each side for smooth scroll
+        const viewStart = Math.max(0, scrollLeft - BUFFER);
+        const viewEnd = Math.min(fullWidth, scrollLeft + (containerWidth || window.innerWidth) + BUFFER);
+        const viewWidth = viewEnd - viewStart;
+
+        canvas.width = viewWidth * dpr;
         canvas.height = height * dpr;
-        canvas.style.width = `${width}px`;
+        canvas.style.width = `${viewWidth}px`;
         canvas.style.height = `${height}px`;
+        // Position the canvas so it covers the visible area
+        canvas.style.transform = `translateX(${viewStart}px)`;
 
         ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(0, 0, viewWidth, height);
 
         // Read theme colors
         const style = getComputedStyle(document.documentElement);
         const textColor = 'rgba(255, 255, 255, 0.6)';
         const tickColor = 'rgba(255, 255, 255, 0.4)';
 
-        ctx.fillStyle = textColor; // text-main
-        ctx.strokeStyle = tickColor; // border-primary (or highlight)
+        ctx.fillStyle = textColor;
+        ctx.strokeStyle = tickColor;
         ctx.font = `10px ${style.getPropertyValue('--font-sans') || 'sans-serif'}`;
         ctx.textBaseline = 'top';
 
@@ -50,13 +77,19 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
             minorInterval = 500;
         }
 
-        // Calculate the full visible width in milliseconds to extend ruler to viewport edge
-        const visibleDurationMs = (width / pixelsPerSec) * 1000;
+        // Calculate visible time range
+        const visibleDurationMs = (fullWidth / pixelsPerSec) * 1000;
+
+        // Align first tick to a minor-interval boundary at or before the view start
+        const startTimeMs = Math.floor((viewStart / pixelsPerSec) * 1000 / minorInterval) * minorInterval;
 
         ctx.beginPath();
-        // Start t at 0, draw until the end of visible area
-        for (let t = 0; t <= visibleDurationMs; t += minorInterval) {
-            const x = ((t / 1000) * pixelsPerSec);
+        for (let t = startTimeMs; t <= visibleDurationMs; t += minorInterval) {
+            const xAbsolute = (t / 1000) * pixelsPerSec;
+            // Stop once past the visible area
+            if (xAbsolute > viewEnd) break;
+            // Position relative to our viewport canvas
+            const x = xAbsolute - viewStart;
 
             if (t % majorInterval === 0) {
                 ctx.moveTo(x, 0);
@@ -69,7 +102,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({ totalWidth, pixels
         }
         ctx.stroke();
 
-    }, [totalWidth, pixelsPerSec, height]);
+    }, [totalWidth, pixelsPerSec, height, scrollLeft, containerWidth, headerWidth]);
 
     return (
         <div className="sticky top-0 z-[var(--z-index-overlay)] bg-surface border-t border-b border-border">

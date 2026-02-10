@@ -68,6 +68,20 @@ async function transcribe(audioBuffer: ArrayBuffer, language: string = 'en'): Pr
 
     self.postMessage({ type: 'progress', progress: 0.3 });
 
+    // Fake progress: tick linearly from 0.3 → 0.95 over estimated time
+    // Rate: 1 second real-time per 10 seconds of audio
+    const audioDurationSec = audioData.length / 16000;
+    const estimatedMs = (audioDurationSec / 10) * 1000;
+    const PROGRESS_START = 0.3;
+    const PROGRESS_CAP = 0.95;
+    const fakeStart = Date.now();
+    const fakeInterval = setInterval(() => {
+        if (aborted) { clearInterval(fakeInterval); return; }
+        const t = Math.min((Date.now() - fakeStart) / estimatedMs, 1);
+        const progress = PROGRESS_START + t * (PROGRESS_CAP - PROGRESS_START);
+        self.postMessage({ type: 'progress', progress });
+    }, 100);
+
     // Build pipeline options
     const pipelineOptions: any = {
         return_timestamps: true,
@@ -83,9 +97,9 @@ async function transcribe(audioBuffer: ArrayBuffer, language: string = 'en'): Pr
     // Audio is already 16kHz - pass directly to Whisper
     const result = await whisperPipeline(audioData, pipelineOptions);
 
-    if (aborted) throw new Error('Aborted');
+    clearInterval(fakeInterval);
 
-    self.postMessage({ type: 'progress', progress: 0.9 });
+    if (aborted) throw new Error('Aborted');
 
     self.postMessage({
         type: 'result',

@@ -6,7 +6,7 @@ import { initSentry } from '../utils/sentry'
 import { trackPageView } from '../core/analytics'
 
 // Initialize Sentry for error tracking
-initSentry('editor');
+initSentry();
 
 // Track page view
 trackPageView('editor');

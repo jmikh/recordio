@@ -1,7 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, ZoomAction } from '../../../types';
-import { useUIStore } from '../useUIStore';
 
 export interface ZoomActionSlice {
     updateZoomAction: (id: ID, action: Partial<ZoomAction>) => void;
@@ -9,13 +8,6 @@ export interface ZoomActionSlice {
     deleteZoomAction: (id: ID) => void;
     clearZoomActions: () => void;
 }
-
-// Helper to capture snapshot (excluding DOM refs to avoid circular references)
-const getSnapshot = () => {
-    const state = useUIStore.getState();
-    const { timelineContainerRef, ...serializableState } = state;
-    return serializableState;
-};
 
 export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomActionSlice> = (set, _get, store) => ({
     updateZoomAction: (id, updates) => {
@@ -38,7 +30,6 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
             };
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     settings: nextSettings,
@@ -63,7 +54,6 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
             };
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     settings: nextSettings,
@@ -87,7 +77,6 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
             };
 
             return {
-                uiSnapshot: getSnapshot(),
                 project: {
                     ...state.project,
                     settings: nextSettings,
@@ -104,7 +93,6 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
         console.log('[Action] clearZoomActions');
         set(state => {
             return {
-                uiSnapshot: getSnapshot(), // Implicit snapshot
                 project: {
                     ...state.project,
                     timeline: {

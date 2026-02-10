@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { MdInfoOutline, MdEdit } from 'react-icons/md';
+import { MdEdit } from 'react-icons/md';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -15,6 +14,7 @@ import { Notice } from '@shared/components';
 import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
 import { useToast } from '../Toast';
+import { ColorButton } from './ColorButton';
 
 /**
  * Settings panel for managing captions.
@@ -49,17 +49,18 @@ export function CaptionsSettings() {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [emptyCaptionsNotice, setEmptyCaptionsNotice] = useState(false);
     const inputRef = useRef<HTMLSpanElement>(null);
+    // Snapshot of segment text when editing starts. Rendered as the contentEditable's
+    // children during editing so React sees stable content and never overwrites the DOM.
+    // This prevents cursor jumps and preserves the browser's native undo stack.
+    const editStartTextRef = useRef<string>('');
     const abortControllerRef = useRef<AbortController | null>(null);
     const toastIdRef = useRef<string | null>(null);
-    const infoIconRef = useRef<HTMLSpanElement>(null);
     const captionsContainerRef = useRef<HTMLDivElement>(null);
-    const [showInfoTooltip, setShowInfoTooltip] = useState(false);
-    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
     const [selectedLanguage, setSelectedLanguage] = useState('en');
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
-    const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true };
+    const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true, color: '#ffffff' };
 
     // Create TimeMapper for source→output time conversion
     const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
@@ -86,6 +87,9 @@ export function CaptionsSettings() {
         if (!selectedCaptionId) return;
         // Auto-enter edit mode
         if (editingId !== selectedCaptionId) {
+            // Snapshot the segment text before editing begins
+            const seg = captionSegments?.find(s => s.id === selectedCaptionId);
+            if (seg) editStartTextRef.current = seg.text;
             setEditingId(selectedCaptionId);
             startInteraction();
         }
@@ -277,6 +281,9 @@ export function CaptionsSettings() {
             return;
         }
 
+        // Snapshot segment text before editing begins (see editStartTextRef comment)
+        editStartTextRef.current = segment.text;
+
         // Select, move CTI, and enter edit mode immediately
         selectCaption(segment.id);
         setEditingId(segment.id);
@@ -303,55 +310,28 @@ export function CaptionsSettings() {
     };
 
     const handleInput = (e: React.FormEvent<HTMLSpanElement>, segmentId: string) => {
-        const text = e.currentTarget.textContent || '';
-
-        // Save cursor position before update
-        const selection = window.getSelection();
-        const range = selection?.getRangeAt(0);
-        const cursorOffset = range?.startOffset || 0;
-        const cursorNode = range?.startContainer;
+        let text = e.currentTarget.textContent || '';
 
         // Enforce 200 character limit
         if (text.length > 200) {
-            // Truncate to 200 characters while preserving cursor position
-            const truncated = text.substring(0, 200);
-            e.currentTarget.textContent = truncated;
+            text = text.substring(0, 200);
+            e.currentTarget.textContent = text;
 
-            // Move cursor to end
-            const newRange = document.createRange();
-            const newSelection = window.getSelection();
-            newRange.selectNodeContents(e.currentTarget);
-            newRange.collapse(false);
-            newSelection?.removeAllRanges();
-            newSelection?.addRange(newRange);
-
-            // Update with truncated text
-            batchAction(() => {
-                updateCaptionSegment(segmentId, { text: truncated });
-            });
-        } else {
-            // Update in real-time
-            batchAction(() => {
-                updateCaptionSegment(segmentId, { text });
-            });
-
-            // Restore cursor position after React re-render
-            requestAnimationFrame(() => {
-                if (cursorNode && inputRef.current?.contains(cursorNode)) {
-                    try {
-                        const newRange = document.createRange();
-                        newRange.setStart(cursorNode, Math.min(cursorOffset, cursorNode.textContent?.length || 0));
-                        newRange.collapse(true);
-                        const newSelection = window.getSelection();
-                        newSelection?.removeAllRanges();
-                        newSelection?.addRange(newRange);
-                    } catch (e) {
-                        // If restoration fails, just continue - cursor will be at end
-                        console.warn('Could not restore cursor position:', e);
-                    }
-                }
-            });
+            // Move cursor to end after truncation
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(e.currentTarget);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
         }
+
+        // Update the store so the canvas renders the live caption text.
+        // Cursor restoration is NOT needed here because editStartTextRef keeps
+        // React from overwriting the contentEditable DOM (see render logic).
+        batchAction(() => {
+            updateCaptionSegment(segmentId, { text });
+        });
     };
 
     const handleBlur = () => {
@@ -372,29 +352,14 @@ export function CaptionsSettings() {
             {/* Transcription Controls Card */}
             {!isTranscribing && (
                 <div className="bg-surface-inset rounded-lg p-4 space-y-3">
+                    <p className="text-xs text-text-muted text-center">
+                        Powered by Whisper — runs locally in your browser. Your audio never leaves your device.
+                    </p>
                     <PrimaryButton
                         onClick={handleGenerate}
-                        className="w-full flex items-center justify-center gap-2"
+                        className="w-full flex items-center justify-center"
                     >
                         Transcribe
-                        <span
-                            ref={infoIconRef}
-                            className="w-4 h-4 flex items-center justify-center rounded-full bg-black/30"
-                            onMouseEnter={() => {
-                                if (infoIconRef.current) {
-                                    const rect = infoIconRef.current.getBoundingClientRect();
-                                    setTooltipPosition({
-                                        left: rect.left + rect.width / 2,
-                                        top: rect.bottom + 8
-                                    });
-                                }
-                                setShowInfoTooltip(true);
-                            }}
-                            onMouseLeave={() => setShowInfoTooltip(false)}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <MdInfoOutline size={10} className="text-white/80" />
-                        </span>
                     </PrimaryButton>
 
                     {/* Language Dropdown */}
@@ -421,6 +386,15 @@ export function CaptionsSettings() {
             <CollapsibleCard
                 title="Style"
                 previewItems={[
+                    {
+                        type: 'custom',
+                        content: (
+                            <div
+                                className="w-5 h-5 rounded-full border border-border"
+                                style={{ backgroundColor: settings.color || '#ffffff' }}
+                            />
+                        )
+                    },
                     { type: 'text', content: `${Math.round(settings.size)}px` },
                     { type: 'text', content: `${Math.round(settings.width)}%` }
                 ]}
@@ -443,8 +417,8 @@ export function CaptionsSettings() {
                     <Slider
                         value={settings.size}
                         onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
-                        min={32}
-                        max={64}
+                        min={50}
+                        max={150}
                         label="Size"
                         units="px"
                         showTooltip={true}
@@ -460,6 +434,14 @@ export function CaptionsSettings() {
                         units="%"
                         showTooltip={true}
                         decimals={0}
+                    />
+
+                    <ColorButton
+                        label="Color"
+                        color={settings.color || '#ffffff'}
+                        onChange={(color) => batchAction(() => updateSettings({ captions: { ...settings, color } }))}
+                        onPopoverOpen={startInteraction}
+                        onPopoverClose={endInteraction}
                     />
                 </div>
             </CollapsibleCard>
@@ -516,8 +498,12 @@ export function CaptionsSettings() {
                                             minWidth: isEditing ? '20px' : undefined,
                                         }}
                                     >
+                                        {/* While editing, render the frozen snapshot so React never
+                                           overwrites the DOM — this preserves cursor position and
+                                           the browser's native undo stack. Store updates still
+                                           happen on each keystroke for live canvas rendering. */}
                                         {isEditing
-                                            ? (segment.text || '')
+                                            ? (editStartTextRef.current || '')
                                             : (segment.text || '')
                                         }
                                     </span>
@@ -529,22 +515,7 @@ export function CaptionsSettings() {
                 </CollapsibleCard>
             )}
 
-            {/* Info tooltip - rendered via portal */}
-            {showInfoTooltip && createPortal(
-                <div
-                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 max-w-[240px] text-xs text-text-main"
-                    style={{
-                        left: tooltipPosition.left,
-                        top: tooltipPosition.top,
-                        transform: 'translateX(-50%)'
-                    }}
-                    onMouseEnter={() => setShowInfoTooltip(true)}
-                    onMouseLeave={() => setShowInfoTooltip(false)}
-                >
-                    Transcription runs entirely in your browser using local AI. Your audio never leaves your device.
-                </div>,
-                document.body
-            )}
+
 
         </div >
     );

@@ -137,6 +137,7 @@ export interface CaptionSettings {
     visible: boolean;
     size: number; // Font size in pixels
     width: number; // Maximum width as percentage of canvas width (0-100)
+    color?: string; // Text color in hex format (e.g. '#ffffff')
     wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
     /** Baseline captions from last successful transcription (never modified by editing) */
     baselineCaptions?: CaptionSegment[];

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react'; // EXPERIMENT: 3D Tilt — added useState
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
@@ -283,8 +283,32 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.SpotlightEdit ||
         canvasMode === CanvasMode.CameraEdit;
 
+    // ── EXPERIMENT: 3D Tilt ──────────────────────────────────
+    const [tiltActive, setTiltActive] = useState(false);
+    // ── END EXPERIMENT ──────────────────────────────────────
+
     return (
-        <div className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
+        // EXPERIMENT: 3D Tilt — perspective wrapper
+        <div
+            className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}
+            style={{ perspective: tiltActive ? '1000px' : undefined }}
+        >
+            {/* EXPERIMENT: 3D Tilt — toggle button */}
+            <button
+                onClick={() => setTiltActive(v => !v)}
+                style={{
+                    position: 'absolute', top: 8, right: 8, zIndex: 50,
+                    padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                    background: tiltActive ? 'var(--primary)' : 'var(--surface-2)',
+                    color: tiltActive ? '#fff' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer', opacity: 0.85,
+                    transition: 'background 0.2s, color 0.2s',
+                }}
+            >
+                {tiltActive ? '3D On' : '3D Off'}
+            </button>
+            {/* END EXPERIMENT */}
 
             {/* ASPECT RATIO WRAPPER */}
             <div
@@ -294,7 +318,11 @@ export const CanvasContainer = () => {
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     maxHeight: '100%',
                     maxWidth: '100%',
-                    boxShadow: !isEditorMode ? '0 0 0 2px var(--primary)' : undefined
+                    boxShadow: !isEditorMode ? '0 0 0 2px var(--primary)' : undefined,
+                    // EXPERIMENT: 3D Tilt
+                    transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: tiltActive ? 'rotateY(12deg)' : 'rotateY(0deg)',
+                    // END EXPERIMENT
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}

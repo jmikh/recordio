@@ -4,7 +4,6 @@ import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
 import { useUIStore } from './stores/useUIStore';
-import { useHistorySync } from './hooks/useHistorySync';
 
 
 import { ProjectStorage } from '../storage/projectStorage';
@@ -21,7 +20,6 @@ import { useUserStore } from './stores/useUserStore';
 
 
 function Editor() {
-    useHistorySync();
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
     const [containerSize, setContainerSize] = useState({ width: 800, height: 450 });
 

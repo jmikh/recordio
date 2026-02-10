@@ -15,9 +15,6 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlic
     project: Project;
     isSaving: boolean;
 
-    // Context Awareness for Undo
-    // Stores the UI state at the moment of this history entry
-    uiSnapshot?: Partial<import('./useUIStore').UIState>;
 
     // Actions
     loadProject: (project: Project) => Promise<void>;
@@ -166,8 +163,7 @@ export const useProjectStore = create<ProjectState>()(
             {
                 // Zundo Configuration
                 partialize: (state) => ({
-                    project: state.project,
-                    uiSnapshot: state.uiSnapshot
+                    project: state.project
                 }),
                 equality: (a, b) => JSON.stringify(a) === JSON.stringify(b), // Deep compare to avoid unnecessary history
                 limit: 50 // meaningful limit
@@ -197,5 +193,5 @@ export const useProjectTimeline = () => useProjectStore(s => s.project.timeline)
 export const useTimeline = () => useProjectStore(s => s.project.timeline);
 export const useUserEvents = () => useProjectStore(s => s.project.userEvents);
 export const useProjectHistory = <T,>(
-    selector: (state: TemporalState<{ project: Project; uiSnapshot?: Partial<import('./useProjectStore').ProjectState['uiSnapshot']> }>) => T
+    selector: (state: TemporalState<{ project: Project }>) => T
 ) => useStore(useProjectStore.temporal, selector);

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
-import { LogoLink } from '@shared/components';
+import { LogoLink, DefaultButton } from '@shared/components';
+import { BiSupport } from 'react-icons/bi';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -55,55 +56,66 @@ export function DashboardPage() {
     return (
         <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
-            <header className="border-b border-border px-6 py-4 flex items-center justify-between">
-                <LogoLink />
-                <div className="text-text-muted text-sm">
-                    {projects.length} project{projects.length !== 1 ? 's' : ''}
+            <header className="border-b border-border">
+                <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center justify-between">
+                    <LogoLink />
+                    <div className="flex items-center gap-3">
+                        <div className="text-text-muted text-sm">
+                            {projects.length} project{projects.length !== 1 ? 's' : ''}
+                        </div>
+                        <a href="mailto:support@recordio.cc" title="Contact Support" target="_blank" rel="noopener noreferrer">
+                            <DefaultButton>
+                                <BiSupport size={18} />
+                            </DefaultButton>
+                        </a>
+                    </div>
                 </div>
             </header>
 
-            {/* Error Message */}
-            {errorMessage && (
-                <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-3">
-                    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{errorMessage}</span>
-                    <button
-                        onClick={() => setErrorMessage(null)}
-                        className="ml-auto text-red-400 hover:text-red-300"
-                    >
-                        ✕
-                    </button>
-                </div>
-            )}
-
-            {/* Content */}
-            <main className="p-6">
-                {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-text-muted">Loading projects...</div>
-                    </div>
-                ) : projects.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-center">
-                        <div className="text-text-muted mb-2">No projects yet</div>
-                        <div className="text-text-muted text-sm">
-                            Record something with the extension to get started
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {projects.map(project => (
-                            <ProjectCard
-                                key={project.id}
-                                project={project}
-                                onOpen={() => handleOpen(project.id)}
-                                onDelete={() => handleDelete(project.id)}
-                            />
-                        ))}
+            <div style={{ maxWidth: 1400 }} className="mx-auto">
+                {/* Error Message */}
+                {errorMessage && (
+                    <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-3">
+                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{errorMessage}</span>
+                        <button
+                            onClick={() => setErrorMessage(null)}
+                            className="ml-auto text-red-400 hover:text-red-300"
+                        >
+                            ✕
+                        </button>
                     </div>
                 )}
-            </main>
+
+                {/* Content */}
+                <main className="p-6">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="text-text-muted">Loading projects...</div>
+                        </div>
+                    ) : projects.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center">
+                            <div className="text-text-muted mb-2">No projects yet</div>
+                            <div className="text-text-muted text-sm">
+                                Record something with the extension to get started
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {projects.map(project => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    onOpen={() => handleOpen(project.id)}
+                                    onDelete={() => handleDelete(project.id)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </main>
+            </div>
         </div>
     );
 }

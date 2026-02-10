@@ -16,12 +16,16 @@ interface RecordingTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
     trackHeight: number;
+    scrollLeft: number;
+    containerWidth: number;
 }
 
 export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     timeline,
     pixelsPerSec,
     trackHeight,
+    scrollLeft,
+    containerWidth,
 }) => {
     const selectWindow = useUIStore(s => s.selectWindow);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
@@ -136,6 +140,8 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                             cameraAudio={cameraAudio}
                             isMuted={isMuted}
                             hasCamera={hasCamera}
+                            scrollLeft={scrollLeft}
+                            containerWidth={containerWidth}
                         />
                     );
                 })}

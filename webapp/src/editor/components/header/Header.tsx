@@ -6,9 +6,10 @@ import type { ExportQuality } from '../../export/ExportManager';
 import { Dropdown } from '@shared/components';
 import type { DropdownOption } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
-import { MdBugReport, MdDarkMode, MdLightMode } from 'react-icons/md';
+import { MdDarkMode, MdLightMode } from 'react-icons/md';
+import { BiSupport } from 'react-icons/bi';
 import { DefaultButton } from '@shared/components';
-import { BugReportModal } from '../../../components/BugReportModal';
+
 import { AuthModal } from './AuthModal';
 import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
@@ -24,7 +25,7 @@ const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
 ];
 
 export const Header = () => {
-    const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
+
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
@@ -134,14 +135,6 @@ export const Header = () => {
                 />
 
                 <div className="flex items-center gap-4">
-                    <div className="text-xs text-text-main flex items-center gap-2">
-                        {isSaving ? (
-                            <span className="text-primary-fg animate-pulse">Saving...</span>
-                        ) : (
-                            <span className="text-text-main">All changes saved</span>
-                        )}
-                    </div>
-                    {/* User Profile / Other Actions */}
                     <Dropdown
                         options={EXPORT_QUALITY_OPTIONS}
                         value={null as any}
@@ -157,9 +150,11 @@ export const Header = () => {
                             Sign In
                         </DefaultButton>
                     )}
-                    <DefaultButton onClick={() => setIsBugReportModalOpen(true)} title="Report a bug">
-                        <MdBugReport size={18} />
-                    </DefaultButton>
+                    <a href="mailto:support@recordio.cc" title="Contact Support" target="_blank" rel="noopener noreferrer">
+                        <DefaultButton>
+                            <BiSupport size={18} />
+                        </DefaultButton>
+                    </a>
                     <DefaultButton
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -168,10 +163,7 @@ export const Header = () => {
                     </DefaultButton>
                 </div>
             </div>
-            <BugReportModal
-                isOpen={isBugReportModalOpen}
-                onClose={() => setIsBugReportModalOpen(false)}
-            />
+
             <AuthModal
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}

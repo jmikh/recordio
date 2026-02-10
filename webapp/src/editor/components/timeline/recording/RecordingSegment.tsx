@@ -24,6 +24,8 @@ interface RecordingSegmentProps {
     cameraAudio: AudioAnalysisResult;
     isMuted: boolean;
     hasCamera: boolean;
+    scrollLeft: number;
+    containerWidth: number;
 }
 
 export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
@@ -41,6 +43,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
     cameraAudio,
     isMuted,
     hasCamera,
+    scrollLeft,
+    containerWidth,
 }) => {
     // Determine the effective window to display (dragged vs original)
     const win = (dragState && dragState.windowId === seg.id) ? dragState.currentWindow : seg;
@@ -115,6 +119,9 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                                 sourceEndMs={sourceEndMs}
                                 width={width}
                                 height={trackContentHeight}
+                                scrollLeft={scrollLeft}
+                                containerWidth={containerWidth}
+                                segmentLeft={left}
                             />
                         )}
                     </div>

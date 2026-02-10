@@ -8,10 +8,12 @@ import { FaTrash } from 'react-icons/fa';
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const clearZoomActions = useProjectStore(s => s.clearZoomActions);
+    const clearSpotlights = useProjectStore(s => s.clearSpotlights);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
     const effectSettings = useProjectStore(s => s.project.settings.effects);
     const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
+    const spotlightActions = useProjectStore(s => s.project.timeline.spotlightActions || []);
     const userEvents = useProjectStore(s => s.project.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
@@ -45,6 +47,11 @@ export const EffectsSettings = () => {
         clearZoomActions();
         // 2. Disable auto zoom to prevent recalc
         updateSettings({ zoom: { ...zoomSettings, isAuto: false } });
+    };
+
+    const handleClearSpotlights = () => {
+        clearSpotlights();
+        updateSettings({ spotlight: { ...spotlightSettings, isAuto: false } });
     };
 
     const handleMaxDurationChange = (val: number) => {
@@ -207,6 +214,16 @@ export const EffectsSettings = () => {
                         units="s"
                         decimals={2}
                     />
+
+                    {/* Actions - only show when there are spotlights to clear */}
+                    {spotlightActions.length > 0 && (
+                        <DefaultButton
+                            onClick={handleClearSpotlights}
+                            className="w-full"
+                        >
+                            Clear
+                        </DefaultButton>
+                    )}
                 </div>
             </CollapsibleCard>
 

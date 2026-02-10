@@ -33,6 +33,10 @@ export function Timeline() {
     const overlayRef = useRef<HTMLDivElement>(null);
     const overlayEndRef = useRef<HTMLDivElement>(null);
 
+    // Viewport-aware ruler state
+    const [rulerScrollLeft, setRulerScrollLeft] = useState(0);
+    const [containerWidth, setContainerWidth] = useState(0);
+
     const setTimelineContainerRef = useUIStore(s => s.setTimelineContainerRef);
 
     // Register container ref with UIStore for auto-scroll on setCurrentTime
@@ -41,6 +45,16 @@ export function Timeline() {
         return () => setTimelineContainerRef(null);
     }, [setTimelineContainerRef]);
 
+    // Track container width via ResizeObserver
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        setContainerWidth(el.clientWidth);
+        const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [containerEl]); // re-attach when the element changes
+
     const setContainerRef = (node: HTMLDivElement | null) => {
         containerRef.current = node;
         setContainerEl(node);
@@ -48,6 +62,7 @@ export function Timeline() {
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const scrollLeft = e.currentTarget.scrollLeft;
+        setRulerScrollLeft(scrollLeft);
 
         if (overlayRef.current) {
             // shows dark transparent overlay to signfiy more track is hiding.
@@ -309,6 +324,8 @@ export function Timeline() {
                                     totalWidth={totalWidth}
                                     pixelsPerSec={pixelsPerSec}
                                     headerWidth={HEADER_WIDTH}
+                                    scrollLeft={rulerScrollLeft}
+                                    containerWidth={containerWidth}
                                 />
 
                                 {/* Tracks Container */}
@@ -319,6 +336,8 @@ export function Timeline() {
                                             timeline={timeline}
                                             pixelsPerSec={pixelsPerSec}
                                             trackHeight={TRACK_HEIGHT}
+                                            scrollLeft={rulerScrollLeft}
+                                            containerWidth={containerWidth}
                                         />
                                     </TimelineTrackRow>
 

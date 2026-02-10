@@ -68,27 +68,6 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
     console.log(`[Sentry] Initialized for ${context} context (browser extension mode)`);
 }
 
-export function captureBugReport(description: string, additionalContext?: Record<string, any>) {
-    if (!sentryScope) {
-        console.error('[Sentry] Cannot capture bug report: Sentry not initialized');
-        return;
-    }
-
-    // Clone the scope to add temporary context without polluting the main scope
-    const reportScope = sentryScope.clone();
-    reportScope.setLevel("info");
-    reportScope.setTag("report.type", "user-submitted");
-    reportScope.setExtra("userDescription", description);
-
-    if (additionalContext) {
-        Object.entries(additionalContext).forEach(([key, value]) => {
-            reportScope.setExtra(key, value);
-        });
-    }
-
-    reportScope.captureMessage(`User Bug Report: ${description}`);
-}
-
 // Export helper functions that use our scope
 export function captureException(error: Error) {
     if (!sentryScope) {

@@ -25,7 +25,7 @@ export const ProjectCard = ({
         <div
             onClick={() => !isDeleting && onOpen(project)}
             className={`
-                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
+                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden bg-surface-raised
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
                     ? 'border-border-primary scale-[1.02]'

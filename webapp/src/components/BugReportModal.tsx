@@ -24,7 +24,6 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
             // Capture additional context
             const context = {
                 userAgent: navigator.userAgent,
-                extensionVersion: chrome.runtime.getManifest().version,
                 timestamp: new Date().toISOString(),
                 url: window.location.href,
             };
