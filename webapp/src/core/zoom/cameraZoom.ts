@@ -1,6 +1,7 @@
 import { type ZoomAction, type Size, type Rect, type CameraSettings, type ZoomSettings } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 import { prepareZoomActionsForInterpolation } from './zoomAction';
+import { applyEasing } from '../easing';
 
 /**
  * Anchor point for camera positioning.
@@ -100,12 +101,7 @@ function isFullScreen(rect: Rect, outputSize: Size): boolean {
         Math.abs(rect.height - outputSize.height) < 1;
 }
 
-/**
- * Ease-in-out easing function (same as viewportMotion.ts).
- */
-function applyEasing(t: number): number {
-    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
+
 
 /**
  * Calculates the effective camera state at a given time based on viewport motions.
@@ -156,7 +152,7 @@ export function getCameraStateAtTime(
     // PHASE 2: During first zoom-in transition → Shrinking
     if (currentTimeMs >= zoomInStartMs && currentTimeMs < zoomInEndMs) {
         const progress = (currentTimeMs - zoomInStartMs) / zoomInDuration;
-        const eased = applyEasing(progress);
+        const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
         const scale = 1.0 - (1.0 - shrinkScale) * eased;
         return { sizeScale: scale, isTransitioning: true };
     }
@@ -184,7 +180,7 @@ export function getCameraStateAtTime(
     // PHASE 4: During zoom-out transition → Growing back
     if (currentTimeMs >= zoomOutStartMs && currentTimeMs < zoomOutEndMs) {
         const progress = (currentTimeMs - zoomOutStartMs) / zoomOutDuration;
-        const eased = applyEasing(progress);
+        const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
         const scale = shrinkScale + (1.0 - shrinkScale) * eased;
         return { sizeScale: scale, isTransitioning: true };
     }

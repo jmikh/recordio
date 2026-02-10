@@ -84,18 +84,22 @@ export function Timeline() {
         }
     };
 
-    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-        const container = containerRef.current;
-        if (!container) return;
+    // Attach wheel listener imperatively with { passive: false } so preventDefault works
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
 
-        const maxScroll = container.scrollWidth - container.clientWidth;
+        const handleWheel = (e: WheelEvent) => {
+            const maxScroll = el.scrollWidth - el.clientWidth;
+            if (maxScroll > 0) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
 
-        // Only handle horizontal scrolling if the timeline is scrollable
-        if (maxScroll > 0) {
-            e.preventDefault();
-            container.scrollLeft += e.deltaY;
-        }
-    };
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, [containerEl]);
 
     // -- Stores --
     const timeline = useProjectTimeline();
@@ -303,7 +307,6 @@ export function Timeline() {
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                             ref={setContainerRef}
                             onScroll={handleScroll}
-                            onWheel={handleWheel}
                             onMouseMove={handleMouseMove}
                             onMouseDown={handleMouseDown}
                             onMouseLeave={handleMouseLeave}

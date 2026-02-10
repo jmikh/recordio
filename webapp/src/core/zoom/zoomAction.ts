@@ -2,6 +2,7 @@ import { type ZoomAction, type Size, type Rect, type ZoomSettings, type FocusAre
 import { ViewMapper } from '../mappers/viewMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 import { rectContainsRect, clampViewportToBounds } from '../geometry';
+import { applyEasing } from '../easing';
 
 export * from '../mappers/viewMapper';
 
@@ -278,7 +279,7 @@ export function getViewportStateAtTime(
         // Calculate progress relative to the action's FULL duration
         const elapsed = timeLimit - action.outputStartTime;
         const progress = Math.max(0, Math.min(1, elapsed / action.duration));
-        const eased = applyEasing(progress);
+        const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
 
         const interpolated = interpolateRect(currentRect, action.rect, eased);
 
@@ -292,10 +293,6 @@ export function getViewportStateAtTime(
     }
 
     return currentRect;
-}
-
-function applyEasing(t: number): number {
-    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // Ease In Out
 }
 
 function interpolateRect(from: Rect, to: Rect, t: number): Rect {

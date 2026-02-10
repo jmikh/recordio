@@ -2,6 +2,7 @@ import type { SpotlightAction, SpotlightSettings, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
+import { applyEasing } from '../easing';
 import { getMinSpotlightDuration } from '../../editor/components/timeline/spotlight/SpotlightTrackUtils';
 
 // ============================================================================
@@ -103,7 +104,7 @@ export function getSpotlightStateAtTime(
     }
 
     // Apply easing (ease-in-out)
-    const easedProgress = applyEasing(animationProgress);
+    const easedProgress = applyEasing(animationProgress, settings.easing ?? 'ease-in-out');
 
     // Interpolate values
     const currentDimOpacity = dimOpacity * easedProgress;
@@ -166,15 +167,3 @@ export function getSpotlightStateAtTime(
 // Helpers
 // ============================================================================
 
-/**
- * Ease-in-out function for smooth transitions.
- * Uses cubic bezier approximation.
- */
-function applyEasing(t: number): number {
-    // Clamp t to [0, 1]
-    t = Math.max(0, Math.min(1, t));
-    // Ease-in-out cubic
-    return t < 0.5
-        ? 4 * t * t * t
-        : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}

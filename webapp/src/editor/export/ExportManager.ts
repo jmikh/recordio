@@ -21,7 +21,7 @@ export class ExportManager {
         project: Project,
         quality: ExportQuality,
         onProgress: (state: ExportProgress) => void,
-        isPro: boolean = false
+        options?: { useFreeCredit?: boolean }
     ): Promise<void> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -126,7 +126,6 @@ export class ExportManager {
                 }
             }
 
-
             const deviceFrameSettings = renderProject.settings.screen;
             if (deviceFrameSettings.mode === 'device' && deviceFrameSettings.deviceFrameId) {
                 const frameDef = getDeviceFrame(deviceFrameSettings.deviceFrameId);
@@ -142,8 +141,30 @@ export class ExportManager {
                 }
             }
 
-            // Load watermark logo for non-pro users (only in production)
-            const shouldShowWatermark = !isPro && import.meta.env.MODE === 'production';
+            // --- Watermark & Credit Resolution ---
+            const userState = (await import('../stores/useUserStore')).useUserStore.getState();
+            const isHdExport = quality === '1080p' || quality === '4K';
+            let shouldShowWatermark = false;
+
+            if (userState.isPro) {
+                // Pro user: no watermark at any quality
+                shouldShowWatermark = false;
+            } else if (options?.useFreeCredit) {
+                // Free credit path: consume credit or abort export
+                const { FreeCreditsService } = await import('../services/FreeCreditsService');
+                const { success, error } = await FreeCreditsService.consumeFreeCredit();
+                if (!success) {
+                    throw new Error(error?.message || 'Failed to use free export credit.');
+                }
+                shouldShowWatermark = false;
+            } else if (isHdExport) {
+                // Non-pro without free credit trying HD — should not reach here (UI gates this)
+                throw new Error('1080p and 4K exports require a Pro subscription.');
+            } else {
+                // Non-pro, SD export: watermark in production
+                shouldShowWatermark = import.meta.env.MODE === 'production';
+            }
+
             if (shouldShowWatermark) {
                 imageElements.watermark = await loadImage(fullLogoPng);
             }

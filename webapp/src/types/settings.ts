@@ -6,6 +6,7 @@
 
 import type { ID, Size, Rect } from '@shared/types';
 import type { CaptionSegment } from './timeline';
+import type { EasingStyle } from '../core/easing';
 
 // ==========================================
 // STYLE (base for camera/screen)
@@ -98,6 +99,8 @@ export interface ZoomSettings {
     isAuto: boolean;
     maxZoomDurationMs: number;
     minZoomDurationMs: number;
+    /** Easing curve applied to zoom transitions */
+    easing: EasingStyle;
 }
 
 // ==========================================
@@ -117,6 +120,8 @@ export interface SpotlightSettings {
     minHoldDurationMs: number;
     /** Default hold duration in milliseconds (preferred when adding new spotlight). Default: 1000 */
     defaultHoldDurationMs: number;
+    /** Easing curve applied to spotlight transitions */
+    easing: EasingStyle;
 }
 
 // ==========================================

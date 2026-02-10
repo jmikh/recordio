@@ -64,7 +64,7 @@ function Editor() {
 
         // Initialize auth state listener
         AuthManager.initAuthListener(async (session) => {
-            const { setUser, setSubscription, clearUser } = useUserStore.getState();
+            const { setUser, setSubscription, setFreeCreditsUsed, clearUser } = useUserStore.getState();
 
             if (session) {
                 // User is logged in
@@ -82,10 +82,9 @@ function Editor() {
                         .from('subscriptions')
                         .select('*')
                         .eq('user_id', session.user.id)
-                        .single();
+                        .maybeSingle();
 
                     if (error) {
-                        // Table might not exist yet or user has no subscription
                         console.log('[Auth] No subscription found (user is on free plan)');
                     } else if (data) {
                         setSubscription({
@@ -99,6 +98,24 @@ function Editor() {
                     }
                 } catch (error) {
                     console.log('[Auth] Subscription table not configured yet - user defaults to free plan');
+                }
+
+                // Fetch free export credits from profile
+                try {
+                    const { data: profile, error: profileError } = await supabase!
+                        .from('user_metadata')
+                        .select('free_credits_used')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
+
+                    if (profileError) {
+                        console.log('[Auth] Could not fetch profile:', profileError.message);
+                    } else if (profile) {
+                        setFreeCreditsUsed(profile.free_credits_used ?? 0);
+                        console.log('[Auth] Free credits used:', profile.free_credits_used ?? 0);
+                    }
+                } catch (error) {
+                    console.log('[Auth] Profile table not configured yet');
                 }
             } else {
                 // User is logged out

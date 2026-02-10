@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCrown, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCrown, FaCheck, FaTimes, FaGift } from 'react-icons/fa';
 import { PrimaryButton, DefaultButton, XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
@@ -8,15 +8,16 @@ import { supabase } from '../../../auth/AuthManager';
 interface UpgradeModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSignInRequest: () => void;
     selectedQuality?: string | null;
 }
 
-export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalProps) {
+export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
     const [checkingStatus, setCheckingStatus] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { userId, email } = useUserStore();
+    const { userId, email, isAuthenticated } = useUserStore();
 
     // Poll for subscription status after checkout opens
     useEffect(() => {
@@ -76,7 +77,8 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
 
     const handleUpgrade = async () => {
         if (!userId || !email) {
-            setError('Please sign in to subscribe');
+            onClose();
+            onSignInRequest();
             return;
         }
 
@@ -137,6 +139,27 @@ export function UpgradeModal({ isOpen, onClose, selectedQuality }: UpgradeModalP
                     <p className="text-sm text-text-highlighted">
                         <strong>{selectedQuality}</strong> exports are only available for Pro subscribers.
                     </p>
+                </div>
+            )}
+
+            {/* Free Credit Banner (non-authenticated users only) */}
+            {!isAuthenticated && (
+                <div className="mb-4 bg-primary/10 border border-primary/30 rounded-sm p-3 flex items-start gap-3">
+                    <FaGift className="text-primary mt-0.5 shrink-0" size={16} />
+                    <div>
+                        <p className="text-sm text-text-highlighted">
+                            <strong>Get a free HD/4K export!</strong>
+                        </p>
+                        <p className="text-xs text-text-muted mt-0.5">
+                            <button
+                                onClick={() => { onClose(); onSignInRequest(); }}
+                                className="text-primary hover:text-primary-highlighted underline"
+                            >
+                                Sign in
+                            </button>
+                            {' '}to claim your free export credit — no subscription needed.
+                        </p>
+                    </div>
                 </div>
             )}
 

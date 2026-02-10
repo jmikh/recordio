@@ -1,4 +1,4 @@
-import { supabase, supabaseAnonKey } from '../../auth/AuthManager';
+import { supabase } from '../../auth/AuthManager';
 
 export class StripeService {
     /**
@@ -12,17 +12,8 @@ export class StripeService {
         try {
             console.log('[Stripe] Creating checkout session for user:', userEmail);
 
-            // For Chrome extensions, we can't use chrome-extension:// URLs as redirect targets
-            // Users will need to manually return to the extension after payment
             const redirectUrl = 'https://recordio.site/subscription-success';
 
-            // Get user session token
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                return { error: new Error('Not authenticated') };
-            }
-
-            // Call Supabase Edge Function to create checkout session
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
                     userId,
@@ -30,10 +21,6 @@ export class StripeService {
                     successUrl: redirectUrl,
                     cancelUrl: redirectUrl,
                 },
-                headers: {
-                    Authorization: `Bearer ${session.access_token}`,
-                    apikey: supabaseAnonKey
-                }
             });
 
             if (error) {
@@ -70,24 +57,11 @@ export class StripeService {
         }
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                return { error: new Error('Not authenticated') };
-            }
-
-            const payload = {
-                customerId,
-                returnUrl: window.location.href,
-            };
-
-            const headers = {
-                Authorization: `Bearer ${session.access_token}`,
-                apikey: supabaseAnonKey
-            };
-
             const { data, error } = await supabase.functions.invoke('create-portal-session', {
-                body: payload,
-                headers
+                body: {
+                    customerId,
+                    returnUrl: window.location.href,
+                },
             });
 
             if (error) {

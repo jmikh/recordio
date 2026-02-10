@@ -24,17 +24,22 @@ export interface UserState {
     subscription: Subscription;
     isPro: boolean; // Computed from subscription.status
 
+    // Free export credit
+    freeCreditsUsed: number; // 0 = credit available, 1+ = used
+
     // Theme preference
     theme: Theme;
 
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
+    setFreeCreditsUsed: (count: number) => void;
     setTheme: (theme: Theme) => void;
     clearUser: () => void;
 
-    // Helper method
+    // Helper methods
     canExportQuality: (quality: ExportQuality) => boolean;
+    hasFreeExportCredit: () => boolean;
 }
 
 export const useUserStore = create<UserState>()(
@@ -54,6 +59,7 @@ export const useUserStore = create<UserState>()(
                 stripeCustomerId: null
             },
             isPro: false,
+            freeCreditsUsed: 0,
             theme: 'dark',
 
             // Actions
@@ -69,6 +75,8 @@ export const useUserStore = create<UserState>()(
                 subscription,
                 isPro: subscription.status === 'active' || subscription.status === 'trialing'
             }),
+
+            setFreeCreditsUsed: (count) => set({ freeCreditsUsed: count }),
 
             setTheme: (theme) => {
                 // Apply theme class to document
@@ -93,20 +101,27 @@ export const useUserStore = create<UserState>()(
                     cancelAtPeriodEnd: false,
                     stripeCustomerId: null
                 },
-                isPro: false
+                isPro: false,
+                freeCreditsUsed: 0
             }),
+
+            // Helper to check if user has a free export credit available
+            hasFreeExportCredit: () => {
+                const { isAuthenticated, isPro, freeCreditsUsed } = get();
+                return isAuthenticated && !isPro && freeCreditsUsed === 0;
+            },
 
             // Helper to check if user can export at quality
             canExportQuality: (quality: ExportQuality) => {
-                const { isPro } = get();
+                const { isPro, hasFreeExportCredit } = get();
 
                 // Free users can export 360p and 720p (with watermark)
                 if (quality === '360p' || quality === '720p') {
                     return true;
                 }
 
-                // Only pro users can export 1080p and 4K
-                return isPro;
+                // Pro users or users with free credit can export 1080p and 4K
+                return isPro || hasFreeExportCredit();
             }
         }),
         {

@@ -13,23 +13,33 @@ import { DefaultButton } from '@shared/components';
 import { AuthModal } from './AuthModal';
 import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
+import { FreeExportConfirmModal } from './FreeExportConfirmModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { LogoLink } from '@shared/components';
 import { trackExportCompleted } from '../../../core/analytics';
+import { useToast } from '../Toast';
 
-const EXPORT_QUALITY_OPTIONS: DropdownOption<ExportQuality>[] = [
-    { value: '360p', label: '360p' },
-    { value: '720p', label: '720p' },
-    { value: '1080p', label: '1080p' },
-    { value: '4K', label: '4K' },
-];
 
 export const Header = () => {
+    const { addToast } = useToast();
 
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [isFreeExportModalOpen, setIsFreeExportModalOpen] = useState(false);
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
-    const { isAuthenticated, isPro, canExportQuality, theme, setTheme } = useUserStore();
+    const { isAuthenticated, isPro, canExportQuality, hasFreeExportCredit, theme, setTheme } = useUserStore();
+
+    const proPill = !isPro ? (
+        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
+            Pro
+        </span>
+    ) : undefined;
+    const exportQualityOptions: DropdownOption<ExportQuality>[] = [
+        { value: '360p', label: '360p' },
+        { value: '720p', label: '720p' },
+        { value: '1080p', label: '1080p', suffix: proPill },
+        { value: '4K', label: '4K', suffix: proPill },
+    ];
     const project = useProjectData();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const isSaving = useProjectStore(s => s.isSaving);
@@ -45,24 +55,33 @@ export const Header = () => {
 
         // Check if user can export this quality
         if (!canExportQuality(quality)) {
-            // User needs Pro subscription for this quality
             setSelectedQuality(quality);
             setIsUpgradeModalOpen(true);
             return;
         }
 
+        // If user has a free credit and this is an HD/4K export, confirm before proceeding
+        if (hasFreeExportCredit() && (quality === '1080p' || quality === '4K')) {
+            setSelectedQuality(quality);
+            setIsFreeExportModalOpen(true);
+            return;
+        }
+
+        startExport(quality);
+    };
+
+    const startExport = async (quality: ExportQuality, options?: { useFreeCredit?: boolean }) => {
+        setIsFreeExportModalOpen(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
 
         try {
-            // Assign to global for cancellation (hacky but effective for single active export)
             (window as any).__activeExportManager = manager;
 
-            await manager.exportProject(project, quality, onProgress, isPro);
+            await manager.exportProject(project, quality, onProgress, options);
 
-            // Track successful export
             const totalDurationMs = project.timeline.outputWindows.length > 0
                 ? project.timeline.outputWindows[project.timeline.outputWindows.length - 1].endMs
                 : 0;
@@ -74,8 +93,11 @@ export const Header = () => {
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
             });
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
+            if (e?.message) {
+                addToast({ type: 'error', title: 'Export Failed', message: e.message });
+            }
         } finally {
             setExportState({ isExporting: false });
             (window as any).__activeExportManager = null;
@@ -136,11 +158,12 @@ export const Header = () => {
 
                 <div className="flex items-center gap-4">
                     <Dropdown
-                        options={EXPORT_QUALITY_OPTIONS}
+                        options={exportQualityOptions}
                         value={null as any}
                         onChange={handleExport}
                         placeholder="Export"
                         fullWidth={false}
+                        buttonClassName="!bg-primary !text-text-on-primary hover:!bg-primary-highlighted"
                     />
                     {/* User Authentication */}
                     {isAuthenticated ? (
@@ -167,12 +190,27 @@ export const Header = () => {
             <AuthModal
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
+                onAuthSuccess={() => {
+                    // If upgrade modal was open before login, re-show it
+                    if (selectedQuality) {
+                        setIsUpgradeModalOpen(true);
+                    }
+                }}
             />
             <UpgradeModal
                 isOpen={isUpgradeModalOpen}
                 onClose={() => setIsUpgradeModalOpen(false)}
+                onSignInRequest={() => setIsAuthModalOpen(true)}
                 selectedQuality={selectedQuality}
             />
+            {selectedQuality && (
+                <FreeExportConfirmModal
+                    isOpen={isFreeExportModalOpen}
+                    onClose={() => setIsFreeExportModalOpen(false)}
+                    onConfirm={() => startExport(selectedQuality, { useFreeCredit: true })}
+                    selectedQuality={selectedQuality}
+                />
+            )}
         </div>
     );
 };

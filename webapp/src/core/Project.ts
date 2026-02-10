@@ -39,7 +39,8 @@ const createDefaultSettings = (): ProjectSettings => ({
         maxZoom: 2,
         isAuto: true,
         maxZoomDurationMs: 750,
-        minZoomDurationMs: 200
+        minZoomDurationMs: 200,
+        easing: 'ease-in-out'
     },
 
     spotlight: {
@@ -48,7 +49,8 @@ const createDefaultSettings = (): ProjectSettings => ({
         enlargeScale: 1.25,
         transitionDurationMs: 300,
         minHoldDurationMs: 200,
-        defaultHoldDurationMs: 1000
+        defaultHoldDurationMs: 1000,
+        easing: 'ease-in-out'
     },
 
     effects: {
