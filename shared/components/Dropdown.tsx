@@ -6,6 +6,7 @@ export interface DropdownOption<T> {
     value: T;
     label: string;
     icon?: React.ReactNode;
+    suffix?: React.ReactNode;
 }
 
 interface DropdownProps<T> {
@@ -18,6 +19,8 @@ interface DropdownProps<T> {
     placeholder?: string;
     /** Additional class for the container */
     className?: string;
+    /** Additional class for the trigger button */
+    buttonClassName?: string;
     /** Use full-width style (default: true) */
     fullWidth?: boolean;
 }
@@ -29,6 +32,7 @@ export function Dropdown<T>({
     label,
     placeholder = 'Select...',
     className = '',
+    buttonClassName = '',
     fullWidth = true
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +49,7 @@ export function Dropdown<T>({
             position: 'fixed',
             top: rect.bottom + 4,
             left: rect.left,
-            width: rect.width,
+            minWidth: rect.width,
             zIndex: 9999,
         });
     }, [isOpen]);
@@ -100,6 +104,7 @@ export function Dropdown<T>({
                     >
                         {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
                         <span className="flex-1">{option.label}</span>
+                        {option.suffix && <span className="flex-shrink-0">{option.suffix}</span>}
                         {isSelected && (
                             <svg
                                 width="10"
@@ -126,7 +131,7 @@ export function Dropdown<T>({
             {/* Trigger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''}`}
+                className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''} ${buttonClassName}`}
             >
                 <div className="flex items-center gap-2">
                     {label && <span className="text-text-muted">{label}</span>}

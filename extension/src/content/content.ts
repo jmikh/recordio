@@ -108,8 +108,20 @@ function handleCountdown(message: BaseMessage) {
     currentSessionId = message.payload?.sessionId;
     blurManager.disable(); // Ensure tool UI is gone before recording
     console.log("[Content] Preparing recording (Countdown)", currentSessionId);
-    startCountdown().then(() => {
+    startCountdown().then((result) => {
         isPreparing = false;
+
+        if (result.canceled) {
+            // User canceled — notify background, show toast
+            const cancelMsg: BaseMessage = {
+                type: MSG_TYPES.COUNTDOWN_CANCELED,
+                payload: { sessionId: currentSessionId }
+            };
+            chrome.runtime.sendMessage(cancelMsg);
+            showCancelToast();
+            return;
+        }
+
         // Notify background we are ready with dimensions
         const readyMsg: BaseMessage = {
             type: MSG_TYPES.COUNTDOWN_DONE,
@@ -157,14 +169,14 @@ function handleStopRecording() {
 
 // --- Utils ---
 
-function startCountdown(): Promise<void> {
+function startCountdown(): Promise<{ canceled: boolean }> {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         Object.assign(overlay.style, {
             position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'oklch(0.15 0.05 260 / 0.85)', zIndex: '2147483647',
-            pointerEvents: 'none'
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'oklch(0 0 0 / 0.5)', zIndex: '2147483647',
+            cursor: 'pointer'
         });
         document.body.appendChild(overlay);
 
@@ -176,14 +188,15 @@ function startCountdown(): Promise<void> {
             color: primaryColor,
             fontSize: '120px',
             fontWeight: 'bold',
-            fontFamily: 'sans-serif',
+            fontFamily: "'Satoshi', sans-serif",
             width: '200px',
             height: '200px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             border: `6px solid ${primaryColor}`,
-            borderRadius: '50%'
+            borderRadius: '50%',
+            backgroundColor: 'oklch(0.93 0.015 75)'
         });
 
         // Create blur background behind the circle
@@ -201,20 +214,95 @@ function startCountdown(): Promise<void> {
 
         overlay.appendChild(countdownContainer);
 
-        let count = 1;
+        // Cancel hint below the circle
+        const hint = document.createElement('div');
+        Object.assign(hint.style, {
+            marginTop: '24px',
+            color: 'oklch(0.92 0 0 / 70%)',
+            fontSize: '14px',
+            fontFamily: "'Satoshi', sans-serif",
+            fontWeight: '500',
+            pointerEvents: 'none',
+            backgroundColor: 'oklch(0.13 0.01 270)',
+            padding: '6px 14px',
+            borderRadius: '6px'
+        });
+        hint.innerText = 'Press Esc or click to cancel';
+        overlay.appendChild(hint);
+
+        let count = 3;
         countdownContainer.innerText = count.toString();
+        let canceled = false;
+
+        const cleanup = () => {
+            clearInterval(interval);
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+        };
+
+        const cancel = () => {
+            if (canceled) return;
+            canceled = true;
+            cleanup();
+            resolve({ canceled: true });
+        };
+
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') cancel();
+        };
+
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('click', cancel);
 
         const interval = setInterval(() => {
             count--;
             if (count > 0) {
                 countdownContainer.innerText = count.toString();
             } else {
-                clearInterval(interval);
-                overlay.remove();
-                resolve();
+                cleanup();
+                resolve({ canceled: false });
             }
         }, 1000);
     });
+}
+
+/** Lightweight DOM toast — auto-dismisses after 2s */
+function showCancelToast() {
+    const toast = document.createElement('div');
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '32px',
+        left: '50%',
+        transform: 'translateX(-50%) translateY(0)',
+        padding: '10px 20px',
+        borderRadius: '8px',
+        backgroundColor: 'oklch(0.20 0.01 270 / 0.9)',
+        color: 'oklch(0.9 0 0 / 80%)',
+        fontSize: '14px',
+        fontFamily: "'Satoshi', sans-serif",
+        fontWeight: '500',
+        zIndex: '2147483647',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid oklch(1 0 0 / 8%)',
+        transition: 'opacity 0.3s, transform 0.3s',
+        opacity: '0',
+        pointerEvents: 'none'
+    });
+    toast.innerText = 'Recording cancelled';
+    document.body.appendChild(toast);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+    });
+
+    // Animate out and remove
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
 }
 
 // History API Patching (for URL changes)

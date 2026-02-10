@@ -37,6 +37,7 @@ export const MSG_TYPES = {
     CAPTURE_USER_EVENT: 'CAPTURE_USER_EVENT',           // Content -> Background (User interactions)
     START_COUNTDOWN: 'START_COUNTDOWN',                 // Background -> Content (Start countdown/calibration)
     COUNTDOWN_DONE: 'COUNTDOWN_DONE',                   // Content -> Background (Countdown done)
+    COUNTDOWN_CANCELED: 'COUNTDOWN_CANCELED',           // Content -> Background (User canceled countdown)
 
     // Coordination
     PING_OFFSCREEN: 'PING_OFFSCREEN',

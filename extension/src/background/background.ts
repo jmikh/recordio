@@ -319,12 +319,12 @@ async function startTabModeSession(payload: any, sessionId: string) {
         chrome.tabs.sendMessage(tabId, countdownMsg);
     }
 
-    // Wait for COUNTDOWN_DONE from Content (contains dimensions)
-    const dimensions = await waitForCountdownDone(tabId, sessionId);
-    if (!dimensions) throw new Error("Could not retrieve viewport dimensions from content script.");
+    // Wait for COUNTDOWN_DONE or COUNTDOWN_CANCELED from Content
+    const countdownResult = await waitForCountdown(tabId, sessionId);
+    if (countdownResult.status === 'canceled') return; // Silent early return
 
     // Update config with real dimensions
-    config.tabViewportSize = dimensions;
+    config.tabViewportSize = countdownResult.dimensions;
 
     // 6. Send START to Offscreen (VideoRecorder)
     const startVideoMsg: BaseMessage = {
@@ -470,26 +470,39 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
     }
 }
 
-async function waitForCountdownDone(tabId: number | undefined, sessionId: string): Promise<Size | null> {
-    if (!tabId) return null;
+type CountdownResult =
+    | { status: 'done'; dimensions: Size }
+    | { status: 'canceled' };
 
-    return new Promise<Size | null>((resolve, reject) => {
-        const readyListener = (msg: any) => {
-            if (msg.type === MSG_TYPES.COUNTDOWN_DONE && msg.payload?.sessionId === sessionId) {
-                chrome.runtime.onMessage.removeListener(readyListener);
-                if (msg.payload && msg.payload.width && msg.payload.height) {
-                    const { width, height, dpr } = msg.payload;
-                    resolve({ width: Math.round(width * (dpr || 1)), height: Math.round(height * (dpr || 1)) });
-                } else {
-                    resolve(null);
-                }
+async function waitForCountdown(tabId: number | undefined, sessionId: string): Promise<CountdownResult> {
+    if (!tabId) throw new Error('No tab ID for countdown');
+
+    return new Promise<CountdownResult>((resolve, reject) => {
+        const listener = (msg: any) => {
+            if (msg.payload?.sessionId !== sessionId) return;
+
+            if (msg.type === MSG_TYPES.COUNTDOWN_DONE) {
+                chrome.runtime.onMessage.removeListener(listener);
+                clearTimeout(timeout);
+                const { width, height, dpr } = msg.payload;
+                resolve({
+                    status: 'done',
+                    dimensions: {
+                        width: Math.round(width * (dpr || 1)),
+                        height: Math.round(height * (dpr || 1))
+                    }
+                });
+            } else if (msg.type === MSG_TYPES.COUNTDOWN_CANCELED) {
+                chrome.runtime.onMessage.removeListener(listener);
+                clearTimeout(timeout);
+                resolve({ status: 'canceled' });
             }
         };
-        chrome.runtime.onMessage.addListener(readyListener);
-        setTimeout(() => {
-            chrome.runtime.onMessage.removeListener(readyListener);
-            reject(new Error("Timeout waiting for countdown"));
-        }, 5000);
+        chrome.runtime.onMessage.addListener(listener);
+        const timeout = setTimeout(() => {
+            chrome.runtime.onMessage.removeListener(listener);
+            reject(new Error('Timeout waiting for countdown'));
+        }, 10000);
     });
 }
 
