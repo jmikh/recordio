@@ -447,7 +447,7 @@ export function CaptionsSettings() {
             </CollapsibleCard>
 
             {emptyCaptionsNotice && (
-                <Notice variant="info">
+                <Notice>
                     No audible speech was detected in the audio. Captions require clear, spoken English to generate.
                 </Notice>
             )}

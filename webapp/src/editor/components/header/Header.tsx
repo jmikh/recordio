@@ -109,7 +109,7 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <LogoLink className="mr-2" imgClassName="h-8" />
+                    <LogoLink className="mr-2" imgClassName="h-7" />
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">

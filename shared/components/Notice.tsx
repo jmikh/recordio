@@ -2,24 +2,17 @@ import type { ReactNode } from 'react';
 
 interface NoticeProps {
     children: ReactNode;
-    variant?: 'info' | 'warning' | 'error';
     className?: string;
 }
 
 /**
- * Notice component for displaying informational, warning, or error messages to users.
+ * Notice component for displaying informational messages to users.
  * Used across the app to convey important messages in a consistent style.
  */
-export const Notice = ({ children, variant = 'info', className = '' }: NoticeProps) => {
-    const variantStyles = {
-        info: 'text-text-main bg-state-inactive border-border',
-        warning: 'text-secondary bg-secondary/10 border-secondary/20',
-        error: 'text-red-400 bg-red-500/10 border-red-500/20',
-    };
-
+export const Notice = ({ children, className = '' }: NoticeProps) => {
     return (
         <div
-            className={`font-normal flex items-start gap-3 text-sm px-4 py-3 rounded-sm border ${variantStyles[variant]} ${className}`}
+            className={`font-normal flex items-start gap-3 text-sm text-disabled px-4 py-3 rounded-sm border border-border bg-state-inactive ${className}`}
         >
             {/* Exclamation Icon */}
             <div className="flex-shrink-0 mt-0.5">

@@ -20,6 +20,7 @@ dist-ssr
 supabase/.temp/*
 
 dist.zip
+extension.zip
 
 # Editor directories and files
 .vscode/*

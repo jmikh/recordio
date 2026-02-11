@@ -1,6 +1,6 @@
 import { type ComponentProps } from 'react';
-import logoDark from '@shared/assets/fulllogo-dark.webp';
-import logoLight from '@shared/assets/fulllogo-light.webp';
+import logoDark from '@shared/assets/fulllogo-dark.png';
+import logoLight from '@shared/assets/fulllogo-light.png';
 import './LogoLink.css';
 
 interface LogoProps extends ComponentProps<'a'> {

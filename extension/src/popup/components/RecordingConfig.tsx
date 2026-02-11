@@ -70,7 +70,7 @@ export function RecordingConfig({
             </div>
 
             {recordingMode === 'tab' && canInjectContentScript === false && (
-                <Notice variant="warning" className="animate-in fade-in slide-in-from-top-1">
+                <Notice className="animate-in fade-in slide-in-from-top-1">
                     Cannot record tab of Chrome own pages. Start Recordio in another tab or use Window or Screen mode instead.
                 </Notice>
             )}
