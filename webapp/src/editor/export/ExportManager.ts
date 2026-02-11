@@ -4,6 +4,7 @@ import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
+import { TimeMapper } from '../../core/mappers/timeMapper';
 import type { Project, SourceMetadata } from '../../types';
 import fullLogoPng from '@shared/assets/fulllogo-dark.png';
 
@@ -169,7 +170,8 @@ export class ExportManager {
                 imageElements.watermark = await loadImage(fullLogoPng);
             }
 
-            const totalDurationMs = this.getTotalDuration(renderProject);
+            const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
+            const totalDurationMs = timeMapper.outputDuration;
             const totalDurationSec = totalDurationMs / 1000;
             const sampleRate = 44100;
 
@@ -183,14 +185,18 @@ export class ExportManager {
                     const arrayBuffer = await response.arrayBuffer();
                     const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
+                    let outputAccSec = 0;
                     renderProject.timeline.outputWindows.forEach((window: any) => {
+                        const speed = window.speed || 1.0;
                         const sourceNode = offlineCtx.createBufferSource();
                         sourceNode.buffer = audioBuffer;
+                        sourceNode.playbackRate.value = speed;
                         sourceNode.connect(offlineCtx.destination);
 
-                        const startTime = window.startMs / 1000;
+                        const offset = window.startMs / 1000;
                         const duration = (window.endMs - window.startMs) / 1000;
-                        const offset = (window.startMs) / 1000;
+                        const startTime = outputAccSec;
+                        outputAccSec += duration / speed;
 
                         if (offset >= 0 && offset < audioBuffer.duration) {
                             sourceNode.start(startTime, offset, duration);
@@ -228,7 +234,7 @@ export class ExportManager {
                     timeRemainingSeconds: timeRemaining
                 });
 
-                const sourceTimeMs = currentTimeMs;
+                const sourceTimeMs = timeMapper.mapOutputToSourceTime(currentTimeMs);
                 await Promise.all(Object.values(videoElements).map(async (v) => {
                     v.currentTime = sourceTimeMs / 1000;
                     await new Promise<void>(r => {
@@ -377,9 +383,7 @@ export class ExportManager {
     }
 
     private getTotalDuration(project: Project): number {
-        // Last window end time
-        const windows = project.timeline.outputWindows;
-        if (windows.length === 0) return 0;
-        return windows[windows.length - 1].endMs;
+        const timeMapper = new TimeMapper(project.timeline.outputWindows);
+        return timeMapper.outputDuration;
     }
 }

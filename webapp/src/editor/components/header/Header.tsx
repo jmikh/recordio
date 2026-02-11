@@ -17,6 +17,7 @@ import { FreeExportConfirmModal } from './FreeExportConfirmModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { LogoLink } from '@shared/components';
 import { trackExportCompleted } from '../../../core/analytics';
+import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { useToast } from '../Toast';
 
 
@@ -82,9 +83,7 @@ export const Header = () => {
 
             await manager.exportProject(project, quality, onProgress, options);
 
-            const totalDurationMs = project.timeline.outputWindows.length > 0
-                ? project.timeline.outputWindows[project.timeline.outputWindows.length - 1].endMs
-                : 0;
+            const totalDurationMs = new TimeMapper(project.timeline.outputWindows).outputDuration;
 
             trackExportCompleted({
                 quality,
@@ -135,13 +134,13 @@ export const Header = () => {
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 
-                            <button
+                            {/* <button
                                 onClick={() => useUIStore.getState().toggleDebugBar()}
                                 title="Toggle Debug Bar"
                                 className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
                             >
                                 Debug
-                            </button>
+                            </button> */}
                         </>
                     )}
                 </div>
