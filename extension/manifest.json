@@ -12,8 +12,7 @@
         "scripting",
         "desktopCapture",
         "tabs",
-        "unlimitedStorage",
-        "identity"
+        "unlimitedStorage"
     ],
     "host_permissions": [
         "<all_urls>"
@@ -47,7 +46,7 @@
         ]
     },
     "content_security_policy": {
-        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.supabase.co https://www.google-analytics.com; object-src 'self'"
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.supabase.co; object-src 'self'"
     },
     "web_accessible_resources": []
 }
