@@ -352,7 +352,8 @@ function App() {
           <DefaultButton
             onClick={handleBlurMode}
             className="p-1.5"
-            title="Blur Items"
+            title={canInjectContentScript === false ? "Blur doesn't work on Chrome-owned pages" : "Blur Items"}
+            disabled={canInjectContentScript === false}
           >
             <MdBlurOn size={16} />
           </DefaultButton>
