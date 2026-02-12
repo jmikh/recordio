@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { formatTimeCode } from '../../utils';
+import { useUserStore } from '../../stores/useUserStore';
 
 interface TimelineRulerProps {
     totalWidth: number;
@@ -10,15 +11,8 @@ interface TimelineRulerProps {
     containerWidth?: number;
 }
 
-/**
- * Viewport-aware timeline ruler.
- *
- * Instead of creating a single canvas spanning the full timeline width
- * (which crashes the browser for long recordings when the pixel dimensions
- * exceed ~65 535 px), we size the canvas to the visible viewport plus a
- * small buffer and translate it with CSS so it lines up with the scroll
- * position.  The drawing loop only emits ticks inside this window.
- */
+// ... (interface remains same)
+
 export const TimelineRuler: React.FC<TimelineRulerProps> = ({
     totalWidth,
     pixelsPerSec,
@@ -28,6 +22,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
     containerWidth = 0,
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Subscribe to theme changes to force redraw
+    const theme = useUserStore((s) => s.theme);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -56,10 +52,10 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, viewWidth, height);
 
-        // Read theme colors
+        // Read theme colors from semantic tokens
         const style = getComputedStyle(document.documentElement);
-        const textColor = 'rgba(255, 255, 255, 0.6)';
-        const tickColor = 'rgba(255, 255, 255, 0.4)';
+        const textColor = style.getPropertyValue('--text-muted').trim();
+        const tickColor = style.getPropertyValue('--text-disabled').trim();
 
         ctx.fillStyle = textColor;
         ctx.strokeStyle = tickColor;
@@ -102,7 +98,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         }
         ctx.stroke();
 
-    }, [totalWidth, pixelsPerSec, height, scrollLeft, containerWidth, headerWidth]);
+    }, [totalWidth, pixelsPerSec, height, scrollLeft, containerWidth, headerWidth, theme]);
 
     return (
         <div className="sticky top-0 z-[var(--z-index-overlay)] bg-surface border-t border-b border-border">

@@ -73,6 +73,7 @@ export const Header = () => {
 
     const startExport = async (quality: ExportQuality, options?: { useFreeCredit?: boolean }) => {
         setIsFreeExportModalOpen(false);
+        useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
         const manager = new ExportManager();

@@ -13,21 +13,21 @@ import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/pro
 
 
 const BACKGROUND_IMAGES = [
-    { name: 'Background 1', url: '/assets/backgrounds/bg1.avif' },
-    { name: 'Background 2', url: '/assets/backgrounds/bg2.avif' },
-    { name: 'Background 3', url: '/assets/backgrounds/bg3.avif' },
-    { name: 'Background 4', url: '/assets/backgrounds/bg4.avif' },
-    { name: 'Background 5', url: '/assets/backgrounds/bg5.avif' },
-    { name: 'Background 6', url: '/assets/backgrounds/bg6.avif' },
-    { name: 'Background 7', url: '/assets/backgrounds/bg7.avif' },
-    { name: 'Background 8', url: '/assets/backgrounds/bg8.avif' },
-    { name: 'Background 9', url: '/assets/backgrounds/bg9.avif' },
-    { name: 'Background 10', url: '/assets/backgrounds/bg10.avif' },
-    { name: 'Background 11', url: '/assets/backgrounds/bg11.avif' },
-    { name: 'Background 12', url: '/assets/backgrounds/bg12.avif' },
-    { name: 'Background 13', url: '/assets/backgrounds/bg13.avif' },
-    { name: 'Background 14', url: '/assets/backgrounds/bg14.avif' },
-    { name: 'Background 15', url: '/assets/backgrounds/bg15.avif' },
+    { name: 'Background 1', url: '/assets/backgrounds/bg1.avif', thumbnail: '/assets/backgrounds/bg1-small.avif' },
+    { name: 'Background 2', url: '/assets/backgrounds/bg2.avif', thumbnail: '/assets/backgrounds/bg2-small.avif' },
+    { name: 'Background 3', url: '/assets/backgrounds/bg3.avif', thumbnail: '/assets/backgrounds/bg3-small.avif' },
+    { name: 'Background 4', url: '/assets/backgrounds/bg4.avif', thumbnail: '/assets/backgrounds/bg4-small.avif' },
+    { name: 'Background 5', url: '/assets/backgrounds/bg5.avif', thumbnail: '/assets/backgrounds/bg5-small.avif' },
+    { name: 'Background 6', url: '/assets/backgrounds/bg6.avif', thumbnail: '/assets/backgrounds/bg6-small.avif' },
+    { name: 'Background 7', url: '/assets/backgrounds/bg7.avif', thumbnail: '/assets/backgrounds/bg7-small.avif' },
+    { name: 'Background 8', url: '/assets/backgrounds/bg8.avif', thumbnail: '/assets/backgrounds/bg8-small.avif' },
+    { name: 'Background 9', url: '/assets/backgrounds/bg9.avif', thumbnail: '/assets/backgrounds/bg9-small.avif' },
+    { name: 'Background 10', url: '/assets/backgrounds/bg10.avif', thumbnail: '/assets/backgrounds/bg10-small.avif' },
+    { name: 'Background 11', url: '/assets/backgrounds/bg11.avif', thumbnail: '/assets/backgrounds/bg11-small.avif' },
+    { name: 'Background 12', url: '/assets/backgrounds/bg12.avif', thumbnail: '/assets/backgrounds/bg12-small.avif' },
+    { name: 'Background 13', url: '/assets/backgrounds/bg13.avif', thumbnail: '/assets/backgrounds/bg13-small.avif' },
+    { name: 'Background 14', url: '/assets/backgrounds/bg14.avif', thumbnail: '/assets/backgrounds/bg14-small.avif' },
+    { name: 'Background 15', url: '/assets/backgrounds/bg15.avif', thumbnail: '/assets/backgrounds/bg15-small.avif' },
 ];
 
 export const BackgroundSettings = () => {
@@ -254,7 +254,9 @@ export const BackgroundSettings = () => {
                 ? { background: `linear-gradient(${gradientDirection}deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)` }
                 : { background: backgroundColor };
         } else if (backgroundType === 'preset') {
-            return { backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+            const match = BACKGROUND_IMAGES.find(bg => bg.url === backgroundImageUrl);
+            const previewUrl = match?.thumbnail ?? backgroundImageUrl;
+            return { backgroundImage: `url(${previewUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
         } else if (backgroundType === 'custom' && background.customRuntimeUrl) {
             return { backgroundImage: `url(${background.customRuntimeUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
         }
@@ -400,7 +402,7 @@ export const BackgroundSettings = () => {
                                     onClick={() => handlePresetSelect(img.url)}
                                     title={img.name}
                                 >
-                                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                    <img src={img.thumbnail} alt={img.name} className="w-full h-full object-cover" />
                                 </div>
                             );
                         })}

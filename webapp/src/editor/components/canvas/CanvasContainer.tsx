@@ -94,6 +94,13 @@ export const CanvasContainer = () => {
         const tick = (time: number) => {
             animationFrameRef.current = requestAnimationFrame(tick);
 
+            // Skip expensive rendering while export is in progress.
+            // The export uses its own offscreen canvas and video elements,
+            // so the main canvas render loop just wastes CPU/GPU cycles.
+            // Playback is paused via UIStore at export start (Header.tsx).
+            const { exportState } = useProjectStore.getState();
+            if (exportState.isExporting) return;
+
             const uiState = useUIStore.getState();
             const { project } = useProjectStore.getState();
             const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId } = uiState;

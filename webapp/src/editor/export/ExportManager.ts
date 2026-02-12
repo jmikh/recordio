@@ -222,17 +222,19 @@ export class ExportManager {
                 const currentTimeMs = i * frameInterval;
                 const timestampMicros = i * (1000000 / fps);
 
-                // Update Progress
+                // Update Progress (every 30 frames to avoid excessive store updates)
                 framesProcessed++;
-                const elapsedTime = (performance.now() - startTime) / 1000;
-                const fpsRate = framesProcessed / elapsedTime;
-                const remainingFrames = totalFrames - framesProcessed;
-                const timeRemaining = remainingFrames / fpsRate;
+                if (framesProcessed % 30 === 0 || framesProcessed === totalFrames) {
+                    const elapsedTime = (performance.now() - startTime) / 1000;
+                    const fpsRate = framesProcessed / elapsedTime;
+                    const remainingFrames = totalFrames - framesProcessed;
+                    const timeRemaining = remainingFrames / fpsRate;
 
-                onProgress({
-                    progress: framesProcessed / totalFrames,
-                    timeRemainingSeconds: timeRemaining
-                });
+                    onProgress({
+                        progress: framesProcessed / totalFrames,
+                        timeRemainingSeconds: timeRemaining
+                    });
+                }
 
                 const sourceTimeMs = timeMapper.mapOutputToSourceTime(currentTimeMs);
                 await Promise.all(Object.values(videoElements).map(async (v) => {
@@ -243,12 +245,9 @@ export class ExportManager {
                 }));
 
                 // Render Frame
-                // 1. CLEAR & BACKGROUND
                 ctx.clearRect(0, 0, width, height);
 
-                // We need to import drawBackground
-                // (Import added at top of file separately)
-                await drawBackground(
+                drawBackground(
                     ctx,
                     renderProject.settings.background,
                     renderProject.settings.background.backgroundBlur,
@@ -272,7 +271,6 @@ export class ExportManager {
                     drawWatermark(ctx, imageElements.watermark, width);
                 }
 
-
                 const durationMicros = 1000000 / fps;
                 const frame = new VideoFrame(offscreenCanvas, {
                     timestamp: timestampMicros,
@@ -282,7 +280,13 @@ export class ExportManager {
                 videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
                 frame.close();
 
-                await new Promise(r => setTimeout(r, 0));
+                // Yield to the event loop only when the encoder is backed up
+                // or periodically for UI responsiveness (progress bar, cancel button)
+                if (videoEncoder.encodeQueueSize > 10) {
+                    await new Promise(r => setTimeout(r, 0));
+                } else if (framesProcessed % 30 === 0) {
+                    await new Promise(r => setTimeout(r, 0));
+                }
             }
 
             await videoEncoder.flush();
