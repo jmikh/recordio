@@ -1,24 +1,17 @@
-import type { Size, Rect, Project } from '../../types';
+import type { Size, Rect } from '../../types';
 import type { SpotlightState } from '../spotlight/spotlightMotion';
-import { drawScreen } from './screenPainter';
-
-/**
- * Resources needed for rendering the scaled spotlight content.
- */
-export interface SpotlightRenderResources {
-    video: HTMLVideoElement;
-    project: Project;
-    effectiveViewport: Rect;
-    deviceFrameImg: HTMLImageElement | null;
-}
 
 /**
  * Draws the spotlight overlay effect on the canvas.
  * 
  * The effect consists of:
- * 1. A semi-transparent dark overlay covering the entire canvas (ALWAYS when spotlight is active)
- * 2. A "cut out" region where the spotlight is (ONLY if spotlight is visible in viewport)
- * 3. The spotlight content re-rendered at enlargeScale (ONLY if spotlight is visible)
+ * 1. Snapshot the spotlight region from the current canvas (capturing all previously painted layers)
+ * 2. A semi-transparent dark overlay covering the entire canvas (ALWAYS when spotlight is active)
+ * 3. A "cut out" region where the spotlight is (ONLY if spotlight is visible in viewport)
+ * 4. The snapshotted content drawn back scaled into the spotlight region
+ * 
+ * Because the spotlight samples what's already on the canvas, all effects (mouse clicks,
+ * drags, debug overlays) are captured in the enlarged spotlight region.
  * 
  * If the spotlight region is outside the current viewport:
  * - Dimming still applies (entire screen is dimmed)
@@ -28,13 +21,13 @@ export interface SpotlightRenderResources {
  * @param ctx - Canvas rendering context
  * @param spotlightState - Current spotlight state (null = no spotlight)
  * @param outputSize - Canvas dimensions
- * @param renderResources - Optional resources for rendering scaled content
+ * @param sourceCanvas - The canvas to sample existing content from for the enlarged region
  */
 export function drawSpotlight(
     ctx: CanvasRenderingContext2D,
     spotlightState: SpotlightState | null,
     outputSize: Size,
-    renderResources?: SpotlightRenderResources
+    sourceCanvas?: HTMLCanvasElement | OffscreenCanvas
 ): void {
     // Skip if no spotlight state OR if there's no visual effect at all
     // (dimOpacity = 0 means no dimming, scale = 1 means no enlargement)
@@ -59,16 +52,28 @@ export function drawSpotlight(
 
     // =========================================================
     // CASE 2: Spotlight IS visible
-    // Draw dim overlay with cut-out hole and scaled content
+    // Snapshot → Dim with cut-out → Draw scaled content
     // =========================================================
 
     // borderRadius is already in OUTPUT coordinates
     const radiusPx = borderRadius;
 
-    // Save current state
-    ctx.save();
+    // Snapshot the spotlight region BEFORE dimming so the enlarged
+    // content does not include the dim overlay.
+    let snapshot: ImageData | null = null;
+    if (sourceCanvas && scale > 1.0 && scaledRect) {
+        // Clamp to canvas bounds to avoid getImageData errors
+        const sx = Math.max(0, Math.round(originalRect.x));
+        const sy = Math.max(0, Math.round(originalRect.y));
+        const sw = Math.min(Math.round(originalRect.width), sourceCanvas.width - sx);
+        const sh = Math.min(Math.round(originalRect.height), sourceCanvas.height - sy);
+        if (sw > 0 && sh > 0) {
+            snapshot = ctx.getImageData(sx, sy, sw, sh);
+        }
+    }
 
     // Draw dim overlay with cut-out for spotlight
+    ctx.save();
     ctx.fillStyle = dimColor;
 
     // Top rectangle (full width, from top to spotlight top)
@@ -101,26 +106,24 @@ export function drawSpotlight(
 
     ctx.restore();
 
-    // Draw scaled spotlight content (if resources provided and scale > 1)
-    if (renderResources && scale > 1.0 && scaledRect) {
-        drawScaledSpotlightContent(ctx, originalRect, scaledRect, scale, radiusPx, renderResources);
+    // Draw scaled spotlight content from the snapshot
+    if (snapshot && scale > 1.0 && scaledRect) {
+        drawScaledCanvasContent(ctx, snapshot, originalRect, scaledRect, scale, radiusPx);
     }
 }
 
 /**
- * Draws the spotlight content scaled up from the center.
- * Uses clipping to only affect the spotlight region.
+ * Draws the spotlight content scaled up from the center using a canvas snapshot.
+ * Uses an offscreen bitmap to scale the snapshot and clips to the spotlight region.
  */
-function drawScaledSpotlightContent(
+function drawScaledCanvasContent(
     ctx: CanvasRenderingContext2D,
+    snapshot: ImageData,
     originalRect: Rect,
     scaledRect: Rect,
     scale: number,
-    radiusPx: [number, number, number, number],
-    resources: SpotlightRenderResources
+    radiusPx: [number, number, number, number]
 ): void {
-    const { video, project, effectiveViewport, deviceFrameImg } = resources;
-
     // Calculate spotlight center (from original rect)
     const cx = originalRect.x + originalRect.width / 2;
     const cy = originalRect.y + originalRect.height / 2;
@@ -154,14 +157,13 @@ function drawScaledSpotlightContent(
     ctx.scale(scale, scale);
     ctx.translate(-cx, -cy);
 
-    // Re-render screen content (clipped and scaled)
-    drawScreen(
-        ctx,
-        video,
-        project,
-        effectiveViewport,
-        deviceFrameImg
-    );
+    // Draw the snapshot back at the original position (the transform scales it up)
+    // Use a temporary canvas to convert ImageData → drawable source
+    const tmpCanvas = new OffscreenCanvas(snapshot.width, snapshot.height);
+    const tmpCtx = tmpCanvas.getContext('2d')!;
+    tmpCtx.putImageData(snapshot, 0, 0);
+
+    ctx.drawImage(tmpCanvas, Math.round(originalRect.x), Math.round(originalRect.y));
 
     ctx.restore();
 }

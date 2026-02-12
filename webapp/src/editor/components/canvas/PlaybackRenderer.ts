@@ -96,19 +96,8 @@ export class PlaybackRenderer {
         }
 
 
-
-        // Render Keyboard Overlay
-        if (project.settings.effects?.showKeyboardClicks) {
-            drawKeyboardOverlay(
-                ctx,
-                userEvents.keyboardEvents,
-                sourceTimeMs,
-                outputSize
-            );
-        }
-
-        // Render Spotlight Overlay (after all content, before camera)
-        // Spotlight is defined in source coordinates and mapped to output via viewMapper
+        // Render Spotlight Overlay (after screen + effects, before keyboard/camera)
+        // Spotlight samples the canvas as-is, so mouse clicks/drags are captured
         if (viewMapper) {
             const spotlightState = getSpotlightStateAtTime(
                 timeline.spotlightActions || [],
@@ -119,14 +108,19 @@ export class PlaybackRenderer {
                 timeMapper
             );
 
-            // Pass resources for scaled content rendering
-            drawSpotlight(ctx, spotlightState, outputSize, screenVideo ? {
-                video: screenVideo,
-                project,
-                effectiveViewport,
-                deviceFrameImg: resources.deviceFrameImg
-            } : undefined);
+            drawSpotlight(ctx, spotlightState, outputSize, resources.canvas);
         }
+
+        // Render Keyboard Overlay (after spotlight, so it appears on top of dimming)
+        if (project.settings.effects?.showKeyboardClicks) {
+            drawKeyboardOverlay(
+                ctx,
+                userEvents.keyboardEvents,
+                sourceTimeMs,
+                outputSize
+            );
+        }
+
 
         // Render Webcam Layer (after spotlight, so camera always appears on top)
         if (cameraSource) {
