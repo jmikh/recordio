@@ -4,13 +4,13 @@ export class StripeService {
     /**
      * Create a Stripe Checkout session and redirect to checkout
      */
-    static async createCheckoutSession(userId: string, userEmail: string): Promise<{ error?: Error }> {
+    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly'): Promise<{ error?: Error }> {
         if (!supabase) {
             return { error: new Error('Supabase not configured') };
         }
 
         try {
-            console.log('[Stripe] Creating checkout session for user:', userEmail);
+            console.log('[Stripe] Creating checkout session for user:', userEmail, 'interval:', interval);
 
             const redirectUrl = 'https://recordio.site/subscription-success';
 
@@ -18,6 +18,7 @@ export class StripeService {
                 body: {
                     userId,
                     userEmail,
+                    interval,
                     successUrl: redirectUrl,
                     cancelUrl: redirectUrl,
                 },

@@ -126,7 +126,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                         ) : (
                             <button
                                 onClick={handleUpgrade}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-primary-fg hover:bg-primary/10 rounded-md transition-colors text-left font-medium group"
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-primary/10 rounded-md transition-colors text-left font-medium group"
                             >
                                 <FaCrown size={14} className="group-hover:scale-110 transition-transform" />
                                 Upgrade to Pro

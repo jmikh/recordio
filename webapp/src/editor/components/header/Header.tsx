@@ -30,11 +30,11 @@ export const Header = () => {
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
     const { isAuthenticated, isPro, canExportQuality, hasFreeExportCredit, theme, setTheme } = useUserStore();
 
-    const proPill = !isPro ? (
+    const proPill = (
         <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
             Pro
         </span>
-    ) : undefined;
+    );
     const exportQualityOptions: DropdownOption<ExportQuality>[] = [
         { value: '360p', label: '360p' },
         { value: '720p', label: '720p' },

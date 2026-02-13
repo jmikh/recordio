@@ -78,10 +78,6 @@ export class AuthManager {
                 provider,
                 options: {
                     redirectTo: window.location.href,
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
-                    },
                 },
             });
 

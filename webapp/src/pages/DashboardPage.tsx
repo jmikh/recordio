@@ -4,11 +4,14 @@ import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { LogoLink, DefaultButton } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
+import { MdDarkMode, MdLightMode } from 'react-icons/md';
+import { useUserStore } from '../editor/stores/useUserStore';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { theme, setTheme } = useUserStore();
 
     useEffect(() => {
         // Check for error message in URL
@@ -68,6 +71,12 @@ export function DashboardPage() {
                                 <BiSupport size={18} />
                             </DefaultButton>
                         </a>
+                        <DefaultButton
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
+                        </DefaultButton>
                     </div>
                 </div>
             </header>

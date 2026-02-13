@@ -7,7 +7,13 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
     httpClient: Stripe.createFetchHttpClient(),
 });
 
-const PRICE_ID = Deno.env.get('STRIPE_PRICE_ID') || '';
+const PRICE_IDS: Record<string, string> = {
+    monthly: Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
+    yearly: Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
+};
+
+// Backward compat: fall back to single STRIPE_PRICE_ID if monthly/yearly not set
+const FALLBACK_PRICE_ID = Deno.env.get('STRIPE_PRICE_ID') || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -45,7 +51,7 @@ serve(async (req) => {
             );
         }
 
-        const { userId, userEmail, successUrl, cancelUrl } = await req.json();
+        const { userId, userEmail, interval, successUrl, cancelUrl } = await req.json();
 
         if (userId !== user.id) {
             console.error('[Checkout] User ID mismatch:', userId, 'vs', user.id);
@@ -55,14 +61,25 @@ serve(async (req) => {
             );
         }
 
+        // Select price based on interval, falling back to single price ID
+        const priceId = PRICE_IDS[interval || 'yearly'] || FALLBACK_PRICE_ID;
+
+        if (!priceId) {
+            console.error('[Checkout] No price ID configured for interval:', interval);
+            return new Response(
+                JSON.stringify({ error: 'No price configured for the selected plan' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
         const session = await stripe.checkout.sessions.create({
             customer_email: userEmail,
             client_reference_id: userId,
-            line_items: [{ price: PRICE_ID, quantity: 1 }],
+            line_items: [{ price: priceId, quantity: 1 }],
             mode: 'subscription',
             success_url: successUrl,
             cancel_url: cancelUrl,
-            metadata: { userId },
+            metadata: { userId, interval: interval || 'yearly' },
         });
 
         return new Response(
@@ -78,8 +95,11 @@ serve(async (req) => {
             error: errorMessage,
             stack: error instanceof Error ? error.stack?.substring(0, 500) : undefined,
             hasStripeKey: !!Deno.env.get('STRIPE_SECRET_KEY'),
-            hasPriceId: !!Deno.env.get('STRIPE_PRICE_ID'),
-            priceIdValue: Deno.env.get('STRIPE_PRICE_ID') || '(not set)',
+            hasPriceIds: {
+                monthly: !!Deno.env.get('STRIPE_PRICE_ID_MONTHLY'),
+                annual: !!Deno.env.get('STRIPE_PRICE_ID_YEARLY'),
+                fallback: !!Deno.env.get('STRIPE_PRICE_ID'),
+            },
         };
 
         console.error('[Checkout] Error details:', errorDetails);
@@ -90,3 +110,4 @@ serve(async (req) => {
         );
     }
 });
+

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCrown, FaCheck, FaTimes, FaGift } from 'react-icons/fa';
+import { FaCrown, FaCheck, FaGift } from 'react-icons/fa';
 import { PrimaryButton, DefaultButton, XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
@@ -12,11 +12,14 @@ interface UpgradeModalProps {
     selectedQuality?: string | null;
 }
 
+type BillingInterval = 'monthly' | 'yearly';
+
 export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
     const [checkingStatus, setCheckingStatus] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [billingInterval, setBillingInterval] = useState<BillingInterval>('yearly');
     const { userId, email, isAuthenticated } = useUserStore();
 
     // Poll for subscription status after checkout opens
@@ -85,7 +88,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         setLoading(true);
         setError(null);
 
-        const { error: checkoutError } = await StripeService.createCheckoutSession(userId, email);
+        const { error: checkoutError } = await StripeService.createCheckoutSession(userId, email, billingInterval);
 
         if (checkoutError) {
             setError(checkoutError.message || 'Failed to start checkout. Please try again.');
@@ -97,8 +100,13 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
     };
 
+    const monthlyPrice = 12;
+    const yearlyPrice = 59;
+    const yearlyMonthlyEquivalent = (yearlyPrice / 12).toFixed(2);
+    const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[500px]">
+        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[380px]">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                     <FaCrown className="text-yellow-500" size={24} />
@@ -163,52 +171,63 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Pricing Card */}
-            <div className="bg-surface rounded-lg p-6 mb-6 border border-border">
-                <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-4xl font-bold text-text-highlighted">$9.99</span>
-                    <span className="text-text-muted">/month</span>
-                </div>
-
-                <ul className="space-y-3">
-                    <li className="flex items-start gap-3 text-sm">
-                        <FaCheck className="text-green-500 mt-0.5 shrink-0" size={14} />
-                        <span className="text-text-main">
-                            <strong className="text-text-highlighted">Export in 1080p and 4K</strong> - Crystal clear quality for professional videos
-                        </span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm">
-                        <FaCheck className="text-green-500 mt-0.5 shrink-0" size={14} />
-                        <span className="text-text-main">
-                            <strong className="text-text-highlighted">No watermarks</strong> - Clean exports at all resolutions
-                        </span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm">
-                        <FaCheck className="text-green-500 mt-0.5 shrink-0" size={14} />
-                        <span className="text-text-main">
-                            <strong className="text-text-highlighted">Priority support</strong> - Get help when you need it
-                        </span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm">
-                        <FaCheck className="text-green-500 mt-0.5 shrink-0" size={14} />
-                        <span className="text-text-main">
-                            <strong className="text-text-highlighted">Cancel anytime</strong> - No long-term commitment required
-                        </span>
-                    </li>
-                </ul>
+            {/* Billing Toggle */}
+            <div className="flex items-center justify-center gap-1 mb-5 bg-surface-inset rounded-lg p-1">
+                <button
+                    onClick={() => setBillingInterval('monthly')}
+                    className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-all ${billingInterval === 'monthly'
+                        ? 'bg-surface-raised text-text-highlighted shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Monthly
+                </button>
+                <button
+                    onClick={() => setBillingInterval('yearly')}
+                    className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${billingInterval === 'yearly'
+                        ? 'bg-surface-raised text-text-highlighted shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Yearly
+                    <span className="text-[11px] font-semibold text-success">Save {savingsPercent}%</span>
+                </button>
             </div>
 
-            {/* Free Plan Comparison */}
-            <div className="mb-6 p-4 bg-surface rounded-sm border border-border">
-                <p className="text-xs font-medium text-text-muted mb-2">Free Plan Limitations:</p>
-                <ul className="space-y-1">
-                    <li className="flex items-center gap-2 text-xs text-text-muted">
-                        <FaTimes className="text-red-400" size={10} />
-                        <span>360p & 720p only</span>
+            {/* Pricing Card */}
+            <div className="bg-surface rounded-lg p-6 mb-6 border border-border">
+                <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-4xl font-bold text-text-highlighted">
+                        ${billingInterval === 'monthly' ? monthlyPrice : yearlyPrice}
+                    </span>
+                    <span className="text-text-muted">
+                        /{billingInterval === 'monthly' ? 'month' : 'year'}
+                    </span>
+                </div>
+
+                {billingInterval === 'yearly' && (
+                    <p className="text-xs text-text-muted mb-4">
+                        That's just ${yearlyMonthlyEquivalent}/month
+                    </p>
+                )}
+                {billingInterval === 'monthly' && (
+                    <p className="text-xs text-text-muted mb-4">
+                        ${yearlyPrice}/yr if billed annually
+                    </p>
+                )}
+
+                <ul className="space-y-3">
+                    <li className="flex items-center gap-3 text-sm">
+                        <FaCheck className="text-green-500 shrink-0" size={14} />
+                        <span className="text-text-highlighted">Unlimited 1080p & 4K exports</span>
                     </li>
-                    <li className="flex items-center gap-2 text-xs text-text-muted">
-                        <FaTimes className="text-red-400" size={10} />
-                        <span>Watermark on all exports</span>
+                    <li className="flex items-center gap-3 text-sm">
+                        <FaCheck className="text-green-500 shrink-0" size={14} />
+                        <span className="text-text-highlighted">No watermarks</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-sm">
+                        <FaCheck className="text-green-500 shrink-0" size={14} />
+                        <span className="text-text-highlighted">Priority support</span>
                     </li>
                 </ul>
             </div>
