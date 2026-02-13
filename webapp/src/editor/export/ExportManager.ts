@@ -263,7 +263,8 @@ export class ExportManager {
                     deviceFrameImg: imageElements.device
                 }, {
                     project: renderProject,
-                    currentTimeMs: currentTimeMs
+                    currentTimeMs: currentTimeMs,
+                    timeMapper: timeMapper
                 });
 
                 // Draw watermark for non-pro users (last, on top of all layers; skipped in dev)

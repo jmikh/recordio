@@ -11,7 +11,7 @@ import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/zoom/cameraZoom';
-import { TimeMapper } from '../../../core/mappers/timeMapper';
+import type { TimeMapper } from '../../../core/mappers/timeMapper';
 import { type FocusArea } from '../../../types';
 import type { Project, Rect, CameraSettings } from '../../../types';
 
@@ -29,6 +29,7 @@ export class PlaybackRenderer {
         state: {
             project: Project,
             currentTimeMs: number,
+            timeMapper: TimeMapper,
             overrideCameraSettings?: CameraSettings,
             isCameraEditing?: boolean,
             focusAreas?: FocusArea[],
@@ -56,7 +57,7 @@ export class PlaybackRenderer {
 
         const outputTimeMs = currentTimeMs;
         const zoomActions = timeline.zoomActions || [];
-        const timeMapper = new TimeMapper(timeline.outputWindows);
+        const { timeMapper } = state;
 
         effectiveViewport = getViewportStateAtTime(
             zoomActions,
@@ -164,7 +165,6 @@ export class PlaybackRenderer {
 
         // Render Captions (on top of everything including spotlight)
         if (project.settings.captions.visible) {
-            const timeMapper = new TimeMapper(timeline.outputWindows);
             drawCaptions(
                 ctx,
                 timeline.captionSegments,

@@ -1,6 +1,10 @@
 import type { Size, Rect } from '../../types';
 import type { SpotlightState } from '../spotlight/spotlightMotion';
 
+// Cached offscreen canvas for spotlight snapshots (avoids per-frame allocation)
+let _snapshotCanvas: OffscreenCanvas | null = null;
+let _snapshotCtx: OffscreenCanvasRenderingContext2D | null = null;
+
 /**
  * Draws the spotlight overlay effect on the canvas.
  * 
@@ -58,17 +62,25 @@ export function drawSpotlight(
     // borderRadius is already in OUTPUT coordinates
     const radiusPx = borderRadius;
 
-    // Snapshot the spotlight region BEFORE dimming so the enlarged
-    // content does not include the dim overlay.
-    let snapshot: ImageData | null = null;
+    // Snapshot the spotlight region BEFORE dimming using GPU-side drawImage
+    // (avoids expensive getImageData GPU→CPU readback)
+    let hasSnapshot = false;
     if (sourceCanvas && scale > 1.0 && scaledRect) {
-        // Clamp to canvas bounds to avoid getImageData errors
         const sx = Math.max(0, Math.round(originalRect.x));
         const sy = Math.max(0, Math.round(originalRect.y));
-        const sw = Math.min(Math.round(originalRect.width), sourceCanvas.width - sx);
-        const sh = Math.min(Math.round(originalRect.height), sourceCanvas.height - sy);
+        const sw = Math.min(Math.round(originalRect.width), (sourceCanvas.width || 0) - sx);
+        const sh = Math.min(Math.round(originalRect.height), (sourceCanvas.height || 0) - sy);
         if (sw > 0 && sh > 0) {
-            snapshot = ctx.getImageData(sx, sy, sw, sh);
+            // Reuse or create the cached offscreen canvas
+            if (!_snapshotCanvas || _snapshotCanvas.width !== sw || _snapshotCanvas.height !== sh) {
+                _snapshotCanvas = new OffscreenCanvas(sw, sh);
+                _snapshotCtx = _snapshotCanvas.getContext('2d');
+            }
+            if (_snapshotCtx) {
+                _snapshotCtx.clearRect(0, 0, sw, sh);
+                _snapshotCtx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+                hasSnapshot = true;
+            }
         }
     }
 
@@ -106,19 +118,19 @@ export function drawSpotlight(
 
     ctx.restore();
 
-    // Draw scaled spotlight content from the snapshot
-    if (snapshot && scale > 1.0 && scaledRect) {
-        drawScaledCanvasContent(ctx, snapshot, originalRect, scaledRect, scale, radiusPx);
+    // Draw scaled spotlight content from the cached snapshot canvas
+    if (hasSnapshot && _snapshotCanvas && scale > 1.0 && scaledRect) {
+        drawScaledCanvasContent(ctx, _snapshotCanvas, originalRect, scaledRect, scale, radiusPx);
     }
 }
 
 /**
  * Draws the spotlight content scaled up from the center using a canvas snapshot.
- * Uses an offscreen bitmap to scale the snapshot and clips to the spotlight region.
+ * Uses the cached offscreen canvas directly (no ImageData conversion needed).
  */
 function drawScaledCanvasContent(
     ctx: CanvasRenderingContext2D,
-    snapshot: ImageData,
+    snapshotCanvas: OffscreenCanvas,
     originalRect: Rect,
     scaledRect: Rect,
     scale: number,
@@ -158,12 +170,7 @@ function drawScaledCanvasContent(
     ctx.translate(-cx, -cy);
 
     // Draw the snapshot back at the original position (the transform scales it up)
-    // Use a temporary canvas to convert ImageData → drawable source
-    const tmpCanvas = new OffscreenCanvas(snapshot.width, snapshot.height);
-    const tmpCtx = tmpCanvas.getContext('2d')!;
-    tmpCtx.putImageData(snapshot, 0, 0);
-
-    ctx.drawImage(tmpCanvas, Math.round(originalRect.x), Math.round(originalRect.y));
+    ctx.drawImage(snapshotCanvas, Math.round(originalRect.x), Math.round(originalRect.y));
 
     ctx.restore();
 }

@@ -91,8 +91,39 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // -----------------------------------------------------------
     useEffect(() => {
+        // Toggle to `true` to enable per-frame performance profiling
+        const ENABLE_FPS_PROFILER = false;
+        let fpsFrameCount = 0;
+        let fpsLastTime = performance.now();
+        let perfAccum: Record<string, number> = {};
+
+        const perf = (label: string, fn: () => void) => {
+            if (ENABLE_FPS_PROFILER) {
+                const s = performance.now();
+                fn();
+                perfAccum[label] = (perfAccum[label] || 0) + (performance.now() - s);
+            } else {
+                fn();
+            }
+        };
+
         const tick = (time: number) => {
             animationFrameRef.current = requestAnimationFrame(tick);
+
+            // FPS + per-operation profiler
+            if (ENABLE_FPS_PROFILER) {
+                fpsFrameCount++;
+                const now = performance.now();
+                if (now - fpsLastTime >= 1000) {
+                    const breakdown = Object.entries(perfAccum)
+                        .map(([k, v]) => `${k}=${(v / fpsFrameCount).toFixed(1)}ms`)
+                        .join(' | ');
+                    console.log(`[Canvas FPS] ${fpsFrameCount}  ${breakdown}`);
+                    fpsFrameCount = 0;
+                    fpsLastTime = now;
+                    perfAccum = {};
+                }
+            }
 
             // Skip expensive rendering while export is in progress.
             // The export uses its own offscreen canvas and video elements,
@@ -141,14 +172,16 @@ export const CanvasContainer = () => {
 
             if (canvas && ctx) {
                 // 1. CLEAR & BACKGROUND
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                drawBackground(
-                    ctx,
-                    project.settings.background,
-                    project.settings.background.backgroundBlur,
-                    canvas,
-                    bgRef.current
-                );
+                perf('bg', () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawBackground(
+                        ctx,
+                        project.settings.background,
+                        project.settings.background.backgroundBlur,
+                        canvas,
+                        bgRef.current
+                    );
+                });
 
                 // 2. DETERMINE FRAME TIME
                 let effectiveTimeMs = uiState.currentTimeMs;
@@ -159,28 +192,25 @@ export const CanvasContainer = () => {
                 }
 
                 // 3. SYNC VIDEO
-                // Use TimeMapper to get the correct source time for this output time
-                const sourceTimeMs = timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs);
+                perf('videoSync', () => {
+                    const sourceTimeMs = timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs);
+                    const windowInfo = timeMapperRef.current.getWindowAtOutputTime(effectiveTimeMs);
+                    const playbackSpeed = windowInfo?.window.speed || 1.0;
 
-                // Get current window speed for playback rate
-                const windowInfo = timeMapperRef.current.getWindowAtOutputTime(effectiveTimeMs);
-                const playbackSpeed = windowInfo?.window.speed || 1.0;
-
-                Object.values(sources).forEach(source => {
-                    const video = internalVideoRefs.current[source.id];
-                    if (video) {
-                        if (sourceTimeMs === -1) {
-                            // GAP: Ensure video is paused if we are in a gap
-                            if (!video.paused) video.pause();
-                            video.playbackRate = 1.0;  // Reset playback rate
-                        } else {
-                            // Set playback rate to match window speed
-                            if (video.playbackRate !== playbackSpeed) {
-                                video.playbackRate = playbackSpeed;
+                    Object.values(sources).forEach(source => {
+                        const video = internalVideoRefs.current[source.id];
+                        if (video) {
+                            if (sourceTimeMs === -1) {
+                                if (!video.paused) video.pause();
+                                video.playbackRate = 1.0;
+                            } else {
+                                if (video.playbackRate !== playbackSpeed) {
+                                    video.playbackRate = playbackSpeed;
+                                }
+                                syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
                             }
-                            syncVideo(video, sourceTimeMs / 1000, uiState.isPlaying);
                         }
-                    }
+                    });
                 });
 
                 // 4. STRATEGY
@@ -192,35 +222,38 @@ export const CanvasContainer = () => {
                     deviceFrameImg: deviceFrameRef.current
                 };
 
-                if (canvasMode === CanvasMode.CropEdit) {
-                    renderCropEditor(resources, {
-                        project,
-                        currentTimeMs: effectiveTimeMs
-                    });
-                } else if (canvasMode === CanvasMode.ZoomEdit && activeZoomId) {
-                    renderZoomEditor(resources, {
-                        project,
-                        currentTimeMs: effectiveTimeMs,
-                        editingZoomId: activeZoomId,
-                        previewZoomRect: previewZoomRectRef.current
-                    });
-                } else if (canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId) {
-                    renderSpotlightEditor(resources, {
-                        project,
-                        currentTimeMs: effectiveTimeMs,
-                        editingSpotlightId: activeSpotlightId,
-                        previewSpotlightRect: previewSpotlightRectRef.current
-                    });
-                } else {
-                    PlaybackRenderer.render(resources, {
-                        project,
-                        currentTimeMs: effectiveTimeMs,
-                        overrideCameraSettings: previewCameraSettingsRef.current || undefined,
-                        isCameraEditing: canvasMode === CanvasMode.CameraEdit,
-                        focusAreas: focusAreasRef.current,
-                        showDebugOverlays: uiState.showDebugOverlays
-                    });
-                }
+                perf('render', () => {
+                    if (canvasMode === CanvasMode.CropEdit) {
+                        renderCropEditor(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs
+                        });
+                    } else if (canvasMode === CanvasMode.ZoomEdit && activeZoomId) {
+                        renderZoomEditor(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs,
+                            editingZoomId: activeZoomId,
+                            previewZoomRect: previewZoomRectRef.current
+                        });
+                    } else if (canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId) {
+                        renderSpotlightEditor(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs,
+                            editingSpotlightId: activeSpotlightId,
+                            previewSpotlightRect: previewSpotlightRectRef.current
+                        });
+                    } else {
+                        PlaybackRenderer.render(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs,
+                            timeMapper: timeMapperRef.current,
+                            overrideCameraSettings: previewCameraSettingsRef.current || undefined,
+                            isCameraEditing: canvasMode === CanvasMode.CameraEdit,
+                            focusAreas: focusAreasRef.current,
+                            showDebugOverlays: uiState.showDebugOverlays
+                        });
+                    }
+                });
 
                 // Thumbnail capture (after rendering is complete)
                 if (pendingThumbnailCaptureRef.current) {
