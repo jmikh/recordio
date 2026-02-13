@@ -25,7 +25,7 @@ import type { RawRecording } from '@shared/types';
 // Investigate: Clear Chrome's extension cache or load from a fresh folder path to fix.
 const EXTENSION_ID = import.meta.env.DEV
     ? 'lpponocoanighhephabalkejmdbjlhmi'   // Cached dev ID (Chrome bug)
-    : 'nihlpdaihoacconboieolmmnpnnhedan';  // Plasma ITRO production ID
+    : 'bbcdpipjplklaneplfmlhhibnllhinii';  // Production extension ID
 
 // ============================================
 // Types
