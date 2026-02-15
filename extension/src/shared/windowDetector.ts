@@ -87,81 +87,6 @@ export async function detectControllerWindow(stream: MediaStream): Promise<Windo
     });
 }
 
-export async function detectWindowInBlob(blob: Blob): Promise<WindowDetectionResult> { // Renamed from detectCalibrationInBlob
-    const videoUrl = URL.createObjectURL(blob);
-    const video = document.createElement('video');
-
-    // Cleanup helper
-    const cleanup = () => {
-        URL.revokeObjectURL(videoUrl);
-        video.remove();
-    };
-
-    return new Promise((resolve, reject) => {
-        // Timeout Safety
-        const timeoutId = setTimeout(() => {
-            console.warn("[VideoValidation] Validation timed out (background tab?). Returning invalid.");
-            cleanup();
-            resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
-        }, 3000); // 3 seconds timeout
-
-        const extractFrame = () => {
-            try {
-                if (video.readyState < 2) {
-                    console.warn("[VideoValidation] Video not ready on seeked.");
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-                if (!ctx) {
-                    clearTimeout(timeoutId);
-                    cleanup();
-                    return reject(new Error("Could not create canvas context for validation"));
-                }
-
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const result = findMarkers(imageData);
-
-                clearTimeout(timeoutId);
-                cleanup();
-                resolve(result);
-            } catch (e) {
-                clearTimeout(timeoutId);
-                cleanup();
-                reject(e);
-            }
-        };
-
-        video.onseeked = () => {
-            extractFrame();
-        };
-
-        video.onerror = () => {
-            clearTimeout(timeoutId);
-            cleanup();
-            reject(new Error("Video load error"));
-        };
-
-        video.onloadedmetadata = () => {
-            // Seek to a safe frame (e.g. 0.1s to ensure we have content)
-            video.currentTime = 0.1;
-        };
-
-        // Attributes to help with background execution
-        video.muted = true;
-        video.playsInline = true;
-        video.preload = 'auto';
-
-        video.src = videoUrl;
-        video.load();
-    });
-}
-
 function findMarkers(imageData: ImageData): WindowDetectionResult {
     const width = imageData.width;
     const height = imageData.height;
@@ -234,6 +159,7 @@ function findMarkers(imageData: ImageData): WindowDetectionResult {
                             // y is the Y-Offset (header height).
                             // x is the X-Offset.
 
+                            console.log(`[WindowDetector] Marker found at top-left corner (${x}, ${y})`);
                             return {
                                 isControllerWindow: true,
                                 xOffset: x,
