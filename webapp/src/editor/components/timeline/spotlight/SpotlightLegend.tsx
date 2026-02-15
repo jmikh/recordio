@@ -9,7 +9,7 @@ import { legendItem } from './SpotlightTrackStyles';
 export const SpotlightLegend: React.FC = () => {
     return (
         <LegendTooltip
-            videoSrc="/assets/demos/spotlight-demo.mp4"
+            videoSrc="https://cdn.recordio.cc/demos/spotlight-demo.mp4"
             description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on clearly defined areas."}
         >
             <LegendItem

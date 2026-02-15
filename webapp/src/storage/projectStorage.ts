@@ -10,7 +10,7 @@ const isWebsite = typeof window !== 'undefined' &&
         window.location.origin === EDITOR_ORIGIN_PROD);
 
 const DB_NAME = isWebsite ? 'recordio-editor' : 'RecordioDB';
-const DB_VERSION = 4; // Added customBackgrounds store
+const DB_VERSION = 5; // Added customMusic store
 
 /**
  * Entry in the global custom backgrounds library.
@@ -18,6 +18,16 @@ const DB_VERSION = 4; // Added customBackgrounds store
 export interface CustomBackgroundEntry {
     id: string;        // bg-{uuid}
     blob: Blob;
+    createdAt: number; // timestamp
+}
+
+/**
+ * Entry in the global custom music library.
+ */
+export interface CustomMusicEntry {
+    id: string;        // music-{uuid}
+    blob: Blob;
+    name: string;      // Original filename
     createdAt: number; // timestamp
 }
 
@@ -51,6 +61,11 @@ export class ProjectStorage {
                 // 4. Custom Backgrounds Store (Global library)
                 if (!db.objectStoreNames.contains('customBackgrounds')) {
                     db.createObjectStore('customBackgrounds', { keyPath: 'id' });
+                }
+
+                // 5. Custom Music Store (Global library)
+                if (!db.objectStoreNames.contains('customMusic')) {
+                    db.createObjectStore('customMusic', { keyPath: 'id' });
                 }
 
                 // Remove legacy sources store if it exists
@@ -133,6 +148,18 @@ export class ProjectStorage {
             };
         }
 
+        // Strip customRuntimeUrl from audio music settings
+        if (stripped.settings?.audio?.music?.customRuntimeUrl) {
+            const { customRuntimeUrl: _r, ...musicRest } = stripped.settings.audio.music;
+            stripped.settings = {
+                ...stripped.settings,
+                audio: {
+                    ...stripped.settings.audio,
+                    music: musicRest as typeof stripped.settings.audio.music
+                }
+            };
+        }
+
         return stripped;
     }
 
@@ -202,6 +229,24 @@ export class ProjectStorage {
                         console.log(`[ProjectStorage] Auto-added missing background to library: ${libraryId}`);
                     }
                 }
+            }
+        }
+
+        // Hydrate audio music customRuntimeUrl
+        if (project.settings?.audio?.music?.customStorageUrl?.startsWith('recordio-blob://')) {
+            const blobId = project.settings.audio.music.customStorageUrl.replace('recordio-blob://', '');
+            const blob = await this.getRecordingBlob(blobId);
+            if (blob) {
+                project.settings = {
+                    ...project.settings,
+                    audio: {
+                        ...project.settings.audio,
+                        music: {
+                            ...project.settings.audio.music,
+                            customRuntimeUrl: URL.createObjectURL(blob)
+                        }
+                    }
+                };
             }
         }
 
@@ -430,6 +475,101 @@ export class ProjectStorage {
         return new Promise((resolve, reject) => {
             const tx = db.transaction('customBackgrounds', 'readwrite');
             const store = tx.objectStore('customBackgrounds');
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // CUSTOM MUSIC LIBRARY (Global)
+    // ===========================================
+
+    /**
+     * Save a music file to the global library.
+     * Returns the generated ID.
+     */
+    static async saveCustomMusic(blob: Blob, name: string): Promise<string> {
+        const db = await this.getDB();
+        const id = `music-${crypto.randomUUID()}`;
+        const entry: CustomMusicEntry = {
+            id,
+            blob,
+            name,
+            createdAt: Date.now()
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customMusic', 'readwrite');
+            const store = tx.objectStore('customMusic');
+            const req = store.put(entry);
+            req.onsuccess = () => resolve(id);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Save a music file with a specific ID (for restoring deleted entries).
+     */
+    static async saveCustomMusicWithId(id: string, blob: Blob, name: string): Promise<void> {
+        const db = await this.getDB();
+        const entry: CustomMusicEntry = {
+            id,
+            blob,
+            name,
+            createdAt: Date.now()
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customMusic', 'readwrite');
+            const store = tx.objectStore('customMusic');
+            const req = store.put(entry);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get all custom music from the library.
+     * Sorted by createdAt descending (newest first).
+     */
+    static async listCustomMusic(): Promise<CustomMusicEntry[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customMusic', 'readonly');
+            const store = tx.objectStore('customMusic');
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const entries = req.result as CustomMusicEntry[];
+                entries.sort((a, b) => b.createdAt - a.createdAt);
+                resolve(entries);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get a specific custom music entry by ID.
+     */
+    static async getCustomMusic(id: string): Promise<CustomMusicEntry | undefined> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customMusic', 'readonly');
+            const store = tx.objectStore('customMusic');
+            const req = store.get(id);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Delete a custom music entry from the library.
+     */
+    static async deleteCustomMusic(id: string): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('customMusic', 'readwrite');
+            const store = tx.objectStore('customMusic');
             const req = store.delete(id);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);

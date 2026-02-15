@@ -6,12 +6,13 @@ import { ScreenSettings } from './ScreenSettings';
 import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
+import { AudioSettingsPanel } from './AudioSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
-import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder } from 'react-icons/tb';
+import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
 
@@ -99,6 +100,11 @@ export const SettingsPanel = () => {
                 disabled: !hasMicrophone,
                 disabledTooltip: 'No microphone detected'
             },
+            {
+                id: 'audio',
+                label: 'Audio',
+                icon: <TbMusic size={20} />,
+            },
         ];
         return items;
     }, [hasCameraSource, hasMicrophone]);
@@ -180,6 +186,7 @@ export const SettingsPanel = () => {
                     {activeTab === 'camera' && <CameraSettings />}
                     {activeTab === 'zoom' && <EffectsSettings />}
                     {activeTab === 'captions' && <CaptionsSettings />}
+                    {activeTab === 'audio' && <AudioSettingsPanel />}
                 </div>
                 <Scrollbar
                     container={scrollContainer}

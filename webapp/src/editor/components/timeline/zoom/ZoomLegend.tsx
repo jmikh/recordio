@@ -9,7 +9,7 @@ import { legendItem } from './ZoomTrackStyles';
 export const ZoomLegend: React.FC = () => {
     return (
         <LegendTooltip
-            videoSrc="/assets/demos/zoom-demo.mp4"
+            videoSrc="https://cdn.recordio.cc/demos/zoom-demo.mp4"
             description="Zoom and pan to where the action is happening with smooth transitions."
         >
             <LegendItem

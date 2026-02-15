@@ -87,6 +87,20 @@ const createDefaultSettings = (): ProjectSettings => ({
         color: '#ffffff'
     },
 
+    audio: {
+        muteMicrophone: false,
+        muteScreenAudio: false,
+        screenVolume: 1,
+        microphoneVolume: 1,
+        music: {
+            enabled: false,
+            source: 'preset',
+            volume: 0.3,
+            fadeOut: true,
+            fadeOutDurationMs: 3000,
+        },
+    },
+
     camera: {
         width: 300,
         height: 300,

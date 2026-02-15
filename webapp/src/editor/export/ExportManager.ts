@@ -177,13 +177,45 @@ export class ExportManager {
 
             const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDurationSec), sampleRate);
 
-            await Promise.all(sources.map(async (source) => {
-                if (!source.hasAudio) return;
+            // --- Audio Source Filtering (Mute Settings) ---
+            const audioSettings = renderProject.settings.audio;
+            const isSingleMode = renderProject.screenSource.has_microphone && !renderProject.cameraSource;
 
+            const filteredSources = sources.filter(source => {
+                if (!source.hasAudio) return false;
+
+                // Single mode: "Recording Audio" toggle controls the combined screen track
+                if (isSingleMode && source.id === renderProject.screenSource.id && audioSettings?.muteScreenAudio) {
+                    return false;
+                }
+
+                // Dual mode: separate toggles
+                if (!isSingleMode) {
+                    if (source.id === renderProject.screenSource.id && audioSettings?.muteScreenAudio) {
+                        return false;
+                    }
+                    if (source.id === renderProject.cameraSource?.id && audioSettings?.muteMicrophone) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            await Promise.all(filteredSources.map(async (source) => {
                 try {
                     const response = await fetch(source.runtimeUrl!);
                     const arrayBuffer = await response.arrayBuffer();
                     const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+
+                    // Determine volume for this source
+                    const isScreenSource = source.id === renderProject.screenSource.id;
+                    const isCameraSource = source.id === renderProject.cameraSource?.id;
+                    const sourceVolume = isScreenSource
+                        ? (audioSettings?.screenVolume ?? 1)
+                        : isCameraSource
+                            ? (audioSettings?.microphoneVolume ?? 1)
+                            : 1;
 
                     let outputAccSec = 0;
                     renderProject.timeline.outputWindows.forEach((window: any) => {
@@ -191,7 +223,12 @@ export class ExportManager {
                         const sourceNode = offlineCtx.createBufferSource();
                         sourceNode.buffer = audioBuffer;
                         sourceNode.playbackRate.value = speed;
-                        sourceNode.connect(offlineCtx.destination);
+
+                        // Apply per-source volume via GainNode
+                        const gainNode = offlineCtx.createGain();
+                        gainNode.gain.setValueAtTime(sourceVolume, 0);
+                        sourceNode.connect(gainNode);
+                        gainNode.connect(offlineCtx.destination);
 
                         const offset = window.startMs / 1000;
                         const duration = (window.endMs - window.startMs) / 1000;
@@ -206,6 +243,44 @@ export class ExportManager {
                     console.warn(`[Export] Failed to decode audio for source ${source.id}:`, error);
                 }
             }));
+
+            // --- Background Music Track ---
+            if (audioSettings?.music?.enabled) {
+                const musicUrl = audioSettings.music.source === 'preset'
+                    ? audioSettings.music.presetUrl
+                    : audioSettings.music.customRuntimeUrl;
+
+                if (musicUrl) {
+                    try {
+                        const response = await fetch(musicUrl);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const musicBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+
+                        const musicSource = offlineCtx.createBufferSource();
+                        musicSource.buffer = musicBuffer;
+                        musicSource.loop = true;
+
+                        // Volume control via GainNode
+                        const gainNode = offlineCtx.createGain();
+                        const musicVolume = audioSettings.music.volume ?? 0.3;
+                        gainNode.gain.setValueAtTime(musicVolume, 0);
+
+                        // Fade out at end
+                        if (audioSettings.music.fadeOut) {
+                            const fadeMs = audioSettings.music.fadeOutDurationMs ?? 3000;
+                            const fadeStartSec = Math.max(0, totalDurationSec - (fadeMs / 1000));
+                            gainNode.gain.setValueAtTime(musicVolume, fadeStartSec);
+                            gainNode.gain.linearRampToValueAtTime(0, totalDurationSec);
+                        }
+
+                        musicSource.connect(gainNode);
+                        gainNode.connect(offlineCtx.destination);
+                        musicSource.start(0); // Music starts at the beginning of the output
+                    } catch (error) {
+                        console.warn('[Export] Failed to load background music:', error);
+                    }
+                }
+            }
 
             const renderedAudioBuffer = await offlineCtx.startRendering();
             this.processAudioBuffer(renderedAudioBuffer, audioEncoder);

@@ -3,6 +3,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ProjectStorage } from '../../../storage/projectStorage';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
+import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
@@ -20,6 +21,9 @@ export const CanvasContainer = () => {
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
     const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
+
+    // Background music sync with playback
+    useBackgroundMusic();
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -346,13 +350,27 @@ export const CanvasContainer = () => {
                         <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin={deviceFrame.imageUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
                     {Object.values(sources).map((source) => {
-                        const isMuted = !isPlaying || mutedSources[source.id];
+                        const audioSettings = project.settings.audio;
+                        const isScreenSource = source.id === project.screenSource?.id;
+                        const isCameraSource = source.id === project.cameraSource?.id;
+                        const settingsMuted = (isScreenSource && audioSettings?.muteScreenAudio)
+                            || (isCameraSource && audioSettings?.muteMicrophone);
+                        const isMuted = !isPlaying || mutedSources[source.id] || !!settingsMuted;
+                        const volume = isScreenSource
+                            ? (audioSettings?.screenVolume ?? 1)
+                            : isCameraSource
+                                ? (audioSettings?.microphoneVolume ?? 1)
+                                : 1;
                         return source.runtimeUrl ? (
                             <video
                                 key={source.id}
                                 ref={el => {
-                                    if (el) internalVideoRefs.current[source.id] = el;
-                                    else delete internalVideoRefs.current[source.id];
+                                    if (el) {
+                                        internalVideoRefs.current[source.id] = el;
+                                        el.volume = volume;
+                                    } else {
+                                        delete internalVideoRefs.current[source.id];
+                                    }
                                 }}
                                 src={source.runtimeUrl}
                                 muted={isMuted}

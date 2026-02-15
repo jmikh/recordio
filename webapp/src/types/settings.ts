@@ -151,6 +151,46 @@ export interface CaptionSettings {
 }
 
 // ==========================================
+// AUDIO
+// ==========================================
+
+export interface MusicSettings {
+    /** Whether background music is enabled */
+    enabled: boolean;
+    /** Source type: CDN preset or user upload */
+    source: 'preset' | 'custom';
+    /** Volume level (0-1). Default: 0.3 */
+    volume: number;
+    /** CDN URL for preset music (source: 'preset') */
+    presetUrl?: string;
+    /** Display name of the selected preset */
+    presetName?: string;
+    /** Persistent URL for custom uploads (recordio-blob:// protocol) */
+    customStorageUrl?: string;
+    /** Transient blob URL (populated on load, never saved) */
+    customRuntimeUrl?: string;
+    /** ID of the global music library entry */
+    customLibraryId?: string;
+    /** Whether to fade out music near the end of the video */
+    fadeOut: boolean;
+    /** Fade out duration in milliseconds. Default: 3000 */
+    fadeOutDurationMs: number;
+}
+
+export interface AudioSettings {
+    /** Mute the microphone track */
+    muteMicrophone: boolean;
+    /** Mute the screen/system audio track */
+    muteScreenAudio: boolean;
+    /** Screen/system audio volume (0–1) */
+    screenVolume: number;
+    /** Microphone volume (0–1) */
+    microphoneVolume: number;
+    /** Background music settings */
+    music: MusicSettings;
+}
+
+// ==========================================
 // PROJECT SETTINGS (aggregated)
 // ==========================================
 
@@ -178,5 +218,8 @@ export interface ProjectSettings {
 
     // Captions
     captions: CaptionSettings;
+
+    // Audio
+    audio: AudioSettings;
 }
 

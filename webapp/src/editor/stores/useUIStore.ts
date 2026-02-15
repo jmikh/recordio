@@ -21,7 +21,7 @@ export const SettingsPanel = {
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions';
+export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions' | 'audio';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -93,6 +93,9 @@ export interface UIState {
     // -- Captions Settings
     showCollapsibleCaptionStyle: boolean;
     showCollapsibleCaptionPosition: boolean;
+    // -- Audio Settings
+    showCollapsibleAudioToggles: boolean;
+    showCollapsibleMusic: boolean;
     setCollapsibleVisibility: (key: string, value: boolean) => void;
 
     // Explicit reset to default state
@@ -254,6 +257,9 @@ export const useUIStore = create<UIState>((set, get) => ({
     // -- Captions Settings
     showCollapsibleCaptionStyle: true, // Default expanded
     showCollapsibleCaptionPosition: false,
+    // -- Audio Settings
+    showCollapsibleAudioToggles: true, // Default expanded
+    showCollapsibleMusic: true, // Default expanded
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
     reset: () => set({
@@ -285,5 +291,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         showCollapsibleBorder: false,
         showCollapsibleCaptionStyle: true,
         showCollapsibleCaptionPosition: false,
+        showCollapsibleAudioToggles: true,
+        showCollapsibleMusic: true,
     })
 }));

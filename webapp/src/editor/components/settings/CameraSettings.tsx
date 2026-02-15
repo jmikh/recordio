@@ -158,7 +158,7 @@ export const CameraSettings = () => {
                         >
                             <InfoTooltip
                                 description="Automatically shrinks the camera when screen zoom is active."
-                                videoSrc="/assets/demos/autoshrink-demo.mp4"
+                                videoSrc="https://cdn.recordio.cc/demos/autoshrink-demo.mp4"
                             />
                         </Toggle>
 
