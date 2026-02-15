@@ -54,7 +54,7 @@ export interface CameraSettings extends StyleSettings {
 // ==========================================
 
 /** Supported aspect ratio presets for output video crop */
-export type OutputCropOption = 'none' | '16:9' | '4:3' | '1:1' | '9:16';
+export type OutputCropOption = 'none' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
 
 export interface ScreenSettings extends StyleSettings {
     mode: 'device' | 'border';

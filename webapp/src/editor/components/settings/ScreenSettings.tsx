@@ -11,12 +11,15 @@ interface Resolution {
     label: string;
     width: number;
     height: number;
+    orientation?: string;
 }
 
 const RESOLUTIONS: Resolution[] = [
     { label: '1:1', width: 1080 * 2, height: 1080 * 2 },
-    { label: '4:3', width: 1440 * 2, height: 1080 * 2 },
-    { label: '16:9', width: 1920 * 2, height: 1080 * 2 },
+    { label: '4:3', width: 1440 * 2, height: 1080 * 2, orientation: 'Horizontal' },
+    { label: '16:9', width: 1920 * 2, height: 1080 * 2, orientation: 'Horizontal' },
+    { label: '3:4', width: 1080 * 2, height: 1440 * 2, orientation: 'Vertical' },
+    { label: '9:16', width: 1080 * 2, height: 1920 * 2, orientation: 'Vertical' },
 ];
 
 export const ScreenSettings = () => {
@@ -49,6 +52,7 @@ export const ScreenSettings = () => {
     const resolutionOptions: DropdownOption<Resolution>[] = RESOLUTIONS.map(res => ({
         value: res,
         label: res.label,
+        suffix: res.orientation ? <span className="text-text-muted text-xs">{res.orientation}</span> : undefined,
     }));
 
     const handleResolutionChange = (resolution: Resolution) => {

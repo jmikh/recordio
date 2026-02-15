@@ -23,7 +23,7 @@ export const MultiToggle = <T extends string>({
     className = ''
 }: MultiToggleProps<T>) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number; height: number }>({ left: 0, width: 0, height: 0 });
+    const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
 
     // Update indicator position when value changes
     useEffect(() => {
@@ -35,7 +35,6 @@ export const MultiToggle = <T extends string>({
             setIndicatorStyle({
                 left: buttonRect.left - containerRect.left,
                 width: buttonRect.width,
-                height: buttonRect.height
             });
         }
     }, [value, options]);
@@ -44,7 +43,7 @@ export const MultiToggle = <T extends string>({
     const indicatorTransition = {
         transitionDuration: ANIMATION_DURATION,
         transitionTimingFunction: ANIMATION_EASE,
-        transitionProperty: 'left, width, height'
+        transitionProperty: 'left, width'
     };
 
     return (
@@ -52,18 +51,20 @@ export const MultiToggle = <T extends string>({
             ref={containerRef}
             className={`
                 relative flex items-center justify-center select-none
+                bg-state-hover rounded-full p-1 h-9
                 ${className}
             `}
         >
-            {/* Sliding Pill Indicator - positioned behind the selected button */}
+            {/* Sliding Pill Indicator */}
             <div
                 style={{
                     ...indicatorTransition,
                     left: indicatorStyle.left,
                     width: indicatorStyle.width,
-                    height: indicatorStyle.height
+                    top: 3,
+                    bottom: 3,
                 }}
-                className="absolute top-0 border border-border-primary rounded-full z-0 shadow-[var(--shadow-button)]"
+                className="absolute bg-primary rounded-full z-0 shadow-[var(--shadow-button)]"
             />
 
             {/* Options */}
@@ -75,12 +76,12 @@ export const MultiToggle = <T extends string>({
                         data-value={option.value}
                         onClick={() => onChange(option.value)}
                         className={`
-                            relative flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-w-0
+                            relative flex-1 flex flex-col items-center justify-center gap-1 py-1 px-3 min-w-0
                             text-sm z-10 outline-none cursor-pointer
                             text-center
                             transition-colors duration-200
                             ${isSelected
-                                ? 'text-main'
+                                ? 'text-text-on-primary'
                                 : 'text-text-disabled hover:text-text-muted'
                             }
                         `}

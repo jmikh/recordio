@@ -188,10 +188,10 @@
    --surface-inset: oklch(0.17 0.012 270);
 
    /* Interactive State Overlays - Original values */
+   --state-disabled: oklch(1 0 0 / 1%);
    --state-inactive: oklch(1 0 0 / 4%);
    --state-hover: oklch(1 0 0 / 8%);
    --state-active: oklch(1 0 0 / 12%);
-   --state-disabled: oklch(1 0 0 / 1%);
 
    /* Borders - Original values */
    --border-default: oklch(1 0 0 / 3%);
