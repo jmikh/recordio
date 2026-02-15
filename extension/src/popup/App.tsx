@@ -32,6 +32,7 @@ function App() {
   const [audioPermission, setAudioPermission] = useState<PermissionState>('unknown');
   const [videoPermission, setVideoPermission] = useState<PermissionState>('unknown');
   const [canInjectContentScript, setCanInjectContentScript] = useState<boolean | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
 
   // Live timer for recording duration
@@ -231,6 +232,8 @@ function App() {
     if (isAudioEnabled && audioPermission !== 'granted') return;
     if (isVideoEnabled && videoPermission !== 'granted') return;
 
+    setStartError(null);
+
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const tab = tabs[0];
@@ -248,15 +251,22 @@ function App() {
           videoDeviceId: selectedVideoId
         }
       }, (response: any) => {
+        if (chrome.runtime.lastError) {
+          console.error("Connection error:", chrome.runtime.lastError.message);
+          setStartError('Could not start recording. Please refresh the tab and try again.');
+          return;
+        }
         if (response?.success) {
           setIsRecording(true);
           window.close();
         } else {
           console.error("Failed to start recording", response?.error);
+          setStartError('Could not start recording. Please refresh the tab and try again.');
         }
       });
     } catch (error) {
       console.error("Error starting recording:", error);
+      setStartError('Could not start recording. Please refresh the tab and try again.');
     }
   };
 
@@ -382,6 +392,7 @@ function App() {
             setSelectedAudioId={setSelectedAudioId}
             setSelectedVideoId={setSelectedVideoId}
             startRecording={startRecording}
+            startError={startError}
           />
         ) : (
           <RecordingStatus

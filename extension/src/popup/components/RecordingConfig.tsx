@@ -22,6 +22,7 @@ interface RecordingConfigProps {
     setSelectedAudioId: (id: string) => void;
     setSelectedVideoId: (id: string) => void;
     startRecording: () => void;
+    startError: string | null;
 }
 
 export function RecordingConfig({
@@ -41,7 +42,8 @@ export function RecordingConfig({
     handleVideoToggle,
     setSelectedAudioId,
     setSelectedVideoId,
-    startRecording
+    startRecording,
+    startError
 }: RecordingConfigProps) {
     return (
         <div className="flex flex-col w-full gap-5">
@@ -122,6 +124,12 @@ export function RecordingConfig({
                     </div>
                 )}
             </div>
+
+            {startError && (
+                <Notice className="animate-in fade-in slide-in-from-top-1 text-destructive">
+                    {startError}
+                </Notice>
+            )}
 
             <PrimaryButton
                 onClick={startRecording}
