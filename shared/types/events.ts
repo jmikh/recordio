@@ -59,6 +59,11 @@ export interface DragEvent extends BaseEvent {
  * User interaction events recorded during screen capture.
  */
 export interface UserEvents {
+    /**
+     * Viewport region within the recorded video frame.
+     * Mirrors screenSource.viewportRect. Absent for tab recordings.
+     */
+    viewportRect?: Rect;
     mouseClicks: BaseEvent[];
     mousePositions: BaseEvent[];
     keyboardEvents: KeyboardEvent[];

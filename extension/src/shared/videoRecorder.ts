@@ -12,7 +12,7 @@
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
-import { EventType, type UserEvents, type Size, type SourceMetadata } from '@shared/types';
+import { EventType, type UserEvents, type Size, type SourceMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 import type { RawRecording } from '@shared/types';
 
@@ -56,6 +56,7 @@ export class VideoRecorder {
 
     // Detection Result (Window Mode)
     private detectionResult: WindowDetectionResult | null = null;
+    private viewportRect: Rect | undefined;
 
     constructor(sessionId: string, config: RecordingConfig, mode: RecorderMode) {
         this.currentSessionId = sessionId;
@@ -103,6 +104,17 @@ export class VideoRecorder {
                 detectionStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
 
                 console.log("[VideoRecorder] Detection isControllerWindow:", this.detectionResult?.isControllerWindow);
+
+                // Store viewport rect for later use (events + screenSource metadata)
+                if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
+                    this.viewportRect = {
+                        x: this.detectionResult.xOffset,
+                        y: this.detectionResult.yOffset,
+                        width: this.config.tabViewportSize.width,
+                        height: this.config.tabViewportSize.height
+                    };
+                    this.events.viewportRect = this.viewportRect;
+                }
             }
         }
 
@@ -213,10 +225,7 @@ export class VideoRecorder {
     public addEvent(event: any) {
         if (this.state !== 'recording') return;
 
-        // Apply Offsets if Valid
-        if (this.detectionResult && this.detectionResult.isControllerWindow) {
-            this.applyOffsetToEvent(event, this.detectionResult.xOffset, this.detectionResult.yOffset);
-        }
+        // Viewport offset is stored as viewportRect on UserEvents (not per-event)
 
         // Categorize on the fly
         const e = event; // Incoming event payload
@@ -407,6 +416,7 @@ export class VideoRecorder {
             storageUrl: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
+            viewportRect: this.viewportRect,
             hasAudio: screenHasAudio,
             has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
             createdAt: now,

@@ -54,6 +54,13 @@ export interface SourceMetadata {
     /** Total duration of the source file in milliseconds */
     durationMs: TimeMs;
     size: Size;
+    /**
+     * Viewport region within the video frame (window recordings only).
+     * x,y = offset from video frame origin to viewport origin.
+     * width,height = viewport dimensions in video pixels.
+     * Absent for tab recordings (viewport IS the full frame).
+     */
+    viewportRect?: Rect;
     /** Frames Per Second (Video only) */
     fps?: number;
     hasAudio: boolean;
