@@ -10,13 +10,20 @@ const DEFAULT_TEXT_COLOR = '#ffffff';
 
 /**
  * Convert hex color string + opacity to rgba() for canvas rendering.
+ * Supports 6-char (#rrggbb) and 8-char (#rrggbbaa) hex strings.
+ * When an 8-char hex is provided, the embedded alpha is multiplied with the opacity parameter.
  */
 function hexToRgba(hex: string, opacity: number): string {
     const clean = hex.replace('#', '');
     const r = parseInt(clean.substring(0, 2), 16);
     const g = parseInt(clean.substring(2, 4), 16);
     const b = parseInt(clean.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    let a = opacity;
+    if (clean.length === 8) {
+        const hexAlpha = parseInt(clean.substring(6, 8), 16) / 255;
+        a = hexAlpha * opacity;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 /**
@@ -111,7 +118,7 @@ export function drawCaptions(
         const boxY = boxBottomY - boxHeight;
 
         // Draw Background Box with backdrop blur effect
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillStyle = hexToRgba(settings.backgroundColor, 1);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
 
@@ -131,7 +138,7 @@ export function drawCaptions(
         ctx.shadowOffsetY = 1;
 
         // Draw each line with per-word opacity
-        const textColor = settings.color || DEFAULT_TEXT_COLOR;
+        const textColor = settings.textColor;
         let lineY = boxY + paddingY + lineHeight / 2;
         for (const lineInfo of wrappedLines) {
             drawLineWithHighlight(

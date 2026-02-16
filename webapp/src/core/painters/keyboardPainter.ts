@@ -105,10 +105,11 @@ export function drawKeyboardOverlay(
     const boxWidth = metrics.width + (paddingX * 2);
     const boxHeight = fontSize + (paddingY * 2);
 
+    const margin = outputSize.height * (settings.hotkeysMargin / 100);
     const x = outputSize.width / 2;
     const y = settings.hotkeysPlacement === 'bottom'
-        ? outputSize.height - settings.hotkeysMarginPx - boxHeight
-        : settings.hotkeysMarginPx;
+        ? outputSize.height - margin - boxHeight
+        : margin;
 
     // Draw Background Box
     ctx.fillStyle = `rgba(30, 30, 30, ${0.85 * opacity})`;

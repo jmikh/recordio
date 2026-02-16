@@ -159,8 +159,8 @@ export interface KeyboardSettings {
     hotkeysSize: number;
     /** Vertical placement of the hotkey overlay. Default: 'top' */
     hotkeysPlacement: 'top' | 'bottom';
-    /** Margin in pixels from the placed edge. Default: 40 */
-    hotkeysMarginPx: number;
+    /** Distance from the edge of the canvas, as a percentage of output height (0–20). Default: 4 */
+    hotkeysMargin: number;
 
     // ── Base constants (auto-scaled by export, not exposed in UI) ──
     /** Base font size in pixels. Default: 64 */
@@ -182,7 +182,8 @@ export interface CaptionSettings {
     /** Size multiplier for captions (0.5–2.0). Scales font, padding, etc. */
     captionSize: number;
     width: number; // Maximum width as percentage of canvas width (0-100)
-    color?: string; // Text color in hex format (e.g. '#ffffff')
+    textColor: string; // Text color in hex format (e.g. '#ffffff')
+    backgroundColor: string; // Background box color in 8-char hex with alpha (e.g. '#000000cc')
     wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
 
     // ── Base constants (auto-scaled by export, not exposed in UI) ──

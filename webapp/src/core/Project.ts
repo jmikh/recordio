@@ -69,7 +69,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         showHotkeys: true,
         hotkeysSize: 1.0,
         hotkeysPlacement: 'top',
-        hotkeysMarginPx: 40,
+        hotkeysMargin: 4,
         kFontSizePx: 64,
         kPaddingXPx: 40,
         kPaddingYPx: 20,
@@ -105,7 +105,8 @@ const createDefaultSettings = (): ProjectSettings => ({
         kPaddingYPx: 16,
         kCornerRadiusPx: 12,
         width: 75,
-        color: '#ffffff'
+        textColor: '#ffffff',
+        backgroundColor: '#000000cc'
     },
 
     audio: {

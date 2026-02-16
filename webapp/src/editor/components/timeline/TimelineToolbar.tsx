@@ -6,6 +6,7 @@ import { useToast } from '../Toast';
 import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
+import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete, MdContentCut, MdRefresh } from 'react-icons/md';
 import { Slider, DefaultButton } from '@shared/components';
 
@@ -78,8 +79,13 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     };
 
 
-
-    const onTogglePlay = () => setIsPlaying(!isPlaying);
+    const timeMapper = useTimeMapper();
+    const onTogglePlay = () => {
+        if (!isPlaying && useUIStore.getState().currentTimeMs >= timeMapper.outputDuration) {
+            useUIStore.getState().setCurrentTime(0);
+        }
+        setIsPlaying(!isPlaying);
+    };
 
     // Delete button logic
     const handleDelete = () => {

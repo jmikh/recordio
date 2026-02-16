@@ -60,7 +60,7 @@ export function CaptionsSettings() {
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
-    const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, color: '#ffffff' };
+    const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
 
     // Create TimeMapper for source→output time conversion
     const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
@@ -391,7 +391,7 @@ export function CaptionsSettings() {
                         content: (
                             <div
                                 className="w-5 h-5 rounded-full border border-border"
-                                style={{ backgroundColor: settings.color || '#ffffff' }}
+                                style={{ backgroundColor: settings.textColor }}
                             />
                         )
                     },
@@ -436,13 +436,30 @@ export function CaptionsSettings() {
                         decimals={0}
                     />
 
-                    <ColorButton
-                        label="Color"
-                        color={settings.color || '#ffffff'}
-                        onChange={(color) => batchAction(() => updateSettings({ captions: { ...settings, color } }))}
-                        onPopoverOpen={startInteraction}
-                        onPopoverClose={endInteraction}
-                    />
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm text-text-muted w-[80px] shrink-0">Text</label>
+                        <div className="flex-1 min-w-0">
+                            <ColorButton
+                                color={settings.textColor}
+                                onChange={(textColor) => batchAction(() => updateSettings({ captions: { ...settings, textColor } }))}
+                                onPopoverOpen={startInteraction}
+                                onPopoverClose={endInteraction}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm text-text-muted w-[80px] shrink-0">Background</label>
+                        <div className="flex-1 min-w-0">
+                            <ColorButton
+                                color={settings.backgroundColor}
+                                onChange={(backgroundColor) => batchAction(() => updateSettings({ captions: { ...settings, backgroundColor } }))}
+                                onPopoverOpen={startInteraction}
+                                onPopoverClose={endInteraction}
+                                showAlpha
+                            />
+                        </div>
+                    </div>
                 </div>
             </CollapsibleCard>
 

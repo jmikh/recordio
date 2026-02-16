@@ -4,6 +4,7 @@ import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
 import { useUIStore } from './stores/useUIStore';
+import { getTimeMapper } from './hooks/useTimeMapper';
 
 
 import { ProjectStorage } from '../storage/projectStorage';
@@ -205,6 +206,13 @@ function Editor() {
                 return;
             }
 
+            // If a button is focused, Space natively triggers its click event.
+            // Skip our handler to avoid double-toggling play/pause.
+            if (e.code === 'Space' && activeTag === 'button') {
+                e.preventDefault();
+                return;
+            }
+
             if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
                 if (e.shiftKey) {
                     redo();
@@ -216,7 +224,14 @@ function Editor() {
 
             if (e.code === 'Space') {
                 e.preventDefault(); // Prevent scrolling
-                const { isPlaying, setIsPlaying } = useUIStore.getState();
+                const { isPlaying, setIsPlaying, currentTimeMs, setCurrentTime } = useUIStore.getState();
+                if (!isPlaying) {
+                    const windows = useProjectStore.getState().project.timeline.outputWindows;
+                    const tm = getTimeMapper(windows);
+                    if (currentTimeMs >= tm.outputDuration) {
+                        setCurrentTime(0);
+                    }
+                }
                 setIsPlaying(!isPlaying);
             }
         };

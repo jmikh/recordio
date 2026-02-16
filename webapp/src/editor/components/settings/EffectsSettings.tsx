@@ -35,7 +35,7 @@ export const EffectsSettings = () => {
         showHotkeys: true,
         hotkeysSize: 1.0,
         hotkeysPlacement: 'top' as 'top' | 'bottom',
-        hotkeysMarginPx: 40,
+        hotkeysMargin: 4,
         kFontSizePx: 64,
         kPaddingXPx: 40,
         kPaddingYPx: 20,
@@ -195,13 +195,13 @@ export const EffectsSettings = () => {
                             <Slider
                                 label="Margin"
                                 min={0}
-                                max={200}
-                                value={keyboardSettings.hotkeysMarginPx}
-                                onChange={(val) => handleKeyboardChange({ hotkeysMarginPx: val })}
+                                max={20}
+                                value={keyboardSettings.hotkeysMargin}
+                                onChange={(val) => handleKeyboardChange({ hotkeysMargin: val })}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 showTooltip
-                                units="px"
+                                units="%"
                                 decimals={0}
                             />
                         </div>
