@@ -58,6 +58,12 @@ export type OutputCropOption = 'none' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
 
 export interface ScreenSettings extends StyleSettings {
     mode: 'device' | 'border';
+    /** How to handle Chrome toolbar in window recordings.
+     * 'show' = render full window including toolbar.
+     * 'hide' = crop to viewport only (hide toolbar).
+     * Only relevant when screenSource.viewportRect exists.
+     */
+    toolbarMode?: 'show' | 'hide';
     deviceFrameId?: ID;
     crop?: Rect;
     padding: number;

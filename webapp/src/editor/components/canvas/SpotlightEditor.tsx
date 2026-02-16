@@ -76,7 +76,9 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             screenSource.size,
             project.settings.outputSize,
             project.settings.screen.padding,
-            project.settings.screen.crop
+            project.settings.screen.crop,
+            project.screenSource.viewportRect,
+            project.settings.screen.toolbarMode ?? 'hide'
         );
     }, [
         project.screenSource,
@@ -121,7 +123,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     // Convert source rect to output rect for editing (using viewMapper)
     const initialOutputRect = useMemo(() => {
         if (!initialSourceRect || !viewMapper) return null;
-        return viewMapper.inputToOutputRect(initialSourceRect);
+        return viewMapper.eventToOutputRect(initialSourceRect);
     }, [initialSourceRect, viewMapper]);
 
     // Convert output rect back to source rect for saving

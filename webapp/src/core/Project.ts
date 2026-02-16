@@ -78,6 +78,7 @@ const createDefaultSettings = (): ProjectSettings => ({
 
     screen: {
         mode: 'border',
+        toolbarMode: 'hide',
         padding: 0.02,
         borderRadiusPx: 12,
         borderWidthPx: 1,
@@ -215,7 +216,10 @@ export class ProjectImpl {
         const viewMapper = new ViewMapper(
             screenSource.size,
             settings.outputSize,
-            settings.screen.padding
+            settings.screen.padding,
+            undefined,
+            screenSource.viewportRect,
+            settings.screen.toolbarMode ?? 'hide'
         );
 
         const timeMapper = new TimeMapper(outputWindows);

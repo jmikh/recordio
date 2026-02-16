@@ -110,22 +110,11 @@ export function getSpotlightStateAtTime(
     const currentDimOpacity = dimOpacity * easedProgress;
     const currentScale = 1.0 + (spotlightScale - 1.0) * easedProgress;
 
-    // Map source rect to screen (output) coordinates using the viewport
-    const topLeftScreen = viewMapper.projectToScreen({ x: sourceRect.x, y: sourceRect.y }, viewport);
-    const bottomRightScreen = viewMapper.projectToScreen(
-        { x: sourceRect.x + sourceRect.width, y: sourceRect.y + sourceRect.height },
-        viewport
-    );
-
-    const mappedRect: Rect = {
-        x: topLeftScreen.x,
-        y: topLeftScreen.y,
-        width: bottomRightScreen.x - topLeftScreen.x,
-        height: bottomRightScreen.y - topLeftScreen.y
-    };
+    // Map source rect to output coordinates using the viewport
+    const mappedRect = viewMapper.projectEventToOutput(sourceRect, viewport);
 
     // Check if the spotlight is visible in the viewport
-    const outputSize = viewMapper.outputVideoSize;
+    const outputSize = viewMapper.outputSize;
     const isVisible =
         mappedRect.width > 0 &&
         mappedRect.height > 0 &&

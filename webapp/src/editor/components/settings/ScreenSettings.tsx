@@ -3,7 +3,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
 
@@ -155,6 +155,17 @@ export const ScreenSettings = () => {
                         onChange={handleResolutionChange}
                         label="Aspect Ratio"
                     />
+
+                    {/* Hide Toolbar Toggle — only for window recordings */}
+                    {project.screenSource.viewportRect && (
+                        <Toggle
+                            label="Hide Toolbar"
+                            value={screenConfig.toolbarMode !== 'show'}
+                            onChange={(hide) => updateSettings({
+                                screen: { ...screenConfig, toolbarMode: hide ? 'hide' : 'show' }
+                            })}
+                        />
+                    )}
                 </div>
             </CollapsibleCard>
 

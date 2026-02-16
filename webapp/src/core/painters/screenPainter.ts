@@ -58,7 +58,12 @@ export function drawScreen(
     const outputSize = project.settings.outputSize;
     const padding = project.settings.screen.padding;
     // Pass the crop settings to the ViewMapper
-    const viewMapper = new ViewMapper(inputSize, outputSize, padding, project.settings.screen.crop);
+    const viewMapper = new ViewMapper(
+        inputSize, outputSize, padding,
+        project.settings.screen.crop,
+        project.screenSource.viewportRect,
+        project.settings.screen.toolbarMode ?? 'hide'
+    );
 
     // 4. Calculate Rects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
@@ -94,15 +99,12 @@ export function drawScreen(
             const deviceFrame = getDeviceFrame(screenConfig.deviceFrameId);
             if (deviceFrame && deviceFrameImg?.complete) {
                 // Calculate video screen bounds in canvas coordinates
-                const topLeft = viewMapper.projectToScreen({ x: 0, y: 0 }, effectiveViewport);
-                const bottomRight = viewMapper.projectToScreen({ x: inputSize.width, y: inputSize.height }, effectiveViewport);
+                const videoRect = viewMapper.projectSourceToOutput(
+                    { x: 0, y: 0, width: inputSize.width, height: inputSize.height },
+                    effectiveViewport
+                );
 
-                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, {
-                    x: topLeft.x,
-                    y: topLeft.y,
-                    width: bottomRight.x - topLeft.x,
-                    height: bottomRight.y - topLeft.y
-                });
+                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, videoRect);
             }
 
         } else {

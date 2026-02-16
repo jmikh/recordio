@@ -112,23 +112,9 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
         undefined // NO CROP for the mapper, because we are mapping onto the full view
     );
 
-    // Project the Crop Rect to Screen Coordinates
-    const screenRect = viewMapper.projectToScreen(
-        { x: currentCrop.x, y: currentCrop.y },
-        { x: 0, y: 0, width: outputSize.width, height: outputSize.height }
-    );
-    // Calculate width/height from bottom-right to ensure scaling is correct
-    const screenBottomRight = viewMapper.projectToScreen(
-        { x: currentCrop.x + currentCrop.width, y: currentCrop.y + currentCrop.height },
-        { x: 0, y: 0, width: outputSize.width, height: outputSize.height }
-    );
-
-    const renderedRect: Rect = {
-        x: screenRect.x,
-        y: screenRect.y,
-        width: screenBottomRight.x - screenRect.x,
-        height: screenBottomRight.y - screenRect.y
-    };
+    // Project the Crop Rect to Output Coordinates
+    const fullViewport = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+    const renderedRect = viewMapper.projectSourceToOutput(currentCrop, fullViewport);
 
 
     // ------------------------------------------------------------------
@@ -151,8 +137,8 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     // 2. Calculate the Rect for BoundingBox (Relative to the Container)
     const relativeRect: Rect = {
-        x: screenRect.x - viewMapper.contentRect.x,
-        y: screenRect.y - viewMapper.contentRect.y,
+        x: renderedRect.x - viewMapper.contentRect.x,
+        y: renderedRect.y - viewMapper.contentRect.y,
         width: renderedRect.width,
         height: renderedRect.height
     };

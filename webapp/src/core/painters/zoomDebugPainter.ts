@@ -27,20 +27,8 @@ export function paintZoomDebug(
 
     if (!currentFocusArea) return;
 
-    // Project the focus rect corners to screen coordinates
-    const focusRect = currentFocusArea.rect;
-    const topLeft = viewMapper.projectToScreen({ x: focusRect.x, y: focusRect.y }, viewport);
-    const bottomRight = viewMapper.projectToScreen(
-        { x: focusRect.x + focusRect.width, y: focusRect.y + focusRect.height },
-        viewport
-    );
-
-    const screenRect: Rect = {
-        x: topLeft.x,
-        y: topLeft.y,
-        width: bottomRight.x - topLeft.x,
-        height: bottomRight.y - topLeft.y,
-    };
+    // Project the focus rect to output coordinates
+    const screenRect = viewMapper.projectEventToOutput(currentFocusArea.rect, viewport);
 
     // Draw rectangle outline
     ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)'; // Magenta

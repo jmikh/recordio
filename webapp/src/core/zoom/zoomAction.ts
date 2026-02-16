@@ -34,8 +34,8 @@ export function calculateZoomSchedule(
     if (focusAreas.length === 0) return [];
 
     const actions: ZoomAction[] = [];
-    const outputVideoSize = viewMapper.outputVideoSize;
-    let lastViewport: Rect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
+    const outputSize = viewMapper.outputSize;
+    let lastViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
     let lastMustSeeRect: Rect = lastViewport;
     let lastOutputEndTime = 0;
 
@@ -43,7 +43,7 @@ export function calculateZoomSchedule(
     for (const area of focusAreas) {
         // Use the focus area rect directly (already in source coordinates)
         // Map it to output coordinates for viewport calculation
-        const mappedFocusRect = viewMapper.inputToOutputRect(area.rect);
+        const mappedFocusRect = viewMapper.eventToOutputRect(area.rect);
 
         // The must-see rect is the focus area itself
         let mustSeeRect: Rect = mappedFocusRect;
@@ -51,11 +51,11 @@ export function calculateZoomSchedule(
 
         // If the focus area spans the full source viewport, zoom fully out.
         const isFullViewport =
-            Math.abs(area.rect.width - viewMapper.inputVideoSize.width) < 1 &&
-            Math.abs(area.rect.height - viewMapper.inputVideoSize.height) < 1;
+            Math.abs(area.rect.width - viewMapper.sourceSize.width) < 1 &&
+            Math.abs(area.rect.height - viewMapper.sourceSize.height) < 1;
 
         if (isFullViewport) {
-            mustSeeRect = { x: 0, y: 0, width: outputVideoSize.width, height: outputVideoSize.height };
+            mustSeeRect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
             targetViewport = mustSeeRect;
         } else {
             // Calculate viewport: focus area centered within max zoom bounds
@@ -120,7 +120,7 @@ function getViewport(
     maxZoom: number,
     viewMapper: ViewMapper
 ): Rect {
-    const outputSize = viewMapper.outputVideoSize;
+    const outputSize = viewMapper.outputSize;
     const aspectRatio = outputSize.width / outputSize.height;
 
     // Minimum viewport size allowed by MAX ZOOM

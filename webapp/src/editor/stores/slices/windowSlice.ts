@@ -30,7 +30,9 @@ export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
     if (!sourceSize || sourceSize.width === 0) return project.timeline.zoomActions;
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
-        project.settings.screen.padding, project.settings.screen.crop
+        project.settings.screen.padding, project.settings.screen.crop,
+        project.screenSource.viewportRect,
+        project.settings.screen.toolbarMode ?? 'hide'
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
     return calculateZoomSchedule(project.settings.zoom, viewMapper, project.timeline.focusAreas, timeMapper);
@@ -42,7 +44,9 @@ export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAct
     if (!sourceSize || sourceSize.width === 0) return project.timeline.spotlightActions;
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
-        project.settings.screen.padding, project.settings.screen.crop
+        project.settings.screen.padding, project.settings.screen.crop,
+        project.screenSource.viewportRect,
+        project.settings.screen.toolbarMode ?? 'hide'
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
     return calculateAutoSpotlights(

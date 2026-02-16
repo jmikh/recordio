@@ -19,7 +19,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                 onToggle(!linked);
             }}
             className={`flex items-center gap-1.5 px-2 py-1 rounded shadow-md border transition-colors ${linked
-                ? 'bg-primary/20 border-primary/50 hover:bg-primary/30'
+                ? 'bg-primary border-primary hover:bg-primary-highlighted'
                 : 'bg-surface-overlay/90 border-border/50 hover:bg-surface-overlay'
                 }`}
             title={linked ? 'Unlink corners (edit independently)' : 'Link corners (edit together)'}
@@ -35,7 +35,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ color: linked ? 'var(--primary)' : 'var(--text-muted)' }}
+                style={{ color: linked ? 'var(--text-on-primary)' : 'var(--text-muted)' }}
             >
                 {linked ? (
                     // Linked chain
@@ -52,8 +52,8 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                     </>
                 )}
             </svg>
-            <span className={`text-xs ${linked ? 'text-primary' : 'text-text-secondary'}`}>
-                {linked ? 'Linked' : 'Unlinked'}
+            <span className={`text-xs ${linked ? 'text-text-on-primary' : 'text-text-secondary'}`}>
+                Corners
             </span>
         </button>
     );

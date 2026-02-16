@@ -8,35 +8,36 @@ export interface MappedPoint extends Point {
 /**
  * ViewMapper: Maps between Source (input video) coordinates and Output (logical canvas) coordinates.
  * 
- * ## Purpose
- * ViewMapper handles the transformation from the original video frame (Source) to the
- * logical output canvas (Output), accounting for cropping, aspect ratio fitting, and padding.
- * 
  * ## Coordinate Systems
  * - **Source coordinates**: The original video frame pixels (e.g., 3840x2160 capture).
  *   Events like clicks and spotlights are recorded in this coordinate system.
  * - **Output coordinates**: The logical canvas resolution (e.g., 1920x1080).
  *   This is the standardized coordinate system used for rendering and project data.
  * 
- * ## When to Use
- * - Recording: Converting captured event positions to output coordinates
- * - Spotlights: Mapping spotlight source rects to output rects
- * - Video rendering: Calculating source/dest rects for drawImage
- * - Coordinate normalization: Converting between input and output spaces
+ * ## Toolbar Mode (Window Recordings)
+ * Window recordings capture the full Chrome window (toolbar + viewport). The `viewportRect`
+ * describes where the viewport sits within the video frame, and `toolbarMode` controls
+ * how the toolbar region is handled:
+ * - **'hide'**: Viewport acts as an effective crop — only the viewport region is rendered.
+ * - **'show'**: Full frame is rendered including toolbar.
  * 
- * ## Relationship to DisplayMapper
- * - ViewMapper: Source → Output (handles cropping, aspect ratio, padding)
- * - DisplayMapper: Output → Display (handles scale for CSS/DOM rendering)
+ * In both modes, events are recorded in viewport coords and need offset conversion.
  * 
- * These can be chained: Source → ViewMapper → Output → DisplayMapper → Display
+ * Use `eventToOutputPoint` / `eventToOutputRect` / `projectEventToOutput` for event coordinates.
+ * Use `sourceToOutputPoint` / `sourceToOutputRect` / `projectSourceToOutput` for frame geometry.
  * 
  * @see DisplayMapper for Output → Display coordinate conversions
  */
 export class ViewMapper {
-    inputVideoSize: Size;
-    outputVideoSize: Size;
+    sourceSize: Size;
+    outputSize: Size;
     paddingPercentage: number;
     cropRect?: Rect;
+    viewportRect?: Rect;
+    toolbarMode: 'show' | 'hide';
+
+    /** Offset to apply to event coordinates to convert from viewport to frame coords */
+    private eventOffset: Point;
 
     /**
      * The rectangle in Output Space where the content (video) is placed.
@@ -45,63 +46,83 @@ export class ViewMapper {
     public readonly contentRect: Rect;
 
     constructor(
-        inputVideoSize: Size,
-        outputVideoSize: Size,
+        sourceSize: Size,
+        outputSize: Size,
         paddingPercentage: number,
-        cropRect?: Rect
+        cropRect?: Rect,
+        viewportRect?: Rect,
+        toolbarMode: 'show' | 'hide' = 'hide'
     ) {
-        this.outputVideoSize = outputVideoSize;
-        this.inputVideoSize = inputVideoSize;
+        this.outputSize = outputSize;
+        this.sourceSize = sourceSize;
         this.paddingPercentage = paddingPercentage;
-        this.cropRect = cropRect;
+        this.viewportRect = viewportRect;
+        this.toolbarMode = toolbarMode;
 
-        // Effective Input Size is the Crop Size if it exists, otherwise the full video size
-        const effectiveInputSize = cropRect ? { width: cropRect.width, height: cropRect.height } : inputVideoSize;
+        // When hiding toolbar, use viewportRect as an effective crop
+        if (toolbarMode === 'hide' && viewportRect) {
+            this.cropRect = viewportRect;
+        } else {
+            this.cropRect = cropRect;
+        }
 
-        // Calculate Scale to fit effective input into output (considering padding)
+        // Event offset: converts viewport-relative coords to frame coords
+        this.eventOffset = viewportRect
+            ? { x: viewportRect.x, y: viewportRect.y }
+            : { x: 0, y: 0 };
+
+        // Effective size is the Crop Size if it exists, otherwise the full source size
+        const effectiveSize = this.cropRect
+            ? { width: this.cropRect.width, height: this.cropRect.height }
+            : sourceSize;
+
+        // Calculate Scale to fit effective source into output (considering padding)
         const scale = Math.max(
-            effectiveInputSize.width / (this.outputVideoSize.width * (1 - 2 * this.paddingPercentage)),
-            effectiveInputSize.height / (this.outputVideoSize.height * (1 - 2 * this.paddingPercentage))
+            effectiveSize.width / (this.outputSize.width * (1 - 2 * this.paddingPercentage)),
+            effectiveSize.height / (this.outputSize.height * (1 - 2 * this.paddingPercentage))
         );
 
         // Calculate dimensions of the content in Output Space
-        const projectedWidth = effectiveInputSize.width / scale;
-        const projectedHeight = effectiveInputSize.height / scale;
+        const projectedWidth = effectiveSize.width / scale;
+        const projectedHeight = effectiveSize.height / scale;
 
-        const x = (this.outputVideoSize.width - projectedWidth) / 2;
-        const y = (this.outputVideoSize.height - projectedHeight) / 2;
+        const x = (this.outputSize.width - projectedWidth) / 2;
+        const y = (this.outputSize.height - projectedHeight) / 2;
 
         this.contentRect = { x, y, width: projectedWidth, height: projectedHeight };
     }
 
+    // ═══════════════════════════════════════════════════════
+    // Frame Geometry Methods (for rendering — no event offset)
+    // ═══════════════════════════════════════════════════════
+
     /**
-     * Maps a point from Input Space (Source Video) to Output Space (Canvas).
-     * Handles cropping by clamping to the crop area.
+     * Maps a point from Source Space to Output Space.
+     * For frame geometry only — does NOT apply viewport event offset.
+     * For event coordinates, use `eventToOutputPoint()`.
      */
-    inputToOutputPoint(point: Point): MappedPoint {
+    sourceToOutputPoint(point: Point): MappedPoint {
         let effectiveX = point.x;
         let effectiveY = point.y;
         let visible = true;
 
-        const effectiveInputSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.inputVideoSize;
+        const effectiveSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.sourceSize;
         const offsetX = this.cropRect ? this.cropRect.x : 0;
         const offsetY = this.cropRect ? this.cropRect.y : 0;
 
         if (this.cropRect) {
-            // Check visibility using the original point
             if (point.x < this.cropRect.x || point.x > this.cropRect.x + this.cropRect.width ||
                 point.y < this.cropRect.y || point.y > this.cropRect.y + this.cropRect.height) {
                 visible = false;
             }
 
-            // Clamp to Crop Rect
             effectiveX = Math.max(this.cropRect.x, Math.min(point.x, this.cropRect.x + this.cropRect.width));
             effectiveY = Math.max(this.cropRect.y, Math.min(point.y, this.cropRect.y + this.cropRect.height));
         }
 
         // Normalize relative to Crop (0..1)
-        const nx = (effectiveX - offsetX) / effectiveInputSize.width;
-        const ny = (effectiveY - offsetY) / effectiveInputSize.height;
+        const nx = (effectiveX - offsetX) / effectiveSize.width;
+        const ny = (effectiveY - offsetY) / effectiveSize.height;
 
         // Map to ContentRect in Output Space
         return {
@@ -112,11 +133,12 @@ export class ViewMapper {
     }
 
     /**
-     * Maps a rectangle from Input Space to Output Space.
+     * Maps a rectangle from Source Space to Output Space.
+     * For frame geometry only. For event rects, use `eventToOutputRect()`.
      */
-    inputToOutputRect(rect: Rect): Rect {
-        const p1 = this.inputToOutputPoint({ x: rect.x, y: rect.y });
-        const p2 = this.inputToOutputPoint({ x: rect.x + rect.width, y: rect.y + rect.height });
+    sourceToOutputRect(rect: Rect): Rect {
+        const p1 = this.sourceToOutputPoint({ x: rect.x, y: rect.y });
+        const p2 = this.sourceToOutputPoint({ x: rect.x + rect.width, y: rect.y + rect.height });
         return {
             x: p1.x,
             y: p1.y,
@@ -126,41 +148,104 @@ export class ViewMapper {
     }
 
     /**
+     * Projects a source-space rectangle through the viewport to Output coordinates.
+     * Combines sourceToOutputPoint with viewport scaling (zoom).
+     */
+    projectSourceToOutput(rect: Rect, viewport: Rect): Rect {
+        const topLeft = this._projectPointToOutput(
+            { x: rect.x, y: rect.y }, viewport
+        );
+        const bottomRight = this._projectPointToOutput(
+            { x: rect.x + rect.width, y: rect.y + rect.height }, viewport
+        );
+        return {
+            x: topLeft.x,
+            y: topLeft.y,
+            width: bottomRight.x - topLeft.x,
+            height: bottomRight.y - topLeft.y
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Event Coordinate Methods (applies viewport offset)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Maps an event point (viewport-relative) to Output Space.
+     * Applies the viewport offset to convert to frame coords first.
+     */
+    eventToOutputPoint(point: Point): MappedPoint {
+        return this.sourceToOutputPoint({
+            x: point.x + this.eventOffset.x,
+            y: point.y + this.eventOffset.y
+        });
+    }
+
+    /**
+     * Maps an event rectangle (viewport-relative) to Output Space.
+     * Applies the viewport offset to convert to frame coords first.
+     */
+    eventToOutputRect(rect: Rect): Rect {
+        return this.sourceToOutputRect({
+            x: rect.x + this.eventOffset.x,
+            y: rect.y + this.eventOffset.y,
+            width: rect.width,
+            height: rect.height
+        });
+    }
+
+    /**
+     * Projects an event rectangle (viewport-relative) through the viewport to Output coordinates.
+     */
+    projectEventToOutput(rect: Rect, viewport: Rect): Rect {
+        return this.projectSourceToOutput({
+            x: rect.x + this.eventOffset.x,
+            y: rect.y + this.eventOffset.y,
+            width: rect.width,
+            height: rect.height
+        }, viewport);
+    }
+
+    /**
+     * Projects a single event point (viewport-relative) through the viewport to Output coordinates.
+     * Used for mouse cursor rendering where a single point is needed.
+     */
+    projectEventPointToOutput(point: Point, viewport: Rect): MappedPoint {
+        return this._projectPointToOutput(
+            { x: point.x + this.eventOffset.x, y: point.y + this.eventOffset.y },
+            viewport
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Rendering Methods
+    // ═══════════════════════════════════════════════════════
+
+    /**
      * Calculates the source and destination rectangles for rendering the video 
      * based on the current Viewport (Output Space View).
-     * 
-     * @param viewport The current visible window in Output Space.
      */
     resolveRenderRects(viewport: Rect): { sourceRect: Rect, destRect: Rect } | null {
-        // 1. Find Intersection of Viewport and ContentRect
-        // This is the part of the Content visible in the Viewport
         const intersection = getIntersection(viewport, this.contentRect);
 
         if (!intersection) {
-            return null; // Viewport is looking entirely at padding/background
+            return null;
         }
 
-        const effectiveInputSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.inputVideoSize;
+        const effectiveSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.sourceSize;
         const offsetX = this.cropRect ? this.cropRect.x : 0;
         const offsetY = this.cropRect ? this.cropRect.y : 0;
 
-        // 2. Calculate sourceRect (Relative to Effective Input Space --> Then add offset)
-        // Map intersection (Output Space) -> Relative Input Space
-        const relSrcX = (intersection.x - this.contentRect.x) / this.contentRect.width * effectiveInputSize.width;
-        const relSrcY = (intersection.y - this.contentRect.y) / this.contentRect.height * effectiveInputSize.height;
-        const srcW = (intersection.width / this.contentRect.width) * effectiveInputSize.width;
-        const srcH = (intersection.height / this.contentRect.height) * effectiveInputSize.height;
+        const relSrcX = (intersection.x - this.contentRect.x) / this.contentRect.width * effectiveSize.width;
+        const relSrcY = (intersection.y - this.contentRect.y) / this.contentRect.height * effectiveSize.height;
+        const srcW = (intersection.width / this.contentRect.width) * effectiveSize.width;
+        const srcH = (intersection.height / this.contentRect.height) * effectiveSize.height;
 
-        // Add Crop Offset to get actual Source Coordinates
         const srcX = relSrcX + offsetX;
         const srcY = relSrcY + offsetY;
 
-
-        // 3. Calculate destRect (Canvas/Screen Drawing Coordinates)
-        // Map the visible intersection relative to the Viewport
-        // Scaling factor: Output Size / Viewport Size
-        const scaleX = this.outputVideoSize.width / viewport.width;
-        const scaleY = this.outputVideoSize.height / viewport.height;
+        const scaleX = this.outputSize.width / viewport.width;
+        const scaleY = this.outputSize.height / viewport.height;
 
         const dstX = (intersection.x - viewport.x) * scaleX;
         const dstY = (intersection.y - viewport.y) * scaleY;
@@ -174,59 +259,44 @@ export class ViewMapper {
     }
 
     /**
-     * Maps a point from Input Space -> Screen Coordinates (pixels on the final canvas).
+     * Returns the zoom scale factor relative to the Output Size.
+     * Scale 1.0 = Viewport is exactly the Output Size.
+     * Scale 2.0 = Viewport is half the Output Size (Zoomed In).
      */
-    projectToScreen(point: Point, viewport: Rect): MappedPoint {
-        // 1. Input -> Output Space
-        const outputPoint = this.inputToOutputPoint(point);
+    getZoomScale(viewport: Rect): number {
+        return this.outputSize.width / viewport.width;
+    }
 
-        // 2. Output Space -> Screen (Relative to Viewport)
-        // (p - cam.x) * scale
-        const scaleX = this.outputVideoSize.width / viewport.width;
-        const scaleY = this.outputVideoSize.height / viewport.height;
+    /**
+     * Returns the projected rectangle of the "Subject" (effective source) on the output.
+     * "Subject" is the Crop Rect if defined, otherwise the Full Source.
+     * This represents the area that visual elements (borders, shadows) should wrap around.
+     */
+    getProjectedSubjectRect(viewport: Rect): Rect {
+        const subjectRect = this.cropRect
+            ? { x: this.cropRect.x, y: this.cropRect.y, width: this.cropRect.width, height: this.cropRect.height }
+            : { x: 0, y: 0, width: this.sourceSize.width, height: this.sourceSize.height };
+
+        return this.projectSourceToOutput(subjectRect, viewport);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Private helpers
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Projects a single source-space point through the viewport to Output coordinates.
+     */
+    private _projectPointToOutput(point: Point, viewport: Rect): MappedPoint {
+        const outputPoint = this.sourceToOutputPoint(point);
+
+        const scaleX = this.outputSize.width / viewport.width;
+        const scaleY = this.outputSize.height / viewport.height;
 
         return {
             x: (outputPoint.x - viewport.x) * scaleX,
             y: (outputPoint.y - viewport.y) * scaleY,
             visible: outputPoint.visible
-        };
-    }
-
-    /**
-     * Returns the zoom scale factor relative to the Output Video Size.
-     * Scale 1.0 means the Viewport is exactly the Output Video Size.
-     * Scale 2.0 means the Viewport is half the Output Video Size (Zoomed In).
-     */
-    getZoomScale(viewport: Rect): number {
-        // We assume uniform scaling for zoom elements, so we use width ratio.
-        return this.outputVideoSize.width / viewport.width;
-    }
-
-    /**
-     * Returns the projected rectangle of the "Subject" (effective input) on the screen.
-     * "Subject" is the Crop Rect if defined, otherwise the Full Input Video.
-     * This represents the area that visual elements (borders, shadows) should wrap around.
-     */
-    getProjectedSubjectRect(viewport: Rect): Rect {
-        const effectiveInputSize = this.cropRect
-            ? { width: this.cropRect.width, height: this.cropRect.height }
-            : this.inputVideoSize;
-        const offsetX = this.cropRect ? this.cropRect.x : 0;
-        const offsetY = this.cropRect ? this.cropRect.y : 0;
-
-        // Get corners in Input Space
-        const topLeftInput = { x: offsetX, y: offsetY };
-        const bottomRightInput = { x: offsetX + effectiveInputSize.width, y: offsetY + effectiveInputSize.height };
-
-        // Project to Screen Space
-        const topLeftScreen = this.projectToScreen(topLeftInput, viewport);
-        const bottomRightScreen = this.projectToScreen(bottomRightInput, viewport);
-
-        return {
-            x: topLeftScreen.x,
-            y: topLeftScreen.y,
-            width: bottomRightScreen.x - topLeftScreen.x,
-            height: bottomRightScreen.y - topLeftScreen.y
         };
     }
 }

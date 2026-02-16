@@ -56,7 +56,7 @@ class SpotlightScheduler {
         this.zoomActions = zoomActions;
         this.zoomSettings = zoomSettings;
         this.enlargeScale = enlargeScale;
-        this.outputSize = viewMapper.outputVideoSize;
+        this.outputSize = viewMapper.outputSize;
     }
 
     /**
@@ -68,7 +68,7 @@ class SpotlightScheduler {
             hoveredCardsCount: hoveredCards.length,
             zoomActionsCount: this.zoomActions.length,
             outputSize: this.outputSize,
-            sourceSize: this.viewMapper.inputVideoSize,
+            sourceSize: this.viewMapper.sourceSize,
             enlargeScale: this.enlargeScale
         });
 
@@ -119,7 +119,7 @@ class SpotlightScheduler {
         const viewports = this.getViewportsForTimeRange(bufferedOutputRange.start, bufferedOutputRange.end);
 
         // Transform target rect to output coordinates
-        const outputTargetRect = this.viewMapper.inputToOutputRect(card.targetRect);
+        const outputTargetRect = this.viewMapper.eventToOutputRect(card.targetRect);
 
         // Calculate scale factor from source to output (for corner radius conversion)
         // Use average of X and Y scale since radii are uniform

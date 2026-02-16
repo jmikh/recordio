@@ -137,13 +137,13 @@ export const Header = () => {
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 
-                            {/* <button
+                            {<button
                                 onClick={() => useUIStore.getState().toggleDebugBar()}
                                 title="Toggle Debug Bar"
                                 className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
                             >
                                 Debug
-                            </button> */}
+                            </button>}
                         </>
                     )}
                 </div>

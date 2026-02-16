@@ -95,7 +95,7 @@ export function paintMouseClicks(
             const elapsed = currentOutputTime - mappedTime;
             const progress = elapsed / CLICK_DURATION;
 
-            const center = viewMapper.projectToScreen(click.mousePos, viewport);
+            const center = viewMapper.projectEventPointToOutput(click.mousePos, viewport);
             renderer(ctx, center.x, center.y, progress, settings);
         }
     }

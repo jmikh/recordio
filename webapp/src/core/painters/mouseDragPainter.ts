@@ -80,7 +80,7 @@ export function drawDragEffects(
             // Position is clamped to the drag path (source time)
             const positionTime = Math.max(drag.timestamp, Math.min(laggedSourceTime, drag.endTime));
             const currentPoint = getPointAtTime(path, positionTime);
-            const screenPoint = viewMapper.projectToScreen(currentPoint, viewport);
+            const screenPoint = viewMapper.projectEventPointToOutput(currentPoint, viewport);
 
             // Draw ring or circle at full size (no animation / no fade)
             ctx.beginPath();
