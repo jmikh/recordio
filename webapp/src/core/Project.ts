@@ -54,9 +54,16 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     effects: {
-        showMouseClicks: true,
         showMouseDrags: true,
-        showKeyboardClicks: true
+        showKeyboardClicks: true,
+        mouseClick: {
+            effectEnabled: true,
+            effectType: 'ring',
+            color: '#667eea',
+            size: 1.0,
+            soundEnabled: false,
+            soundVolume: 0.5
+        }
     },
 
     screen: {

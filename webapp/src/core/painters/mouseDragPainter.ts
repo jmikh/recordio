@@ -1,5 +1,8 @@
 import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../../types';
+import type { MouseClickSettings } from '../../types/settings';
 import type { ViewMapper } from '../mappers/viewMapper';
+import type { TimeMapper } from '../mappers/timeMapper';
+import { hexToRgba, MOUSE_BASE_RADIUS } from './mouseClickPainter';
 
 /**
  * Extracts the mouse positions that fall within the drag time range.
@@ -29,52 +32,69 @@ function getDragPath(
 }
 
 /**
- * Draws drag effects.
+ * Draws drag effects — shows a ring or filled circle (matching the click
+ * effect style) at full size for the entire duration of the drag.
  *
- * @param ctx 2D Canvas Context
- * @param userEvents User events containing drags and mousePositions
- * @param sourceTimeMs Current Source Time
- * @param viewport Current Viewport (Output Space)
- * @param viewMapper Transformation Wrapper
+ * Event timestamps are source time; they are mapped to output time via timeMapper.
+ * Drags in cut/hidden segments are skipped.
  */
 export function drawDragEffects(
     ctx: CanvasRenderingContext2D,
     userEvents: UserEvents,
-    sourceTimeMs: number,
+    currentOutputTime: number,
     viewport: Rect,
-    viewMapper: ViewMapper
+    viewMapper: ViewMapper,
+    settings: MouseClickSettings,
+    timeMapper: TimeMapper
 ) {
     // Add a visual lag (there is a mismatch between the drag events and the screen events)
     const DRAG_LAG_MS = 80;
-    const MOUSE_BASE_RADIUS = 40;
 
     const { drags, mousePositions } = userEvents;
+    const [r, g, b, a] = hexToRgba(settings.color);
+    const radius = MOUSE_BASE_RADIUS * settings.size;
 
     for (const drag of drags) {
-        const endTimestamp = drag.endTime;
+        // Map the drag's source time range to output time range
+        const mappedRange = timeMapper.mapSourceRangeToOutputRange(drag.timestamp, drag.endTime);
+        if (!mappedRange) continue; // Drag is entirely in a cut/hidden segment
 
-        if (sourceTimeMs >= drag.timestamp && sourceTimeMs <= endTimestamp + DRAG_LAG_MS) {
+        const { start: outputStart, end: outputEnd } = mappedRange;
+
+        if (currentOutputTime >= outputStart && currentOutputTime <= outputEnd + DRAG_LAG_MS) {
             // Derive the path from mousePositions
             const path = getDragPath(drag, mousePositions);
             if (path.length === 0) continue;
 
-            // Calculate "Visual Time" (where the cursor appears to be)
-            const rawVisualTime = sourceTimeMs - DRAG_LAG_MS;
+            // Convert current output time back to source time for position interpolation
+            // (mouse positions are in source time)
+            const sourceTime = timeMapper.mapOutputToSourceTime(currentOutputTime);
+            if (sourceTime < 0) continue;
 
-            // Position is clamped to the drag path
-            const positionTime = Math.max(drag.timestamp, Math.min(rawVisualTime, endTimestamp));
+            // Calculate "Visual Time" (where the cursor appears to be) in source time
+            // We apply the lag in output time, then convert back to source
+            const laggedOutputTime = Math.max(outputStart, currentOutputTime - DRAG_LAG_MS);
+            const laggedSourceTime = timeMapper.mapOutputToSourceTime(laggedOutputTime);
+            if (laggedSourceTime < 0) continue;
+
+            // Position is clamped to the drag path (source time)
+            const positionTime = Math.max(drag.timestamp, Math.min(laggedSourceTime, drag.endTime));
             const currentPoint = getPointAtTime(path, positionTime);
             const screenPoint = viewMapper.projectToScreen(currentPoint, viewport);
 
-            // Scale radius by zoom level
-            const scaledRadius = MOUSE_BASE_RADIUS;
-            const opacity = 0.3;
-
-            // Draw Cursor Representative
+            // Draw ring or circle at full size (no animation / no fade)
             ctx.beginPath();
-            ctx.arc(screenPoint.x, screenPoint.y, scaledRadius, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(128, 128, 128, ${opacity})`;
-            ctx.fill();
+            ctx.arc(screenPoint.x, screenPoint.y, radius, 0, Math.PI * 2);
+
+            if (settings.effectType === 'ring') {
+                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.7 * a})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            } else {
+                // 'circle' — filled
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.5 * a})`;
+                ctx.fill();
+            }
         }
     }
 }

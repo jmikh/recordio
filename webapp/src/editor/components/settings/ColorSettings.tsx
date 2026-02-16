@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { HexColorPicker } from 'react-colorful';
+import { HexColorPicker, HexAlphaColorPicker } from 'react-colorful';
 import { MultiToggle } from '@shared/components';
 import { usePaletteStore } from '../../stores/usePaletteStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -21,6 +21,8 @@ interface ColorSettingsProps {
     onDirectionChange: (direction: number) => void;
     /** If true, hides the Solid/Gradient toggle and shows only solid color controls */
     solidOnly?: boolean;
+    /** If true, shows an opacity/alpha slider on the color picker */
+    showAlpha?: boolean;
 }
 
 export const ColorSettings = ({
@@ -32,7 +34,8 @@ export const ColorSettings = ({
     onColorChange,
     onGradientColorChange,
     onDirectionChange,
-    solidOnly = false
+    solidOnly = false,
+    showAlpha = false
 }: ColorSettingsProps) => {
     // Global palette store
     const { palette, updatePaletteColor, resetPalette } = usePaletteStore();
@@ -108,7 +111,7 @@ export const ColorSettings = ({
                         {/* Fixed height wrapper to align circle centers (52px = dial outer size) */}
                         <div className="h-[52px] flex items-center justify-center">
                             <div
-                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 0
+                                className={`w-10 h-10 rounded-full border shadow-sm transition-all ${activeGradientIndex === 0
                                     ? 'border-ring ring-2 ring-ring/30 scale-110'
                                     : 'border-border hover:border-border-hover'}`}
                                 style={{ backgroundColor: safeGradient.colors[0] }}
@@ -134,7 +137,7 @@ export const ColorSettings = ({
                         {/* Fixed height wrapper to align circle centers (52px = dial outer size) */}
                         <div className="h-[52px] flex items-center justify-center">
                             <div
-                                className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${activeGradientIndex === 1
+                                className={`w-10 h-10 rounded-full border shadow-sm transition-all ${activeGradientIndex === 1
                                     ? 'border-ring ring-2 ring-ring/30 scale-110'
                                     : 'border-border hover:border-border-hover'}`}
                                 style={{ backgroundColor: safeGradient.colors[1] }}
@@ -167,7 +170,7 @@ export const ColorSettings = ({
                         <button
                             key={index}
                             onClick={() => handlePaletteClick(index)}
-                            className={`w-6 h-6 rounded-full border-2 transition-all
+                            className={`w-6 h-6 rounded-full border transition-all
                                 ${selectedPaletteIndex === index
                                     ? 'border-ring ring-2 ring-ring/40 scale-110'
                                     : 'border-border hover:border-border-hover hover:scale-110'
@@ -182,11 +185,19 @@ export const ColorSettings = ({
 
             {/* Embedded Picker */}
             <div className="flex justify-center py-2">
-                <HexColorPicker
-                    color={activeColorValue}
-                    onChange={handleColorUpdate}
-                    style={{ width: '100%', height: '150px' }}
-                />
+                {showAlpha ? (
+                    <HexAlphaColorPicker
+                        color={activeColorValue}
+                        onChange={handleColorUpdate}
+                        style={{ width: '100%', height: '150px' }}
+                    />
+                ) : (
+                    <HexColorPicker
+                        color={activeColorValue}
+                        onChange={handleColorUpdate}
+                        style={{ width: '100%', height: '150px' }}
+                    />
+                )}
             </div>
 
             {/* Hex Input */}
@@ -199,7 +210,7 @@ export const ColorSettings = ({
                         value={activeColorValue.replace('#', '')}
                         onChange={(e) => handleColorUpdate(`#${e.target.value}`)}
                         className="bg-transparent border-none outline-none text-xs font-mono text-text-highlighted w-full"
-                        maxLength={6}
+                        maxLength={showAlpha ? 8 : 6}
                     />
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
                 </div>

@@ -145,7 +145,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                         />
                     );
                 })}
-            </div >
+            </div>
 
             {/* Scissors Split Button */}
             <button

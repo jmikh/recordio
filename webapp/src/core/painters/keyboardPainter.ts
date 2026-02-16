@@ -1,40 +1,47 @@
 
 import type { KeyboardEvent, Size } from '../../types';
+import type { TimeMapper } from '../mappers/timeMapper';
 
 /**
  * Draws keysrokes at the top of the canvas.
  *
  * @param ctx 2D Canvas Context
  * @param events List of keystroke events
- * @param sourceTimeMs Current Source Time
+ * @param currentOutputTime Current Output Time
  * @param outputSize Size of the output canvas
+ * @param timeMapper Maps source time to output time
  */
 export function drawKeyboardOverlay(
     ctx: CanvasRenderingContext2D,
     events: KeyboardEvent[],
-    sourceTimeMs: number,
-    outputSize: Size
+    currentOutputTime: number,
+    outputSize: Size,
+    timeMapper: TimeMapper
 ) {
     const EVENT_DURATION = 1500; // Show for 1.5 seconds
     const FADE_OUT_START = 1000;
 
-    // Filter relevant events
-    // We only care about events that are "active"
-    const activeEvents = events.filter(e =>
-        sourceTimeMs >= e.timestamp && sourceTimeMs <= e.timestamp + EVENT_DURATION
-    );
+    // Filter relevant events — map source timestamps to output time, skip hidden
+    const activeEvents: { event: KeyboardEvent; mappedTime: number }[] = [];
+    for (const e of events) {
+        const mappedTime = timeMapper.mapSourceToOutputTime(e.timestamp);
+        if (mappedTime < 0) continue; // Event is in a cut/hidden segment
+        if (currentOutputTime >= mappedTime && currentOutputTime <= mappedTime + EVENT_DURATION) {
+            activeEvents.push({ event: e, mappedTime });
+        }
+    }
 
     if (activeEvents.length === 0) return;
 
-    // Sort active events by timestamp
-    activeEvents.sort((a, b) => a.timestamp - b.timestamp);
+    // Sort active events by mapped output time
+    activeEvents.sort((a, b) => a.mappedTime - b.mappedTime);
 
     // Only show the latest active event to avoid clutter
-    // (Or we could stack them?)
-    const latestEvent = activeEvents[activeEvents.length - 1];
+    const latest = activeEvents[activeEvents.length - 1];
+    const latestEvent = latest.event;
 
     // Calculate Opacity
-    const elapsed = sourceTimeMs - latestEvent.timestamp;
+    const elapsed = currentOutputTime - latest.mappedTime;
     let opacity = 1;
     if (elapsed > FADE_OUT_START) {
         opacity = 1 - ((elapsed - FADE_OUT_START) / (EVENT_DURATION - FADE_OUT_START));

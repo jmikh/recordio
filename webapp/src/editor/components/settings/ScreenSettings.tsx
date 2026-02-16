@@ -219,6 +219,7 @@ export const ScreenSettings = () => {
                                 }))}
                                 onPopoverOpen={startInteraction}
                                 onPopoverClose={endInteraction}
+                                showAlpha
                             />
 
                             {/* Rounding Slider */}

@@ -128,10 +128,28 @@ export interface SpotlightSettings {
 // EFFECTS
 // ==========================================
 
+export type MouseClickEffectType = 'ring' | 'circle';
+
+export interface MouseClickSettings {
+    /** Whether the visual click effect is rendered. Sound can still play when this is off. */
+    effectEnabled: boolean;
+    /** Which visual effect to use for clicks */
+    effectType: MouseClickEffectType;
+    /** Color of the effect (hex string). Used by ring and circle effects. */
+    color: string;
+    /** Size multiplier (0.5–2.0). Scales the base radius. */
+    size: number;
+    /** Enable click sound effect */
+    soundEnabled: boolean;
+    /** Sound volume (0–1). Default: 0.5 */
+    soundVolume: number;
+}
+
 export interface EffectSettings {
-    showMouseClicks: boolean;
     showMouseDrags: boolean;
     showKeyboardClicks: boolean;
+    /** Mouse click visual and sound configuration */
+    mouseClick: MouseClickSettings;
 }
 
 // ==========================================

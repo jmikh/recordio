@@ -14,6 +14,8 @@ interface ColorButtonProps {
     onPopoverClose?: () => void;
     /** Optional label displayed above the button */
     label?: string;
+    /** If true, shows an opacity/alpha slider on the color picker */
+    showAlpha?: boolean;
 }
 
 export const ColorButton: React.FC<ColorButtonProps> = ({
@@ -21,7 +23,8 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
     onChange,
     onPopoverOpen,
     onPopoverClose,
-    label
+    label,
+    showAlpha
 }) => {
     const [showColorPopover, setShowColorPopover] = useState(false);
     const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
@@ -75,7 +78,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                 title="Select color"
             >
                 <div
-                    className="w-5 h-5 rounded-full border border-border shrink-0"
+                    className="w-5 h-5 rounded-full border border-text-muted shrink-0"
                     style={{ backgroundColor: color }}
                 />
                 <span className="text-xs font-mono text-text-muted uppercase">
@@ -102,6 +105,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                         onGradientColorChange={() => { }}
                         onDirectionChange={() => { }}
                         solidOnly={true}
+                        showAlpha={showAlpha}
                     />
                 </div>,
                 document.body

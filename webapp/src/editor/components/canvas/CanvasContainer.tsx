@@ -6,6 +6,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
+import { resetClickSounds } from '../../../core/audio/clickSoundPlayer';
 import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
 import { SpotlightEditor, renderSpotlightEditor } from './SpotlightEditor';
 import { renderCropEditor, CropEditor } from './CropEditor';
@@ -168,6 +169,7 @@ export const CanvasContainer = () => {
                 lastTimeRef.current = time;
             } else {
                 lastTimeRef.current = 0;
+                resetClickSounds();
             }
 
             // PERFORM RENDER

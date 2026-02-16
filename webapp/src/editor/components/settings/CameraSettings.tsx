@@ -194,6 +194,7 @@ export const CameraSettings = () => {
                             onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
                             onPopoverOpen={startInteraction}
                             onPopoverClose={endInteraction}
+                            showAlpha
                         />
 
                         {/* Thickness Slider */}

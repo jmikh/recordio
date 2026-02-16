@@ -1,5 +1,6 @@
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
+import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
@@ -43,9 +44,6 @@ export class PlaybackRenderer {
 
         const { timeline } = project;
 
-        // 2. Calculate Times
-        const sourceTimeMs = currentTimeMs;
-
         // 3. Resolve sources directly from project
         const screenSource = project.screenSource;
         const cameraSource = project.cameraSource;
@@ -55,13 +53,12 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
 
-        const outputTimeMs = currentTimeMs;
         const zoomActions = timeline.zoomActions || [];
         const { timeMapper } = state;
 
         effectiveViewport = getViewportStateAtTime(
             zoomActions,
-            outputTimeMs,
+            currentTimeMs,
             outputSize,
             timeMapper,
             project.settings.zoom
@@ -82,17 +79,24 @@ export class PlaybackRenderer {
             );
             viewMapper = result.viewMapper;
 
-            // Conditionally render effects based on settings
-            if (project.settings.effects?.showMouseClicks) {
-                paintMouseClicks(ctx, userEvents.mouseClicks, sourceTimeMs, effectiveViewport, viewMapper);
+            // Mouse click effects (visual and sound are independent)
+            const mouseClick = project.settings.effects?.mouseClick;
+            if (mouseClick) {
+                if (mouseClick.effectEnabled) {
+                    paintMouseClicks(ctx, userEvents.mouseClicks, currentTimeMs, effectiveViewport, viewMapper, mouseClick, timeMapper);
+                }
+                if (mouseClick.soundEnabled) {
+                    playClickSounds(userEvents.mouseClicks, currentTimeMs, mouseClick.soundVolume ?? 0.5, timeMapper);
+                    playDragSounds(userEvents.drags, currentTimeMs, mouseClick.soundVolume ?? 0.5, timeMapper);
+                }
             }
-            if (project.settings.effects?.showMouseDrags) {
-                drawDragEffects(ctx, userEvents, sourceTimeMs, effectiveViewport, viewMapper);
+            if (project.settings.effects?.showMouseDrags && mouseClick?.effectEnabled) {
+                drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouseClick, timeMapper);
             }
 
             // DEBUG: Render zoom focus areas (controlled via DebugBar)
             if (state.showDebugOverlays && state.focusAreas) {
-                paintZoomDebug(ctx, state.focusAreas, outputTimeMs, effectiveViewport, viewMapper);
+                paintZoomDebug(ctx, state.focusAreas, currentTimeMs, effectiveViewport, viewMapper);
             }
         }
 
@@ -103,7 +107,7 @@ export class PlaybackRenderer {
             const spotlightState = getSpotlightStateAtTime(
                 timeline.spotlightActions || [],
                 project.settings.spotlight,
-                outputTimeMs,
+                currentTimeMs,
                 effectiveViewport,
                 viewMapper,
                 timeMapper
@@ -117,8 +121,9 @@ export class PlaybackRenderer {
             drawKeyboardOverlay(
                 ctx,
                 userEvents.keyboardEvents,
-                sourceTimeMs,
-                outputSize
+                currentTimeMs,
+                outputSize,
+                timeMapper
             );
         }
 

@@ -48,9 +48,10 @@ export class EventRecorder {
 
     // Drag State
     private dragStartPos: { x: number; y: number; timestamp: number } | null = null;
+    private suppressNextClick = false;
 
     // Constants
-    private readonly DRAG_DISTANCE_THRESHOLD = 50;
+    private readonly DRAG_DISTANCE_THRESHOLD = 40;
     // 3 seconds for scroll session timeout
     private readonly SCROLL_SESSION_TIMEOUT = 3000;
 
@@ -183,6 +184,10 @@ export class EventRecorder {
     }
 
     private handleClick = (e: MouseEvent) => {
+        if (this.suppressNextClick) {
+            this.suppressNextClick = false;
+            return;
+        }
         if (!this.isActive()) return;
 
         // Interaction should flush pending sessions
@@ -231,6 +236,7 @@ export class EventRecorder {
 
         // Only emit drag if moved beyond threshold (clicks are handled by click event)
         if (dist >= this.DRAG_DISTANCE_THRESHOLD) {
+            this.suppressNextClick = true;
             this.sendMessage(EventType.MOUSEDRAG, {
                 timestamp: this.dragStartPos.timestamp,
                 mousePos: { x: this.dragStartPos.x, y: this.dragStartPos.y },

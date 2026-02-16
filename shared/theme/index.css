@@ -163,9 +163,9 @@
    --state-disabled: oklch(0 0 0 / 2%);
 
    /* Borders - Black transparency */
-   --border-default: oklch(0 0 0 / 8%);
-   --border-hover: oklch(0 0 0 / 15%);
-   --border-selected: oklch(0 0 0 / 25%);
+   --border-default: oklch(0 0 0 / 6%);
+   --border-hover: oklch(0 0 0 / 12%);
+   --border-selected: oklch(0 0 0 / 18%);
 
    /* Text Colors - Dark */
    --text-highlighted: oklch(0.15 0 0);
@@ -194,7 +194,7 @@
    --state-active: oklch(1 0 0 / 12%);
 
    /* Borders - Original values */
-   --border-default: oklch(1 0 0 / 3%);
+   --border-default: oklch(1 0 0 / 6%);
    --border-hover: oklch(1 0 0 / 12%);
    --border-selected: oklch(1 0 0 / 18%);
 

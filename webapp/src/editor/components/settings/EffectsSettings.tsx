@@ -3,8 +3,10 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, DefaultButton, InfoTooltip, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
+import { ColorButton } from './ColorButton';
 import { FaTrash } from 'react-icons/fa';
 import type { EasingStyle } from '../../../core/easing';
+import type { MouseClickEffectType, MouseClickSettings } from '../../../types/settings';
 
 // Easing dropdown options
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
@@ -57,6 +59,12 @@ const EasingTooltipContent = () => (
     </div>
 );
 
+// Click effect toggle options
+const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string }[] = [
+    { value: 'ring', label: 'Ring' },
+    { value: 'circle', label: 'Circle' },
+];
+
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const clearZoomActions = useProjectStore(s => s.clearZoomActions);
@@ -76,6 +84,7 @@ export const EffectsSettings = () => {
     const showCollapsibleZoom = useUIStore(s => s.showCollapsibleZoom);
     const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
     const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
+    const showCollapsibleMouse = useUIStore(s => s.showCollapsibleMouse);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
     // Spotlight handlers
@@ -112,8 +121,13 @@ export const EffectsSettings = () => {
         batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoom: val } }));
     };
 
-    const handleEffectToggle = (key: keyof typeof effectSettings, value: boolean) => {
+    const handleEffectToggle = (key: 'showMouseDrags' | 'showKeyboardClicks', value: boolean) => {
         updateSettings({ effects: { ...effectSettings, [key]: value } });
+    };
+
+    const handleMouseClickChange = (partial: Partial<MouseClickSettings>) => {
+        const current = effectSettings.mouseClick;
+        batchAction(() => updateSettings({ effects: { ...effectSettings, mouseClick: { ...current, ...partial } } }));
     };
 
     const handleZoomEasingChange = (easing: EasingStyle) => {
@@ -309,6 +323,95 @@ export const EffectsSettings = () => {
                 </div>
             </CollapsibleCard>
 
+            {/* MOUSE SETTINGS */}
+            <CollapsibleCard
+                title="Mouse"
+                isExpanded={showCollapsibleMouse}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMouse', v)}
+            >
+                <div className="flex flex-col gap-4">
+                    {/* Sound Toggle */}
+                    <Toggle
+                        label="Sound"
+                        value={effectSettings.mouseClick.soundEnabled}
+                        onChange={(val) => handleMouseClickChange({ soundEnabled: val })}
+                    />
+
+                    {/* Volume (visible when sound enabled) */}
+                    {effectSettings.mouseClick.soundEnabled && (
+                        <div className="pl-1">
+                            <Slider
+                                label="Volume"
+                                min={0}
+                                max={1}
+                                value={effectSettings.mouseClick.soundVolume}
+                                onChange={(val) => handleMouseClickChange({ soundVolume: val })}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                showTooltip
+                                valueTransform={(val) => val * 100}
+                                units="%"
+                                decimals={0}
+                            />
+                        </div>
+                    )}
+
+                    {/* Click Effect Toggle */}
+                    <Toggle
+                        label="Click Effect"
+                        value={effectSettings.mouseClick.effectEnabled}
+                        onChange={(val) => handleMouseClickChange({ effectEnabled: val })}
+                    />
+
+                    {/* Click Effect Sub-Settings (visible when effect enabled) */}
+                    {effectSettings.mouseClick.effectEnabled && (
+                        <div className="flex flex-col gap-4 pl-1">
+                            {/* Effect Type */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm text-text-muted">Effect</label>
+                                <MultiToggle
+                                    options={CLICK_EFFECT_OPTIONS}
+                                    value={effectSettings.mouseClick.effectType}
+                                    onChange={(val) => handleMouseClickChange({ effectType: val })}
+                                />
+                            </div>
+
+                            {/* Color (ring and circle only) */}
+                            <ColorButton
+                                label="Color"
+                                color={effectSettings.mouseClick.color}
+                                onChange={(color) => handleMouseClickChange({ color })}
+                                onPopoverOpen={startInteraction}
+                                onPopoverClose={endInteraction}
+                                showAlpha
+                            />
+
+
+                            {/* Size */}
+                            <Slider
+                                label="Size"
+                                min={0.5}
+                                max={2}
+                                value={effectSettings.mouseClick.size}
+                                onChange={(val) => handleMouseClickChange({ size: val })}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                showTooltip
+                                units="×"
+                                decimals={1}
+                            />
+                        </div>
+                    )}
+
+                    {/* Drag Effect */}
+                    <Toggle
+                        label="Drag Effect"
+                        value={effectSettings.showMouseDrags}
+                        onChange={(val) => handleEffectToggle('showMouseDrags', val)}
+                    />
+                </div>
+            </CollapsibleCard>
+
             {/* EFFECT SETTINGS */}
             <CollapsibleCard
                 title="Effects"
@@ -316,18 +419,6 @@ export const EffectsSettings = () => {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleEffects', v)}
             >
                 <div className="flex flex-col gap-4">
-                    <Toggle
-                        label="Mouse Clicks"
-                        value={effectSettings.showMouseClicks}
-                        onChange={(val) => handleEffectToggle('showMouseClicks', val)}
-                    />
-
-                    <Toggle
-                        label="Mouse Drags"
-                        value={effectSettings.showMouseDrags}
-                        onChange={(val) => handleEffectToggle('showMouseDrags', val)}
-                    />
-
                     <Toggle
                         label="Keyboard Clicks"
                         value={effectSettings.showKeyboardClicks}
