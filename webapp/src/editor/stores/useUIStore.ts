@@ -235,7 +235,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 
     // Debug Bar
-    showDebugBar: true,
+    showDebugBar: false,
     toggleDebugBar: () => set((state) => ({ showDebugBar: !state.showDebugBar })),
 
     // Debug Overlays
