@@ -112,10 +112,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             const keyframeX = coords.msToX(action.outputEndTime);
             const trailWidth = coords.msToX(action.duration);
             const trailStartX = keyframeX - trailWidth;
-            const isFullScreen = isFullViewport(action.rect, outputSize);
+            const isFullScreen = isFullViewport(action.rectPx, outputSize);
             const isSelected = editingZoomId === action.id;
             const isDragging = dragState?.motionId === action.id;
-            const scale = calculateZoomScale(action.rect, outputSize);
+            const scale = calculateZoomScale(action.rectPx, outputSize);
 
             // 1. Render transition trail leading into this keyframe
             elements.push(

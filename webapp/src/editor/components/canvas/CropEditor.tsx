@@ -38,8 +38,8 @@ export const renderCropEditor = (
             ...project.settings.screen,
             crop: undefined, // Force undefined to see full video
             mode: 'border' as const, // Force non-device mode to hide frames
-            borderRadius: 0,
-            borderWidth: 0, // Hide borders
+            borderRadiusPx: 0,
+            borderWidthPx: 0, // Hide borders
             hasShadow: false, // Hide shadow
             hasGlow: false, // Hide glow
         }
@@ -82,7 +82,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Get current border radius for screen (all corners linked)
-    const screenBorderRadius = project.settings.screen.borderRadius ?? 0;
+    const screenBorderRadius = project.settings.screen.borderRadiusPx ?? 0;
     const [localBorderRadius, setLocalBorderRadius] = useState(screenBorderRadius);
     const cornerRadii: CornerRadii = useMemo(() => {
         return [localBorderRadius, localBorderRadius, localBorderRadius, localBorderRadius];
@@ -181,7 +181,7 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
 
     const handleCornerRadiiCommit = (radii: CornerRadii) => {
         const newRadius = radii[0];
-        batchAction(() => updateSettings({ screen: { borderRadius: newRadius } }));
+        batchAction(() => updateSettings({ screen: { borderRadiusPx: newRadius } }));
     };
 
     // Close when clicking outside the canvas container

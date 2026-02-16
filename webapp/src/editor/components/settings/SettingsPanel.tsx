@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
+import { FocusSettings } from './FocusSettings';
 import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
@@ -12,7 +13,7 @@ import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
-import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic } from 'react-icons/tb';
+import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
 
@@ -85,7 +86,8 @@ export const SettingsPanel = () => {
             { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
             { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
             { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
-            { id: 'zoom', label: 'Effects', icon: <TbZoomIn size={20} /> },
+            { id: 'zoom', label: 'Focus', icon: <TbZoomIn size={20} /> },
+            { id: 'effects', label: 'Effects', icon: <TbClick size={20} /> },
             {
                 id: 'camera',
                 label: 'Webcam',
@@ -184,7 +186,8 @@ export const SettingsPanel = () => {
                     {activeTab === 'background' && <BackgroundSettings />}
                     {activeTab === 'screen' && <ScreenSettings />}
                     {activeTab === 'camera' && <CameraSettings />}
-                    {activeTab === 'zoom' && <EffectsSettings />}
+                    {activeTab === 'zoom' && <FocusSettings />}
+                    {activeTab === 'effects' && <EffectsSettings />}
                     {activeTab === 'captions' && <CaptionsSettings />}
                     {activeTab === 'audio' && <AudioSettingsPanel />}
                 </div>

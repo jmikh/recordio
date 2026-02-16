@@ -22,7 +22,7 @@ export interface SpotlightState {
     /** The source rectangle (in source video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */
-    borderRadius: [number, number, number, number];
+    borderRadiusPx: [number, number, number, number];
     /** Current animated dim value (0 to settings.dimOpacity) */
     dimOpacity: number;
     /** Current animated scale (1.0 to settings.enlargeScale) */
@@ -83,7 +83,7 @@ export function getSpotlightStateAtTime(
     }
 
     // Calculate animation progress
-    const { sourceRect, borderRadius, scale: spotlightScale } = activeSpotlight;
+    const { sourceRect, borderRadiusPx, scale: spotlightScale } = activeSpotlight;
     const { transitionDurationMs, dimOpacity } = settings;
 
     const elapsed = outputTimeMs - resolvedStart;
@@ -144,7 +144,7 @@ export function getSpotlightStateAtTime(
             originalRect: clampedRect,
             scaledRect,
             sourceRect,
-            borderRadius,
+            borderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };
@@ -156,7 +156,7 @@ export function getSpotlightStateAtTime(
             originalRect: null,
             scaledRect: null,
             sourceRect,
-            borderRadius,
+            borderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };

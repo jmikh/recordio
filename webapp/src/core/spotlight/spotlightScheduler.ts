@@ -153,7 +153,7 @@ class SpotlightScheduler {
             sourceStartTimeMs: spotlightSourceStartMs,
             sourceEndTimeMs: spotlightSourceEndMs,
             sourceRect: card.targetRect,
-            borderRadius: outputCornerRadii,
+            borderRadiusPx: outputCornerRadii,
             scale,
             reason: 'hoveredCard'
         };

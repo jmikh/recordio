@@ -53,24 +53,34 @@ const createDefaultSettings = (): ProjectSettings => ({
         easing: 'ease-in-out'
     },
 
-    effects: {
-        showMouseDrags: true,
-        showKeyboardClicks: true,
-        mouseClick: {
-            effectEnabled: true,
-            effectType: 'ring',
-            color: '#667eea',
-            size: 1.0,
-            soundEnabled: false,
-            soundVolume: 0.5
-        }
+    mouse: {
+        mouseClickEnabled: true,
+        mouseDragEnabled: true,
+        effectType: 'ring',
+        color: '#667eea',
+        size: 1.0,
+        soundEnabled: false,
+        soundVolume: 0.5,
+        kClickRadiusPx: 80,
+        kDragRadiusPx: 60,
+    },
+
+    keyboard: {
+        showHotkeys: true,
+        hotkeysSize: 1.0,
+        hotkeysPlacement: 'top',
+        hotkeysMarginPx: 40,
+        kFontSizePx: 64,
+        kPaddingXPx: 40,
+        kPaddingYPx: 20,
+        kCornerRadiusPx: 16,
     },
 
     screen: {
         mode: 'border',
         padding: 0.02,
-        borderRadius: 12,       // Corner radius in output pixels
-        borderWidth: 1,
+        borderRadiusPx: 12,
+        borderWidthPx: 1,
         borderColor: '#667eea',
         deviceFrameId: 'macbook-air-dark',
         hasShadow: true,
@@ -84,12 +94,16 @@ const createDefaultSettings = (): ProjectSettings => ({
         gradientColors: ['#95a6f2ff', '#83689dff'],
         gradientDirection: 135,
         colorMode: 'gradient',
-        backgroundBlur: 0
+        backgroundBlurPx: 0
     },
 
     captions: {
         visible: true,
-        size: 50,
+        captionSize: 1.0,
+        kFontSizePx: 50,
+        kPaddingXPx: 32,
+        kPaddingYPx: 16,
+        kCornerRadiusPx: 12,
         width: 75,
         color: '#ffffff'
     },
@@ -109,13 +123,13 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     camera: {
-        width: 300,
-        height: 300,
-        x: 25,
-        y: 1080 - 325,
+        widthPx: 300,
+        heightPx: 300,
+        xPx: 25,
+        yPx: 1080 - 325,
         shape: 'circle',
-        borderRadius: 0,        // Corner radius in output pixels
-        borderWidth: 1,
+        borderRadiusPx: 0,
+        borderWidthPx: 1,
         borderColor: 'white',
         hasShadow: true,
         hasGlow: false,
@@ -250,8 +264,72 @@ export class ProjectImpl {
     }
 
     /**
+     * Recursively scales any number property ending in 'Px' by the given scale factor.
+     * Also handles Rect objects (only if parent field ends in Px) and arrays.
+     */
+    private static scalePixelValues(obj: any, scale: number, parentKey: string = ''): any {
+        if (obj === null || obj === undefined) return obj;
+
+        // Handle arrays (e.g. spotlight borderRadiusPx: [number, number, number, number])
+        if (Array.isArray(obj)) {
+            // Only scale array elements if parent key ends with Px
+            if (parentKey.endsWith('Px')) {
+                return obj.map(item => {
+                    if (typeof item === 'number') return item * scale;
+                    if (typeof item === 'object') return ProjectImpl.scalePixelValues(item, scale, parentKey);
+                    return item;
+                });
+            }
+            // Otherwise recurse without scaling
+            return obj.map(item => {
+                if (typeof item === 'object') return ProjectImpl.scalePixelValues(item, scale, parentKey);
+                return item;
+            });
+        }
+
+        // Handle Rect objects - ONLY scale if parent field ends with Px
+        if (obj.hasOwnProperty('x') && obj.hasOwnProperty('y') && obj.hasOwnProperty('width') && obj.hasOwnProperty('height')) {
+            if (parentKey.endsWith('Px')) {
+                return {
+                    x: obj.x * scale,
+                    y: obj.y * scale,
+                    width: obj.width * scale,
+                    height: obj.height * scale
+                };
+            }
+            // Don't scale source coordinate rects (e.g., ZoomAction.rect, SpotlightAction.sourceRect)
+            return obj;
+        }
+
+        // Not an object — return as-is
+        if (typeof obj !== 'object') return obj;
+
+        const result: any = {};
+        for (const key in obj) {
+            if (!obj.hasOwnProperty(key)) continue;
+
+            const value = obj[key];
+
+            // Scale number fields ending in 'Px'
+            if (key.endsWith('Px') && typeof value === 'number') {
+                result[key] = value * scale;
+            }
+            // Recursively process nested objects (pass key for context)
+            else if (typeof value === 'object') {
+                result[key] = ProjectImpl.scalePixelValues(value, scale, key);
+            }
+            // Pass through all other values
+            else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    /**
      * Scales a project's spatial settings to match a new output size.
      * Used for exporting at different resolutions while maintaining proportions.
+     * Automatically scales all fields ending in 'Px' (e.g. borderRadiusPx, widthPx).
      */
     static scale(project: Project, newSize: Size): Project {
         const oldSize = project.settings.outputSize;
@@ -269,68 +347,24 @@ export class ProjectImpl {
         // Use single scale factor (average of both for robustness)
         const scale = (scaleX + scaleY) / 2;
 
-        const scaleRect = (rect: Rect): Rect => ({
-            x: rect.x * scale,
-            y: rect.y * scale,
-            width: rect.width * scale,
-            height: rect.height * scale
-        });
-
-        const scaleCamera = (cam: CameraSettings): CameraSettings => ({
-            ...cam,
-            x: cam.x * scale,
-            y: cam.y * scale,
-            width: cam.width * scale,
-            height: cam.height * scale,
-            borderRadius: cam.borderRadius * scale,
-            borderWidth: cam.borderWidth * scale,
-        });
-
-        const scaleScreen = (screen: ScreenSettings): ScreenSettings => ({
-            ...screen,
-            borderRadius: screen.borderRadius * scale,
-            borderWidth: screen.borderWidth * scale,
-        });
-
-        const newZoomActions: ZoomAction[] = project.timeline.zoomActions.map((m: ZoomAction) => ({
-            ...m,
-            rect: scaleRect(m.rect)
-        }));
-
-        // Note: sourceRect is in SOURCE video coordinates (original recording), NOT output coordinates.
-        // The ViewMapper handles the mapping from source to screen at render time.
-        // Only borderRadius (which is in output coordinates) needs to be scaled.
-        const newSpotlightActions: SpotlightAction[] = project.timeline.spotlightActions.map((s: SpotlightAction) => ({
-            ...s,
-            // sourceRect intentionally NOT scaled - it's in source video coords
-            borderRadius: [
-                s.borderRadius[0] * scale,
-                s.borderRadius[1] * scale,
-                s.borderRadius[2] * scale,
-                s.borderRadius[3] * scale
-            ] as [number, number, number, number]
-        }));
-
         return {
             ...project,
             settings: {
-                ...project.settings,
+                ...ProjectImpl.scalePixelValues(project.settings, scale),
                 outputSize: { ...newSize },
-                camera: project.settings.camera ? scaleCamera(project.settings.camera) : undefined,
-                screen: scaleScreen(project.settings.screen),
-                captions: {
-                    ...project.settings.captions,
-                    size: project.settings.captions.size * scale,
-                },
-                background: {
-                    ...project.settings.background,
-                    backgroundBlur: project.settings.background.backgroundBlur * scale,
-                }
             },
             timeline: {
                 ...project.timeline,
-                zoomActions: newZoomActions,
-                spotlightActions: newSpotlightActions
+                // Auto-scale Px-suffixed fields in timeline actions:
+                //   ZoomAction.rectPx (output coords) → scaled
+                //   SpotlightAction.borderRadiusPx → scaled
+                //   SpotlightAction.sourceRect (source coords, no Px suffix) → NOT scaled
+                zoomActions: project.timeline.zoomActions.map((za: ZoomAction) =>
+                    ProjectImpl.scalePixelValues(za, scale) as ZoomAction
+                ),
+                spotlightActions: project.timeline.spotlightActions.map((sa: SpotlightAction) =>
+                    ProjectImpl.scalePixelValues(sa, scale) as SpotlightAction
+                ),
             }
         };
     }

@@ -1,10 +1,9 @@
 import type { BaseEvent, Rect } from '../../types';
-import type { MouseClickSettings } from '../../types/settings';
+import type { MouseSettings } from '../../types/settings';
 import type { ViewMapper } from '../mappers/viewMapper';
 import type { TimeMapper } from '../mappers/timeMapper';
 
 const CLICK_DURATION = 500;
-export const MOUSE_BASE_RADIUS = 80;
 
 /**
  * Converts a hex color string to an RGBA tuple.
@@ -27,10 +26,10 @@ function paintRing(
     x: number,
     y: number,
     progress: number,
-    settings: MouseClickSettings
+    settings: MouseSettings
 ) {
     const [r, g, b, a] = hexToRgba(settings.color);
-    const maxRadius = MOUSE_BASE_RADIUS * settings.size;
+    const maxRadius = settings.kClickRadiusPx * settings.size;
     const currentRadius = maxRadius * progress;
     const opacity = 0.7 * a * (1 - progress);
     const lineWidth = 3 * (1 - progress * 0.5);
@@ -50,10 +49,10 @@ function paintCircle(
     x: number,
     y: number,
     progress: number,
-    settings: MouseClickSettings
+    settings: MouseSettings
 ) {
     const [r, g, b, a] = hexToRgba(settings.color);
-    const currentRadius = MOUSE_BASE_RADIUS * settings.size * progress;
+    const currentRadius = settings.kClickRadiusPx * settings.size * progress;
     const opacity = 0.5 * a * (1 - progress);
 
     ctx.beginPath();
@@ -65,8 +64,8 @@ function paintCircle(
 // ── Painter Dispatch ─────────────────────────────────────────
 
 const EFFECT_RENDERERS: Record<
-    MouseClickSettings['effectType'],
-    (ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, settings: MouseClickSettings) => void
+    MouseSettings['effectType'],
+    (ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, settings: MouseSettings) => void
 > = {
     ring: paintRing,
     circle: paintCircle,
@@ -83,7 +82,7 @@ export function paintMouseClicks(
     currentOutputTime: number,
     viewport: Rect,
     viewMapper: ViewMapper,
-    settings: MouseClickSettings,
+    settings: MouseSettings,
     timeMapper: TimeMapper
 ) {
     const renderer = EFFECT_RENDERERS[settings.effectType];

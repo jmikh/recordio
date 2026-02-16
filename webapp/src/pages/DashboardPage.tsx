@@ -6,12 +6,14 @@ import { LogoLink, DefaultButton } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { SupportModal } from '../components/SupportModal';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { theme, setTheme } = useUserStore();
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
     useEffect(() => {
         // Check for error message in URL
@@ -66,11 +68,9 @@ export function DashboardPage() {
                         <div className="text-text-muted text-sm">
                             {projects.length} project{projects.length !== 1 ? 's' : ''}
                         </div>
-                        <a href="mailto:support@recordio.cc" title="Contact Support" target="_blank" rel="noopener noreferrer">
-                            <DefaultButton>
-                                <BiSupport size={18} />
-                            </DefaultButton>
-                        </a>
+                        <DefaultButton onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
+                            <BiSupport size={18} />
+                        </DefaultButton>
                         <DefaultButton
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -125,6 +125,7 @@ export function DashboardPage() {
                     )}
                 </main>
             </div>
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </div>
     );
 }

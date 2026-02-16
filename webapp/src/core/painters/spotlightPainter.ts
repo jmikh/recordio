@@ -39,7 +39,7 @@ export function drawSpotlight(
         return;
     }
 
-    const { isVisible, originalRect, scaledRect, borderRadius, dimOpacity, scale } = spotlightState;
+    const { isVisible, originalRect, scaledRect, borderRadiusPx, dimOpacity, scale } = spotlightState;
     const dimColor = `rgba(0, 0, 0, ${dimOpacity})`;
 
     // =========================================================
@@ -59,8 +59,8 @@ export function drawSpotlight(
     // Snapshot → Dim with cut-out → Draw scaled content
     // =========================================================
 
-    // borderRadius is already in OUTPUT coordinates
-    const radiusPx = borderRadius;
+    // borderRadiusPx is already in OUTPUT coordinates
+    const radiusPx = borderRadiusPx;
 
     // Snapshot the spotlight region BEFORE dimming using GPU-side drawImage
     // (avoids expensive getImageData GPU→CPU readback)
@@ -111,7 +111,7 @@ export function drawSpotlight(
     }
 
     // Fill corner areas for rounded corners (if any corner has radius)
-    const hasRoundedCorners = radiusPx.some(r => r > 0);
+    const hasRoundedCorners = radiusPx.some((r: number) => r > 0);
     if (hasRoundedCorners) {
         drawCornerFillsMultiRadius(ctx, originalRect, radiusPx, dimColor);
     }

@@ -129,7 +129,7 @@ export function useZoomHover(
         let initialRect;
 
         if (previousAction) {
-            initialRect = { ...previousAction.rect };
+            initialRect = { ...previousAction.rectPx };
         } else {
             // Default to 75% viewport centered
             const { width, height } = project.settings.outputSize;
@@ -145,7 +145,7 @@ export function useZoomHover(
             id: crypto.randomUUID(),
             sourceEndTimeMs,
             reason: 'Manual Zoom',
-            rect: initialRect,
+            rectPx: initialRect,
             type: 'manual'
         };
 

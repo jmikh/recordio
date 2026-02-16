@@ -21,8 +21,8 @@ export interface StyleSettings {
      * Applied uniformly to create circular corners (not elliptical).
      * Clamped to half of smaller dimension during rendering.
      */
-    borderRadius: number;
-    borderWidth: number;
+    borderRadiusPx: number;
+    borderWidthPx: number;
     borderColor: string; // Used for border and glow/shadow color
     hasShadow: boolean;
     hasGlow: boolean;
@@ -33,10 +33,10 @@ export interface StyleSettings {
 // ==========================================
 
 export interface CameraSettings extends StyleSettings {
-    width: number;
-    height: number;
-    x: number;
-    y: number;
+    widthPx: number;
+    heightPx: number;
+    xPx: number;
+    yPx: number;
     shape: 'circle' | 'rect' | 'square';
 
     /** Zoom/crop within the camera video feed (1x = no crop, 3x = 3x zoom) */
@@ -85,7 +85,7 @@ export interface BackgroundSettings {
     /** ID of the global library entry this background came from. Used for matching. */
     customLibraryId?: string;
     colorMode: 'gradient' | 'solid';
-    backgroundBlur: number;
+    backgroundBlurPx: number;
 }
 
 export type BackgroundType = 'solid' | 'image';
@@ -130,10 +130,12 @@ export interface SpotlightSettings {
 
 export type MouseClickEffectType = 'ring' | 'circle';
 
-export interface MouseClickSettings {
+export interface MouseSettings {
     /** Whether the visual click effect is rendered. Sound can still play when this is off. */
-    effectEnabled: boolean;
-    /** Which visual effect to use for clicks */
+    mouseClickEnabled: boolean;
+    /** Whether the visual drag effect is rendered. */
+    mouseDragEnabled: boolean;
+    /** Which visual effect to use for clicks and drags */
     effectType: MouseClickEffectType;
     /** Color of the effect (hex string). Used by ring and circle effects. */
     color: string;
@@ -143,13 +145,32 @@ export interface MouseClickSettings {
     soundEnabled: boolean;
     /** Sound volume (0–1). Default: 0.5 */
     soundVolume: number;
+
+    // ── Base constants (auto-scaled by export, not exposed in UI) ──
+    /** Base radius for click effects in pixels. Default: 80 */
+    kClickRadiusPx: number;
+    /** Base radius for drag effects in pixels. Default: 60 */
+    kDragRadiusPx: number;
 }
 
-export interface EffectSettings {
-    showMouseDrags: boolean;
-    showKeyboardClicks: boolean;
-    /** Mouse click visual and sound configuration */
-    mouseClick: MouseClickSettings;
+export interface KeyboardSettings {
+    showHotkeys: boolean;
+    /** Size multiplier for the hotkey overlay (0.5–2.0). Scales font, padding, etc. */
+    hotkeysSize: number;
+    /** Vertical placement of the hotkey overlay. Default: 'top' */
+    hotkeysPlacement: 'top' | 'bottom';
+    /** Margin in pixels from the placed edge. Default: 40 */
+    hotkeysMarginPx: number;
+
+    // ── Base constants (auto-scaled by export, not exposed in UI) ──
+    /** Base font size in pixels. Default: 64 */
+    kFontSizePx: number;
+    /** Base horizontal padding in pixels. Default: 40 */
+    kPaddingXPx: number;
+    /** Base vertical padding in pixels. Default: 20 */
+    kPaddingYPx: number;
+    /** Base corner radius in pixels. Default: 16 */
+    kCornerRadiusPx: number;
 }
 
 // ==========================================
@@ -158,10 +179,22 @@ export interface EffectSettings {
 
 export interface CaptionSettings {
     visible: boolean;
-    size: number; // Font size in pixels
+    /** Size multiplier for captions (0.5–2.0). Scales font, padding, etc. */
+    captionSize: number;
     width: number; // Maximum width as percentage of canvas width (0-100)
     color?: string; // Text color in hex format (e.g. '#ffffff')
     wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
+
+    // ── Base constants (auto-scaled by export, not exposed in UI) ──
+    /** Base font size in pixels. Default: 50 */
+    kFontSizePx: number;
+    /** Base horizontal padding in pixels. Default: 32 */
+    kPaddingXPx: number;
+    /** Base vertical padding in pixels. Default: 16 */
+    kPaddingYPx: number;
+    /** Base corner radius in pixels. Default: 12 */
+    kCornerRadiusPx: number;
+
     /** Baseline captions from last successful transcription (never modified by editing) */
     baselineCaptions?: CaptionSegment[];
     /** When captions were generated (if any) */
@@ -222,8 +255,11 @@ export interface ProjectSettings {
     // Spotlight
     spotlight: SpotlightSettings;
 
-    // Effects
-    effects: EffectSettings;
+    // Mouse
+    mouse: MouseSettings;
+
+    // Keyboard
+    keyboard: KeyboardSettings;
 
     // Background
     background: BackgroundSettings;

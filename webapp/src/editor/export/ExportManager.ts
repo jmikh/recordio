@@ -325,7 +325,7 @@ export class ExportManager {
                 drawBackground(
                     ctx,
                     renderProject.settings.background,
-                    renderProject.settings.background.backgroundBlur,
+                    renderProject.settings.background.backgroundBlurPx,
                     offscreenCanvas as unknown as HTMLCanvasElement,
                     imageElements.bg
                 );

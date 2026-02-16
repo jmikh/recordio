@@ -135,7 +135,7 @@ export function useSpotlightHover(
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
             sourceRect: initialSourceRect,
-            borderRadius: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
+            borderRadiusPx: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
             scale: project.settings.spotlight.enlargeScale,
             reason: 'Manual Spotlight'
         };

@@ -37,24 +37,24 @@ export const CameraSettings = () => {
         if (newShape === 'rect') {
             if (cameraSource && cameraSource.size.height > 0) {
                 const ratio = cameraSource.size.width / cameraSource.size.height;
-                newSettings.width = newSettings.height * ratio;
+                newSettings.widthPx = newSettings.heightPx * ratio;
             }
         } else if (newShape === 'square' || newShape === 'circle') {
-            const size = Math.min(newSettings.width, newSettings.height);
-            newSettings.width = size;
-            newSettings.height = size;
+            const size = Math.min(newSettings.widthPx, newSettings.heightPx);
+            newSettings.widthPx = size;
+            newSettings.heightPx = size;
         }
 
         const outputSize = project.settings.outputSize;
-        newSettings.x = Math.max(0, Math.min(newSettings.x, outputSize.width - newSettings.width));
-        newSettings.y = Math.max(0, Math.min(newSettings.y, outputSize.height - newSettings.height));
+        newSettings.xPx = Math.max(0, Math.min(newSettings.xPx, outputSize.width - newSettings.widthPx));
+        newSettings.yPx = Math.max(0, Math.min(newSettings.yPx, outputSize.height - newSettings.heightPx));
 
         updateSettings({ camera: newSettings });
     };
 
     const {
         shape,
-        borderWidth = 0,
+        borderWidthPx = 0,
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
@@ -67,7 +67,7 @@ export const CameraSettings = () => {
     const borderPreviewItems: PreviewItem[] = [];
 
     // Only show color if there's a visible border or glow effect
-    if (borderWidth > 0 || hasGlow) {
+    if (borderWidthPx > 0 || hasGlow) {
         borderPreviewItems.push({
             type: 'custom',
             content: (
@@ -80,8 +80,8 @@ export const CameraSettings = () => {
     }
 
     // Only show pixel count if there's a border
-    if (borderWidth > 0) {
-        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidth)}px` });
+    if (borderWidthPx > 0) {
+        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
     }
 
     // Add effect type (shadow/glow) only if enabled
@@ -202,10 +202,10 @@ export const CameraSettings = () => {
                             label="Thickness"
                             min={0}
                             max={20}
-                            value={borderWidth}
+                            value={borderWidthPx}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidth: val } }))}
+                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidthPx: val } }))}
                             showTooltip
                             units="px"
                         />

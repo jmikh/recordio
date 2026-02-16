@@ -23,12 +23,12 @@ export interface CameraMotionState {
  * The camera will shrink toward the corner closest to its center.
  */
 export function getCameraAnchor(
-    camera: Pick<CameraSettings, 'x' | 'y' | 'width' | 'height'>,
+    camera: Pick<CameraSettings, 'xPx' | 'yPx' | 'widthPx' | 'heightPx'>,
     outputSize: Size
 ): CameraAnchor {
     // Calculate camera center
-    const cameraCenterX = camera.x + camera.width / 2;
-    const cameraCenterY = camera.y + camera.height / 2;
+    const cameraCenterX = camera.xPx + camera.widthPx / 2;
+    const cameraCenterY = camera.yPx + camera.heightPx / 2;
 
     // Calculate output center
     const outputCenterX = outputSize.width / 2;
@@ -48,19 +48,19 @@ export function getCameraAnchor(
  * Scales camera settings while maintaining anchor position.
  * The specified corner will stay fixed while the camera shrinks/grows.
  */
-export function scaleCameraSettings<T extends Pick<CameraSettings, 'x' | 'y' | 'width' | 'height'>>(
+export function scaleCameraSettings<T extends Pick<CameraSettings, 'xPx' | 'yPx' | 'widthPx' | 'heightPx'>>(
     settings: T,
     scale: number,
     anchor: CameraAnchor
 ): T {
-    const newWidth = settings.width * scale;
-    const newHeight = settings.height * scale;
+    const newWidth = settings.widthPx * scale;
+    const newHeight = settings.heightPx * scale;
 
-    const deltaW = settings.width - newWidth;
-    const deltaH = settings.height - newHeight;
+    const deltaW = settings.widthPx - newWidth;
+    const deltaH = settings.heightPx - newHeight;
 
-    let newX = settings.x;
-    let newY = settings.y;
+    let newX = settings.xPx;
+    let newY = settings.yPx;
 
     // Adjust position based on anchor to keep corner fixed
     switch (anchor) {
@@ -84,10 +84,10 @@ export function scaleCameraSettings<T extends Pick<CameraSettings, 'x' | 'y' | '
 
     return {
         ...settings,
-        width: newWidth,
-        height: newHeight,
-        x: newX,
-        y: newY,
+        widthPx: newWidth,
+        heightPx: newHeight,
+        xPx: newX,
+        yPx: newY,
     };
 }
 
@@ -133,7 +133,7 @@ export function getCameraStateAtTime(
     const preparedActions = prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings);
 
     // Find first zoom-in motion (viewport becomes smaller than full screen)
-    const firstZoomIn = preparedActions.find(m => !isFullScreen(m.rect, outputSize));
+    const firstZoomIn = preparedActions.find(m => !isFullScreen(m.rectPx, outputSize));
 
     if (!firstZoomIn) {
         // No zoom-ins found, camera stays full size
@@ -159,7 +159,7 @@ export function getCameraStateAtTime(
 
     // Find first zoom-out to full screen (after a zoom-in has occurred)
     const firstZoomOutToFull = preparedActions.find(m =>
-        isFullScreen(m.rect, outputSize) &&
+        isFullScreen(m.rectPx, outputSize) &&
         m.outputEndTime > zoomInEndMs
     );
 

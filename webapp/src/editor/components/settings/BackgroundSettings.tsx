@@ -74,7 +74,7 @@ export const BackgroundSettings = () => {
 
     const { settings } = project;
     const { background } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customLibraryId, gradientColors, gradientDirection, backgroundBlur, colorMode } = background;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customLibraryId, gradientColors, gradientDirection, backgroundBlurPx, colorMode } = background;
 
     // Helpers to determine active state
     // colorMode is always used to determine solid vs gradient when type is 'color'
@@ -277,8 +277,8 @@ export const BackgroundSettings = () => {
     ];
 
     // Add blur amount for image backgrounds
-    if ((backgroundType === 'preset' || backgroundType === 'custom') && backgroundBlur !== undefined) {
-        previewItems.push({ type: 'text', content: `${Math.round(backgroundBlur)}px blur` });
+    if ((backgroundType === 'preset' || backgroundType === 'custom') && backgroundBlurPx !== undefined) {
+        previewItems.push({ type: 'text', content: `${Math.round(backgroundBlurPx)}px blur` });
     }
 
     return (
@@ -417,12 +417,12 @@ export const BackgroundSettings = () => {
                             label="Blur"
                             min={0}
                             max={100}
-                            value={backgroundBlur || 0}
+                            value={backgroundBlurPx || 0}
                             onPointerDown={startInteraction}
                             onPointerUp={endInteraction}
                             onChange={(val) => batchAction(() => updateSettings({
                                 background: {
-                                    backgroundBlur: val
+                                    backgroundBlurPx: val
                                 }
                             }))}
                             showTooltip

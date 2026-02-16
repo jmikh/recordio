@@ -11,6 +11,7 @@ import { BiSupport } from 'react-icons/bi';
 import { DefaultButton } from '@shared/components';
 
 import { AuthModal } from './AuthModal';
+import { SupportModal } from '../../../components/SupportModal';
 import { UserMenu } from './UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { FreeExportConfirmModal } from './FreeExportConfirmModal';
@@ -28,6 +29,7 @@ export const Header = () => {
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isFreeExportModalOpen, setIsFreeExportModalOpen] = useState(false);
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality | null>(null);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const { isAuthenticated, isPro, canExportQuality, hasFreeExportCredit, theme, setTheme } = useUserStore();
 
     const proPill = (
@@ -173,11 +175,9 @@ export const Header = () => {
                             Sign In
                         </DefaultButton>
                     )}
-                    <a href="mailto:support@recordio.cc" title="Contact Support" target="_blank" rel="noopener noreferrer">
-                        <DefaultButton>
-                            <BiSupport size={18} />
-                        </DefaultButton>
-                    </a>
+                    <DefaultButton onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
+                        <BiSupport size={18} />
+                    </DefaultButton>
                     <DefaultButton
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -211,6 +211,7 @@ export const Header = () => {
                     selectedQuality={selectedQuality}
                 />
             )}
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </div>
     );
 };

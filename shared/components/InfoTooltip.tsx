@@ -7,6 +7,8 @@ interface InfoTooltipProps {
     description: string;
     /** Optional path to the demo video */
     videoSrc?: string;
+    /** Optional path to the demo image */
+    imageSrc?: string;
     /** Optional additional content to render below the description */
     children?: ReactNode;
 }
@@ -20,7 +22,7 @@ interface InfoTooltipProps {
  * - Description text
  * - Optional children for additional content
  */
-export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc, children }) => {
+export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc, imageSrc, children }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [position, setPosition] = useState({ left: 0, top: 0 });
     const iconRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc,
             {isHovered &&
                 createPortal(
                     <div
-                        className={`fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float overflow-hidden text-xs text-text-main ${videoSrc
+                        className={`fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float overflow-hidden text-xs text-text-main ${(videoSrc || imageSrc)
                             ? 'w-[500px] px-5 py-3 flex flex-col items-center'
                             : 'max-w-[280px]'
                             }`}
@@ -79,8 +81,19 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ description, videoSrc,
                             />
                         )}
 
+                        {/* Demo Image - fixed 480px width */}
+                        {imageSrc && (
+                            <img
+                                src={imageSrc}
+                                alt=""
+                                width={480}
+                                className="rounded"
+                                style={{ width: 480, minWidth: 480, maxWidth: 480 }}
+                            />
+                        )}
+
                         {/* Description text */}
-                        <div className={videoSrc ? 'mt-2 text-center' : 'px-3 py-2'}>
+                        <div className={(videoSrc || imageSrc) ? 'mt-2 text-center' : 'px-3 py-2'}>
                             {description}
                         </div>
 

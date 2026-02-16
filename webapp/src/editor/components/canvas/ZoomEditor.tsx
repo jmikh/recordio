@@ -62,7 +62,7 @@ export const renderZoomEditor = (
             let zoomRect = previewZoomRect;
             if (!zoomRect && editingZoomId) {
                 const action = project.timeline.zoomActions.find(m => m.id === editingZoomId);
-                zoomRect = action?.rect || null;
+                zoomRect = action?.rectPx || null;
             }
 
             if (zoomRect) {
@@ -74,13 +74,13 @@ export const renderZoomEditor = (
 
                 const scaleFactor = zoomRect.width / outputSize.width;
 
-                const relativeX = (cameraSettings.x / outputSize.width) * zoomRect.width;
-                const relativeY = (cameraSettings.y / outputSize.height) * zoomRect.height;
+                const relativeX = (cameraSettings.xPx / outputSize.width) * zoomRect.width;
+                const relativeY = (cameraSettings.yPx / outputSize.height) * zoomRect.height;
 
                 const projectedX = zoomRect.x + relativeX;
                 const projectedY = zoomRect.y + relativeY;
-                const projectedW = cameraSettings.width * scaleFactor;
-                const projectedH = cameraSettings.height * scaleFactor;
+                const projectedW = cameraSettings.widthPx * scaleFactor;
+                const projectedH = cameraSettings.heightPx * scaleFactor;
 
                 // 4. Draw Camera
                 drawWebcam(
@@ -89,10 +89,10 @@ export const renderZoomEditor = (
                     cameraSource.size, // Input size
                     {
                         ...cameraSettings,
-                        x: projectedX,
-                        y: projectedY,
-                        width: projectedW,
-                        height: projectedH,
+                        xPx: projectedX,
+                        yPx: projectedY,
+                        widthPx: projectedW,
+                        heightPx: projectedH,
                     },
                     scaleFactor // Global scale for borders/shadows
                 );
@@ -135,7 +135,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     // Derived State
     const videoSize = project.settings.outputSize;
     const initialRect = editingZoomId
-        ? project.timeline.zoomActions.find(m => m.id === editingZoomId)?.rect
+        ? project.timeline.zoomActions.find(m => m.id === editingZoomId)?.rectPx
         : null;
 
     // Actions
@@ -143,7 +143,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         if (!editingZoomId) return;
 
         batchAction(() => {
-            updateZoomAction(editingZoomId, { rect, type: 'manual' });
+            updateZoomAction(editingZoomId, { rectPx: rect, type: 'manual' });
         });
     };
 
@@ -179,7 +179,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         // Live Update Store!
         if (editingZoomId) {
             batchAction(() => {
-                updateZoomAction(editingZoomId, { rect: newRect });
+                updateZoomAction(editingZoomId, { rectPx: newRect });
             });
         }
     };

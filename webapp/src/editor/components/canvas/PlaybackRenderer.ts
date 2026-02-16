@@ -79,19 +79,19 @@ export class PlaybackRenderer {
             );
             viewMapper = result.viewMapper;
 
-            // Mouse click effects (visual and sound are independent)
-            const mouseClick = project.settings.effects?.mouseClick;
-            if (mouseClick) {
-                if (mouseClick.effectEnabled) {
-                    paintMouseClicks(ctx, userEvents.mouseClicks, currentTimeMs, effectiveViewport, viewMapper, mouseClick, timeMapper);
+            // Mouse click/drag effects (visual and sound are independent)
+            const mouse = project.settings.mouse;
+            if (mouse) {
+                if (mouse.mouseClickEnabled) {
+                    paintMouseClicks(ctx, userEvents.mouseClicks, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper);
                 }
-                if (mouseClick.soundEnabled) {
-                    playClickSounds(userEvents.mouseClicks, currentTimeMs, mouseClick.soundVolume ?? 0.5, timeMapper);
-                    playDragSounds(userEvents.drags, currentTimeMs, mouseClick.soundVolume ?? 0.5, timeMapper);
+                if (mouse.mouseDragEnabled) {
+                    drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper);
                 }
-            }
-            if (project.settings.effects?.showMouseDrags && mouseClick?.effectEnabled) {
-                drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouseClick, timeMapper);
+                if (mouse.soundEnabled) {
+                    playClickSounds(userEvents.mouseClicks, currentTimeMs, mouse.soundVolume ?? 0.5, timeMapper);
+                    playDragSounds(userEvents.drags, currentTimeMs, mouse.soundVolume ?? 0.5, timeMapper);
+                }
             }
 
             // DEBUG: Render zoom focus areas (controlled via DebugBar)
@@ -117,13 +117,14 @@ export class PlaybackRenderer {
         }
 
         // Render Keyboard Overlay (after spotlight, so it appears on top of dimming)
-        if (project.settings.effects?.showKeyboardClicks) {
+        if (project.settings.keyboard?.showHotkeys ?? true) {
             drawKeyboardOverlay(
                 ctx,
                 userEvents.keyboardEvents,
                 currentTimeMs,
                 outputSize,
-                timeMapper
+                timeMapper,
+                project.settings.keyboard
             );
         }
 

@@ -60,7 +60,7 @@ export function CaptionsSettings() {
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
-    const settings = project.settings.captions || { visible: true, size: 24, width: 75, wordHighlight: true, color: '#ffffff' };
+    const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, color: '#ffffff' };
 
     // Create TimeMapper for source→output time conversion
     const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
@@ -395,7 +395,7 @@ export function CaptionsSettings() {
                             />
                         )
                     },
-                    { type: 'text', content: `${Math.round(settings.size)}px` },
+                    { type: 'text', content: `${(settings.captionSize ?? 1.0).toFixed(1)}×` },
                     { type: 'text', content: `${Math.round(settings.width)}%` }
                 ]}
                 isExpanded={showCollapsibleCaptionStyle}
@@ -415,14 +415,14 @@ export function CaptionsSettings() {
                     />
 
                     <Slider
-                        value={settings.size}
-                        onChange={(value) => updateSettings({ captions: { ...settings, size: value } })}
-                        min={50}
-                        max={150}
+                        value={settings.captionSize ?? 1.0}
+                        onChange={(value) => updateSettings({ captions: { ...settings, captionSize: value } })}
+                        min={0.5}
+                        max={2}
                         label="Size"
-                        units="px"
+                        units="×"
                         showTooltip={true}
-                        decimals={0}
+                        decimals={1}
                     />
 
                     <Slider

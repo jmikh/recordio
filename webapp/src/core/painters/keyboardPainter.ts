@@ -1,22 +1,25 @@
 
 import type { KeyboardEvent, Size } from '../../types';
+import type { KeyboardSettings } from '../../types/settings';
 import type { TimeMapper } from '../mappers/timeMapper';
 
 /**
- * Draws keysrokes at the top of the canvas.
+ * Draws keysrokes at the top or bottom of the canvas.
  *
  * @param ctx 2D Canvas Context
  * @param events List of keystroke events
  * @param currentOutputTime Current Output Time
  * @param outputSize Size of the output canvas
  * @param timeMapper Maps source time to output time
+ * @param settings Keyboard settings (includes base sizes and multipliers)
  */
 export function drawKeyboardOverlay(
     ctx: CanvasRenderingContext2D,
     events: KeyboardEvent[],
     currentOutputTime: number,
     outputSize: Size,
-    timeMapper: TimeMapper
+    timeMapper: TimeMapper,
+    settings: KeyboardSettings
 ) {
     const EVENT_DURATION = 1500; // Show for 1.5 seconds
     const FADE_OUT_START = 1000;
@@ -83,12 +86,11 @@ export function drawKeyboardOverlay(
     parts.push(label);
     const text = parts.join(' ');
 
-    // Drawing Settings
-    const fontSize = 64;
-    const paddingX = 40;
-    const paddingY = 20;
-    const cornerRadius = 16;
-    const marginTop = 80;
+    // Drawing Settings — base values from settings, scaled by hotkeysSize multiplier
+    const fontSize = Math.round(settings.kFontSizePx * settings.hotkeysSize);
+    const paddingX = Math.round(settings.kPaddingXPx * settings.hotkeysSize);
+    const paddingY = Math.round(settings.kPaddingYPx * settings.hotkeysSize);
+    const cornerRadius = Math.round(settings.kCornerRadiusPx * settings.hotkeysSize);
 
     ctx.save();
 
@@ -104,7 +106,9 @@ export function drawKeyboardOverlay(
     const boxHeight = fontSize + (paddingY * 2);
 
     const x = outputSize.width / 2;
-    const y = marginTop;
+    const y = settings.hotkeysPlacement === 'bottom'
+        ? outputSize.height - settings.hotkeysMarginPx - boxHeight
+        : settings.hotkeysMarginPx;
 
     // Draw Background Box
     ctx.fillStyle = `rgba(30, 30, 30, ${0.85 * opacity})`;

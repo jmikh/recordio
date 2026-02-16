@@ -38,8 +38,8 @@ export function drawScreen(
     const screenConfig = project.settings.screen || {
         mode: 'device',
         deviceFrameId: 'macbook-pro',
-        borderRadius: 24,
-        borderWidth: 0,
+        borderRadiusPx: 24,
+        borderWidthPx: 0,
         borderColor: '#ffffff',
         hasShadow: true,
         hasGlow: false
@@ -110,8 +110,8 @@ export function drawScreen(
             // MODE: BORDER / CUSTOM
             // ============================
             const {
-                borderRadius = 0,
-                borderWidth = 0,
+                borderRadiusPx: borderRadius = 0,
+                borderWidthPx: borderWidth = 0,
                 borderColor = '#ffffff',
                 hasShadow = false,
                 hasGlow = false

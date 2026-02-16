@@ -64,7 +64,8 @@ export interface ZoomAction {
     /** Source time when zoom reaches target state (in source coordinate system) */
     sourceEndTimeMs: TimeMs;
     /** Duration is now derived dynamically from settings and available space */
-    rect: Rect;
+    /** Target viewport in OUTPUT coordinates (pixels) */
+    rectPx: Rect;
     reason: string;
     type: 'auto' | 'manual';
 }
@@ -87,7 +88,7 @@ export interface SpotlightAction {
     /** The rectangle to spotlight (in SOURCE video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */
-    borderRadius: [number, number, number, number];
+    borderRadiusPx: [number, number, number, number];
     /** Scale factor for this spotlight (capped to fit within output bounds) */
     scale: number;
     /** Optional reason/label for the spotlight */

@@ -1,8 +1,8 @@
 import type { DragEvent, Point, Rect, BaseEvent, UserEvents } from '../../types';
-import type { MouseClickSettings } from '../../types/settings';
+import type { MouseSettings } from '../../types/settings';
 import type { ViewMapper } from '../mappers/viewMapper';
 import type { TimeMapper } from '../mappers/timeMapper';
-import { hexToRgba, MOUSE_BASE_RADIUS } from './mouseClickPainter';
+import { hexToRgba } from './mouseClickPainter';
 
 /**
  * Extracts the mouse positions that fall within the drag time range.
@@ -44,7 +44,7 @@ export function drawDragEffects(
     currentOutputTime: number,
     viewport: Rect,
     viewMapper: ViewMapper,
-    settings: MouseClickSettings,
+    settings: MouseSettings,
     timeMapper: TimeMapper
 ) {
     // Add a visual lag (there is a mismatch between the drag events and the screen events)
@@ -52,7 +52,7 @@ export function drawDragEffects(
 
     const { drags, mousePositions } = userEvents;
     const [r, g, b, a] = hexToRgba(settings.color);
-    const radius = MOUSE_BASE_RADIUS * settings.size;
+    const radius = settings.kDragRadiusPx * settings.size;
 
     for (const drag of drags) {
         // Map the drag's source time range to output time range

@@ -2,62 +2,9 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, DefaultButton, InfoTooltip, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip } from '@shared/components';
 import { ColorButton } from './ColorButton';
-import { FaTrash } from 'react-icons/fa';
-import type { EasingStyle } from '../../../core/easing';
-import type { MouseClickEffectType, MouseClickSettings } from '../../../types/settings';
-
-// Easing dropdown options
-const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
-    { value: 'linear', label: 'Linear' },
-    { value: 'ease-in', label: 'Ease In' },
-    { value: 'ease-out', label: 'Ease Out' },
-    { value: 'ease-in-out', label: 'Ease In Out' },
-];
-
-// SVG easing curve paths (displayed in a 32x32 viewBox)
-const EASING_CURVES: Record<EasingStyle, string> = {
-    'linear': 'M 4 28 L 28 4',
-    'ease-in': 'M 4 28 C 4 28 20 28 28 4',
-    'ease-out': 'M 4 28 C 4 4 24 4 28 4',
-    'ease-in-out': 'M 4 28 C 4 16 28 16 28 4',
-};
-
-const EASING_DESCRIPTIONS: Record<EasingStyle, string> = {
-    'linear': 'Constant speed, no acceleration',
-    'ease-in': 'Starts slow, accelerates',
-    'ease-out': 'Starts fast, decelerates',
-    'ease-in-out': 'Starts slow, speeds up, then slows down',
-};
-
-const EASING_LABELS: Record<EasingStyle, string> = {
-    'linear': 'Linear',
-    'ease-in': 'Ease In',
-    'ease-out': 'Ease Out',
-    'ease-in-out': 'Ease In Out',
-};
-
-/** Shared tooltip content for easing info */
-const EasingTooltipContent = () => (
-    <div className="flex flex-col gap-2 px-3 py-2">
-        {(Object.keys(EASING_CURVES) as EasingStyle[]).map((style) => (
-            <div key={style} className="flex items-center gap-2.5">
-                <svg width="32" height="32" viewBox="0 0 32 32" className="flex-shrink-0">
-                    {/* Axes */}
-                    <line x1="4" y1="28" x2="28" y2="28" stroke="var(--text-disabled)" strokeWidth="1" />
-                    <line x1="4" y1="28" x2="4" y2="4" stroke="var(--text-disabled)" strokeWidth="1" />
-                    {/* Curve */}
-                    <path d={EASING_CURVES[style]} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <div className="flex flex-col">
-                    <span className="text-text-main text-xs font-medium">{EASING_LABELS[style]}</span>
-                    <span className="text-text-muted text-[11px]">{EASING_DESCRIPTIONS[style]}</span>
-                </div>
-            </div>
-        ))}
-    </div>
-);
+import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
 
 // Click effect toggle options
 const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string }[] = [
@@ -65,263 +12,52 @@ const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string }[] = [
     { value: 'circle', label: 'Circle' },
 ];
 
+// Hotkey placement options
+const PLACEMENT_OPTIONS: { value: 'top' | 'bottom'; label: string }[] = [
+    { value: 'top', label: 'Top' },
+    { value: 'bottom', label: 'Bottom' },
+];
+
 export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const clearZoomActions = useProjectStore(s => s.clearZoomActions);
-    const clearSpotlights = useProjectStore(s => s.clearSpotlights);
-    const zoomSettings = useProjectStore(s => s.project.settings.zoom);
-    const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
-    const effectSettings = useProjectStore(s => s.project.settings.effects);
-    const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
-    const spotlightActions = useProjectStore(s => s.project.timeline.spotlightActions || []);
-    const userEvents = useProjectStore(s => s.project.userEvents);
+    const mouseSettings = useProjectStore(s => s.project.settings.mouse) ?? {
+        mouseClickEnabled: true,
+        mouseDragEnabled: true,
+        effectType: 'ring' as MouseClickEffectType,
+        color: '#667eea',
+        size: 1.0,
+        soundEnabled: false,
+        soundVolume: 0.5,
+        kClickRadiusPx: 80,
+        kDragRadiusPx: 60,
+    };
+    const keyboardSettings = useProjectStore(s => s.project.settings.keyboard) ?? {
+        showHotkeys: true,
+        hotkeysSize: 1.0,
+        hotkeysPlacement: 'top' as 'top' | 'bottom',
+        hotkeysMarginPx: 40,
+        kFontSizePx: 64,
+        kPaddingXPx: 40,
+        kPaddingYPx: 20,
+        kCornerRadiusPx: 16,
+    };
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    // Check if user events exist (Chrome tab/window vs desktop)
-    const hasUserEvents = userEvents.mousePositions.length > 0;
-
     // Collapsible visibility state
-    const showCollapsibleZoom = useUIStore(s => s.showCollapsibleZoom);
-    const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
     const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
     const showCollapsibleMouse = useUIStore(s => s.showCollapsibleMouse);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
-    // Spotlight handlers
-    const handleDimOpacityChange = (val: number) => {
-        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, dimOpacity: val } }));
+    const handleMouseChange = (partial: Partial<MouseSettings>) => {
+        batchAction(() => updateSettings({ mouse: { ...mouseSettings, ...partial } }));
     };
 
-    const handleEnlargeScaleChange = (val: number) => {
-        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, enlargeScale: val } }));
+    const handleKeyboardChange = (partial: Partial<KeyboardSettings>) => {
+        batchAction(() => updateSettings({ keyboard: { ...keyboardSettings, ...partial } }));
     };
-
-    const handleTransitionDurationChange = (val: number) => {
-        batchAction(() => updateSettings({ spotlight: { ...spotlightSettings, transitionDurationMs: val } }));
-    };
-
-    // Tooltip message for disabled auto toggles
-    const autoDisabledTooltip = "Auto effects require mouse events, which are only captured during Chrome tab and window recordings.";
-
-    const handleClearZooms = () => {
-        clearZoomActions();
-        updateSettings({ zoom: { ...zoomSettings, isAuto: false } });
-    };
-
-    const handleClearSpotlights = () => {
-        clearSpotlights();
-        updateSettings({ spotlight: { ...spotlightSettings, isAuto: false } });
-    };
-
-    const handleMaxDurationChange = (val: number) => {
-        batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoomDurationMs: val } }));
-    };
-
-    const handleMaxZoomChange = (val: number) => {
-        batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoom: val } }));
-    };
-
-    const handleEffectToggle = (key: 'showMouseDrags' | 'showKeyboardClicks', value: boolean) => {
-        updateSettings({ effects: { ...effectSettings, [key]: value } });
-    };
-
-    const handleMouseClickChange = (partial: Partial<MouseClickSettings>) => {
-        const current = effectSettings.mouseClick;
-        batchAction(() => updateSettings({ effects: { ...effectSettings, mouseClick: { ...current, ...partial } } }));
-    };
-
-    const handleZoomEasingChange = (easing: EasingStyle) => {
-        updateSettings({ zoom: { ...zoomSettings, easing } });
-    };
-
-    const handleSpotlightEasingChange = (easing: EasingStyle) => {
-        updateSettings({ spotlight: { ...spotlightSettings, easing } });
-    };
-
-    // Generate preview items for each section
-    const zoomPreviewItems: PreviewItem[] = [
-        { type: 'text', content: zoomSettings.isAuto ? 'Auto' : 'Manual' },
-        { type: 'text', content: `${zoomSettings.maxZoom.toFixed(1)}x` }
-    ];
-
-    const spotlightPreviewItems: PreviewItem[] = [
-        { type: 'text', content: `${Math.round(spotlightSettings.dimOpacity * 100)}% dim` },
-        { type: 'text', content: `${spotlightSettings.enlargeScale.toFixed(2)}x` }
-    ];
 
     return (
         <div className="flex flex-col gap-3 text-sm text-text-main">
-
-            {/* ZOOM SETTINGS */}
-            <CollapsibleCard
-                title="Zoom"
-                previewItems={zoomPreviewItems}
-                isExpanded={showCollapsibleZoom}
-                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleZoom', v)}
-            >
-                <div className="flex flex-col gap-4">
-                    {/* Header with Auto Toggle */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                            <label className="text-sm text-text-muted">Auto</label>
-                            {!hasUserEvents && (
-                                <InfoTooltip description={autoDisabledTooltip} />
-                            )}
-                        </div>
-                        <Toggle
-                            value={zoomSettings.isAuto}
-                            onChange={(isAuto) => {
-                                updateSettings({ zoom: { ...zoomSettings, isAuto } });
-                            }}
-                            disabled={!hasUserEvents}
-                        />
-                    </div>
-
-                    {/* Transition Duration */}
-                    <Slider
-                        label="Transition"
-                        min={zoomSettings.minZoomDurationMs}
-                        max={1500}
-                        value={zoomSettings.maxZoomDurationMs}
-                        onChange={handleMaxDurationChange}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        showTooltip
-                        valueTransform={(ms) => ms / 1000}
-                        units="s"
-                        decimals={2}
-                    />
-
-                    {/* Max Zoom */}
-                    <Slider
-                        label="Max Zoom"
-                        min={1.1}
-                        max={6}
-                        value={zoomSettings.maxZoom}
-                        onChange={handleMaxZoomChange}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        showTooltip
-                        units="x"
-                        decimals={1}
-                    />
-
-                    {/* Easing */}
-                    <div className="flex items-center gap-1.5">
-                        <Dropdown
-                            options={EASING_OPTIONS}
-                            value={zoomSettings.easing ?? 'ease-in-out'}
-                            onChange={handleZoomEasingChange}
-                        />
-                        <InfoTooltip description="">
-                            <EasingTooltipContent />
-                        </InfoTooltip>
-                    </div>
-
-                    {/* Actions - only show when there are zooms to clear */}
-                    {zoomActions.length > 0 && (
-                        <DefaultButton
-                            onClick={handleClearZooms}
-                            className="w-full"
-                        >
-                            Clear
-                        </DefaultButton>
-                    )}
-                </div>
-            </CollapsibleCard>
-
-            {/* SPOTLIGHT SETTINGS */}
-            <CollapsibleCard
-                title="Spotlight"
-                previewItems={spotlightPreviewItems}
-                isExpanded={showCollapsibleSpotlight}
-                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSpotlight', v)}
-            >
-                <div className="flex flex-col gap-4">
-                    {/* Auto Toggle */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                            <label className="text-sm text-text-muted">Auto</label>
-                            {!hasUserEvents && (
-                                <InfoTooltip description={autoDisabledTooltip} />
-                            )}
-                        </div>
-                        <Toggle
-                            value={spotlightSettings.isAuto}
-                            onChange={(isAuto) => {
-                                updateSettings({ spotlight: { ...spotlightSettings, isAuto } });
-                            }}
-                            disabled={!hasUserEvents}
-                        />
-                    </div>
-
-                    {/* Dim Opacity */}
-                    <Slider
-                        label="Dim Opacity"
-                        min={0}
-                        max={1}
-                        value={spotlightSettings.dimOpacity}
-                        onChange={handleDimOpacityChange}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        showTooltip
-                        valueTransform={(val) => val * 100}
-                        units="%"
-                        decimals={0}
-                    />
-
-                    {/* Enlarge Scale */}
-                    <Slider
-                        label="Enlarge Scale"
-                        min={1.0}
-                        max={1.5}
-                        value={spotlightSettings.enlargeScale}
-                        onChange={handleEnlargeScaleChange}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        showTooltip
-                        units="x"
-                        decimals={2}
-                    />
-
-                    {/* Transition Time */}
-                    <Slider
-                        label="Transition Time"
-                        min={0}
-                        max={1000}
-                        value={spotlightSettings.transitionDurationMs}
-                        onChange={handleTransitionDurationChange}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        showTooltip
-                        valueTransform={(ms) => ms / 1000}
-                        units="s"
-                        decimals={2}
-                    />
-
-                    {/* Easing */}
-                    <div className="flex items-center gap-1.5">
-                        <Dropdown
-                            options={EASING_OPTIONS}
-                            value={spotlightSettings.easing ?? 'ease-in-out'}
-                            onChange={handleSpotlightEasingChange}
-                        />
-                        <InfoTooltip description="">
-                            <EasingTooltipContent />
-                        </InfoTooltip>
-                    </div>
-
-                    {/* Actions - only show when there are spotlights to clear */}
-                    {spotlightActions.length > 0 && (
-                        <DefaultButton
-                            onClick={handleClearSpotlights}
-                            className="w-full"
-                        >
-                            Clear
-                        </DefaultButton>
-                    )}
-                </div>
-            </CollapsibleCard>
 
             {/* MOUSE SETTINGS */}
             <CollapsibleCard
@@ -333,19 +69,19 @@ export const EffectsSettings = () => {
                     {/* Sound Toggle */}
                     <Toggle
                         label="Sound"
-                        value={effectSettings.mouseClick.soundEnabled}
-                        onChange={(val) => handleMouseClickChange({ soundEnabled: val })}
+                        value={mouseSettings.soundEnabled}
+                        onChange={(val) => handleMouseChange({ soundEnabled: val })}
                     />
 
                     {/* Volume (visible when sound enabled) */}
-                    {effectSettings.mouseClick.soundEnabled && (
+                    {mouseSettings.soundEnabled && (
                         <div className="pl-1">
                             <Slider
                                 label="Volume"
                                 min={0}
                                 max={1}
-                                value={effectSettings.mouseClick.soundVolume}
-                                onChange={(val) => handleMouseClickChange({ soundVolume: val })}
+                                value={mouseSettings.soundVolume}
+                                onChange={(val) => handleMouseChange({ soundVolume: val })}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 showTooltip
@@ -359,28 +95,35 @@ export const EffectsSettings = () => {
                     {/* Click Effect Toggle */}
                     <Toggle
                         label="Click Effect"
-                        value={effectSettings.mouseClick.effectEnabled}
-                        onChange={(val) => handleMouseClickChange({ effectEnabled: val })}
+                        value={mouseSettings.mouseClickEnabled}
+                        onChange={(val) => handleMouseChange({ mouseClickEnabled: val })}
                     />
 
-                    {/* Click Effect Sub-Settings (visible when effect enabled) */}
-                    {effectSettings.mouseClick.effectEnabled && (
+                    {/* Drag Effect Toggle */}
+                    <Toggle
+                        label="Drag Effect"
+                        value={mouseSettings.mouseDragEnabled}
+                        onChange={(val) => handleMouseChange({ mouseDragEnabled: val })}
+                    />
+
+                    {/* Shared Effect Sub-Settings (visible when either click or drag is enabled) */}
+                    {(mouseSettings.mouseClickEnabled || mouseSettings.mouseDragEnabled) && (
                         <div className="flex flex-col gap-4 pl-1">
                             {/* Effect Type */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-sm text-text-muted">Effect</label>
                                 <MultiToggle
                                     options={CLICK_EFFECT_OPTIONS}
-                                    value={effectSettings.mouseClick.effectType}
-                                    onChange={(val) => handleMouseClickChange({ effectType: val })}
+                                    value={mouseSettings.effectType}
+                                    onChange={(val) => handleMouseChange({ effectType: val })}
                                 />
                             </div>
 
                             {/* Color (ring and circle only) */}
                             <ColorButton
                                 label="Color"
-                                color={effectSettings.mouseClick.color}
-                                onChange={(color) => handleMouseClickChange({ color })}
+                                color={mouseSettings.color}
+                                onChange={(color) => handleMouseChange({ color })}
                                 onPopoverOpen={startInteraction}
                                 onPopoverClose={endInteraction}
                                 showAlpha
@@ -392,8 +135,8 @@ export const EffectsSettings = () => {
                                 label="Size"
                                 min={0.5}
                                 max={2}
-                                value={effectSettings.mouseClick.size}
-                                onChange={(val) => handleMouseClickChange({ size: val })}
+                                value={mouseSettings.size}
+                                onChange={(val) => handleMouseChange({ size: val })}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 showTooltip
@@ -402,28 +145,67 @@ export const EffectsSettings = () => {
                             />
                         </div>
                     )}
-
-                    {/* Drag Effect */}
-                    <Toggle
-                        label="Drag Effect"
-                        value={effectSettings.showMouseDrags}
-                        onChange={(val) => handleEffectToggle('showMouseDrags', val)}
-                    />
                 </div>
             </CollapsibleCard>
 
-            {/* EFFECT SETTINGS */}
+            {/* KEYBOARD SETTINGS */}
             <CollapsibleCard
-                title="Effects"
+                title="Keyboard"
                 isExpanded={showCollapsibleEffects}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleEffects', v)}
             >
                 <div className="flex flex-col gap-4">
-                    <Toggle
-                        label="Keyboard Clicks"
-                        value={effectSettings.showKeyboardClicks}
-                        onChange={(val) => handleEffectToggle('showKeyboardClicks', val)}
-                    />
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-sm text-text-muted">Hotkeys</label>
+                            <InfoTooltip
+                                description="Shows keyboard shortcuts as an overlay during playback."
+                                imageSrc="/assets/images/hotkey-demo.png"
+                            />
+                        </div>
+                        <Toggle
+                            value={keyboardSettings.showHotkeys ?? true}
+                            onChange={(val) => handleKeyboardChange({ showHotkeys: val })}
+                        />
+                    </div>
+
+                    {/* Sub-settings (visible when hotkeys enabled) */}
+                    {(keyboardSettings.showHotkeys ?? true) && (
+                        <div className="pl-1 flex flex-col gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm text-text-muted">Placement</label>
+                                <MultiToggle
+                                    options={PLACEMENT_OPTIONS}
+                                    value={keyboardSettings.hotkeysPlacement ?? 'top'}
+                                    onChange={(val) => handleKeyboardChange({ hotkeysPlacement: val })}
+                                />
+                            </div>
+                            <Slider
+                                label="Size"
+                                min={0.5}
+                                max={2}
+                                value={keyboardSettings.hotkeysSize ?? 1.0}
+                                onChange={(val) => handleKeyboardChange({ hotkeysSize: val })}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                showTooltip
+                                units="×"
+                                decimals={1}
+                            />
+                            <Slider
+                                label="Margin"
+                                min={0}
+                                max={200}
+                                value={keyboardSettings.hotkeysMarginPx}
+                                onChange={(val) => handleKeyboardChange({ hotkeysMarginPx: val })}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                showTooltip
+                                units="px"
+                                decimals={0}
+                            />
+                        </div>
+                    )}
                 </div>
             </CollapsibleCard>
         </div>

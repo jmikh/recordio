@@ -112,10 +112,10 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         : null;
     const initialSourceRect = spotlight?.sourceRect || null;
 
-    // borderRadius is now stored in OUTPUT coordinates - no conversion needed
+    // borderRadiusPx is now stored in OUTPUT coordinates - no conversion needed
     const initialCornerRadii: CornerRadii = useMemo(
-        () => spotlight?.borderRadius ?? [0, 0, 0, 0],
-        [spotlight?.borderRadius]
+        () => spotlight?.borderRadiusPx ?? [0, 0, 0, 0],
+        [spotlight?.borderRadiusPx]
     );
 
     // Convert source rect to output rect for editing (using viewMapper)
@@ -206,9 +206,9 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         setCurrentCornerRadii(newRadii);
 
         if (editingSpotlightId) {
-            // borderRadius is now stored in OUTPUT coordinates - save directly
+            // borderRadiusPx is now stored in OUTPUT coordinates - save directly
             batchAction(() => {
-                updateSpotlight(editingSpotlightId, { borderRadius: newRadii });
+                updateSpotlight(editingSpotlightId, { borderRadiusPx: newRadii });
             });
         }
     };

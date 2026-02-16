@@ -21,10 +21,10 @@ export function drawWebcam(
     globalScale: number = 1
 ) {
     const {
-        x, y, width, height,
+        xPx: x, yPx: y, widthPx: width, heightPx: height,
         shape = 'rect',
-        borderRadius = 0,
-        borderWidth = 0,
+        borderRadiusPx: borderRadius = 0,
+        borderWidthPx: borderWidth = 0,
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,

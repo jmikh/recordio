@@ -79,7 +79,10 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
             >
                 <div
                     className="w-5 h-5 rounded-full border border-text-muted shrink-0"
-                    style={{ backgroundColor: color }}
+                    style={{
+                        backgroundImage: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%)`,
+                        backgroundSize: '100% 100%, 6px 6px'
+                    }}
                 />
                 <span className="text-xs font-mono text-text-muted uppercase">
                     {color}

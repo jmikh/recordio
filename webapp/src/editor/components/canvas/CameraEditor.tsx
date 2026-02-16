@@ -36,8 +36,8 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     const cropZoom = useProjectStore(s => s.project.settings.camera?.cropZoom);
     const autoShrink = useProjectStore(s => s.project.settings.camera?.autoShrink);
     const shrinkScale = useProjectStore(s => s.project.settings.camera?.shrinkScale);
-    const borderRadius = useProjectStore(s => s.project.settings.camera?.borderRadius);
-    const borderWidth = useProjectStore(s => s.project.settings.camera?.borderWidth);
+    const borderRadius = useProjectStore(s => s.project.settings.camera?.borderRadiusPx);
+    const borderWidth = useProjectStore(s => s.project.settings.camera?.borderWidthPx);
     const borderColor = useProjectStore(s => s.project.settings.camera?.borderColor);
     const hasShadow = useProjectStore(s => s.project.settings.camera?.hasShadow);
     const hasGlow = useProjectStore(s => s.project.settings.camera?.hasGlow);
@@ -80,17 +80,17 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             // Merge: take position from local state, everything else from store
             const merged = {
                 ...freshSettings,
-                x: currentSettings.x,
-                y: currentSettings.y,
-                width: currentSettings.width,
-                height: currentSettings.height,
+                xPx: currentSettings.xPx,
+                yPx: currentSettings.yPx,
+                widthPx: currentSettings.widthPx,
+                heightPx: currentSettings.heightPx,
             };
             // But if shape changed, take the new dimensions from store too
             if (freshSettings.shape !== currentSettings.shape) {
-                merged.x = freshSettings.x;
-                merged.y = freshSettings.y;
-                merged.width = freshSettings.width;
-                merged.height = freshSettings.height;
+                merged.xPx = freshSettings.xPx;
+                merged.yPx = freshSettings.yPx;
+                merged.widthPx = freshSettings.widthPx;
+                merged.heightPx = freshSettings.heightPx;
             }
             setCurrentSettings(merged);
             cameraRef.current = merged;
@@ -137,19 +137,27 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
 
     // Get current border radius as CornerRadii array (all corners linked)
     const cornerRadii: CornerRadii = (() => {
-        const r = currentSettings.borderRadius ?? 0;
+        const r = currentSettings.borderRadiusPx ?? 0;
         return [r, r, r, r];
     })();
 
     // For circle shape, use half the size as radius for DimmedOverlay
     const dimmedOverlayRadii: CornerRadii = (() => {
         if (currentShape === 'circle') {
-            // Circle is always square (width === height), use half as radius
-            const circleRadius = currentSettings.width / 2;
+            // Circle is always square (widthPx === heightPx), use half as radius
+            const circleRadius = currentSettings.widthPx / 2;
             return [circleRadius, circleRadius, circleRadius, circleRadius];
         }
         return cornerRadii;
     })();
+
+    // Adapter: convert Px-suffixed CameraSettings to Rect for BoundingBox/DimmedOverlay
+    const cameraRect: Rect = {
+        x: currentSettings.xPx,
+        y: currentSettings.yPx,
+        width: currentSettings.widthPx,
+        height: currentSettings.heightPx,
+    };
 
     // ------------------------------------------------------------------
     // HANDLERS
@@ -157,7 +165,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
 
     const handleChange = (rect: Rect) => {
         console.log('[CameraEditor] handleChange', { w: rect.width.toFixed(0), h: rect.height.toFixed(0) });
-        const newSettings = { ...currentSettings, ...rect };
+        const newSettings = { ...currentSettings, xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height };
         setCurrentSettings(newSettings);
         cameraRef.current = newSettings; // Update canvas live preview
     };
@@ -167,7 +175,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         // Merge all local changes with rect and commit to store
         const newSettings: CameraSettings = {
             ...currentSettings,
-            ...rect
+            xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height
         };
         batchAction(() => updateSettings({ camera: newSettings }));
         cameraRef.current = null;
@@ -176,7 +184,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     const handleCornerRadiiChange = (radii: CornerRadii) => {
         // All corners are linked, so just take the first value
         const newRadius = radii[0];
-        const newSettings = { ...currentSettings, borderRadius: newRadius };
+        const newSettings = { ...currentSettings, borderRadiusPx: newRadius };
         setCurrentSettings(newSettings);
         cameraRef.current = newSettings; // Update canvas live preview
     };
@@ -185,7 +193,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         const newRadius = radii[0];
         const newSettings: CameraSettings = {
             ...currentSettings,
-            borderRadius: newRadius
+            borderRadiusPx: newRadius
         };
         batchAction(() => updateSettings({ camera: newSettings }));
     };
@@ -199,14 +207,14 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] pointer-events-none"
         >
             <DimmedOverlay
-                holeRect={currentSettings}
+                holeRect={cameraRect}
                 cornerRadii={dimmedOverlayRadii}
                 opacity={dimOpacity}
             />
 
             <div className="absolute inset-0 pointer-events-none">
                 <BoundingBox
-                    rect={currentSettings}
+                    rect={cameraRect}
                     minSize={MIN_CAMERA_SIZE}
                     fixedAspectRatio={fixedAspectRatio}
                     onChange={handleChange}

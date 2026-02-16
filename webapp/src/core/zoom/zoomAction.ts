@@ -84,7 +84,7 @@ export function calculateZoomSchedule(
                 actions.push({
                     id: crypto.randomUUID(),
                     sourceEndTimeMs,
-                    rect: targetViewport,
+                    rectPx: targetViewport,
                     reason: area.reason,
                     type: 'auto'
                 });
@@ -104,7 +104,7 @@ export function calculateZoomSchedule(
                     };
 
                     const mergedViewport = getViewport(boundingRect, maxZoom, viewMapper);
-                    prevAction.rect = mergedViewport;
+                    prevAction.rectPx = mergedViewport;
                     lastViewport = mergedViewport;
                     lastMustSeeRect = boundingRect;
                 }
@@ -281,7 +281,7 @@ export function getViewportStateAtTime(
         const progress = Math.max(0, Math.min(1, elapsed / action.duration));
         const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
 
-        const interpolated = interpolateRect(currentRect, action.rect, eased);
+        const interpolated = interpolateRect(currentRect, action.rectPx, eased);
 
         // If our lookup time was within this segment, we are done!
         if (outputTimeMs <= interruptionTime) {

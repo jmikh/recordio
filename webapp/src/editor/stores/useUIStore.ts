@@ -21,7 +21,7 @@ export const SettingsPanel = {
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'background' | 'camera' | 'captions' | 'audio';
+export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'effects' | 'background' | 'camera' | 'captions' | 'audio';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -235,7 +235,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     setPreviewTime: (previewTimeMs) => set({ previewTimeMs }),
 
     // Debug Bar
-    showDebugBar: false,
+    showDebugBar: true,
     toggleDebugBar: () => set((state) => ({ showDebugBar: !state.showDebugBar })),
 
     // Debug Overlays

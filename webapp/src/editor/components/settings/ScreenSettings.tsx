@@ -81,10 +81,10 @@ export const ScreenSettings = () => {
         }
     } else {
         // Border mode - show color (only if glow or border > 0), thickness, and effect
-        const { borderWidth = 0, borderColor = '#ffffff', hasGlow = false, hasShadow = false } = screenConfig;
+        const { borderWidthPx = 0, borderColor = '#ffffff', hasGlow = false, hasShadow = false } = screenConfig;
 
         // Only show color if there's a visible border or glow effect
-        if (borderWidth > 0 || hasGlow) {
+        if (borderWidthPx > 0 || hasGlow) {
             framePreviewItems.push({
                 type: 'custom',
                 content: (
@@ -97,8 +97,8 @@ export const ScreenSettings = () => {
         }
 
         // Only show pixel count if there's a border
-        if (borderWidth > 0) {
-            framePreviewItems.push({ type: 'text', content: `${Math.round(borderWidth)}px` });
+        if (borderWidthPx > 0) {
+            framePreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
         }
 
         // Add effect type (shadow/glow) only if enabled
@@ -227,11 +227,11 @@ export const ScreenSettings = () => {
                                 label="Rounding"
                                 min={0}
                                 max={200}
-                                value={screenConfig.borderRadius}
+                                value={screenConfig.borderRadiusPx}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 onChange={(val) => batchAction(() => updateSettings({
-                                    screen: { ...screenConfig, borderRadius: val }
+                                    screen: { ...screenConfig, borderRadiusPx: val }
                                 }))}
                                 showTooltip
                                 units="px"
@@ -242,11 +242,11 @@ export const ScreenSettings = () => {
                                 label="Thickness"
                                 min={0}
                                 max={20}
-                                value={screenConfig.borderWidth}
+                                value={screenConfig.borderWidthPx}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 onChange={(val) => batchAction(() => updateSettings({
-                                    screen: { ...screenConfig, borderWidth: val }
+                                    screen: { ...screenConfig, borderWidthPx: val }
                                 }))}
                                 showTooltip
                                 units="px"

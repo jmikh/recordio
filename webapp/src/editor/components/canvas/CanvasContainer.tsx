@@ -183,7 +183,7 @@ export const CanvasContainer = () => {
                     drawBackground(
                         ctx,
                         project.settings.background,
-                        project.settings.background.backgroundBlur,
+                        project.settings.background.backgroundBlurPx,
                         canvas,
                         bgRef.current
                     );
