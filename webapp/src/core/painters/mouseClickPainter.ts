@@ -1,7 +1,14 @@
-import type { BaseEvent, Rect } from '../../types';
+import type { BaseEvent, Rect, Size } from '../../types';
 import type { MouseSettings } from '../../types/settings';
 import type { ViewMapper } from '../mappers/viewMapper';
 import type { TimeMapper } from '../mappers/timeMapper';
+
+// ══════════════════════════════════════════
+// Reference Constants (designed for 1080px height)
+// ══════════════════════════════════════════
+
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_CLICK_RADIUS = 80;
 
 const CLICK_DURATION = 500;
 
@@ -26,10 +33,11 @@ function paintRing(
     x: number,
     y: number,
     progress: number,
-    settings: MouseSettings
+    settings: MouseSettings,
+    scale: number
 ) {
     const [r, g, b, a] = hexToRgba(settings.color);
-    const maxRadius = settings.kClickRadiusPx * settings.size;
+    const maxRadius = REF_CLICK_RADIUS * settings.size * scale;
     const currentRadius = maxRadius * progress;
     const opacity = 0.7 * a * (1 - progress);
     const lineWidth = 3 * (1 - progress * 0.5);
@@ -49,10 +57,11 @@ function paintCircle(
     x: number,
     y: number,
     progress: number,
-    settings: MouseSettings
+    settings: MouseSettings,
+    scale: number
 ) {
     const [r, g, b, a] = hexToRgba(settings.color);
-    const currentRadius = settings.kClickRadiusPx * settings.size * progress;
+    const currentRadius = REF_CLICK_RADIUS * settings.size * scale * progress;
     const opacity = 0.5 * a * (1 - progress);
 
     ctx.beginPath();
@@ -65,7 +74,7 @@ function paintCircle(
 
 const EFFECT_RENDERERS: Record<
     MouseSettings['effectType'],
-    (ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, settings: MouseSettings) => void
+    (ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, settings: MouseSettings, scale: number) => void
 > = {
     ring: paintRing,
     circle: paintCircle,
@@ -83,9 +92,11 @@ export function paintMouseClicks(
     viewport: Rect,
     viewMapper: ViewMapper,
     settings: MouseSettings,
-    timeMapper: TimeMapper
+    timeMapper: TimeMapper,
+    outputSize: Size
 ) {
     const renderer = EFFECT_RENDERERS[settings.effectType];
+    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
 
     for (const click of events) {
         const mappedTime = timeMapper.mapSourceToOutputTime(click.timestamp);
@@ -96,7 +107,7 @@ export function paintMouseClicks(
             const progress = elapsed / CLICK_DURATION;
 
             const center = viewMapper.projectEventPointToOutput(click.mousePos, viewport);
-            renderer(ctx, center.x, center.y, progress, settings);
+            renderer(ctx, center.x, center.y, progress, settings, scale);
         }
     }
 }

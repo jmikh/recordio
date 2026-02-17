@@ -3,15 +3,25 @@ import type { KeyboardEvent, Size } from '../../types';
 import type { KeyboardSettings } from '../../types/settings';
 import type { TimeMapper } from '../mappers/timeMapper';
 
+// ══════════════════════════════════════════
+// Reference Constants (designed for 1080px height)
+// ══════════════════════════════════════════
+
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_FONT_SIZE = 128;
+const REF_PADDING_X = 40;
+const REF_PADDING_Y = 20;
+const REF_CORNER_RADIUS = 16;
+
 /**
- * Draws keysrokes at the top or bottom of the canvas.
+ * Draws keystrokes at the top or bottom of the canvas.
  *
  * @param ctx 2D Canvas Context
  * @param events List of keystroke events
  * @param currentOutputTime Current Output Time
  * @param outputSize Size of the output canvas
  * @param timeMapper Maps source time to output time
- * @param settings Keyboard settings (includes base sizes and multipliers)
+ * @param settings Keyboard settings (includes multipliers)
  */
 export function drawKeyboardOverlay(
     ctx: CanvasRenderingContext2D,
@@ -86,11 +96,12 @@ export function drawKeyboardOverlay(
     parts.push(label);
     const text = parts.join(' ');
 
-    // Drawing Settings — base values from settings, scaled by hotkeysSize multiplier
-    const fontSize = Math.round(settings.kFontSizePx * settings.hotkeysSize);
-    const paddingX = Math.round(settings.kPaddingXPx * settings.hotkeysSize);
-    const paddingY = Math.round(settings.kPaddingYPx * settings.hotkeysSize);
-    const cornerRadius = Math.round(settings.kCornerRadiusPx * settings.hotkeysSize);
+    // Drawing Settings — scale by output height and hotkeysSize multiplier
+    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const fontSize = Math.round(REF_FONT_SIZE * settings.hotkeysSize * scale);
+    const paddingX = Math.round(REF_PADDING_X * settings.hotkeysSize * scale);
+    const paddingY = Math.round(REF_PADDING_Y * settings.hotkeysSize * scale);
+    const cornerRadius = Math.round(REF_CORNER_RADIUS * settings.hotkeysSize * scale);
 
     ctx.save();
 

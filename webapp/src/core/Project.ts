@@ -56,12 +56,10 @@ const createDefaultSettings = (): ProjectSettings => ({
         mouseClickEnabled: true,
         mouseDragEnabled: true,
         effectType: 'ring',
-        color: '#667eea',
+        color: '#8b5cf6',
         size: 1.0,
         soundEnabled: false,
         soundVolume: 0.5,
-        kClickRadiusPx: 80,
-        kDragRadiusPx: 60,
     },
 
     keyboard: {
@@ -69,10 +67,6 @@ const createDefaultSettings = (): ProjectSettings => ({
         hotkeysSize: 1.0,
         hotkeysPlacement: 'top',
         hotkeysMargin: 4,
-        kFontSizePx: 64,
-        kPaddingXPx: 40,
-        kPaddingYPx: 20,
-        kCornerRadiusPx: 16,
     },
 
     screen: {
@@ -104,10 +98,6 @@ const createDefaultSettings = (): ProjectSettings => ({
     captions: {
         visible: true,
         captionSize: 1.0,
-        kFontSizePx: 50,
-        kPaddingXPx: 32,
-        kPaddingYPx: 16,
-        kCornerRadiusPx: 12,
         width: 75,
         textColor: '#ffffff',
         backgroundColor: '#000000cc'

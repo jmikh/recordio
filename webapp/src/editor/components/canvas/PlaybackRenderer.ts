@@ -85,10 +85,10 @@ export class PlaybackRenderer {
             const mouse = project.settings.mouse;
             if (mouse) {
                 if (mouse.mouseClickEnabled) {
-                    paintMouseClicks(ctx, userEvents.mouseClicks, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper);
+                    paintMouseClicks(ctx, userEvents.mouseClicks, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper, project.settings.outputSize);
                 }
                 if (mouse.mouseDragEnabled) {
-                    drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper);
+                    drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper, project.settings.outputSize);
                 }
                 if (mouse.soundEnabled) {
                     playClickSounds(userEvents.mouseClicks, currentTimeMs, mouse.soundVolume ?? 0.5, timeMapper);

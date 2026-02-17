@@ -2,6 +2,16 @@ import type { Size, CaptionSettings, CaptionSegment } from '../../types';
 import { CaptionTimeMapper } from '../mappers/CaptionTimeMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 
+// ══════════════════════════════════════════
+// Reference Constants (designed for 1080px height)
+// ══════════════════════════════════════════
+
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_FONT_SIZE = 50;
+const REF_PADDING_X = 32;
+const REF_PADDING_Y = 16;
+const REF_CORNER_RADIUS = 12;
+
 /** Opacity for non-highlighted words */
 const DIM_OPACITY = 0.6;
 
@@ -62,11 +72,12 @@ export function drawCaptions(
         return;
     }
 
-    // Drawing Settings — base values from settings, scaled by captionSize multiplier
-    const fontSize = Math.round(settings.kFontSizePx * settings.captionSize);
-    const paddingX = Math.round(settings.kPaddingXPx * settings.captionSize);
-    const paddingY = Math.round(settings.kPaddingYPx * settings.captionSize);
-    const cornerRadius = Math.round(settings.kCornerRadiusPx * settings.captionSize);
+    // Drawing Settings — scale by output height and captionSize multiplier
+    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const fontSize = Math.round(REF_FONT_SIZE * settings.captionSize * scale);
+    const paddingX = Math.round(REF_PADDING_X * settings.captionSize * scale);
+    const paddingY = Math.round(REF_PADDING_Y * settings.captionSize * scale);
+    const cornerRadius = Math.round(REF_CORNER_RADIUS * settings.captionSize * scale);
     const marginBottom = outputSize.height * 0.02; // 2% from bottom of canvas
     const maxWidth = outputSize.width * (settings.width / 100); // Use width setting as percentage
 

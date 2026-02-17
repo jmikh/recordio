@@ -155,12 +155,6 @@ export interface MouseSettings {
     soundEnabled: boolean;
     /** Sound volume (0–1). Default: 0.5 */
     soundVolume: number;
-
-    // ── Base constants (auto-scaled by export, not exposed in UI) ──
-    /** Base radius for click effects in pixels. Default: 80 */
-    kClickRadiusPx: number;
-    /** Base radius for drag effects in pixels. Default: 60 */
-    kDragRadiusPx: number;
 }
 
 export interface KeyboardSettings {
@@ -171,16 +165,6 @@ export interface KeyboardSettings {
     hotkeysPlacement: 'top' | 'bottom';
     /** Distance from the edge of the canvas, as a percentage of output height (0–20). Default: 4 */
     hotkeysMargin: number;
-
-    // ── Base constants (auto-scaled by export, not exposed in UI) ──
-    /** Base font size in pixels. Default: 64 */
-    kFontSizePx: number;
-    /** Base horizontal padding in pixels. Default: 40 */
-    kPaddingXPx: number;
-    /** Base vertical padding in pixels. Default: 20 */
-    kPaddingYPx: number;
-    /** Base corner radius in pixels. Default: 16 */
-    kCornerRadiusPx: number;
 }
 
 // ==========================================
@@ -195,16 +179,6 @@ export interface CaptionSettings {
     textColor: string; // Text color in hex format (e.g. '#ffffff')
     backgroundColor: string; // Background box color in 8-char hex with alpha (e.g. '#000000cc')
     wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
-
-    // ── Base constants (auto-scaled by export, not exposed in UI) ──
-    /** Base font size in pixels. Default: 50 */
-    kFontSizePx: number;
-    /** Base horizontal padding in pixels. Default: 32 */
-    kPaddingXPx: number;
-    /** Base vertical padding in pixels. Default: 16 */
-    kPaddingYPx: number;
-    /** Base corner radius in pixels. Default: 12 */
-    kCornerRadiusPx: number;
 
     /** Baseline captions from last successful transcription (never modified by editing) */
     baselineCaptions?: CaptionSegment[];

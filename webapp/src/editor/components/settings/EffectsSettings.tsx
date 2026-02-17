@@ -134,7 +134,7 @@ export const EffectsSettings = () => {
                             <Slider
                                 label="Size"
                                 min={0.5}
-                                max={2}
+                                max={3}
                                 value={mouseSettings.size}
                                 onChange={(val) => handleMouseChange({ size: val })}
                                 onPointerDown={startInteraction}
