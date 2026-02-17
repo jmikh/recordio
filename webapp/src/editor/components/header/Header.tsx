@@ -8,7 +8,7 @@ import type { DropdownOption } from '@shared/components';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { BiSupport } from 'react-icons/bi';
-import { DefaultButton } from '@shared/components';
+import { DefaultButton, GhostButton } from '@shared/components';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -115,22 +115,22 @@ export const Header = () => {
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
-                        <DefaultButton
+                        <GhostButton
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
                             className="p-1.5"
                         >
                             <FaUndo size={14} />
-                        </DefaultButton>
-                        <DefaultButton
+                        </GhostButton>
+                        <GhostButton
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
                             className="p-1.5"
                         >
                             <FaRedo size={14} />
-                        </DefaultButton>
+                        </GhostButton>
                     </div>
 
                     {import.meta.env.MODE !== 'production' && (

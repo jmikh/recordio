@@ -56,14 +56,18 @@ export interface CameraSettings extends StyleSettings {
 /** Supported aspect ratio presets for output video crop */
 export type OutputCropOption = 'none' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
 
+export interface ToolbarSettings {
+    /** Whether to render the custom branded toolbar. Default: true. */
+    enabled: boolean;
+    /** Color theme for custom toolbar. Default: 'light'. */
+    theme: 'light' | 'dark';
+    /** URL display mode for custom toolbar. Default: 'short'. */
+    urlMode: 'full' | 'short';
+}
+
 export interface ScreenSettings extends StyleSettings {
     mode: 'device' | 'border';
-    /** How to handle Chrome toolbar in window recordings.
-     * 'show' = render full window including toolbar.
-     * 'hide' = crop to viewport only (hide toolbar).
-     * Only relevant when screenSource.viewportRect exists.
-     */
-    toolbarMode?: 'show' | 'hide';
+    toolbar: ToolbarSettings;
     deviceFrameId?: ID;
     crop?: Rect;
     padding: number;

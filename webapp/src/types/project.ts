@@ -5,7 +5,7 @@
  */
 
 import type { ID } from '@shared/types';
-import type { SourceMetadata, UserEvents } from '@shared/types';
+import type { ScreenMetadata, CameraMetadata, UserEvents } from '@shared/types';
 import type { ProjectSettings } from './settings';
 import type { Timeline } from './timeline';
 
@@ -23,9 +23,9 @@ export interface Project {
     thumbnail?: string;
 
     /** Screen recording source metadata (always present) */
-    screenSource: SourceMetadata;
+    screenSource: ScreenMetadata;
     /** Camera recording source metadata (optional) */
-    cameraSource?: SourceMetadata;
+    cameraSource?: CameraMetadata;
     /** User interaction events from the recording */
     userEvents: UserEvents;
 

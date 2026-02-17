@@ -140,13 +140,13 @@ export function CaptionsSettings() {
         let sourceName = '';
 
         // Check camera source first
-        if (cameraSource?.has_microphone) {
+        if (cameraSource?.hasMicrophone) {
             sourceToTranscribe = cameraSource;
             sourceName = 'camera';
         }
 
         // Fall back to screen source if camera doesn't have microphone
-        if (!sourceToTranscribe && screenSource?.has_microphone) {
+        if (!sourceToTranscribe && screenSource?.hasMicrophone) {
             sourceToTranscribe = screenSource;
             sourceName = 'screen';
         }

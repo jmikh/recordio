@@ -77,8 +77,8 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             project.settings.outputSize,
             project.settings.screen.padding,
             project.settings.screen.crop,
-            project.screenSource.viewportRect,
-            project.settings.screen.toolbarMode ?? 'hide'
+            project.screenSource.trackableContentRect,
+            project.settings.screen.toolbar.enabled
         );
     }, [
         project.screenSource,

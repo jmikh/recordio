@@ -240,6 +240,11 @@ body,
       box-shadow: var(--shadow-button);
    }
 
+   /* Interactive Ghost - borderless, backgroundless variant for subtle toolbar actions */
+   .interactive-ghost {
+      @apply h-9 px-3 bg-transparent border-none rounded-full text-sm text-text-muted hover:text-text-highlighted hover:bg-state-hover transition-colors cursor-pointer disabled:text-text-disabled disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-text-disabled;
+   }
+
    /* Interactive Selected State - secondary border with glow */
    .interactive-selected {
       @apply border-secondary;

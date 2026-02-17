@@ -79,10 +79,10 @@ export const AudioSettingsPanel = () => {
     const screenSource = project.screenSource;
     const cameraSource = project.cameraSource;
     const screenHasAudio = screenSource?.hasAudio ?? false;
-    const isSingleMode = screenSource?.has_microphone && !cameraSource;
+    const isSingleMode = screenSource?.hasMicrophone && !cameraSource;
     const isDualMode = !!cameraSource;
-    const hasMicOnCamera = cameraSource?.has_microphone ?? false;
-    const hasMicAnywhere = screenSource?.has_microphone || hasMicOnCamera;
+    const hasMicOnCamera = cameraSource?.hasMicrophone ?? false;
+    const hasMicAnywhere = screenSource?.hasMicrophone || hasMicOnCamera;
 
     // Preview helper
     const togglePreview = (url: string) => {

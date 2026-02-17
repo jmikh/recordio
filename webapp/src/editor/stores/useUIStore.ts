@@ -87,6 +87,7 @@ export interface UIState {
     showCollapsibleBackground: boolean;
     // -- Screen Settings
     showCollapsibleSize: boolean;
+    showCollapsibleToolbar: boolean;
     showCollapsibleFrame: boolean;
     // -- Camera Settings
     showCollapsibleShape: boolean;
@@ -252,6 +253,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     showCollapsibleBackground: true, // Default expanded
     // -- Screen Settings
     showCollapsibleSize: false,
+    showCollapsibleToolbar: false,
     showCollapsibleFrame: false,
     // -- Camera Settings
     showCollapsibleShape: true, // Default expanded
@@ -289,6 +291,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         showCollapsibleMouse: false,
         showCollapsibleBackground: true,
         showCollapsibleSize: false,
+        showCollapsibleToolbar: false,
         showCollapsibleFrame: false,
         showCollapsibleShape: true,
         showCollapsibleBorder: false,

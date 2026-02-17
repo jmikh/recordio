@@ -14,14 +14,16 @@ export interface MappedPoint extends Point {
  * - **Output coordinates**: The logical canvas resolution (e.g., 1920x1080).
  *   This is the standardized coordinate system used for rendering and project data.
  * 
- * ## Toolbar Mode (Window Recordings)
- * Window recordings capture the full Chrome window (toolbar + viewport). The `viewportRect`
- * describes where the viewport sits within the video frame, and `toolbarMode` controls
- * how the toolbar region is handled:
- * - **'hide'**: Viewport acts as an effective crop — only the viewport region is rendered.
- * - **'show'**: Full frame is rendered including toolbar.
- * 
- * In both modes, events are recorded in viewport coords and need offset conversion.
+ * ## Toolbar (Window Recordings)
+ * Window recordings capture the full Chrome window (toolbar + content area). The `trackableContentRect`
+ * describes where the JavaScript-trackable content sits within the video frame, and `toolbarEnabled`
+ * controls whether a custom branded toolbar is drawn above the content:
+ * - **enabled=true**: The user's crop is respected, but if it doesn't fully exclude the
+ *   native toolbar area (above trackableContentRect.y), the effective crop is clamped to exclude it.
+ *   A custom branded toolbar is drawn on top of the content.
+ * - **enabled=false**: The user's crop is used as-is. No toolbar is drawn.
+ *
+ * In both cases, events are recorded in content area coords and need offset conversion.
  * 
  * Use `eventToOutputPoint` / `eventToOutputRect` / `projectEventToOutput` for event coordinates.
  * Use `sourceToOutputPoint` / `sourceToOutputRect` / `projectSourceToOutput` for frame geometry.
@@ -33,63 +35,117 @@ export class ViewMapper {
     outputSize: Size;
     paddingPercentage: number;
     cropRect?: Rect;
-    viewportRect?: Rect;
-    toolbarMode: 'show' | 'hide';
+    trackableContentRect?: Rect;
+    toolbarEnabled: boolean;
 
     /** Offset to apply to event coordinates to convert from viewport to frame coords */
     private eventOffset: Point;
 
     /**
-     * The rectangle in Output Space where the content (video) is placed.
-     * Calculated based on aspect ratio fit and padding.
+     * The rectangle in Output Space where the video content is placed.
+     * When custom toolbar is active, this is shifted down to make room for the toolbar.
      */
     public readonly contentRect: Rect;
+
+    /**
+     * Height of the custom toolbar in Output Space (0 when no toolbar).
+     * The toolbar sits directly above contentRect.
+     */
+    public readonly toolbarOutputHeight: number;
+
+    /** Toolbar height as a fraction of source viewport height */
+    private static readonly TOOLBAR_HEIGHT_RATIO = 0.05;
 
     constructor(
         sourceSize: Size,
         outputSize: Size,
         paddingPercentage: number,
         cropRect?: Rect,
-        viewportRect?: Rect,
-        toolbarMode: 'show' | 'hide' = 'hide'
+        trackableContentRect?: Rect,
+        toolbarEnabled: boolean = true
     ) {
         this.outputSize = outputSize;
         this.sourceSize = sourceSize;
         this.paddingPercentage = paddingPercentage;
-        this.viewportRect = viewportRect;
-        this.toolbarMode = toolbarMode;
+        this.trackableContentRect = trackableContentRect;
+        this.toolbarEnabled = toolbarEnabled;
 
-        // When hiding toolbar, use viewportRect as an effective crop
-        if (toolbarMode === 'hide' && viewportRect) {
-            this.cropRect = viewportRect;
+        // ══════════════════════════════════════════════════════════════════
+        // Step 1: Determine effective crop (respecting user crop while handling toolbar)
+        // ══════════════════════════════════════════════════════════════════
+        if (toolbarEnabled && trackableContentRect) {
+            // Custom toolbar mode: respect user crop but ensure native toolbar is excluded
+            const baseCrop = cropRect ?? { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height };
+
+            // If user's crop starts above the viewport (includes native toolbar area),
+            // clamp the top to trackableContentRect.y to exclude it
+            if (baseCrop.y < trackableContentRect.y) {
+                const clippedTop = trackableContentRect.y;
+                const lostHeight = clippedTop - baseCrop.y;
+                this.cropRect = {
+                    x: baseCrop.x,
+                    y: clippedTop,
+                    width: baseCrop.width,
+                    height: baseCrop.height - lostHeight
+                };
+            } else {
+                // User's crop already starts at or below viewport — use as-is
+                this.cropRect = baseCrop;
+            }
         } else {
+            // No toolbar or toolbar disabled: use user crop as-is (or no crop)
             this.cropRect = cropRect;
         }
 
-        // Event offset: converts viewport-relative coords to frame coords
-        this.eventOffset = viewportRect
-            ? { x: viewportRect.x, y: viewportRect.y }
+        // ══════════════════════════════════════════════════════════════════
+        // Step 2: Calculate event offset for trackable-content-relative coordinates
+        // ══════════════════════════════════════════════════════════════════
+        this.eventOffset = trackableContentRect
+            ? { x: trackableContentRect.x, y: trackableContentRect.y }
             : { x: 0, y: 0 };
 
-        // Effective size is the Crop Size if it exists, otherwise the full source size
+        // ══════════════════════════════════════════════════════════════════
+        // Step 3: Calculate toolbar height and total frame dimensions
+        // ══════════════════════════════════════════════════════════════════
+
+        // Effective size = cropped region (or full source if no crop)
         const effectiveSize = this.cropRect
             ? { width: this.cropRect.width, height: this.cropRect.height }
             : sourceSize;
 
-        // Calculate Scale to fit effective source into output (considering padding)
+        // Toolbar height in source space (5% of trackable content height when enabled)
+        const hasCustomToolbar = toolbarEnabled && !!trackableContentRect;
+        const toolbarSourceH = hasCustomToolbar
+            ? trackableContentRect.height * ViewMapper.TOOLBAR_HEIGHT_RATIO
+            : 0;
+
+        // Total source frame = content + toolbar
+        const totalSourceH = effectiveSize.height + toolbarSourceH;
+
+        // ══════════════════════════════════════════════════════════════════
+        // Step 4: Calculate scale and output dimensions
+        // ══════════════════════════════════════════════════════════════════
+
+        // Scale factor to fit total frame into output (accounting for padding)
         const scale = Math.max(
             effectiveSize.width / (this.outputSize.width * (1 - 2 * this.paddingPercentage)),
-            effectiveSize.height / (this.outputSize.height * (1 - 2 * this.paddingPercentage))
+            totalSourceH / (this.outputSize.height * (1 - 2 * this.paddingPercentage))
         );
 
-        // Calculate dimensions of the content in Output Space
+        // Project dimensions to output space
         const projectedWidth = effectiveSize.width / scale;
-        const projectedHeight = effectiveSize.height / scale;
+        const projectedContentH = effectiveSize.height / scale;
+        this.toolbarOutputHeight = toolbarSourceH / scale;
+        const totalOutputH = projectedContentH + this.toolbarOutputHeight;
 
+        // ══════════════════════════════════════════════════════════════════
+        // Step 5: Center the combined frame and position content below toolbar
+        // ══════════════════════════════════════════════════════════════════
         const x = (this.outputSize.width - projectedWidth) / 2;
-        const y = (this.outputSize.height - projectedHeight) / 2;
+        const y = (this.outputSize.height - totalOutputH) / 2;
 
-        this.contentRect = { x, y, width: projectedWidth, height: projectedHeight };
+        // contentRect: video content area (shifted down by toolbar height)
+        this.contentRect = { x, y: y + this.toolbarOutputHeight, width: projectedWidth, height: projectedContentH };
     }
 
     // ═══════════════════════════════════════════════════════

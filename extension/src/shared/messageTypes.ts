@@ -68,6 +68,8 @@ export interface RecordingState {
     currentSessionId: string | null;
     mode: RecorderMode | null;
     originalTabId: number | null;
+    hasAudio: boolean;
+    hasCamera: boolean;
 }
 
 // --- Payloads ---

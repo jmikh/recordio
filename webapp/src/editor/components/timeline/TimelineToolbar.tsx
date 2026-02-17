@@ -8,7 +8,7 @@ import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete, MdContentCut, MdRefresh } from 'react-icons/md';
-import { Slider, DefaultButton } from '@shared/components';
+import { Slider, GhostButton } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -66,8 +66,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     // 1. Camera exists and has microphone
     // OR
     // 2. Camera doesn't exist (or no mic), Screen has microphone, and User Events exist
-    const cameraHasMic = cameraSource?.has_microphone && cameraSource?.runtimeUrl;
-    const screenHasMic = screenSource.has_microphone && screenSource.runtimeUrl;
+    const cameraHasMic = cameraSource?.hasMicrophone && cameraSource?.runtimeUrl;
+    const screenHasMic = screenSource.hasMicrophone && screenSource.runtimeUrl;
     const hasUserEvents = userEvents.mousePositions.length > 0;
 
     const showAutoCut = (cameraHasMic) || (screenHasMic && hasUserEvents);
@@ -116,8 +116,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
         try {
             // Select audio source: Prefer Camera if it has mic, otherwise Screen if it has mic
-            const cameraHasMic = cameraSource?.has_microphone && cameraSource?.runtimeUrl;
-            const screenHasMic = screenSource.has_microphone && screenSource.runtimeUrl;
+            const cameraHasMic = cameraSource?.hasMicrophone && cameraSource?.runtimeUrl;
+            const screenHasMic = screenSource.hasMicrophone && screenSource.runtimeUrl;
 
             const audioUrl = cameraHasMic
                 ? (cameraSource?.runtimeUrl || '')
@@ -221,7 +221,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
             <div className="flex items-center gap-2">
                 {/* Delete Button */}
-                <DefaultButton
+                <GhostButton
                     onClick={handleDelete}
                     className="px-3 py-1 text-xs flex items-center gap-1"
                     title={
@@ -233,11 +233,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 >
                     <MdDelete size={14} />
                     Delete
-                </DefaultButton>
+                </GhostButton>
 
                 {/* AutoCut Button */}
                 {showAutoCut && (
-                    <DefaultButton
+                    <GhostButton
                         onClick={handleAutoCut}
                         className="px-3 py-1 text-xs flex items-center gap-1"
                         title="Remove silent/inactive segments"
@@ -245,11 +245,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                     >
                         <MdContentCut size={14} />
                         AutoCut
-                    </DefaultButton>
+                    </GhostButton>
                 )}
 
                 {/* Reset Windows Button */}
-                <DefaultButton
+                <GhostButton
                     onClick={() => {
                         setOutputWindows([{
                             id: crypto.randomUUID(),
@@ -263,41 +263,44 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 >
                     <MdRefresh size={14} />
                     Reset
-                </DefaultButton>
+                </GhostButton>
             </div>
 
-            <div className="flex items-center gap-4 bg-state-inactive px-4 py-1 rounded-full border border-border">
-                <button onClick={onTogglePlay} className="hover:text-primary transition-colors flex items-center justify-center p-0.5 text-text-highlighted">
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={onTogglePlay}
+                    className="w-7 h-7 rounded-full bg-primary text-text-on-primary hover:bg-primary-highlighted transition-colors flex items-center justify-center shrink-0"
+                >
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
                 <div className="flex items-baseline gap-1.5">
                     <div
                         ref={timeDisplayRef}
-                        className="font-mono text-sm text-text-main tabular-nums"
+                        className="text-sm text-text-main tabular-nums"
                     >
                         00:00.0
                     </div>
                     <span className="text-xs text-text-muted">/</span>
-                    <div className="font-mono text-xs text-text-muted tabular-nums">
+                    <div className="text-xs text-text-muted tabular-nums">
                         {formatSmartTime(totalDurationMs, totalDurationMs)}
                     </div>
                 </div>
             </div>
 
             <div className="flex items-center gap-2">
-                <DefaultButton
+                <GhostButton
                     onClick={onFit}
                     className="px-2 py-0.5 text-[10px]"
                     title="Fit timeline to screen"
                 >
                     Fit
-                </DefaultButton>
-                <button
+                </GhostButton>
+                <GhostButton
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                    className="hover:text-primary transition-colors text-text-main"
+                    className="px-1"
                 >
                     <MdRemove size={14} />
-                </button>
+                </GhostButton>
                 <div className="w-24">
                     <Slider
                         value={pixelsPerSec}
@@ -308,12 +311,12 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                         onPointerUp={batcher.endInteraction}
                     />
                 </div>
-                <button
+                <GhostButton
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                    className="hover:text-primary transition-colors text-text-main"
+                    className="px-1"
                 >
                     <MdAdd size={14} />
-                </button>
+                </GhostButton>
             </div>
         </div>
     );

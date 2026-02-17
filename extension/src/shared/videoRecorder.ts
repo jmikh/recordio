@@ -12,7 +12,7 @@
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
-import { EventType, type UserEvents, type Size, type SourceMetadata, type Rect } from '@shared/types';
+import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 import type { RawRecording } from '@shared/types';
 
@@ -57,6 +57,11 @@ export class VideoRecorder {
     // Detection Result (Window Mode)
     private detectionResult: WindowDetectionResult | null = null;
     private viewportRect: Rect | undefined;
+
+    // Audio Detection (AnalyserNode-based)
+    private audioAnalyser: AnalyserNode | null = null;
+    private audioDetectionInterval: ReturnType<typeof setInterval> | null = null;
+    private detectedScreenAudio = false;
 
     constructor(sessionId: string, config: RecordingConfig, mode: RecorderMode) {
         this.currentSessionId = sessionId;
@@ -120,6 +125,9 @@ export class VideoRecorder {
 
         console.log(`[VideoRecorder] Streams initialized (warmup complete).`);
 
+        // Set up audio analyser to detect actual audio content
+        this.setupAudioAnalyser();
+
         return this.detectionResult;
     }
 
@@ -145,6 +153,7 @@ export class VideoRecorder {
 
         this.startTime = Date.now();
         this.state = 'recording';
+        this.startAudioDetection();
 
         console.log(`[VideoRecorder] Recording started.`);
 
@@ -203,8 +212,9 @@ export class VideoRecorder {
         }
 
         await Promise.all(stopPromises);
+        this.stopAudioDetection();
 
-        console.log("[VideoRecorder] Stopped recorders. Display Surface: ", displaySurface);
+        console.log(`[VideoRecorder] Stopped recorders. Display Surface: ${displaySurface}, Detected audio: ${this.detectedScreenAudio}`);
 
         // Save Data
         // Use currentSessionId if not provided (should match due to validateSession)
@@ -406,25 +416,31 @@ export class VideoRecorder {
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
-        // Screen hasAudio if: system audio exists OR microphone mixed in (single mode)
-        const screenHasAudio = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
+        // Screen hasAudio: audio track exists AND actual audio content was detected
+        const hasAudioTrack = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
+        const screenHasAudio = hasAudioTrack && this.detectedScreenAudio;
 
         // 2. Create Screen Source Metadata (embedded in project, not saved separately)
-        const screenSource: SourceMetadata = {
+        // For tab recordings, viewportRect is the full frame (x=0, y=0)
+        const viewportRect = this.viewportRect
+            ?? (this.mode === 'tab' && this.config.tabViewportSize
+                ? { x: 0, y: 0, ...this.config.tabViewportSize }
+                : undefined);
+
+        const screenSource: ScreenMetadata = {
             id: `src-${projectId}-screen`,
-            type: 'video',
             storageUrl: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
-            viewportRect: this.viewportRect,
+            recordingType: this.mode,
+            viewportRect,
             hasAudio: screenHasAudio,
-            has_microphone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
+            hasMicrophone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
             createdAt: now,
-            name: this.config.sourceName || this.mode
         };
 
         // 3. Save Camera Recording Blob (If any)
-        let cameraSource: SourceMetadata | undefined;
+        let cameraSource: CameraMetadata | undefined;
         if (this.cameraData.length > 0) {
             const camMimeType = this.cameraRecorder?.mimeType || 'video/webm';
             console.log(`[VideoRecorder] Saving Camera Blob with MimeType: ${camMimeType}`);
@@ -434,14 +450,11 @@ export class VideoRecorder {
 
             cameraSource = {
                 id: `src-${projectId}-camera`,
-                type: 'video',
                 storageUrl: `recordio-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
-                hasAudio: Boolean(this.config.hasAudio),
-                has_microphone: Boolean(this.config.hasAudio),
+                hasMicrophone: Boolean(this.config.hasAudio),
                 createdAt: now,
-                name: 'Camera'
             };
         }
 
@@ -480,6 +493,7 @@ export class VideoRecorder {
     // --- Cleanup ---
 
     private releaseStreams() {
+        this.stopAudioDetection();
         this.activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
         this.activeStreams = [];
 
@@ -487,7 +501,54 @@ export class VideoRecorder {
             this.audioContext.close();
             this.audioContext = null;
         }
+        this.audioAnalyser = null;
         this.state = 'idle'; // Reset state on release
+    }
+
+    // --- Audio Detection ---
+
+    /**
+     * Sets up an AnalyserNode on the screen stream's audio to detect
+     * whether actual audio content is present (not just a silent track).
+     */
+    private setupAudioAnalyser() {
+        const screenStream = this.activeStreams[0];
+        if (!screenStream || screenStream.getAudioTracks().length === 0) return;
+
+        try {
+            const ctx = this.audioContext || new AudioContext();
+            if (!this.audioContext) this.audioContext = ctx;
+
+            const source = ctx.createMediaStreamSource(screenStream);
+            this.audioAnalyser = ctx.createAnalyser();
+            this.audioAnalyser.fftSize = 2048;
+            source.connect(this.audioAnalyser);
+            // Don't connect to destination — we only observe, no playback
+        } catch (e) {
+            console.warn('[VideoRecorder] Failed to set up audio analyser:', e);
+        }
+    }
+
+    private startAudioDetection() {
+        if (!this.audioAnalyser) return;
+
+        const dataArray = new Float32Array(this.audioAnalyser.fftSize);
+        this.audioDetectionInterval = setInterval(() => {
+            if (!this.audioAnalyser) return;
+            this.audioAnalyser.getFloatTimeDomainData(dataArray);
+            // RMS (root mean square) — measures actual signal energy
+            const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
+            if (rms > 0.001) { // ~-60dB threshold
+                this.detectedScreenAudio = true;
+            }
+        }, 500);
+    }
+
+    private stopAudioDetection() {
+        if (this.audioDetectionInterval) {
+            clearInterval(this.audioDetectionInterval);
+            this.audioDetectionInterval = null;
+        }
     }
 
     private validateSession(sessionId?: string) {

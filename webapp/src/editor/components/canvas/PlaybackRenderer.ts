@@ -75,7 +75,9 @@ export class PlaybackRenderer {
                 screenVideo,
                 project,
                 effectiveViewport,
-                resources.deviceFrameImg
+                resources.deviceFrameImg,
+                currentTimeMs,
+                state.timeMapper
             );
             viewMapper = result.viewMapper;
 

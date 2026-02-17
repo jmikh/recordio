@@ -31,8 +31,8 @@ export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
         project.settings.screen.padding, project.settings.screen.crop,
-        project.screenSource.viewportRect,
-        project.settings.screen.toolbarMode ?? 'hide'
+        project.screenSource.trackableContentRect,
+        project.settings.screen.toolbar.enabled
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
     return calculateZoomSchedule(project.settings.zoom, viewMapper, project.timeline.focusAreas, timeMapper);
@@ -45,8 +45,8 @@ export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAct
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
         project.settings.screen.padding, project.settings.screen.crop,
-        project.screenSource.viewportRect,
-        project.settings.screen.toolbarMode ?? 'hide'
+        project.screenSource.trackableContentRect,
+        project.settings.screen.toolbar.enabled
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
     return calculateAutoSpotlights(

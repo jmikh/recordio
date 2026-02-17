@@ -70,7 +70,7 @@ export const SettingsPanel = () => {
     const canvasMode = useUIStore(s => s.canvasMode);
     const setCanvasMode = useUIStore(s => s.setCanvasMode);
     const hasCameraSource = !!project.cameraSource;
-    const hasMicrophone = project.cameraSource?.has_microphone || project.screenSource?.has_microphone;
+    const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
 
     // Exit camera edit mode when switching away from camera tab
     const handleTabChange = (tab: SettingsPanelTab) => {

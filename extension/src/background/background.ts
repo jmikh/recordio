@@ -33,7 +33,9 @@ const DEFAULT_STATE: RecordingState = {
     startTime: 0,
     currentSessionId: null,
     mode: null,
-    originalTabId: null
+    originalTabId: null,
+    hasAudio: false,
+    hasCamera: false
 };
 
 let currentState: RecordingState | null = null;
@@ -353,7 +355,9 @@ async function startTabModeSession(payload: any, sessionId: string) {
         startTime: syncTimestamp,
         currentSessionId: sessionId,
         mode: 'tab',
-        originalTabId: tabId
+        originalTabId: tabId,
+        hasAudio: hasAudio !== false,
+        hasCamera: hasCamera === true
     });
 
     // Start badge timer to show recording duration on extension icon
@@ -453,7 +457,9 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
             startTime: syncTimestamp,
             currentSessionId: sessionId,
             mode: mode,
-            originalTabId: originalTabId || null
+            originalTabId: originalTabId || null,
+            hasAudio: hasAudio !== false,
+            hasCamera: hasCamera === true
         });
 
         // Start badge timer to show recording duration on extension icon
@@ -590,7 +596,7 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
         // Only report recording=true if we are recording THIS tab
         isRecording = currentState.isRecording && _sender.tab.id === currentState.recordedTabId;
     }
-    sendResponse({ isRecording, startTime: currentState.startTime });
+    sendResponse({ isRecording, startTime: currentState.startTime, hasAudio: currentState.hasAudio, hasCamera: currentState.hasCamera });
 }
 
 // --- Tab Removal Listener ---

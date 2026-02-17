@@ -34,11 +34,10 @@ export interface Rect extends Point, Size { }
 // ==========================================
 
 /**
- * Represents a raw media asset (File) that has been imported.
+ * Shared fields for all media source types.
  */
-export interface SourceMetadata {
+interface BaseSourceMetadata {
     id: ID;
-    type: 'video' | 'audio' | 'image';
     /**
      * Persistent URL to the media file (recordio-blob:// protocol).
      * This is the storage reference that survives page reloads.
@@ -50,26 +49,35 @@ export interface SourceMetadata {
      */
     runtimeUrl?: string;
 
-    // Metadata
     /** Total duration of the source file in milliseconds */
     durationMs: TimeMs;
     size: Size;
-    /**
-     * Viewport region within the video frame (window recordings only).
-     * x,y = offset from video frame origin to viewport origin.
-     * width,height = viewport dimensions in video pixels.
-     * Absent for tab recordings (viewport IS the full frame).
-     */
-    viewportRect?: Rect;
-    /** Frames Per Second (Video only) */
-    fps?: number;
-    hasAudio: boolean;
-    has_microphone: boolean;
-    fileSizeBytes?: number;
+    hasMicrophone: boolean;
     createdAt?: number;
-    /** Human readable name of the source (e.g. Tab Title or "Desktop") */
-    name: string;
 }
+
+/**
+ * Metadata for a screen recording source (tab, window, or screen capture).
+ */
+export interface ScreenMetadata extends BaseSourceMetadata {
+    recordingType: 'tab' | 'window' | 'screen';
+    /**
+     * Trackable content area within the video frame (JavaScript-monitored region).
+     * For window recordings: x,y = offset from video frame origin to content area origin.
+     * For tab recordings: x=0, y=0, width/height = full frame dimensions.
+     * Absent for screen (desktop) recordings.
+     */
+    trackableContentRect?: Rect;
+    hasAudio: boolean;
+}
+
+/**
+ * Metadata for a camera recording source.
+ */
+export interface CameraMetadata extends BaseSourceMetadata { }
+
+/** Union type for consumer code that handles both source types. */
+export type SourceMetadata = ScreenMetadata | CameraMetadata;
 
 // ==========================================
 // RAW RECORDING (handoff format)
@@ -84,7 +92,7 @@ export interface RawRecording {
     name: string;
     timestamp: number; // createdAt timestamp
 
-    screenSource: SourceMetadata;
-    cameraSource?: SourceMetadata;
+    screenSource: ScreenMetadata;
+    cameraSource?: CameraMetadata;
     userEvents: UserEvents;
 }

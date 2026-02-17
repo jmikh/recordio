@@ -32,6 +32,7 @@ export const ScreenSettings = () => {
 
     // Collapsible visibility state
     const showCollapsibleSize = useUIStore(s => s.showCollapsibleSize);
+    const showCollapsibleToolbar = useUIStore(s => s.showCollapsibleToolbar);
     const showCollapsibleFrame = useUIStore(s => s.showCollapsibleFrame);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
@@ -156,18 +157,62 @@ export const ScreenSettings = () => {
                         label="Aspect Ratio"
                     />
 
-                    {/* Hide Toolbar Toggle — only for window recordings */}
-                    {project.screenSource.viewportRect && (
-                        <Toggle
-                            label="Hide Toolbar"
-                            value={screenConfig.toolbarMode !== 'show'}
-                            onChange={(hide) => updateSettings({
-                                screen: { ...screenConfig, toolbarMode: hide ? 'hide' : 'show' }
-                            })}
-                        />
-                    )}
                 </div>
             </CollapsibleCard>
+
+            {/* Area 2: Toolbar Settings — only when viewport exists */}
+            {project.screenSource.trackableContentRect && (() => {
+                const toolbarEnabled = screenConfig.toolbar.enabled;
+
+                // Preview items
+                const toolbarPreviewItems: PreviewItem[] = [];
+                toolbarPreviewItems.push({ type: 'text', content: toolbarEnabled ? 'On' : 'Off' });
+
+                return (
+                    <CollapsibleCard
+                        title="Toolbar"
+                        previewItems={toolbarPreviewItems}
+                        isExpanded={showCollapsibleToolbar}
+                        onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleToolbar', v)}
+                    >
+                        <div className="space-y-4">
+                            <Toggle
+                                label="Custom Toolbar"
+                                value={toolbarEnabled}
+                                onChange={(val) => updateSettings({
+                                    screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, enabled: val } }
+                                })}
+                            />
+
+                            {/* Sub-settings for custom toolbar */}
+                            {toolbarEnabled && (
+                                <div className="space-y-4">
+                                    <MultiToggle
+                                        options={[
+                                            { value: 'light', label: 'Light' },
+                                            { value: 'dark', label: 'Dark' },
+                                        ]}
+                                        value={screenConfig.toolbar.theme}
+                                        onChange={(val) => updateSettings({
+                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, theme: val as 'light' | 'dark' } }
+                                        })}
+                                    />
+                                    <MultiToggle
+                                        options={[
+                                            { value: 'short', label: 'Short URL' },
+                                            { value: 'full', label: 'Full URL' },
+                                        ]}
+                                        value={screenConfig.toolbar.urlMode}
+                                        onChange={(val) => updateSettings({
+                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, urlMode: val as 'full' | 'short' } }
+                                        })}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </CollapsibleCard>
+                );
+            })()}
 
             {/* Area 2: Frame Settings */}
             <CollapsibleCard

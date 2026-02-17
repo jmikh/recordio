@@ -1,4 +1,4 @@
-import { type Project, type SourceMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/spotlightScheduler';
@@ -17,15 +17,14 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 // Create a placeholder source for empty projects
-const createPlaceholderSource = (): SourceMetadata => ({
+const createPlaceholderSource = (): ScreenMetadata => ({
     id: '',
-    type: 'video',
     storageUrl: '',
     durationMs: 0,
     size: { width: 1920, height: 1080 },
+    recordingType: 'tab',
     hasAudio: false,
-    has_microphone: false,
-    name: ''
+    hasMicrophone: false,
 });
 
 /**
@@ -78,7 +77,11 @@ const createDefaultSettings = (): ProjectSettings => ({
 
     screen: {
         mode: 'border',
-        toolbarMode: 'hide',
+        toolbar: {
+            enabled: true,
+            theme: 'light',
+            urlMode: 'short',
+        },
         padding: 0.02,
         borderRadiusPx: 12,
         borderWidthPx: 1,
@@ -183,11 +186,12 @@ export class ProjectImpl {
      */
     static createFromSource(
         projectId: ID,
-        screenSource: SourceMetadata,
+        screenSource: ScreenMetadata,
         userEvents: UserEvents,
-        cameraSource?: SourceMetadata
+        cameraSource?: CameraMetadata,
+        rawName?: string
     ): Project {
-        let name = screenSource.name || "New Project";
+        let name = rawName || "New Project";
         if (name.length > 40) {
             name = name.substring(0, 37) + "...";
         }
@@ -218,8 +222,8 @@ export class ProjectImpl {
             settings.outputSize,
             settings.screen.padding,
             undefined,
-            screenSource.viewportRect,
-            settings.screen.toolbarMode ?? 'hide'
+            screenSource.trackableContentRect,
+            settings.screen.toolbar.enabled
         );
 
         const timeMapper = new TimeMapper(outputWindows);

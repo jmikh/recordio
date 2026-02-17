@@ -1,7 +1,10 @@
 import type { Project, Rect } from '../../types';
+import type { UrlChangeEvent } from '@shared/types';
 import { ViewMapper } from '../mappers/viewMapper';
+import type { TimeMapper } from '../mappers/timeMapper';
 import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
+import { drawToolbar, getUrlAtTime } from './toolbarPainter';
 
 const SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
@@ -13,14 +16,11 @@ const GLOW_BLUR = 25;
  */
 function defineScreenPath(
     ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
+    rect: Rect,
     radius: number
 ) {
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, radius);
+    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, radius);
 }
 
 /**
@@ -33,7 +33,9 @@ export function drawScreen(
     video: HTMLVideoElement,
     project: Project,
     effectiveViewport: Rect, // Injected from caller
-    deviceFrameImg: HTMLImageElement | null // Cached device frame image
+    deviceFrameImg: HTMLImageElement | null, // Cached device frame image
+    currentOutputTimeMs?: number, // Current playback time (output) for URL lookup
+    timeMapper?: TimeMapper, // For converting output time → source time
 ): { viewMapper: ViewMapper } {
     const screenConfig = project.settings.screen || {
         mode: 'device',
@@ -61,8 +63,8 @@ export function drawScreen(
     const viewMapper = new ViewMapper(
         inputSize, outputSize, padding,
         project.settings.screen.crop,
-        project.screenSource.viewportRect,
-        project.settings.screen.toolbarMode ?? 'hide'
+        project.screenSource.trackableContentRect,
+        project.settings.screen.toolbar.enabled
     );
 
     // 4. Calculate Rects
@@ -71,7 +73,6 @@ export function drawScreen(
     if (renderRects) {
         // Note: borderRadius scaling happens in the Project.scaleToResolution function
 
-        // Calculate Project Rect (Full Video on Canvas)
         // Calculate Project Rect (Logical Screen on Canvas)
         const logicalScreenRect = viewMapper.getProjectedSubjectRect(effectiveViewport);
         const originX = logicalScreenRect.x;
@@ -81,6 +82,24 @@ export function drawScreen(
 
         const isDeviceMode = screenConfig.mode === 'device';
 
+        // Compute the full content rect (toolbar + video) from ViewMapper
+        // Scale toolbar height by zoom factor so it tracks with the content
+        const zoomScale = viewMapper.getZoomScale(effectiveViewport);
+        const toolbarH = viewMapper.toolbarOutputHeight * zoomScale;
+        const hasCustomToolbar = toolbarH > 0;
+        const contentRect: Rect = {
+            x: originX,
+            y: originY - toolbarH,
+            width: projectedW,
+            height: projectedH + toolbarH
+        };
+        const toolbarRect: Rect = {
+            x: originX,
+            y: originY - toolbarH,
+            width: projectedW,
+            height: toolbarH
+        };
+
         ctx.save();
 
         if (isDeviceMode) {
@@ -88,23 +107,31 @@ export function drawScreen(
             // MODE: DEVICE FRAME
             // ============================
 
-            // Just draw video directly (no clipping/rounding, frame covers edges)
+            // Draw custom toolbar (if active), then video
+            if (hasCustomToolbar) {
+                const urlChanges = project.userEvents?.urlChanges as UrlChangeEvent[] | undefined;
+                const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
+                    ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
+                    : undefined;
+                const toolbarSettings = project.settings.screen.toolbar;
+                const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
+                    ? getUrlAtTime(urlChanges, sourceTimeMs, project.name, toolbarSettings.urlMode)
+                    : project.name;
+
+                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
+            }
+
+            // Draw video content (positioned by ViewMapper's contentRect)
             ctx.drawImage(
                 video,
                 renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
                 renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
             );
 
-            // Draw Device Frame Overlay
+            // Draw Device Frame Overlay — wraps the full frame (toolbar + content)
             const deviceFrame = getDeviceFrame(screenConfig.deviceFrameId);
             if (deviceFrame && deviceFrameImg?.complete) {
-                // Calculate video screen bounds in canvas coordinates
-                const videoRect = viewMapper.projectSourceToOutput(
-                    { x: 0, y: 0, width: inputSize.width, height: inputSize.height },
-                    effectiveViewport
-                );
-
-                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, videoRect);
+                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, contentRect);
             }
 
         } else {
@@ -119,13 +146,12 @@ export function drawScreen(
                 hasGlow = false
             } = screenConfig;
 
-            // borderRadius is in output pixels, clamp to half of smaller dimension
             const renderBorderWidth = borderWidth;
 
             // --- PASS 1: GLOW ---
             if (hasGlow) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
+                defineScreenPath(ctx, contentRect, borderRadius);
                 ctx.shadowColor = borderColor;
                 ctx.shadowBlur = GLOW_BLUR;
                 ctx.fillStyle = borderColor;
@@ -142,11 +168,11 @@ export function drawScreen(
             // --- PASS 2: SHADOW ---
             if (hasShadow) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
+                defineScreenPath(ctx, contentRect, borderRadius);
                 ctx.shadowColor = SHADOW_COLOR;
                 ctx.shadowBlur = SHADOW_BLUR;
                 ctx.shadowOffsetY = SHADOW_OFFSET_Y;
-                ctx.fillStyle = 'black'; // Shadow caster color
+                ctx.fillStyle = 'black';
                 ctx.fill();
 
                 if (renderBorderWidth > 0) {
@@ -157,10 +183,26 @@ export function drawScreen(
                 ctx.restore();
             }
 
-            // --- PASS 3: VIDEO CONTENT (Clipped) ---
+            // --- PASS 3: VIDEO CONTENT + TOOLBAR (Clipped) ---
             ctx.save();
-            defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
+            defineScreenPath(ctx, contentRect, borderRadius);
             ctx.clip();
+
+            // Draw custom toolbar in the top portion
+            if (hasCustomToolbar) {
+                const urlChanges = project.userEvents?.urlChanges as UrlChangeEvent[] | undefined;
+                const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
+                    ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
+                    : undefined;
+                const toolbarSettings = project.settings.screen.toolbar;
+                const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
+                    ? getUrlAtTime(urlChanges, sourceTimeMs, project.name, toolbarSettings.urlMode)
+                    : project.name;
+
+                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
+            }
+
+            // Draw video content (destRect is already positioned below toolbar by ViewMapper)
             ctx.drawImage(
                 video,
                 renderRects.sourceRect.x, renderRects.sourceRect.y, renderRects.sourceRect.width, renderRects.sourceRect.height,
@@ -171,7 +213,7 @@ export function drawScreen(
             // --- PASS 4: BORDER ---
             if (renderBorderWidth > 0) {
                 ctx.save();
-                defineScreenPath(ctx, originX, originY, projectedW, projectedH, borderRadius);
+                defineScreenPath(ctx, contentRect, borderRadius);
                 ctx.lineWidth = renderBorderWidth;
                 ctx.strokeStyle = borderColor;
                 ctx.stroke();

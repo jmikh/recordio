@@ -31,73 +31,86 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const dpr = window.devicePixelRatio || 1;
+        let cancelled = false;
 
-        // Full logical width of the ruler
-        const fullWidth = Math.max(totalWidth, (containerWidth || window.innerWidth) - headerWidth);
+        const draw = () => {
+            if (cancelled) return;
 
-        // Viewport-aware: only render the visible portion + buffer
-        const BUFFER = 200; // extra px each side for smooth scroll
-        const viewStart = Math.max(0, scrollLeft - BUFFER);
-        const viewEnd = Math.min(fullWidth, scrollLeft + (containerWidth || window.innerWidth) + BUFFER);
-        const viewWidth = viewEnd - viewStart;
+            const dpr = window.devicePixelRatio || 1;
 
-        canvas.width = viewWidth * dpr;
-        canvas.height = height * dpr;
-        canvas.style.width = `${viewWidth}px`;
-        canvas.style.height = `${height}px`;
-        // Position the canvas so it covers the visible area
-        canvas.style.transform = `translateX(${viewStart}px)`;
+            // Full logical width of the ruler
+            const fullWidth = Math.max(totalWidth, (containerWidth || window.innerWidth) - headerWidth);
 
-        ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, viewWidth, height);
+            // Viewport-aware: only render the visible portion + buffer
+            const BUFFER = 200; // extra px each side for smooth scroll
+            const viewStart = Math.max(0, scrollLeft - BUFFER);
+            const viewEnd = Math.min(fullWidth, scrollLeft + (containerWidth || window.innerWidth) + BUFFER);
+            const viewWidth = viewEnd - viewStart;
 
-        // Read theme colors from semantic tokens
-        const style = getComputedStyle(document.documentElement);
-        const textColor = style.getPropertyValue('--text-muted').trim();
-        const tickColor = style.getPropertyValue('--text-disabled').trim();
+            canvas.width = viewWidth * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = `${viewWidth}px`;
+            canvas.style.height = `${height}px`;
+            // Position the canvas so it covers the visible area
+            canvas.style.transform = `translateX(${viewStart}px)`;
 
-        ctx.fillStyle = textColor;
-        ctx.strokeStyle = tickColor;
-        ctx.font = `10px ${style.getPropertyValue('--font-sans') || 'sans-serif'}`;
-        ctx.textBaseline = 'top';
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, viewWidth, height);
 
-        let majorInterval = 1000;
-        let minorInterval = 100;
+            // Read theme colors from semantic tokens
+            const style = getComputedStyle(document.documentElement);
+            const textColor = style.getPropertyValue('--text-muted').trim();
+            const tickColor = style.getPropertyValue('--text-disabled').trim();
 
-        if (pixelsPerSec < 20) {
-            majorInterval = 5000;
-            minorInterval = 1000;
-        } else if (pixelsPerSec < 50) {
-            majorInterval = 2000;
-            minorInterval = 500;
-        }
+            // Strip quotes from CSS variable so canvas font string is well-formed
+            const fontFamily = (style.getPropertyValue('--font-sans') || 'sans-serif').replace(/['"]/g, '');
 
-        // Calculate visible time range
-        const visibleDurationMs = (fullWidth / pixelsPerSec) * 1000;
+            ctx.fillStyle = textColor;
+            ctx.strokeStyle = tickColor;
+            ctx.font = `10px ${fontFamily}`;
+            ctx.textBaseline = 'top';
 
-        // Align first tick to a minor-interval boundary at or before the view start
-        const startTimeMs = Math.floor((viewStart / pixelsPerSec) * 1000 / minorInterval) * minorInterval;
+            let majorInterval = 1000;
+            let minorInterval = 100;
 
-        ctx.beginPath();
-        for (let t = startTimeMs; t <= visibleDurationMs; t += minorInterval) {
-            const xAbsolute = (t / 1000) * pixelsPerSec;
-            // Stop once past the visible area
-            if (xAbsolute > viewEnd) break;
-            // Position relative to our viewport canvas
-            const x = xAbsolute - viewStart;
-
-            if (t % majorInterval === 0) {
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, height);
-                ctx.fillText(formatTimeCode(t), x + 4, 2);
-            } else {
-                ctx.moveTo(x, height - 6);
-                ctx.lineTo(x, height);
+            if (pixelsPerSec < 20) {
+                majorInterval = 5000;
+                minorInterval = 1000;
+            } else if (pixelsPerSec < 50) {
+                majorInterval = 2000;
+                minorInterval = 500;
             }
-        }
-        ctx.stroke();
 
+            // Calculate visible time range
+            const visibleDurationMs = (fullWidth / pixelsPerSec) * 1000;
+
+            // Align first tick to a minor-interval boundary at or before the view start
+            const startTimeMs = Math.floor((viewStart / pixelsPerSec) * 1000 / minorInterval) * minorInterval;
+
+            ctx.beginPath();
+            for (let t = startTimeMs; t <= visibleDurationMs; t += minorInterval) {
+                const xAbsolute = (t / 1000) * pixelsPerSec;
+                // Stop once past the visible area
+                if (xAbsolute > viewEnd) break;
+                // Position relative to our viewport canvas
+                const x = xAbsolute - viewStart;
+
+                if (t % majorInterval === 0) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.fillText(formatTimeCode(t), x + 4, 2);
+                } else {
+                    ctx.moveTo(x, height - 6);
+                    ctx.lineTo(x, height);
+                }
+            }
+            ctx.stroke();
+        };
+
+        // Wait for web fonts (Satoshi) to load before drawing
+        document.fonts.ready.then(draw);
+
+        return () => { cancelled = true; };
     }, [totalWidth, pixelsPerSec, height, scrollLeft, containerWidth, headerWidth, theme]);
 
     return (

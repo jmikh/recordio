@@ -38,6 +38,10 @@ function App() {
   // Live timer for recording duration
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
 
+  // Synced media state (from recording session storage)
+  const [recordingHasAudio, setRecordingHasAudio] = useState(false);
+  const [recordingHasCamera, setRecordingHasCamera] = useState(false);
+
   // Update recording duration every second
   useEffect(() => {
     if (!isRecording || !recordingStartTime) {
@@ -64,6 +68,8 @@ function App() {
       if (state && (state as any).isRecording) {
         setIsRecording(true);
         setRecordingStartTime((state as any).startTime || 0);
+        setRecordingHasAudio((state as any).hasAudio || false);
+        setRecordingHasCamera((state as any).hasCamera || false);
       }
     });
 
@@ -73,6 +79,8 @@ function App() {
         const newState = changes[STORAGE_KEYS.RECORDING_STATE].newValue;
         setIsRecording(newState?.isRecording || false);
         setRecordingStartTime(newState?.startTime || 0);
+        setRecordingHasAudio(newState?.hasAudio || false);
+        setRecordingHasCamera(newState?.hasCamera || false);
       }
     };
     chrome.storage.onChanged.addListener(storageListener);
@@ -85,6 +93,8 @@ function App() {
       if (response && response.isRecording) {
         setIsRecording(true);
         setRecordingStartTime(response.startTime || 0);
+        setRecordingHasAudio(response.hasAudio || false);
+        setRecordingHasCamera(response.hasCamera || false);
       }
     });
 
@@ -398,6 +408,8 @@ function App() {
           <RecordingStatus
             recordingDuration={recordingDuration}
             stopRecording={stopRecording}
+            hasAudio={recordingHasAudio}
+            hasCamera={recordingHasCamera}
           />
         )}
       </div>

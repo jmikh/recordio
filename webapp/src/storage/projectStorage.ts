@@ -581,15 +581,15 @@ export class ProjectStorage {
 // Import from RawRecording (for handoff flow)
 // ============================================
 
-import type { SourceMetadata, UserEvents } from '../types';
+import type { ScreenMetadata, CameraMetadata, UserEvents } from '../types';
 import { ProjectImpl } from '../core/Project';
 
 interface RawRecording {
     id: string;
     name: string;
     timestamp: number;
-    screenSource: SourceMetadata;
-    cameraSource?: SourceMetadata;
+    screenSource: ScreenMetadata;
+    cameraSource?: CameraMetadata;
     userEvents: UserEvents;
 }
 
@@ -611,13 +611,13 @@ export async function importFromRawRecording(
     }
 
     // 2. Build source metadata with new storage URLs
-    const screenSource: SourceMetadata = {
+    const screenSource: ScreenMetadata = {
         ...recording.screenSource,
         id: `src-${projectId}-screen`,
         storageUrl: `recordio-blob://${screenBlobId}`,
     };
 
-    let cameraSource: SourceMetadata | undefined;
+    let cameraSource: CameraMetadata | undefined;
     if (recording.cameraSource && cameraBlobId) {
         cameraSource = {
             ...recording.cameraSource,
@@ -631,7 +631,8 @@ export async function importFromRawRecording(
         projectId,
         screenSource,
         recording.userEvents,
-        cameraSource
+        cameraSource,
+        recording.name
     );
 
     // 4. Save project

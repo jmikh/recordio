@@ -5,7 +5,7 @@ import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
-import type { Project, SourceMetadata } from '../../types';
+import type { Project, SourceMetadata, ScreenMetadata } from '../../types';
 import fullLogoPng from '@shared/assets/fulllogo-dark.png';
 
 export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
@@ -137,7 +137,7 @@ export class ExportManager {
 
             // Load video elements for screen and camera sources
             for (const source of sources) {
-                if (source.type === 'video' && source.runtimeUrl) {
+                if (source.runtimeUrl) {
                     videoElements[source.id] = await loadVideo(source.runtimeUrl);
                 }
             }
@@ -179,10 +179,15 @@ export class ExportManager {
 
             // --- Audio Source Filtering (Mute Settings) ---
             const audioSettings = renderProject.settings.audio;
-            const isSingleMode = renderProject.screenSource.has_microphone && !renderProject.cameraSource;
+            const isSingleMode = renderProject.screenSource.hasMicrophone && !renderProject.cameraSource;
 
             const filteredSources = sources.filter(source => {
-                if (!source.hasAudio) return false;
+                // Screen has hasAudio; camera only has hasMicrophone
+                const isScreen = source.id === renderProject.screenSource.id;
+                const hasAnyAudio = isScreen
+                    ? (source as ScreenMetadata).hasAudio
+                    : source.hasMicrophone;
+                if (!hasAnyAudio) return false;
 
                 // Single mode: "Recording Audio" toggle controls the combined screen track
                 if (isSingleMode && source.id === renderProject.screenSource.id && audioSettings?.muteScreenAudio) {

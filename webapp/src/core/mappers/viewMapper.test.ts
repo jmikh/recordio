@@ -94,66 +94,47 @@ describe('ViewMapper', () => {
         expect(p3.visible).toBe(false);
     });
 
-    it('Case 5: Viewport offset - hide mode (toolbar hidden, viewport as crop)', () => {
+    it('Case 5: Toolbar disabled - no user crop (viewport as reference only)', () => {
         // Full window: 1920x1180, viewport at y=100 (100px toolbar)
-        const viewportRect = { x: 0, y: 100, width: 1920, height: 1080 };
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
         const mapper = new ViewMapper(
             { width: 1920, height: 1180 },
             { width: 1920, height: 1080 },
             0,
             undefined,
-            viewportRect,
-            'hide' // default
+            trackableContentRect,
+            false // toolbar disabled
         );
 
-        // In 'hide' mode, viewport acts as a crop
-        expect(mapper.contentRect.width).toBe(1920);
-        expect(mapper.contentRect.height).toBe(1080);
-
-        // eventToOutputPoint: viewport coord (0,0) → frame (0,100) → crop-relative (0,0) → output (0,0)
-        const p1 = mapper.eventToOutputPoint({ x: 0, y: 0 });
-        expect(p1.x).toBeCloseTo(0, 0);
-        expect(p1.y).toBeCloseTo(0, 0);
-
-        // eventToOutputPoint: viewport center (960, 540) → frame (960, 640) → output (960, 540)
-        const p2 = mapper.eventToOutputPoint({ x: 960, y: 540 });
-        expect(p2.x).toBeCloseTo(960, 0);
-        expect(p2.y).toBeCloseTo(540, 0);
-
-        // sourceToOutputPoint (frame geometry): frame (0, 100) = top of viewport crop
-        // → crop-relative (0, 0) → output (0, 0)
-        const p3 = mapper.sourceToOutputPoint({ x: 0, y: 100 });
-        expect(p3.x).toBeCloseTo(0, 0);
-        expect(p3.y).toBeCloseTo(0, 0);
-    });
-
-    it('Case 6: Viewport offset - show mode (full frame visible)', () => {
-        // Full window: 1920x1180, viewport at y=100 (toolbar visible)
-        const viewportRect = { x: 0, y: 100, width: 1920, height: 1080 };
-        const mapper = new ViewMapper(
-            { width: 1920, height: 1180 },
-            { width: 1920, height: 1080 },
-            0,
-            undefined,
-            viewportRect,
-            'show'
-        );
-
-        // In 'show' mode, full frame is the input (no crop from viewport)
-        // 1920x1180 input fit into 1920x1080 output → height-limited
+        // With toolbar disabled, no crop is applied → full source is rendered
+        // 1920x1180 fit into 1920x1080 → letterboxed
         expect(mapper.contentRect.height).toBe(1080);
         expect(mapper.contentRect.width).toBeLessThan(1920); // Width shrinks to fit aspect ratio
 
-        // eventToOutputPoint: viewport (0,0) → frame (0,100)
-        const p1 = mapper.eventToOutputPoint({ x: 0, y: 0 });
-        // The frame coord (0, 100) should be slightly below the top of output
-        expect(p1.y).toBeGreaterThan(0);
-
-        // sourceToOutputPoint: frame (0,0) = top-left of full frame (no offset applied)
+        // sourceToOutputPoint: frame (0,0) = top-left of full frame
         const p2 = mapper.sourceToOutputPoint({ x: 0, y: 0 });
-        // Should be at top-left of content rect (has pillarbox + letterbox padding)
         expect(p2.x).toBeCloseTo(mapper.contentRect.x, 0);
         expect(p2.y).toBeCloseTo(mapper.contentRect.y, 0);
+    });
+
+    it('Case 6: Toolbar enabled - no user crop (auto-crops to viewport)', () => {
+        // Full window: 1920x1180, viewport at y=100 (100px toolbar)
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
+        const mapper = new ViewMapper(
+            { width: 1920, height: 1180 },
+            { width: 1920, height: 1080 },
+            0,
+            undefined,
+            trackableContentRect,
+            true // toolbar enabled
+        );
+
+        // With toolbar enabled and no crop, effective crop starts at trackableContentRect.y
+        // Crop: {x:0, y:100, w:1920, h:1080} + toolbar height on top
+        expect(mapper.cropRect).toBeDefined();
+        expect(mapper.cropRect!.y).toBe(100);
+        expect(mapper.cropRect!.height).toBe(1080);
+        expect(mapper.toolbarOutputHeight).toBeGreaterThan(0);
     });
 
     it('Case 7: projectSourceToOutput rect-based projection', () => {
@@ -173,27 +154,82 @@ describe('ViewMapper', () => {
         expect(result.height).toBeCloseTo(500, 0);
     });
 
-    it('Case 8: projectEventToOutput applies offset', () => {
-        const viewportRect = { x: 0, y: 100, width: 1920, height: 1080 };
+    it('Case 8: projectEventToOutput applies offset (toolbar disabled)', () => {
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
         const mapper = new ViewMapper(
             { width: 1920, height: 1180 },
             { width: 1920, height: 1080 },
             0,
             undefined,
-            viewportRect,
-            'hide'
+            trackableContentRect,
+            false // toolbar disabled
         );
 
-        const viewport = { x: 0, y: 0, width: 1920, height: 1080 };
-        // Event rect at (100, 200) in viewport coords, 400x300
-        const eventRect = { x: 100, y: 200, width: 400, height: 300 };
-        const result = mapper.projectEventToOutput(eventRect, viewport);
+        // eventToOutputPoint: viewport coord (0,0) → frame (0,100)
+        const p1 = mapper.eventToOutputPoint({ x: 0, y: 0 });
+        // The frame coord (0, 100) should be slightly below the top of output
+        expect(p1.y).toBeGreaterThan(0);
+    });
 
-        // In hide mode, viewport IS the crop (1920x1080 → 1920x1080 output, scale 1:1)
-        // Event (100, 200) → frame (100, 300) → crop-relative (100, 200) → output (100, 200)
-        expect(result.x).toBeCloseTo(100, 0);
-        expect(result.y).toBeCloseTo(200, 0);
-        expect(result.width).toBeCloseTo(400, 0);
-        expect(result.height).toBeCloseTo(300, 0);
+    it('Case 9: Toolbar enabled + user crop includes toolbar area → auto-clamp', () => {
+        // Full window: 1920x1180, viewport at y=100 (100px toolbar)
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
+        // User's crop starts at y=50 (includes part of toolbar)
+        const userCrop = { x: 0, y: 50, width: 1920, height: 1080 };
+        const mapper = new ViewMapper(
+            { width: 1920, height: 1180 },
+            { width: 1920, height: 1080 },
+            0,
+            userCrop,
+            trackableContentRect,
+            true
+        );
+
+        // Effective crop should be clamped to y=100 (trackableContentRect.y), losing 50px
+        expect(mapper.cropRect!.y).toBe(100);
+        expect(mapper.cropRect!.height).toBe(1030); // 1080 - 50 lost
+        expect(mapper.toolbarOutputHeight).toBeGreaterThan(0);
+    });
+
+    it('Case 10: Toolbar enabled + user crop already excludes toolbar → use as-is', () => {
+        // Full window: 1920x1180, viewport at y=100
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
+        // User crop starts below toolbar (at y=200), cropping into content
+        const userCrop = { x: 100, y: 200, width: 1600, height: 800 };
+        const mapper = new ViewMapper(
+            { width: 1920, height: 1180 },
+            { width: 1920, height: 1080 },
+            0,
+            userCrop,
+            trackableContentRect,
+            true
+        );
+
+        // User's crop already excludes toolbar, so use as-is
+        expect(mapper.cropRect!.x).toBe(100);
+        expect(mapper.cropRect!.y).toBe(200);
+        expect(mapper.cropRect!.width).toBe(1600);
+        expect(mapper.cropRect!.height).toBe(800);
+        expect(mapper.toolbarOutputHeight).toBeGreaterThan(0);
+    });
+
+    it('Case 11: Toolbar disabled + user crop → use crop as-is, no toolbar', () => {
+        const trackableContentRect = { x: 0, y: 100, width: 1920, height: 1080 };
+        const userCrop = { x: 100, y: 50, width: 1600, height: 900 };
+        const mapper = new ViewMapper(
+            { width: 1920, height: 1180 },
+            { width: 1920, height: 1080 },
+            0,
+            userCrop,
+            trackableContentRect,
+            false
+        );
+
+        // Toolbar disabled: user crop used as-is, no clamping, no toolbar
+        expect(mapper.cropRect!.x).toBe(100);
+        expect(mapper.cropRect!.y).toBe(50);
+        expect(mapper.cropRect!.width).toBe(1600);
+        expect(mapper.cropRect!.height).toBe(900);
+        expect(mapper.toolbarOutputHeight).toBe(0);
     });
 });

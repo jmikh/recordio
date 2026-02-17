@@ -55,22 +55,27 @@ export interface DragEvent extends BaseEvent {
     endTime: number;
 }
 
+export interface UrlChangeEvent extends BaseEvent {
+    type: typeof EventType.URLCHANGE;
+    url: string; // window.location.href at time of navigation
+}
+
 /**
  * User interaction events recorded during screen capture.
  */
 export interface UserEvents {
     /**
-     * Viewport region within the recorded video frame.
-     * Mirrors screenSource.viewportRect. Absent for tab recordings.
+     * Trackable content area within the recorded video frame (JavaScript-monitored region).
+     * Mirrors screenSource.trackableContentRect. Absent for tab recordings.
      */
-    viewportRect?: Rect;
+    trackableContentRect?: Rect;
     mouseClicks: BaseEvent[];
     mousePositions: BaseEvent[];
     keyboardEvents: KeyboardEvent[];
     drags: DragEvent[];
     scrolls: BaseEvent[];
     typingEvents: BaseEvent[];
-    urlChanges: BaseEvent[];
+    urlChanges: UrlChangeEvent[];
     hoveredCards: HoveredCardEvent[];
 
     /**

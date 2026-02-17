@@ -82,6 +82,7 @@ export class EventRecorder {
         this.isRecording = true;
         this.attachListeners();
         this.hoveredCardDetector.start();
+        if (this.isActive()) this.sendUrlEventDirectly();
         console.log("[ContentRecorder] Started capturing events.");
     }
 
@@ -366,6 +367,7 @@ export class EventRecorder {
         this.sendMessage(EventType.URLCHANGE, {
             timestamp: this.getRelativeTime() + 1,
             mousePos: this.lastMousePos.mousePos,
+            url: window.location.href,
         }, true);
     }
 
