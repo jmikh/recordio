@@ -69,40 +69,37 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
             <button
                 onClick={handleToggle}
                 className="
-                    w-full flex items-center justify-between
-                    h-11
-                    px-4
+                    w-full flex items-center flex-wrap
+                    min-h-[2.75rem]
+                    px-4 py-2 pr-8
                     text-left
                     transition-colors
                     cursor-pointer
+                    relative
                 "
             >
-                <span className="text-sm font-medium text-text-highlighted">
+                <span className="text-sm font-medium text-text-highlighted mr-4 shrink-0">
                     {title}
                 </span>
 
                 {/* Preview items - only shown when collapsed, right-aligned */}
                 <div
                     className={`
-                        flex items-center gap-2 ml-auto mr-3
+                        flex items-center flex-wrap gap-1 ml-auto justify-end
                         transition-opacity duration-200
                         ${expanded ? 'opacity-0' : 'opacity-100'}
                     `}
                 >
-                    {previewItems.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs text-text-muted">
-                            {previewItems.map((item, index) => (
-                                <React.Fragment key={index}>
-                                    {index > 0 && <span className="text-text-disabled">·</span>}
-                                    {item.type === 'text' ? (
-                                        <span>{item.content}</span>
-                                    ) : (
-                                        item.content
-                                    )}
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    )}
+                    {previewItems.length > 0 && previewItems.map((item, index) => (
+                        <span key={index} className="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap">
+                            {index > 0 && <span className="text-text-disabled">·</span>}
+                            {item.type === 'text' ? (
+                                <span>{item.content}</span>
+                            ) : (
+                                item.content
+                            )}
+                        </span>
+                    ))}
                 </div>
 
                 {/* Chevron */}
@@ -119,6 +116,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                         text-text-muted
                         transition-transform
                         hover:text-text-main
+                        absolute right-4 top-1/2 -translate-y-1/2
                         ${expanded ? 'rotate-180' : 'rotate-0'}
                     `}
                     style={{ transitionDuration: `${ANIMATION_DURATION}ms` }}

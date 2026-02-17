@@ -6,6 +6,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
+import { MdDarkMode, MdLightMode } from 'react-icons/md';
 
 interface Resolution {
     label: string;
@@ -167,6 +168,14 @@ export const ScreenSettings = () => {
                 // Preview items
                 const toolbarPreviewItems: PreviewItem[] = [];
                 toolbarPreviewItems.push({ type: 'text', content: toolbarEnabled ? 'On' : 'Off' });
+                if (toolbarEnabled) {
+                    toolbarPreviewItems.push({
+                        type: 'custom',
+                        content: screenConfig.toolbar.theme === 'dark'
+                            ? <MdDarkMode size={14} className="text-text-muted" />
+                            : <MdLightMode size={14} className="text-text-muted" />
+                    });
+                }
 
                 return (
                     <CollapsibleCard
@@ -187,24 +196,18 @@ export const ScreenSettings = () => {
                             {/* Sub-settings for custom toolbar */}
                             {toolbarEnabled && (
                                 <div className="space-y-4">
-                                    <MultiToggle
-                                        options={[
-                                            { value: 'light', label: 'Light' },
-                                            { value: 'dark', label: 'Dark' },
-                                        ]}
-                                        value={screenConfig.toolbar.theme}
+                                    <Toggle
+                                        label="Dark Mode"
+                                        value={screenConfig.toolbar.theme === 'dark'}
                                         onChange={(val) => updateSettings({
-                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, theme: val as 'light' | 'dark' } }
+                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, theme: val ? 'dark' : 'light' } }
                                         })}
                                     />
-                                    <MultiToggle
-                                        options={[
-                                            { value: 'short', label: 'Short URL' },
-                                            { value: 'full', label: 'Full URL' },
-                                        ]}
-                                        value={screenConfig.toolbar.urlMode}
+                                    <Toggle
+                                        label="Shorten URL"
+                                        value={screenConfig.toolbar.urlMode === 'short'}
                                         onChange={(val) => updateSettings({
-                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, urlMode: val as 'full' | 'short' } }
+                                            screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, urlMode: val ? 'short' : 'full' } }
                                         })}
                                     />
                                 </div>
@@ -222,13 +225,10 @@ export const ScreenSettings = () => {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleFrame', v)}
             >
                 <div className="space-y-4">
-                    <MultiToggle
-                        options={[
-                            { value: 'device', label: 'Device' },
-                            { value: 'border', label: 'Border' }
-                        ]}
-                        value={screenConfig.mode}
-                        onChange={(val) => handleModeChange(val as any)}
+                    <Toggle
+                        label="Device Frame"
+                        value={screenConfig.mode === 'device'}
+                        onChange={(val) => handleModeChange(val ? 'device' : 'border')}
                     />
 
                     {/* Device Selection - Always mounted to keep images loaded */}

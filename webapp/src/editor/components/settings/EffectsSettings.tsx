@@ -2,7 +2,7 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip, type PreviewItem } from '@shared/components';
 import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
 
@@ -62,6 +62,19 @@ export const EffectsSettings = () => {
             {/* MOUSE SETTINGS */}
             <CollapsibleCard
                 title="Mouse"
+                previewItems={[
+                    {
+                        type: 'custom',
+                        content: (
+                            <div
+                                className="w-4 h-4 rounded-full border border-border"
+                                style={{ backgroundColor: mouseSettings.color }}
+                            />
+                        )
+                    },
+                    { type: 'text', content: mouseSettings.effectType === 'ring' ? 'Ring' : 'Circle' },
+                    ...(mouseSettings.soundEnabled ? [{ type: 'text' as const, content: 'Sound' }] : []),
+                ]}
                 isExpanded={showCollapsibleMouse}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMouse', v)}
             >
@@ -151,6 +164,13 @@ export const EffectsSettings = () => {
             {/* KEYBOARD SETTINGS */}
             <CollapsibleCard
                 title="Keyboard"
+                previewItems={[
+                    { type: 'text', content: (keyboardSettings.showHotkeys ?? true) ? 'On' : 'Off' },
+                    ...((keyboardSettings.showHotkeys ?? true) ? [
+                        { type: 'text' as const, content: (keyboardSettings.hotkeysPlacement ?? 'top') === 'top' ? 'Top' : 'Bottom' },
+                        { type: 'text' as const, content: `${(keyboardSettings.hotkeysSize ?? 1.0).toFixed(1)}×` },
+                    ] : []),
+                ]}
                 isExpanded={showCollapsibleEffects}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleEffects', v)}
             >

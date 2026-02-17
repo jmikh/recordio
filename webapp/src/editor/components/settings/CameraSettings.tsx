@@ -75,26 +75,20 @@ export const CameraSettings = () => {
         borderPreviewItems.push({ type: 'text', content: 'Feather' });
         borderPreviewItems.push({ type: 'text', content: `${Math.round(featherAmount * 100)}%` });
     } else {
-        // Border mode: show color, thickness, and effect
-        // Only show color if there's a visible border or glow effect
-        if (borderWidthPx > 0 || hasGlow) {
-            borderPreviewItems.push({
-                type: 'custom',
-                content: (
-                    <div
-                        className="w-5 h-5 rounded-full border border-border"
-                        style={{ backgroundColor: borderColor }}
-                    />
-                )
-            });
-        }
+        // Border mode: always show color, thickness, and effect
+        borderPreviewItems.push({
+            type: 'custom',
+            content: (
+                <div
+                    className="w-5 h-5 rounded-full border border-border"
+                    style={{ backgroundColor: borderColor }}
+                />
+            )
+        });
 
-        // Only show pixel count if there's a border
-        if (borderWidthPx > 0) {
-            borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
-        }
+        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
 
-        // Add effect type (shadow/glow) only if enabled
+        // Add effect type (shadow/glow) if enabled
         if (hasShadow) {
             borderPreviewItems.push({ type: 'text', content: 'Shadow' });
         } else if (hasGlow) {
@@ -151,7 +145,8 @@ export const CameraSettings = () => {
                 <CollapsibleCard
                     title="Style"
                     previewItems={[
-                        ...(mirrored ? [{ type: 'text' as const, content: 'Mirrored' }] : []),
+                        ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
+                        ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
                         { type: 'text', content: `${cropZoom.toFixed(1)}x` }
                     ]}
                     isExpanded={showCollapsibleShape}
@@ -160,7 +155,7 @@ export const CameraSettings = () => {
                     <div className="flex flex-col gap-4">
                         {/* Mirrored Toggle */}
                         <Toggle
-                            label="Mirrored"
+                            label="Mirror"
                             value={mirrored}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, mirrored: val } })}
                         />
