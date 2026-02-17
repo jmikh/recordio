@@ -47,6 +47,9 @@ export interface CameraSettings extends StyleSettings {
 
     /** Scale factor when shrunk (0.25 = 25%, 0.5 = 50%, 0.75 = 75%). Default: 0.5 */
     shrinkScale?: number;
+
+    /** Horizontally flip the camera feed */
+    mirrored?: boolean;
 }
 
 // ==========================================

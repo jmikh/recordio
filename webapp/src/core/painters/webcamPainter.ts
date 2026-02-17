@@ -28,7 +28,8 @@ export function drawWebcam(
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
-        cropZoom = 1
+        cropZoom = 1,
+        mirrored = false
     } = settings;
 
     // Calculate Crop (Object-Fit: Cover)
@@ -93,7 +94,15 @@ export function drawWebcam(
         ctx.closePath();
     };
 
+
     ctx.save();
+
+    // Apply mirror transformation if enabled
+    if (mirrored) {
+        ctx.translate(x + width, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-x, 0);
+    }
 
     // 1. Glow Pass
     if (hasGlow) {

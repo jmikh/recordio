@@ -16,6 +16,7 @@ export const CameraSettings = () => {
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Collapsible visibility state
+    const showCollapsibleCameraShape = useUIStore(s => s.showCollapsibleCameraShape);
     const showCollapsibleShape = useUIStore(s => s.showCollapsibleShape);
     const showCollapsibleBorder = useUIStore(s => s.showCollapsibleBorder);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
@@ -60,7 +61,8 @@ export const CameraSettings = () => {
         hasGlow = false,
         cropZoom = 1,
         autoShrink = false,
-        shrinkScale = 0.5
+        shrinkScale = 0.5,
+        mirrored = false
     } = cameraConfig;
 
     // Build preview items for collapsed border state
@@ -94,22 +96,9 @@ export const CameraSettings = () => {
     return (
         <div className="flex flex-col gap-3 relative">
             <div className="flex flex-col gap-3">
-                <div className="bg-surface-inset rounded-lg p-4">
-                    <div className="flex flex-col gap-1">
-                        <DefaultButton
-                            onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                            className={`w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
-                        >
-                            {isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight />}
-                            {isEditingCamera ? 'Done' : 'Adjust'}
-                        </DefaultButton>
-                        <span className="text-xs text-text-disabled text-center">Size, Position, Corner Radius</span>
-                    </div>
-                </div>
-
-                {/* Style Settings */}
+                {/* Shape Settings */}
                 <CollapsibleCard
-                    title="Style"
+                    title="Shape"
                     previewItems={[
                         {
                             type: 'custom',
@@ -118,14 +107,13 @@ export const CameraSettings = () => {
                                 : shape === 'square'
                                     ? <FaRegSquare size={12} className="text-text-muted" />
                                     : <FaRegCircle size={12} className="text-text-muted" />
-                        },
-                        { type: 'text', content: `${cropZoom.toFixed(1)}x` }
+                        }
                     ]}
-                    isExpanded={showCollapsibleShape}
-                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleShape', v)}
+                    isExpanded={showCollapsibleCameraShape}
+                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCameraShape', v)}
                 >
                     <div className="flex flex-col gap-4">
-                        {/* Shape */}
+                        {/* Shape Toggle */}
                         <MultiToggle
                             options={[
                                 { value: 'rect', label: 'Free' },
@@ -134,6 +122,38 @@ export const CameraSettings = () => {
                             ]}
                             value={shape}
                             onChange={(val) => handleShapeChange(val as any)}
+                        />
+
+                        {/* Adjust Button */}
+                        <div className="flex flex-col gap-1">
+                            <DefaultButton
+                                onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
+                                className={`w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
+                            >
+                                {isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight />}
+                                {isEditingCamera ? 'Done' : 'Adjust'}
+                            </DefaultButton>
+                            <span className="text-xs text-text-disabled text-center">Size, Position, Corner Radius</span>
+                        </div>
+                    </div>
+                </CollapsibleCard>
+
+                {/* Style Settings */}
+                <CollapsibleCard
+                    title="Style"
+                    previewItems={[
+                        ...(mirrored ? [{ type: 'text' as const, content: 'Mirrored' }] : []),
+                        { type: 'text', content: `${cropZoom.toFixed(1)}x` }
+                    ]}
+                    isExpanded={showCollapsibleShape}
+                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleShape', v)}
+                >
+                    <div className="flex flex-col gap-4">
+                        {/* Mirrored Toggle */}
+                        <Toggle
+                            label="Mirrored"
+                            value={mirrored}
+                            onChange={(val) => updateSettings({ camera: { ...cameraConfig, mirrored: val } })}
                         />
 
                         {/* Crop Zoom - zooms within the camera video feed */}
