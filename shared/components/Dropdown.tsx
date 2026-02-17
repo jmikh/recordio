@@ -139,7 +139,7 @@ export function Dropdown<T>({
                 </div>
                 <MdKeyboardArrowDown
                     size={18}
-                    className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 

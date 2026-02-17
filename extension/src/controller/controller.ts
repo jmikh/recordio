@@ -91,13 +91,16 @@ async function handlePrepare(message: BaseMessage) {
     return { success: true, detection: detectionResult };
 }
 
-async function handleStart(_message: BaseMessage) {
+async function handleStart(message: BaseMessage) {
     if (!recorder) {
         throw new Error("Recorder not initialized. Call PREPARE first.");
     }
 
+    // Extract tabTitle if provided (for window mode with Chrome window detection)
+    const tabTitle = message.payload?.tabTitle;
+
     // Start recording (this will return the stored detection result)
-    await recorder.start();
+    await recorder.start(tabTitle);
 
     // Update UI to show recording status
     const waitingEl = document.getElementById('status-waiting');

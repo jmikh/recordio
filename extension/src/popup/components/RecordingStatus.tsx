@@ -6,9 +6,11 @@ interface RecordingStatusProps {
     stopRecording: () => void;
     hasAudio: boolean;
     hasCamera: boolean;
+    recordingMode: 'tab' | 'window' | 'screen';
 }
 
-export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, hasCamera }: RecordingStatusProps) {
+export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, hasCamera, recordingMode }: RecordingStatusProps) {
+    const modeLabel = recordingMode.charAt(0).toUpperCase() + recordingMode.slice(1);
     return (
         <div className="flex flex-col items-center gap-4">
             {/* Media Status Pills */}
@@ -33,7 +35,7 @@ export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, ha
             <div className="flex flex-col items-center gap-2 py-2">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
-                    <span className="text-sm text-text-highlighted font-medium">Recording</span>
+                    <span className="text-sm text-text-highlighted font-medium">Recording {modeLabel}</span>
                 </div>
 
                 {/* Live Timer */}

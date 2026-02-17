@@ -258,7 +258,8 @@ function App() {
           hasAudio: isAudioEnabled,
           hasCamera: isVideoEnabled,
           audioDeviceId: selectedAudioId,
-          videoDeviceId: selectedVideoId
+          videoDeviceId: selectedVideoId,
+          tabTitle: tab.title || 'Untitled'
         }
       }, (response: any) => {
         if (chrome.runtime.lastError) {
@@ -410,6 +411,7 @@ function App() {
             stopRecording={stopRecording}
             hasAudio={recordingHasAudio}
             hasCamera={recordingHasCamera}
+            recordingMode={recordingMode}
           />
         )}
       </div>

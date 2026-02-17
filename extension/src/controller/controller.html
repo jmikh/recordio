@@ -20,7 +20,7 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background: #1a1a2e;
+            background: oklch(0.17 0.012 270);
             color: #eee;
             overflow: hidden;
             /* Prevent scrollbars from markers */
@@ -100,7 +100,8 @@
         <!-- Initial Message -->
         <div id="status-waiting">
             <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">Click "Share" to start recording</p>
-            <p style="opacity: 0.7;">Select a window or screen in the browser prompt</p>
+            <p style="opacity: 0.7; margin-bottom: 0.5rem;">Select a window or screen in the browser prompt</p>
+            <p style="opacity: 0.7; font-size: 0.9rem;">You'll be taken back to the previous tab automatically</p>
         </div>
 
         <!-- Recording Message (Hidden Initially) -->

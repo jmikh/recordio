@@ -110,7 +110,7 @@ export class VideoRecorder {
 
                 console.log("[VideoRecorder] Detection isControllerWindow:", this.detectionResult?.isControllerWindow);
 
-                // Store viewport rect for later use (events + screenSource metadata)
+                // Store trackable content rect for later use (events + screenSource metadata)
                 if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
                     this.viewportRect = {
                         x: this.detectionResult.xOffset,
@@ -118,7 +118,7 @@ export class VideoRecorder {
                         width: this.config.tabViewportSize.width,
                         height: this.config.tabViewportSize.height
                     };
-                    this.events.viewportRect = this.viewportRect;
+                    this.events.trackableContentRect = this.viewportRect;
                 }
             }
         }
@@ -134,9 +134,14 @@ export class VideoRecorder {
     /**
      * Starts the recording session.
      */
-    public async start(): Promise<void> {
+    public async start(tabTitle?: string): Promise<void> {
         if (this.state !== 'preparing') {
             throw new Error(`Cannot start recording: Recorder is in ${this.state} state. It must be in 'preparing' state.`);
+        }
+
+        // Update source name if we detected a Chrome window and have a tab title
+        if (this.mode === 'window' && this.detectionResult?.isControllerWindow && tabTitle) {
+            this.config.sourceName = tabTitle;
         }
 
         console.log(`[VideoRecorder] Starting session ${this.currentSessionId} in ${this.mode} mode.`, this.config);
@@ -421,8 +426,8 @@ export class VideoRecorder {
         const screenHasAudio = hasAudioTrack && this.detectedScreenAudio;
 
         // 2. Create Screen Source Metadata (embedded in project, not saved separately)
-        // For tab recordings, viewportRect is the full frame (x=0, y=0)
-        const viewportRect = this.viewportRect
+        // For tab recordings, trackableContentRect is the full frame (x=0, y=0)
+        const trackableContentRect = this.viewportRect
             ?? (this.mode === 'tab' && this.config.tabViewportSize
                 ? { x: 0, y: 0, ...this.config.tabViewportSize }
                 : undefined);
@@ -433,7 +438,7 @@ export class VideoRecorder {
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
             recordingType: this.mode,
-            viewportRect,
+            trackableContentRect,
             hasAudio: screenHasAudio,
             hasMicrophone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
             createdAt: now,

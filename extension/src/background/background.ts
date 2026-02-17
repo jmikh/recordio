@@ -261,7 +261,7 @@ async function handleStartSession(message: any, sendResponse: Function) {
 }
 
 async function startTabModeSession(payload: any, sessionId: string) {
-    const { tabId, hasAudio, hasCamera, audioDeviceId, videoDeviceId } = payload || {};
+    const { tabId, hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabTitle } = payload || {};
 
     if (!tabId) throw new Error("Tab ID is required for tab recording");
 
@@ -276,8 +276,6 @@ async function startTabModeSession(payload: any, sessionId: string) {
     await waitForOffscreen();
 
     // 5. Generate Config
-    const tabInfo = await chrome.tabs.get(tabId);
-
     // Fetch REAL dimensions from content script now
     // This ensures MediaStreams are initialized with correct constraints
     if (!tabId) throw new Error("No tab ID");
@@ -301,7 +299,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
 
         audioDeviceId: audioDeviceId,
         videoDeviceId: videoDeviceId,
-        sourceName: tabInfo?.title || 'Tab'
+        sourceName: tabTitle || 'Tab'
     };
 
     // 6. Send PREPARE to Offscreen (Warmup Streams)
@@ -368,7 +366,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
 
 async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'screen') {
     let openedControllerTabId: number | null = null;
-    const { hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabId: originalTabId } = payload || {};
+    const { hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabId: originalTabId, tabTitle } = payload || {};
 
     try {
         // 1. Open Controller Tab first (needed as target for chooseDesktopMedia in service worker)
@@ -393,6 +391,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         });
 
         // 4. Generate Config with sourceId
+        // Name will be updated after detection if it's a Chrome window
         const config: RecordingConfig = {
             hasAudio: hasAudio !== false,
             hasCamera: hasCamera === true,
@@ -409,6 +408,11 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         };
         const prepareResponse = await chrome.tabs.sendMessage(openedControllerTabId, prepareVideoMsg);
 
+        // Update name to use tab title if recording a Chrome window (has trackable viewport)
+        if (prepareResponse?.detection?.isControllerWindow && tabTitle) {
+            config.sourceName = tabTitle;
+        }
+
         // 6. Switch back to original tab if available (Before Start)
         if (originalTabId) {
             chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
@@ -418,7 +422,7 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         // 7. Send START to Controller
         const startVideoMsg: BaseMessage = {
             type: MSG_TYPES.START_RECORDING_VIDEO,
-            payload: { config, mode, sessionId }
+            payload: { config, mode, sessionId, tabTitle }
         };
         // ensures enough time for the tab switch to take effect and 
         // web cam to warm up
