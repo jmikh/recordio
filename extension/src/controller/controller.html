@@ -20,8 +20,8 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background: oklch(0.17 0.012 270);
-            color: #eee;
+            background: oklch(0.93 0.015 75);
+            color: oklch(0.15 0 0 / 80%);
             overflow: hidden;
             /* Prevent scrollbars from markers */
         }
@@ -34,7 +34,7 @@
         .spinner {
             width: 40px;
             height: 40px;
-            border: 3px solid #333;
+            border: 3px solid #ddd;
             border-top-color: #e94560;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -45,6 +45,17 @@
             to {
                 transform: rotate(360deg);
             }
+        }
+
+        /* Blue capsule button style */
+        .share-button {
+            display: inline-block;
+            background: #0D6EFD;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 24px;
+            font-weight: 600;
+            font-size: 1rem;
         }
 
         /* Calibration Markers */
@@ -72,8 +83,7 @@
             width: 100%;
             text-align: center;
             font-size: 0.9rem;
-            color: #aaa;
-            background-color: rgba(26, 26, 46, 0.9);
+            color: oklch(0.15 0 0 / 60%);
             padding: 10px 0;
             pointer-events: none;
             /* Let click passthrough if needed, though it's text */
@@ -99,8 +109,8 @@
     <div class="status" id="status-container">
         <!-- Initial Message -->
         <div id="status-waiting">
-            <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">Click "Share" to start recording</p>
-            <p style="opacity: 0.7; margin-bottom: 0.5rem;">Select a window or screen in the browser prompt</p>
+            <p style="font-size: 1.2rem; font-weight: 500; margin-bottom: 1rem;">Click <span
+                    class="share-button">Share</span> to start recording</p>
             <p style="opacity: 0.7; font-size: 0.9rem;">You'll be taken back to the previous tab automatically</p>
         </div>
 

@@ -255,7 +255,12 @@ async function handleStartSession(message: any, sendResponse: Function) {
 
         sendResponse({ success: true });
     } catch (err: any) {
-        console.error("Error starting recording:", err);
+        // User cancellation is not an error, just a normal user action
+        if (err.message === "User cancelled desktop capture picker") {
+            console.log("User cancelled desktop capture picker");
+        } else {
+            console.error("Error starting recording:", err);
+        }
         sendResponse({ success: false, error: err.message });
     }
 }
@@ -600,7 +605,13 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
         // Only report recording=true if we are recording THIS tab
         isRecording = currentState.isRecording && _sender.tab.id === currentState.recordedTabId;
     }
-    sendResponse({ isRecording, startTime: currentState.startTime, hasAudio: currentState.hasAudio, hasCamera: currentState.hasCamera });
+    sendResponse({
+        isRecording,
+        startTime: currentState.startTime,
+        hasAudio: currentState.hasAudio,
+        hasCamera: currentState.hasCamera,
+        mode: currentState.mode
+    });
 }
 
 // --- Tab Removal Listener ---

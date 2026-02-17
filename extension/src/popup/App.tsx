@@ -70,6 +70,7 @@ function App() {
         setRecordingStartTime((state as any).startTime || 0);
         setRecordingHasAudio((state as any).hasAudio || false);
         setRecordingHasCamera((state as any).hasCamera || false);
+        if ((state as any).mode) setRecordingMode((state as any).mode);
       }
     });
 
@@ -81,6 +82,7 @@ function App() {
         setRecordingStartTime(newState?.startTime || 0);
         setRecordingHasAudio(newState?.hasAudio || false);
         setRecordingHasCamera(newState?.hasCamera || false);
+        if (newState?.mode) setRecordingMode(newState.mode);
       }
     };
     chrome.storage.onChanged.addListener(storageListener);
@@ -95,6 +97,7 @@ function App() {
         setRecordingStartTime(response.startTime || 0);
         setRecordingHasAudio(response.hasAudio || false);
         setRecordingHasCamera(response.hasCamera || false);
+        if (response.mode) setRecordingMode(response.mode);
       }
     });
 
