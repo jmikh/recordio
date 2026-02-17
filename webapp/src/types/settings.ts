@@ -26,6 +26,7 @@ export interface StyleSettings {
     borderColor: string; // Used for border and glow/shadow color
     hasShadow: boolean;
     hasGlow: boolean;
+    hasFeather: boolean;
 }
 
 // ==========================================
@@ -50,6 +51,9 @@ export interface CameraSettings extends StyleSettings {
 
     /** Horizontally flip the camera feed */
     mirrored?: boolean;
+
+    /** Amount of edge feathering as percentage of size (0.0 = 0%, 0.25 = 25%). Default: 0.15 */
+    featherAmount?: number;
 }
 
 // ==========================================

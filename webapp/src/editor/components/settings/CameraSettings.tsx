@@ -59,38 +59,47 @@ export const CameraSettings = () => {
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
+        hasFeather = false,
+        featherAmount = 0.15,
         cropZoom = 1,
         autoShrink = false,
         shrinkScale = 0.5,
         mirrored = false
     } = cameraConfig;
 
-    // Build preview items for collapsed border state
+    // Build preview items for collapsed outline state
     const borderPreviewItems: PreviewItem[] = [];
 
-    // Only show color if there's a visible border or glow effect
-    if (borderWidthPx > 0 || hasGlow) {
-        borderPreviewItems.push({
-            type: 'custom',
-            content: (
-                <div
-                    className="w-5 h-5 rounded-full border border-border"
-                    style={{ backgroundColor: borderColor }}
-                />
-            )
-        });
-    }
+    if (hasFeather) {
+        // Feather mode: show "Feather" and percentage
+        borderPreviewItems.push({ type: 'text', content: 'Feather' });
+        borderPreviewItems.push({ type: 'text', content: `${Math.round(featherAmount * 100)}%` });
+    } else {
+        // Border mode: show color, thickness, and effect
+        // Only show color if there's a visible border or glow effect
+        if (borderWidthPx > 0 || hasGlow) {
+            borderPreviewItems.push({
+                type: 'custom',
+                content: (
+                    <div
+                        className="w-5 h-5 rounded-full border border-border"
+                        style={{ backgroundColor: borderColor }}
+                    />
+                )
+            });
+        }
 
-    // Only show pixel count if there's a border
-    if (borderWidthPx > 0) {
-        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
-    }
+        // Only show pixel count if there's a border
+        if (borderWidthPx > 0) {
+            borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
+        }
 
-    // Add effect type (shadow/glow) only if enabled
-    if (hasShadow) {
-        borderPreviewItems.push({ type: 'text', content: 'Shadow' });
-    } else if (hasGlow) {
-        borderPreviewItems.push({ type: 'text', content: 'Glow' });
+        // Add effect type (shadow/glow) only if enabled
+        if (hasShadow) {
+            borderPreviewItems.push({ type: 'text', content: 'Shadow' });
+        } else if (hasGlow) {
+            borderPreviewItems.push({ type: 'text', content: 'Glow' });
+        }
     }
 
     return (
@@ -202,52 +211,88 @@ export const CameraSettings = () => {
                 </CollapsibleCard>
 
                 <CollapsibleCard
-                    title="Border"
+                    title="Outline"
                     previewItems={borderPreviewItems}
                     isExpanded={showCollapsibleBorder}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBorder', v)}
                 >
                     <div className="space-y-4">
-                        {/* Color Picker */}
-                        <ColorButton
-                            color={borderColor}
-                            onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
-                            onPopoverOpen={startInteraction}
-                            onPopoverClose={endInteraction}
-                            showAlpha
-                        />
-
-                        {/* Thickness Slider */}
-                        <Slider
-                            label="Thickness"
-                            min={0}
-                            max={20}
-                            value={borderWidthPx}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidthPx: val } }))}
-                            showTooltip
-                            units="px"
-                        />
-
-                        {/* Shadow/Glow Toggle */}
-                        <MultiToggle
-                            options={[
-                                { value: 'shadow', label: 'Shadow' },
-                                { value: 'none', label: 'None' },
-                                { value: 'glow', label: 'Glow' }
-                            ]}
-                            value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
-                            onChange={(val) => {
-                                if (val === 'shadow') {
-                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: true, hasGlow: false } }));
-                                } else if (val === 'glow') {
-                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: true } }));
-                                } else {
-                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: false } }));
-                                }
+                        {/* Feather Toggle */}
+                        <Toggle
+                            label="Feather"
+                            value={hasFeather}
+                            onChange={(enabled) => {
+                                batchAction(() => updateSettings({ camera: { ...cameraConfig, hasFeather: enabled } }));
                             }}
                         />
+
+                        {/* Border Mode Controls */}
+                        {!hasFeather && (
+                            <>
+                                {/* Color Picker */}
+                                <div className="flex items-center gap-3">
+                                    <label className="text-sm text-text-muted w-[80px] shrink-0">Color</label>
+                                    <div className="flex-1 min-w-0">
+                                        <ColorButton
+                                            color={borderColor}
+                                            onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
+                                            onPopoverOpen={startInteraction}
+                                            onPopoverClose={endInteraction}
+                                            showAlpha
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Thickness Slider */}
+                                <Slider
+                                    label="Thickness"
+                                    min={0}
+                                    max={20}
+                                    value={borderWidthPx}
+                                    onPointerDown={startInteraction}
+                                    onPointerUp={endInteraction}
+                                    onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidthPx: val } }))}
+                                    showTooltip
+                                    units="px"
+                                />
+
+                                {/* Shadow/Glow/None Toggle */}
+                                <MultiToggle
+                                    options={[
+                                        { value: 'shadow', label: 'Shadow' },
+                                        { value: 'none', label: 'None' },
+                                        { value: 'glow', label: 'Glow' }
+                                    ]}
+                                    value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
+                                    onChange={(val) => {
+                                        if (val === 'shadow') {
+                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: true, hasGlow: false } }));
+                                        } else if (val === 'glow') {
+                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: true } }));
+                                        } else {
+                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: false } }));
+                                        }
+                                    }}
+                                />
+                            </>
+                        )}
+
+                        {/* Feather Mode Controls */}
+                        {hasFeather && (
+                            <Slider
+                                label="Amount"
+                                min={0}
+                                max={0.5}
+                                value={featherAmount}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, featherAmount: val } }))}
+                                showTooltip
+                                units="%"
+                                decimals={0}
+                                valueTransform={(v) => v * 100}
+                            />
+                        )}
                     </div>
                 </CollapsibleCard>
             </div>
