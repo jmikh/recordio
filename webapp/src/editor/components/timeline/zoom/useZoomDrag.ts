@@ -1,17 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
+import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomAction, ZoomSettings } from '../../../../types';
-import { getZoomBlockBounds, prepareZoomActionsForUI, type PreparedZoomAction } from './ZoomTrackUtils';
+import type { ZoomSegment } from '../../../../types';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { getBlockBounds, getMinZoomDuration, doSourceRangesOverlap, type ResolvedZoomSegment } from './ZoomTrackUtils';
 
 export interface DragState {
-    type: 'move';
-    motionId: string;
+    type: 'move' | 'resize-start' | 'resize-end';
+    zoomId: string;
     startX: number;
-    initialOutputEndTime: number; // Anchor in Output Time (for drag calculations)
-    initialSourceEndTime: number; // Original source time (for conversions)
+    /** Output-time positions at drag start */
+    initialStartTimeMs: number;
+    initialEndTimeMs: number;
 }
 
 export function useZoomDrag(
@@ -20,91 +22,120 @@ export function useZoomDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     setEditingZoom: (id: string | null) => void,
-    preparedActions: PreparedZoomAction[]
+    resolvedSegments: ResolvedZoomSegment[],
+    timeMapper: TimeMapper
 ) {
-    const updateZoomAction = useProjectStore(s => s.updateZoomAction);
+    const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
+    const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-    const timeMapper = useTimeMapper();
 
     const [dragState, setDragState] = useState<DragState | null>(null);
-
-    // Track whether actual dragging happened (mouse moved during drag)
     const wasDraggingRef = useRef(false);
-
-    // Track whether item was already selected before mousedown
     const wasSelectedBeforeMousedownRef = useRef(false);
 
-    const handleDragStart = (e: React.MouseEvent, type: 'move', action: ZoomAction, isCurrentlySelected: boolean) => {
+    const handleDragStart = (
+        e: React.MouseEvent,
+        type: DragState['type'],
+        segment: ZoomSegment,
+        isCurrentlySelected: boolean
+    ) => {
         e.stopPropagation();
-
-        // Find the prepared action to get its output time
-        const preparedAction = preparedActions.find(p => p.id === action.id);
-        if (!preparedAction) return;
-
-        const outputEndTimeX = coords.msToX(preparedAction.outputEndTime);
-        if (outputEndTimeX === -1) return;
 
         wasDraggingRef.current = false;
         wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
 
+        const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
+        if (!range) return;
+
         setDragState({
             type,
-            motionId: action.id,
+            zoomId: segment.id,
             startX: e.clientX,
-            initialOutputEndTime: preparedAction.outputEndTime,
-            initialSourceEndTime: action.sourceEndTimeMs,
+            initialStartTimeMs: range.start,
+            initialEndTimeMs: range.end,
         });
         startInteraction();
-        setEditingZoom(action.id);
+        setEditingZoom(segment.id);
+
+        if (type === 'resize-end') {
+            setCurrentTime(range.end);
+        } else {
+            setCurrentTime(range.start);
+        }
     };
 
-    /**
-     * Handles the actual dragging logic.
-     * Works in output time for UI interactions, then converts to source time for storage.
-     */
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         if (!dragState) return;
 
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        let targetOutputEndTime = dragState.initialOutputEndTime + deltaTimeMs;
-
-        // Get boundaries using prepared actions (in output time)
-        const { prevEnd, nextEnd } = getZoomBlockBounds(
-            dragState.motionId, preparedActions, outputDuration
-        );
-
+        const { prevEnd, nextStart } = getBlockBounds(dragState.zoomId, resolvedSegments, outputDuration);
         const { transitionDurationMs } = project.settings.zoom;
+        const minDuration = getMinZoomDuration(transitionDurationMs);
 
-        // Clamp output end time to boundaries
-        // Left: must leave room for at least transitionDurationMs (our own transition)
-        targetOutputEndTime = Math.max(targetOutputEndTime, prevEnd + transitionDurationMs);
-        // Right: leave room for next zoom's transition, or output duration
-        const rightBoundary = nextEnd < outputDuration
-            ? nextEnd - transitionDurationMs
-            : outputDuration;
-        targetOutputEndTime = Math.min(targetOutputEndTime, rightBoundary);
+        let newStart = dragState.initialStartTimeMs;
+        let newEnd = dragState.initialEndTimeMs;
+        const currentDuration = newEnd - newStart;
 
-        // Convert target output time back to source time
-        const targetSourceEndTime = timeMapper.mapOutputToSourceTime(targetOutputEndTime);
-        if (targetSourceEndTime === -1) return; // Invalid time
+        if (dragState.type === 'move') {
+            newStart = dragState.initialStartTimeMs + deltaTimeMs;
+            newEnd = dragState.initialEndTimeMs + deltaTimeMs;
 
-        // Mark that actual dragging happened
+            // Clamp to neighbors
+            if (newStart < prevEnd) { newStart = prevEnd; newEnd = newStart + currentDuration; }
+            if (newEnd > nextStart) { newEnd = nextStart; newStart = newEnd - currentDuration; }
+            if (newStart < 0) { newStart = 0; newEnd = currentDuration; }
+            if (newEnd > outputDuration) { newEnd = outputDuration; newStart = newEnd - currentDuration; }
+        } else if (dragState.type === 'resize-start') {
+            newStart = dragState.initialStartTimeMs + deltaTimeMs;
+            newStart = Math.max(newStart, prevEnd);
+            newStart = Math.min(newStart, newEnd - minDuration);
+        } else if (dragState.type === 'resize-end') {
+            newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+            newEnd = Math.min(newEnd, nextStart, outputDuration);
+            newEnd = Math.max(newEnd, newStart + minDuration);
+        }
+
         wasDraggingRef.current = true;
 
-        batchAction(() => updateZoomAction(dragState.motionId, {
-            sourceEndTimeMs: targetSourceEndTime,
-            type: 'manual'
+        const sourceStart = timeMapper.mapOutputToSourceTime(newStart);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(newEnd);
+
+        batchAction(() => updateZoomSegment(dragState.zoomId, {
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
+            type: 'manual',
         }));
-    }, [dragState, coords, updateZoomAction, preparedActions, project.settings.zoom, batchAction, outputDuration, timeMapper]);
+
+        if (dragState.type === 'resize-end') {
+            setCurrentTime(newEnd);
+        } else {
+            setCurrentTime(newStart);
+        }
+    }, [dragState, coords, updateZoomSegment, resolvedSegments, batchAction, outputDuration, setCurrentTime, timeMapper, project.settings.zoom]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {
+            // On move commit: delete any zoom segments that now overlap (source time)
+            if (dragState.type === 'move' && wasDraggingRef.current) {
+                const allSegments: ZoomSegment[] = timeline.zoomSegments || [];
+                const movedSegment = allSegments.find((a: ZoomSegment) => a.id === dragState.zoomId);
+                if (movedSegment) {
+                    for (const existing of allSegments) {
+                        if (existing.id === dragState.zoomId) continue;
+                        if (doSourceRangesOverlap(movedSegment, existing)) {
+                            deleteZoomSegment(existing.id);
+                        }
+                    }
+                }
+            }
+
             setDragState(null);
             endInteraction();
         }
-    }, [dragState, endInteraction]);
+    }, [dragState, endInteraction, timeline, deleteZoomSegment]);
 
     useEffect(() => {
         if (dragState) {
@@ -121,6 +152,6 @@ export function useZoomDrag(
         dragState,
         handleDragStart,
         wasDraggingRef,
-        wasSelectedBeforeMousedownRef
+        wasSelectedBeforeMousedownRef,
     };
 }

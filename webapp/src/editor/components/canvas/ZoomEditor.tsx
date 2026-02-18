@@ -61,7 +61,7 @@ export const renderZoomEditor = (
             // 2. Determine Zoom Rect (Preview or Committed)
             let zoomRect = previewZoomRect;
             if (!zoomRect && editingZoomId) {
-                const action = project.timeline.zoomActions.find(m => m.id === editingZoomId);
+                const action = project.timeline.zoomSegments.find(m => m.id === editingZoomId);
                 zoomRect = action?.rectPx || null;
             }
 
@@ -111,8 +111,8 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     const timeMapper = useTimeMapper();
 
     // Actions
-    const updateZoomAction = useProjectStore(s => s.updateZoomAction);
-    const deleteZoomAction = useProjectStore(s => s.deleteZoomAction);
+    const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const project = useProjectStore(s => s.project);
 
     // History Batcher
@@ -122,7 +122,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     useEffect(() => {
         if (!editingZoomId) return;
 
-        const action = project.timeline.zoomActions.find(m => m.id === editingZoomId);
+        const action = project.timeline.zoomSegments.find(m => m.id === editingZoomId);
         if (action) {
             // Convert source time to output time
             const outputTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
@@ -130,12 +130,12 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                 useUIStore.getState().setCurrentTime(outputTime);
             }
         }
-    }, [editingZoomId, timeMapper, project.timeline.zoomActions]);
+    }, [editingZoomId, timeMapper, project.timeline.zoomSegments]);
 
     // Derived State
     const videoSize = project.settings.outputSize;
     const initialRect = editingZoomId
-        ? project.timeline.zoomActions.find(m => m.id === editingZoomId)?.rectPx
+        ? project.timeline.zoomSegments.find(m => m.id === editingZoomId)?.rectPx
         : null;
 
     // Actions
@@ -143,7 +143,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         if (!editingZoomId) return;
 
         batchAction(() => {
-            updateZoomAction(editingZoomId, { rectPx: rect, type: 'manual' });
+            updateZoomSegment(editingZoomId, { rectPx: rect, type: 'manual' });
         });
     };
 
@@ -154,7 +154,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
     const onDelete = () => {
         if (editingZoomId) {
-            deleteZoomAction(editingZoomId);
+            deleteZoomSegment(editingZoomId);
             onCancel();
         }
     };
@@ -179,7 +179,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         // Live Update Store!
         if (editingZoomId) {
             batchAction(() => {
-                updateZoomAction(editingZoomId, { rectPx: newRect });
+                updateZoomSegment(editingZoomId, { rectPx: newRect });
             });
         }
     };

@@ -5,9 +5,9 @@
  * Spotlights highlight UI elements that the user hovered over for extended periods.
  */
 
-import type { HoveredCardEvent, ZoomAction, SpotlightAction, Rect, Size, ZoomSettings } from '../../types';
+import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, Rect, Size, ZoomSettings } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
-import { getViewportStateAtTime, prepareZoomActionsForInterpolation } from '../zoom';
+import { getViewportStateAtTime, prepareZoomSegmentsForInterpolation } from '../zoom';
 import { TimeMapper } from '../mappers/timeMapper';
 
 // ============================================================================
@@ -39,7 +39,7 @@ const K_VIEWPORT_MARGIN = 0.98;
 class SpotlightScheduler {
     private readonly viewMapper: ViewMapper;
     private readonly timeMapper: TimeMapper;
-    private readonly zoomActions: ZoomAction[];
+    private readonly zoomSegments: ZoomSegment[];
     private readonly zoomSettings: ZoomSettings;
     private readonly enlargeScale: number;
     private readonly outputSize: Size;
@@ -47,13 +47,13 @@ class SpotlightScheduler {
     constructor(
         viewMapper: ViewMapper,
         timeMapper: TimeMapper,
-        zoomActions: ZoomAction[],
+        zoomSegments: ZoomSegment[],
         zoomSettings: ZoomSettings,
         enlargeScale: number
     ) {
         this.viewMapper = viewMapper;
         this.timeMapper = timeMapper;
-        this.zoomActions = zoomActions;
+        this.zoomSegments = zoomSegments;
         this.zoomSettings = zoomSettings;
         this.enlargeScale = enlargeScale;
         this.outputSize = viewMapper.outputSize;
@@ -62,17 +62,17 @@ class SpotlightScheduler {
     /**
      * Process all hovered cards and generate spotlight actions.
      */
-    processCards(hoveredCards: HoveredCardEvent[]): SpotlightAction[] {
+    processCards(hoveredCards: HoveredCardEvent[]): SpotlightSegment[] {
         console.log('[AutoSpotlight] Starting calculation...');
         console.log('[AutoSpotlight] Input:', {
             hoveredCardsCount: hoveredCards.length,
-            zoomActionsCount: this.zoomActions.length,
+            zoomSegmentsCount: this.zoomSegments.length,
             outputSize: this.outputSize,
             sourceSize: this.viewMapper.sourceSize,
             enlargeScale: this.enlargeScale
         });
 
-        const spotlights: SpotlightAction[] = [];
+        const spotlights: SpotlightSegment[] = [];
 
         for (let i = 0; i < hoveredCards.length; i++) {
             const spotlight = this.processCard(hoveredCards[i], i);
@@ -89,7 +89,7 @@ class SpotlightScheduler {
     /**
      * Process a single hovered card and return a spotlight action if it qualifies.
      */
-    private processCard(card: HoveredCardEvent, index: number): SpotlightAction | null {
+    private processCard(card: HoveredCardEvent, index: number): SpotlightSegment | null {
         // Map time range to output coordinates
         const outputRange = this.timeMapper.mapSourceRangeToOutputRange(card.timestamp, card.endTime);
         if (!outputRange) {
@@ -148,7 +148,7 @@ class SpotlightScheduler {
         const scale = Math.min(this.enlargeScale, maxFitScale);
 
         // Create the spotlight action with SOURCE times
-        const spotlight: SpotlightAction = {
+        const spotlight: SpotlightSegment = {
             id: crypto.randomUUID(),
             sourceStartTimeMs: spotlightSourceStartMs,
             sourceEndTimeMs: spotlightSourceEndMs,
@@ -177,17 +177,17 @@ class SpotlightScheduler {
         const viewports: Rect[] = [];
 
         // Viewport at start
-        viewports.push(getViewportStateAtTime(this.zoomActions, startMs, this.outputSize, this.timeMapper, this.zoomSettings));
+        viewports.push(getViewportStateAtTime(this.zoomSegments, startMs, this.outputSize, this.timeMapper, this.zoomSettings));
 
         // Viewport at end
-        viewports.push(getViewportStateAtTime(this.zoomActions, endMs, this.outputSize, this.timeMapper, this.zoomSettings));
+        viewports.push(getViewportStateAtTime(this.zoomSegments, endMs, this.outputSize, this.timeMapper, this.zoomSettings));
 
         // Viewports at any zoom action start times (derived from source time) within the range
-        const preparedActions = prepareZoomActionsForInterpolation(this.zoomActions, this.timeMapper, this.zoomSettings);
+        const preparedActions = prepareZoomSegmentsForInterpolation(this.zoomSegments, this.timeMapper, this.zoomSettings);
         for (const action of preparedActions) {
             const actionStartMs = action.outputStartTime;
             if (actionStartMs > startMs && actionStartMs < endMs) {
-                viewports.push(getViewportStateAtTime(this.zoomActions, actionStartMs, this.outputSize, this.timeMapper, this.zoomSettings));
+                viewports.push(getViewportStateAtTime(this.zoomSegments, actionStartMs, this.outputSize, this.timeMapper, this.zoomSettings));
             }
         }
 
@@ -301,23 +301,23 @@ class SpotlightScheduler {
  * 2. Filter for events with output duration > 3000ms
  * 3. Check if the hovered card's targetRect fits within 
  *    the current zoom viewport at that output time (output coords)
- * 4. If it fits, create a SpotlightAction for that duration
+ * 4. If it fits, create a SpotlightSegment for that duration
  * 
  * @param viewMapper - ViewMapper for source to output coordinate transformation
  * @param timeMapper - TimeMapper for source to output time mapping
  * @param hoveredCards - Array of hovered card events to process
- * @param zoomActions - The zoom actions to check visibility against
+ * @param zoomSegments - The zoom actions to check visibility against
  * @param enlargeScale - Settings scale factor for spotlights
- * @returns Array of auto-generated SpotlightActions
+ * @returns Array of auto-generated SpotlightSegments
  */
 export const calculateAutoSpotlights = (
     viewMapper: ViewMapper,
     timeMapper: TimeMapper,
     hoveredCards: HoveredCardEvent[],
-    zoomActions: ZoomAction[],
+    zoomSegments: ZoomSegment[],
     zoomSettings: ZoomSettings,
     enlargeScale: number
-): SpotlightAction[] => {
-    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomActions, zoomSettings, enlargeScale);
+): SpotlightSegment[] => {
+    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomSegments, zoomSettings, enlargeScale);
     return scheduler.processCards(hoveredCards);
 };

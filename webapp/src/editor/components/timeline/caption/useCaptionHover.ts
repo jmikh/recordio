@@ -107,8 +107,8 @@ export function useCaptionHover(
         const newCaption: CaptionSegment = {
             id: crypto.randomUUID(),
             text: '',
-            sourceStartMs: sourceStart,
-            sourceEndMs: sourceEnd,
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
         };
 
         addCaptionSegment(newCaption);

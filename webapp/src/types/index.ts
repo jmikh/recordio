@@ -6,7 +6,7 @@
  * Type Hierarchy:
  * - @shared/types: Primitives (ID, TimeMs, Point, Size, Rect) and shared contracts
  * - ./settings: All project settings types
- * - ./timeline: Timeline, OutputWindow, ZoomAction, SpotlightAction, Captions
+ * - ./timeline: Timeline, OutputWindow, ZoomSegment, SpotlightSegment, Captions
  * - ./project: The root Project entity
  * - ./deviceFrames: Device frame types
  */

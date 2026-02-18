@@ -114,7 +114,7 @@ export function CaptionsSettings() {
 
         // Find segment containing current time
         const currentSegment = captionSegments.find(segment => {
-            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
             if (!outputRange) return false;
             return currentTimeMs >= outputRange.start && currentTimeMs <= outputRange.end;
         });
@@ -292,7 +292,7 @@ export function CaptionsSettings() {
         startInteraction();
 
         // Move CTI to the start of the caption
-        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
         if (outputRange) {
             setCurrentTime(outputRange.start + 1);
         }
@@ -482,9 +482,9 @@ export function CaptionsSettings() {
                     <div ref={captionsContainerRef}>
                         {captionSegments.map(segment => {
                             // Convert source time to output time for display
-                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
-                            const outputStart = outputRange?.start ?? segment.sourceStartMs;
-                            const outputEnd = outputRange?.end ?? segment.sourceEndMs;
+                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
+                            const outputStart = outputRange?.start ?? segment.sourceStartTimeMs;
+                            const outputEnd = outputRange?.end ?? segment.sourceEndTimeMs;
                             const isSelected = selectedCaptionId === segment.id;
                             const isEditing = isSelected || editingId === segment.id;
 

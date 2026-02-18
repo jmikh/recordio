@@ -49,8 +49,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
     // Determine the effective window to display (dragged vs original)
     const win = (dragState && dragState.windowId === seg.id) ? dragState.currentWindow : seg;
 
-    const sourceStartMs = win.startMs;
-    const sourceEndMs = win.endMs;
+    const sourceStartTimeMs = win.startMs;
+    const sourceEndTimeMs = win.endMs;
     const speed = win.speed || 1.0;
     const outputDurationMs = (win.endMs - win.startMs) / speed;
 
@@ -115,8 +115,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                         {displayMode !== 'none' && (
                             <StaticAudioWave
                                 peaks={displayPeaks}
-                                sourceStartMs={sourceStartMs}
-                                sourceEndMs={sourceEndMs}
+                                sourceStartTimeMs={sourceStartTimeMs}
+                                sourceEndTimeMs={sourceEndTimeMs}
                                 width={width}
                                 height={trackContentHeight}
                                 scrollLeft={scrollLeft}

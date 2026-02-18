@@ -1,6 +1,6 @@
-import { type ZoomAction, type Size, type Rect, type CameraSettings, type ZoomSettings } from '../../types';
+import { type ZoomSegment, type Size, type Rect, type CameraSettings, type ZoomSettings } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
-import { prepareZoomActionsForInterpolation } from './zoomAnimator';
+import { prepareZoomSegmentsForInterpolation } from './zoomAnimator';
 import { applyEasing } from '../easing';
 
 /**
@@ -118,7 +118,7 @@ function isFullScreen(rect: Rect, outputSize: Size): boolean {
  * @returns The current camera state including scale factor
  */
 export function getCameraStateAtTime(
-    actions: ZoomAction[],
+    actions: ZoomSegment[],
     currentTimeMs: number,
     outputSize: Size,
     shrinkScale: number,
@@ -130,7 +130,7 @@ export function getCameraStateAtTime(
     }
 
     // Prepare actions with output times and durations
-    const preparedActions = prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings);
+    const preparedActions = prepareZoomSegmentsForInterpolation(actions, timeMapper, zoomSettings);
 
     // Find first zoom-in motion (viewport becomes smaller than full screen)
     const firstZoomIn = preparedActions.find(m => !isFullScreen(m.rectPx, outputSize));

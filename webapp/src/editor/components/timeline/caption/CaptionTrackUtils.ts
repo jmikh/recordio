@@ -32,8 +32,8 @@ export function resolveCaptionOutputTimes(
 
     for (const segment of segments) {
         const range = timeMapper.mapSourceRangeToOutputRange(
-            segment.sourceStartMs,
-            segment.sourceEndMs
+            segment.sourceStartTimeMs,
+            segment.sourceEndTimeMs
         );
         if (!range) continue; // Caption entirely trimmed
 
@@ -145,5 +145,5 @@ export function doCaptionSourceRangesOverlap(
     a: CaptionSegment,
     b: CaptionSegment
 ): boolean {
-    return a.sourceStartMs < b.sourceEndMs && a.sourceEndMs > b.sourceStartMs;
+    return a.sourceStartTimeMs < b.sourceEndTimeMs && a.sourceEndTimeMs > b.sourceStartTimeMs;
 }

@@ -1,4 +1,4 @@
-import { type ZoomAction, type Size, type Rect, type ZoomSettings } from '../../types';
+import { type ZoomSegment, type Size, type Rect, type ZoomSettings } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 import { applyEasing } from '../easing';
 
@@ -10,7 +10,7 @@ import { applyEasing } from '../easing';
  * Prepared zoom action with computed output times and duration.
  * Used for viewport interpolation and UI rendering.
  */
-export interface PreparedZoomAction extends ZoomAction {
+export interface PreparedZoomSegment extends ZoomSegment {
     outputStartTime: number;
     outputEndTime: number;
     duration: number;
@@ -25,11 +25,11 @@ export interface PreparedZoomAction extends ZoomAction {
  * Filters out invisible zooms (those that map outside the output range).
  * Input is assumed to be pre-sorted by source time; output is sorted by output start time.
  */
-export function prepareZoomActionsForInterpolation(
-    actions: ZoomAction[],
+export function prepareZoomSegmentsForInterpolation(
+    actions: ZoomSegment[],
     timeMapper: TimeMapper,
     zoomSettings: ZoomSettings
-): PreparedZoomAction[] {
+): PreparedZoomSegment[] {
     return actions
         .map(action => {
             const outputStartTime = timeMapper.mapSourceToOutputTime(action.sourceStartTimeMs);
@@ -77,7 +77,7 @@ export function prepareZoomActionsForInterpolation(
  * @param zoomSettings - Zoom settings (transitionDurationMs, easing)
  */
 export function getViewportStateAtTime(
-    actions: ZoomAction[],
+    actions: ZoomSegment[],
     outputTimeMs: number,
     outputSize: Size,
     timeMapper: TimeMapper,
@@ -87,7 +87,7 @@ export function getViewportStateAtTime(
     const T = zoomSettings.transitionDurationMs;
     const easing = zoomSettings.easing ?? 'ease-in-out';
 
-    const prepared = prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings);
+    const prepared = prepareZoomSegmentsForInterpolation(actions, timeMapper, zoomSettings);
 
     if (prepared.length === 0) return fullRect;
 

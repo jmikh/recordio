@@ -53,11 +53,11 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
 
-        const zoomActions = timeline.zoomActions || [];
+        const zoomSegments = timeline.zoomSegments || [];
         const { timeMapper } = state;
 
         effectiveViewport = getViewportStateAtTime(
-            zoomActions,
+            zoomSegments,
             currentTimeMs,
             outputSize,
             timeMapper,
@@ -107,7 +107,7 @@ export class PlaybackRenderer {
         // Spotlight samples the canvas as-is, so mouse clicks/drags are captured
         if (viewMapper) {
             const spotlightState = getSpotlightStateAtTime(
-                timeline.spotlightActions || [],
+                timeline.spotlightSegments || [],
                 project.settings.spotlight,
                 currentTimeMs,
                 effectiveViewport,
@@ -149,7 +149,7 @@ export class PlaybackRenderer {
                 // Only apply auto-shrink if enabled and not using override (drag preview) and not in camera edit mode
                 if (cameraSettings.autoShrink && !state.overrideCameraSettings && !state.isCameraEditing) {
                     const cameraState = getCameraStateAtTime(
-                        zoomActions,
+                        zoomSegments,
                         currentTimeMs,
                         outputSize,
                         cameraSettings.shrinkScale ?? 0.5,

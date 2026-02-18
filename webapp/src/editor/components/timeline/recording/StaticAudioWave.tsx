@@ -3,8 +3,8 @@ import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../../../core/audioConstants';
 
 interface StaticAudioWaveProps {
     peaks: number[]; // Full cached peaks for the source
-    sourceStartMs: number; // Where this segment starts in source time
-    sourceEndMs: number;   // Where this segment ends in source time
+    sourceStartTimeMs: number; // Where this segment starts in source time
+    sourceEndTimeMs: number;   // Where this segment ends in source time
     width: number; // Full segment render width in px
     height: number;
     /** Scroll offset of the timeline container */
@@ -20,8 +20,8 @@ const BUFFER = 200; // extra px each side for smooth scroll
 
 const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     peaks,
-    sourceStartMs,
-    sourceEndMs,
+    sourceStartTimeMs,
+    sourceEndTimeMs,
     width,
     height,
     scrollLeft = 0,
@@ -31,8 +31,8 @@ const StaticAudioWaveComponent: React.FC<StaticAudioWaveProps> = ({
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate which slice of peaks to show
-    const startIndex = Math.floor((sourceStartMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
-    const endIndex = Math.ceil((sourceEndMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
+    const startIndex = Math.floor((sourceStartTimeMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
+    const endIndex = Math.ceil((sourceEndTimeMs / 1000) * AUDIO_PEAKS_SAMPLES_PER_SEC);
 
     const visiblePeaks = useMemo(() => {
         const start = Math.max(0, startIndex);

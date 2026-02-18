@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow, ZoomAction, SpotlightAction, Project, UserEvents, FocusArea } from '../../../types';
+import type { ID, OutputWindow, ZoomSegment, SpotlightSegment, Project, UserEvents, FocusArea } from '../../../types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
 import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
@@ -25,10 +25,10 @@ const computeFocusAreas = (project: Project, events: UserEvents): FocusArea[] =>
     return getAllFocusAreas(events, sourceSize, project.screenSource.durationMs);
 };
 
-export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
-    if (!project.settings.zoom.isAuto) return project.timeline.zoomActions;
+export const recalculateAutoZooms = (project: Project): ZoomSegment[] => {
+    if (!project.settings.zoom.isAuto) return project.timeline.zoomSegments;
     const sourceSize = project.screenSource.size;
-    if (!sourceSize || sourceSize.width === 0) return project.timeline.zoomActions;
+    if (!sourceSize || sourceSize.width === 0) return project.timeline.zoomSegments;
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
         project.settings.screen.padding, project.settings.screen.crop,
@@ -39,10 +39,10 @@ export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
     return calculateZoomSchedule(project.settings.zoom, viewMapper, timeMapper, project.timeline.focusAreas);
 };
 
-export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAction[]): SpotlightAction[] => {
-    if (!project.settings.spotlight.isAuto) return project.timeline.spotlightActions;
+export const recalculateAutoSpotlights = (project: Project, zoomSegments: ZoomSegment[]): SpotlightSegment[] => {
+    if (!project.settings.spotlight.isAuto) return project.timeline.spotlightSegments;
     const sourceSize = project.screenSource.size;
-    if (!sourceSize || sourceSize.width === 0) return project.timeline.spotlightActions;
+    if (!sourceSize || sourceSize.width === 0) return project.timeline.spotlightSegments;
     const viewMapper = new ViewMapper(
         sourceSize, project.settings.outputSize,
         project.settings.screen.padding, project.settings.screen.crop,
@@ -53,7 +53,7 @@ export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAct
     return calculateAutoSpotlights(
         viewMapper, timeMapper,
         project.userEvents.hoveredCards || [],
-        zoomActions, project.settings.zoom,
+        zoomSegments, project.settings.zoom,
         project.settings.spotlight.enlargeScale
     );
 };
@@ -109,18 +109,18 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Zoom: auto recalculates, manual stays as-is (source time anchored)
             const nextActions = state.project.settings.zoom.isAuto
                 ? recalculateAutoZooms(tempProject)
-                : state.project.timeline.zoomActions;
+                : state.project.timeline.zoomSegments;
 
             // Spotlight: auto recalculates, manual stays as-is (source time anchored)
-            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
+            const nextSpotlightSegments = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 project: {
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        zoomActions: nextActions,
-                        spotlightActions: nextSpotlightActions
+                        zoomSegments: nextActions,
+                        spotlightSegments: nextSpotlightSegments
                     },
                     updatedAt: new Date()
                 }
@@ -164,18 +164,18 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Zoom: auto recalculates, manual stays as-is (source time anchored, auto-hidden)
             const nextActions = state.project.settings.zoom.isAuto
                 ? recalculateAutoZooms(tempProject)
-                : state.project.timeline.zoomActions;
+                : state.project.timeline.zoomSegments;
 
             // Spotlight: auto recalculates, manual stays as-is (source time anchored)
-            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
+            const nextSpotlightSegments = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 project: {
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        zoomActions: nextActions,
-                        spotlightActions: nextSpotlightActions
+                        zoomSegments: nextActions,
+                        spotlightSegments: nextSpotlightSegments
                     },
                     updatedAt: new Date()
                 }
@@ -269,15 +269,15 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                 : [];
 
             // Spotlight: auto recalculates, manual cleared (full timeline rebuild)
-            const nextSpotlightActions = recalculateAutoSpotlights(tempProject, nextActions);
+            const nextSpotlightSegments = recalculateAutoSpotlights(tempProject, nextActions);
 
             return {
                 project: {
                     ...tempProject,
                     timeline: {
                         ...tempProject.timeline,
-                        zoomActions: nextActions,
-                        spotlightActions: nextSpotlightActions
+                        zoomSegments: nextActions,
+                        spotlightSegments: nextSpotlightSegments
                     },
                     updatedAt: new Date()
                 }

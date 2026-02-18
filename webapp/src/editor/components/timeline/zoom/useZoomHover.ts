@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomAction } from '../../../../types';
+import type { ZoomSegment } from '../../../../types';
 import type { DragState } from './useZoomDrag';
-import type { PreparedZoomAction } from './ZoomTrackUtils';
+import type { ResolvedZoomSegment } from './ZoomTrackUtils';
+import { getValidBlockRange, getMinZoomDuration, getDefaultZoomDuration, doSourceRangesOverlap } from './ZoomTrackUtils';
+import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
     x: number;
-    outputEndTime: number;
+    outputStartTimeMs: number;
+    outputEndTimeMs: number;
     width: number;
 }
 
@@ -21,19 +23,18 @@ export function useZoomHover(
     editingZoomId: string | null,
     setEditingZoom: (id: string | null) => void,
     outputDuration: number,
-    preparedActions: PreparedZoomAction[]
+    resolvedSegments: ResolvedZoomSegment[],
+    timeMapper: TimeMapper
 ) {
-    const addZoomAction = useProjectStore(s => s.addZoomAction);
+    const addZoomSegment = useProjectStore(s => s.addZoomSegment);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
-    const timeMapper = useTimeMapper();
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-    /**
-     * Handles hover interactions for 'Add Zoom' ghost block.
-     * Uses prepared actions (with computed output times) for collision detection.
-     */
+    const { transitionDurationMs } = project.settings.zoom;
+
     const handleMouseMove = (e: React.MouseEvent) => {
-        // No ghost when dragging or when something is selected
+        // No ghost while dragging or when something is selected
         if (dragState || editingZoomId || selectedSpotlightId) {
             setHoverInfo(null);
             return;
@@ -41,62 +42,41 @@ export function useZoomHover(
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
+        const mouseTimeMs = coords.xToMs(x);
 
-        // Convert x directly to output time
-        let mouseOutputTimeMs = coords.xToMs(x);
-
-        // Don't show hover if we're past the end of the output
-        if (mouseOutputTimeMs > outputDuration) {
+        if (mouseTimeMs > outputDuration || mouseTimeMs < 0) {
             setHoverInfo(null);
             return;
         }
 
-        // Buffer zone in pixels for keyframe visual size (diamond/square is ~14px wide)
-        const keyframeBufferPx = 10;
-        const keyframeBufferMs = coords.xToMs(keyframeBufferPx);
-
-        // 1. Check if we are inside an existing action OR near a keyframe marker
-        const isInside = preparedActions.some((m: PreparedZoomAction) => {
-            const start = m.outputStartTime;
-            const end = m.outputEndTime;
-            // Include buffer zone after keyframe end for the visual marker
-            return mouseOutputTimeMs > start && mouseOutputTimeMs < (end + keyframeBufferMs);
-        });
-
+        // Don't show ghost if mouse is inside an existing block
+        const isInside = resolvedSegments.some(r =>
+            mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
+        );
         if (isInside) {
             setHoverInfo(null);
             return;
         }
 
-        // 2. Calculate Available Duration backwards (to the left)
-        let prevEnd = 0;
-        for (const m of preparedActions) {
-            if (m.outputEndTime <= mouseOutputTimeMs) {
-                if (m.outputEndTime > prevEnd) {
-                    prevEnd = m.outputEndTime;
-                }
-            }
+        const range = getValidBlockRange(
+            mouseTimeMs,
+            resolvedSegments,
+            outputDuration,
+            getMinZoomDuration(transitionDurationMs),
+            getDefaultZoomDuration(transitionDurationMs)
+        );
+        if (!range) {
+            setHoverInfo(null);
+            return;
         }
 
-        const defaultDur = project.settings.zoom.transitionDurationMs;
-        const availableDuration = mouseOutputTimeMs - prevEnd;
-
-        // Calculate width for display (duration is derived from available space)
-        let displayDuration = Math.min(defaultDur, availableDuration);
-        let outputEndTime = mouseOutputTimeMs;
-
-        if (displayDuration < project.settings.zoom.transitionDurationMs) {
-            displayDuration = project.settings.zoom.transitionDurationMs;
-            outputEndTime = prevEnd + displayDuration;
-        }
-
-        // Calculate visual width and position
-        const width = coords.msToX(displayDuration);
-        const constrainedX = coords.msToX(outputEndTime);
+        const width = coords.msToX(range.end - range.start);
+        const leftX = coords.msToX(range.start);
 
         setHoverInfo({
-            x: constrainedX,
-            outputEndTime,
+            x: leftX,
+            outputStartTimeMs: range.start,
+            outputEndTimeMs: range.end,
             width,
         });
     };
@@ -116,47 +96,38 @@ export function useZoomHover(
 
         if (!hoverInfo) return;
 
-        // Convert output time to source time for storage
-        const sourceEndTimeMs = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTime);
-        if (sourceEndTimeMs === -1) return; // Invalid time
+        // Convert output placement times → source times
+        const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
 
-        // Calculate sourceStartTimeMs from output start time
-        const outputStartTime = hoverInfo.outputEndTime - (hoverInfo.width > 0 ? coords.xToMs(hoverInfo.width) : project.settings.zoom.transitionDurationMs);
-        const sourceStartTimeMs = timeMapper.mapOutputToSourceTime(Math.max(0, outputStartTime));
-        if (sourceStartTimeMs === -1) return;
+        // Use the output size as the initial rect (full viewport — user can resize in canvas)
+        const outputSize = project.settings.outputSize;
+        const initialRect = {
+            x: 0,
+            y: 0,
+            width: outputSize.width,
+            height: outputSize.height,
+        };
 
-        // Find the closest previous action to inherit rect from
-        const startTime = hoverInfo.outputEndTime - project.settings.zoom.transitionDurationMs;
-        const previousAction = preparedActions
-            .filter((m: PreparedZoomAction) => m.outputEndTime <= startTime)
-            .sort((a: PreparedZoomAction, b: PreparedZoomAction) => b.outputEndTime - a.outputEndTime)[0];
-
-        let initialRect;
-
-        if (previousAction) {
-            initialRect = { ...previousAction.rectPx };
-        } else {
-            // Default to 75% viewport centered
-            const { width, height } = project.settings.outputSize;
-            initialRect = {
-                width: width * 0.75,
-                height: height * 0.75,
-                x: width * 0.125,
-                y: height * 0.125
-            };
-        }
-
-        const newAction: ZoomAction = {
+        const newSegment: ZoomSegment = {
             id: crypto.randomUUID(),
-            sourceStartTimeMs,
-            sourceEndTimeMs,
-            reason: 'Manual Zoom',
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
             rectPx: initialRect,
+            reason: 'manual',
             type: 'manual',
         };
 
-        addZoomAction(newAction);
-        setEditingZoom(newAction.id);
+        // Delete any existing zoom segments that overlap the new one (source time)
+        const allSegments: ZoomSegment[] = timeline.zoomSegments || [];
+        for (const existing of allSegments) {
+            if (doSourceRangesOverlap(newSegment, existing)) {
+                deleteZoomSegment(existing.id);
+            }
+        }
+
+        addZoomSegment(newSegment);
+        setEditingZoom(newSegment.id);
         setHoverInfo(null);
     };
 
@@ -164,6 +135,6 @@ export function useZoomHover(
         hoverInfo,
         handleMouseMove,
         handleMouseLeave,
-        handleClick
+        handleClick,
     };
 }

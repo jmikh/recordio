@@ -1,97 +1,83 @@
-import type { ZoomAction, Rect, Size, ZoomSettings } from '../../../../types';
+import type { ZoomSegment } from '../../../../types';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
-import { prepareZoomActionsForInterpolation } from '../../../../core/zoom';
+import { doSourceRangesOverlap, getBlockBounds, getValidBlockRange } from '../timelineTrackUtils';
+import type { OutputTimeBlock } from '../timelineTrackUtils';
 
-// NOTE: Style constants are now centralized in ZoomTrackStyles.ts
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/** Minimum hold portion of a zoom block (ms), excluding transition-in */
+export const K_MIN_ZOOM_HOLD_MS = 100;
+
+/** Default hold duration for a newly placed zoom block */
+const DEFAULT_HOLD_MS = 3000;
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 /**
- * Prepared zoom action with computed output times and duration for UI rendering.
+ * Zoom segment with resolved output times, ready for UI rendering.
  */
-export interface PreparedZoomAction extends ZoomAction {
-    outputEndTime: number;
-    outputStartTime: number;
-    duration: number;
+export interface ResolvedZoomSegment extends OutputTimeBlock {
+    zoomSegment: ZoomSegment;
+}
+
+// ============================================================================
+// DURATION HELPERS
+// ============================================================================
+
+/**
+ * Minimum total output duration for a zoom block to be visible:
+ * transition-in + minimum hold.
+ */
+export function getMinZoomDuration(transitionDurationMs: number): number {
+    return transitionDurationMs + K_MIN_ZOOM_HOLD_MS;
 }
 
 /**
- * Prepares zoom actions for UI rendering by converting source times to output times.
+ * Default total duration for a newly placed zoom block:
+ * transition-in + default hold (capped at 3s total).
  */
-export function prepareZoomActionsForUI(
-    actions: ZoomAction[],
-    timeMapper: TimeMapper,
-    zoomSettings: ZoomSettings
-): PreparedZoomAction[] {
-    return prepareZoomActionsForInterpolation(actions, timeMapper, zoomSettings) as PreparedZoomAction[];
+export function getDefaultZoomDuration(transitionDurationMs: number): number {
+    return transitionDurationMs + DEFAULT_HOLD_MS;
 }
 
-/**
- * Calculate the zoom scale factor from a zoom rect.
- * Scale represents how much the viewport is zoomed in.
- * @returns Scale value (e.g., 2.5 means 2.5x zoom)
- */
-export function calculateZoomScale(rect: Rect, outputSize: Size): number {
-    // Scale is output width divided by zoom rect width
-    const scale = outputSize.width / rect.width;
-    return Math.round(scale * 10) / 10; // Round to 1 decimal
-}
+// ============================================================================
+// RESOLUTION
+// ============================================================================
 
 /**
- * Format scale value for display (e.g., "2.5x", "1x")
+ * Resolves zoom segment source times to output times using TimeMapper.
+ * Filters out segments entirely in a cut.
  */
-export function formatScaleLabel(scale: number): string {
-    return `${scale}x`;
-}
+export function resolveZoomOutputTimes(
+    zoomSegments: ZoomSegment[],
+    timeMapper: TimeMapper
+): ResolvedZoomSegment[] {
+    const resolved: ResolvedZoomSegment[] = [];
 
-/**
- * Check if a zoom rect represents full viewport (no zoom).
- * Uses a small tolerance for floating-point comparison.
- */
-export function isFullViewport(rect: Rect, outputSize: Size): boolean {
-    const tolerance = 1;
-    return (
-        Math.abs(rect.x) < tolerance &&
-        Math.abs(rect.y) < tolerance &&
-        Math.abs(rect.width - outputSize.width) < tolerance &&
-        Math.abs(rect.height - outputSize.height) < tolerance
-    );
-}
+    for (const segment of zoomSegments) {
+        const range = timeMapper.mapSourceRangeToOutputRange(
+            segment.sourceStartTimeMs,
+            segment.sourceEndTimeMs
+        );
+        if (!range) continue;
 
-/**
- * Calculate boundary constraints for a zoom block using prepared actions.
- * Returns the end of the previous block (or 0) and the start of the next block (or timelineEnd).
- * 
- * This scans all other blocks to find the closest ones in either direction.
- */
-export function getZoomBlockBounds(
-    targetMotionId: string | null,
-    preparedActions: PreparedZoomAction[],
-    timelineEnd: number
-): { prevEnd: number; nextEnd: number } {
-    // Find the current block position to determine what's "before" and "after"
-    const currentAction = targetMotionId
-        ? preparedActions.find(m => m.id === targetMotionId)
-        : null;
-
-    // If no current action, default to finding closest to start
-    const referenceEnd = currentAction?.outputEndTime ?? 0;
-    const referenceStart = currentAction?.outputStartTime ?? 0;
-
-    let prevEnd = 0;
-    let nextEnd = timelineEnd;
-
-    for (const m of preparedActions) {
-        if (m.id === targetMotionId) continue;
-        const mEnd = m.outputEndTime;
-
-        // A block is "previous" if it ends before our current start
-        if (mEnd <= referenceStart && mEnd > prevEnd) {
-            prevEnd = mEnd;
-        }
-        // A block is "next" if it ends after our current end (find the closest one)
-        if (mEnd > referenceEnd && mEnd < nextEnd) {
-            nextEnd = mEnd;
-        }
+        resolved.push({
+            id: segment.id,
+            zoomSegment: segment,
+            outputStartTimeMs: range.start,
+            outputEndTimeMs: range.end,
+        });
     }
 
-    return { prevEnd, nextEnd };
+    return resolved;
 }
+
+// ============================================================================
+// BOUNDS & RANGE HELPERS (re-exported from shared utils with zoom-specific names)
+// ============================================================================
+
+export { doSourceRangesOverlap, getBlockBounds, getValidBlockRange };

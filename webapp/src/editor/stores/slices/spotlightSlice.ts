@@ -1,10 +1,10 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, SpotlightAction } from '../../../types';
+import type { ID, SpotlightSegment } from '../../../types';
 
 export interface SpotlightSlice {
-    updateSpotlight: (id: ID, spotlight: Partial<SpotlightAction>) => void;
-    addSpotlight: (spotlight: SpotlightAction) => void;
+    updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;
+    addSpotlight: (spotlight: SpotlightSegment) => void;
     deleteSpotlight: (id: ID) => void;
     clearSpotlights: () => void;
 }
@@ -15,15 +15,15 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             console.log('[Action] updateSpotlight', id, updates);
         }
         set(state => {
-            const spotlightActions = state.project.timeline.spotlightActions;
-            const idx = spotlightActions.findIndex(s => s.id === id);
+            const spotlightSegments = state.project.timeline.spotlightSegments;
+            const idx = spotlightSegments.findIndex(s => s.id === id);
             if (idx === -1) return state;
 
-            const nextSpotlightActions = [...spotlightActions];
-            nextSpotlightActions[idx] = { ...nextSpotlightActions[idx], ...updates };
+            const nextSpotlightSegments = [...spotlightSegments];
+            nextSpotlightSegments[idx] = { ...nextSpotlightSegments[idx], ...updates };
 
             // Sort by start time to maintain order
-            nextSpotlightActions.sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
+            nextSpotlightSegments.sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
             // If sourceRect is being changed, set isAuto to false
             const nextSettings = updates.sourceRect
@@ -36,7 +36,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        spotlightActions: nextSpotlightActions
+                        spotlightSegments: nextSpotlightSegments
                     }
                 }
             };
@@ -46,7 +46,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     addSpotlight: (spotlight) => {
         console.log('[Action] addSpotlight', spotlight);
         set(state => {
-            const spotlightActions = [...state.project.timeline.spotlightActions, spotlight]
+            const spotlightSegments = [...state.project.timeline.spotlightSegments, spotlight]
                 .sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
             // Manual spotlight addition sets isAuto to false
@@ -62,7 +62,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     },
                     timeline: {
                         ...state.project.timeline,
-                        spotlightActions
+                        spotlightSegments
                     }
                 }
             };
@@ -72,14 +72,14 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     deleteSpotlight: (id) => {
         console.log('[Action] deleteSpotlight', id);
         set(state => {
-            const spotlightActions = state.project.timeline.spotlightActions.filter(s => s.id !== id);
+            const spotlightSegments = state.project.timeline.spotlightSegments.filter(s => s.id !== id);
 
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlightActions
+                        spotlightSegments
                     }
                 }
             };
@@ -94,7 +94,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        spotlightActions: []
+                        spotlightSegments: []
                     }
                 }
             };

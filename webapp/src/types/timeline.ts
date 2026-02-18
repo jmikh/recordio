@@ -7,6 +7,20 @@
 import type { ID, TimeMs, Rect } from '@shared/types';
 
 // ==========================================
+// BASE BLOCK INTERFACES
+// ==========================================
+
+/**
+ * Base interface for any timeline action stored in source time.
+ * Source time is the original recording time, before cuts and speed adjustments.
+ */
+export interface SourceTimeSegment {
+    id: ID;
+    sourceStartTimeMs: TimeMs;
+    sourceEndTimeMs: TimeMs;
+}
+
+// ==========================================
 // CAPTION SEGMENTS
 // ==========================================
 
@@ -15,13 +29,8 @@ import type { ID, TimeMs, Rect } from '@shared/types';
  * Timestamps are in source timeline time (before window cuts and speed adjustments).
  * The caption painter uses CaptionTimeMapper to convert to output time at render.
  */
-export interface CaptionSegment {
-    id: ID;
+export interface CaptionSegment extends SourceTimeSegment {
     text: string;
-    /** Start time in source timeline (milliseconds) */
-    sourceStartMs: number;
-    /** End time in source timeline (milliseconds) */
-    sourceEndMs: number;
 }
 
 // ==========================================
@@ -60,12 +69,7 @@ export interface OutputWindow {
 // ZOOM ACTIONS
 // ==========================================
 
-export interface ZoomAction {
-    id: ID;
-    /** Source time when zoom block begins */
-    sourceStartTimeMs: TimeMs;
-    /** Source time when zoom block ends (hold position, no transition padding) */
-    sourceEndTimeMs: TimeMs;
+export interface ZoomSegment extends SourceTimeSegment {
     /** Target viewport in OUTPUT coordinates (pixels) */
     rectPx: Rect;
     reason: string;
@@ -81,12 +85,7 @@ export interface ZoomAction {
  * and enlarges a specific region with smooth transitions.
  * The spotlight region is defined in SOURCE coordinates (original screen recording).
  */
-export interface SpotlightAction {
-    id: ID;
-    /** Source time when the spotlight starts (in source coordinate system) */
-    sourceStartTimeMs: TimeMs;
-    /** Source time when the spotlight ends (in source coordinate system) */
-    sourceEndTimeMs: TimeMs;
+export interface SpotlightSegment extends SourceTimeSegment {
     /** The rectangle to spotlight (in SOURCE video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */
@@ -118,9 +117,9 @@ export interface Timeline {
     outputWindows: OutputWindow[];
 
     /** Zoom action keyframes for zoom/pan effects */
-    zoomActions: ZoomAction[];
+    zoomSegments: ZoomSegment[];
     /** Spotlight action keyframes for spotlight effect (non-overlapping) */
-    spotlightActions: SpotlightAction[];
+    spotlightSegments: SpotlightSegment[];
     /** Caption segments from webcam audio transcription */
     captionSegments: CaptionSegment[];
     /** Cached focus areas computed from user events and output windows */

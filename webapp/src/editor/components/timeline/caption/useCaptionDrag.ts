@@ -46,7 +46,7 @@ export function useCaptionDrag(
         wasDraggingRef.current = false;
         wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
 
-        const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartMs, segment.sourceEndMs);
+        const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
         if (!range) return;
 
         setDragState({
@@ -120,8 +120,8 @@ export function useCaptionDrag(
         const sourceEnd = timeMapper.mapOutputToSourceTime(newEnd);
 
         batchAction(() => updateCaptionSegment(dragState.captionId, {
-            sourceStartMs: sourceStart,
-            sourceEndMs: sourceEnd,
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
         }));
 
         // Sync CTI

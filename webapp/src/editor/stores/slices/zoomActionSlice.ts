@@ -1,21 +1,21 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, ZoomAction } from '../../../types';
+import type { ID, ZoomSegment } from '../../../types';
 
-export interface ZoomActionSlice {
-    updateZoomAction: (id: ID, action: Partial<ZoomAction>) => void;
-    addZoomAction: (action: ZoomAction) => void;
-    deleteZoomAction: (id: ID) => void;
-    clearZoomActions: () => void;
+export interface ZoomSegmentSlice {
+    updateZoomSegment: (id: ID, action: Partial<ZoomSegment>) => void;
+    addZoomSegment: (action: ZoomSegment) => void;
+    deleteZoomSegment: (id: ID) => void;
+    clearZoomSegments: () => void;
 }
 
-export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomActionSlice> = (set, _get, store) => ({
-    updateZoomAction: (id, updates) => {
+export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomSegmentSlice> = (set, _get, store) => ({
+    updateZoomSegment: (id, updates) => {
         if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateZoomAction', id, updates);
+            console.log('[Action] updateZoomSegment', id, updates);
         }
         set(state => {
-            const actions = state.project.timeline.zoomActions;
+            const actions = state.project.timeline.zoomSegments;
             const idx = actions.findIndex(m => m.id === id);
             if (idx === -1) return state;
 
@@ -35,17 +35,17 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        zoomActions: nextActions
+                        zoomSegments: nextActions
                     }
                 }
             };
         });
     },
 
-    addZoomAction: (action) => {
-        console.log('[Action] addZoomAction', action);
+    addZoomSegment: (action) => {
+        console.log('[Action] addZoomSegment', action);
         set(state => {
-            const actions = [...state.project.timeline.zoomActions, action]
+            const actions = [...state.project.timeline.zoomSegments, action]
                 .sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
 
             const nextSettings = {
@@ -59,17 +59,17 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        zoomActions: actions
+                        zoomSegments: actions
                     }
                 }
             };
         });
     },
 
-    deleteZoomAction: (id) => {
-        console.log('[Action] deleteZoomAction', id);
+    deleteZoomSegment: (id) => {
+        console.log('[Action] deleteZoomSegment', id);
         set(state => {
-            const actions = state.project.timeline.zoomActions.filter(m => m.id !== id);
+            const actions = state.project.timeline.zoomSegments.filter(m => m.id !== id);
 
             const nextSettings = {
                 ...state.project.settings,
@@ -82,22 +82,22 @@ export const createZoomActionSlice: StateCreator<ProjectState, [["zustand/subscr
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        zoomActions: actions
+                        zoomSegments: actions
                     }
                 }
             };
         });
     },
 
-    clearZoomActions: () => {
-        console.log('[Action] clearZoomActions');
+    clearZoomSegments: () => {
+        console.log('[Action] clearZoomSegments');
         set(state => {
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        zoomActions: []
+                        zoomSegments: []
                     }
                 }
             };

@@ -1,4 +1,4 @@
-import { type ZoomAction, type Rect, type ZoomSettings, type FocusArea } from '../../types';
+import { type ZoomSegment, type Rect, type ZoomSettings, type FocusArea } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 import { rectContainsRect, clampViewportToBounds, unionRects } from '../geometry';
@@ -18,7 +18,7 @@ interface OutputFocusArea {
 }
 
 /** Zoom action with output times, used internally during scheduling. */
-interface OutputZoomAction {
+interface OutputZoomSegment {
     outputStartTimeMs: number;
     outputEndTimeMs: number;
     rectPx: Rect;
@@ -86,7 +86,7 @@ export function calculateZoomSchedule(
     viewMapper: ViewMapper,
     timeMapper: TimeMapper,
     focusAreas: FocusArea[],
-): ZoomAction[] {
+): ZoomSegment[] {
     const { maxZoom, transitionDurationMs } = zoomSettings;
     const minBlockDuration = transitionDurationMs;
 
@@ -107,7 +107,7 @@ export function calculateZoomSchedule(
     const FULL_ZOOM_OUT_DELAY_MS = 500;       // To avoid quick zoom out after a zoom in.
     const END_BUFFER_MS = 1500 + transitionDurationMs;               // Leave this much room at the end of the video before zooming out
 
-    const outputActions: OutputZoomAction[] = [];
+    const outputActions: OutputZoomSegment[] = [];
     let openBlock: OpenBlock | null = null;
 
     const closeBlock = (endTimeMs: number) => {

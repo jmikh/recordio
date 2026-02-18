@@ -51,11 +51,11 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
     // Resolve spotlights from source time → output time
     const resolvedSpotlights = useMemo(() => {
-        const all = resolveSpotlightOutputTimes(timeline.spotlightActions || [], timeMapper);
+        const all = resolveSpotlightOutputTimes(timeline.spotlightSegments || [], timeMapper);
         // Filter out spotlights below minimum visible duration
         const minDuration = getMinSpotlightDuration(transitionDurationMs);
         return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration);
-    }, [timeline.spotlightActions, timeMapper]);
+    }, [timeline.spotlightSegments, timeMapper]);
 
     // Hooks
     const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useSpotlightDrag(

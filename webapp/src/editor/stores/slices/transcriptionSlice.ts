@@ -11,7 +11,7 @@ export interface TranscriptionSlice {
     setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
     setCaptionSegments: (segments: CaptionSegment[]) => void;
     restoreCaptionsFromBaseline: () => void;
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => void;
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
     deleteAllCaptions: () => void;
     addCaptionSegment: (segment: CaptionSegment) => void;
@@ -94,7 +94,7 @@ export const createTranscriptionSlice: StateCreator<
         }));
     },
 
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartMs: number; sourceEndMs: number }>) => {
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {
         set(state => {
             const captionSegments = state.project.timeline.captionSegments;
             if (!captionSegments || captionSegments.length === 0) {
@@ -157,12 +157,12 @@ export const createTranscriptionSlice: StateCreator<
 
             // Delete intersecting captions (same rule as Spotlight)
             const nonOverlapping = existing.filter(s =>
-                !(segment.sourceStartMs < s.sourceEndMs && segment.sourceEndMs > s.sourceStartMs)
+                !(segment.sourceStartTimeMs < s.sourceEndTimeMs && segment.sourceEndTimeMs > s.sourceStartTimeMs)
             );
 
             // Insert and sort by source start time
             const updatedSegments = [...nonOverlapping, segment].sort(
-                (a, b) => a.sourceStartMs - b.sourceStartMs
+                (a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs
             );
 
             return {

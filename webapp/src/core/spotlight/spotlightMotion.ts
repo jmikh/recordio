@@ -1,4 +1,4 @@
-import type { SpotlightAction, SpotlightSettings, Rect } from '../../types';
+import type { SpotlightSegment, SpotlightSettings, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
@@ -47,23 +47,23 @@ export interface SpotlightState {
  * 5. After outputEndTimeMs: null (spotlight ended)
  */
 export function getSpotlightStateAtTime(
-    spotlightActions: SpotlightAction[],
+    spotlightSegments: SpotlightSegment[],
     settings: SpotlightSettings,
     outputTimeMs: number,
     viewport: Rect,
     viewMapper: ViewMapper,
     timeMapper: TimeMapper
 ): SpotlightState | null {
-    if (!spotlightActions || spotlightActions.length === 0) {
+    if (!spotlightSegments || spotlightSegments.length === 0) {
         return null;
     }
 
     // Find the active spotlight at this time by resolving source → output
-    let activeSpotlight: SpotlightAction | null = null;
+    let activeSpotlight: SpotlightSegment | null = null;
     let resolvedStart = 0;
     let resolvedEnd = 0;
 
-    for (const s of spotlightActions) {
+    for (const s of spotlightSegments) {
         const range = timeMapper.mapSourceRangeToOutputRange(s.sourceStartTimeMs, s.sourceEndTimeMs);
         if (!range) continue;
 

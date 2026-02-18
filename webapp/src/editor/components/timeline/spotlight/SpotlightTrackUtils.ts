@@ -1,4 +1,4 @@
-import type { SpotlightAction, SpotlightSettings } from '../../../../types';
+import type { SpotlightSegment, SpotlightSettings } from '../../../../types';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 /** Minimum hold portion of a spotlight (ms), excluding fade in/out */
@@ -25,7 +25,7 @@ export function getDefaultSpotlightDuration(settings: SpotlightSettings): number
  * Resolved spotlight with computed output times from source times.
  */
 export interface ResolvedSpotlight {
-    spotlight: SpotlightAction;
+    spotlight: SpotlightSegment;
     outputStartTimeMs: number;
     outputEndTimeMs: number;
 }
@@ -35,12 +35,12 @@ export interface ResolvedSpotlight {
  * Filters out spotlights that are entirely trimmed (not in any output window).
  */
 export function resolveSpotlightOutputTimes(
-    spotlightActions: SpotlightAction[],
+    spotlightSegments: SpotlightSegment[],
     timeMapper: TimeMapper
 ): ResolvedSpotlight[] {
     const resolved: ResolvedSpotlight[] = [];
 
-    for (const spotlight of spotlightActions) {
+    for (const spotlight of spotlightSegments) {
         const range = timeMapper.mapSourceRangeToOutputRange(
             spotlight.sourceStartTimeMs,
             spotlight.sourceEndTimeMs
@@ -163,8 +163,8 @@ export function getValidSpotlightRange(
  * Checks if two source-time ranges overlap.
  */
 export function doSourceRangesOverlap(
-    a: SpotlightAction,
-    b: SpotlightAction
+    a: SpotlightSegment,
+    b: SpotlightSegment
 ): boolean {
     return a.sourceStartTimeMs < b.sourceEndTimeMs && a.sourceEndTimeMs > b.sourceStartTimeMs;
 }

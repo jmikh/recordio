@@ -1,4 +1,4 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomAction, type SpotlightAction, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/spotlightScheduler';
@@ -139,8 +139,8 @@ const createDefaultSettings = (): ProjectSettings => ({
 const createDefaultTimeline = (): Timeline => ({
     id: crypto.randomUUID(),
     durationMs: 0,
-    zoomActions: [],
-    spotlightActions: [],
+    zoomSegments: [],
+    spotlightSegments: [],
     outputWindows: [],
     focusAreas: [],
     captionSegments: []
@@ -217,7 +217,7 @@ export class ProjectImpl {
 
         const timeMapper = new TimeMapper(outputWindows);
         const focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
-        const zoomActions = hasUserEvents
+        const zoomSegments = hasUserEvents
             ? calculateZoomSchedule(
                 settings.zoom,
                 viewMapper,
@@ -227,12 +227,12 @@ export class ProjectImpl {
             : [];
 
         // Calculate Spotlight Schedule (if auto-spotlights enabled and has events)
-        const spotlightActions = (settings.spotlight.isAuto && hasUserEvents)
+        const spotlightSegments = (settings.spotlight.isAuto && hasUserEvents)
             ? calculateAutoSpotlights(
                 viewMapper,
                 timeMapper,
                 userEvents.hoveredCards || [],
-                zoomActions,
+                zoomSegments,
                 settings.zoom,
                 settings.spotlight.enlargeScale
             )
@@ -242,8 +242,8 @@ export class ProjectImpl {
             id: crypto.randomUUID(),
             durationMs: durationMs,
             outputWindows: outputWindows,
-            zoomActions: zoomActions,
-            spotlightActions: spotlightActions,
+            zoomSegments: zoomSegments,
+            spotlightSegments: spotlightSegments,
             focusAreas: focusAreas,
             captionSegments: []
         };
@@ -295,7 +295,7 @@ export class ProjectImpl {
                     height: obj.height * scale
                 };
             }
-            // Don't scale source coordinate rects (e.g., ZoomAction.rect, SpotlightAction.sourceRect)
+            // Don't scale source coordinate rects (e.g., ZoomSegment.rect, SpotlightSegment.sourceRect)
             return obj;
         }
 
@@ -354,14 +354,14 @@ export class ProjectImpl {
             timeline: {
                 ...project.timeline,
                 // Auto-scale Px-suffixed fields in timeline actions:
-                //   ZoomAction.rectPx (output coords) → scaled
-                //   SpotlightAction.borderRadiusPx → scaled
-                //   SpotlightAction.sourceRect (source coords, no Px suffix) → NOT scaled
-                zoomActions: project.timeline.zoomActions.map((za: ZoomAction) =>
-                    ProjectImpl.scalePixelValues(za, scale) as ZoomAction
+                //   ZoomSegment.rectPx (output coords) → scaled
+                //   SpotlightSegment.borderRadiusPx → scaled
+                //   SpotlightSegment.sourceRect (source coords, no Px suffix) → NOT scaled
+                zoomSegments: project.timeline.zoomSegments.map((za: ZoomSegment) =>
+                    ProjectImpl.scalePixelValues(za, scale) as ZoomSegment
                 ),
-                spotlightActions: project.timeline.spotlightActions.map((sa: SpotlightAction) =>
-                    ProjectImpl.scalePixelValues(sa, scale) as SpotlightAction
+                spotlightSegments: project.timeline.spotlightSegments.map((sa: SpotlightSegment) =>
+                    ProjectImpl.scalePixelValues(sa, scale) as SpotlightSegment
                 ),
             }
         };

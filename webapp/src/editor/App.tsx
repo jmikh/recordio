@@ -166,8 +166,8 @@ function Editor() {
                     hasShownCreationToast.current = true;
                     const hasUserEvents = loadedProject.userEvents.mousePositions.length > 0;
                     if (hasUserEvents) {
-                        const zoomCount = loadedProject.timeline.zoomActions.length;
-                        const spotlightCount = loadedProject.timeline.spotlightActions.length;
+                        const zoomCount = loadedProject.timeline.zoomSegments.length;
+                        const spotlightCount = loadedProject.timeline.spotlightSegments.length;
 
                         // Build message conditionally - only show counts > 0
                         const parts: string[] = [];

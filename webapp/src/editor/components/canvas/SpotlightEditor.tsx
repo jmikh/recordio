@@ -97,7 +97,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     useEffect(() => {
         if (!editingSpotlightId) return;
 
-        const spotlight = project.timeline.spotlightActions.find(s => s.id === editingSpotlightId);
+        const spotlight = project.timeline.spotlightSegments.find(s => s.id === editingSpotlightId);
         if (spotlight) {
             const outputRange = timeMapper.mapSourceRangeToOutputRange(spotlight.sourceStartTimeMs, spotlight.sourceEndTimeMs);
             if (outputRange) {
@@ -110,7 +110,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     const outputSize = project.settings.outputSize;
 
     const spotlight = editingSpotlightId
-        ? project.timeline.spotlightActions.find(s => s.id === editingSpotlightId)
+        ? project.timeline.spotlightSegments.find(s => s.id === editingSpotlightId)
         : null;
     const initialSourceRect = spotlight?.sourceRect || null;
 

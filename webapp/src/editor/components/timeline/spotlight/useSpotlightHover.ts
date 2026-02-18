@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightAction, SpotlightSettings } from '../../../../types';
+import type { SpotlightSegment, SpotlightSettings } from '../../../../types';
 import type { DragState } from './useSpotlightDrag';
 import type { ResolvedSpotlight } from './SpotlightTrackUtils';
 import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
@@ -130,7 +130,7 @@ export function useSpotlightHover(
             y: height * 0.25
         };
 
-        const newSpotlight: SpotlightAction = {
+        const newSpotlight: SpotlightSegment = {
             id: crypto.randomUUID(),
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
@@ -141,7 +141,7 @@ export function useSpotlightHover(
         };
 
         // Delete any existing spotlights whose source range overlaps the new one
-        const allSpotlights: SpotlightAction[] = timeline.spotlightActions || [];
+        const allSpotlights: SpotlightSegment[] = timeline.spotlightSegments || [];
         for (const existing of allSpotlights) {
             if (doSourceRangesOverlap(newSpotlight, existing)) {
                 deleteSpotlight(existing.id);

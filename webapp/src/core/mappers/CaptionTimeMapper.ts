@@ -33,7 +33,7 @@ export class CaptionTimeMapper {
         }
 
         return this.segments.filter(segment =>
-            sourceTime >= segment.sourceStartMs && sourceTime < segment.sourceEndMs
+            sourceTime >= segment.sourceStartTimeMs && sourceTime < segment.sourceEndTimeMs
         );
     }
 
@@ -51,8 +51,8 @@ export class CaptionTimeMapper {
      */
     mapSegmentToOutputRange(segment: CaptionSegment): { start: number; end: number } | null {
         return this.timeMapper.mapSourceRangeToOutputRange(
-            segment.sourceStartMs,
-            segment.sourceEndMs
+            segment.sourceStartTimeMs,
+            segment.sourceEndTimeMs
         );
     }
 

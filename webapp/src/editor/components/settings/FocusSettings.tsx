@@ -58,12 +58,12 @@ const EasingTooltipContent = () => (
 
 export const FocusSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const clearZoomActions = useProjectStore(s => s.clearZoomActions);
+    const clearZoomSegments = useProjectStore(s => s.clearZoomSegments);
     const clearSpotlights = useProjectStore(s => s.clearSpotlights);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
-    const zoomActions = useProjectStore(s => s.project.timeline.zoomActions || []);
-    const spotlightActions = useProjectStore(s => s.project.timeline.spotlightActions || []);
+    const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments || []);
+    const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments || []);
     const userEvents = useProjectStore(s => s.project.userEvents);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
@@ -92,7 +92,7 @@ export const FocusSettings = () => {
     const autoDisabledTooltip = "Auto effects require mouse events, which are only captured during Chrome tab and window recordings.";
 
     const handleClearZooms = () => {
-        clearZoomActions();
+        clearZoomSegments();
         updateSettings({ zoom: { ...zoomSettings, isAuto: false } });
     };
 
@@ -200,7 +200,7 @@ export const FocusSettings = () => {
                     </div>
 
                     {/* Actions - only show when there are zooms to clear */}
-                    {zoomActions.length > 0 && (
+                    {zoomSegments.length > 0 && (
                         <DefaultButton
                             onClick={handleClearZooms}
                             className="w-full"
@@ -293,7 +293,7 @@ export const FocusSettings = () => {
                     </div>
 
                     {/* Actions - only show when there are spotlights to clear */}
-                    {spotlightActions.length > 0 && (
+                    {spotlightSegments.length > 0 && (
                         <DefaultButton
                             onClick={handleClearSpotlights}
                             className="w-full"

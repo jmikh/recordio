@@ -128,8 +128,8 @@ export class TranscriptionService {
             segments.push({
                 id: crypto.randomUUID(),
                 text,
-                sourceStartMs: Math.round((chunk.timestamp[0] || 0) * 1000),
-                sourceEndMs: Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000)
+                sourceStartTimeMs: Math.round((chunk.timestamp[0] || 0) * 1000),
+                sourceEndTimeMs: Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000)
             });
         }
 

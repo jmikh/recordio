@@ -30,7 +30,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
     // Delete actions
     const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
-    const deleteZoomAction = useProjectStore(s => s.deleteZoomAction);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
 
     // Selection state
@@ -92,7 +92,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const handleDelete = () => {
         // Can only delete window if it's NOT the last one
         if (selectedZoomId) {
-            deleteZoomAction(selectedZoomId);
+            deleteZoomSegment(selectedZoomId);
             setCanvasMode(CanvasMode.Preview);
         } else if (selectedSpotlightId) {
             deleteSpotlight(selectedSpotlightId);

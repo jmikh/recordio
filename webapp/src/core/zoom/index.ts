@@ -8,6 +8,6 @@ export {
 } from './autoZoom';
 export {
     getViewportStateAtTime,
-    prepareZoomActionsForInterpolation,
-    type PreparedZoomAction
+    prepareZoomSegmentsForInterpolation,
+    type PreparedZoomSegment
 } from './zoomAnimator';

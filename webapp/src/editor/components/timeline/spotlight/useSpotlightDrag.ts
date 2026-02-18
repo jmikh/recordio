@@ -3,7 +3,7 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightAction } from '../../../../types';
+import type { SpotlightSegment } from '../../../../types';
 import type { ResolvedSpotlight } from './SpotlightTrackUtils';
 import { getSpotlightBounds, getMinSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
@@ -42,7 +42,7 @@ export function useSpotlightDrag(
     const handleDragStart = (
         e: React.MouseEvent,
         type: DragState['type'],
-        spotlight: SpotlightAction,
+        spotlight: SpotlightSegment,
         isCurrentlySelected: boolean
     ) => {
         e.stopPropagation();
@@ -144,8 +144,8 @@ export function useSpotlightDrag(
         if (dragState) {
             // On move commit: delete overlapping spotlights (source-time intersection)
             if (dragState.type === 'move' && wasDraggingRef.current) {
-                const allSpotlights: SpotlightAction[] = timeline.spotlightActions || [];
-                const movedSpotlight = allSpotlights.find((s: SpotlightAction) => s.id === dragState.spotlightId);
+                const allSpotlights: SpotlightSegment[] = timeline.spotlightSegments || [];
+                const movedSpotlight = allSpotlights.find((s: SpotlightSegment) => s.id === dragState.spotlightId);
                 if (movedSpotlight) {
                     for (const existing of allSpotlights) {
                         if (existing.id === dragState.spotlightId) continue;

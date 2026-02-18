@@ -60,7 +60,7 @@ export const DebugBar = () => {
             </button>
             <button
                 className="px-2 py-0.5 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-[10px] rounded cursor-pointer border border-purple-800"
-                onClick={() => console.log(project.timeline.zoomActions)}
+                onClick={() => console.log(project.timeline.zoomSegments)}
             >
                 Log Zooms
             </button>
@@ -78,7 +78,7 @@ export const DebugBar = () => {
             </button>
             <button
                 className="px-2 py-0.5 bg-amber-900/50 hover:bg-amber-800 text-amber-200 text-[10px] rounded cursor-pointer border border-amber-800"
-                onClick={() => console.log(project.timeline.spotlightActions)}
+                onClick={() => console.log(project.timeline.spotlightSegments)}
             >
                 Log Spotlights
             </button>

@@ -25,7 +25,7 @@ export function useTimelineInteraction({
     const selectZoom = useUIStore(s => s.selectZoom);
     const selectSpotlight = useUIStore(s => s.selectSpotlight);
 
-    const zoomActions = useProjectStore(s => s.project.timeline.zoomActions);
+    const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
 
     const timeMapper = useTimeMapper();
 
@@ -36,10 +36,10 @@ export function useTimelineInteraction({
     // When a zoom is selected, set currentTime to its end output time and clear hover/preview
     useEffect(() => {
         if (selectedZoomId) {
-            const action = zoomActions?.find(m => m.id === selectedZoomId);
-            if (action) {
+            const segment = zoomSegments?.find(m => m.id === selectedZoomId);
+            if (segment) {
                 // Convert source time to output time
-                const outputTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
+                const outputTime = timeMapper.mapSourceToOutputTime(segment.sourceEndTimeMs);
                 if (outputTime !== -1) {
                     setCurrentTime(outputTime);
                 }
@@ -47,7 +47,7 @@ export function useTimelineInteraction({
             setPreviewTime(null);
             setHoverTime(null);
         }
-    }, [selectedZoomId, zoomActions, timeMapper, setCurrentTime, setPreviewTime]);
+    }, [selectedZoomId, zoomSegments, timeMapper, setCurrentTime, setPreviewTime]);
 
     const getTimeFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!containerRef.current) return { outputTime: 0 };

@@ -115,20 +115,20 @@ export class TimeMapper {
     /**
      * Maps a source range (start/end) to an output range.
      * Returns the output start and end times representing the visible portion of the range.
-     * If sourceEndMs is undefined, it is treated as a point event.
+     * If sourceEndTimeMs is undefined, it is treated as a point event.
      *
      * - If the range is fully visible, returns the corresponding output range.
      * - If the range overlaps with gaps, returns the start of the first visible segment and end of the last visible segment.
      * - If the range is completely hidden (in a gap), returns null.
      */
-    mapSourceRangeToOutputRange(sourceStartMs: number, sourceEndMs: number | undefined): { start: number, end: number } | null {
+    mapSourceRangeToOutputRange(sourceStartTimeMs: number, sourceEndTimeMs: number | undefined): { start: number, end: number } | null {
         let acc = 0;
         let startOutput: number | null = null;
         let endOutput: number | null = null;
 
-        // If sourceEndMs is undefined, this is a point event (e.g. click), otherwise it's a range (e.g. scroll).
-        const isPoint = sourceEndMs === undefined;
-        const effectiveEnd = isPoint ? sourceStartMs : sourceEndMs;
+        // If sourceEndTimeMs is undefined, this is a point event (e.g. click), otherwise it's a range (e.g. scroll).
+        const isPoint = sourceEndTimeMs === undefined;
+        const effectiveEnd = isPoint ? sourceStartTimeMs : sourceEndTimeMs;
 
         for (const w of this.windows) {
             const speed = w.speed || 1.0;
@@ -137,13 +137,13 @@ export class TimeMapper {
 
             if (isPoint) {
                 // Check if the point falls within the current window [start, end]
-                if (sourceStartMs >= w.startMs && sourceStartMs <= w.endMs) {
-                    const mapped = outputOffset + ((sourceStartMs - w.startMs) / speed);
+                if (sourceStartTimeMs >= w.startMs && sourceStartTimeMs <= w.endMs) {
+                    const mapped = outputOffset + ((sourceStartTimeMs - w.startMs) / speed);
                     return { start: mapped, end: mapped };
                 }
             } else {
                 // Check for overlap between the source range and the current window
-                const overlapStart = Math.max(sourceStartMs, w.startMs);
+                const overlapStart = Math.max(sourceStartTimeMs, w.startMs);
                 const overlapEnd = Math.min(effectiveEnd, w.endMs);
 
                 // If valid overlap exists

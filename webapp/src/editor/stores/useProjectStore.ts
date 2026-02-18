@@ -6,12 +6,12 @@ import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
-import { createZoomActionSlice, type ZoomActionSlice } from './slices/zoomActionSlice';
+import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActionSlice';
 import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSlice';
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ZoomActionSlice, SpotlightSlice, TranscriptionSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice {
     project: Project;
     isSaving: boolean;
 
@@ -57,7 +57,7 @@ export const useProjectStore = create<ProjectState>()(
                 // Slices
                 ...createWindowSlice(set, get, store),
                 ...createSettingsSlice(set, get, store),
-                ...createZoomActionSlice(set, get, store),
+                ...createZoomSegmentSlice(set, get, store),
                 ...createSpotlightSlice(set, get, store),
                 ...createTranscriptionSlice(set, get, store),
 
