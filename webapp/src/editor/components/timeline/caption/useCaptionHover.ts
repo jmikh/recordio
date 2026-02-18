@@ -4,7 +4,7 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { CaptionSegment } from '../../../../types';
 import type { CaptionDragState } from './useCaptionDrag';
-import { getValidBlockRange, type OutputCaptionSegment } from '../timelineTrackUtils';
+import { getValidBlockRange } from '../timelineTrackUtils';
 import { K_MIN_CAPTION_DURATION_MS, K_DEFAULT_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
@@ -21,7 +21,7 @@ export function useCaptionHover(
     dragState: CaptionDragState | null,
     selectedCaptionId: string | null,
     outputDuration: number,
-    resolvedCaptions: OutputCaptionSegment[],
+    captionSegments: CaptionSegment[],
     timeMapper: TimeMapper
 ) {
     const addCaptionSegment = useProjectStore(s => s.addCaptionSegment);
@@ -48,7 +48,7 @@ export function useCaptionHover(
         }
 
         // Check if inside an existing caption
-        const isInside = resolvedCaptions.some(r =>
+        const isInside = captionSegments.some(r =>
             mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
         );
 
@@ -59,7 +59,7 @@ export function useCaptionHover(
 
         const range = getValidBlockRange(
             mouseTimeMs,
-            resolvedCaptions,
+            captionSegments,
             outputDuration,
             K_MIN_CAPTION_DURATION_MS,
             K_DEFAULT_CAPTION_DURATION_MS,
@@ -105,6 +105,9 @@ export function useCaptionHover(
             text: '',
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
+            outputStartTimeMs: hoverInfo.outputStartTimeMs,
+            outputEndTimeMs: hoverInfo.outputEndTimeMs,
+            visible: true,
         };
 
         addCaptionSegment(newCaption);

@@ -1,9 +1,9 @@
 import type { SpotlightSegment, SpotlightSettings, Rect } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
-import { TimeMapper } from '../mappers/timeMapper';
+
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
 import { applyEasing } from '../easing';
-import { K_MIN_SPOTLIGHT_HOLD_MS } from '../../editor/components/timeline/spotlight/SpotlightTrackUtils';
+
 
 // ============================================================================
 // Spotlight State
@@ -51,48 +51,36 @@ export function getSpotlightStateAtTime(
     settings: SpotlightSettings,
     outputTimeMs: number,
     viewport: Rect,
-    viewMapper: ViewMapper,
-    timeMapper: TimeMapper
+    viewMapper: ViewMapper
 ): SpotlightState | null {
     if (!spotlightSegments || spotlightSegments.length === 0) {
         return null;
     }
 
-    // Find the active spotlight at this time by resolving source → output
-    let activeSpotlight: SpotlightSegment | null = null;
-    let resolvedStart = 0;
-    let resolvedEnd = 0;
-
-    for (const s of spotlightSegments) {
-        const range = timeMapper.mapSourceRangeToOutputRange(s.sourceStartTimeMs, s.sourceEndTimeMs);
-        if (!range) continue;
-
-        // Skip spotlights below minimum visible duration
-        if (range.end - range.start < settings.transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS) continue;
-
-        if (outputTimeMs >= range.start && outputTimeMs <= range.end) {
-            activeSpotlight = s;
-            resolvedStart = range.start;
-            resolvedEnd = range.end;
-            break;
-        }
-    }
-
-    if (!activeSpotlight) {
-        return null;
-    }
+    const s = spotlightSegments.find(seg => seg.visible && outputTimeMs >= seg.outputStartTimeMs && outputTimeMs <= seg.outputEndTimeMs);
+    if (!s) return null;
 
     // Calculate animation progress
-    const { sourceRect, borderRadiusPx, scale: spotlightScale } = activeSpotlight;
     const { transitionDurationMs, dimOpacity } = settings;
 
-    const elapsed = outputTimeMs - resolvedStart;
-    const remaining = resolvedEnd - outputTimeMs;
+    const elapsed = outputTimeMs - s.outputStartTimeMs;
+    const remaining = s.outputEndTimeMs - outputTimeMs;
+    const duration = s.outputEndTimeMs - s.outputStartTimeMs;
+    const halfDuration = duration / 2;
 
     let animationProgress: number;
 
-    // Determine which phase we're in
-    if (elapsed < transitionDurationMs) {
+    if (duration < transitionDurationMs * 2) {
+        // Short spotlight: use halfway as the pivot.
+        // Fade in until halfway, then fade out from whatever progress was reached.
+        if (elapsed <= halfDuration) {
+            animationProgress = elapsed / transitionDurationMs;
+        } else {
+            const peakProgress = halfDuration / transitionDurationMs;
+            const fadeOutElapsed = elapsed - halfDuration;
+            animationProgress = peakProgress - (fadeOutElapsed / transitionDurationMs) * peakProgress;
+        }
+    } else if (elapsed < transitionDurationMs) {
         // Phase 2: Fade in
         animationProgress = elapsed / transitionDurationMs;
     } else if (remaining < transitionDurationMs) {
@@ -108,10 +96,10 @@ export function getSpotlightStateAtTime(
 
     // Interpolate values
     const currentDimOpacity = dimOpacity * easedProgress;
-    const currentScale = 1.0 + (spotlightScale - 1.0) * easedProgress;
+    const currentScale = 1.0 + (s.scale - 1.0) * easedProgress;
 
     // Map source rect to output coordinates using the viewport
-    const mappedRect = viewMapper.projectEventToOutput(sourceRect, viewport);
+    const mappedRect = viewMapper.projectEventToOutput(s.sourceRect, viewport);
 
     // Check if the spotlight is visible in the viewport
     const outputSize = viewMapper.outputSize;
@@ -132,8 +120,8 @@ export function getSpotlightStateAtTime(
             isVisible: true,
             originalRect: clampedRect,
             scaledRect,
-            sourceRect,
-            borderRadiusPx,
+            sourceRect: s.sourceRect,
+            borderRadiusPx: s.borderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };
@@ -144,8 +132,8 @@ export function getSpotlightStateAtTime(
             isVisible: false,
             originalRect: null,
             scaledRect: null,
-            sourceRect,
-            borderRadiusPx,
+            sourceRect: s.sourceRect,
+            borderRadiusPx: s.borderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };

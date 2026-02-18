@@ -5,7 +5,7 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomSegment } from '../../../../types';
 import type { DragState } from './useZoomDrag';
 import { K_MIN_ZOOM_HOLD_MS, K_DEFAULT_ZOOM_HOLD_MS } from './ZoomTrackUtils';
-import { getValidBlockRange, doSourceRangesOverlap, type OutputZoomSegment } from '../timelineTrackUtils';
+import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -23,7 +23,7 @@ export function useZoomHover(
     editingZoomId: string | null,
     setEditingZoom: (id: string | null) => void,
     outputDuration: number,
-    resolvedSegments: OutputZoomSegment[],
+    zoomSegments: ZoomSegment[],
     timeMapper: TimeMapper
 ) {
     const addZoomSegment = useProjectStore(s => s.addZoomSegment);
@@ -50,7 +50,7 @@ export function useZoomHover(
         }
 
         // Don't show ghost if mouse is inside an existing block
-        const isInside = resolvedSegments.some(r =>
+        const isInside = zoomSegments.some(r =>
             mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
         );
         if (isInside) {
@@ -60,7 +60,7 @@ export function useZoomHover(
 
         const range = getValidBlockRange(
             mouseTimeMs,
-            resolvedSegments,
+            zoomSegments,
             outputDuration,
             transitionDurationMs + K_MIN_ZOOM_HOLD_MS,
             transitionDurationMs + K_DEFAULT_ZOOM_HOLD_MS
@@ -113,6 +113,9 @@ export function useZoomHover(
             id: crypto.randomUUID(),
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
+            outputStartTimeMs: hoverInfo.outputStartTimeMs,
+            outputEndTimeMs: hoverInfo.outputEndTimeMs,
+            visible: true,
             rectPx: initialRect,
             reason: 'manual',
             type: 'manual',

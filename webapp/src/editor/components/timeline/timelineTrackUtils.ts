@@ -1,5 +1,4 @@
-import type { SourceTimeSegment, ZoomSegment, SpotlightSegment, CaptionSegment } from '../../../types';
-import type { TimeMapper } from '../../../core/mappers/timeMapper';
+import type { TimeSegment, ZoomSegment, SpotlightSegment, CaptionSegment } from '../../../types';
 
 // ============================================================================
 // SHARED TIMELINE TRACK UTILITIES
@@ -7,57 +6,10 @@ import type { TimeMapper } from '../../../core/mappers/timeMapper';
 // All time values are in OUTPUT TIME (milliseconds).
 // ============================================================================
 
-/**
- * Base interface for any resolved timeline block with output-time positions.
- * id mirrors segment.id for use by shared utility functions.
- */
-export interface OutputTimeBlock {
-    id: string;
-    outputStartTimeMs: number;
-    outputEndTimeMs: number;
-}
-
-/**
- * A resolved segment: output-time positions + the original typed source segment.
- */
-export interface ResolvedSegment<T extends SourceTimeSegment> extends OutputTimeBlock {
-    segment: T;
-}
-
-// Typed aliases for each track
-export type OutputZoomSegment = ResolvedSegment<ZoomSegment>;
-export type OutputSpotlightSegment = ResolvedSegment<SpotlightSegment>;
-export type OutputCaptionSegment = ResolvedSegment<CaptionSegment>;
-
-// ============================================================================
-// RESOLUTION
-// ============================================================================
-
-/**
- * Resolves source-time segments to output-time blocks using TimeMapper.
- * Filters out segments that fall entirely within a cut.
- * Works for any SourceTimeSegment (ZoomSegment, SpotlightSegment, CaptionSegment).
- */
-export function resolveOutputTimes<T extends SourceTimeSegment>(
-    segments: T[],
-    timeMapper: TimeMapper
-): ResolvedSegment<T>[] {
-    const resolved: ResolvedSegment<T>[] = [];
-    for (const segment of segments) {
-        const range = timeMapper.mapSourceRangeToOutputRange(
-            segment.sourceStartTimeMs,
-            segment.sourceEndTimeMs
-        );
-        if (!range) continue;
-        resolved.push({
-            id: segment.id,
-            outputStartTimeMs: range.start,
-            outputEndTimeMs: range.end,
-            segment,
-        });
-    }
-    return resolved;
-}
+// Typed aliases for each track — segments now carry output times directly
+export type OutputZoomSegment = ZoomSegment;
+export type OutputSpotlightSegment = SpotlightSegment;
+export type OutputCaptionSegment = CaptionSegment;
 
 // ============================================================================
 // SOURCE-TIME OVERLAP
@@ -66,7 +18,7 @@ export function resolveOutputTimes<T extends SourceTimeSegment>(
 /**
  * Checks if two source-time ranges overlap.
  */
-export function doSourceRangesOverlap(a: SourceTimeSegment, b: SourceTimeSegment): boolean {
+export function doSourceRangesOverlap(a: TimeSegment, b: TimeSegment): boolean {
     return a.sourceStartTimeMs < b.sourceEndTimeMs && a.sourceEndTimeMs > b.sourceStartTimeMs;
 }
 
@@ -80,11 +32,12 @@ export function doSourceRangesOverlap(a: SourceTimeSegment, b: SourceTimeSegment
  */
 export function getBlockBounds(
     blockId: string,
-    resolvedBlocks: OutputTimeBlock[],
+    segments: TimeSegment[],
     outputDuration: number
 ): { prevEnd: number; nextStart: number } {
-    const sorted = [...resolvedBlocks].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
-    const idx = sorted.findIndex(r => r.id === blockId);
+    const sorted = [...segments]
+        .filter(s => s.visible)
+    const idx = sorted.findIndex(s => s.id === blockId);
 
     if (idx === -1) {
         return { prevEnd: 0, nextStart: outputDuration };
@@ -107,7 +60,7 @@ export function getBlockBounds(
  */
 export function getValidBlockRange(
     mouseTimeMs: number,
-    resolvedBlocks: OutputTimeBlock[],
+    segments: TimeSegment[],
     outputDuration: number,
     minDuration: number,
     defaultDuration: number
@@ -118,12 +71,13 @@ export function getValidBlockRange(
     let prevEnd = 0;
     let nextStart = outputDuration;
 
-    for (const r of resolvedBlocks) {
-        if (r.outputEndTimeMs <= mouseTimeMs) {
-            prevEnd = r.outputEndTimeMs;
+    for (const s of segments) {
+        if (!s.visible) continue;
+        if (s.outputEndTimeMs <= mouseTimeMs) {
+            prevEnd = s.outputEndTimeMs;
         }
-        if (r.outputStartTimeMs > mouseTimeMs && r.outputStartTimeMs < nextStart) {
-            nextStart = r.outputStartTimeMs;
+        if (s.outputStartTimeMs > mouseTimeMs && s.outputStartTimeMs < nextStart) {
+            nextStart = s.outputStartTimeMs;
             break;
         }
     }

@@ -1,7 +1,7 @@
 import { type Project, type ScreenMetadata, type CameraMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
-import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from './zoom';
+import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
-import { calculateAutoSpotlights } from './spotlight/spotlightScheduler';
+import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 
 // Empty events constant
 const EMPTY_USER_EVENTS: UserEvents = {
@@ -218,7 +218,7 @@ export class ProjectImpl {
         const timeMapper = new TimeMapper(outputWindows);
         const focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
         const zoomSegments = hasUserEvents
-            ? calculateZoomSchedule(
+            ? calculateAutoZooms(
                 settings.zoom,
                 viewMapper,
                 timeMapper,

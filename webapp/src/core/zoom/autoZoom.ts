@@ -81,7 +81,7 @@ function toOutputFocusAreas(focusAreas: FocusArea[], timeMapper: TimeMapper): Ou
  * @param focusAreas - Focus areas computed from user events (in source time, pre-sorted)
  * @returns Array of zoom actions with sourceStartTimeMs and sourceEndTimeMs
  */
-export function calculateZoomSchedule(
+export function calculateAutoZooms(
     zoomSettings: ZoomSettings,
     viewMapper: ViewMapper,
     timeMapper: TimeMapper,
@@ -206,6 +206,9 @@ export function calculateZoomSchedule(
         id: crypto.randomUUID(),
         sourceStartTimeMs: timeMapper.mapOutputToSourceTime(action.outputStartTimeMs),
         sourceEndTimeMs: timeMapper.mapOutputToSourceTime(action.outputEndTimeMs),
+        outputStartTimeMs: action.outputStartTimeMs,
+        outputEndTimeMs: action.outputEndTimeMs,
+        visible: true,
         rectPx: action.rectPx,
         reason: action.reason,
         type: 'auto' as const,
@@ -216,7 +219,7 @@ export function calculateZoomSchedule(
 // Viewport Calculation
 // ============================================================================
 
-export function getViewport(
+function getViewport(
     mustSeeRect: Rect,
     maxZoom: number,
     viewMapper: ViewMapper

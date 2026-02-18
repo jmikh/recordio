@@ -1,4 +1,28 @@
-import type { OutputWindow } from '../../types';
+import type { OutputWindow, TimeSegment } from '../../types';
+
+/**
+ * Stamps cached output times onto an array of TimeSegment objects.
+ * Call this whenever outputWindows change or a segment is written.
+ * Source times remain the source of truth — output times are purely a cache.
+ */
+export function recomputeOutputTimes<T extends TimeSegment>(
+    segments: T[],
+    timeMapper: TimeMapper
+): T[] {
+    return segments.map(segment => {
+        const range = timeMapper.mapSourceRangeToOutputRange(
+            segment.sourceStartTimeMs,
+            segment.sourceEndTimeMs
+        );
+        return {
+            ...segment,
+            outputStartTimeMs: range?.start ?? 0,
+            outputEndTimeMs: range?.end ?? 0,
+            visible: range !== null,
+        };
+    });
+}
+
 
 export class TimeMapper {
     private readonly windows: OutputWindow[];

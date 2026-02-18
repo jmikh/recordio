@@ -4,7 +4,7 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { CaptionSegment } from '../../../../types';
-import { getBlockBounds, doSourceRangesOverlap, type OutputCaptionSegment } from '../timelineTrackUtils';
+import { getBlockBounds, doSourceRangesOverlap } from '../timelineTrackUtils';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
@@ -12,7 +12,7 @@ export interface CaptionDragState {
     type: 'move' | 'resize-start' | 'resize-end';
     captionId: string;
     startX: number;
-    /** Output-time positions at drag start (resolved from source) */
+    /** Output-time positions at drag start */
     initialStartTimeMs: number;
     initialEndTimeMs: number;
 }
@@ -22,7 +22,7 @@ export function useCaptionDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     selectCaption: (id: string | null) => void,
-    resolvedCaptions: OutputCaptionSegment[],
+    captionSegments: CaptionSegment[],
     timeMapper: TimeMapper
 ) {
     const updateCaptionSegment = useProjectStore(s => s.updateCaptionSegment);
@@ -46,24 +46,23 @@ export function useCaptionDrag(
         wasDraggingRef.current = false;
         wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
 
-        const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
-        if (!range) return;
+        if (!segment.visible) return;
 
         setDragState({
             type,
             captionId: segment.id,
             startX: e.clientX,
-            initialStartTimeMs: range.start,
-            initialEndTimeMs: range.end,
+            initialStartTimeMs: segment.outputStartTimeMs,
+            initialEndTimeMs: segment.outputEndTimeMs,
         });
         startInteraction();
         selectCaption(segment.id);
 
         // Sync CTI to appropriate edge
         if (type === 'resize-end') {
-            setCurrentTime(range.end);
+            setCurrentTime(segment.outputEndTimeMs);
         } else {
-            setCurrentTime(range.start);
+            setCurrentTime(segment.outputStartTimeMs);
         }
     };
 
@@ -75,7 +74,7 @@ export function useCaptionDrag(
 
         const { prevEnd, nextStart } = getBlockBounds(
             dragState.captionId,
-            resolvedCaptions,
+            captionSegments,
             outputDuration
         );
 
@@ -130,7 +129,7 @@ export function useCaptionDrag(
         } else {
             setCurrentTime(newStart);
         }
-    }, [dragState, coords, updateCaptionSegment, resolvedCaptions, batchAction, outputDuration, setCurrentTime, timeMapper]);
+    }, [dragState, coords, updateCaptionSegment, captionSegments, batchAction, outputDuration, setCurrentTime, timeMapper]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {

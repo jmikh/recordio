@@ -1,5 +1,5 @@
 import type { Size, Rect } from '../../types';
-import type { SpotlightState } from '../spotlight/spotlightMotion';
+import type { SpotlightState } from '../spotlight/spotlightAnimator';
 
 // Cached offscreen canvas for spotlight snapshots (avoids per-frame allocation)
 let _snapshotCanvas: OffscreenCanvas | null = null;

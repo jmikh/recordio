@@ -129,7 +129,10 @@ export class TranscriptionService {
                 id: crypto.randomUUID(),
                 text,
                 sourceStartTimeMs: Math.round((chunk.timestamp[0] || 0) * 1000),
-                sourceEndTimeMs: Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000)
+                sourceEndTimeMs: Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000),
+                outputStartTimeMs: 0,
+                outputEndTimeMs: 0,
+                visible: false, // Will be stamped by setCaptionSegments
             });
         }
 

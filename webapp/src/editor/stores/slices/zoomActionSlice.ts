@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, ZoomSegment } from '../../../types';
+import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 export interface ZoomSegmentSlice {
     updateZoomSegment: (id: ID, action: Partial<ZoomSegment>) => void;
@@ -22,8 +24,11 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
             const nextActions = [...actions];
             nextActions[idx] = { ...nextActions[idx], ...updates };
 
+            // Stamp output times on the updated segment
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(nextActions, timeMapper);
+
             // FORCE AUTO ZOOM OFF if it was on
-            // This prevents recalc from overwriting our manual work
             const nextSettings = {
                 ...state.project.settings,
                 zoom: { ...state.project.settings.zoom, isAuto: false }
@@ -35,7 +40,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        zoomSegments: nextActions
+                        zoomSegments: stamped
                     }
                 }
             };
@@ -48,6 +53,10 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
             const actions = [...state.project.timeline.zoomSegments, action]
                 .sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
 
+            // Stamp output times on the new segment
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(actions, timeMapper);
+
             const nextSettings = {
                 ...state.project.settings,
                 zoom: { ...state.project.settings.zoom, isAuto: false }
@@ -59,7 +68,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        zoomSegments: actions
+                        zoomSegments: stamped
                     }
                 }
             };

@@ -6,8 +6,8 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useSpotlightDrag } from './useSpotlightDrag';
 import { useSpotlightHover } from './useSpotlightHover';
 import { SpotlightBlock } from './SpotlightBlock';
-import { resolveOutputTimes, type OutputSpotlightSegment } from '../timelineTrackUtils';
-import { K_MIN_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
+import type { SpotlightSegment } from '../../../../types';
+
 import {
     ghostSpotlight,
     FADE_HEIGHT,
@@ -50,12 +50,10 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         return timeMapper.getOutputDuration();
     }, [timeMapper]);
 
-    // Resolve spotlights from source time → output time
-    const resolvedSpotlights = useMemo(() => {
-        const all = resolveOutputTimes(timeline.spotlightSegments || [], timeMapper);
-        const minDuration = transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS;
-        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration) as OutputSpotlightSegment[];
-    }, [timeline.spotlightSegments, timeMapper]);
+    // Only filter out non-visible segments (cut windows); no duration gate
+    const spotlightSegments = useMemo(() =>
+        (timeline.spotlightSegments || []).filter((s: SpotlightSegment) => s.visible)
+        , [timeline.spotlightSegments]);
 
     // Hooks
     const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useSpotlightDrag(
@@ -64,7 +62,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         coords,
         outputDuration,
         setEditingSpotlight,
-        resolvedSpotlights,
+        spotlightSegments,
         timeMapper
     );
 
@@ -76,7 +74,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         editingSpotlightId,
         setEditingSpotlight,
         outputDuration,
-        resolvedSpotlights,
+        spotlightSegments,
         timeMapper
     );
 
@@ -98,20 +96,20 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Existing Spotlights (rendered using resolved output times) */}
-                {resolvedSpotlights.map((r) => {
-                    const startX = coords.msToX(r.outputStartTimeMs);
-                    const endX = coords.msToX(r.outputEndTimeMs);
+                {/* Existing Spotlights */}
+                {spotlightSegments.map((s) => {
+                    const startX = coords.msToX(s.outputStartTimeMs);
+                    const endX = coords.msToX(s.outputEndTimeMs);
                     const totalWidth = endX - startX;
 
                     if (totalWidth <= 0) return null;
 
-                    const isSelected = editingSpotlightId === r.id;
-                    const isDragging = dragState?.spotlightId === r.id;
+                    const isSelected = editingSpotlightId === s.id;
+                    const isDragging = dragState?.spotlightId === s.id;
 
                     return (
                         <SpotlightBlock
-                            key={r.id}
+                            key={s.id}
                             left={startX}
                             width={totalWidth}
                             fadeInWidth={fadeWidthPx}
@@ -119,7 +117,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
-                            onMouseDown={(e) => handleDragStart(e, 'move', r.segment, isSelected)}
+                            onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 // Suppress toggle if we just finished dragging
@@ -137,11 +135,11 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             }}
                             onResizeStartMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-start', r.segment, isSelected);
+                                handleDragStart(e, 'resize-start', s, isSelected);
                             }}
                             onResizeEndMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-end', r.segment, isSelected);
+                                handleDragStart(e, 'resize-end', s, isSelected);
                             }}
                         />
                     );

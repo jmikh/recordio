@@ -9,7 +9,7 @@ import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 
 
 import { getViewportStateAtTime } from '../../../core/zoom';
-import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightMotion';
+import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightAnimator';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
 import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings } from '../../../core/zoom/cameraZoom';
 import type { TimeMapper } from '../../../core/mappers/timeMapper';
@@ -60,7 +60,6 @@ export class PlaybackRenderer {
             zoomSegments,
             currentTimeMs,
             outputSize,
-            timeMapper,
             project.settings.zoom
         );
         // -----------------------------------------------------------
@@ -111,8 +110,7 @@ export class PlaybackRenderer {
                 project.settings.spotlight,
                 currentTimeMs,
                 effectiveViewport,
-                viewMapper,
-                timeMapper
+                viewMapper
             );
 
             drawSpotlight(ctx, spotlightState, outputSize, resources.canvas);
@@ -153,7 +151,6 @@ export class PlaybackRenderer {
                         currentTimeMs,
                         outputSize,
                         cameraSettings.shrinkScale ?? 0.5,
-                        timeMapper,
                         project.settings.zoom
                     );
 
@@ -177,7 +174,6 @@ export class PlaybackRenderer {
                 ctx,
                 timeline.captionSegments,
                 project.settings.captions,
-                timeMapper,
                 currentTimeMs,
                 outputSize
             );

@@ -6,7 +6,7 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { CaptionBlock } from './CaptionBlock';
 import { useCaptionDrag } from './useCaptionDrag';
 import { useCaptionHover } from './useCaptionHover';
-import { resolveOutputTimes, type OutputCaptionSegment } from '../timelineTrackUtils';
+import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import { ghostCaption, CAPTION_BLOCK_HEIGHT } from './CaptionTrackStyles';
 
@@ -43,11 +43,12 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         return timeMapper.getOutputDuration();
     }, [timeMapper]);
 
-    // Resolve captions from source time → output time
-    const resolvedCaptions = useMemo(() => {
-        const all = resolveOutputTimes(timeline.captionSegments || [], timeMapper) as OutputCaptionSegment[];
-        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= K_MIN_CAPTION_DURATION_MS);
-    }, [timeline.captionSegments, timeMapper]);
+    // Filter captions: visible and above min duration
+    const captionSegments = useMemo(() => {
+        return (timeline.captionSegments || []).filter((s: CaptionSegment) =>
+            s.visible && (s.outputEndTimeMs - s.outputStartTimeMs) >= K_MIN_CAPTION_DURATION_MS
+        );
+    }, [timeline.captionSegments]);
 
     // Selection handler that also opens the captions settings tab
     const handleSelectCaption = (id: string | null) => {
@@ -63,7 +64,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         coords,
         outputDuration,
         handleSelectCaption,
-        resolvedCaptions,
+        captionSegments,
         timeMapper
     );
 
@@ -73,7 +74,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         dragState,
         selectedCaptionId,
         outputDuration,
-        resolvedCaptions,
+        captionSegments,
         timeMapper
     );
 
@@ -90,27 +91,27 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
-                {/* Existing Captions (rendered using resolved output times) */}
-                {resolvedCaptions.map((r) => {
-                    const startX = coords.msToX(r.outputStartTimeMs);
-                    const endX = coords.msToX(r.outputEndTimeMs);
+                {/* Existing Captions */}
+                {captionSegments.map((s) => {
+                    const startX = coords.msToX(s.outputStartTimeMs);
+                    const endX = coords.msToX(s.outputEndTimeMs);
                     const totalWidth = endX - startX;
 
                     if (totalWidth <= 0) return null;
 
-                    const isSelected = selectedCaptionId === r.segment.id;
-                    const isDragging = dragState?.captionId === r.segment.id;
+                    const isSelected = selectedCaptionId === s.id;
+                    const isDragging = dragState?.captionId === s.id;
 
                     return (
                         <CaptionBlock
-                            key={r.segment.id}
+                            key={s.id}
                             left={startX}
                             width={totalWidth}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
-                            text={r.segment.text || '[empty]'}
-                            onMouseDown={(e) => handleDragStart(e, 'move', r.segment, isSelected)}
+                            text={s.text || '[empty]'}
+                            onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 // Suppress toggle if we just finished dragging
@@ -129,11 +130,11 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                             }}
                             onResizeStartMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-start', r.segment, isSelected);
+                                handleDragStart(e, 'resize-start', s, isSelected);
                             }}
                             onResizeEndMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-end', r.segment, isSelected);
+                                handleDragStart(e, 'resize-end', s, isSelected);
                             }}
                         />
                     );

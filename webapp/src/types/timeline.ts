@@ -7,17 +7,26 @@
 import type { ID, TimeMs, Rect } from '@shared/types';
 
 // ==========================================
-// BASE BLOCK INTERFACES
+// BASE SEGMENT INTERFACE
 // ==========================================
 
 /**
- * Base interface for any timeline action stored in source time.
- * Source time is the original recording time, before cuts and speed adjustments.
+ * Base interface for all timeline segments (zoom, spotlight, caption).
+ *
+ * Source times are the source of truth — stored and edited in source time.
+ * Output times are a cache — recomputed via recomputeOutputTimes() whenever
+ * outputWindows change or a segment is written. Never edit output times directly.
  */
-export interface SourceTimeSegment {
+export interface TimeSegment {
     id: ID;
+    /** Source time: original recording time, before cuts/speed */
     sourceStartTimeMs: TimeMs;
     sourceEndTimeMs: TimeMs;
+    /** Cached output time. Recomputed when windows change. */
+    outputStartTimeMs: TimeMs;
+    outputEndTimeMs: TimeMs;
+    /** False if this segment falls entirely within a cut window. */
+    visible: boolean;
 }
 
 // ==========================================
@@ -26,10 +35,10 @@ export interface SourceTimeSegment {
 
 /**
  * A transcribed caption segment.
- * Timestamps are in source timeline time (before window cuts and speed adjustments).
- * The caption painter uses CaptionTimeMapper to convert to output time at render.
+ * Timestamps are in source time (before window cuts and speed adjustments).
+ * Output times are cached on the segment via recomputeOutputTimes().
  */
-export interface CaptionSegment extends SourceTimeSegment {
+export interface CaptionSegment extends TimeSegment {
     text: string;
 }
 
@@ -69,7 +78,7 @@ export interface OutputWindow {
 // ZOOM ACTIONS
 // ==========================================
 
-export interface ZoomSegment extends SourceTimeSegment {
+export interface ZoomSegment extends TimeSegment {
     /** Target viewport in OUTPUT coordinates (pixels) */
     rectPx: Rect;
     reason: string;
@@ -85,7 +94,7 @@ export interface ZoomSegment extends SourceTimeSegment {
  * and enlarges a specific region with smooth transitions.
  * The spotlight region is defined in SOURCE coordinates (original screen recording).
  */
-export interface SpotlightSegment extends SourceTimeSegment {
+export interface SpotlightSegment extends TimeSegment {
     /** The rectangle to spotlight (in SOURCE video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */

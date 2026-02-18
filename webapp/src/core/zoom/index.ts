@@ -3,11 +3,7 @@
 
 export { getAllFocusAreas, type FocusArea } from './focusManager';
 export {
-    calculateZoomSchedule,
+    calculateAutoZooms,
     ViewMapper
 } from './autoZoom';
-export {
-    getViewportStateAtTime,
-    prepareZoomSegmentsForInterpolation,
-    type PreparedZoomSegment
-} from './zoomAnimator';
+export { getViewportStateAtTime } from './zoomAnimator';

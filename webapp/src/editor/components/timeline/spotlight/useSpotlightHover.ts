@@ -4,8 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightSegment, SpotlightSettings } from '../../../../types';
 import type { DragState } from './useSpotlightDrag';
-import { getValidBlockRange, doSourceRangesOverlap, type OutputSpotlightSegment } from '../timelineTrackUtils';
-import { K_MIN_SPOTLIGHT_HOLD_MS, K_DEFAULT_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
+import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
+import { K_MIN_SPOTLIGHT_DURATION_MS, K_DEFAULT_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -23,7 +23,7 @@ export function useSpotlightHover(
     editingSpotlightId: string | null,
     setEditingSpotlight: (id: string | null) => void,
     outputDuration: number,
-    resolvedSpotlights: OutputSpotlightSegment[],
+    spotlightSegments: SpotlightSegment[],
     timeMapper: TimeMapper
 ) {
     const addSpotlight = useProjectStore(s => s.addSpotlight);
@@ -59,7 +59,7 @@ export function useSpotlightHover(
         }
 
         // Check if we are inside an existing (visible) spotlight
-        const isInside = resolvedSpotlights.some(r =>
+        const isInside = spotlightSegments.some(r =>
             mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
         );
 
@@ -71,9 +71,9 @@ export function useSpotlightHover(
         // Find valid range for new spotlight (starts at mouse position, using resolved output times)
         const range = getValidBlockRange(
             mouseTimeMs,
-            resolvedSpotlights,
+            spotlightSegments,
             outputDuration,
-            settings.transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS,
+            K_MIN_SPOTLIGHT_DURATION_MS,
             defaultDuration
         );
 
@@ -134,6 +134,9 @@ export function useSpotlightHover(
             id: crypto.randomUUID(),
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
+            outputStartTimeMs: hoverInfo.outputStartTimeMs,
+            outputEndTimeMs: hoverInfo.outputEndTimeMs,
+            visible: true,
             sourceRect: initialSourceRect,
             borderRadiusPx: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
             scale: project.settings.spotlight.enlargeScale,

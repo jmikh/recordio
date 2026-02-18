@@ -13,7 +13,7 @@ import {
     HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
-import { resolveOutputTimes, type OutputZoomSegment } from '../timelineTrackUtils';
+import type { ZoomSegment } from '../../../../types';
 
 interface ZoomTrackProps {
     height: number;
@@ -46,12 +46,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const coords = useMemo(() => new TimePixelMapper(timeMapper, pixelsPerSec), [timeMapper, pixelsPerSec]);
     const outputDuration = useMemo(() => timeMapper.getOutputDuration(), [timeMapper]);
 
-    // Resolve zoom segments from source → output time, filter below min duration
-    const resolvedSegments = useMemo(() => {
-        const all = resolveOutputTimes(timeline.zoomSegments || [], timeMapper);
-        const minDuration = transitionDurationMs + K_MIN_ZOOM_HOLD_MS;
-        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration) as OutputZoomSegment[];
-    }, [timeline.zoomSegments, timeMapper, transitionDurationMs]);
+    // Filter zoom segments: only show visible ones
+    const zoomSegments = useMemo(() =>
+        (timeline.zoomSegments || []).filter((s: ZoomSegment) => s.visible),
+        [timeline.zoomSegments]);
 
     // Transition-in width in pixels
     const transitionInWidthPx = coords.msToX(transitionDurationMs);
@@ -66,7 +64,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         coords,
         outputDuration,
         setEditingZoom,
-        resolvedSegments,
+        zoomSegments,
         timeMapper
     );
 
@@ -78,7 +76,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         editingZoomId,
         setEditingZoom,
         outputDuration,
-        resolvedSegments,
+        zoomSegments,
         timeMapper
     );
 
@@ -94,26 +92,26 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             <div className="relative flex-1" style={{ height }}>
 
                 {/* Zoom blocks */}
-                {resolvedSegments.map((r) => {
-                    const startX = coords.msToX(r.outputStartTimeMs);
-                    const endX = coords.msToX(r.outputEndTimeMs);
+                {zoomSegments.map((s) => {
+                    const startX = coords.msToX(s.outputStartTimeMs);
+                    const endX = coords.msToX(s.outputEndTimeMs);
                     const blockWidth = Math.max(endX - startX, 2);
 
                     if (blockWidth <= 0) return null;
 
-                    const isSelected = editingZoomId === r.id;
-                    const isDragging = dragState?.zoomId === r.id;
+                    const isSelected = editingZoomId === s.id;
+                    const isDragging = dragState?.zoomId === s.id;
 
                     return (
                         <ZoomBlock
-                            key={r.id}
+                            key={s.id}
                             left={startX}
                             width={blockWidth}
                             transitionInWidth={transitionInWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
-                            onMouseDown={(e) => handleDragStart(e, 'move', r.segment, isSelected)}
+                            onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (wasDraggingRef.current) {
@@ -126,11 +124,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             }}
                             onResizeStartMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-start', r.segment, isSelected);
+                                handleDragStart(e, 'resize-start', s, isSelected);
                             }}
                             onResizeEndMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-end', r.segment, isSelected);
+                                handleDragStart(e, 'resize-end', s, isSelected);
                             }}
                         />
                     );

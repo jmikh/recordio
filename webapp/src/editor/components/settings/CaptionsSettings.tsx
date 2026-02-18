@@ -8,7 +8,7 @@ import { Slider, DefaultButton, CollapsibleCard, Toggle, Dropdown, type PreviewI
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
 import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
-import { TimeMapper } from '../../../core/mappers/timeMapper';
+
 import { PrimaryButton } from '@shared/components';
 import { Notice } from '@shared/components';
 import { XButton } from '@shared/components';
@@ -62,8 +62,6 @@ export function CaptionsSettings() {
     const outputWindows = project.timeline.outputWindows;
     const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
 
-    // Create TimeMapper for source→output time conversion
-    const timeMapper = useMemo(() => new TimeMapper(outputWindows), [outputWindows]);
 
     // Focus when editing starts
     useEffect(() => {
@@ -113,11 +111,9 @@ export function CaptionsSettings() {
         if (!captionSegments || captionSegments.length === 0) return;
 
         // Find segment containing current time
-        const currentSegment = captionSegments.find(segment => {
-            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
-            if (!outputRange) return false;
-            return currentTimeMs >= outputRange.start && currentTimeMs <= outputRange.end;
-        });
+        const currentSegment = captionSegments.find(segment =>
+            segment.visible && currentTimeMs >= segment.outputStartTimeMs && currentTimeMs <= segment.outputEndTimeMs
+        );
 
         if (currentSegment) {
             if (selectedCaptionId !== currentSegment.id) {
@@ -129,7 +125,7 @@ export function CaptionsSettings() {
                 selectCaption(null);
             }
         }
-    }, [isPlaying, currentTimeMs, captionSegments, timeMapper, canvasMode, selectedSettingsPanel, selectedCaptionId, selectCaption]);
+    }, [isPlaying, currentTimeMs, captionSegments, canvasMode, selectedSettingsPanel, selectedCaptionId, selectCaption]);
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
@@ -292,10 +288,7 @@ export function CaptionsSettings() {
         startInteraction();
 
         // Move CTI to the start of the caption
-        const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
-        if (outputRange) {
-            setCurrentTime(outputRange.start + 1);
-        }
+        setCurrentTime(segment.outputStartTimeMs + 1);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -481,10 +474,8 @@ export function CaptionsSettings() {
                 >
                     <div ref={captionsContainerRef}>
                         {captionSegments.map(segment => {
-                            // Convert source time to output time for display
-                            const outputRange = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
-                            const outputStart = outputRange?.start ?? segment.sourceStartTimeMs;
-                            const outputEnd = outputRange?.end ?? segment.sourceEndTimeMs;
+                            const outputStart = segment.outputStartTimeMs;
+                            const outputEnd = segment.outputEndTimeMs;
                             const isSelected = selectedCaptionId === segment.id;
                             const isEditing = isSelected || editingId === segment.id;
 

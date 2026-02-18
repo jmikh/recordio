@@ -1,55 +1,5 @@
 import { type ZoomSegment, type Size, type Rect, type ZoomSettings } from '../../types';
-import { TimeMapper } from '../mappers/timeMapper';
 import { applyEasing } from '../easing';
-
-// ============================================================================
-// Prepared Zoom Action
-// ============================================================================
-
-/**
- * Prepared zoom action with computed output times and duration.
- * Used for viewport interpolation and UI rendering.
- */
-export interface PreparedZoomSegment extends ZoomSegment {
-    outputStartTime: number;
-    outputEndTime: number;
-    duration: number;
-}
-
-// ============================================================================
-// Preparation / Resolution
-// ============================================================================
-
-/**
- * Prepares zoom actions for interpolation by converting source times to output times.
- * Filters out invisible zooms (those that map outside the output range).
- * Input is assumed to be pre-sorted by source time; output is sorted by output start time.
- */
-export function prepareZoomSegmentsForInterpolation(
-    actions: ZoomSegment[],
-    timeMapper: TimeMapper,
-    zoomSettings: ZoomSettings
-): PreparedZoomSegment[] {
-    return actions
-        .map(action => {
-            const outputStartTime = timeMapper.mapSourceToOutputTime(action.sourceStartTimeMs);
-            let outputEndTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
-            // If end time is past the last window, clamp to output duration
-            if (outputEndTime === -1 && outputStartTime !== -1) {
-                outputEndTime = timeMapper.outputDuration;
-            }
-            return { action, outputStartTime, outputEndTime };
-        })
-        .filter(({ outputStartTime, outputEndTime }) =>
-            outputStartTime !== -1 && outputEndTime !== -1
-        )
-        .map(({ action, outputStartTime, outputEndTime }) => ({
-            ...action,
-            outputStartTime,
-            outputEndTime,
-            duration: outputEndTime - outputStartTime,
-        }));
-}
 
 // ============================================================================
 // Viewport Interpolation
@@ -80,54 +30,56 @@ export function getViewportStateAtTime(
     actions: ZoomSegment[],
     outputTimeMs: number,
     outputSize: Size,
-    timeMapper: TimeMapper,
     zoomSettings: ZoomSettings
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
     const T = zoomSettings.transitionDurationMs;
     const easing = zoomSettings.easing ?? 'ease-in-out';
 
-    const prepared = prepareZoomSegmentsForInterpolation(actions, timeMapper, zoomSettings);
-
-    if (prepared.length === 0) return fullRect;
+    // Find the first visible segment
+    const firstVisible = actions.find(s => s.visible);
+    if (!firstVisible) return fullRect;
 
     // Before the first block starts
-    if (outputTimeMs < prepared[0].outputStartTime) return fullRect;
+    if (outputTimeMs < firstVisible.outputStartTimeMs) return fullRect;
 
     // Forward pass: track currentRect as the state at the start of each block
-    // (i.e. wherever the previous gap zoom-out reached by the time this block begins)
     let currentRect = fullRect;
 
-    for (let i = 0; i < prepared.length; i++) {
-        const block = prepared[i];
-        const nextBlock = prepared[i + 1] ?? null;
+    for (let i = 0; i < actions.length; i++) {
+        const block = actions[i];
+        if (!block.visible) continue;
 
-        // Clamp transition-in end to the block's own end time.
-        // If the block is shorter than T, the zoom-in never fully completes —
-        // it just reaches wherever it gets to by outputEndTime.
-        const transitionInEnd = Math.min(block.outputStartTime + T, block.outputEndTime);
+        // Find next visible block
+        let nextBlock: ZoomSegment | null = null;
+        for (let j = i + 1; j < actions.length; j++) {
+            if (actions[j].visible) { nextBlock = actions[j]; break; }
+        }
+
+        const blockStart = block.outputStartTimeMs;
+        const blockEnd = block.outputEndTimeMs;
+
+        const transitionInEnd = Math.min(blockStart + T, blockEnd);
 
         // ---- PHASE 1a: Transition IN ----
-        if (outputTimeMs >= block.outputStartTime && outputTimeMs < transitionInEnd) {
-            const elapsed = outputTimeMs - block.outputStartTime;
+        if (outputTimeMs >= blockStart && outputTimeMs < transitionInEnd) {
+            const elapsed = outputTimeMs - blockStart;
             const t = applyEasing(Math.min(elapsed / T, 1), easing);
             return interpolateRect(currentRect, block.rectPx, t);
         }
 
         // ---- PHASE 1b: Hold ----
-        // Only exists if the block is longer than T
-        if (outputTimeMs >= transitionInEnd && outputTimeMs < block.outputEndTime) {
+        if (outputTimeMs >= transitionInEnd && outputTimeMs < blockEnd) {
             return block.rectPx;
         }
 
-        // We're past this block — compute the rect at block end
-        // (may be partially zoomed-in if block was shorter than T)
-        const rectAtBlockEnd = (block.outputEndTime - block.outputStartTime) >= T
+        // Past this block — compute rect at block end
+        const rectAtBlockEnd = (blockEnd - blockStart) >= T
             ? block.rectPx
-            : interpolateRect(currentRect, block.rectPx, applyEasing(Math.min((block.outputEndTime - block.outputStartTime) / T, 1), easing));
+            : interpolateRect(currentRect, block.rectPx, applyEasing(Math.min((blockEnd - blockStart) / T, 1), easing));
 
-        const gapStart = block.outputEndTime;
-        const gapEnd = nextBlock ? nextBlock.outputStartTime : gapStart + T;
+        const gapStart = blockEnd;
+        const gapEnd = nextBlock ? nextBlock.outputStartTimeMs : gapStart + T;
 
         if (outputTimeMs >= gapStart && outputTimeMs < gapEnd) {
             // ---- PHASE 2: Gap zoom-out ----
@@ -137,13 +89,12 @@ export function getViewportStateAtTime(
         }
 
         if (outputTimeMs >= gapEnd && !nextBlock) {
-            // ---- After last block, gap complete ----
             return fullRect;
         }
 
-        // Advance currentRect to wherever the gap zoom-out reached at nextBlock.outputStartTime
+        // Advance currentRect to wherever the gap zoom-out reached at next block start
         if (nextBlock) {
-            const gapElapsed = nextBlock.outputStartTime - gapStart;
+            const gapElapsed = nextBlock.outputStartTimeMs - gapStart;
             const t = applyEasing(Math.min(gapElapsed / T, 1), easing);
             currentRect = interpolateRect(rectAtBlockEnd, fullRect, t);
         }

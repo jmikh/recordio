@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { CaptionSegment } from '../../../types';
+import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 
 export interface TranscriptionSlice {
@@ -32,24 +34,28 @@ export const createTranscriptionSlice: StateCreator<
     },
 
     setCaptionSegments: (segments) => {
-        set(state => ({
-            project: {
-                ...state.project,
-                timeline: {
-                    ...state.project.timeline,
-                    captionSegments: segments
-                },
-                settings: {
-                    ...state.project.settings,
-                    captions: {
-                        ...state.project.settings.captions,
-                        baselineCaptions: segments.map(s => ({ ...s })),
-                        generatedAt: new Date()
-                    }
-                },
-                updatedAt: new Date()
-            }
-        }));
+        set(state => {
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(segments, timeMapper);
+            return ({
+                project: {
+                    ...state.project,
+                    timeline: {
+                        ...state.project.timeline,
+                        captionSegments: stamped
+                    },
+                    settings: {
+                        ...state.project.settings,
+                        captions: {
+                            ...state.project.settings.captions,
+                            baselineCaptions: segments.map(s => ({ ...s })),
+                            generatedAt: new Date()
+                        }
+                    },
+                    updatedAt: new Date()
+                }
+            });
+        });
     },
 
     restoreCaptionsFromBaseline: () => {
@@ -114,12 +120,16 @@ export const createTranscriptionSlice: StateCreator<
                 ...updates
             };
 
+            // Stamp output times if source times changed
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(updatedSegments, timeMapper);
+
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        captionSegments: updatedSegments
+                        captionSegments: stamped
                     },
                     updatedAt: new Date()
                 }
@@ -165,12 +175,16 @@ export const createTranscriptionSlice: StateCreator<
                 (a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs
             );
 
+            // Stamp output times
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(updatedSegments, timeMapper);
+
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        captionSegments: updatedSegments
+                        captionSegments: stamped
                     },
                     updatedAt: new Date()
                 }

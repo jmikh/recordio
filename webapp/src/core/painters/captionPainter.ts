@@ -1,6 +1,4 @@
 import type { Size, CaptionSettings, CaptionSegment } from '../../types';
-import { CaptionTimeMapper } from '../mappers/CaptionTimeMapper';
-import { TimeMapper } from '../mappers/timeMapper';
 
 // ══════════════════════════════════════════
 // Reference Constants (designed for 1080px height)
@@ -50,7 +48,6 @@ export function drawCaptions(
     ctx: CanvasRenderingContext2D,
     captionSegments: CaptionSegment[],
     settings: CaptionSettings,
-    timeMapper: TimeMapper,
     currentTimeMs: number,
     outputSize: Size
 ) {
@@ -59,13 +56,11 @@ export function drawCaptions(
         return;
     }
 
-    // Create caption time mapper to convert source time → output time
-    const captionTimeMapper = new CaptionTimeMapper(captionSegments, timeMapper);
-
-    // Get visible captions at current time (with output ranges)
-    const visibleSegments = captionTimeMapper.getVisibleSegments();
-    const visibleCaptions = visibleSegments.filter(segment =>
-        currentTimeMs >= segment.outputRange.start && currentTimeMs < segment.outputRange.end
+    // Get captions active at current time using cached output times
+    const visibleCaptions = captionSegments.filter(segment =>
+        segment.visible &&
+        currentTimeMs >= segment.outputStartTimeMs &&
+        currentTimeMs < segment.outputEndTimeMs
     );
 
     if (visibleCaptions.length === 0) {
@@ -95,9 +90,9 @@ export function drawCaptions(
         const text = caption.text || '[empty]';
         const words = text.split(' ').filter(w => w.length > 0);
 
-        // Calculate elapsed ratio within this segment (using output range)
-        const segmentStart = caption.outputRange.start;
-        const segmentEnd = caption.outputRange.end;
+        // Calculate elapsed ratio within this segment (using cached output times)
+        const segmentStart = caption.outputStartTimeMs;
+        const segmentEnd = caption.outputEndTimeMs;
         const segmentDuration = segmentEnd - segmentStart;
         const elapsedRatio = segmentDuration > 0
             ? (currentTimeMs - segmentStart) / segmentDuration
@@ -105,7 +100,7 @@ export function drawCaptions(
 
         // Get which word should be highlighted (if highlighting is enabled)
         const highlightEnabled = settings.wordHighlight !== false;
-        const highlightedWordIndex = highlightEnabled ? captionTimeMapper.getHighlightedWordIndex(words, elapsedRatio) : -1;
+        const highlightedWordIndex = highlightEnabled ? getHighlightedWordIndex(words, elapsedRatio) : -1;
 
         // Word wrap the text if it exceeds maxWidth - returns lines with word indices
         const wrappedLines = wrapTextWithWordInfo(ctx, words, maxWidth - (paddingX * 2));
@@ -169,6 +164,26 @@ export function drawCaptions(
     }
 
     ctx.restore();
+}
+
+/**
+ * Calculates which word should be highlighted based on elapsed time in segment.
+ * Uses letter count + base value for proportional timing.
+ */
+function getHighlightedWordIndex(words: string[], elapsedRatio: number): number {
+    if (words.length === 0) return -1;
+    if (words.length === 1) return 0;
+
+    const WORD_BASE_VALUE = 3;
+    const weights = words.map(word => word.length + WORD_BASE_VALUE);
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+    let cumulative = 0;
+    for (let i = 0; i < words.length; i++) {
+        cumulative += weights[i] / totalWeight;
+        if (elapsedRatio < cumulative) return i;
+    }
+    return words.length - 1;
 }
 
 interface LineInfo {

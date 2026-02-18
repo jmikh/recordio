@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, SpotlightSegment } from '../../../types';
+import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;
@@ -25,6 +27,10 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             // Sort by start time to maintain order
             nextSpotlightSegments.sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
+            // Stamp output times
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(nextSpotlightSegments, timeMapper);
+
             // If sourceRect is being changed, set isAuto to false
             const nextSettings = updates.sourceRect
                 ? { ...state.project.settings, spotlight: { ...state.project.settings.spotlight, isAuto: false } }
@@ -36,7 +42,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
-                        spotlightSegments: nextSpotlightSegments
+                        spotlightSegments: stamped
                     }
                 }
             };
@@ -48,6 +54,10 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
         set(state => {
             const spotlightSegments = [...state.project.timeline.spotlightSegments, spotlight]
                 .sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
+
+            // Stamp output times
+            const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
+            const stamped = recomputeOutputTimes(spotlightSegments, timeMapper);
 
             // Manual spotlight addition sets isAuto to false
             return {
@@ -62,7 +72,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     },
                     timeline: {
                         ...state.project.timeline,
-                        spotlightSegments
+                        spotlightSegments: stamped
                     }
                 }
             };

@@ -3,10 +3,10 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import { getBlockBounds, doSourceRangesOverlap } from '../timelineTrackUtils';
 import type { ZoomSegment } from '../../../../types';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
-import { getBlockBounds, doSourceRangesOverlap, type OutputZoomSegment } from '../timelineTrackUtils';
 
 export interface DragState {
     type: 'move' | 'resize-start' | 'resize-end';
@@ -23,7 +23,7 @@ export function useZoomDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     setEditingZoom: (id: string | null) => void,
-    resolvedSegments: OutputZoomSegment[],
+    zoomSegments: ZoomSegment[],
     timeMapper: TimeMapper
 ) {
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
@@ -46,23 +46,22 @@ export function useZoomDrag(
         wasDraggingRef.current = false;
         wasSelectedBeforeMousedownRef.current = isCurrentlySelected;
 
-        const range = timeMapper.mapSourceRangeToOutputRange(segment.sourceStartTimeMs, segment.sourceEndTimeMs);
-        if (!range) return;
+        if (!segment.visible) return;
 
         setDragState({
             type,
             zoomId: segment.id,
             startX: e.clientX,
-            initialStartTimeMs: range.start,
-            initialEndTimeMs: range.end,
+            initialStartTimeMs: segment.outputStartTimeMs,
+            initialEndTimeMs: segment.outputEndTimeMs,
         });
         startInteraction();
         setEditingZoom(segment.id);
 
         if (type === 'resize-end') {
-            setCurrentTime(range.end);
+            setCurrentTime(segment.outputEndTimeMs);
         } else {
-            setCurrentTime(range.start);
+            setCurrentTime(segment.outputStartTimeMs);
         }
     };
 
@@ -72,7 +71,7 @@ export function useZoomDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const { prevEnd, nextStart } = getBlockBounds(dragState.zoomId, resolvedSegments, outputDuration);
+        const { prevEnd, nextStart } = getBlockBounds(dragState.zoomId, zoomSegments, outputDuration);
         const { transitionDurationMs } = project.settings.zoom;
         const minDuration = transitionDurationMs + K_MIN_ZOOM_HOLD_MS;
 
@@ -115,7 +114,7 @@ export function useZoomDrag(
         } else {
             setCurrentTime(newStart);
         }
-    }, [dragState, coords, updateZoomSegment, resolvedSegments, batchAction, outputDuration, setCurrentTime, timeMapper, project.settings.zoom]);
+    }, [dragState, coords, updateZoomSegment, zoomSegments, batchAction, outputDuration, setCurrentTime, timeMapper, project.settings.zoom]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (dragState) {

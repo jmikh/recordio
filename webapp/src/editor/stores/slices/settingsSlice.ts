@@ -3,7 +3,8 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ProjectSettings } from '../../../types';
 import { isSubset } from '../../utils/subsetMatcher';
-import { recalculateAutoZooms } from './windowSlice';
+import { calculateAutoZooms, ViewMapper } from '../../../core/zoom';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 type DeepPartial<T> = {
     [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
@@ -101,7 +102,19 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                 // When output size changes with manual zooms, clear them since rects are invalid
                 nextActions = [];
             } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.isAuto) {
-                nextActions = recalculateAutoZooms(nextProject);
+                const sourceSize = nextProject.screenSource.size;
+                if (sourceSize && sourceSize.width > 0) {
+                    const viewMapper = new ViewMapper(
+                        sourceSize, nextSettings.outputSize,
+                        nextSettings.screen.padding, nextSettings.screen.crop,
+                        nextProject.screenSource.trackableContentRect,
+                        nextSettings.screen.toolbar.enabled
+                    );
+                    const timeMapper = getTimeMapper(nextProject.timeline.outputWindows);
+                    nextActions = calculateAutoZooms(
+                        nextSettings.zoom, viewMapper, timeMapper, nextProject.timeline.focusAreas
+                    );
+                }
             }
             // Duration changes no longer require action - duration is derived dynamically
 

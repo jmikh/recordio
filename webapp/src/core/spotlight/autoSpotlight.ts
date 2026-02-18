@@ -7,7 +7,7 @@
 
 import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, Rect, Size, ZoomSettings } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
-import { getViewportStateAtTime, prepareZoomSegmentsForInterpolation } from '../zoom';
+import { getViewportStateAtTime } from '../zoom';
 import { TimeMapper } from '../mappers/timeMapper';
 
 // ============================================================================
@@ -90,7 +90,7 @@ class SpotlightScheduler {
      * Process a single hovered card and return a spotlight action if it qualifies.
      */
     private processCard(card: HoveredCardEvent, index: number): SpotlightSegment | null {
-        // Map time range to output coordinates
+        // Map time range to output coordinates using cached fields
         const outputRange = this.timeMapper.mapSourceRangeToOutputRange(card.timestamp, card.endTime);
         if (!outputRange) {
             console.log(`[AutoSpotlight] Card ${index}: SKIPPED - not visible in output (trimmed)`);
@@ -152,6 +152,9 @@ class SpotlightScheduler {
             id: crypto.randomUUID(),
             sourceStartTimeMs: spotlightSourceStartMs,
             sourceEndTimeMs: spotlightSourceEndMs,
+            outputStartTimeMs: bufferedOutputRange.start,
+            outputEndTimeMs: bufferedOutputRange.end,
+            visible: true,
             sourceRect: card.targetRect,
             borderRadiusPx: outputCornerRadii,
             scale,
@@ -177,17 +180,17 @@ class SpotlightScheduler {
         const viewports: Rect[] = [];
 
         // Viewport at start
-        viewports.push(getViewportStateAtTime(this.zoomSegments, startMs, this.outputSize, this.timeMapper, this.zoomSettings));
+        viewports.push(getViewportStateAtTime(this.zoomSegments, startMs, this.outputSize, this.zoomSettings));
 
         // Viewport at end
-        viewports.push(getViewportStateAtTime(this.zoomSegments, endMs, this.outputSize, this.timeMapper, this.zoomSettings));
+        viewports.push(getViewportStateAtTime(this.zoomSegments, endMs, this.outputSize, this.zoomSettings));
 
-        // Viewports at any zoom action start times (derived from source time) within the range
-        const preparedActions = prepareZoomSegmentsForInterpolation(this.zoomSegments, this.timeMapper, this.zoomSettings);
-        for (const action of preparedActions) {
-            const actionStartMs = action.outputStartTime;
+        // Viewports at any zoom action start times within the range
+        for (const s of this.zoomSegments) {
+            if (!s.visible) continue;
+            const actionStartMs = s.outputStartTimeMs;
             if (actionStartMs > startMs && actionStartMs < endMs) {
-                viewports.push(getViewportStateAtTime(this.zoomSegments, actionStartMs, this.outputSize, this.timeMapper, this.zoomSettings));
+                viewports.push(getViewportStateAtTime(this.zoomSegments, actionStartMs, this.outputSize, this.zoomSettings));
             }
         }
 
