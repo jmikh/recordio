@@ -4,8 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomSegment } from '../../../../types';
 import type { DragState } from './useZoomDrag';
-import type { ResolvedZoomSegment } from './ZoomTrackUtils';
-import { getValidBlockRange, getMinZoomDuration, getDefaultZoomDuration, doSourceRangesOverlap } from './ZoomTrackUtils';
+import { K_MIN_ZOOM_HOLD_MS, K_DEFAULT_ZOOM_HOLD_MS } from './ZoomTrackUtils';
+import { getValidBlockRange, doSourceRangesOverlap, type OutputZoomSegment } from '../timelineTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -23,7 +23,7 @@ export function useZoomHover(
     editingZoomId: string | null,
     setEditingZoom: (id: string | null) => void,
     outputDuration: number,
-    resolvedSegments: ResolvedZoomSegment[],
+    resolvedSegments: OutputZoomSegment[],
     timeMapper: TimeMapper
 ) {
     const addZoomSegment = useProjectStore(s => s.addZoomSegment);
@@ -62,8 +62,8 @@ export function useZoomHover(
             mouseTimeMs,
             resolvedSegments,
             outputDuration,
-            getMinZoomDuration(transitionDurationMs),
-            getDefaultZoomDuration(transitionDurationMs)
+            transitionDurationMs + K_MIN_ZOOM_HOLD_MS,
+            transitionDurationMs + K_DEFAULT_ZOOM_HOLD_MS
         );
         if (!range) {
             setHoverInfo(null);

@@ -6,14 +6,14 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useZoomDrag } from './useZoomDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomBlock } from './ZoomBlock';
-import { resolveZoomOutputTimes, getMinZoomDuration } from './ZoomTrackUtils';
+import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
     TRANSITION_HEIGHT,
     HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
-import type { ZoomSegment } from '../../../../types';
+import { resolveOutputTimes, type OutputZoomSegment } from '../timelineTrackUtils';
 
 interface ZoomTrackProps {
     height: number;
@@ -48,9 +48,9 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     // Resolve zoom segments from source → output time, filter below min duration
     const resolvedSegments = useMemo(() => {
-        const all = resolveZoomOutputTimes(timeline.zoomSegments || [], timeMapper);
-        const minDuration = getMinZoomDuration(transitionDurationMs);
-        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration);
+        const all = resolveOutputTimes(timeline.zoomSegments || [], timeMapper);
+        const minDuration = transitionDurationMs + K_MIN_ZOOM_HOLD_MS;
+        return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= minDuration) as OutputZoomSegment[];
     }, [timeline.zoomSegments, timeMapper, transitionDurationMs]);
 
     // Transition-in width in pixels
@@ -101,22 +101,19 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                     if (blockWidth <= 0) return null;
 
-                    const isSelected = editingZoomId === r.zoomSegment.id;
-                    const isDragging = dragState?.zoomId === r.zoomSegment.id;
-
-                    const originalSegment = (timeline.zoomSegments as ZoomSegment[]).find(a => a.id === r.zoomSegment.id);
-                    if (!originalSegment) return null;
+                    const isSelected = editingZoomId === r.id;
+                    const isDragging = dragState?.zoomId === r.id;
 
                     return (
                         <ZoomBlock
-                            key={r.zoomSegment.id}
+                            key={r.id}
                             left={startX}
                             width={blockWidth}
                             transitionInWidth={transitionInWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
-                            onMouseDown={(e) => handleDragStart(e, 'move', originalSegment, isSelected)}
+                            onMouseDown={(e) => handleDragStart(e, 'move', r.segment, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (wasDraggingRef.current) {
@@ -129,11 +126,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             }}
                             onResizeStartMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-start', originalSegment, isSelected);
+                                handleDragStart(e, 'resize-start', r.segment, isSelected);
                             }}
                             onResizeEndMouseDown={(e) => {
                                 e.stopPropagation();
-                                handleDragStart(e, 'resize-end', originalSegment, isSelected);
+                                handleDragStart(e, 'resize-end', r.segment, isSelected);
                             }}
                         />
                     );

@@ -6,7 +6,8 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { CaptionBlock } from './CaptionBlock';
 import { useCaptionDrag } from './useCaptionDrag';
 import { useCaptionHover } from './useCaptionHover';
-import { resolveCaptionOutputTimes, K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
+import { resolveOutputTimes, type OutputCaptionSegment } from '../timelineTrackUtils';
+import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import { ghostCaption, CAPTION_BLOCK_HEIGHT } from './CaptionTrackStyles';
 
 interface CaptionTrackProps {
@@ -44,7 +45,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
 
     // Resolve captions from source time → output time
     const resolvedCaptions = useMemo(() => {
-        const all = resolveCaptionOutputTimes(timeline.captionSegments || [], timeMapper);
+        const all = resolveOutputTimes(timeline.captionSegments || [], timeMapper) as OutputCaptionSegment[];
         return all.filter(r => (r.outputEndTimeMs - r.outputStartTimeMs) >= K_MIN_CAPTION_DURATION_MS);
     }, [timeline.captionSegments, timeMapper]);
 

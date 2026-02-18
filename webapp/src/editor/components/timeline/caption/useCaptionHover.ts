@@ -4,12 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { CaptionSegment } from '../../../../types';
 import type { CaptionDragState } from './useCaptionDrag';
-import type { ResolvedCaption } from './CaptionTrackUtils';
-import {
-    getValidCaptionRange,
-    K_MIN_CAPTION_DURATION_MS,
-    K_DEFAULT_CAPTION_DURATION_MS,
-} from './CaptionTrackUtils';
+import { getValidBlockRange, type OutputCaptionSegment } from '../timelineTrackUtils';
+import { K_MIN_CAPTION_DURATION_MS, K_DEFAULT_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface CaptionHoverInfo {
@@ -25,7 +21,7 @@ export function useCaptionHover(
     dragState: CaptionDragState | null,
     selectedCaptionId: string | null,
     outputDuration: number,
-    resolvedCaptions: ResolvedCaption[],
+    resolvedCaptions: OutputCaptionSegment[],
     timeMapper: TimeMapper
 ) {
     const addCaptionSegment = useProjectStore(s => s.addCaptionSegment);
@@ -61,7 +57,7 @@ export function useCaptionHover(
             return;
         }
 
-        const range = getValidCaptionRange(
+        const range = getValidBlockRange(
             mouseTimeMs,
             resolvedCaptions,
             outputDuration,

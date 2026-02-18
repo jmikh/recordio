@@ -4,8 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightSegment } from '../../../../types';
-import type { ResolvedSpotlight } from './SpotlightTrackUtils';
-import { getSpotlightBounds, getMinSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
+import { getBlockBounds, doSourceRangesOverlap, type OutputSpotlightSegment } from '../timelineTrackUtils';
+import { K_MIN_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface DragState {
@@ -23,7 +23,7 @@ export function useSpotlightDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     setEditingSpotlight: (id: string | null) => void,
-    resolvedSpotlights: ResolvedSpotlight[],
+    resolvedSpotlights: OutputSpotlightSegment[],
     timeMapper: TimeMapper
 ) {
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
@@ -78,7 +78,7 @@ export function useSpotlightDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const { prevEnd, nextStart } = getSpotlightBounds(
+        const { prevEnd, nextStart } = getBlockBounds(
             dragState.spotlightId,
             resolvedSpotlights,
             outputDuration
@@ -88,7 +88,7 @@ export function useSpotlightDrag(
         let newEnd = dragState.initialEndTimeMs;
         const currentDuration = newEnd - newStart;
 
-        const minDuration = getMinSpotlightDuration(project.settings.spotlight.transitionDurationMs);
+        const minDuration = project.settings.spotlight.transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS;
 
         if (dragState.type === 'move') {
             newStart = dragState.initialStartTimeMs + deltaTimeMs;

@@ -4,8 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { CaptionSegment } from '../../../../types';
-import type { ResolvedCaption } from './CaptionTrackUtils';
-import { getCaptionBounds, K_MIN_CAPTION_DURATION_MS, doCaptionSourceRangesOverlap } from './CaptionTrackUtils';
+import { getBlockBounds, doSourceRangesOverlap, type OutputCaptionSegment } from '../timelineTrackUtils';
+import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface CaptionDragState {
@@ -22,7 +22,7 @@ export function useCaptionDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     selectCaption: (id: string | null) => void,
-    resolvedCaptions: ResolvedCaption[],
+    resolvedCaptions: OutputCaptionSegment[],
     timeMapper: TimeMapper
 ) {
     const updateCaptionSegment = useProjectStore(s => s.updateCaptionSegment);
@@ -73,7 +73,7 @@ export function useCaptionDrag(
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const { prevEnd, nextStart } = getCaptionBounds(
+        const { prevEnd, nextStart } = getBlockBounds(
             dragState.captionId,
             resolvedCaptions,
             outputDuration
@@ -141,7 +141,7 @@ export function useCaptionDrag(
                 if (movedCaption) {
                     for (const existing of allCaptions) {
                         if (existing.id === dragState.captionId) continue;
-                        if (doCaptionSourceRangesOverlap(movedCaption, existing)) {
+                        if (doSourceRangesOverlap(movedCaption, existing)) {
                             deleteCaptionSegment(existing.id);
                         }
                     }

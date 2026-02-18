@@ -4,8 +4,8 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { SpotlightSegment, SpotlightSettings } from '../../../../types';
 import type { DragState } from './useSpotlightDrag';
-import type { ResolvedSpotlight } from './SpotlightTrackUtils';
-import { getValidSpotlightRange, getMinSpotlightDuration, getDefaultSpotlightDuration, doSourceRangesOverlap } from './SpotlightTrackUtils';
+import { getValidBlockRange, doSourceRangesOverlap, type OutputSpotlightSegment } from '../timelineTrackUtils';
+import { K_MIN_SPOTLIGHT_HOLD_MS, K_DEFAULT_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -23,7 +23,7 @@ export function useSpotlightHover(
     editingSpotlightId: string | null,
     setEditingSpotlight: (id: string | null) => void,
     outputDuration: number,
-    resolvedSpotlights: ResolvedSpotlight[],
+    resolvedSpotlights: OutputSpotlightSegment[],
     timeMapper: TimeMapper
 ) {
     const addSpotlight = useProjectStore(s => s.addSpotlight);
@@ -32,7 +32,7 @@ export function useSpotlightHover(
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
     const settings: SpotlightSettings = project.settings.spotlight;
-    const defaultDuration = getDefaultSpotlightDuration(settings);
+    const defaultDuration = settings.transitionDurationMs * 2 + K_DEFAULT_SPOTLIGHT_HOLD_MS;
 
     /**
      * Handles hover interactions for 'Add Spotlight' ghost block.
@@ -69,11 +69,11 @@ export function useSpotlightHover(
         }
 
         // Find valid range for new spotlight (starts at mouse position, using resolved output times)
-        const range = getValidSpotlightRange(
+        const range = getValidBlockRange(
             mouseTimeMs,
             resolvedSpotlights,
             outputDuration,
-            getMinSpotlightDuration(settings.transitionDurationMs),
+            settings.transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS,
             defaultDuration
         );
 

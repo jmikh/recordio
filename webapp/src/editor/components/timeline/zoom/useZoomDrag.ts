@@ -5,7 +5,8 @@ import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomSegment } from '../../../../types';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
-import { getBlockBounds, getMinZoomDuration, doSourceRangesOverlap, type ResolvedZoomSegment } from './ZoomTrackUtils';
+import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
+import { getBlockBounds, doSourceRangesOverlap, type OutputZoomSegment } from '../timelineTrackUtils';
 
 export interface DragState {
     type: 'move' | 'resize-start' | 'resize-end';
@@ -22,7 +23,7 @@ export function useZoomDrag(
     coords: TimePixelMapper,
     outputDuration: number,
     setEditingZoom: (id: string | null) => void,
-    resolvedSegments: ResolvedZoomSegment[],
+    resolvedSegments: OutputZoomSegment[],
     timeMapper: TimeMapper
 ) {
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
@@ -73,7 +74,7 @@ export function useZoomDrag(
 
         const { prevEnd, nextStart } = getBlockBounds(dragState.zoomId, resolvedSegments, outputDuration);
         const { transitionDurationMs } = project.settings.zoom;
-        const minDuration = getMinZoomDuration(transitionDurationMs);
+        const minDuration = transitionDurationMs + K_MIN_ZOOM_HOLD_MS;
 
         let newStart = dragState.initialStartTimeMs;
         let newEnd = dragState.initialEndTimeMs;

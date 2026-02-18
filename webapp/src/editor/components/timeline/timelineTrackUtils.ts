@@ -1,14 +1,15 @@
-import type { SourceTimeSegment } from '../../../types';
+import type { SourceTimeSegment, ZoomSegment, SpotlightSegment, CaptionSegment } from '../../../types';
+import type { TimeMapper } from '../../../core/mappers/timeMapper';
 
 // ============================================================================
 // SHARED TIMELINE TRACK UTILITIES
-// Generic helpers shared between Spotlight and Zoom tracks.
+// Generic helpers shared between Spotlight, Zoom, and Caption tracks.
 // All time values are in OUTPUT TIME (milliseconds).
 // ============================================================================
 
 /**
- * Base interface for any resolved timeline segment with output-time positions.
- * Output time is the final rendered time, after cuts and speed adjustments.
+ * Base interface for any resolved timeline block with output-time positions.
+ * id mirrors segment.id for use by shared utility functions.
  */
 export interface OutputTimeBlock {
     id: string;
@@ -17,11 +18,61 @@ export interface OutputTimeBlock {
 }
 
 /**
+ * A resolved segment: output-time positions + the original typed source segment.
+ */
+export interface ResolvedSegment<T extends SourceTimeSegment> extends OutputTimeBlock {
+    segment: T;
+}
+
+// Typed aliases for each track
+export type OutputZoomSegment = ResolvedSegment<ZoomSegment>;
+export type OutputSpotlightSegment = ResolvedSegment<SpotlightSegment>;
+export type OutputCaptionSegment = ResolvedSegment<CaptionSegment>;
+
+// ============================================================================
+// RESOLUTION
+// ============================================================================
+
+/**
+ * Resolves source-time segments to output-time blocks using TimeMapper.
+ * Filters out segments that fall entirely within a cut.
+ * Works for any SourceTimeSegment (ZoomSegment, SpotlightSegment, CaptionSegment).
+ */
+export function resolveOutputTimes<T extends SourceTimeSegment>(
+    segments: T[],
+    timeMapper: TimeMapper
+): ResolvedSegment<T>[] {
+    const resolved: ResolvedSegment<T>[] = [];
+    for (const segment of segments) {
+        const range = timeMapper.mapSourceRangeToOutputRange(
+            segment.sourceStartTimeMs,
+            segment.sourceEndTimeMs
+        );
+        if (!range) continue;
+        resolved.push({
+            id: segment.id,
+            outputStartTimeMs: range.start,
+            outputEndTimeMs: range.end,
+            segment,
+        });
+    }
+    return resolved;
+}
+
+// ============================================================================
+// SOURCE-TIME OVERLAP
+// ============================================================================
+
+/**
  * Checks if two source-time ranges overlap.
  */
 export function doSourceRangesOverlap(a: SourceTimeSegment, b: SourceTimeSegment): boolean {
     return a.sourceStartTimeMs < b.sourceEndTimeMs && a.sourceEndTimeMs > b.sourceStartTimeMs;
 }
+
+// ============================================================================
+// OUTPUT-TIME BOUNDS & RANGE HELPERS
+// ============================================================================
 
 /**
  * Gets the boundaries for a block (previous block's end and next block's start)
@@ -63,13 +114,11 @@ export function getValidBlockRange(
 ): { start: number; end: number } | null {
     const CURSOR_OVERLAP_MS = 100;
 
-    const sorted = [...resolvedBlocks].sort((a, b) => a.outputStartTimeMs - b.outputStartTimeMs);
-
     // Find the gap boundaries around the mouse position
     let prevEnd = 0;
     let nextStart = outputDuration;
 
-    for (const r of sorted) {
+    for (const r of resolvedBlocks) {
         if (r.outputEndTimeMs <= mouseTimeMs) {
             prevEnd = r.outputEndTimeMs;
         }

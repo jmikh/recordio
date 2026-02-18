@@ -3,7 +3,7 @@ import { ViewMapper } from '../mappers/viewMapper';
 import { TimeMapper } from '../mappers/timeMapper';
 import { scaleRectFromCenter, clampRectToBounds } from '../geometry';
 import { applyEasing } from '../easing';
-import { getMinSpotlightDuration } from '../../editor/components/timeline/spotlight/SpotlightTrackUtils';
+import { K_MIN_SPOTLIGHT_HOLD_MS } from '../../editor/components/timeline/spotlight/SpotlightTrackUtils';
 
 // ============================================================================
 // Spotlight State
@@ -68,7 +68,7 @@ export function getSpotlightStateAtTime(
         if (!range) continue;
 
         // Skip spotlights below minimum visible duration
-        if (range.end - range.start < getMinSpotlightDuration(settings.transitionDurationMs)) continue;
+        if (range.end - range.start < settings.transitionDurationMs * 2 + K_MIN_SPOTLIGHT_HOLD_MS) continue;
 
         if (outputTimeMs >= range.start && outputTimeMs <= range.end) {
             activeSpotlight = s;
