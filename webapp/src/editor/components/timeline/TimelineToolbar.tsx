@@ -8,7 +8,7 @@ import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete, MdContentCut, MdRefresh } from 'react-icons/md';
-import { Slider, GhostButton } from '@shared/components';
+import { Slider, GhostButton, Tooltip } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -37,6 +37,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
     const setCanvasMode = useUIStore(s => s.setCanvasMode);
 
     // Subscribe for perf
@@ -177,7 +178,20 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     };
 
     const canDeleteWindow = selectedWindowId && outputWindows.length > 1;
-    const isDeleteEnabled = canDeleteWindow || Boolean(selectedZoomId) || Boolean(selectedSpotlightId);
+    const isDeleteEnabled = canDeleteWindow || Boolean(selectedZoomId) || Boolean(selectedSpotlightId) || Boolean(selectedCaptionId);
+
+    // Contextual delete tooltip
+    const deleteTooltip = selectedZoomId
+        ? 'Delete zoom'
+        : selectedSpotlightId
+            ? 'Delete spotlight'
+            : selectedCaptionId
+                ? 'Delete caption'
+                : selectedWindowId && outputWindows.length <= 1
+                    ? 'Cannot delete the only clip'
+                    : !isDeleteEnabled
+                        ? 'Select an item from the timeline to delete'
+                        : 'Delete selected clip';
 
     // Helper format
     const formatSmartTime = (ms: number, totalMs: number) => {
@@ -221,49 +235,48 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
             <div className="flex items-center gap-2">
                 {/* Delete Button */}
-                <GhostButton
-                    onClick={handleDelete}
-                    className="px-3 py-1 text-xs flex items-center gap-1"
-                    title={
-                        selectedWindowId && outputWindows.length <= 1
-                            ? "Cannot delete the last window"
-                            : "Delete selected item"
-                    }
-                    disabled={!isDeleteEnabled}
-                >
-                    <MdDelete size={14} />
-                    Delete
-                </GhostButton>
+                <Tooltip text={deleteTooltip}>
+                    <GhostButton
+                        onClick={handleDelete}
+                        className="px-3 py-1 text-xs flex items-center gap-1"
+                        disabled={!isDeleteEnabled}
+                    >
+                        <MdDelete size={14} />
+                        Delete
+                    </GhostButton>
+                </Tooltip>
 
                 {/* AutoCut Button */}
                 {showAutoCut && (
-                    <GhostButton
-                        onClick={handleAutoCut}
-                        className="px-3 py-1 text-xs flex items-center gap-1"
-                        title="Remove silent/inactive segments"
-                        disabled={isAnalyzing}
-                    >
-                        <MdContentCut size={14} />
-                        AutoCut
-                    </GhostButton>
+                    <Tooltip text="Remove silent/inactive segments">
+                        <GhostButton
+                            onClick={handleAutoCut}
+                            className="px-3 py-1 text-xs flex items-center gap-1"
+                            disabled={isAnalyzing}
+                        >
+                            <MdContentCut size={14} />
+                            AutoCut
+                        </GhostButton>
+                    </Tooltip>
                 )}
 
                 {/* Reset Windows Button */}
-                <GhostButton
-                    onClick={() => {
-                        setOutputWindows([{
-                            id: crypto.randomUUID(),
-                            startMs: 0,
-                            endMs: sourceDurationMs,
-                            speed: 1.0
-                        }]);
-                    }}
-                    className="px-3 py-1 text-xs flex items-center gap-1"
-                    title="Reset to single window"
-                >
-                    <MdRefresh size={14} />
-                    Reset
-                </GhostButton>
+                <Tooltip text="Reset to single window">
+                    <GhostButton
+                        onClick={() => {
+                            setOutputWindows([{
+                                id: crypto.randomUUID(),
+                                startMs: 0,
+                                endMs: sourceDurationMs,
+                                speed: 1.0
+                            }]);
+                        }}
+                        className="px-3 py-1 text-xs flex items-center gap-1"
+                    >
+                        <MdRefresh size={14} />
+                        Reset
+                    </GhostButton>
+                </Tooltip>
             </div>
 
             <div className="flex items-center gap-3">
