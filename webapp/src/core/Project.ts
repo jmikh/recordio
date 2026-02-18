@@ -37,8 +37,7 @@ const createDefaultSettings = (): ProjectSettings => ({
     zoom: {
         maxZoom: 2,
         isAuto: true,
-        maxZoomDurationMs: 750,
-        minZoomDurationMs: 200,
+        transitionDurationMs: 750,
         easing: 'ease-in-out'
     },
 
@@ -217,13 +216,13 @@ export class ProjectImpl {
         );
 
         const timeMapper = new TimeMapper(outputWindows);
-        const focusAreas = getAllFocusAreas(userEvents, timeMapper, screenSource.size);
+        const focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
         const zoomActions = hasUserEvents
             ? calculateZoomSchedule(
                 settings.zoom,
                 viewMapper,
-                focusAreas,
-                timeMapper
+                timeMapper,
+                focusAreas
             )
             : [];
 

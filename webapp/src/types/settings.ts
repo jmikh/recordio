@@ -114,8 +114,8 @@ export type BackgroundType = 'solid' | 'image';
 export interface ZoomSettings {
     maxZoom: number;
     isAuto: boolean;
-    maxZoomDurationMs: number;
-    minZoomDurationMs: number;
+    /** Duration of zoom transition animations in milliseconds */
+    transitionDurationMs: number;
     /** Easing curve applied to zoom transitions */
     easing: EasingStyle;
 }

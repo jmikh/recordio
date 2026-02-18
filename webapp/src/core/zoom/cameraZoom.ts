@@ -1,6 +1,6 @@
 import { type ZoomAction, type Size, type Rect, type CameraSettings, type ZoomSettings } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
-import { prepareZoomActionsForInterpolation } from './zoomAction';
+import { prepareZoomActionsForInterpolation } from './zoomAnimator';
 import { applyEasing } from '../easing';
 
 /**

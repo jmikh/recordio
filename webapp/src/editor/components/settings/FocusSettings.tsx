@@ -101,8 +101,8 @@ export const FocusSettings = () => {
         updateSettings({ spotlight: { ...spotlightSettings, isAuto: false } });
     };
 
-    const handleMaxDurationChange = (val: number) => {
-        batchAction(() => updateSettings({ zoom: { ...zoomSettings, maxZoomDurationMs: val } }));
+    const handleZoomTransitionDurationChange = (val: number) => {
+        batchAction(() => updateSettings({ zoom: { ...zoomSettings, transitionDurationMs: val } }));
     };
 
     const handleMaxZoomChange = (val: number) => {
@@ -159,10 +159,10 @@ export const FocusSettings = () => {
                     {/* Transition Duration */}
                     <Slider
                         label="Transition"
-                        min={zoomSettings.minZoomDurationMs}
+                        min={100}
                         max={1500}
-                        value={zoomSettings.maxZoomDurationMs}
-                        onChange={handleMaxDurationChange}
+                        value={zoomSettings.transitionDurationMs}
+                        onChange={handleZoomTransitionDurationChange}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         showTooltip

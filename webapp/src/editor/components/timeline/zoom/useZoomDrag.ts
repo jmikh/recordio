@@ -75,14 +75,14 @@ export function useZoomDrag(
             dragState.motionId, preparedActions, outputDuration
         );
 
-        const { minZoomDurationMs } = project.settings.zoom;
+        const { transitionDurationMs } = project.settings.zoom;
 
         // Clamp output end time to boundaries
-        // Left: must leave room for at least minZoomDurationMs (our own transition)
-        targetOutputEndTime = Math.max(targetOutputEndTime, prevEnd + minZoomDurationMs);
+        // Left: must leave room for at least transitionDurationMs (our own transition)
+        targetOutputEndTime = Math.max(targetOutputEndTime, prevEnd + transitionDurationMs);
         // Right: leave room for next zoom's transition, or output duration
         const rightBoundary = nextEnd < outputDuration
-            ? nextEnd - minZoomDurationMs
+            ? nextEnd - transitionDurationMs
             : outputDuration;
         targetOutputEndTime = Math.min(targetOutputEndTime, rightBoundary);
 

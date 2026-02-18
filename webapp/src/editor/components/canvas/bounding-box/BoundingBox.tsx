@@ -179,7 +179,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             newRect = calculateResize(type, initialRect, deltaX, deltaY);
         }
 
-        console.log('[BoundingBox] pointerMove', { type, deltaX: deltaX.toFixed(1), deltaY: deltaY.toFixed(1), newRect: { w: newRect.width.toFixed(0), h: newRect.height.toFixed(0) } });
+
         currentRectRef.current = newRect;
         onChange(newRect);
     }, [displayMapper, calculateMove, calculateResize, onChange]);

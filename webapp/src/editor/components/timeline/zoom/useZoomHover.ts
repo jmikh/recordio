@@ -78,15 +78,15 @@ export function useZoomHover(
             }
         }
 
-        const defaultDur = project.settings.zoom.maxZoomDurationMs;
+        const defaultDur = project.settings.zoom.transitionDurationMs;
         const availableDuration = mouseOutputTimeMs - prevEnd;
 
         // Calculate width for display (duration is derived from available space)
         let displayDuration = Math.min(defaultDur, availableDuration);
         let outputEndTime = mouseOutputTimeMs;
 
-        if (displayDuration < project.settings.zoom.minZoomDurationMs) {
-            displayDuration = project.settings.zoom.minZoomDurationMs;
+        if (displayDuration < project.settings.zoom.transitionDurationMs) {
+            displayDuration = project.settings.zoom.transitionDurationMs;
             outputEndTime = prevEnd + displayDuration;
         }
 
@@ -120,8 +120,13 @@ export function useZoomHover(
         const sourceEndTimeMs = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTime);
         if (sourceEndTimeMs === -1) return; // Invalid time
 
+        // Calculate sourceStartTimeMs from output start time
+        const outputStartTime = hoverInfo.outputEndTime - (hoverInfo.width > 0 ? coords.xToMs(hoverInfo.width) : project.settings.zoom.transitionDurationMs);
+        const sourceStartTimeMs = timeMapper.mapOutputToSourceTime(Math.max(0, outputStartTime));
+        if (sourceStartTimeMs === -1) return;
+
         // Find the closest previous action to inherit rect from
-        const startTime = hoverInfo.outputEndTime - project.settings.zoom.maxZoomDurationMs;
+        const startTime = hoverInfo.outputEndTime - project.settings.zoom.transitionDurationMs;
         const previousAction = preparedActions
             .filter((m: PreparedZoomAction) => m.outputEndTime <= startTime)
             .sort((a: PreparedZoomAction, b: PreparedZoomAction) => b.outputEndTime - a.outputEndTime)[0];
@@ -143,10 +148,11 @@ export function useZoomHover(
 
         const newAction: ZoomAction = {
             id: crypto.randomUUID(),
+            sourceStartTimeMs,
             sourceEndTimeMs,
             reason: 'Manual Zoom',
             rectPx: initialRect,
-            type: 'manual'
+            type: 'manual',
         };
 
         addZoomAction(newAction);

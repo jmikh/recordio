@@ -5,7 +5,7 @@ import type { ViewMapper } from '../mappers/viewMapper';
  * DEBUG PAINTER - Throwaway code for visualizing FocusAreas
  * 
  * Paints the current focus area as a rectangle with the reason string inside.
- * Each focus area stays visible until the next one begins.
+ * Each focus area stays visible while its time range is active.
  */
 export function paintZoomDebug(
     ctx: CanvasRenderingContext2D,
@@ -16,11 +16,12 @@ export function paintZoomDebug(
 ) {
     if (focusAreas.length === 0) return;
 
-    // Find the current focus area (the last one whose timestamp <= currentTime)
+    // Find the current focus area (active if currentTime is within [start, end])
     let currentFocusArea: FocusArea | null = null;
     for (let i = focusAreas.length - 1; i >= 0; i--) {
-        if (focusAreas[i].timestamp <= currentTime) {
-            currentFocusArea = focusAreas[i];
+        const area = focusAreas[i];
+        if (currentTime >= area.sourceStartTimeMs && currentTime <= area.sourceEndTimeMs) {
+            currentFocusArea = area;
             break;
         }
     }
@@ -64,8 +65,8 @@ export function paintZoomDebug(
     ctx.fillStyle = 'rgba(255, 0, 255, 1)';
     ctx.fillText(text, centerX, centerY);
 
-    // Draw timestamp in corner
-    const timestampText = `t=${currentFocusArea.timestamp.toFixed(0)}ms`;
+    // Draw time range in corner
+    const timestampText = `t=${currentFocusArea.sourceStartTimeMs.toFixed(0)}-${currentFocusArea.sourceEndTimeMs.toFixed(0)}ms`;
     ctx.font = `${fontSize * 0.6}px sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';

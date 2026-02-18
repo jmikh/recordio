@@ -33,9 +33,10 @@ export interface CaptionSegment {
  * Stored in Timeline and computed from user events.
  */
 export interface FocusArea {
-    timestamp: number;  // Output time when this focus area applies
-    rect: Rect;         // The focus rectangle in source coordinates
-    reason: string;     // Why this focus area was returned (event type, 'hover', or 'inactivity')
+    sourceStartTimeMs: number;  // Source time when this focus area starts
+    sourceEndTimeMs: number;    // Source time when this focus area ends
+    rect: Rect;                 // The focus rectangle in source coordinates
+    reason: string;             // Why this focus area was returned (event type or 'hover')
 }
 
 // ==========================================
@@ -61,9 +62,10 @@ export interface OutputWindow {
 
 export interface ZoomAction {
     id: ID;
-    /** Source time when zoom reaches target state (in source coordinate system) */
+    /** Source time when zoom block begins */
+    sourceStartTimeMs: TimeMs;
+    /** Source time when zoom block ends (hold position, no transition padding) */
     sourceEndTimeMs: TimeMs;
-    /** Duration is now derived dynamically from settings and available space */
     /** Target viewport in OUTPUT coordinates (pixels) */
     rectPx: Rect;
     reason: string;

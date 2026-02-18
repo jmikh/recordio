@@ -155,3 +155,19 @@ export function rectFromCenter(center: Point, size: Size): Rect {
 export function getRectArea(rect: Rect): number {
     return rect.width * rect.height;
 }
+
+/**
+ * Computes the bounding box (union) of an array of rectangles.
+ * Returns a rectangle that contains all input rectangles.
+ */
+export function unionRects(rects: Rect[]): Rect {
+    if (rects.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of rects) {
+        if (r.x < minX) minX = r.x;
+        if (r.y < minY) minY = r.y;
+        if (r.x + r.width > maxX) maxX = r.x + r.width;
+        if (r.y + r.height > maxY) maxY = r.y + r.height;
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}

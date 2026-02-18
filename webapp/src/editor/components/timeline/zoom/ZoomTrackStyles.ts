@@ -3,130 +3,66 @@ import type { CSSProperties } from 'react';
 // ============================================================================
 // ZOOM TRACK STYLES
 // Centralized styling for zoom track visual elements.
-// Used by ZoomKeyframe, ZoomLines, ZoomLegend, and ZoomTrack (ghost).
+// Block-based rendering: each zoom action is a rectangle spanning its full time range.
 // ============================================================================
 
 // ============= SIZE CONSTANTS =============
 
-/** Size of keyframe markers (diamond and square) in pixels */
-export const KEYFRAME_SIZE = 14;
+/** Height of the zoom block as a fraction of track height */
+export const BLOCK_HEIGHT_FRACTION = 0.55;
 
-/** Height of transition trail in pixels */
-export const TRANSITION_HEIGHT = 5;
+/** Border radius of zoom blocks in pixels */
+export const BLOCK_BORDER_RADIUS = 4;
 
-/** Height of hold line in pixels */
-export const HOLD_HEIGHT = 2;
+/** Minimum block width before label is hidden */
+export const MIN_BLOCK_LABEL_WIDTH_PX = 40;
 
-// ============= KEYFRAME STYLES =============
+// ============= BLOCK STYLES =============
 
-/** Diamond-shaped keyframe for zoomed states */
-export const diamondKeyframe = {
-    base: 'rotate-45 transition-all duration-150',
-    default: 'bg-primary',
-    selected: 'bg-secondary scale-110',
-    hover: 'group-hover:bg-primary-highlighted group-hover:scale-110',
-    style: {
-        width: KEYFRAME_SIZE,
-        height: KEYFRAME_SIZE,
-        borderRadius: 1,
-        boxShadow: 'var(--shadow-segment)',
-    } as CSSProperties,
+/** Main zoom block rectangle */
+export const zoomBlock = {
+    base: 'absolute top-1/2 -translate-y-1/2 rounded cursor-grab transition-colors duration-100 group flex items-center overflow-hidden',
+    default: 'bg-primary/70 hover:bg-primary',
+    selected: 'bg-secondary ring-1 ring-secondary/60',
+    dragging: 'cursor-grabbing opacity-80',
 };
 
-/** Hollow square keyframe for full-viewport (1x) states */
-export const squareKeyframe = {
-    base: 'bg-surface-overlay transition-all duration-150',
-    default: 'border-primary',
-    selected: 'border-secondary scale-110',
-    hover: 'group-hover:border-primary-highlighted group-hover:scale-110',
-    style: {
-        width: KEYFRAME_SIZE,
-        height: KEYFRAME_SIZE,
-        borderWidth: 2,
-        borderRadius: 2,
-        borderStyle: 'solid' as const,
-    } as CSSProperties,
+/** Scale label inside the block */
+export const blockLabel = {
+    className: 'text-[9px] font-mono text-white/90 px-1.5 whitespace-nowrap pointer-events-none select-none truncate',
 };
 
-/** Container for keyframe markers */
-export const keyframeContainer = {
-    base: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-20',
-    dragging: 'cursor-grabbing',
-    idle: 'cursor-grab',
+/** Transition-in indicator (left edge of block) */
+export const transitionInEdge = {
+    className: 'absolute left-0 top-0 bottom-0 bg-white/20 pointer-events-none',
 };
 
-/** Scale label shown below keyframes */
-export const scaleLabel = {
-    className: 'absolute top-[calc(100%+4px)] whitespace-nowrap text-[8px] font-mono text-text-muted pointer-events-none select-none',
-};
-
-// ============= LINE STYLES =============
-
-/** Transition trail - thicker line leading into a keyframe */
-export const transitionTrail = {
-    base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-10',
-    default: 'bg-primary',
-    selected: 'bg-secondary',
-    opacity: 1,
-    height: TRANSITION_HEIGHT,
-};
-
-/** Hold line - thin line between zoomed keyframes */
-export const holdLine = {
-    base: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-[5]',
-    default: 'bg-primary',
-    selected: 'bg-secondary',
-    opacity: 0.7,
-    height: HOLD_HEIGHT,
+/** Transition-out indicator (right edge of block) */
+export const transitionOutEdge = {
+    className: 'absolute right-0 top-0 bottom-0 bg-white/20 pointer-events-none',
 };
 
 // ============= GHOST STYLES (Add Zoom indicator) =============
 
+export const ghostBlock = {
+    className: 'absolute top-1/2 -translate-y-1/2 rounded pointer-events-none z-25 bg-secondary/50 border border-secondary/80 flex items-center',
+    label: 'text-[9px] text-white px-1.5 whitespace-nowrap pointer-events-none select-none',
+};
+
+// Keep legacy ghost styles for any remaining usages
 export const ghostKeyframe = {
     container: 'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-25 pointer-events-none flex flex-col items-center',
     label: 'absolute bottom-[calc(100%+6px)] whitespace-nowrap text-[9px] text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none',
     diamond: 'rotate-45 bg-secondary',
     diamondStyle: {
-        width: KEYFRAME_SIZE,
-        height: KEYFRAME_SIZE,
+        width: 14,
+        height: 14,
         borderRadius: 1,
     } as CSSProperties,
 };
 
 export const ghostTrail = {
-    className: 'absolute top-1/2 -translate-y-1/2  pointer-events-none z-15 bg-secondary',
+    className: 'absolute top-1/2 -translate-y-1/2 pointer-events-none z-15 bg-secondary',
     opacity: 0.5,
-    height: TRANSITION_HEIGHT,
-};
-
-// ============= LEGEND STYLES =============
-
-/** For use in ZoomLegend tooltip */
-export const legendItem = {
-    holdLine: {
-        className: 'w-6 bg-primary opacity-50 rounded',
-        style: { height: HOLD_HEIGHT } as CSSProperties,
-    },
-    transitionTrail: {
-        className: 'w-6 bg-primary opacity-70 ',
-        style: { height: TRANSITION_HEIGHT } as CSSProperties,
-    },
-    diamond: {
-        className: 'bg-primary rotate-45',
-        style: {
-            width: KEYFRAME_SIZE,
-            height: KEYFRAME_SIZE,
-            borderRadius: 1,
-        } as CSSProperties,
-    },
-    square: {
-        className: 'border-primary bg-surface-overlay',
-        style: {
-            width: KEYFRAME_SIZE,
-            height: KEYFRAME_SIZE,
-            borderWidth: 2,
-            borderRadius: 2,
-            borderStyle: 'solid' as const,
-        } as CSSProperties,
-    },
+    height: 5,
 };

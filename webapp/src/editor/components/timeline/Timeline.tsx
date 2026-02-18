@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { ZoomTrack } from './zoom/ZoomTrack';
-import { ZoomLegend } from './zoom/ZoomLegend';
+
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
 import { SpotlightLegend } from './spotlight/SpotlightLegend';
 import { CaptionTrack } from './caption/CaptionTrack';
@@ -253,7 +253,6 @@ export function Timeline() {
                         <TimelineHeaderCell
                             title="Zoom"
                             height={TRACK_HEIGHT}
-                            infoElement={<ZoomLegend />}
                         />
                     </div>
 

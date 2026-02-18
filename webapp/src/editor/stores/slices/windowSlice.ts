@@ -5,6 +5,8 @@ import { calculateZoomSchedule, ViewMapper, getAllFocusAreas } from '../../../co
 import { calculateAutoSpotlights } from '../../../core/spotlight/spotlightScheduler';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
+
+
 export interface WindowSlice {
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
     removeOutputWindow: (id: ID) => void;
@@ -20,8 +22,7 @@ const getWindowDuration = (w: OutputWindow) => {
 const computeFocusAreas = (project: Project, events: UserEvents): FocusArea[] => {
     const sourceSize = project.screenSource.size;
     if (!sourceSize || sourceSize.width === 0) return [];
-    const timeMapper = getTimeMapper(project.timeline.outputWindows);
-    return getAllFocusAreas(events, timeMapper, sourceSize);
+    return getAllFocusAreas(events, sourceSize, project.screenSource.durationMs);
 };
 
 export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
@@ -35,7 +36,7 @@ export const recalculateAutoZooms = (project: Project): ZoomAction[] => {
         project.settings.screen.toolbar.enabled
     );
     const timeMapper = getTimeMapper(project.timeline.outputWindows);
-    return calculateZoomSchedule(project.settings.zoom, viewMapper, project.timeline.focusAreas, timeMapper);
+    return calculateZoomSchedule(project.settings.zoom, viewMapper, timeMapper, project.timeline.focusAreas);
 };
 
 export const recalculateAutoSpotlights = (project: Project, zoomActions: ZoomAction[]): SpotlightAction[] => {

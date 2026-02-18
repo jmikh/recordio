@@ -5,10 +5,12 @@ import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useZoomDrag } from './useZoomDrag';
 import { useZoomHover } from './useZoomHover';
-import { ZoomKeyframe } from './ZoomKeyframe';
-import { TransitionTrail, HoldLine } from './ZoomLines';
-import { calculateZoomScale, formatScaleLabel, isFullViewport, prepareZoomActionsForUI } from './ZoomTrackUtils';
-import { ghostKeyframe, ghostTrail } from './ZoomTrackStyles';
+import { calculateZoomScale, formatScaleLabel, prepareZoomActionsForUI } from './ZoomTrackUtils';
+import {
+    zoomBlock, blockLabel,
+    ghostBlock,
+    BLOCK_HEIGHT_FRACTION, BLOCK_BORDER_RADIUS, MIN_BLOCK_LABEL_WIDTH_PX,
+} from './ZoomTrackStyles';
 import type { ZoomAction } from '../../../../types';
 
 interface ZoomTrackProps {
@@ -16,13 +18,9 @@ interface ZoomTrackProps {
 }
 
 /**
- * ZoomTrack renders keyframed zoom/pan transitions on a timeline.
- * 
- * Visual elements:
- * - Diamond keyframes for zoomed states
- * - Hollow square keyframes for full-viewport (1x) states
- * - Transition trails (thick lines) leading into keyframes
- * - Hold lines (semi-transparent) between zoomed keyframes
+ * ZoomTrack renders zoom actions as time-range blocks on the timeline.
+ *
+ * Each block spans [outputStartTime, outputEndTime] and shows the zoom scale.
  */
 export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -39,19 +37,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const outputSize = project.settings.outputSize;
     const zoomSettings = project.settings.zoom;
 
-    // Memoize TimeMapper and TimePixelMapper for consistent usage
     const timeMapper = useTimeMapper();
 
     const coords = useMemo(() => {
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeMapper, pixelsPerSec]);
 
-    // Derive output duration from output windows
     const outputDuration = useMemo(() => {
         return timeMapper.getOutputDuration();
     }, [timeMapper]);
 
-    // Prepare zoom actions with computed output times and durations
     const preparedActions = useMemo(() => {
         return prepareZoomActionsForUI(
             timeline.zoomActions || [],
@@ -85,105 +80,72 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     );
 
     // ------------------------------------------------------------------
-    // COMPUTE LINE SEGMENTS AND KEYFRAMES
+    // BLOCK HEIGHT
     // ------------------------------------------------------------------
 
-    // Minimum pixel distance between keyframes before hiding all labels
-    const MIN_LABEL_DISTANCE_PX = 30;
+    const blockHeight = Math.round(height * BLOCK_HEIGHT_FRACTION);
 
-    const renderElements = useMemo(() => {
+    // ------------------------------------------------------------------
+    // RENDER BLOCKS
+    // ------------------------------------------------------------------
+
+    const renderBlocks = useMemo(() => {
         const elements: React.ReactNode[] = [];
 
-        // Sort prepared actions by output end time for proper sequencing
-        const sortedActions = [...preparedActions].sort((a, b) => a.outputEndTime - b.outputEndTime);
+        const sortedActions = [...preparedActions].sort((a, b) => a.outputStartTime - b.outputStartTime);
 
-        // Calculate if any consecutive keyframes are too close
-        let hideLabels = false;
-        for (let i = 0; i < sortedActions.length - 1; i++) {
-            const currentX = coords.msToX(sortedActions[i].outputEndTime);
-            const nextX = coords.msToX(sortedActions[i + 1].outputEndTime);
-            if (nextX - currentX < MIN_LABEL_DISTANCE_PX) {
-                hideLabels = true;
-                break;
-            }
-        }
+        sortedActions.forEach((action) => {
+            const startX = coords.msToX(action.outputStartTime);
+            const endX = coords.msToX(action.outputEndTime);
+            const blockWidth = Math.max(endX - startX, 2);
 
-        sortedActions.forEach((action, index) => {
-            const keyframeX = coords.msToX(action.outputEndTime);
-            const trailWidth = coords.msToX(action.duration);
-            const trailStartX = keyframeX - trailWidth;
-            const isFullScreen = isFullViewport(action.rectPx, outputSize);
             const isSelected = editingZoomId === action.id;
             const isDragging = dragState?.motionId === action.id;
             const scale = calculateZoomScale(action.rectPx, outputSize);
+            const showLabel = blockWidth >= MIN_BLOCK_LABEL_WIDTH_PX;
 
-            // 1. Render transition trail leading into this keyframe
-            elements.push(
-                <TransitionTrail
-                    key={`trail-${action.id}`}
-                    left={trailStartX}
-                    width={trailWidth}
-                    isSelected={isSelected}
-                />
-            );
-
-            // 2. Render hold line or no-zoom line extending from this keyframe
-            // to the next action's trail start (or end of timeline)
-            const nextAction = sortedActions[index + 1];
-            const nextTrailStartMs = nextAction
-                ? nextAction.outputStartTime
-                : outputDuration;
-
-            const lineStartX = keyframeX;
-            const lineEndX = coords.msToX(nextTrailStartMs);
-            const lineWidth = lineEndX - lineStartX;
-
-            if (lineWidth > 0) {
-                if (!isFullScreen) {
-                    // Zoom holds steady between keyframes
-                    elements.push(
-                        <HoldLine
-                            key={`hold-${action.id}`}
-                            left={lineStartX}
-                            width={lineWidth}
-                            isSelected={isSelected}
-                        />
-                    );
-                }
-            }
-
-            // 3. Render keyframe marker - need to find original action for handleDragStart
             const originalAction = timeline.zoomActions.find((a: ZoomAction) => a.id === action.id);
             if (!originalAction) return;
 
+            const blockClass = [
+                zoomBlock.base,
+                isSelected ? zoomBlock.selected : zoomBlock.default,
+                isDragging ? zoomBlock.dragging : '',
+            ].join(' ');
+
             elements.push(
-                <ZoomKeyframe
-                    key={`keyframe-${action.id}`}
-                    left={keyframeX}
-                    isFullViewport={isFullScreen}
-                    scaleLabel={formatScaleLabel(scale)}
-                    isSelected={isSelected}
-                    isDragging={isDragging}
-                    hideLabel={hideLabels}
+                <div
+                    key={`block-${action.id}`}
+                    className={blockClass}
+                    style={{
+                        left: `${startX}px`,
+                        width: `${blockWidth}px`,
+                        height: `${blockHeight}px`,
+                        borderRadius: BLOCK_BORDER_RADIUS,
+                    }}
                     onMouseDown={(e) => handleDragStart(e, 'move', originalAction, isSelected)}
                     onClick={(e) => {
                         e.stopPropagation();
-                        // Suppress toggle if we just finished dragging
                         if (wasDraggingRef.current) {
                             wasDraggingRef.current = false;
                             return;
                         }
-                        // Toggle: only deselect if it was already selected before mousedown
                         if (wasSelectedBeforeMousedownRef.current) {
                             setEditingZoom(null);
                         }
                     }}
-                />
+                >
+                    {showLabel && (
+                        <span className={blockLabel.className}>
+                            {formatScaleLabel(scale)}
+                        </span>
+                    )}
+                </div>
             );
         });
 
         return elements;
-    }, [preparedActions, coords, outputSize, editingZoomId, dragState, outputDuration, handleDragStart, timeline.zoomActions]);
+    }, [preparedActions, coords, outputSize, editingZoomId, dragState, blockHeight, handleDragStart, timeline.zoomActions]);
 
     // ------------------------------------------------------------------
     // RENDER
@@ -201,36 +163,22 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
 
-                {/* Line segments and keyframes */}
-                {renderElements}
+                {/* Zoom blocks */}
+                {renderBlocks}
 
-                {/* Add Zoom Ghost Indicator */}
+                {/* Ghost block — shown when hovering to add a new zoom */}
                 {hoverInfo && !editingZoomId && !dragState && (
-                    <>
-                        {/* Ghost transition trail */}
-                        <div
-                            className={ghostTrail.className}
-                            style={{
-                                left: `${hoverInfo.x - hoverInfo.width}px`,
-                                width: `${hoverInfo.width}px`,
-                                height: ghostTrail.height,
-                                opacity: ghostTrail.opacity,
-                            }}
-                        />
-                        {/* Ghost keyframe diamond */}
-                        <div
-                            className={ghostKeyframe.container}
-                            style={{ left: `${hoverInfo.x}px` }}
-                        >
-                            <span className={ghostKeyframe.label}>
-                                + Zoom
-                            </span>
-                            <div
-                                className={ghostKeyframe.diamond}
-                                style={ghostKeyframe.diamondStyle}
-                            />
-                        </div>
-                    </>
+                    <div
+                        className={ghostBlock.className}
+                        style={{
+                            left: `${hoverInfo.x - hoverInfo.width}px`,
+                            width: `${hoverInfo.width}px`,
+                            height: `${blockHeight}px`,
+                            borderRadius: BLOCK_BORDER_RADIUS,
+                        }}
+                    >
+                        <span className={ghostBlock.label}>+ Zoom</span>
+                    </div>
                 )}
             </div>
         </div>

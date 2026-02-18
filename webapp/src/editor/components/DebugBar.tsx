@@ -28,11 +28,12 @@ export const DebugBar = () => {
         }
 
         const timeMapper = getTimeMapper(project.timeline.outputWindows);
-        const focusAreas = getAllFocusAreas(userEvents, timeMapper, screenSource.size);
+        const focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
 
         console.log('Focus Areas:', focusAreas);
         console.table(focusAreas.map(area => ({
-            timestamp: area.timestamp,
+            startTime: area.sourceStartTimeMs,
+            endTime: area.sourceEndTimeMs,
             reason: area.reason,
             x: area.rect.x.toFixed(0),
             y: area.rect.y.toFixed(0),
