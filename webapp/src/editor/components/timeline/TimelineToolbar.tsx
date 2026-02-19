@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useToast } from '../Toast';
 import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
-import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdDelete, MdContentCut, MdRefresh } from 'react-icons/md';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdContentCut, MdRefresh } from 'react-icons/md';
 import { Slider, GhostButton, Tooltip } from '@shared/components';
 
 
@@ -27,18 +27,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 }) => {
     // Stores
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
-
-    // Delete actions
-    const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
-    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
-    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
-
-    // Selection state
-    const selectedWindowId = useUIStore(s => s.selectedWindowId);
-    const selectedZoomId = useUIStore(s => s.selectedZoomId);
-    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
-    const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
 
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
@@ -88,19 +76,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         setIsPlaying(!isPlaying);
     };
 
-    // Delete button logic
-    const handleDelete = () => {
-        // Can only delete window if it's NOT the last one
-        if (selectedZoomId) {
-            deleteZoomSegment(selectedZoomId);
-            setCanvasMode(CanvasMode.Preview);
-        } else if (selectedSpotlightId) {
-            deleteSpotlight(selectedSpotlightId);
-            setCanvasMode(CanvasMode.Preview);
-        } else if (selectedWindowId && outputWindows.length > 1) {
-            removeOutputWindow(selectedWindowId);
-        }
-    };
+
 
     // AutoCut handler (async VAD analysis)
     const handleAutoCut = async () => {
@@ -177,21 +153,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         }
     };
 
-    const canDeleteWindow = selectedWindowId && outputWindows.length > 1;
-    const isDeleteEnabled = canDeleteWindow || Boolean(selectedZoomId) || Boolean(selectedSpotlightId) || Boolean(selectedCaptionId);
-
-    // Contextual delete tooltip
-    const deleteTooltip = selectedZoomId
-        ? 'Delete zoom'
-        : selectedSpotlightId
-            ? 'Delete spotlight'
-            : selectedCaptionId
-                ? 'Delete caption'
-                : selectedWindowId && outputWindows.length <= 1
-                    ? 'Cannot delete the only clip'
-                    : !isDeleteEnabled
-                        ? 'Select an item from the timeline to delete'
-                        : 'Delete selected clip';
 
     // Helper format
     const formatSmartTime = (ms: number, totalMs: number) => {
@@ -234,17 +195,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     return (
         <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
             <div className="flex items-center gap-2">
-                {/* Delete Button */}
-                <Tooltip text={deleteTooltip}>
-                    <GhostButton
-                        onClick={handleDelete}
-                        className="px-3 py-1 text-xs flex items-center gap-1"
-                        disabled={!isDeleteEnabled}
-                    >
-                        <MdDelete size={14} />
-                        Delete
-                    </GhostButton>
-                </Tooltip>
 
                 {/* AutoCut Button */}
                 {showAutoCut && (

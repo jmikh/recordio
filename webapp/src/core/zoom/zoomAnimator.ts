@@ -33,8 +33,9 @@ export function getViewportStateAtTime(
     zoomSettings: ZoomSettings
 ): Rect {
     const fullRect: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
-    const T = zoomSettings.transitionDurationMs;
-    const easing = zoomSettings.easing ?? 'ease-in-out';
+    // Global T is used as fallback only if a segment doesn't define its own
+    const globalT = zoomSettings.transitionDurationMs;
+    const globalEasing = zoomSettings.easing ?? 'ease-in-out';
 
     // Find the first visible segment
     const firstVisible = actions.find(s => s.visible);
@@ -49,6 +50,10 @@ export function getViewportStateAtTime(
     for (let i = 0; i < actions.length; i++) {
         const block = actions[i];
         if (!block.visible) continue;
+
+        // Per-segment transition and easing (fall back to global for legacy data)
+        const T = block.transitionDurationMs ?? globalT;
+        const easing = block.easing ?? globalEasing;
 
         // Find next visible block
         let nextBlock: ZoomSegment | null = null;

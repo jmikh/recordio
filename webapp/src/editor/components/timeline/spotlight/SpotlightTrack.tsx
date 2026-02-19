@@ -39,7 +39,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     };
 
     const project = useProjectStore(s => s.project);
-    const transitionDurationMs = project.settings.spotlight.transitionDurationMs;
+    const globalTransitionDurationMs = project.settings.spotlight.transitionDurationMs;
 
     // Memoize TimeMapper and TimePixelMapper
     const timeMapper = useTimeMapper();
@@ -85,8 +85,8 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         timeMapper
     );
 
-    // Fade width = min(half of ghost width, full transition time) — hold is the remainder (may be 0)
-    const fadeWidthPx = coords.msToX(transitionDurationMs);
+    // Ghost fade width uses global transition duration
+    const ghostFadeWidthPx = coords.msToX(globalTransitionDurationMs);
 
     // Calculate vertical positions for ghost
     const fadeY = (height - FADE_HEIGHT) / 2;
@@ -114,8 +114,9 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                     const isSelected = editingSpotlightId === s.id;
                     const isDragging = dragState?.segmentId === s.id;
 
-                    // Cap fade widths so they never exceed half the block width (handles min-width edge case)
-                    const clampedFadeWidthPx = Math.min(fadeWidthPx, totalWidth / 2);
+                    // Per-segment fade width from segment's transitionDurationMs
+                    const segFadeWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
+                    const clampedFadeWidthPx = Math.min(segFadeWidthPx, totalWidth / 2);
 
                     return (
                         <SpotlightBlock
@@ -175,20 +176,20 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 position: 'absolute',
                                 left: 0,
                                 top: fadeY,
-                                width: Math.min(hoverInfo.width / 2, fadeWidthPx),
+                                width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeIn.getStyle(),
                             }}
                         />
 
                         {/* Ghost Hold (may be 0 width when ghost is short) */}
                         {(() => {
-                            const ghostHoldWidth = Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, fadeWidthPx) * 2);
+                            const ghostHoldWidth = Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, ghostFadeWidthPx) * 2);
                             return ghostHoldWidth > 0 && (
                                 <div
                                     className={`${ghostSpotlight.hold.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
-                                        left: Math.min(hoverInfo.width / 2, fadeWidthPx),
+                                        left: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                         top: holdY,
                                         width: ghostHoldWidth,
                                         ...ghostSpotlight.hold.getStyle(),
@@ -208,7 +209,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 position: 'absolute',
                                 right: 0,
                                 top: fadeY,
-                                width: Math.min(hoverInfo.width / 2, fadeWidthPx),
+                                width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeOut.getStyle(),
                             }}
                         />

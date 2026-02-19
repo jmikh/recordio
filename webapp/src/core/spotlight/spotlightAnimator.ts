@@ -60,8 +60,10 @@ export function getSpotlightStateAtTime(
     const s = spotlightSegments.find(seg => seg.visible && outputTimeMs >= seg.outputStartTimeMs && outputTimeMs <= seg.outputEndTimeMs);
     if (!s) return null;
 
-    // Calculate animation progress
-    const { transitionDurationMs, dimOpacity } = settings;
+    // Per-segment values (fall back to global settings for legacy data)
+    const transitionDurationMs = s.transitionDurationMs ?? settings.transitionDurationMs;
+    const dimOpacity = s.dimOpacity ?? settings.dimOpacity;
+    const easing = s.easing ?? settings.easing ?? 'ease-in-out';
 
     const elapsed = outputTimeMs - s.outputStartTimeMs;
     const remaining = s.outputEndTimeMs - outputTimeMs;
@@ -91,8 +93,8 @@ export function getSpotlightStateAtTime(
         animationProgress = 1.0;
     }
 
-    // Apply easing (ease-in-out)
-    const easedProgress = applyEasing(animationProgress, settings.easing ?? 'ease-in-out');
+    // Apply easing
+    const easedProgress = applyEasing(animationProgress, easing);
 
     // Interpolate values
     const currentDimOpacity = dimOpacity * easedProgress;

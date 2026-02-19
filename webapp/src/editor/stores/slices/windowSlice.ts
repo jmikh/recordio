@@ -52,7 +52,7 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
             viewMapper, timeMapper,
             project.userEvents.hoveredCards || [],
             nextZoomSegments, project.settings.zoom,
-            project.settings.spotlight.enlargeScale
+            project.settings.spotlight
         );
     } else {
         nextSpotlightSegments = recomputeOutputTimes(project.timeline.spotlightSegments, timeMapper);

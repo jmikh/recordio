@@ -132,6 +132,8 @@ export function useZoomHover(
             rectPx: initialRect,
             reason: 'manual',
             type: 'manual',
+            transitionDurationMs: project.settings.zoom.transitionDurationMs,
+            easing: project.settings.zoom.easing,
         };
 
         // Delete any existing zoom segments that overlap the new one (source time)

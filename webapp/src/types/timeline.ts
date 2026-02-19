@@ -84,6 +84,10 @@ export interface ZoomSegment extends TimeSegment {
     rectPx: Rect;
     reason: string;
     type: 'auto' | 'manual';
+    /** Transition duration for this zoom (inherited from global settings on creation) */
+    transitionDurationMs: number;
+    /** Easing curve for this zoom (inherited from global settings on creation) */
+    easing: EasingStyle;
 }
 
 // ==========================================
@@ -104,6 +108,12 @@ export interface SpotlightSegment extends TimeSegment {
     scale: number;
     /** Optional reason/label for the spotlight */
     reason?: string;
+    /** Dim opacity for this spotlight (inherited from global settings on creation) */
+    dimOpacity: number;
+    /** Transition duration for this spotlight (inherited from global settings on creation) */
+    transitionDurationMs: number;
+    /** Easing curve for this spotlight (inherited from global settings on creation) */
+    easing: EasingStyle;
 }
 
 // ==========================================

@@ -212,6 +212,8 @@ export function calculateAutoZooms(
         rectPx: action.rectPx,
         reason: action.reason,
         type: 'auto' as const,
+        transitionDurationMs: zoomSettings.transitionDurationMs,
+        easing: zoomSettings.easing,
     }));
 }
 

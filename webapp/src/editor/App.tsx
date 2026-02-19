@@ -13,8 +13,7 @@ import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { useToast } from './components/Toast';
-import { useHistoryBatcher } from './hooks/useHistoryBatcher';
-import { Slider } from '@shared/components';
+
 
 // Auth imports
 import { AuthManager, supabase } from '../auth/AuthManager';
@@ -34,7 +33,7 @@ function Editor() {
     const redo = useProjectHistory(state => state.redo);
     const showDebugBar = useUIStore(s => s.showDebugBar);
     const canvasMode = useUIStore(s => s.canvasMode);
-    const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
+
 
     // Export state (must be at top level - Rules of Hooks)
     const isExporting = useProjectStore(s => s.exportState.isExporting);
@@ -46,20 +45,6 @@ function Editor() {
     const [isLoading, setIsLoading] = useState(true);
     const hasShownCreationToast = useRef(false);
 
-    // Spotlight scale editing
-    const updateSpotlight = useProjectStore(s => s.updateSpotlight);
-    const { batchAction } = useHistoryBatcher();
-    const activeSpotlight = activeSpotlightId
-        ? project.timeline.spotlightSegments.find(s => s.id === activeSpotlightId)
-        : null;
-    const isSpotlightEditing = canvasMode === CanvasMode.SpotlightEdit && !!activeSpotlight;
-
-    const handleScaleChange = useCallback((newScale: number) => {
-        if (!activeSpotlightId) return;
-        batchAction(() => {
-            updateSpotlight(activeSpotlightId, { scale: newScale });
-        });
-    }, [activeSpotlightId, batchAction, updateSpotlight]);
 
     // Initialize authentication
     useEffect(() => {
@@ -344,23 +329,6 @@ function Editor() {
                         }}
                     >
 
-                        {/* SPOTLIGHT SCALE TOOLBAR — absolute overlay at top */}
-                        {isSpotlightEditing && activeSpotlight && (
-                            <div id="canvas-spotlight-toolbar" className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-index-tooltip)] w-full max-w-xs">
-                                <div className="bg-surface-overlay border border-border rounded-lg shadow-float px-3 py-2">
-                                    <Slider
-                                        value={activeSpotlight.scale}
-                                        onChange={handleScaleChange}
-                                        min={1}
-                                        max={2}
-                                        label="Enlarge"
-                                        showTooltip
-                                        decimals={2}
-                                        units="x"
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {hasActiveProject && (
                             <div

@@ -236,7 +236,7 @@ export class ProjectImpl {
                 userEvents.hoveredCards || [],
                 zoomSegments,
                 settings.zoom,
-                settings.spotlight.enlargeScale
+                settings.spotlight
             )
             : [];
 

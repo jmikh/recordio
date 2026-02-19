@@ -40,7 +40,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     };
 
     const project = useProjectStore(s => s.project);
-    const { transitionDurationMs } = project.settings.zoom;
+    const { transitionDurationMs: globalTransitionDurationMs } = project.settings.zoom;
 
     const timeMapper = useTimeMapper();
 
@@ -52,8 +52,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         (timeline.zoomSegments || []).filter((s: ZoomSegment) => s.visible),
         [timeline.zoomSegments]);
 
-    // Transition-in width in pixels
-    const transitionInWidthPx = coords.msToX(transitionDurationMs);
 
     // Ghost vertical position — both segments are same height now
     const ghostY = (height - HOLD_HEIGHT) / 2;
@@ -95,10 +93,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
         for (let i = 0; i < zoomSegments.length; i++) {
             const block = zoomSegments[i];
+            const blockT = block.transitionDurationMs ?? globalTransitionDurationMs;
             const gapStart = block.outputEndTimeMs;
             const nextBlock = zoomSegments[i + 1];
             let gapEnd = Math.min(
-                gapStart + transitionDurationMs,
+                gapStart + blockT,
                 nextBlock ? nextBlock.outputStartTimeMs : outputDuration
             );
             // Clip or hide the gap when the ghost overlaps it
@@ -118,7 +117,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             }
         }
         return widthMap;
-    }, [zoomSegments, transitionDurationMs, outputDuration, coords, hoverInfo, editingZoomId, dragState]);
+    }, [zoomSegments, globalTransitionDurationMs, outputDuration, coords, hoverInfo, editingZoomId, dragState]);
 
     return (
         <div
@@ -142,13 +141,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                     const isSelected = editingZoomId === s.id;
                     const isDragging = dragState?.segmentId === s.id;
+                    const segTransitionInWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
 
                     return (
                         <ZoomBlock
                             key={s.id}
                             left={startX}
                             width={blockWidth}
-                            transitionInWidth={transitionInWidthPx}
+                            transitionInWidth={segTransitionInWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
@@ -179,7 +179,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
                 {/* Ghost block — shown when hovering to add a new zoom */}
                 {hoverInfo && !editingZoomId && !dragState && (() => {
-                    const clampedTransitionWidth = Math.min(transitionInWidthPx, hoverInfo.width);
+                    const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
+                    const clampedTransitionWidth = Math.min(ghostTransitionWidthPx, hoverInfo.width);
                     const holdWidth = Math.max(0, hoverInfo.width - clampedTransitionWidth);
 
                     return (

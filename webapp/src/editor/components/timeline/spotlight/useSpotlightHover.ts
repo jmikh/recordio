@@ -146,7 +146,10 @@ export function useSpotlightHover(
             sourceRect: initialSourceRect,
             borderRadiusPx: [0, 0, 0, 0], // Start with sharp corners [tl, tr, br, bl]
             scale: project.settings.spotlight.enlargeScale,
-            reason: 'Manual Spotlight'
+            reason: 'Manual Spotlight',
+            dimOpacity: project.settings.spotlight.dimOpacity,
+            transitionDurationMs: project.settings.spotlight.transitionDurationMs,
+            easing: project.settings.spotlight.easing,
         };
 
         // Delete any existing spotlights whose source range overlaps the new one

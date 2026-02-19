@@ -5,7 +5,7 @@
  * Spotlights highlight UI elements that the user hovered over for extended periods.
  */
 
-import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, Rect, Size, ZoomSettings } from '../../types';
+import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, SpotlightSettings, Rect, Size, ZoomSettings } from '../../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import { getViewportStateAtTime } from '../zoom';
 import { TimeMapper } from '../mappers/timeMapper';
@@ -41,6 +41,7 @@ class SpotlightScheduler {
     private readonly timeMapper: TimeMapper;
     private readonly zoomSegments: ZoomSegment[];
     private readonly zoomSettings: ZoomSettings;
+    private readonly spotlightSettings: SpotlightSettings;
     private readonly enlargeScale: number;
     private readonly outputSize: Size;
 
@@ -49,13 +50,14 @@ class SpotlightScheduler {
         timeMapper: TimeMapper,
         zoomSegments: ZoomSegment[],
         zoomSettings: ZoomSettings,
-        enlargeScale: number
+        spotlightSettings: SpotlightSettings
     ) {
         this.viewMapper = viewMapper;
         this.timeMapper = timeMapper;
         this.zoomSegments = zoomSegments;
         this.zoomSettings = zoomSettings;
-        this.enlargeScale = enlargeScale;
+        this.spotlightSettings = spotlightSettings;
+        this.enlargeScale = spotlightSettings.enlargeScale;
         this.outputSize = viewMapper.outputSize;
     }
 
@@ -158,7 +160,10 @@ class SpotlightScheduler {
             sourceRect: card.targetRect,
             borderRadiusPx: outputCornerRadii,
             scale,
-            reason: 'hoveredCard'
+            reason: 'hoveredCard',
+            dimOpacity: this.spotlightSettings.dimOpacity,
+            transitionDurationMs: this.spotlightSettings.transitionDurationMs,
+            easing: this.spotlightSettings.easing,
         };
 
         console.log(`[AutoSpotlight] Card ${index}: CREATED spotlight`, {
@@ -319,8 +324,8 @@ export const calculateAutoSpotlights = (
     hoveredCards: HoveredCardEvent[],
     zoomSegments: ZoomSegment[],
     zoomSettings: ZoomSettings,
-    enlargeScale: number
+    spotlightSettings: SpotlightSettings
 ): SpotlightSegment[] => {
-    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomSegments, zoomSettings, enlargeScale);
+    const scheduler = new SpotlightScheduler(viewMapper, timeMapper, zoomSegments, zoomSettings, spotlightSettings);
     return scheduler.processCards(hoveredCards);
 };

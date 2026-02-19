@@ -13,6 +13,7 @@ import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
+import { SelectionInspector } from './SelectionInspector';
 import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
@@ -120,15 +121,23 @@ export const SettingsPanel = () => {
         }
     }, [activeTab, navItems]);
 
+    // Check if any timeline item is selected
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
+    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const selectedWindowId = useUIStore(s => s.selectedWindowId);
+    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId);
+
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Sidebar Navigation */}
             <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
-                {/* Sliding accent bar */}
-                <div
-                    className="absolute left-3 w-[3px] h-7 bg-primary transition-all duration-200 ease-out"
-                    style={{ top: accentTop }}
-                />
+                {/* Sliding accent bar — hidden when inspector is active */}
+                {!hasSelection && (
+                    <div
+                        className="absolute left-3 w-[3px] h-7 bg-primary transition-all duration-200 ease-out"
+                        style={{ top: accentTop }}
+                    />
+                )}
 
                 {navItems.map((item) => {
                     const isActive = activeTab === item.id;
@@ -152,7 +161,9 @@ export const SettingsPanel = () => {
                             onMouseLeave={() => setHoveredDisabledTab(null)}
                             className={`group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg transition-colors duration-200 ${isDisabled
                                 ? 'opacity-50'
-                                : 'cursor-pointer'
+                                : hasSelection
+                                    ? 'cursor-pointer opacity-60'
+                                    : 'cursor-pointer'
                                 }`}
                         >
                             <span className={`flex transition-colors ${isDisabled
@@ -182,14 +193,20 @@ export const SettingsPanel = () => {
                     ref={setScrollContainer}
                     className="p-4 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
                 >
-                    {activeTab === 'project' && <ProjectSettings />}
-                    {activeTab === 'background' && <BackgroundSettings />}
-                    {activeTab === 'screen' && <ScreenSettings />}
-                    {activeTab === 'camera' && <CameraSettings />}
-                    {activeTab === 'zoom' && <FocusSettings />}
-                    {activeTab === 'effects' && <EffectsSettings />}
-                    {activeTab === 'captions' && <CaptionsSettings />}
-                    {activeTab === 'audio' && <AudioSettingsPanel />}
+                    {hasSelection ? (
+                        <SelectionInspector />
+                    ) : (
+                        <>
+                            {activeTab === 'project' && <ProjectSettings />}
+                            {activeTab === 'background' && <BackgroundSettings />}
+                            {activeTab === 'screen' && <ScreenSettings />}
+                            {activeTab === 'camera' && <CameraSettings />}
+                            {activeTab === 'zoom' && <FocusSettings />}
+                            {activeTab === 'effects' && <EffectsSettings />}
+                            {activeTab === 'captions' && <CaptionsSettings />}
+                            {activeTab === 'audio' && <AudioSettingsPanel />}
+                        </>
+                    )}
                 </div>
                 <Scrollbar
                     container={scrollContainer}
