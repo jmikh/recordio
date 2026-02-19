@@ -433,30 +433,22 @@ export function CaptionsSettings() {
                         decimals={0}
                     />
 
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm text-text-muted w-[80px] shrink-0">Text</label>
-                        <div className="flex-1 min-w-0">
-                            <ColorButton
-                                color={settings.textColor}
-                                onChange={(textColor) => batchAction(() => updateSettings({ captions: { ...settings, textColor } }))}
-                                onPopoverOpen={startInteraction}
-                                onPopoverClose={endInteraction}
-                            />
-                        </div>
-                    </div>
+                    <ColorButton
+                        title="Text"
+                        color={settings.textColor}
+                        onChange={(textColor) => batchAction(() => updateSettings({ captions: { ...settings, textColor } }))}
+                        onPopoverOpen={startInteraction}
+                        onPopoverClose={endInteraction}
+                    />
 
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm text-text-muted w-[80px] shrink-0">Background</label>
-                        <div className="flex-1 min-w-0">
-                            <ColorButton
-                                color={settings.backgroundColor}
-                                onChange={(backgroundColor) => batchAction(() => updateSettings({ captions: { ...settings, backgroundColor } }))}
-                                onPopoverOpen={startInteraction}
-                                onPopoverClose={endInteraction}
-                                showAlpha
-                            />
-                        </div>
-                    </div>
+                    <ColorButton
+                        title="Background"
+                        color={settings.backgroundColor}
+                        onChange={(backgroundColor) => batchAction(() => updateSettings({ captions: { ...settings, backgroundColor } }))}
+                        onPopoverOpen={startInteraction}
+                        onPopoverClose={endInteraction}
+                        showAlpha
+                    />
                 </div>
             </CollapsibleCard>
 

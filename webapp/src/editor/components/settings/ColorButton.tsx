@@ -12,8 +12,8 @@ interface ColorButtonProps {
     onPopoverOpen?: () => void;
     /** Called when the color popover closes */
     onPopoverClose?: () => void;
-    /** Optional label displayed above the button */
-    label?: string;
+    /** Title displayed inside the left half of the button */
+    title: string;
     /** If true, shows an opacity/alpha slider on the color picker */
     showAlpha?: boolean;
 }
@@ -23,7 +23,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
     onChange,
     onPopoverOpen,
     onPopoverClose,
-    label,
+    title,
     showAlpha
 }) => {
     const [showColorPopover, setShowColorPopover] = useState(false);
@@ -67,27 +67,26 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
     }, [showColorPopover, onPopoverClose]);
 
     return (
-        <div className="flex flex-col gap-1.5">
-            {label && (
-                <label className="text-sm text-text-muted">{label}</label>
-            )}
-            <DefaultButton
-                ref={buttonRef}
-                onClick={toggleColorPopover}
-                className="justify-start gap-3 px-2"
-                title="Select color"
-            >
-                <div
-                    className="w-5 h-5 rounded-full border border-text-muted shrink-0"
-                    style={{
-                        backgroundImage: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%)`,
-                        backgroundSize: '100% 100%, 6px 6px'
-                    }}
-                />
-                <span className="text-xs font-mono text-text-muted uppercase">
-                    {color}
-                </span>
-            </DefaultButton>
+        <div className="flex items-center gap-3">
+            <span className="text-sm text-text-muted w-[80px] shrink-0">{title}</span>
+            <div className="flex-1 min-w-0">
+                <DefaultButton
+                    ref={buttonRef}
+                    onClick={toggleColorPopover}
+                    className="w-full justify-start gap-3 px-2"
+                >
+                    <div
+                        className="w-5 h-5 rounded-full border border-text-muted shrink-0"
+                        style={{
+                            backgroundImage: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%)`,
+                            backgroundSize: '100% 100%, 6px 6px'
+                        }}
+                    />
+                    <span className="text-xs font-mono text-text-muted uppercase">
+                        {color}
+                    </span>
+                </DefaultButton>
+            </div>
 
             {showColorPopover && createPortal(
                 <div

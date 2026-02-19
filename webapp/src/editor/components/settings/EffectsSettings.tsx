@@ -162,7 +162,7 @@ export const EffectsSettings = () => {
 
                             {/* Color (ring and circle only) */}
                             <ColorButton
-                                label="Color"
+                                title="Color"
                                 color={mouseSettings.color}
                                 onChange={(color) => handleMouseChange({ color })}
                                 onPopoverOpen={startInteraction}

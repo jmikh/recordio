@@ -225,18 +225,14 @@ export const CameraSettings = () => {
                         {!hasFeather && (
                             <>
                                 {/* Color Picker */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-sm text-text-muted w-[80px] shrink-0">Color</label>
-                                    <div className="flex-1 min-w-0">
-                                        <ColorButton
-                                            color={borderColor}
-                                            onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
-                                            onPopoverOpen={startInteraction}
-                                            onPopoverClose={endInteraction}
-                                            showAlpha
-                                        />
-                                    </div>
-                                </div>
+                                <ColorButton
+                                    title="Color"
+                                    color={borderColor}
+                                    onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
+                                    onPopoverOpen={startInteraction}
+                                    onPopoverClose={endInteraction}
+                                    showAlpha
+                                />
 
                                 {/* Thickness Slider */}
                                 <Slider

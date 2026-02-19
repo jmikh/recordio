@@ -269,6 +269,7 @@ export const ScreenSettings = () => {
                         <div className="space-y-4">
                             {/* Color Picker */}
                             <ColorButton
+                                title="Color"
                                 color={screenConfig.borderColor}
                                 onChange={(color) => batchAction(() => updateSettings({
                                     screen: { ...screenConfig, borderColor: color }

@@ -5,6 +5,7 @@
  */
 
 import type { ID, TimeMs, Rect } from '@shared/types';
+import type { EasingStyle } from '../core/easing';
 
 // ==========================================
 // BASE SEGMENT INTERFACE
