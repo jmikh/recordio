@@ -1,4 +1,5 @@
 import React from 'react';
+import { RiLightbulbFlashLine } from 'react-icons/ri';
 import {
     fadeInSegment,
     holdSegment,
@@ -10,6 +11,7 @@ import {
     HOLD_HEIGHT,
     DRAG_HANDLE_HEIGHT
 } from './SpotlightTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface SpotlightBlockProps {
     /** Left position in pixels */
@@ -72,7 +74,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
 
     return (
         <div
-            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle}`}
+            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle} ${!isSelected ? spotlightContainer.hoverClass : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -98,14 +100,18 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Hold Segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: fadeInWidth,
                         top: holdY,
                         width: holdWidth,
                         ...holdSegment.getStyle(),
                     }}
-                />
+                >
+                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                        <RiLightbulbFlashLine className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                    )}
+                </div>
             )}
 
             {/* Fade Out Segment */}

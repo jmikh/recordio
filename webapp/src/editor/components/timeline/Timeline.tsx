@@ -17,7 +17,7 @@ import { TimelineHeaderCell } from './TimelineHeaderCell';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
-import { Scrollbar } from '@shared/components';
+
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
 
@@ -93,7 +93,10 @@ export function Timeline() {
             const maxScroll = el.scrollWidth - el.clientWidth;
             if (maxScroll > 0) {
                 e.preventDefault();
-                el.scrollLeft += e.deltaY;
+                // Use deltaX (trackpad horizontal swipe) or deltaY (mouse wheel / trackpad vertical),
+                // whichever has larger absolute magnitude
+                const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                el.scrollLeft += delta;
             }
         };
 
@@ -302,8 +305,7 @@ export function Timeline() {
                         />
 
                         <div
-                            className="w-full h-full overflow-x-auto overflow-y-hidden relative custom-scrollbar [&::-webkit-scrollbar]:hidden"
-                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            className="w-full h-full overflow-x-auto overflow-y-hidden relative scrollbar-thin"
                             ref={setContainerRef}
                             onScroll={handleScroll}
                             onMouseMove={handleMouseMove}
@@ -379,7 +381,7 @@ export function Timeline() {
                         </div>
 
                     </div>
-                    <Scrollbar container={containerEl} dependency={pixelsPerSec} className="border-b-0 border-t border-border" />
+
                 </div>
             </div>
         </div>

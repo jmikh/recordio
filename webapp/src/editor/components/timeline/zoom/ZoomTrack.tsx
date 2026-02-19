@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { AiOutlineZoomIn } from 'react-icons/ai';
 import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
@@ -9,10 +10,10 @@ import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
-    TRANSITION_HEIGHT,
     HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import type { ZoomSegment } from '../../../../types';
 
 interface ZoomTrackProps {
@@ -54,9 +55,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     // Transition-in width in pixels
     const transitionInWidthPx = coords.msToX(transitionDurationMs);
 
-    // Ghost vertical positions
-    const transitionY = (height - TRANSITION_HEIGHT) / 2;
-    const holdY = (height - HOLD_HEIGHT) / 2;
+    // Ghost vertical position — both segments are same height now
+    const ghostY = (height - HOLD_HEIGHT) / 2;
 
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
@@ -162,9 +162,10 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                     style={{
                                         position: 'absolute',
                                         left: 0,
-                                        top: transitionY,
+                                        top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostZoom.transitionIn.getStyle(),
+                                        ...(holdWidth <= 0 ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
                                     }}
                                 />
                             )}
@@ -172,16 +173,20 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             {/* Ghost hold */}
                             {holdWidth > 0 && (
                                 <div
-                                    className={ghostZoom.hold.className}
+                                    className={`${ghostZoom.hold.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
                                         left: clampedTransitionWidth,
-                                        top: holdY,
+                                        top: ghostY,
                                         width: holdWidth,
                                         ...ghostZoom.hold.getStyle(),
                                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                                     }}
-                                />
+                                >
+                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                                        <AiOutlineZoomIn className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                    )}
+                                </div>
                             )}
                         </div>
                     );

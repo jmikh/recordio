@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { createPortal } from 'react-dom';
 import {
     captionBlock,
@@ -8,6 +9,7 @@ import {
     CAPTION_BLOCK_HEIGHT,
     DRAG_HANDLE_HEIGHT,
 } from './CaptionTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface CaptionBlockProps {
     /** Left position in pixels */
@@ -71,7 +73,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle}`}
+                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle} ${!isSelected ? captionContainer.hoverClass : ''}`}
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
@@ -85,7 +87,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
             >
                 {/* Caption Block */}
                 <div
-                    className={`${captionBlock.base} ${colorClass} ${hoverClass}`}
+                    className={`${captionBlock.base} ${colorClass} ${hoverClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: 0,
                         top: blockY,
@@ -93,6 +95,9 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                         ...captionBlock.getStyle(),
                     }}
                 >
+                    {width >= MIN_ICON_WIDTH_PX && (
+                        <FaRegClosedCaptioning className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                    )}
                 </div>
 
                 {/* Left resize handle */}

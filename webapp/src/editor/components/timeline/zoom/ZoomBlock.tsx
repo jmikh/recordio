@@ -1,15 +1,16 @@
 import React from 'react';
+import { AiOutlineZoomIn } from 'react-icons/ai';
 import {
     transitionInSegment,
     holdSegment,
     zoomContainer,
     resizeHandle,
     dragHandleIndicator,
-    TRANSITION_HEIGHT,
     HOLD_HEIGHT,
     DRAG_HANDLE_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface ZoomBlockProps {
     /** Left position in pixels */
@@ -57,9 +58,8 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     const clampedTransitionWidth = Math.min(transitionInWidth, width);
     const holdWidth = Math.max(0, width - clampedTransitionWidth);
 
-    // Vertical centering
-    const transitionY = (trackHeight - TRANSITION_HEIGHT) / 2;
-    const holdY = (trackHeight - HOLD_HEIGHT) / 2;
+    // Vertical centering — same height for both segments
+    const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
 
     const transitionColorClass = isSelected ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
     const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
@@ -77,7 +77,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
 
     return (
         <div
-            className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle}`}
+            className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle} ${!isSelected ? zoomContainer.hoverClass : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -93,7 +93,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     className={`${transitionInSegment.base} ${transitionColorClass} ${transitionHoverClass}`}
                     style={{
                         left: 0,
-                        top: transitionY,
+                        top: segmentY,
                         width: clampedTransitionWidth,
                         ...transitionStyle,
                     }}
@@ -103,15 +103,19 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {/* Hold segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: clampedTransitionWidth,
-                        top: holdY,
+                        top: segmentY,
                         width: holdWidth,
                         ...holdSegment.getStyle(),
                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                     }}
-                />
+                >
+                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                        <AiOutlineZoomIn className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                    )}
+                </div>
             )}
 
             {/* Left resize handle */}

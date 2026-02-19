@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
@@ -13,6 +14,7 @@ import {
     FADE_HEIGHT,
     HOLD_HEIGHT
 } from './SpotlightTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface SpotlightTrackProps {
     height: number;
@@ -179,16 +181,25 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                         />
 
                         {/* Ghost Hold (may be 0 width when ghost is short) */}
-                        <div
-                            className={ghostSpotlight.hold.className}
-                            style={{
-                                position: 'absolute',
-                                left: Math.min(hoverInfo.width / 2, fadeWidthPx),
-                                top: holdY,
-                                width: Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, fadeWidthPx) * 2),
-                                ...ghostSpotlight.hold.getStyle(),
-                            }}
-                        />
+                        {(() => {
+                            const ghostHoldWidth = Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, fadeWidthPx) * 2);
+                            return ghostHoldWidth > 0 && (
+                                <div
+                                    className={`${ghostSpotlight.hold.className} flex items-center justify-center overflow-hidden`}
+                                    style={{
+                                        position: 'absolute',
+                                        left: Math.min(hoverInfo.width / 2, fadeWidthPx),
+                                        top: holdY,
+                                        width: ghostHoldWidth,
+                                        ...ghostSpotlight.hold.getStyle(),
+                                    }}
+                                >
+                                    {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
+                                        <RiLightbulbFlashLine className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Ghost Fade Out */}
                         <div

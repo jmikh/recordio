@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
@@ -31,6 +31,7 @@ export function useZoomHover(
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+    const hoverInfoSetAtRef = useRef<number>(0);
 
     // Clear ghost whenever a zoom is selected (covers the case where the mouse
     // didn't move after selection, so handleMouseMove never had a chance to clear).
@@ -78,6 +79,10 @@ export function useZoomHover(
         const width = coords.msToX(range.end - range.start);
         const leftX = coords.msToX(range.start);
 
+        // Only stamp when ghost first appears (null → non-null)
+        if (!hoverInfo) {
+            hoverInfoSetAtRef.current = Date.now();
+        }
         setHoverInfo({
             x: leftX,
             outputStartTimeMs: range.start,
@@ -101,7 +106,9 @@ export function useZoomHover(
             return;
         }
 
-        if (!hoverInfo) return;
+        // Require the ghost to have been visible for at least 200ms (prevents
+        // accidental adds from mouse-jitter between rapid deselect clicks)
+        if (!hoverInfo || Date.now() - hoverInfoSetAtRef.current < 200) return;
 
         // Convert output placement times → source times
         const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);

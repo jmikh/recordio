@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
@@ -9,6 +10,7 @@ import { useCaptionHover } from './useCaptionHover';
 import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import { ghostCaption, CAPTION_BLOCK_HEIGHT } from './CaptionTrackStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface CaptionTrackProps {
     height: number;
@@ -161,7 +163,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
 
                         {/* Ghost block */}
                         <div
-                            className={ghostCaption.block.className}
+                            className={`${ghostCaption.block.className} flex items-center justify-center overflow-hidden`}
                             style={{
                                 position: 'absolute',
                                 left: 0,
@@ -169,7 +171,11 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                                 width: '100%',
                                 ...ghostCaption.block.getStyle(),
                             }}
-                        />
+                        >
+                            {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
+                                <FaRegClosedCaptioning className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

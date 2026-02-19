@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
@@ -27,6 +27,7 @@ export function useCaptionHover(
     const addCaptionSegment = useProjectStore(s => s.addCaptionSegment);
     const selectCaption = useUIStore(s => s.selectCaption);
     const [hoverInfo, setHoverInfo] = useState<CaptionHoverInfo | null>(null);
+    const hoverInfoSetAtRef = useRef<number>(0);
 
     // Clear ghost whenever a caption is selected.
     useEffect(() => {
@@ -78,6 +79,10 @@ export function useCaptionHover(
         const width = coords.msToX(range.end - range.start);
         const leftX = coords.msToX(range.start);
 
+        // Only stamp when ghost first appears (null → non-null)
+        if (!hoverInfo) {
+            hoverInfoSetAtRef.current = Date.now();
+        }
         setHoverInfo({
             x: leftX,
             outputStartTimeMs: range.start,
@@ -101,7 +106,9 @@ export function useCaptionHover(
             return;
         }
 
-        if (!hoverInfo) return;
+        // Require the ghost to have been visible for at least 200ms (prevents
+        // accidental adds from mouse-jitter between rapid deselect clicks)
+        if (!hoverInfo || Date.now() - hoverInfoSetAtRef.current < 200) return;
 
         // Convert output times → source times
         const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
