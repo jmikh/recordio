@@ -82,6 +82,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         deviceFrameId: 'macbook-air-dark',
         hasShadow: true,
         hasGlow: false,
+        hasFeather: false,
         mute: false
     },
 
@@ -127,6 +128,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         borderColor: 'white',
         hasShadow: true,
         hasGlow: false,
+        hasFeather: false,
         cropZoom: 1,
         autoShrink: true,
         shrinkScale: 0.5

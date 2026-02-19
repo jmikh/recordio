@@ -3,7 +3,7 @@ import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomSegment } from '../../../../types';
-import type { DragState } from './useZoomDrag';
+import type { TimelineSegmentDragState as DragState } from '../useTimelineSegmentDrag';
 
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
