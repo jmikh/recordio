@@ -7,6 +7,7 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomBlock } from './ZoomBlock';
+import { ZoomOutBlock } from './ZoomOutBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
@@ -85,6 +86,40 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         timeMapper
     );
 
+    // Compute zoom-out gap ranges (the implicit ease back to full viewport).
+    // Gaps are clipped to avoid overlapping the ghost "+" indicator.
+    const zoomOutGaps = useMemo(() => {
+        const gaps: { left: number; width: number }[] = [];
+        // Ghost start time — clip zoom-out blocks here when ghost is visible
+        const ghostStartMs = (hoverInfo && !editingZoomId && !dragState)
+            ? hoverInfo.outputStartTimeMs : null;
+
+        for (let i = 0; i < zoomSegments.length; i++) {
+            const block = zoomSegments[i];
+            const gapStart = block.outputEndTimeMs;
+            const nextBlock = zoomSegments[i + 1];
+            let gapEnd = Math.min(
+                gapStart + transitionDurationMs,
+                nextBlock ? nextBlock.outputStartTimeMs : outputDuration
+            );
+            // Clip or hide the gap when the ghost overlaps it
+            if (ghostStartMs !== null && ghostStartMs < gapEnd) {
+                if (ghostStartMs <= gapStart) {
+                    // Ghost starts at or before the gap — hide entirely
+                    continue;
+                }
+                // Ghost starts within the gap — clip the end
+                gapEnd = ghostStartMs;
+            }
+            if (gapEnd > gapStart) {
+                const left = coords.msToX(gapStart);
+                const width = coords.msToX(gapEnd - gapStart);
+                if (width > 0) gaps.push({ left, width });
+            }
+        }
+        return gaps;
+    }, [zoomSegments, transitionDurationMs, outputDuration, coords, hoverInfo, editingZoomId, dragState]);
+
     return (
         <div
             className="w-full relative select-none flex"
@@ -95,6 +130,16 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
             onClick={handleClick}
         >
             <div className="relative flex-1" style={{ height }}>
+
+                {/* Zoom-out indicator blocks */}
+                {zoomOutGaps.map((gap, i) => (
+                    <ZoomOutBlock
+                        key={`zoom-out-${i}`}
+                        left={gap.left}
+                        width={gap.width}
+                        trackHeight={height}
+                    />
+                ))}
 
                 {/* Zoom blocks */}
                 {zoomSegments.map((s) => {
@@ -158,7 +203,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             {/* Ghost transition-in */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={ghostZoom.transitionIn.className}
+                                    className={`${ghostZoom.transitionIn.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
                                         left: 0,
@@ -167,13 +212,17 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                         ...ghostZoom.transitionIn.getStyle(),
                                         ...(holdWidth <= 0 ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
                                     }}
-                                />
+                                >
+                                    {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
+                                        <AiOutlineZoomIn className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                    )}
+                                </div>
                             )}
 
                             {/* Ghost hold */}
                             {holdWidth > 0 && (
                                 <div
-                                    className={`${ghostZoom.hold.className} flex items-center justify-center overflow-hidden`}
+                                    className={ghostZoom.hold.className}
                                     style={{
                                         position: 'absolute',
                                         left: clampedTransitionWidth,
@@ -182,11 +231,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                         ...ghostZoom.hold.getStyle(),
                                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                                     }}
-                                >
-                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
-                                    )}
-                                </div>
+                                />
                             )}
                         </div>
                     );

@@ -10,7 +10,7 @@ import {
     DRAG_HANDLE_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface ZoomBlockProps {
     /** Left position in pixels */
@@ -90,20 +90,24 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {/* Transition-in segment */}
             {clampedTransitionWidth > 0 && (
                 <div
-                    className={`${transitionInSegment.base} ${transitionColorClass} ${transitionHoverClass}`}
+                    className={`${transitionInSegment.base} ${transitionColorClass} ${transitionHoverClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: 0,
                         top: segmentY,
                         width: clampedTransitionWidth,
                         ...transitionStyle,
                     }}
-                />
+                >
+                    {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
+                        <AiOutlineZoomIn className="text-main opacity-50" size={BLOCK_ICON_SIZE} />
+                    )}
+                </div>
             )}
 
             {/* Hold segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
                     style={{
                         left: clampedTransitionWidth,
                         top: segmentY,
@@ -111,11 +115,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         ...holdSegment.getStyle(),
                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                     }}
-                >
-                    {holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
-                    )}
-                </div>
+                />
             )}
 
             {/* Left resize handle */}
