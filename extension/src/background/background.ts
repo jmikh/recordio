@@ -629,6 +629,20 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     }
 });
 
+// --- Tab Switch Detection (Tab Recording) ---
+// When recording a specific tab, detect if user switches to a different tab
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    await ensureState();
+    if (!currentState?.isRecording || currentState.mode !== 'tab') return;
+    if (activeInfo.tabId === currentState.recordedTabId) return;
+
+    // User switched away from the recorded tab — notify the new tab
+    chrome.tabs.sendMessage(activeInfo.tabId, {
+        type: MSG_TYPES.SHOW_TAB_SWITCH_TOAST,
+        payload: {}
+    }).catch(() => { /* tab may not have content script */ });
+});
+
 // --- Main Listener ---
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -653,6 +667,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
             case MSG_TYPES.PING_OFFSCREEN:
                 sendResponse("PONG");
+                break;
+
+            case MSG_TYPES.SWITCH_TO_RECORDING_TAB:
+                if (currentState?.recordedTabId) {
+                    chrome.tabs.update(currentState.recordedTabId, { active: true });
+                }
                 break;
         }
     })();

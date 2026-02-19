@@ -48,5 +48,14 @@
     "content_security_policy": {
         "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.supabase.co; object-src 'self'"
     },
-    "web_accessible_resources": []
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icons/*.png"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
 }

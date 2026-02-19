@@ -95,6 +95,10 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
         case MSG_TYPES.DISABLE_BLUR_MODE:
             blurManager.disable();
             break;
+
+        case MSG_TYPES.SHOW_TAB_SWITCH_TOAST:
+            showTabSwitchToast();
+            break;
     }
 };
 
@@ -271,38 +275,170 @@ function showCancelToast() {
     const toast = document.createElement('div');
     Object.assign(toast.style, {
         position: 'fixed',
-        bottom: '32px',
+        top: '16px',
         left: '50%',
-        transform: 'translateX(-50%) translateY(0)',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        backgroundColor: 'oklch(0.20 0.01 270 / 0.9)',
-        color: 'oklch(0.9 0 0 / 80%)',
+        transform: 'translateX(-50%) translateY(-8px)',
+        padding: '12px 16px',
+        borderRadius: '12px',
+        backgroundColor: 'oklch(0.20 0.01 270 / 0.92)',
+        color: 'oklch(0.9 0 0 / 85%)',
         fontSize: '14px',
-        fontFamily: "'Satoshi', sans-serif",
+        fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
         fontWeight: '500',
         zIndex: '2147483647',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid oklch(1 0 0 / 8%)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid oklch(1 0 0 / 10%)',
         transition: 'opacity 0.3s, transform 0.3s',
         opacity: '0',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        boxShadow: '0 8px 32px oklch(0 0 0 / 0.3)'
     });
-    toast.innerText = 'Recording cancelled';
+
+    // Logo
+    const logo = document.createElement('img');
+    logo.src = chrome.runtime.getURL('icons/icon48.png');
+    Object.assign(logo.style, {
+        width: '20px',
+        height: '20px',
+        flexShrink: '0'
+    });
+    toast.appendChild(logo);
+
+    const text = document.createElement('span');
+    text.textContent = 'Recording cancelled';
+    toast.appendChild(text);
+
     document.body.appendChild(toast);
 
     // Animate in
     requestAnimationFrame(() => {
         toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
     });
 
     // Animate out and remove
     setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateX(-50%) translateY(8px)';
+        toast.style.transform = 'translateX(-50%) translateY(-8px)';
         setTimeout(() => toast.remove(), 300);
     }, 2000);
+}
+
+/** Interactive toast shown when user switches away from the recorded tab */
+function showTabSwitchToast() {
+    // Singleton — don't stack if already showing
+    if (document.getElementById('recordio-tab-switch-toast')) return;
+
+    const toast = document.createElement('div');
+    toast.id = 'recordio-tab-switch-toast';
+    Object.assign(toast.style, {
+        position: 'fixed',
+        top: '16px',
+        left: '50%',
+        transform: 'translateX(-50%) translateY(-8px)',
+        padding: '12px 16px',
+        borderRadius: '12px',
+        backgroundColor: 'oklch(0.20 0.01 270 / 0.92)',
+        color: 'oklch(0.9 0 0 / 85%)',
+        fontSize: '14px',
+        fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+        fontWeight: '500',
+        zIndex: '2147483647',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid oklch(1 0 0 / 10%)',
+        transition: 'opacity 0.3s, transform 0.3s',
+        opacity: '0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        boxShadow: '0 8px 32px oklch(0 0 0 / 0.3)'
+    });
+
+    // Logo
+    const logo = document.createElement('img');
+    logo.src = chrome.runtime.getURL('icons/icon48.png');
+    Object.assign(logo.style, {
+        width: '20px',
+        height: '20px',
+        flexShrink: '0'
+    });
+    toast.appendChild(logo);
+
+    // Message text
+    const text = document.createElement('span');
+    text.textContent = "You're recording another tab";
+    toast.appendChild(text);
+
+    // "Take me back" button
+    const btn = document.createElement('button');
+    btn.textContent = 'Take me back';
+    Object.assign(btn.style, {
+        padding: '6px 14px',
+        borderRadius: '8px',
+        border: 'none',
+        backgroundColor: 'oklch(0.58 0.19 290)',
+        color: '#fff',
+        fontSize: '13px',
+        fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+        fontWeight: '600',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        transition: 'filter 0.15s'
+    });
+    btn.addEventListener('mouseenter', () => btn.style.filter = 'brightness(1.15)');
+    btn.addEventListener('mouseleave', () => btn.style.filter = 'brightness(1)');
+    btn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: MSG_TYPES.SWITCH_TO_RECORDING_TAB });
+        dismissToast();
+    });
+    toast.appendChild(btn);
+
+    // X close button
+    const close = document.createElement('button');
+    close.textContent = '✕';
+    Object.assign(close.style, {
+        background: 'none',
+        border: 'none',
+        color: 'oklch(0.9 0 0 / 50%)',
+        fontSize: '14px',
+        cursor: 'pointer',
+        padding: '2px 4px',
+        lineHeight: '1',
+        transition: 'color 0.15s'
+    });
+    close.addEventListener('mouseenter', () => close.style.color = 'oklch(0.9 0 0 / 90%)');
+    close.addEventListener('mouseleave', () => close.style.color = 'oklch(0.9 0 0 / 50%)');
+    close.addEventListener('click', dismissToast);
+    toast.appendChild(close);
+
+    document.body.appendChild(toast);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    function dismissToast() {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(-8px)';
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    // Dismiss when leaving the tab
+    function onVisibilityChange() {
+        if (document.hidden) dismissToast();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(dismissToast, 5000);
 }
 
 // History API Patching (for URL changes)

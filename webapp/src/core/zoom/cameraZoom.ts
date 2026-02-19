@@ -1,5 +1,5 @@
 import { type ZoomSegment, type Size, type Rect, type CameraSettings, type ZoomSettings } from '../../types';
-import { applyEasing } from '../easing';
+import { getViewportStateAtTime } from './zoomAnimator';
 
 /**
  * Anchor point for camera positioning.
@@ -100,19 +100,19 @@ function isFullScreen(rect: Rect, outputSize: Size): boolean {
 }
 
 
-
 /**
  * Calculates the effective camera state at a given time based on viewport motions.
  * 
- * The camera will automatically shrink during zoom-in periods and grow back
- * during zoom-out periods, using the same transition timing as the viewport.
+ * Derives camera shrink from the authoritative viewport interpolator
+ * (getViewportStateAtTime), so the camera scale is always proportional to
+ * and perfectly synchronized with the viewport zoom level — including the
+ * gap-based zoom-out transitions that have no explicit ZoomSegment.
  * 
- * @param actions - Array of zoom actions from the timeline
+ * @param actions - Array of zoom segments from the timeline
  * @param currentTimeMs - Current playback time in milliseconds (OUTPUT time)
  * @param outputSize - The output video size
- * @param shrinkScale - Target scale when shrunk (e.g., 0.5 for 50%)
- * @param timeMapper - TimeMapper for source to output conversion
- * @param zoomSettings - Zoom settings for duration calculation
+ * @param shrinkScale - Target scale when fully shrunk (e.g., 0.5 for 50%)
+ * @param zoomSettings - Zoom settings (transitionDurationMs, easing)
  * @returns The current camera state including scale factor
  */
 export function getCameraStateAtTime(
@@ -126,60 +126,22 @@ export function getCameraStateAtTime(
         return { sizeScale: 1.0, isTransitioning: false };
     }
 
-    // Find first zoom-in motion (viewport becomes smaller than full screen)
-    const firstZoomIn = actions.find(s => s.visible && !isFullScreen(s.rectPx, outputSize));
+    // Use the same interpolation engine as the viewport itself
+    const viewport = getViewportStateAtTime(actions, currentTimeMs, outputSize, zoomSettings);
 
-    if (!firstZoomIn) {
-        // No zoom-ins found, camera stays full size
+    if (isFullScreen(viewport, outputSize)) {
         return { sizeScale: 1.0, isTransitioning: false };
     }
 
-    const zoomInStartMs = firstZoomIn.outputStartTimeMs;
-    const zoomInEndMs = firstZoomIn.outputEndTimeMs;
-    const zoomInDuration = zoomInEndMs - zoomInStartMs;
+    // Calculate how zoomed-in the viewport is (1.0 = full screen, 0 = infinitely zoomed)
+    const zoomRatio = viewport.width / outputSize.width;
 
-    // PHASE 1: Before first zoom-in starts → Full size
-    if (currentTimeMs < zoomInStartMs) {
-        return { sizeScale: 1.0, isTransitioning: false };
-    }
+    // Map zoom ratio to camera scale: full screen → 1.0, fully zoomed → shrinkScale
+    const sizeScale = shrinkScale + (1.0 - shrinkScale) * zoomRatio;
 
-    // PHASE 2: During first zoom-in transition → Shrinking
-    if (currentTimeMs >= zoomInStartMs && currentTimeMs < zoomInEndMs) {
-        const progress = (currentTimeMs - zoomInStartMs) / zoomInDuration;
-        const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
-        const scale = 1.0 - (1.0 - shrinkScale) * eased;
-        return { sizeScale: scale, isTransitioning: true };
-    }
-
-    // Find first zoom-out to full screen (after a zoom-in has occurred)
-    const firstZoomOutToFull = actions.find(s =>
-        s.visible &&
-        isFullScreen(s.rectPx, outputSize) &&
-        s.outputEndTimeMs > zoomInEndMs
-    );
-
-    if (!firstZoomOutToFull) {
-        // No zoom-out to full found, camera stays shrunk forever
-        return { sizeScale: shrinkScale, isTransitioning: false };
-    }
-
-    const zoomOutStartMs = firstZoomOutToFull.outputStartTimeMs;
-    const zoomOutEndMs = firstZoomOutToFull.outputEndTimeMs;
-    const zoomOutDuration = zoomOutEndMs - zoomOutStartMs;
-
-    // PHASE 3: Between zoom-in end and zoom-out start → Shrunk (static)
-    if (currentTimeMs >= zoomInEndMs && currentTimeMs < zoomOutStartMs) {
-        return { sizeScale: shrinkScale, isTransitioning: false };
-    }
-
-    // PHASE 4: During zoom-out transition → Growing back
-    if (currentTimeMs >= zoomOutStartMs && currentTimeMs < zoomOutEndMs) {
-        const progress = (currentTimeMs - zoomOutStartMs) / zoomOutDuration;
-        const eased = applyEasing(progress, zoomSettings.easing ?? 'ease-in-out');
-        const scale = shrinkScale + (1.0 - shrinkScale) * eased;
-        return { sizeScale: scale, isTransitioning: true };
-    }
-
-    // PHASE 5: After zoom-out completes → Full size
-    return { sizeScale: 1.0, isTransitioning: false };
+    return {
+        sizeScale,
+        isTransitioning: zoomRatio > 0.01 && zoomRatio < 0.99,
+    };
 }
+

@@ -48,6 +48,10 @@ export const MSG_TYPES = {
     ENABLE_BLUR_MODE: 'ENABLE_BLUR_MODE',
     DISABLE_BLUR_MODE: 'DISABLE_BLUR_MODE',
 
+    // Tab Switch (Tab Recording)
+    SHOW_TAB_SWITCH_TOAST: 'SHOW_TAB_SWITCH_TOAST',       // Background -> Content (wrong tab)
+    SWITCH_TO_RECORDING_TAB: 'SWITCH_TO_RECORDING_TAB',   // Content -> Background (take me back)
+
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];

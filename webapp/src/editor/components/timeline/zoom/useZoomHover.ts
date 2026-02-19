@@ -7,6 +7,7 @@ import type { DragState } from './useZoomDrag';
 
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
+import { rectFromCenter } from '../../../../core/geometry';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -114,14 +115,12 @@ export function useZoomHover(
         const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
         const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
 
-        // Use the output size as the initial rect (full viewport — user can resize in canvas)
+        // Use half the output size, centered — user can resize in canvas
         const outputSize = project.settings.outputSize;
-        const initialRect = {
-            x: 0,
-            y: 0,
-            width: outputSize.width,
-            height: outputSize.height,
-        };
+        const initialRect = rectFromCenter(
+            { x: outputSize.width / 2, y: outputSize.height / 2 },
+            { width: outputSize.width / 2, height: outputSize.height / 2 }
+        );
 
         const newSegment: ZoomSegment = {
             id: crypto.randomUUID(),

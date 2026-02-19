@@ -82,6 +82,7 @@ export class BlurManager {
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             #recordio-blur-toast {
+                all: initial;
                 position: fixed;
                 bottom: 24px;
                 left: 50%;
@@ -93,13 +94,29 @@ export class BlurManager {
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                 z-index: 2147483647 !important;
                 font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+                font-size: 14px;
                 display: flex;
                 align-items: center;
                 gap: 16px;
                 border: 1px solid oklch(1 0 0 / 8%);
                 animation: recordio-fade-in 0.2s ease-out;
+                box-sizing: border-box;
+            }
+            #recordio-blur-toast img {
+                all: initial;
+                width: 20px;
+                height: 20px;
+                flex-shrink: 0;
+                display: block;
+            }
+            #recordio-blur-toast span {
+                all: initial;
+                font-size: 14px;
+                font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+                color: oklch(0.98 0 0 / 80%);
             }
             #recordio-blur-toast button {
+                all: initial;
                 background-color: oklch(0.58 0.19 290);
                 color: oklch(0.98 0 0);
                 border: none;
@@ -108,7 +125,10 @@ export class BlurManager {
                 font-weight: 500;
                 cursor: pointer;
                 font-size: 14px;
+                font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+                line-height: 1;
                 transition: background-color 0.2s;
+                box-sizing: border-box;
             }
             #recordio-blur-toast button:hover {
                 background-color: oklch(0.66 0.20 290);
@@ -127,15 +147,20 @@ export class BlurManager {
         this.toast = document.createElement('div');
         this.toast.id = 'recordio-blur-toast';
 
+        const logo = document.createElement('img');
+        logo.src = chrome.runtime.getURL('icons/icon48.png');
+        logo.style.width = '20px';
+        logo.style.height = '20px';
+        logo.style.flexShrink = '0';
+
         const message = document.createElement('span');
         message.textContent = 'Hover and click elements to blur them.';
-        message.style.fontSize = '14px';
-        message.style.color = 'oklch(0.98 0 0 / 80%)';
 
         const doneBtn = document.createElement('button');
         doneBtn.textContent = 'Done';
         doneBtn.addEventListener('click', this.handleToastClick);
 
+        this.toast.appendChild(logo);
         this.toast.appendChild(message);
         this.toast.appendChild(doneBtn);
         document.body.appendChild(this.toast);
