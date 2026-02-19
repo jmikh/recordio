@@ -7,10 +7,10 @@ import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
 import { resetClickSounds } from '../../../core/audio/clickSoundPlayer';
-import { ZoomEditor, renderZoomEditor } from './ZoomEditor';
-import { SpotlightEditor, renderSpotlightEditor } from './SpotlightEditor';
-import { renderCropEditor, CropEditor } from './CropEditor';
-import { CameraEditor } from './CameraEditor';
+import { ZoomEditor, renderZoomEditor } from './CanvasZoomEditor';
+import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor';
+import { renderCropEditor, CropEditor } from './CanvasCropEditor';
+import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
 
@@ -248,13 +248,18 @@ export const CanvasContainer = () => {
                             editingSpotlightId: activeSpotlightId,
                             previewSpotlightRect: previewSpotlightRectRef.current
                         });
+                    } else if (canvasMode === CanvasMode.CameraEdit) {
+                        renderCameraEditor(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs,
+                            overrideCameraSettings: previewCameraSettingsRef.current
+                        });
                     } else {
                         PlaybackRenderer.render(resources, {
                             project,
                             currentTimeMs: effectiveTimeMs,
                             timeMapper: timeMapperRef.current,
                             overrideCameraSettings: previewCameraSettingsRef.current || undefined,
-                            isCameraEditing: canvasMode === CanvasMode.CameraEdit,
                             focusAreas: focusAreasRef.current,
                             showDebugOverlays: uiState.showDebugOverlays
                         });
@@ -330,10 +335,11 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.CameraEdit;
 
     return (
-        <div className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
+        <div id="canvas-container" className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
 
             {/* ASPECT RATIO WRAPPER */}
             <div
+                id="canvas-aspect-wrapper"
                 ref={aspectWrapperRef}
                 className={`relative ${isEditorMode ? 'canvas-editor-glow' : ''}`}
                 style={{
@@ -344,7 +350,7 @@ export const CanvasContainer = () => {
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}
-                <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
+                <div id="canvas-hidden-resources" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
                     {(project.settings.background.type === 'preset' || project.settings.background.type === 'custom') && bgUrl && (
                         <img ref={bgRef} src={bgUrl} className="hidden" crossOrigin={bgUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
@@ -409,6 +415,7 @@ export const CanvasContainer = () => {
 
                 {/* MAIN CANVAS */}
                 <canvas
+                    id="main-canvas"
                     ref={canvasRef}
                     className="block w-full h-full object-contain"
                 />

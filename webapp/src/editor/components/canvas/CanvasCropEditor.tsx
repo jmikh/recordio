@@ -99,17 +99,26 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     const resolvedSize = (videoSize && videoSize.width > 0) ? videoSize : sourceSize;
     const inputSize = resolvedSize || { width: 1920, height: 1080 }; // Final Fallback
 
-    // Current Crop (or default to full)
-    const currentCrop = project.settings.screen.crop || { x: 0, y: 0, ...inputSize };
+    // Current Crop (or default to full croppable area)
+    // When toolbar is enabled, the croppable area starts below the native toolbar
+    const trackableRect = project.screenSource.trackableContentRect;
+    const toolbarEnabled = project.settings.screen.toolbar.enabled;
+    const defaultCrop = (toolbarEnabled && trackableRect)
+        ? { x: 0, y: trackableRect.y, width: inputSize.width, height: inputSize.height - trackableRect.y }
+        : { x: 0, y: 0, ...inputSize };
+    const currentCrop = project.settings.screen.crop || defaultCrop;
 
-    // We need a ViewMapper that matches what `renderCropEditor` does (Full Video -> Output)
-    // So we can project the Crop Rect from Source Space -> Screen Space
+    // We need a ViewMapper that matches what `renderCropEditor` does (Full Video → Output)
+    // So we can project the Crop Rect from Source Space → Screen Space
     // Use same padding as renderCropEditor to ensure overlay aligns with rendered video
+    // Pass trackableContentRect and toolbar.enabled so the ViewMapper accounts for the toolbar
     const viewMapper = new ViewMapper(
         inputSize,
         outputSize,
         project.settings.screen.padding,
-        undefined // NO CROP for the mapper, because we are mapping onto the full view
+        undefined, // NO CROP for the mapper, because we are mapping onto the full view
+        project.screenSource.trackableContentRect,
+        project.settings.screen.toolbar.enabled
     );
 
     // Project the Crop Rect to Output Coordinates

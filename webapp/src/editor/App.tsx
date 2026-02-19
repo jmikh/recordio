@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
-import { useUIStore } from './stores/useUIStore';
+import { useUIStore, CanvasMode } from './stores/useUIStore';
 import { getTimeMapper } from './hooks/useTimeMapper';
 
 
@@ -13,6 +13,8 @@ import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { useToast } from './components/Toast';
+import { useHistoryBatcher } from './hooks/useHistoryBatcher';
+import { Slider } from '@shared/components';
 
 // Auth imports
 import { AuthManager, supabase } from '../auth/AuthManager';
@@ -31,6 +33,8 @@ function Editor() {
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const showDebugBar = useUIStore(s => s.showDebugBar);
+    const canvasMode = useUIStore(s => s.canvasMode);
+    const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
 
     // Export state (must be at top level - Rules of Hooks)
     const isExporting = useProjectStore(s => s.exportState.isExporting);
@@ -41,6 +45,21 @@ function Editor() {
     // Initialization State
     const [isLoading, setIsLoading] = useState(true);
     const hasShownCreationToast = useRef(false);
+
+    // Spotlight scale editing
+    const updateSpotlight = useProjectStore(s => s.updateSpotlight);
+    const { batchAction } = useHistoryBatcher();
+    const activeSpotlight = activeSpotlightId
+        ? project.timeline.spotlightSegments.find(s => s.id === activeSpotlightId)
+        : null;
+    const isSpotlightEditing = canvasMode === CanvasMode.SpotlightEdit && !!activeSpotlight;
+
+    const handleScaleChange = useCallback((newScale: number) => {
+        if (!activeSpotlightId) return;
+        batchAction(() => {
+            updateSpotlight(activeSpotlightId, { scale: newScale });
+        });
+    }, [activeSpotlightId, batchAction, updateSpotlight]);
 
     // Initialize authentication
     useEffect(() => {
@@ -296,7 +315,7 @@ function Editor() {
     }
 
     return (
-        <div className="w-full h-screen bg-surface-body flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
+        <div id="editor-root" className="w-full h-screen bg-surface-body flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
 
             {/* Header / Toolbar */}
             <Header />
@@ -308,13 +327,14 @@ function Editor() {
                 </div>
             )}
 
-            <div className="flex-1 flex overflow-hidden">
+            <div id="editor-body" className="flex-1 flex overflow-hidden">
                 <SettingsPanel />
                 <div
                     id="video-player-container"
                     className="flex-1 flex overflow-hidden relative items-center justify-center bg-surface"
                 >
                     <div
+                        id="canvas-sizing-container"
                         ref={setContainerElement}
                         className="relative flex items-center bg-surface justify-center shadow-2xl"
                         style={{
@@ -324,8 +344,27 @@ function Editor() {
                         }}
                     >
 
+                        {/* SPOTLIGHT SCALE TOOLBAR — absolute overlay at top */}
+                        {isSpotlightEditing && activeSpotlight && (
+                            <div id="canvas-spotlight-toolbar" className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-index-tooltip)] w-full max-w-xs">
+                                <div className="bg-surface-overlay border border-border rounded-lg shadow-float px-3 py-2">
+                                    <Slider
+                                        value={activeSpotlight.scale}
+                                        onChange={handleScaleChange}
+                                        min={1}
+                                        max={2}
+                                        label="Enlarge"
+                                        showTooltip
+                                        decimals={2}
+                                        units="x"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {hasActiveProject && (
                             <div
+                                id="canvas-rendered-wrapper"
                                 className="bg-surface"
                                 style={{ position: 'relative', ...renderedStyle }}
                             >

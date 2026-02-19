@@ -107,7 +107,7 @@ export const Header = () => {
     };
 
     return (
-        <div className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none" style={{ boxShadow: 'var(--shadow-panel)' }}>
+        <div id="editor-header" className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
@@ -131,6 +131,9 @@ export const Header = () => {
                         >
                             <FaRedo size={14} />
                         </GhostButton>
+                        <span className="text-[10px] text-text-muted ml-1 tabular-nums">
+                            {pastStates.length}/{pastStates.length + futureStates.length}
+                        </span>
                     </div>
 
                     {import.meta.env.MODE !== 'production' && (
@@ -150,6 +153,7 @@ export const Header = () => {
 
                 {/* Project Name (Centered in Top Row) */}
                 <input
+                    id="project-name-input"
                     type="text"
                     value={project.name}
                     onChange={(e) => updateProjectName(e.target.value)}

@@ -1,15 +1,34 @@
 
+import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip, type PreviewItem } from '@shared/components';
 import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
+import { TbPlayerPlay } from 'react-icons/tb';
+import { previewClickSound } from '../../../core/audio/clickSoundPlayer';
 
 // Click effect toggle options
-const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string }[] = [
-    { value: 'ring', label: 'Ring' },
-    { value: 'circle', label: 'Circle' },
+const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string; icon?: React.ReactNode }[] = [
+    {
+        value: 'ring',
+        label: 'Ring',
+        icon: (
+            <svg width="14" height="14" viewBox="0 0 14 14">
+                <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+        ),
+    },
+    {
+        value: 'circle',
+        label: 'Circle',
+        icon: (
+            <svg width="14" height="14" viewBox="0 0 14 14">
+                <circle cx="7" cy="7" r="5.5" fill="currentColor" />
+            </svg>
+        ),
+    },
 ];
 
 // Hotkey placement options
@@ -42,6 +61,7 @@ export const EffectsSettings = () => {
         kCornerRadiusPx: 16,
     };
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+
 
     // Collapsible visibility state
     const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
@@ -79,12 +99,20 @@ export const EffectsSettings = () => {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMouse', v)}
             >
                 <div className="flex flex-col gap-4">
-                    {/* Sound Toggle */}
+                    {/* Sound Toggle + Preview */}
                     <Toggle
                         label="Sound"
                         value={mouseSettings.soundEnabled}
                         onChange={(val) => handleMouseChange({ soundEnabled: val })}
-                    />
+                    >
+                        <button
+                            className="flex items-center px-1 py-0.5 rounded text-text-muted hover:text-text-highlighted hover:bg-state-hover transition-colors cursor-pointer"
+                            onClick={() => previewClickSound(mouseSettings.soundVolume ?? 0.5)}
+                            title="Preview sound"
+                        >
+                            <TbPlayerPlay size={13} />
+                        </button>
+                    </Toggle>
 
                     {/* Volume (visible when sound enabled) */}
                     {mouseSettings.soundEnabled && (

@@ -233,7 +233,7 @@ export function Timeline() {
             />
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div className="flex flex-1 bg-surface overflow-hidden relative">
+            <div id="timeline-body" className="flex flex-1 bg-surface overflow-hidden relative">
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -333,7 +333,7 @@ export function Timeline() {
                                 />
 
                                 {/* Tracks Container */}
-                                <div className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP }}>
+                                <div id="timeline-tracks" className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP }}>
                                     {/* Recording Track */}
                                     <TimelineTrackRow height={TRACK_HEIGHT}>
                                         <RecordingTrack

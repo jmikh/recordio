@@ -1,10 +1,67 @@
 import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import type { CameraSettings, Rect } from '../../../types';
+import type { CameraSettings, Rect, Project } from '../../../types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+
+import { type RenderResources } from './PlaybackRenderer';
+import { drawScreen } from '../../../core/painters/screenPainter';
+import { drawWebcam } from '../../../core/painters/webcamPainter';
+import { getViewportStateAtTime } from '../../../core/zoom';
+
+// ------------------------------------------------------------------
+// LOGIC: Render Strategy (for CameraEdit mode)
+// No auto-shrink applied; zoom viewport is preserved.
+// ------------------------------------------------------------------
+export const renderCameraEditor = (
+    resources: RenderResources,
+    state: {
+        project: Project,
+        currentTimeMs: number,
+        overrideCameraSettings: CameraSettings | null
+    }
+) => {
+    const { ctx, videoRefs } = resources;
+    const { project, currentTimeMs } = state;
+    const outputSize = project.settings.outputSize;
+
+    const screenSource = project.screenSource;
+
+    // Apply zoom viewport
+    const effectiveViewport = getViewportStateAtTime(
+        project.timeline.zoomSegments || [],
+        currentTimeMs,
+        outputSize,
+        project.settings.zoom
+    );
+
+    // Render Screen Layer
+    if (screenSource.id) {
+        const video = videoRefs[screenSource.id];
+        if (video) {
+            drawScreen(
+                ctx,
+                video,
+                project,
+                effectiveViewport,
+                resources.deviceFrameImg
+            );
+        }
+    }
+
+    // Render Camera Layer (no auto-shrink)
+    const cameraSource = project.cameraSource;
+    const cameraSettings = state.overrideCameraSettings || project.settings.camera;
+
+    if (cameraSource && cameraSettings) {
+        const video = videoRefs[cameraSource.id];
+        if (video) {
+            drawWebcam(ctx, video, cameraSource.size, cameraSettings);
+        }
+    }
+};
 
 // ------------------------------------------------------------------
 // COMPONENT: Camera Editor Overlay

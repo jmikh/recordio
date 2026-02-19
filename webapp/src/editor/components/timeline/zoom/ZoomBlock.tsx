@@ -132,7 +132,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {/* Zoom-out segment (overflows the container to the right) */}
             {zoomOutWidth > 0 && (
                 <div
-                    className={`${zoomOutBlock.base} ${isSelected ? 'border-secondary' : ''}`}
+                    className={`${zoomOutBlock.base} pointer-events-auto ${isSelected ? 'border-secondary' : ''}`}
                     style={{
                         left: width,
                         top: segmentY,

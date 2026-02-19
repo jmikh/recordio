@@ -201,3 +201,30 @@ export async function getDragSoundBuffers(): Promise<{ down: AudioBuffer | null;
     await ensureLoaded();
     return { down: mouseDownBuffer, up: mouseUpBuffer };
 }
+
+/**
+ * Preview the click sound at the given volume (0–1).
+ * For use in the settings UI — does not require active playback.
+ */
+export async function previewClickSound(volume: number): Promise<void> {
+    await ensureLoaded();
+    if (!audioContext || !audioBuffer) return;
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    playBuffer(audioBuffer, volume);
+}
+
+/**
+ * Preview the drag sound at the given volume (0–1).
+ * Plays mouse_down immediately, then mouse_up after 600ms.
+ * Returns a cleanup function to cancel the scheduled mouse_up.
+ */
+export async function previewDragSound(volume: number): Promise<() => void> {
+    await ensureLoaded();
+    if (!audioContext || !mouseDownBuffer || !mouseUpBuffer) return () => { };
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    playBuffer(mouseDownBuffer, volume);
+    const timer = setTimeout(() => {
+        if (mouseUpBuffer) playBuffer(mouseUpBuffer, volume);
+    }, 600);
+    return () => clearTimeout(timer);
+}

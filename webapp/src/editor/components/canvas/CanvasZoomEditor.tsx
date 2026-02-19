@@ -2,17 +2,18 @@ import React, { useRef, useEffect } from 'react';
 import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 import { BoundingBox } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { SecondaryButton } from '@shared/components';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawWebcam } from '../../../core/painters/webcamPainter';
 import type { Project } from '../../../types';
+
+// Maximum zoom bounding box size as a fraction of the output
+const MAX_ZOOM_RATIO = 0.9;
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy
@@ -108,7 +109,6 @@ export const renderZoomEditor = (
 export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect | null> }> = ({ previewRectRef }) => {
     // Connect to Stores
     const editingZoomId = useUIStore(s => s.selectedZoomId);
-    const timeMapper = useTimeMapper();
 
     // Actions
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
@@ -118,22 +118,13 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
     // History Batcher
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
-    // Sync Playback to Zoom End Time
-    useEffect(() => {
-        if (!editingZoomId) return;
-
-        const action = project.timeline.zoomSegments.find(m => m.id === editingZoomId);
-        if (action) {
-            // Convert source time to output time
-            const outputTime = timeMapper.mapSourceToOutputTime(action.sourceEndTimeMs);
-            if (outputTime !== -1) {
-                useUIStore.getState().setCurrentTime(outputTime);
-            }
-        }
-    }, [editingZoomId, timeMapper, project.timeline.zoomSegments]);
-
     // Derived State
     const videoSize = project.settings.outputSize;
+    const maxSize = React.useMemo(() => ({
+        width: videoSize.width * MAX_ZOOM_RATIO,
+        height: videoSize.height * MAX_ZOOM_RATIO,
+    }), [videoSize]);
+
     const initialRect = editingZoomId
         ? project.timeline.zoomSegments.find(m => m.id === editingZoomId)?.rectPx
         : null;
@@ -220,40 +211,11 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
             <BoundingBox
                 rect={currentRect}
+                maxSize={maxSize}
                 fixedAspectRatio={currentRect.width / currentRect.height}
                 onChange={handleRectChange}
                 onCommit={onCommit}
             />
-
-            {/* Toolbar - Render after BoundingBox to ensure it's on top */}
-            <div
-                className="absolute top-4 inset-x-0 flex justify-center pointer-events-auto z-[1000]"
-            >
-                <SecondaryButton
-                    className="text-xs shadow"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        // Also stop immediate propagation just in case
-                        e.nativeEvent.stopImmediatePropagation();
-
-                        const isFullView = Math.abs(currentRect.x) < 1 &&
-                            Math.abs(currentRect.y) < 1 &&
-                            Math.abs(currentRect.width - videoSize.width) < 1 &&
-                            Math.abs(currentRect.height - videoSize.height) < 1;
-
-                        if (isFullView) return;
-
-                        const newRect = { x: 0, y: 0, width: videoSize.width, height: videoSize.height };
-                        handleRectChange(newRect);
-                    }}
-                    disabled={Math.abs(currentRect.x) < 1 &&
-                        Math.abs(currentRect.y) < 1 &&
-                        Math.abs(currentRect.width - videoSize.width) < 1 &&
-                        Math.abs(currentRect.height - videoSize.height) < 1}
-                >
-                    Full View
-                </SecondaryButton>
-            </div>
         </div>
     );
 };

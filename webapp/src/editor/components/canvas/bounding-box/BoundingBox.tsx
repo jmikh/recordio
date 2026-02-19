@@ -27,6 +27,8 @@ export interface BoundingBoxProps {
     rect: Rect;
     /** Minimum size constraint (default: outputSize / 5) */
     minSize?: number;
+    /** Maximum size constraint - caps dimensions independent of position */
+    maxSize?: { width: number; height: number };
     /** Maximum bounds for the rectangle (default: outputSize) */
     maxBounds?: { width: number; height: number };
     /** Constraint bounds - the rectangle must stay within this area (in output coordinates) */
@@ -66,6 +68,7 @@ export interface BoundingBoxProps {
 export const BoundingBox: React.FC<BoundingBoxProps> = ({
     rect,
     minSize,
+    maxSize,
     maxBounds,
     constraintBounds,
     fixedAspectRatio = null,
@@ -115,6 +118,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // ------------------------------------------------------------------
     const { calculateResize } = useResizeLogic({
         minSize: MIN_SIZE,
+        maxSize,
         constraints,
         fixedAspectRatio,
     });

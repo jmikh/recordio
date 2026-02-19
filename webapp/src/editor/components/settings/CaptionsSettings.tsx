@@ -409,7 +409,9 @@ export function CaptionsSettings() {
 
                     <Slider
                         value={settings.captionSize ?? 1.0}
-                        onChange={(value) => updateSettings({ captions: { ...settings, captionSize: value } })}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(value) => batchAction(() => updateSettings({ captions: { ...settings, captionSize: value } }))}
                         min={0.5}
                         max={2}
                         label="Size"
@@ -420,7 +422,9 @@ export function CaptionsSettings() {
 
                     <Slider
                         value={settings.width}
-                        onChange={(value) => updateSettings({ captions: { ...settings, width: value } })}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(value) => batchAction(() => updateSettings({ captions: { ...settings, width: value } }))}
                         min={30}
                         max={100}
                         label="Width"

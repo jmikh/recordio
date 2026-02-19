@@ -6,6 +6,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 import { ViewMapper } from '../../../core/mappers/viewMapper';
 
@@ -66,6 +67,9 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
 
     // History Batcher
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+
+    // Display Mapper for output -> CSS coordinate conversion
+    const displayMapper = useDisplayMapper();
 
     // ViewMapper for source <-> output coordinate conversion
     const viewMapper = useMemo(() => {
@@ -232,49 +236,61 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]);
 
-    // Click on background moves the spotlight box (in output coordinates)
-    const handleContainerPointerDown = (e: React.PointerEvent) => {
-        if (e.target !== containerRef.current || !initialOutputRect || !screenContentBounds) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-
-        // Convert click to output coordinates
-        const targetX = (offsetX / rect.width) * outputSize.width;
-        const targetY = (offsetY / rect.height) * outputSize.height;
-
-        // Use screen content bounds for clamping
-        const minX = screenContentBounds.x;
-        const minY = screenContentBounds.y;
-        const maxX = screenContentBounds.x + screenContentBounds.width;
-        const maxY = screenContentBounds.y + screenContentBounds.height;
-
-        let newX = targetX - initialOutputRect.width / 2;
-        let newY = targetY - initialOutputRect.height / 2;
-
-        // Clamp to screen content bounds
-        if (newX < minX) newX = minX;
-        if (newX + initialOutputRect.width > maxX) newX = maxX - initialOutputRect.width;
-        if (newY < minY) newY = minY;
-        if (newY + initialOutputRect.height > maxY) newY = maxY - initialOutputRect.height;
-
-        const newOutputRect = { ...initialOutputRect, x: newX, y: newY };
-        handleRectChange(newOutputRect);
-    };
+    // Compute the enlarged preview rect (centered on the current spotlight rect)
+    const scale = spotlight?.scale ?? 1;
+    const showEnlargedPreview = scale > 1;
+    const scaledOutputRect = useMemo(() => {
+        if (!showEnlargedPreview) return null;
+        const cx = currentOutputRect.x + currentOutputRect.width / 2;
+        const cy = currentOutputRect.y + currentOutputRect.height / 2;
+        const sw = currentOutputRect.width * scale;
+        const sh = currentOutputRect.height * scale;
+        return {
+            x: cx - sw / 2,
+            y: cy - sh / 2,
+            width: sw,
+            height: sh,
+        };
+    }, [currentOutputRect, scale, showEnlargedPreview]);
 
     if (!initialOutputRect || !editingSpotlightId || !screenContentBounds) return null;
 
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm"
-            onPointerDown={handleContainerPointerDown}
+            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm overflow-hidden"
         >
             <DimmedOverlay
                 holeRect={currentOutputRect}
                 cornerRadii={currentCornerRadii}
             />
+
+            {/* Enlarged preview outline — non-editable, white dashed */}
+            {showEnlargedPreview && scaledOutputRect && (() => {
+                const displayRect = displayMapper.outputToDisplay(scaledOutputRect);
+                const scaledRadii: [number, number, number, number] = [
+                    currentCornerRadii[0] * scale,
+                    currentCornerRadii[1] * scale,
+                    currentCornerRadii[2] * scale,
+                    currentCornerRadii[3] * scale,
+                ];
+                const displayRadii = displayMapper.outputToDisplayRadii(scaledRadii);
+                return (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: displayRect.x,
+                            top: displayRect.y,
+                            width: displayRect.width,
+                            height: displayRect.height,
+                            border: '2px dashed white',
+                            borderRadius: `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`,
+                            pointerEvents: 'none',
+                            boxSizing: 'border-box',
+                        }}
+                    />
+                );
+            })()}
 
             <BoundingBox
                 rect={currentOutputRect}

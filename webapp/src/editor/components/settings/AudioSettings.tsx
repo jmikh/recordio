@@ -57,6 +57,14 @@ export const AudioSettingsPanel = () => {
         };
     }, [previewAudio]);
 
+    // Sync preview volume when music volume setting changes
+    const musicVolume = project?.settings?.audio?.music?.volume ?? 0.3;
+    useEffect(() => {
+        if (previewAudio) {
+            previewAudio.volume = musicVolume;
+        }
+    }, [previewAudio, musicVolume]);
+
     // Stop preview when timeline playback starts
     const isPlaying = useUIStore(s => s.isPlaying);
     useEffect(() => {

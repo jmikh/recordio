@@ -5,6 +5,8 @@ import type { InteractionType, ConstraintEdges, ResizeDirection } from './types'
 interface UseResizeLogicProps {
     /** Minimum allowed size for width/height */
     minSize: number;
+    /** Maximum allowed size for width/height (independent of position) */
+    maxSize?: { width: number; height: number };
     /** Constraint boundaries */
     constraints: ConstraintEdges;
     /** Fixed aspect ratio (width/height) - if null/undefined, free-form resizing is allowed */
@@ -35,6 +37,7 @@ export function getResizeDirection(type: InteractionType): ResizeDirection {
  */
 export function useResizeLogic({
     minSize,
+    maxSize,
     constraints,
     fixedAspectRatio,
 }: UseResizeLogicProps) {
@@ -60,6 +63,13 @@ export function useResizeLogic({
 
         // Apply minimum size constraint
         proposedWidth = Math.max(minSize, proposedWidth);
+
+        // Apply maximum size constraint (position-independent)
+        if (maxSize) {
+            const maxWidthFromW = maxSize.width;
+            const maxWidthFromH = maxSize.height * aspectRatio;
+            proposedWidth = Math.min(proposedWidth, maxWidthFromW, maxWidthFromH);
+        }
 
         // Anchor points for maintaining opposite corner position
         const bottom = initialRect.y + initialRect.height;
@@ -108,7 +118,7 @@ export function useResizeLogic({
         }
 
         return newRect;
-    }, [minSize, maxW, maxH]);
+    }, [minSize, maxSize, maxW, maxH]);
 
     /**
      * Calculate new rect after free-form resize (no aspect ratio lock)
@@ -153,6 +163,20 @@ export function useResizeLogic({
             if (direction.affectsTop) newRect.y -= diff;
         }
 
+        // Apply maximum size constraints (position-independent)
+        if (maxSize) {
+            if (newRect.width > maxSize.width) {
+                const diff = newRect.width - maxSize.width;
+                newRect.width = maxSize.width;
+                if (direction.affectsLeft) newRect.x += diff;
+            }
+            if (newRect.height > maxSize.height) {
+                const diff = newRect.height - maxSize.height;
+                newRect.height = maxSize.height;
+                if (direction.affectsTop) newRect.y += diff;
+            }
+        }
+
         // Clamp to constraint bounds
         if (newRect.x < minX) {
             newRect.width += newRect.x - minX;
@@ -170,7 +194,7 @@ export function useResizeLogic({
         }
 
         return newRect;
-    }, [minSize, minX, minY, maxX, maxY]);
+    }, [minSize, maxSize, minX, minY, maxX, maxY]);
 
     /**
      * Main resize function - dispatches to appropriate handler

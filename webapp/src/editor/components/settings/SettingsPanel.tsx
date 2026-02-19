@@ -121,9 +121,9 @@ export const SettingsPanel = () => {
     }, [activeTab, navItems]);
 
     return (
-        <div className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
+        <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Sidebar Navigation */}
-            <nav ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
+            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
                 {/* Sliding accent bar */}
                 <div
                     className="absolute left-3 w-[3px] h-7 bg-primary transition-all duration-200 ease-out"
@@ -177,7 +177,7 @@ export const SettingsPanel = () => {
             </nav>
 
             {/* Content Area */}
-            <div className="w-72 flex flex-row relative h-full bg-surface-raised">
+            <div id="settings-content" className="w-72 flex flex-row relative h-full bg-surface-raised">
                 <div
                     ref={setScrollContainer}
                     className="p-4 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
