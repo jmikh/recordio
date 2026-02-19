@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { CaptionSegment } from '../../../../types';
 import type { CaptionDragState } from './useCaptionDrag';
 import { getValidBlockRange } from '../timelineTrackUtils';
-import { K_MIN_CAPTION_DURATION_MS, K_DEFAULT_CAPTION_DURATION_MS } from './CaptionTrackUtils';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface CaptionHoverInfo {
@@ -27,6 +27,11 @@ export function useCaptionHover(
     const addCaptionSegment = useProjectStore(s => s.addCaptionSegment);
     const selectCaption = useUIStore(s => s.selectCaption);
     const [hoverInfo, setHoverInfo] = useState<CaptionHoverInfo | null>(null);
+
+    // Clear ghost whenever a caption is selected.
+    useEffect(() => {
+        if (selectedCaptionId) setHoverInfo(null);
+    }, [selectedCaptionId]);
 
     /**
      * Ghost hover for 'Add Caption'.
@@ -61,8 +66,8 @@ export function useCaptionHover(
             mouseTimeMs,
             captionSegments,
             outputDuration,
-            K_MIN_CAPTION_DURATION_MS,
-            K_DEFAULT_CAPTION_DURATION_MS,
+            K_MIN_TIMELINE_BLOCK_MS,
+            K_DEFAULT_TIMELINE_BLOCK_MS,
         );
 
         if (!range) {
@@ -89,8 +94,10 @@ export function useCaptionHover(
         e.stopPropagation();
         if (dragState) return;
 
-        if (selectedCaptionId) {
+        const currentSelectedCaptionId = useUIStore.getState().selectedCaptionId;
+        if (currentSelectedCaptionId) {
             selectCaption(null);
+            setHoverInfo(null);
             return;
         }
 

@@ -3,7 +3,7 @@ import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectS
 import { useUIStore } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import { useZoomDrag } from './useZoomDrag';
+import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
@@ -58,15 +58,20 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
     const transitionY = (height - TRANSITION_HEIGHT) / 2;
     const holdY = (height - HOLD_HEIGHT) / 2;
 
-    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useZoomDrag(
-        timeline,
-        project,
-        coords,
+    const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
+
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<ZoomSegment>({
+        segments: zoomSegments,
         outputDuration,
-        setEditingZoom,
-        zoomSegments,
-        timeMapper
-    );
+        coords,
+        timeMapper,
+        onSelect: setEditingZoom,
+        onUpdate: (id, sourceStart, sourceEnd) =>
+            updateZoomSegment(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd, type: 'manual' }),
+        onDelete: deleteZoomSegment,
+        getAllSegments: () => timeline.zoomSegments ?? [],
+    });
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useZoomHover(
         timeline,
@@ -100,7 +105,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                     if (blockWidth <= 0) return null;
 
                     const isSelected = editingZoomId === s.id;
-                    const isDragging = dragState?.zoomId === s.id;
+                    const isDragging = dragState?.segmentId === s.id;
 
                     return (
                         <ZoomBlock

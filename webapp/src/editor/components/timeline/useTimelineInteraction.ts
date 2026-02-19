@@ -33,13 +33,12 @@ export function useTimelineInteraction({
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [isCTIScrubbing, setIsCTIScrubbing] = useState(false);
 
-    // When a zoom is selected, set currentTime to its end output time and clear hover/preview
+    // When a zoom is selected, set currentTime to its start output time and clear hover/preview
     useEffect(() => {
         if (selectedZoomId) {
             const segment = zoomSegments?.find(m => m.id === selectedZoomId);
             if (segment) {
-                // Convert source time to output time
-                const outputTime = timeMapper.mapSourceToOutputTime(segment.sourceEndTimeMs);
+                const outputTime = timeMapper.mapSourceToOutputTime(segment.sourceStartTimeMs);
                 if (outputTime !== -1) {
                     setCurrentTime(outputTime);
                 }

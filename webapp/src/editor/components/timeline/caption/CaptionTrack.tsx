@@ -4,7 +4,7 @@ import { useUIStore, CanvasMode } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { CaptionBlock } from './CaptionBlock';
-import { useCaptionDrag } from './useCaptionDrag';
+import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useCaptionHover } from './useCaptionHover';
 import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
@@ -58,15 +58,21 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         }
     };
 
+    const updateCaptionSegment = useProjectStore(s => s.updateCaptionSegment);
+    const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
+
     // Hooks
-    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useCaptionDrag(
-        timeline,
-        coords,
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<CaptionSegment>({
+        segments: captionSegments,
         outputDuration,
-        handleSelectCaption,
-        captionSegments,
-        timeMapper
-    );
+        coords,
+        timeMapper,
+        onSelect: handleSelectCaption,
+        onUpdate: (id, sourceStart, sourceEnd) =>
+            updateCaptionSegment(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
+        onDelete: deleteCaptionSegment,
+        getAllSegments: () => timeline.captionSegments ?? [],
+    });
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useCaptionHover(
         timeline,
@@ -100,7 +106,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                     if (totalWidth <= 0) return null;
 
                     const isSelected = selectedCaptionId === s.id;
-                    const isDragging = dragState?.captionId === s.id;
+                    const isDragging = dragState?.segmentId === s.id;
 
                     return (
                         <CaptionBlock

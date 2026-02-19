@@ -3,7 +3,7 @@ import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectS
 import { useUIStore } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import { useSpotlightDrag } from './useSpotlightDrag';
+import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useSpotlightHover } from './useSpotlightHover';
 import { SpotlightBlock } from './SpotlightBlock';
 import type { SpotlightSegment } from '../../../../types';
@@ -55,16 +55,21 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         (timeline.spotlightSegments || []).filter((s: SpotlightSegment) => s.visible)
         , [timeline.spotlightSegments]);
 
+    const updateSpotlight = useProjectStore(s => s.updateSpotlight);
+    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
+
     // Hooks
-    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useSpotlightDrag(
-        timeline,
-        project,
-        coords,
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<SpotlightSegment>({
+        segments: spotlightSegments,
         outputDuration,
-        setEditingSpotlight,
-        spotlightSegments,
-        timeMapper
-    );
+        coords,
+        timeMapper,
+        onSelect: setEditingSpotlight,
+        onUpdate: (id, sourceStart, sourceEnd) =>
+            updateSpotlight(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
+        onDelete: deleteSpotlight,
+        getAllSegments: () => timeline.spotlightSegments ?? [],
+    });
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useSpotlightHover(
         timeline,
@@ -78,7 +83,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         timeMapper
     );
 
-    // Calculate fade in/out widths in pixels
+    // Fade width = min(half of ghost width, full transition time) — hold is the remainder (may be 0)
     const fadeWidthPx = coords.msToX(transitionDurationMs);
 
     // Calculate vertical positions for ghost
@@ -105,15 +110,18 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                     if (totalWidth <= 0) return null;
 
                     const isSelected = editingSpotlightId === s.id;
-                    const isDragging = dragState?.spotlightId === s.id;
+                    const isDragging = dragState?.segmentId === s.id;
+
+                    // Cap fade widths so they never exceed half the block width (handles min-width edge case)
+                    const clampedFadeWidthPx = Math.min(fadeWidthPx, totalWidth / 2);
 
                     return (
                         <SpotlightBlock
                             key={s.id}
                             left={startX}
                             width={totalWidth}
-                            fadeInWidth={fadeWidthPx}
-                            fadeOutWidth={fadeWidthPx}
+                            fadeInWidth={clampedFadeWidthPx}
+                            fadeOutWidth={clampedFadeWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
@@ -165,19 +173,19 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 position: 'absolute',
                                 left: 0,
                                 top: fadeY,
-                                width: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                width: Math.min(hoverInfo.width / 2, fadeWidthPx),
                                 ...ghostSpotlight.fadeIn.getStyle(),
                             }}
                         />
 
-                        {/* Ghost Hold */}
+                        {/* Ghost Hold (may be 0 width when ghost is short) */}
                         <div
                             className={ghostSpotlight.hold.className}
                             style={{
                                 position: 'absolute',
-                                left: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                left: Math.min(hoverInfo.width / 2, fadeWidthPx),
                                 top: holdY,
-                                width: Math.max(0, hoverInfo.width - Math.min(fadeWidthPx, hoverInfo.width / 3) * 2),
+                                width: Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, fadeWidthPx) * 2),
                                 ...ghostSpotlight.hold.getStyle(),
                             }}
                         />
@@ -189,7 +197,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                 position: 'absolute',
                                 right: 0,
                                 top: fadeY,
-                                width: Math.min(fadeWidthPx, hoverInfo.width / 3),
+                                width: Math.min(hoverInfo.width / 2, fadeWidthPx),
                                 ...ghostSpotlight.fadeOut.getStyle(),
                             }}
                         />

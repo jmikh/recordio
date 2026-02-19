@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import type { ZoomSegment } from '../../../../types';
 import type { DragState } from './useZoomDrag';
-import { K_MIN_ZOOM_HOLD_MS, K_DEFAULT_ZOOM_HOLD_MS } from './ZoomTrackUtils';
+
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
@@ -31,7 +32,11 @@ export function useZoomHover(
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-    const { transitionDurationMs } = project.settings.zoom;
+    // Clear ghost whenever a zoom is selected (covers the case where the mouse
+    // didn't move after selection, so handleMouseMove never had a chance to clear).
+    useEffect(() => {
+        if (editingZoomId) setHoverInfo(null);
+    }, [editingZoomId]);
 
     const handleMouseMove = (e: React.MouseEvent) => {
         // No ghost while dragging or when something is selected
@@ -62,8 +67,8 @@ export function useZoomHover(
             mouseTimeMs,
             zoomSegments,
             outputDuration,
-            transitionDurationMs + K_MIN_ZOOM_HOLD_MS,
-            transitionDurationMs + K_DEFAULT_ZOOM_HOLD_MS
+            K_MIN_TIMELINE_BLOCK_MS,
+            K_DEFAULT_TIMELINE_BLOCK_MS
         );
         if (!range) {
             setHoverInfo(null);
@@ -89,8 +94,10 @@ export function useZoomHover(
         e.stopPropagation();
         if (dragState) return;
 
-        if (editingZoomId) {
+        const currentSelectedZoomId = useUIStore.getState().selectedZoomId;
+        if (currentSelectedZoomId) {
             setEditingZoom(null);
+            setHoverInfo(null);
             return;
         }
 

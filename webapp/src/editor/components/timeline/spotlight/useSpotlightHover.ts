@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightSegment, SpotlightSettings } from '../../../../types';
-import type { DragState } from './useSpotlightDrag';
+import type { SpotlightSegment } from '../../../../types';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS, type TimelineSegmentDragState } from '../useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
-import { K_MIN_SPOTLIGHT_DURATION_MS, K_DEFAULT_SPOTLIGHT_HOLD_MS } from './SpotlightTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
@@ -19,7 +18,7 @@ export function useSpotlightHover(
     timeline: any,
     project: any,
     coords: TimePixelMapper,
-    dragState: DragState | null,
+    dragState: TimelineSegmentDragState | null,
     editingSpotlightId: string | null,
     setEditingSpotlight: (id: string | null) => void,
     outputDuration: number,
@@ -31,17 +30,22 @@ export function useSpotlightHover(
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-    const settings: SpotlightSettings = project.settings.spotlight;
-    const defaultDuration = settings.transitionDurationMs * 2 + K_DEFAULT_SPOTLIGHT_HOLD_MS;
+    // Clear ghost whenever a spotlight is selected (covers the case where the
+    // mouse didn't move after selection, so handleMouseMove never cleared it).
+    useEffect(() => {
+        if (editingSpotlightId) setHoverInfo(null);
+    }, [editingSpotlightId]);
 
     /**
      * Handles hover interactions for 'Add Spotlight' ghost block.
-     * Spotlight starts at mouse position and extends to the right.
-     * DISABLED while dragging to prevent interference.
-     * DISABLED when any zoom or spotlight is selected.
+     * Ghost sizing is tiered based on available gap vs transition duration:
+     *   1. Full block (in + hold + out = K_DEFAULT_TIMELINE_BLOCK_MS) if it fits
+     *   2. Transitions only (in + out = transitionMs × 2) if hold doesn't fit
+     *   3. Fill the gap proportionally if not even both transitions fit
+     *   4. No ghost if gap < K_MIN_TIMELINE_BLOCK_MS
+     * DISABLED while dragging or when any zoom/spotlight is selected.
      */
     const handleMouseMove = (e: React.MouseEvent) => {
-        // No ghost when dragging or when something is selected
         if (dragState || editingSpotlightId || selectedZoomId) {
             setHoverInfo(null);
             return;
@@ -49,48 +53,41 @@ export function useSpotlightHover(
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
-
         const mouseTimeMs = coords.xToMs(x);
 
-        // Don't show hover if we're past the end of the output
         if (mouseTimeMs > outputDuration || mouseTimeMs < 0) {
             setHoverInfo(null);
             return;
         }
 
-        // Check if we are inside an existing (visible) spotlight
+        // Check if cursor is inside an existing spotlight
         const isInside = spotlightSegments.some(r =>
             mouseTimeMs >= r.outputStartTimeMs && mouseTimeMs <= r.outputEndTimeMs
         );
-
         if (isInside) {
             setHoverInfo(null);
             return;
         }
 
-        // Find valid range for new spotlight (starts at mouse position, using resolved output times)
+        // Smart placement: starts near cursor, expands right; anchors left if near a boundary
         const range = getValidBlockRange(
             mouseTimeMs,
             spotlightSegments,
             outputDuration,
-            K_MIN_SPOTLIGHT_DURATION_MS,
-            defaultDuration
+            K_MIN_TIMELINE_BLOCK_MS,
+            K_DEFAULT_TIMELINE_BLOCK_MS
         );
 
-        // Don't show ghost if no valid range (not enough space)
         if (!range) {
             setHoverInfo(null);
             return;
         }
 
-        const width = coords.msToX(range.end - range.start);
-        const leftX = coords.msToX(range.start);
-
         setHoverInfo({
-            x: leftX,
+            x: coords.msToX(range.start),
             outputStartTimeMs: range.start,
             outputEndTimeMs: range.end,
-            width,
+            width: coords.msToX(range.end - range.start),
         });
     };
 
@@ -102,8 +99,10 @@ export function useSpotlightHover(
         e.stopPropagation();
         if (dragState) return;
 
-        if (editingSpotlightId) {
+        const currentSelectedSpotlightId = useUIStore.getState().selectedSpotlightId;
+        if (currentSelectedSpotlightId) {
             setEditingSpotlight(null);
+            setHoverInfo(null);
             return;
         }
 
