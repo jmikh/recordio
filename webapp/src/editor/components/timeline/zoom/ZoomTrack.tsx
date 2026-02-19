@@ -7,7 +7,6 @@ import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomBlock } from './ZoomBlock';
-import { ZoomOutBlock } from './ZoomOutBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
@@ -88,8 +87,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     // Compute zoom-out gap ranges (the implicit ease back to full viewport).
     // Gaps are clipped to avoid overlapping the ghost "+" indicator.
-    const zoomOutGaps = useMemo(() => {
-        const gaps: { left: number; width: number }[] = [];
+    const zoomOutWidthMap = useMemo(() => {
+        const widthMap = new Map<string, number>();
         // Ghost start time — clip zoom-out blocks here when ghost is visible
         const ghostStartMs = (hoverInfo && !editingZoomId && !dragState)
             ? hoverInfo.outputStartTimeMs : null;
@@ -112,12 +111,13 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 gapEnd = ghostStartMs;
             }
             if (gapEnd > gapStart) {
-                const left = coords.msToX(gapStart);
                 const width = coords.msToX(gapEnd - gapStart);
-                if (width > 0) gaps.push({ left, width });
+                if (width > 0) {
+                    widthMap.set(block.id, width);
+                }
             }
         }
-        return gaps;
+        return widthMap;
     }, [zoomSegments, transitionDurationMs, outputDuration, coords, hoverInfo, editingZoomId, dragState]);
 
     return (
@@ -131,15 +131,6 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         >
             <div className="relative flex-1" style={{ height }}>
 
-                {/* Zoom-out indicator blocks */}
-                {zoomOutGaps.map((gap, i) => (
-                    <ZoomOutBlock
-                        key={`zoom-out-${i}`}
-                        left={gap.left}
-                        width={gap.width}
-                        trackHeight={height}
-                    />
-                ))}
 
                 {/* Zoom blocks */}
                 {zoomSegments.map((s) => {
@@ -161,6 +152,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
+                            hasZoomOut={zoomOutWidthMap.has(s.id)}
+                            zoomOutWidth={zoomOutWidthMap.get(s.id) ?? 0}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();

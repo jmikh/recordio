@@ -31,7 +31,7 @@ export const ZoomOutBlock: React.FC<ZoomOutBlockProps> = ({ left, width, trackHe
             }}
         >
             {width >= MIN_ICON_WIDTH_PX && (
-                <AiOutlineZoomOut className="text-text-disabled" size={BLOCK_ICON_SIZE} />
+                <AiOutlineZoomOut className="text-main opacity-50" size={BLOCK_ICON_SIZE} />
             )}
         </div>
     );

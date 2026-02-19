@@ -113,11 +113,11 @@ export const ghostZoom = {
 // ============= ZOOM-OUT INDICATOR (non-interactable) =============
 
 export const zoomOutBlock = {
-    base: 'absolute pointer-events-none flex items-center justify-center overflow-hidden',
+    base: 'absolute pointer-events-none flex items-center justify-center overflow-hidden border-2 border-[var(--primary)]',
     getStyle: (): CSSProperties => ({
         height: HOLD_HEIGHT,
-        backgroundColor: 'var(--state-disabled)',
-        borderRadius: SEGMENT_RADIUS,
-        border: '1px solid var(--text-disabled)',
+        backgroundColor: 'color-mix(in srgb, var(--primary) 50%, transparent)',
+        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
+        borderLeft: 'none',
     }),
 };
