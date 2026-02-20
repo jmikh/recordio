@@ -52,6 +52,8 @@ interface BaseSourceMetadata {
     /** Total duration of the source file in milliseconds */
     durationMs: TimeMs;
     size: Size;
+    /** Actual negotiated frame rate from MediaRecorder (fps) */
+    frameRate?: number;
     hasMicrophone: boolean;
     createdAt?: number;
 }

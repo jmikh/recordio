@@ -92,6 +92,8 @@ export interface ProjectCreatedParams {
     has_hovered_cards: boolean;
     auto_zoom_count: number;
     auto_spotlight_count: number;
+    screen_frame_rate: number | null;
+    camera_frame_rate: number | null;
 }
 
 export function trackProjectCreated(params: ProjectCreatedParams) {

@@ -127,6 +127,8 @@ export function ImportPage() {
                             has_hovered_cards: events.hoveredCards.length > 0,
                             auto_zoom_count: project.timeline.zoomSegments.length,
                             auto_spotlight_count: project.timeline.spotlightSegments.length,
+                            screen_frame_rate: recording.screenSource.frameRate ?? null,
+                            camera_frame_rate: recording.cameraSource?.frameRate ?? null,
                         });
                     } catch { /* analytics should never break the app */ }
 

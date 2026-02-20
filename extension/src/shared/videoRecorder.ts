@@ -184,6 +184,7 @@ export class VideoRecorder {
         const stopPromises: Promise<void>[] = [];
 
         let displaySurface: string | undefined;
+        let screenFrameRate: number | undefined;
         if (this.screenRecorder && this.screenRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
                 if (this.screenRecorder) {
@@ -191,15 +192,17 @@ export class VideoRecorder {
                     this.screenRecorder.stop();
                 } else resolve();
             }));
-            // Capture dims
+            // Capture dims + frame rate
             const vt = this.screenRecorder.stream.getVideoTracks()[0];
             const set = vt?.getSettings();
             displaySurface = set?.displaySurface;
+            screenFrameRate = set?.frameRate;
             if (set && set.width && set.height) {
                 this.screenDimensions = { width: set.width, height: set.height };
             }
         }
 
+        let cameraFrameRate: number | undefined;
         if (this.cameraRecorder && this.cameraRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
                 if (this.cameraRecorder) {
@@ -207,9 +210,10 @@ export class VideoRecorder {
                     this.cameraRecorder.stop();
                 } else resolve();
             }));
-            // Capture dims
+            // Capture dims + frame rate
             const vt = this.cameraRecorder.stream.getVideoTracks()[0];
             const settings = vt?.getSettings();
+            cameraFrameRate = settings?.frameRate;
             if (settings && settings.width && settings.height) {
                 this.cameraDimensions = { width: settings.width, height: settings.height };
             }
@@ -225,7 +229,7 @@ export class VideoRecorder {
         const effectiveId = sessionId || this.currentSessionId;
         if (!effectiveId) throw new Error("No session ID available to save");
 
-        await this.saveRecordingData(effectiveId, this.events);
+        await this.saveRecordingData(effectiveId, this.events, screenFrameRate, cameraFrameRate);
 
         const durationMs = Date.now() - this.startTime;
 
@@ -418,7 +422,7 @@ export class VideoRecorder {
 
     // --- Storage ---    
 
-    private async saveRecordingData(projectId: string, events: UserEvents | null) {
+    private async saveRecordingData(projectId: string, events: UserEvents | null, screenFrameRate?: number, cameraFrameRate?: number) {
         const duration = Date.now() - this.startTime;
         const now = Date.now();
 
@@ -445,6 +449,7 @@ export class VideoRecorder {
             storageUrl: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
             size: this.screenDimensions || { width: 1920, height: 1080 },
+            frameRate: screenFrameRate,
             recordingType: this.mode,
             trackableContentRect,
             hasAudio: screenHasAudio,
@@ -466,6 +471,7 @@ export class VideoRecorder {
                 storageUrl: `recordio-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
+                frameRate: cameraFrameRate,
                 hasMicrophone: Boolean(this.config.hasAudio),
                 createdAt: now,
             };

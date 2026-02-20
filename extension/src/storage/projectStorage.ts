@@ -287,9 +287,9 @@ export class ProjectStorage {
         return new Promise((resolve, reject) => {
             const tx = db.transaction('recordings', 'readwrite');
             const store = tx.objectStore('recordings');
-            const req = store.put({ id, blob });
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            store.put({ id, blob });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
         });
     }
 
@@ -361,9 +361,9 @@ export class ProjectStorage {
         return new Promise((resolve, reject) => {
             const tx = db.transaction('projects', 'readwrite');
             const store = tx.objectStore('projects');
-            const req = store.put(recording);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            store.put(recording);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
         });
     }
 
