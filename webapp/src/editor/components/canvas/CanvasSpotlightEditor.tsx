@@ -9,6 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 import { ViewMapper } from '../../../core/mappers/viewMapper';
+import { getZoomBoundsForRange } from '../../../core/zoom/zoomBounds';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
@@ -253,12 +254,52 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         };
     }, [currentOutputRect, scale, showEnlargedPreview]);
 
+    // ── Zoom Bounds ────────────────────────────────────────────────
+    // Compute intersection of all zoom viewports during this spotlight.
+    // All rects here are in OUTPUT coordinates.
+    const zoomBoundsRect = useMemo(() => {
+        if (!spotlight) return null;
+        return getZoomBoundsForRange(
+            project.timeline.zoomSegments,
+            spotlight.outputStartTimeMs,
+            spotlight.outputEndTimeMs,
+            outputSize,
+            project.settings.zoom,
+        );
+    }, [
+        spotlight?.outputStartTimeMs,
+        spotlight?.outputEndTimeMs,
+        project.timeline.zoomSegments,
+        outputSize,
+        project.settings.zoom,
+    ]);
+
+    // Check if the spotlight (or its enlarged version) exceeds the zoom bounds
+    const isOutOfBounds = useMemo(() => {
+        if (!zoomBoundsRect) return false;
+        const check = scaledOutputRect ?? currentOutputRect;
+        return (
+            check.x < zoomBoundsRect.x - 1 ||
+            check.y < zoomBoundsRect.y - 1 ||
+            check.x + check.width > zoomBoundsRect.x + zoomBoundsRect.width + 1 ||
+            check.y + check.height > zoomBoundsRect.y + zoomBoundsRect.height + 1
+        );
+    }, [zoomBoundsRect, scaledOutputRect, currentOutputRect]);
+
+    // If zoom bounds are smaller than 1.2× the minimum spotlight size,
+    // they're too tight to be useful — show a warning banner instead.
+    const minSpotlightSize = Math.min(outputSize.width, outputSize.height) / 5;
+    const zoomBoundsTooSmall = zoomBoundsRect != null && (
+        zoomBoundsRect.width < minSpotlightSize * 1.2 ||
+        zoomBoundsRect.height < minSpotlightSize * 1.2
+    );
+
     if (!initialOutputRect || !editingSpotlightId || !screenContentBounds) return null;
 
     return (
         <div
             ref={containerRef}
-            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm overflow-hidden"
+            className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] text-sm"
         >
             <DimmedOverlay
                 holeRect={currentOutputRect}
@@ -289,7 +330,115 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                             pointerEvents: 'none',
                             boxSizing: 'border-box',
                         }}
-                    />
+                    >
+                        <span
+                            style={{
+                                position: 'absolute',
+                                top: -22,
+                                left: 0,
+                                fontSize: 11,
+                                lineHeight: '18px',
+                                padding: '0 4px',
+                                borderRadius: 3,
+                                background: 'var(--surface-overlay)',
+                                color: 'var(--color-text-main)',
+                                whiteSpace: 'nowrap',
+                                fontWeight: 500,
+                                userSelect: 'none',
+                            }}
+                        >
+                            When Enlarged
+                        </span>
+                    </div>
+                );
+            })()}
+
+            {/* Zoom Bounds: too-small warning banner */}
+            {zoomBoundsTooSmall && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: 8,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        background: 'var(--surface-overlay)',
+                        border: '1px solid var(--destructive)',
+                        color: 'var(--destructive)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                    }}
+                >
+                    ⚠ Spotlight may not display well — multiple zooms target different parts of the screen during this timeframe
+                </div>
+            )}
+
+            {/* Out-of-bounds warning banner */}
+            {isOutOfBounds && !zoomBoundsTooSmall && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: 8,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        background: 'var(--surface-overlay)',
+                        border: '1px solid var(--destructive)',
+                        color: 'var(--destructive)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                    }}
+                >
+                    ⚠ Spotlight exceeds zoom area
+                </div>
+            )}
+
+            {/* Zoom Bounds indicator — dashed rect in output coords → CSS */}
+            {zoomBoundsRect && !zoomBoundsTooSmall && (() => {
+                const displayRect = displayMapper.outputToDisplay(zoomBoundsRect);
+                const boundsColor = isOutOfBounds ? 'var(--color-destructive)' : 'var(--color-primary)';
+                return (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: displayRect.x,
+                            top: displayRect.y,
+                            width: displayRect.width,
+                            height: displayRect.height,
+                            border: `1px dashed ${boundsColor}`,
+                            pointerEvents: 'none',
+                            boxSizing: 'border-box',
+                        }}
+                    >
+                        {/* Label */}
+                        <span
+                            style={{
+                                position: 'absolute',
+                                top: -22,
+                                left: 0,
+                                fontSize: 11,
+                                lineHeight: '18px',
+                                padding: '0 4px',
+                                borderRadius: 3,
+                                background: 'var(--surface-overlay)',
+                                color: 'var(--color-text-main)',
+                                whiteSpace: 'nowrap',
+                                fontWeight: 500,
+                                userSelect: 'none',
+                            }}
+                            title="Spotlights will be clipped or video zoomed here"
+                        >
+                            Zoom Area
+                        </span>
+                    </div>
                 );
             })()}
 

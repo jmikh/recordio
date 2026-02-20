@@ -9,7 +9,6 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
 import type { Project } from '../../../types';
 
 // Maximum zoom bounding box size as a fraction of the output
@@ -50,56 +49,7 @@ export const renderZoomEditor = (
         }
     }
 
-    // Render Camera Layer (Relative to Zoom)
-    // 1. Get Camera Source and Settings
-    const cameraSettings = project.settings.camera;
-    const cameraSource = project.cameraSource;
 
-    // Only render if we have a camera source and it's enabled
-    if (cameraSource && cameraSettings) {
-        const video = videoRefs[cameraSource.id];
-        if (video) {
-            // 2. Determine Zoom Rect (Preview or Committed)
-            let zoomRect = previewZoomRect;
-            if (!zoomRect && editingZoomId) {
-                const action = project.timeline.zoomSegments.find(m => m.id === editingZoomId);
-                zoomRect = action?.rectPx || null;
-            }
-
-            if (zoomRect) {
-                // 3. Calculate Relative Position
-                // The camera is defined in absolute canvas coordinates (0..outputWidth, 0..outputHeight).
-                // We want to project it into the zoomRect.
-                //
-                // Scale Factor = ZoomRect Width / Output Width
-
-                const scaleFactor = zoomRect.width / outputSize.width;
-
-                const relativeX = (cameraSettings.xPx / outputSize.width) * zoomRect.width;
-                const relativeY = (cameraSettings.yPx / outputSize.height) * zoomRect.height;
-
-                const projectedX = zoomRect.x + relativeX;
-                const projectedY = zoomRect.y + relativeY;
-                const projectedW = cameraSettings.widthPx * scaleFactor;
-                const projectedH = cameraSettings.heightPx * scaleFactor;
-
-                // 4. Draw Camera
-                drawWebcam(
-                    ctx,
-                    video,
-                    cameraSource.size, // Input size
-                    {
-                        ...cameraSettings,
-                        xPx: projectedX,
-                        yPx: projectedY,
-                        widthPx: projectedW,
-                        heightPx: projectedH,
-                    },
-                    scaleFactor // Global scale for borders/shadows
-                );
-            }
-        }
-    }
 };
 
 // ------------------------------------------------------------------

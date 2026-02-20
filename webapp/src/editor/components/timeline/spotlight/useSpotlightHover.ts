@@ -6,6 +6,8 @@ import type { SpotlightSegment } from '../../../../types';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS, type TimelineSegmentDragState } from '../useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { getZoomBoundsForRange } from '../../../../core/zoom/zoomBounds';
+import { ViewMapper } from '../../../../core/mappers/viewMapper';
 
 export interface HoverInfo {
     x: number; // Left position in pixels
@@ -127,14 +129,75 @@ export function useSpotlightHover(
         const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
         const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
 
-        // Create initial rect centered at 50% of source video
+        // Create initial rect — center within zoom bounds if available
         const { width, height } = sourceSize;
-        const initialSourceRect = {
-            width: width * 0.5,
-            height: height * 0.5,
-            x: width * 0.25,
-            y: height * 0.25
-        };
+        const outputSize = project.settings.outputSize;
+        const minSpotlightDim = Math.min(outputSize.width, outputSize.height) / 5;
+
+        // Check if zoom bounds exist for this time range
+        const zoomBounds = getZoomBoundsForRange(
+            timeline.zoomSegments ?? [],
+            hoverInfo.outputStartTimeMs,
+            hoverInfo.outputEndTimeMs,
+            outputSize,
+            project.settings.zoom,
+        );
+
+        const zoomBoundsUsable = zoomBounds != null &&
+            zoomBounds.width >= minSpotlightDim * 1.2 &&
+            zoomBounds.height >= minSpotlightDim * 1.2;
+
+        let initialSourceRect;
+
+        if (zoomBoundsUsable && zoomBounds) {
+            // Convert zoom bounds (output coords) → source coords via ViewMapper
+            const viewMapper = new ViewMapper(
+                sourceSize,
+                outputSize,
+                project.settings.screen.padding,
+                project.settings.screen.crop,
+                project.screenSource.trackableContentRect,
+                project.settings.screen.toolbar.enabled
+            );
+            const contentRect = viewMapper.contentRect;
+
+            // Inverse map: output → source
+            const nx = (zoomBounds.x - contentRect.x) / contentRect.width;
+            const ny = (zoomBounds.y - contentRect.y) / contentRect.height;
+            const nw = zoomBounds.width / contentRect.width;
+            const nh = zoomBounds.height / contentRect.height;
+
+            const effectiveInputSize = project.settings.screen.crop
+                ? { width: project.settings.screen.crop.width, height: project.settings.screen.crop.height }
+                : sourceSize;
+            const offsetX = project.settings.screen.crop?.x || 0;
+            const offsetY = project.settings.screen.crop?.y || 0;
+
+            const boundsInSource = {
+                x: nx * effectiveInputSize.width + offsetX,
+                y: ny * effectiveInputSize.height + offsetY,
+                width: nw * effectiveInputSize.width,
+                height: nh * effectiveInputSize.height,
+            };
+
+            // Center a 50%-of-bounds rect within the source bounds
+            const rw = boundsInSource.width * 0.5;
+            const rh = boundsInSource.height * 0.5;
+            initialSourceRect = {
+                width: rw,
+                height: rh,
+                x: boundsInSource.x + (boundsInSource.width - rw) / 2,
+                y: boundsInSource.y + (boundsInSource.height - rh) / 2,
+            };
+        } else {
+            // Fallback: center at 50% of source video
+            initialSourceRect = {
+                width: width * 0.5,
+                height: height * 0.5,
+                x: width * 0.25,
+                y: height * 0.25,
+            };
+        }
 
         const newSpotlight: SpotlightSegment = {
             id: crypto.randomUUID(),

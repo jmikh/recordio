@@ -2,12 +2,13 @@ import React, { useCallback } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, GhostButton, CollapsibleCard, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, GhostButton, CollapsibleCard, InfoTooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { ZoomSegment } from '../../../types';
 import { MdDelete } from 'react-icons/md';
 import { TbZoomIn } from 'react-icons/tb';
 import { VscCopy } from 'react-icons/vsc';
+import { EasingTooltipContent } from './EasingTooltipContent';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
     { value: 'linear', label: 'Linear' },
@@ -64,18 +65,22 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
                     onChange={handleTransitionChange}
                     min={100}
                     max={1500}
-                    units="ms"
+                    decimals={2}
+                    valueTransform={(v) => v / 1000}
+                    units="s"
                     showTooltip
                 />
 
                 {/* Easing */}
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-text-muted">Easing</span>
+                <div className="flex items-center gap-1.5">
                     <Dropdown
                         options={EASING_OPTIONS}
                         value={segment.easing}
                         onChange={handleEasingChange}
                     />
+                    <InfoTooltip description="">
+                        <EasingTooltipContent />
+                    </InfoTooltip>
                 </div>
 
                 {/* Actions */}

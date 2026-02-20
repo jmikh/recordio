@@ -288,8 +288,15 @@ export class VideoRecorder {
         // 3. Get Mic Stream
         let micStream: MediaStream | null = null;
         if (config.hasAudio) {
-            const constraints = config.audioDeviceId ? { deviceId: { exact: config.audioDeviceId } } : true;
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+            const audioConstraints: MediaTrackConstraints = {
+                ...(config.audioDeviceId && { deviceId: { exact: config.audioDeviceId } }),
+                noiseSuppression: true,
+                echoCancellation: true,
+                autoGainControl: true,
+                // @ts-ignore — Chrome-specific, not yet in TS types
+                voiceIsolation: true,
+            };
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
             this.activeStreams.push(micStream);
         }
 
@@ -380,7 +387,8 @@ export class VideoRecorder {
                         chromeMediaSource: 'tab',
                         chromeMediaSourceId: streamId,
                         maxWidth: config.tabViewportSize?.width,
-                        maxHeight: config.tabViewportSize?.height
+                        maxHeight: config.tabViewportSize?.height,
+                        maxFrameRate: 60
                     }
                 }
             } as any);
@@ -400,7 +408,8 @@ export class VideoRecorder {
                 video: {
                     mandatory: {
                         chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId
+                        chromeMediaSourceId: sourceId,
+                        maxFrameRate: 60
                     }
                 }
             } as any);
