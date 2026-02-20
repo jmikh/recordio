@@ -94,7 +94,7 @@ export class ProjectStorage {
     static async loadProjectOrFail(projectId: ID): Promise<Project> {
         const existingProject = await this.loadProject(projectId);
         if (existingProject) {
-            console.log(`[ProjectStorage] Loaded existing project: ${projectId}`);
+
             return existingProject;
         }
 
@@ -226,7 +226,7 @@ export class ProjectStorage {
                     if (!existsInLibrary) {
                         // Re-add to library with same ID
                         await this.saveCustomBackgroundWithId(libraryId, blob);
-                        console.log(`[ProjectStorage] Auto-added missing background to library: ${libraryId}`);
+
                     }
                 }
             }
@@ -638,6 +638,6 @@ export async function importFromRawRecording(
     // 4. Save project
     await ProjectStorage.saveProject(project);
 
-    console.log('[ProjectStorage] Imported recording as project:', projectId);
+
     return project;
 }

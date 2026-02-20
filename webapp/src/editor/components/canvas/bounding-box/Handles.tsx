@@ -50,23 +50,23 @@ export const Handle: React.FC<HandleProps> = ({
         ...(isWest ? { left: -HIT_AREA / 2 } : { right: -HIT_AREA / 2 }),
     };
 
-    // Horizontal arm of the L (extends outward from corner)
+    // Horizontal arm of the L (extends inward from corner)
     const hBarStyle: React.CSSProperties = {
         position: 'absolute',
         width: CORNER_HANDLE_LENGTH,
         height: CORNER_HANDLE_THICKNESS,
         backgroundColor: CORNER_HANDLE_COLOR,
         ...(isNorth ? { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
-        ...(isWest ? { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+        ...(isWest ? { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
     };
 
-    // Vertical arm of the L (extends outward from corner)
+    // Vertical arm of the L (extends inward from corner)
     const vBarStyle: React.CSSProperties = {
         position: 'absolute',
         width: CORNER_HANDLE_THICKNESS,
         height: CORNER_HANDLE_LENGTH,
         backgroundColor: CORNER_HANDLE_COLOR,
-        ...(isNorth ? { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+        ...(isNorth ? { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
         ...(isWest ? { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
     };
 

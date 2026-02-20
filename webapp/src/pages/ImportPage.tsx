@@ -51,13 +51,11 @@ export function ImportPage() {
             .then((existingProject) => {
                 if (existingProject) {
                     // Project already exists, redirect to editor
-                    console.log('[ImportPage] Project already exists, redirecting:', projectId);
                     setStatus('success');
                     setProjectId(projectId);
                     window.location.href = `/editor?projectId=${projectId}`;
                 } else {
                     // Project doesn't exist, initiate handoff
-                    console.log('[ImportPage] Project not found, initiating handoff for:', recordingId);
                     requestHandoff(recordingId);
                     setStatus('receiving');
                 }
@@ -78,7 +76,6 @@ export function ImportPage() {
         }
 
         if (state.status === 'success' && state.recording && state.screenVideo) {
-            console.log('[ImportPage] Received recording, storing...');
             setStatus('storing');
 
             importFromRawRecording(
@@ -87,7 +84,6 @@ export function ImportPage() {
                 state.cameraVideo || undefined
             )
                 .then((project) => {
-                    console.log('[ImportPage] Stored as project:', project.id);
                     setProjectId(project.id);
                     setStatus('success');
                     confirmHandoff(project.id);

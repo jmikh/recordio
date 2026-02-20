@@ -36,6 +36,11 @@ export const CameraSettings = () => {
     const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
         let newSettings = { ...cameraConfig, shape: newShape };
 
+        // Reset corner radius to 10px when switching to square or free
+        if (newShape === 'square' || newShape === 'rect') {
+            newSettings.borderRadiusPx = 10;
+        }
+
         if (newShape === 'rect') {
             if (cameraSource && cameraSource.size.height > 0) {
                 const ratio = cameraSource.size.width / cameraSource.size.height;

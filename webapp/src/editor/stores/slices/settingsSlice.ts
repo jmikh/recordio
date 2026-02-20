@@ -16,9 +16,6 @@ export interface SettingsSlice {
 
 export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SettingsSlice> = (set, _get, store) => ({
     updateSettings: (updates: any) => {
-        if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateSettings', updates);
-        }
         let hasChanged = false; // Capture change status
 
         set((state) => {

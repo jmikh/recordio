@@ -71,7 +71,6 @@ export class HoverDetector {
      * @returns A hover event with targetRect, or null if no valid hover found
      */
     public findNext(minTime: number, timeLimit: number): BaseEvent | null {
-        console.log(`[HD] findNext: idx=${this.currentIdx}/${this.positions.length}, minTime=${minTime}, timeLimit=${timeLimit}`);
 
         // Skip positions before minTime
         while (this.currentIdx < this.positions.length && this.positions[this.currentIdx].timestamp < minTime) {
@@ -90,7 +89,6 @@ export class HoverDetector {
             const result = this.scanCircle(this.currentIdx, anchor, timeLimit);
 
             if (result) {
-                console.log(`[HD] → FOUND hover: idx=${this.currentIdx}→${result.endIdx}, t=${anchor.timestamp}-${result.endTime}, pathDist=${result.pathDistance.toFixed(0)}`);
                 this.currentIdx = result.breakIdx;
                 return this.createHoverEvent(anchor, result);
             }
@@ -99,7 +97,7 @@ export class HoverDetector {
             this.currentIdx++;
         }
 
-        console.log(`[HD] → no hover found, idx=${this.currentIdx}/${this.positions.length}`);
+
         return null;
     }
 

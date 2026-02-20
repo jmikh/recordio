@@ -92,19 +92,16 @@ class FocusManager {
 
         // Search for hovers up until the next explicit event (or end of source)
         const hoverTimeLimit = nextEvent?.timestamp ?? this.sourceDuration;
-        console.log(`[FM] findNext: currentSourceTime=${this.currentSourceTime}, hoverTimeLimit=${hoverTimeLimit}, nextEvent=${nextEvent?.type ?? 'none'}@${nextEvent?.timestamp ?? '-'}`);
         const hover = this.hoverDetector.findNext(this.currentSourceTime, hoverTimeLimit);
 
         if (hover) {
-            console.log(`[FM] → hover found: ${hover.timestamp}-${hover.endTime}`);
             return hover;
         } else if (nextEvent) {
-            console.log(`[FM] → no hover, using event: ${nextEvent.type}@${nextEvent.timestamp}`);
             this.allEventsIdx++; // Consume the event
             return nextEvent;
         }
 
-        console.log(`[FM] → no target found, done`);
+
         return null;
     }
 
@@ -189,7 +186,7 @@ class FocusManager {
             rect: this.getEventRect(target),
             reason: target.type,
         };
-        console.log(`[FM] processTarget: ${target.type} → focus[${sourceStartTimeMs}-${sourceEndTimeMs}], nextSourceTime=${this.currentSourceTime}`);
+
         return area;
     }
 

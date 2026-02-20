@@ -64,11 +64,6 @@ export interface UrlChangeEvent extends BaseEvent {
  * User interaction events recorded during screen capture.
  */
 export interface UserEvents {
-    /**
-     * Trackable content area within the recorded video frame (JavaScript-monitored region).
-     * Mirrors screenSource.trackableContentRect. Absent for tab recordings.
-     */
-    trackableContentRect?: Rect;
     mouseClicks: BaseEvent[];
     mousePositions: BaseEvent[];
     keyboardEvents: KeyboardEvent[];

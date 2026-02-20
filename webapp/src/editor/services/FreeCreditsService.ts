@@ -24,11 +24,11 @@ export class FreeCreditsService {
             if (data?.success) {
                 // Update local store to reflect consumed credit
                 useUserStore.getState().setFreeCreditsUsed(1);
-                console.log('[FreeCredits] Credit consumed successfully');
+
                 return { success: true };
             }
 
-            console.log('[FreeCredits] Credit already used');
+
             return { success: false };
         } catch (error) {
             console.error('[FreeCredits] Unexpected error:', error);

@@ -189,9 +189,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [displayMapper, calculateMove, calculateResize, onChange]);
 
     const handleWindowPointerUp = useCallback(() => {
-        console.log('[BoundingBox] pointerUp', { hasDragRef: !!dragRef.current });
         if (dragRef.current) {
-            console.log('[BoundingBox] releasing capture and committing', { finalRect: { w: currentRectRef.current.width.toFixed(0), h: currentRectRef.current.height.toFixed(0) } });
             try {
                 dragRef.current.capturedElement.releasePointerCapture(dragRef.current.pointerId);
             } catch (e) {
@@ -220,7 +218,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     }, [isDragging, handleWindowPointerMove, handleWindowPointerUp]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent, type: InteractionType) => {
-        console.log('[BoundingBox] pointerDown', { type, pointerId: e.pointerId, hasDragRef: !!dragRef.current });
         e.stopPropagation();
         e.preventDefault();
 

@@ -153,7 +153,6 @@ if (import.meta.hot) {
         vadInstance = null;
         vadInitializing = null;
         vadCache.clear();
-        console.log('[VAD] HMR reset - clearing instance and cache');
     });
 }
 
@@ -275,11 +274,9 @@ export async function getCachedSpeechSegments(
 ): Promise<SpeechSegment[]> {
     // TEMP: Cache disabled for debugging
     // if (!forceRefresh && vadCache.has(audioUrl)) {
-    //     console.log('[VAD] Using cached results');
     //     return vadCache.get(audioUrl)!;
     // }
 
-    console.log('[VAD] Running fresh analysis (cache disabled)...');
     const segments = await detectSpeechSegments(audioUrl);
     // vadCache.set(audioUrl, segments);
 

@@ -69,8 +69,6 @@ export const useProjectStore = create<ProjectState>()(
                 })),
 
                 loadProject: async (project) => {
-                    console.log('[Action] loadProject', project.id);
-
                     // Project now contains embedded sources and events - no separate loading needed
                     set({ project });
 
@@ -79,7 +77,6 @@ export const useProjectStore = create<ProjectState>()(
                 },
 
                 saveProject: async () => {
-                    console.log('[Action] saveProject');
                     set({ isSaving: true });
                     try {
                         await ProjectStorage.saveProject(get().project);
@@ -96,12 +93,12 @@ export const useProjectStore = create<ProjectState>()(
 
                     // 1. Save to global library
                     const libraryId = await ProjectStorage.saveCustomBackground(blob);
-                    console.log(`[Store] Added to library: ${libraryId}`);
+
 
                     // 2. Copy to project recordings
                     const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
                     await ProjectStorage.saveRecordingBlob(copyId, blob);
-                    console.log(`[Store] Created project copy: ${copyId}`);
+
 
                     // 3. Create URLs
                     const storageUrl = `recordio-blob://${copyId}`;
@@ -123,7 +120,7 @@ export const useProjectStore = create<ProjectState>()(
                     // 2. Copy to project recordings
                     const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
                     await ProjectStorage.saveRecordingBlob(copyId, blob);
-                    console.log(`[Store] Created project copy: ${copyId}`);
+
 
                     // 3. Create URLs
                     const storageUrl = `recordio-blob://${copyId}`;
@@ -139,12 +136,11 @@ export const useProjectStore = create<ProjectState>()(
                     if (currentUrl?.startsWith('recordio-blob://')) {
                         const blobId = currentUrl.replace('recordio-blob://', '');
                         await ProjectStorage.deleteRecordingBlob(blobId);
-                        console.log(`[Store] Deleted project background copy: ${blobId}`);
+
                     }
                 },
 
                 updateProjectName: (name: string) => {
-                    console.log('[Action] updateProjectName', name);
                     set((state) => ({
                         project: {
                             ...state.project,
@@ -180,7 +176,6 @@ useProjectStore.subscribe(
         // Debounce save (e.g., 2 seconds)
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            console.log('[AutoSave] Saving project...');
             ProjectStorage.saveProject(project).catch(console.error);
         }, 2000);
     }

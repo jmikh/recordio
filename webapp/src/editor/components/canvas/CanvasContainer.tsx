@@ -17,7 +17,6 @@ import { getDeviceFrame } from '../../../core/deviceFrames';
 import type { CameraSettings, Rect, SourceMetadata } from '../../../types';
 
 export const CanvasContainer = () => {
-    //console.log('[Rerender] CanvasContainer');
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
@@ -123,7 +122,7 @@ export const CanvasContainer = () => {
                     const breakdown = Object.entries(perfAccum)
                         .map(([k, v]) => `${k}=${(v / fpsFrameCount).toFixed(1)}ms`)
                         .join(' | ');
-                    console.log(`[Canvas FPS] ${fpsFrameCount}  ${breakdown}`);
+
                     fpsFrameCount = 0;
                     fpsLastTime = now;
                     perfAccum = {};
@@ -406,7 +405,7 @@ export const CanvasContainer = () => {
                                     });
                                 }}
                                 onWaiting={() => {
-                                    console.log('[CanvasContainer] Video waiting for data:', source.id);
+                                    // Video waiting for data
                                 }}
                             />
                         ) : null;

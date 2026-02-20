@@ -13,9 +13,6 @@ export interface SpotlightSlice {
 
 export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SpotlightSlice> = (set, _get, store) => ({
     updateSpotlight: (id, updates) => {
-        if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateSpotlight', id, updates);
-        }
         set(state => {
             const spotlightSegments = state.project.timeline.spotlightSegments;
             const idx = spotlightSegments.findIndex(s => s.id === id);
@@ -50,7 +47,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     },
 
     addSpotlight: (spotlight) => {
-        console.log('[Action] addSpotlight', spotlight);
+
         set(state => {
             const spotlightSegments = [...state.project.timeline.spotlightSegments, spotlight]
                 .sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
@@ -80,7 +77,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     },
 
     deleteSpotlight: (id) => {
-        console.log('[Action] deleteSpotlight', id);
+
         set(state => {
             const spotlightSegments = state.project.timeline.spotlightSegments.filter(s => s.id !== id);
 
@@ -97,7 +94,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
     },
 
     clearSpotlights: () => {
-        console.log('[Action] clearSpotlights');
+
         set(state => {
             return {
                 project: {

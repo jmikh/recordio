@@ -35,7 +35,7 @@ export class ExportManager {
         const width = targetWidth % 2 === 0 ? targetWidth : targetWidth + 1;
         const height = targetHeight % 2 === 0 ? targetHeight : targetHeight + 1;
 
-        console.log(`[Export] Starting export at ${width}x${height} (${quality})`);
+
 
         const renderProject = ProjectImpl.scale(project, { width, height });
 
@@ -379,7 +379,7 @@ export class ExportManager {
 
         } catch (e) {
             if (signal.aborted) {
-                console.log("Export cancelled by user.");
+                // Export cancelled by user
             } else {
                 console.error("Export failed:", e);
                 throw e;

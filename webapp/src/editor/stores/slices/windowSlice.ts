@@ -77,9 +77,6 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
 export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], WindowSlice> = (set, _get, store) => ({
 
     updateOutputWindow: (id, updates) => {
-        if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateOutputWindow', id, updates);
-        }
         set((state) => {
             const currentWindows = state.project.timeline.outputWindows;
             const windowIndex = currentWindows.findIndex(w => w.id === id);
@@ -95,7 +92,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
     },
 
     removeOutputWindow: (id) => {
-        console.log('[Action] removeOutputWindow', id);
+
         set((state) => {
             const currentWindows = state.project.timeline.outputWindows;
             if (currentWindows.findIndex(w => w.id === id) === -1) return state;
@@ -106,7 +103,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
     },
 
     splitWindow: (windowId, splitTimeMs) => {
-        console.log('[Action] splitWindow', windowId, splitTimeMs);
+
         set((state) => {
             const windowIndex = state.project.timeline.outputWindows.findIndex(w => w.id === windowId);
             if (windowIndex === -1) return state;
@@ -147,7 +144,7 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
     },
 
     setOutputWindows: (windows) => {
-        console.log('[Action] setOutputWindows', windows.length);
+
         set((state) => {
             if (windows.length === 0) {
                 console.warn('[setOutputWindows] At least one window required');

@@ -21,7 +21,6 @@ export class AuthManager {
         }
 
         supabase.auth.onAuthStateChange((event, session) => {
-            console.log('[Auth] State change:', event, session?.user?.email);
             callback(session);
         });
     }
@@ -35,7 +34,7 @@ export class AuthManager {
         }
 
         await supabase.auth.signOut();
-        console.log('[Auth] Signed out');
+
     }
 
     /**
@@ -72,7 +71,7 @@ export class AuthManager {
         }
 
         try {
-            console.log('[Auth] Starting OAuth with', provider);
+
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider,

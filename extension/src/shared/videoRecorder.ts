@@ -118,7 +118,6 @@ export class VideoRecorder {
                         width: this.config.tabViewportSize.width,
                         height: this.config.tabViewportSize.height
                     };
-                    this.events.trackableContentRect = this.viewportRect;
                 }
             }
         }

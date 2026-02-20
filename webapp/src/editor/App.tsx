@@ -49,7 +49,6 @@ function Editor() {
     // Initialize authentication
     useEffect(() => {
         if (!supabase) {
-            console.log('[Auth] Supabase not configured - auth features disabled');
             return;
         }
 
@@ -58,12 +57,12 @@ function Editor() {
         const accessToken = hashParams.get('access_token');
 
         if (accessToken) {
-            console.log('[Auth] OAuth callback detected - processing tokens...');
+
             // Supabase will automatically process the hash and create a session
             // Clear the hash after processing to clean up the URL
             setTimeout(() => {
                 window.location.hash = '';
-                console.log('[Auth] OAuth callback processed, session should be active');
+
             }, 1000);
         }
 
@@ -73,7 +72,7 @@ function Editor() {
 
             if (session) {
                 // User is logged in
-                console.log('[Auth] User logged in:', session.user.email);
+
 
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
@@ -90,7 +89,7 @@ function Editor() {
                         .maybeSingle();
 
                     if (error) {
-                        console.log('[Auth] No subscription found (user is on free plan)');
+                        // User is on free plan (no subscription found)
                     } else if (data) {
                         setSubscription({
                             status: data.status,
@@ -99,10 +98,10 @@ function Editor() {
                             cancelAtPeriodEnd: data.cancel_at_period_end,
                             stripeCustomerId: data.stripe_customer_id
                         });
-                        console.log('[Auth] Subscription status:', data.status);
+
                     }
                 } catch (error) {
-                    console.log('[Auth] Subscription table not configured yet - user defaults to free plan');
+                    // Subscription table not configured yet
                 }
 
                 // Fetch free export credits from profile
@@ -114,17 +113,16 @@ function Editor() {
                         .maybeSingle();
 
                     if (profileError) {
-                        console.log('[Auth] Could not fetch profile:', profileError.message);
+                        // Could not fetch profile
                     } else if (profile) {
                         setFreeCreditsUsed(profile.free_credits_used ?? 0);
-                        console.log('[Auth] Free credits used:', profile.free_credits_used ?? 0);
+
                     }
                 } catch (error) {
-                    console.log('[Auth] Profile table not configured yet');
+                    // Profile table not configured yet
                 }
             } else {
                 // User is logged out
-                console.log('[Auth] User logged out');
                 clearUser();
             }
         });
@@ -157,7 +155,6 @@ function Editor() {
                 return;
             }
             try {
-                console.log('Initializing Project:', projectId);
                 const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
                 setIsLoading(false);

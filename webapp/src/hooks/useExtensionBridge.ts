@@ -152,7 +152,7 @@ export function useExtensionBridge() {
      * Returns once all data is received and blobs are reconstructed.
      */
     const requestHandoff = useCallback(async (recordingId: string) => {
-        console.log('[useExtensionBridge] Requesting handoff for:', recordingId);
+
 
         // Reset state
         screenChunksRef.current = new Map();
@@ -173,7 +173,7 @@ export function useExtensionBridge() {
 
         try {
             // Phase 1: Request metadata
-            console.log('[useExtensionBridge] Phase 1: Requesting metadata');
+
             const response = await sendToExtension<HandoffRequestResponse>(EXTENSION_ID, {
                 type: BRIDGE_MSG.HANDOFF_REQUEST,
                 payload: { recordingId },
@@ -186,10 +186,7 @@ export function useExtensionBridge() {
             metadataRef.current = response;
             const totalBytes = response.screenVideoSize + (response.cameraVideoSize || 0);
 
-            console.log('[useExtensionBridge] Metadata received:', {
-                screenSize: response.screenVideoSize,
-                cameraSize: response.cameraVideoSize,
-            });
+
 
             setState(prev => ({
                 ...prev,
@@ -205,11 +202,11 @@ export function useExtensionBridge() {
             }));
 
             // Phase 2: Stream chunks via Port
-            console.log('[useExtensionBridge] Phase 2: Connecting port for streaming');
+
             await streamChunksViaPort(recordingId, totalBytes, setState);
 
             // Phase 3: Reconstruct blobs from ordered chunks
-            console.log('[useExtensionBridge] Phase 3: Reconstructing blobs');
+
 
             // Reassemble chunks in correct order
             const screenChunksOrdered = reassembleChunks(screenChunksRef.current, screenTotalRef.current);
@@ -230,16 +227,7 @@ export function useExtensionBridge() {
             const cameraChunkBytes = cameraVideo ?
                 [...cameraChunksRef.current.values()].reduce((sum, chunk) => sum + chunk.byteLength, 0) : 0;
 
-            console.log('[useExtensionBridge] Chunk validation:', {
-                screenChunks: screenChunksRef.current.size,
-                screenChunkBytes,
-                expectedScreenBytes: response.screenVideoSize,
-                screenMatch: screenChunkBytes === response.screenVideoSize,
-                cameraChunks: cameraChunksRef.current.size,
-                cameraChunkBytes,
-                expectedCameraBytes: response.cameraVideoSize || 0,
-                cameraMatch: response.cameraVideoSize ? cameraChunkBytes === response.cameraVideoSize : true,
-            });
+
 
             if (screenChunkBytes !== response.screenVideoSize) {
                 console.error('[useExtensionBridge] ⚠️ SCREEN SIZE MISMATCH!', {
@@ -249,10 +237,7 @@ export function useExtensionBridge() {
                 });
             }
 
-            console.log('[useExtensionBridge] Blobs reconstructed:', {
-                screenSize: screenVideo.size,
-                cameraSize: cameraVideo?.size,
-            });
+
 
             setState(prev => ({
                 ...prev,
@@ -293,14 +278,6 @@ export function useExtensionBridge() {
                             const chunk = message.payload as ChunkPayload;
                             const data = new Uint8Array(chunk.data);
 
-                            // Debug: Log every chunk
-                            console.log(`[useExtensionBridge] Received chunk:`, {
-                                source: chunk.source,
-                                index: chunk.index,
-                                total: chunk.total,
-                                chunkBytes: data.byteLength,
-                            });
-
                             // Store chunk by index (handles out-of-order arrival)
                             if (chunk.source === 'screen') {
                                 screenChunksRef.current.set(chunk.index, data);
@@ -327,17 +304,11 @@ export function useExtensionBridge() {
                                 },
                             }));
 
-                            console.log(`[useExtensionBridge] Stored ${chunk.source} chunk ${chunk.index}/${chunk.total - 1} (${screenChunksRef.current.size + cameraChunksRef.current.size} total received)`);
+
                             break;
                         }
 
                         case PORT_MSG.STREAM_COMPLETE:
-                            console.log('[useExtensionBridge] Stream complete', {
-                                screenChunks: screenChunksRef.current.size,
-                                expectedScreen: screenTotalRef.current,
-                                cameraChunks: cameraChunksRef.current.size,
-                                expectedCamera: cameraTotalRef.current,
-                            });
                             port.disconnect();
                             resolve();
                             break;
@@ -383,7 +354,7 @@ export function useExtensionBridge() {
                     projectId,
                 },
             });
-            console.log('[useExtensionBridge] Handoff confirmed');
+
         } catch (error) {
             console.error('[useExtensionBridge] Error confirming handoff:', error);
         }

@@ -65,14 +65,6 @@ class SpotlightScheduler {
      * Process all hovered cards and generate spotlight actions.
      */
     processCards(hoveredCards: HoveredCardEvent[]): SpotlightSegment[] {
-        console.log('[AutoSpotlight] Starting calculation...');
-        console.log('[AutoSpotlight] Input:', {
-            hoveredCardsCount: hoveredCards.length,
-            zoomSegmentsCount: this.zoomSegments.length,
-            outputSize: this.outputSize,
-            sourceSize: this.viewMapper.sourceSize,
-            enlargeScale: this.enlargeScale
-        });
 
         const spotlights: SpotlightSegment[] = [];
 
@@ -84,7 +76,7 @@ class SpotlightScheduler {
         }
 
         // Note: hoveredCards are already sorted by timestamp, so spotlights are naturally sorted
-        console.log('[AutoSpotlight] Result:', { generated: spotlights.length });
+
         return spotlights;
     }
 
@@ -95,14 +87,14 @@ class SpotlightScheduler {
         // Map time range to output coordinates using cached fields
         const outputRange = this.timeMapper.mapSourceRangeToOutputRange(card.timestamp, card.endTime);
         if (!outputRange) {
-            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - not visible in output (trimmed)`);
+
             return null;
         }
 
         // Check minimum duration
         const outputDuration = outputRange.end - outputRange.start;
         if (outputDuration < K_MIN_AUTO_SPOTLIGHT_DURATION_MS) {
-            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - duration ${outputDuration}ms < ${K_MIN_AUTO_SPOTLIGHT_DURATION_MS}ms threshold`);
+
             return null;
         }
 
@@ -113,7 +105,7 @@ class SpotlightScheduler {
         // Re-map the buffered range to output for viewport checks
         const bufferedOutputRange = this.timeMapper.mapSourceRangeToOutputRange(spotlightSourceStartMs, spotlightSourceEndMs);
         if (!bufferedOutputRange) {
-            console.log(`[AutoSpotlight] Card ${index}: SKIPPED - buffered range not visible`);
+
             return null;
         }
 
@@ -166,13 +158,7 @@ class SpotlightScheduler {
             easing: this.spotlightSettings.easing,
         };
 
-        console.log(`[AutoSpotlight] Card ${index}: CREATED spotlight`, {
-            duration: outputDuration,
-            outputRange,
-            targetRect: card.targetRect,
-            scale,
-            maxFitScale
-        });
+
 
         return spotlight;
     }
@@ -214,12 +200,6 @@ class SpotlightScheduler {
     ): boolean {
         for (const viewport of viewports) {
             if (!this.isRectContained(rect, viewport)) {
-                console.log(`[AutoSpotlight] Card ${index}: SKIPPED - does not fit in viewport at some point`, {
-                    targetRect: card.targetRect,
-                    outputTargetRect: rect,
-                    failingViewport: viewport,
-                    outputDuration
-                });
                 return false;
             }
         }

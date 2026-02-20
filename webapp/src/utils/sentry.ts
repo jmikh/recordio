@@ -28,8 +28,6 @@ export function initSentry() {
 
     Sentry.setTag("app", "webapp");
     initialized = true;
-
-    console.log(`[Sentry] Initialized for webapp (${IS_PRODUCTION ? "production" : "development"})`);
 }
 
 export function captureBugReport(description: string, additionalContext?: Record<string, any>) {

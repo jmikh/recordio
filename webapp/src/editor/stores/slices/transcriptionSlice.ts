@@ -63,7 +63,6 @@ export const createTranscriptionSlice: StateCreator<
     },
 
     restoreCaptionsFromBaseline: () => {
-        console.log('[Action] restoreCaptionsFromBaseline');
         set(state => {
             const baseline = state.project.settings.captions?.baselineCaptions;
             if (!baseline || baseline.length === 0) {
@@ -168,7 +167,6 @@ export const createTranscriptionSlice: StateCreator<
     },
 
     addCaptionSegment: (segment: CaptionSegment) => {
-        console.log('[Action] addCaptionSegment', segment.id);
         set(state => {
             const existing = state.project.timeline.captionSegments || [];
 

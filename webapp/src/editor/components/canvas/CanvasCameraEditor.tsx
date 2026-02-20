@@ -221,14 +221,14 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // ------------------------------------------------------------------
 
     const handleChange = (rect: Rect) => {
-        console.log('[CameraEditor] handleChange', { w: rect.width.toFixed(0), h: rect.height.toFixed(0) });
+
         const newSettings = { ...currentSettings, xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height };
         setCurrentSettings(newSettings);
         cameraRef.current = newSettings; // Update canvas live preview
     };
 
     const onCommit = (rect: Rect) => {
-        console.log('[CameraEditor] onCommit', { w: rect.width.toFixed(0), h: rect.height.toFixed(0) });
+
         // Merge all local changes with rect and commit to store
         const newSettings: CameraSettings = {
             ...currentSettings,

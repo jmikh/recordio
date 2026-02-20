@@ -13,9 +13,6 @@ export interface ZoomSegmentSlice {
 
 export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomSegmentSlice> = (set, _get, store) => ({
     updateZoomSegment: (id, updates) => {
-        if ((store as any).temporal.getState().isTracking) {
-            console.log('[Action] updateZoomSegment', id, updates);
-        }
         set(state => {
             const actions = state.project.timeline.zoomSegments;
             const idx = actions.findIndex(m => m.id === id);
@@ -48,7 +45,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
     },
 
     addZoomSegment: (action) => {
-        console.log('[Action] addZoomSegment', action);
+
         set(state => {
             const actions = [...state.project.timeline.zoomSegments, action]
                 .sort((a, b) => a.sourceEndTimeMs - b.sourceEndTimeMs);
@@ -76,7 +73,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
     },
 
     deleteZoomSegment: (id) => {
-        console.log('[Action] deleteZoomSegment', id);
+
         set(state => {
             const actions = state.project.timeline.zoomSegments.filter(m => m.id !== id);
 
@@ -99,7 +96,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
     },
 
     clearZoomSegments: () => {
-        console.log('[Action] clearZoomSegments');
+
         set(state => {
             return {
                 project: {

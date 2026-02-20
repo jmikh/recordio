@@ -159,7 +159,7 @@ export function CaptionsSettings() {
             return;
         }
 
-        console.log(`[CaptionsSettings] Using ${sourceName} source for transcription`);
+
 
         try {
             // Pause playback
@@ -232,7 +232,7 @@ export function CaptionsSettings() {
 
         } catch (error: any) {
             if (error.message === 'Aborted') {
-                console.log('[CaptionsSettings] Transcription cancelled');
+
                 if (toastIdRef.current) {
                     removeToast(toastIdRef.current);
                 }

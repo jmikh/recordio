@@ -10,7 +10,7 @@ export class StripeService {
         }
 
         try {
-            console.log('[Stripe] Creating checkout session for user:', userEmail, 'interval:', interval);
+
 
             const redirectUrl = 'https://recordio.site/subscription-success';
 
@@ -30,8 +30,7 @@ export class StripeService {
                 return { error };
             }
 
-            // Log the response for debugging
-            console.log('[Stripe] Checkout response:', data);
+
 
             if (!data?.url) {
                 return { error: new Error('No checkout URL returned') };
@@ -39,7 +38,7 @@ export class StripeService {
 
             // Open Stripe Checkout in new tab
             // User completes payment there and can close tab when done
-            console.log('[Stripe] Opening checkout in new tab...');
+
             window.open(data.url, '_blank');
 
             return {};

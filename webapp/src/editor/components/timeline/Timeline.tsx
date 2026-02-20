@@ -28,7 +28,6 @@ const TRACK_GAP = 4; // Gap between track rows
 const HEADER_WIDTH = 100;
 
 export function Timeline() {
-    //console.log('[Rerender] Timeline');
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
     const overlayRef = useRef<HTMLDivElement>(null);

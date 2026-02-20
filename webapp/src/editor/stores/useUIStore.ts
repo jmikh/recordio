@@ -133,7 +133,7 @@ function _cleanupEmptyCaption(get: () => UIState) {
     const projectState = useProjectStore.getState();
     const segments = projectState.project?.timeline?.captionSegments;
     const prev = segments?.find((s: { id: string }) => s.id === prevId);
-    console.log('[_cleanupEmptyCaption] prevId:', prevId, 'found:', !!prev, 'text:', JSON.stringify(prev?.text), 'empty:', !prev?.text?.trim());
+
     if (prev && !prev.text?.trim()) {
         projectState.deleteCaptionSegment(prevId);
     }
@@ -207,7 +207,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     },
 
     selectCaption: (selectedCaptionId) => {
-        console.log('[selectCaption] called with:', selectedCaptionId, 'current:', get().selectedCaptionId);
+
         // Cleanup empty caption before changing selection
         if (!selectedCaptionId || selectedCaptionId !== get().selectedCaptionId) {
             _cleanupEmptyCaption(get);
@@ -227,7 +227,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                     trackVisibility: { ...state.trackVisibility, captions: true },
                 };
             }
-            console.log('[selectCaption] setting to null');
+
             return { selectedCaptionId: null };
         });
     },
