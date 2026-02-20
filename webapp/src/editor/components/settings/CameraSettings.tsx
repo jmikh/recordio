@@ -5,7 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, InfoTooltip, DefaultButton, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { FaCheck, FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
-import { MdAspectRatio } from 'react-icons/md';
+import { MdAspectRatio, MdStyle } from 'react-icons/md';
+import { TbShape, TbBorderOuter } from 'react-icons/tb';
 
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -102,6 +103,7 @@ export const CameraSettings = () => {
                 {/* Shape Settings */}
                 <CollapsibleCard
                     title="Shape"
+                    icon={<TbShape size={16} />}
                     previewItems={[
                         {
                             type: 'custom',
@@ -144,6 +146,7 @@ export const CameraSettings = () => {
                 {/* Style Settings */}
                 <CollapsibleCard
                     title="Style"
+                    icon={<MdStyle size={16} />}
                     previewItems={[
                         ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
                         ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
@@ -207,6 +210,7 @@ export const CameraSettings = () => {
 
                 <CollapsibleCard
                     title="Outline"
+                    icon={<TbBorderOuter size={16} />}
                     previewItems={borderPreviewItems}
                     isExpanded={showCollapsibleBorder}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBorder', v)}

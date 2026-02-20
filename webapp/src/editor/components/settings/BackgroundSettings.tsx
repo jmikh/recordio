@@ -7,6 +7,7 @@ import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
 import { XButton, Slider, CollapsibleCard } from '@shared/components';
+import { TbBackground } from 'react-icons/tb';
 import type { PreviewItem } from '@shared/components';
 import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
 
@@ -284,9 +285,8 @@ export const BackgroundSettings = () => {
     return (
         <CollapsibleCard
             title="Background"
-            previewItems={previewItems}
-            isExpanded={showCollapsibleBackground}
-            onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBackground', v)}
+            icon={<TbBackground size={16} />}
+            notCollapsible
         >
             <div className="flex flex-col gap-4 text-sm select-none">
                 <div className="flex flex-wrap gap-4 items-end justify-center w-full">

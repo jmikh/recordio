@@ -7,6 +7,7 @@ import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip, type Preview
 import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
 import { TbPlayerPlay } from 'react-icons/tb';
+import { MdOutlineKeyboardCommandKey, MdAdsClick } from 'react-icons/md';
 import { previewClickSound } from '../../../core/audio/clickSoundPlayer';
 
 // Click effect toggle options
@@ -82,6 +83,7 @@ export const EffectsSettings = () => {
             {/* MOUSE SETTINGS */}
             <CollapsibleCard
                 title="Mouse"
+                icon={<MdAdsClick size={16} />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -151,14 +153,11 @@ export const EffectsSettings = () => {
                     {(mouseSettings.mouseClickEnabled || mouseSettings.mouseDragEnabled) && (
                         <div className="flex flex-col gap-4 pl-1">
                             {/* Effect Type */}
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-sm text-text-muted">Effect</label>
-                                <MultiToggle
-                                    options={CLICK_EFFECT_OPTIONS}
-                                    value={mouseSettings.effectType}
-                                    onChange={(val) => handleMouseChange({ effectType: val })}
-                                />
-                            </div>
+                            <MultiToggle
+                                options={CLICK_EFFECT_OPTIONS}
+                                value={mouseSettings.effectType}
+                                onChange={(val) => handleMouseChange({ effectType: val })}
+                            />
 
                             {/* Color (ring and circle only) */}
                             <ColorButton
@@ -192,6 +191,7 @@ export const EffectsSettings = () => {
             {/* KEYBOARD SETTINGS */}
             <CollapsibleCard
                 title="Keyboard"
+                icon={<MdOutlineKeyboardCommandKey size={16} />}
                 previewItems={[
                     { type: 'text', content: (keyboardSettings.showHotkeys ?? true) ? 'On' : 'Off' },
                     ...((keyboardSettings.showHotkeys ?? true) ? [
@@ -220,14 +220,11 @@ export const EffectsSettings = () => {
                     {/* Sub-settings (visible when hotkeys enabled) */}
                     {(keyboardSettings.showHotkeys ?? true) && (
                         <div className="pl-1 flex flex-col gap-4">
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-sm text-text-muted">Placement</label>
-                                <MultiToggle
-                                    options={PLACEMENT_OPTIONS}
-                                    value={keyboardSettings.hotkeysPlacement ?? 'top'}
-                                    onChange={(val) => handleKeyboardChange({ hotkeysPlacement: val })}
-                                />
-                            </div>
+                            <MultiToggle
+                                options={PLACEMENT_OPTIONS}
+                                value={keyboardSettings.hotkeysPlacement ?? 'top'}
+                                onChange={(val) => handleKeyboardChange({ hotkeysPlacement: val })}
+                            />
                             <Slider
                                 label="Size"
                                 min={0.5}

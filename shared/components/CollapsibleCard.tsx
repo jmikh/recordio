@@ -11,6 +11,8 @@ interface CollapsibleCardProps {
     title: string;
     /** Content rendered when expanded */
     children: React.ReactNode;
+    /** Optional icon shown to the left of the title only when expanded, with slide animation */
+    icon?: React.ReactNode;
     /** Initial expanded state (uncontrolled mode) */
     defaultExpanded?: boolean;
     /** Controlled expanded state */
@@ -19,27 +21,34 @@ interface CollapsibleCardProps {
     onExpandChange?: (expanded: boolean) => void;
     /** Preview items shown when collapsed */
     previewItems?: PreviewItem[];
+    /** When true, the card is always expanded with no toggle or chevron */
+    notCollapsible?: boolean;
     className?: string;
 }
 
 const ANIMATION_DURATION = 200; // ms
+const ANIMATION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     title,
     children,
+    icon,
     defaultExpanded = false,
     isExpanded: controlledExpanded,
     onExpandChange,
     previewItems = [],
+    notCollapsible = false,
     className = ''
 }) => {
     // Support both controlled and uncontrolled modes
     const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
     const isControlled = controlledExpanded !== undefined;
-    const expanded = isControlled ? controlledExpanded : internalExpanded;
+    const expanded = notCollapsible ? true : (isControlled ? controlledExpanded : internalExpanded);
 
     const contentRef = useRef<HTMLDivElement>(null);
+    const iconRef = useRef<HTMLDivElement>(null);
     const [contentHeight, setContentHeight] = useState<number>(0);
+    const [iconWidth, setIconWidth] = useState<number>(0);
 
     // Measure content height for smooth animation
     useEffect(() => {
@@ -47,6 +56,13 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
             setContentHeight(contentRef.current.scrollHeight);
         }
     }, [children, expanded]);
+
+    // Measure icon natural width
+    useEffect(() => {
+        if (iconRef.current && icon) {
+            setIconWidth(iconRef.current.offsetWidth);
+        }
+    }, [icon]);
 
     const handleToggle = () => {
         const newValue = !expanded;
@@ -67,62 +83,89 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
         >
             {/* Header - Always visible */}
             <button
-                onClick={handleToggle}
-                className="
+                onClick={notCollapsible ? undefined : handleToggle}
+                className={`
                     w-full flex items-center flex-wrap
                     min-h-[2.75rem]
-                    px-4 py-2 pr-8
+                    px-4 py-2 ${notCollapsible ? '' : 'pr-8'}
                     text-left
                     transition-colors
-                    cursor-pointer
+                    ${notCollapsible ? 'cursor-default' : 'cursor-pointer'}
                     relative
-                "
+                `}
             >
+                {/* Icon - animated slide in/out */}
+                {icon && (
+                    <div
+                        className="overflow-hidden shrink-0"
+                        style={{
+                            width: expanded ? `${iconWidth}px` : '0px',
+                            opacity: expanded ? 1 : 0,
+                            marginRight: expanded ? '8px' : '0px',
+                            transitionProperty: 'width, opacity, margin-right',
+                            transitionDuration: `${ANIMATION_DURATION}ms`,
+                            transitionTimingFunction: ANIMATION_EASING,
+                        }}
+                    >
+                        <div
+                            ref={iconRef}
+                            className="flex items-center text-text-highlighted"
+                            style={{ width: 'fit-content' }}
+                        >
+                            {icon}
+                        </div>
+                    </div>
+                )}
+
                 <span className="text-sm font-medium text-text-highlighted mr-4 shrink-0">
                     {title}
                 </span>
 
                 {/* Preview items - only shown when collapsed, right-aligned */}
-                <div
-                    className={`
-                        flex items-center flex-wrap gap-1 ml-auto justify-end
-                        transition-opacity duration-200
-                        ${expanded ? 'opacity-0' : 'opacity-100'}
-                    `}
-                >
-                    {previewItems.length > 0 && previewItems.map((item, index) => (
-                        <span key={index} className="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap">
-                            {index > 0 && <span className="text-text-disabled">·</span>}
-                            {item.type === 'text' ? (
-                                <span>{item.content}</span>
-                            ) : (
-                                item.content
-                            )}
-                        </span>
-                    ))}
-                </div>
+                {!notCollapsible && (
+                    <div
+                        className={`
+                            flex items-center flex-wrap gap-1 ml-auto justify-end
+                            transition-opacity duration-200
+                            ${expanded ? 'opacity-0' : 'opacity-100'}
+                        `}
+                    >
+                        {previewItems.length > 0 && previewItems.map((item, index) => (
+                            <span key={index} className="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap">
+                                {index > 0 && <span className="text-text-disabled">·</span>}
+                                {item.type === 'text' ? (
+                                    <span>{item.content}</span>
+                                ) : (
+                                    item.content
+                                )}
+                            </span>
+                        ))}
+                    </div>
+                )}
 
                 {/* Chevron */}
-                <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`
-                        text-text-muted
-                        transition-transform
-                        hover:text-text-main
-                        absolute right-4 top-1/2 -translate-y-1/2
-                        ${expanded ? 'rotate-180' : 'rotate-0'}
-                    `}
-                    style={{ transitionDuration: `${ANIMATION_DURATION}ms` }}
-                >
-                    <polyline points="6 9 12 15 18 9" />
-                </svg>
+                {!notCollapsible && (
+                    <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`
+                            text-text-muted
+                            transition-transform
+                            hover:text-text-main
+                            absolute right-4 top-1/2 -translate-y-1/2
+                            ${expanded ? 'rotate-180' : 'rotate-0'}
+                        `}
+                        style={{ transitionDuration: `${ANIMATION_DURATION}ms` }}
+                    >
+                        <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                )}
             </button>
 
             {/* Content - Animated */}
@@ -130,7 +173,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 style={{
                     maxHeight: expanded ? `${contentHeight}px` : '0px',
                     transitionDuration: `${ANIMATION_DURATION}ms`,
-                    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                    transitionTimingFunction: ANIMATION_EASING,
                     transitionProperty: 'max-height'
                 }}
                 className="overflow-hidden"

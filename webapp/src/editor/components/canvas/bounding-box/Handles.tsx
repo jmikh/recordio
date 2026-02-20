@@ -1,11 +1,11 @@
 import React from 'react';
 import type { InteractionType } from './types';
 import {
-    CORNER_HANDLE_SIZE,
+    CORNER_HANDLE_LENGTH,
+    CORNER_HANDLE_THICKNESS,
+    CORNER_HANDLE_COLOR,
     EDGE_HIT_AREA_WIDTH,
     EDGE_CORNER_OFFSET,
-    PRIMARY_COLOR,
-    HANDLE_BORDER_COLOR,
     Z_INDEX_CORNER_HANDLE,
     Z_INDEX_EDGE_HANDLE,
 } from './constants';
@@ -21,50 +21,63 @@ export interface HandleProps {
 }
 
 // ------------------------------------------------------------------
-// SQUARE CORNER HANDLE
+// L-SHAPED CORNER HANDLE
 // ------------------------------------------------------------------
 
 /**
- * Square corner resize handle.
- * Positioned at corners of the bounding box.
+ * L-shaped corner resize handle.
+ * Renders two perpendicular bars meeting at the corner.
  */
+
+const HIT_AREA = CORNER_HANDLE_LENGTH + 4;
+
 export const Handle: React.FC<HandleProps> = ({
     type,
     cursor,
     onPointerDown
 }) => {
-    const containerStyle: React.CSSProperties = {
-        position: 'absolute',
-        width: CORNER_HANDLE_SIZE,
-        height: CORNER_HANDLE_SIZE,
-        backgroundColor: PRIMARY_COLOR,
-        border: `1.5px solid ${HANDLE_BORDER_COLOR}`,
-        cursor: cursor,
-        zIndex: Z_INDEX_CORNER_HANDLE,
-        boxSizing: 'border-box',
-    };
-
-    // Position based on corner type
     const isNorth = type.includes('n');
     const isWest = type.includes('w');
 
-    if (isNorth) {
-        containerStyle.top = -CORNER_HANDLE_SIZE / 2;
-    } else {
-        containerStyle.bottom = -CORNER_HANDLE_SIZE / 2;
-    }
+    // Hit area container positioned at the corner
+    const containerStyle: React.CSSProperties = {
+        position: 'absolute',
+        width: HIT_AREA,
+        height: HIT_AREA,
+        cursor,
+        zIndex: Z_INDEX_CORNER_HANDLE,
+        ...(isNorth ? { top: -HIT_AREA / 2 } : { bottom: -HIT_AREA / 2 }),
+        ...(isWest ? { left: -HIT_AREA / 2 } : { right: -HIT_AREA / 2 }),
+    };
 
-    if (isWest) {
-        containerStyle.left = -CORNER_HANDLE_SIZE / 2;
-    } else {
-        containerStyle.right = -CORNER_HANDLE_SIZE / 2;
-    }
+    // Horizontal arm of the L (extends outward from corner)
+    const hBarStyle: React.CSSProperties = {
+        position: 'absolute',
+        width: CORNER_HANDLE_LENGTH,
+        height: CORNER_HANDLE_THICKNESS,
+        backgroundColor: CORNER_HANDLE_COLOR,
+        ...(isNorth ? { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+        ...(isWest ? { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+    };
+
+    // Vertical arm of the L (extends outward from corner)
+    const vBarStyle: React.CSSProperties = {
+        position: 'absolute',
+        width: CORNER_HANDLE_THICKNESS,
+        height: CORNER_HANDLE_LENGTH,
+        backgroundColor: CORNER_HANDLE_COLOR,
+        ...(isNorth ? { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+        ...(isWest ? { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
+    };
 
     return (
         <div
             style={containerStyle}
             onPointerDown={(e) => onPointerDown(e, type)}
-        />
+        >
+            <div style={hBarStyle} />
+            <div style={vBarStyle} />
+        </div>
     );
 };
 

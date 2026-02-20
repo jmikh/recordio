@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import type { Rect } from '../../../../types';
 import type { CornerIndex } from './types';
 import { useDisplayMapper } from '../../../hooks/useDisplayMapper';
-import { RADIUS_HANDLE_SIZE, RADIUS_HANDLE_MIN_INSET, Z_INDEX_RADIUS_HANDLE, PRIMARY_COLOR } from './constants';
+import { RADIUS_HANDLE_SIZE, RADIUS_HANDLE_MIN_INSET, Z_INDEX_RADIUS_HANDLE } from './constants';
 
 export interface CornerRadiusHandleProps {
     /** Which corner this handle controls */
@@ -119,7 +119,7 @@ export const CornerRadiusHandle: React.FC<CornerRadiusHandleProps> = ({
         height: RADIUS_HANDLE_SIZE,
         borderRadius: '50%',
         backgroundColor: 'white',
-        border: `1px solid ${PRIMARY_COLOR}`,
+        border: '1px solid black',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         zIndex: Z_INDEX_RADIUS_HANDLE,
         pointerEvents: 'auto',

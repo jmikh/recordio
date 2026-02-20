@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
-import { FocusSettings } from './FocusSettings';
 import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
@@ -13,8 +12,10 @@ import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
-import { SelectionInspector } from './SelectionInspector';
-import { TbDeviceDesktop, TbZoomIn, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick } from 'react-icons/tb';
+import { ClipInspector } from './ClipInspector';
+import { SpotlightInspector } from './SpotlightInspector';
+import { ZoomInspector } from './ZoomInspector';
+import { TbDeviceDesktop, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
 
@@ -74,9 +75,17 @@ export const SettingsPanel = () => {
     const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
 
     // Exit camera edit mode when switching away from camera tab
+    const selectZoom = useUIStore(s => s.selectZoom);
+    const selectSpotlight = useUIStore(s => s.selectSpotlight);
+    const selectWindow = useUIStore(s => s.selectWindow);
+
     const handleTabChange = (tab: SettingsPanelTab) => {
+        // Clear any timeline selection first
+        if (selectedZoomId) selectZoom(null);
+        if (selectedSpotlightId) selectSpotlight(null);
+        if (selectedWindowId) selectWindow(null);
+
         if (canvasMode === CanvasMode.CameraEdit && tab !== 'camera') {
-            // Leaving camera tab while in camera edit mode - exit
             setCanvasMode(CanvasMode.Preview);
         }
         setActiveTab(tab);
@@ -87,7 +96,6 @@ export const SettingsPanel = () => {
             { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
             { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
             { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
-            { id: 'zoom', label: 'Focus', icon: <TbZoomIn size={20} /> },
             { id: 'effects', label: 'Effects', icon: <TbClick size={20} /> },
             {
                 id: 'camera',
@@ -100,8 +108,6 @@ export const SettingsPanel = () => {
                 id: 'captions',
                 label: 'Captions',
                 icon: <TbArticle size={20} />,
-                disabled: !hasMicrophone,
-                disabledTooltip: 'No microphone detected'
             },
             {
                 id: 'audio',
@@ -127,6 +133,14 @@ export const SettingsPanel = () => {
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId);
 
+    const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
+    const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
+    const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
+
+    const selectedZoom = selectedZoomId ? zoomSegments.find(z => z.id === selectedZoomId) : null;
+    const selectedSpotlight = selectedSpotlightId ? spotlightSegments.find(s => s.id === selectedSpotlightId) : null;
+    const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
+
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Sidebar Navigation */}
@@ -142,6 +156,8 @@ export const SettingsPanel = () => {
                 {navItems.map((item) => {
                     const isActive = activeTab === item.id;
                     const isDisabled = item.disabled;
+
+                    const showActive = isActive && !hasSelection;
 
                     return (
                         <button
@@ -161,14 +177,12 @@ export const SettingsPanel = () => {
                             onMouseLeave={() => setHoveredDisabledTab(null)}
                             className={`group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg transition-colors duration-200 ${isDisabled
                                 ? 'opacity-50'
-                                : hasSelection
-                                    ? 'cursor-pointer opacity-60'
-                                    : 'cursor-pointer'
+                                : 'cursor-pointer'
                                 }`}
                         >
                             <span className={`flex transition-colors ${isDisabled
                                 ? 'text-text-disabled'
-                                : isActive
+                                : showActive
                                     ? 'text-primary'
                                     : 'text-text-muted group-hover:text-text-main'
                                 }`}>
@@ -176,7 +190,7 @@ export const SettingsPanel = () => {
                             </span>
                             <span className={`text-sm font-medium transition-colors ${isDisabled
                                 ? 'text-text-disabled'
-                                : isActive
+                                : showActive
                                     ? 'text-text-highlighted'
                                     : 'text-text-muted group-hover:text-text-main'
                                 }`}>
@@ -194,14 +208,17 @@ export const SettingsPanel = () => {
                     className="p-4 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
                 >
                     {hasSelection ? (
-                        <SelectionInspector />
+                        <>
+                            {selectedZoom && <ZoomInspector segment={selectedZoom} />}
+                            {selectedSpotlight && <SpotlightInspector segment={selectedSpotlight} />}
+                            {selectedWindow && <ClipInspector window={selectedWindow} />}
+                        </>
                     ) : (
                         <>
                             {activeTab === 'project' && <ProjectSettings />}
                             {activeTab === 'background' && <BackgroundSettings />}
                             {activeTab === 'screen' && <ScreenSettings />}
                             {activeTab === 'camera' && <CameraSettings />}
-                            {activeTab === 'zoom' && <FocusSettings />}
                             {activeTab === 'effects' && <EffectsSettings />}
                             {activeTab === 'captions' && <CaptionsSettings />}
                             {activeTab === 'audio' && <AudioSettingsPanel />}

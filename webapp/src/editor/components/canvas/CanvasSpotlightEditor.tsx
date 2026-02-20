@@ -263,6 +263,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             <DimmedOverlay
                 holeRect={currentOutputRect}
                 cornerRadii={currentCornerRadii}
+                opacity={spotlight?.dimOpacity}
             />
 
             {/* Enlarged preview outline — non-editable, white dashed */}
@@ -283,7 +284,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                             top: displayRect.y,
                             width: displayRect.width,
                             height: displayRect.height,
-                            border: '2px dashed white',
+                            border: '1px dashed white',
                             borderRadius: `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`,
                             pointerEvents: 'none',
                             boxSizing: 'border-box',

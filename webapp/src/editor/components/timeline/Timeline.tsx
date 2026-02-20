@@ -17,6 +17,7 @@ import { TimelineHeaderCell } from './TimelineHeaderCell';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
+import { TrackVisibilityDropdown } from './TrackVisibilityDropdown';
 
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 
@@ -109,6 +110,7 @@ export function Timeline() {
 
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
+    const trackVisibility = useUIStore(s => s.trackVisibility);
 
 
     // Memoize TimeMapper
@@ -129,6 +131,15 @@ export function Timeline() {
             setPixelsPerSec(clampedPps);
         }
     };
+
+    // Auto-fit timeline zoom on initial mount
+    const hasFittedRef = useRef(false);
+    useEffect(() => {
+        if (!hasFittedRef.current && containerRef.current && totalOutputDuration > 0) {
+            hasFittedRef.current = true;
+            handleFit();
+        }
+    }, [containerEl, totalOutputDuration]);
 
     // -- Interaction Hook --
     const {
@@ -240,36 +251,44 @@ export function Timeline() {
                     className="flex-shrink-0 flex flex-col z-[var(--z-index-overlay)] border-r border-border"
                     style={{ width: HEADER_WIDTH, gap: TRACK_GAP, paddingTop: TRACK_GAP }}
                 >
-                    {/* Spacer for Ruler */}
-                    <div style={{ height: 24 - TRACK_GAP }} className="border-b border-border shrink-0" />
+                    {/* Track Visibility Dropdown (ruler spacer area) */}
+                    <div style={{ height: 24 - TRACK_GAP }} className="border-b border-border shrink-0 flex items-center">
+                        <TrackVisibilityDropdown height={24 - TRACK_GAP} />
+                    </div>
 
                     {/* Header: Recording */}
-                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                        <TimelineHeaderCell
-                            title="Recording"
-                            height={TRACK_HEIGHT}
-                        />
-                    </div>
+                    {trackVisibility.recording && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineHeaderCell
+                                title="Recording"
+                                height={TRACK_HEIGHT}
+                            />
+                        </div>
+                    )}
 
                     {/* Header: Zoom */}
-                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                        <TimelineHeaderCell
-                            title="Zoom"
-                            height={TRACK_HEIGHT}
-                        />
-                    </div>
+                    {trackVisibility.zoom && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineHeaderCell
+                                title="Zoom"
+                                height={TRACK_HEIGHT}
+                            />
+                        </div>
+                    )}
 
                     {/* Header: Spotlight */}
-                    <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                        <TimelineHeaderCell
-                            title="Spotlight"
-                            height={TRACK_HEIGHT}
-                            infoElement={<SpotlightLegend />}
-                        />
-                    </div>
+                    {trackVisibility.spotlight && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineHeaderCell
+                                title="Spotlight"
+                                height={TRACK_HEIGHT}
+                                infoElement={<SpotlightLegend />}
+                            />
+                        </div>
+                    )}
 
-                    {/* Header: Captions (conditional) */}
-                    {(timeline.captionSegments?.length > 0) && (
+                    {/* Header: Captions */}
+                    {trackVisibility.captions && (
                         <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
                             <TimelineHeaderCell
                                 title="Captions"
@@ -333,30 +352,36 @@ export function Timeline() {
                                 />
 
                                 {/* Tracks Container */}
-                                <div id="timeline-tracks" className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP }}>
+                                <div id="timeline-tracks" className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
                                     {/* Recording Track */}
-                                    <TimelineTrackRow height={TRACK_HEIGHT}>
-                                        <RecordingTrack
-                                            timeline={timeline}
-                                            pixelsPerSec={pixelsPerSec}
-                                            trackHeight={TRACK_HEIGHT}
-                                            scrollLeft={rulerScrollLeft}
-                                            containerWidth={containerWidth}
-                                        />
-                                    </TimelineTrackRow>
+                                    {trackVisibility.recording && (
+                                        <TimelineTrackRow height={TRACK_HEIGHT}>
+                                            <RecordingTrack
+                                                timeline={timeline}
+                                                pixelsPerSec={pixelsPerSec}
+                                                trackHeight={TRACK_HEIGHT}
+                                                scrollLeft={rulerScrollLeft}
+                                                containerWidth={containerWidth}
+                                            />
+                                        </TimelineTrackRow>
+                                    )}
 
                                     {/* Zoom Track */}
-                                    <TimelineTrackRow height={TRACK_HEIGHT}>
-                                        <ZoomTrack height={TRACK_HEIGHT} />
-                                    </TimelineTrackRow>
+                                    {trackVisibility.zoom && (
+                                        <TimelineTrackRow height={TRACK_HEIGHT}>
+                                            <ZoomTrack height={TRACK_HEIGHT} />
+                                        </TimelineTrackRow>
+                                    )}
 
                                     {/* Spotlight Track */}
-                                    <TimelineTrackRow height={TRACK_HEIGHT}>
-                                        <SpotlightTrack height={TRACK_HEIGHT} />
-                                    </TimelineTrackRow>
+                                    {trackVisibility.spotlight && (
+                                        <TimelineTrackRow height={TRACK_HEIGHT}>
+                                            <SpotlightTrack height={TRACK_HEIGHT} />
+                                        </TimelineTrackRow>
+                                    )}
 
-                                    {/* Caption Track (conditional) */}
-                                    {(timeline.captionSegments?.length > 0) && (
+                                    {/* Caption Track */}
+                                    {trackVisibility.captions && (
                                         <TimelineTrackRow height={TRACK_HEIGHT}>
                                             <CaptionTrack height={TRACK_HEIGHT} />
                                         </TimelineTrackRow>

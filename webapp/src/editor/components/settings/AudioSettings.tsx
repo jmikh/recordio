@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { ProjectStorage, type CustomMusicEntry } from '../../../storage/projectStorage';
-import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause } from 'react-icons/tb';
+import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
 
 // CDN preset music tracks
 const PRESET_MUSIC = [
@@ -83,14 +83,22 @@ export const AudioSettingsPanel = () => {
     const audio = settings.audio;
     const music = audio?.music;
 
-    // Determine audio mode for toggle display
+    // Determine audio capabilities
     const screenSource = project.screenSource;
     const cameraSource = project.cameraSource;
     const screenHasAudio = screenSource?.hasAudio ?? false;
-    const isSingleMode = screenSource?.hasMicrophone && !cameraSource;
-    const isDualMode = !!cameraSource;
-    const hasMicOnCamera = cameraSource?.hasMicrophone ?? false;
-    const hasMicAnywhere = screenSource?.hasMicrophone || hasMicOnCamera;
+    const screenHasMic = screenSource?.hasMicrophone ?? false;
+    const cameraHasMic = cameraSource?.hasMicrophone ?? false;
+    const hasMicAnywhere = screenHasMic || cameraHasMic;
+
+    // Determine toggle layout:
+    // - Screen has audio AND mic on same source (no separate mic source) → "Screen + Mic"
+    // - Screen has audio AND mic on a different source → separate "Screen Audio" + "Microphone"
+    // - No screen audio, mic somewhere → "Microphone" only
+    // - Screen audio only, no mic → "Screen Audio" only
+    const showCombinedScreenMic = screenHasAudio && screenHasMic && !cameraHasMic;
+    const showScreenAudioToggle = screenHasAudio && !showCombinedScreenMic;
+    const showMicToggle = hasMicAnywhere && !showCombinedScreenMic;
 
     // Preview helper
     const togglePreview = (url: string) => {
@@ -216,11 +224,15 @@ export const AudioSettingsPanel = () => {
 
     // Build preview items for audio toggles card
     const audioTogglePreviewItems: PreviewItem[] = [];
-    if (isSingleMode && audio?.muteScreenAudio) {
+    if (showCombinedScreenMic && audio?.muteScreenAudio) {
         audioTogglePreviewItems.push({ type: 'text', content: 'Muted' });
-    } else if (isDualMode) {
-        if (audio?.muteScreenAudio) audioTogglePreviewItems.push({ type: 'text', content: 'Screen muted' });
-        if (audio?.muteMicrophone) audioTogglePreviewItems.push({ type: 'text', content: 'Mic muted' });
+    } else {
+        if ((showScreenAudioToggle || showCombinedScreenMic) && audio?.muteScreenAudio) {
+            audioTogglePreviewItems.push({ type: 'text', content: 'Screen muted' });
+        }
+        if (showMicToggle && audio?.muteMicrophone) {
+            audioTogglePreviewItems.push({ type: 'text', content: 'Mic muted' });
+        }
     }
     if (audioTogglePreviewItems.length === 0 && (screenHasAudio || hasMicAnywhere)) {
         audioTogglePreviewItems.push({ type: 'text', content: 'On' });
@@ -246,16 +258,17 @@ export const AudioSettingsPanel = () => {
             {(screenHasAudio || hasMicAnywhere) && (
                 <CollapsibleCard
                     title="Audio"
+                    icon={<TbVolume size={16} />}
                     previewItems={audioTogglePreviewItems}
                     isExpanded={showCollapsibleAudioToggles}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
                 >
                     <div className="flex flex-col gap-3">
-                        {isSingleMode ? (
-                            /* Single Mode: one combined toggle + volume */
+                        {/* Combined "Screen + Mic" toggle when both are on the screen source */}
+                        {showCombinedScreenMic && (
                             <>
                                 <Toggle
-                                    label="Recording Audio"
+                                    label="Screen + Mic"
                                     value={!audio?.muteScreenAudio}
                                     onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
                                 />
@@ -277,60 +290,60 @@ export const AudioSettingsPanel = () => {
                                     />
                                 )}
                             </>
-                        ) : (
-                            /* Dual Mode: separate toggles + volumes */
+                        )}
+
+                        {/* Separate Screen Audio toggle */}
+                        {showScreenAudioToggle && (
                             <>
-                                {screenHasAudio && (
-                                    <>
-                                        <Toggle
-                                            label="Screen Audio"
-                                            value={!audio?.muteScreenAudio}
-                                            onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
-                                        />
-                                        {!audio?.muteScreenAudio && (
-                                            <Slider
-                                                label="Volume"
-                                                min={0}
-                                                max={100}
-                                                value={Math.round((audio?.screenVolume ?? 1) * 100)}
-                                                onPointerDown={startInteraction}
-                                                onPointerUp={endInteraction}
-                                                onChange={(val) =>
-                                                    batchAction(() =>
-                                                        updateSettings({ audio: { screenVolume: val / 100 } })
-                                                    )
-                                                }
-                                                showTooltip
-                                                units="%"
-                                            />
-                                        )}
-                                    </>
+                                <Toggle
+                                    label="Screen Audio"
+                                    value={!audio?.muteScreenAudio}
+                                    onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
+                                />
+                                {!audio?.muteScreenAudio && (
+                                    <Slider
+                                        label="Volume"
+                                        min={0}
+                                        max={100}
+                                        value={Math.round((audio?.screenVolume ?? 1) * 100)}
+                                        onPointerDown={startInteraction}
+                                        onPointerUp={endInteraction}
+                                        onChange={(val) =>
+                                            batchAction(() =>
+                                                updateSettings({ audio: { screenVolume: val / 100 } })
+                                            )
+                                        }
+                                        showTooltip
+                                        units="%"
+                                    />
                                 )}
-                                {hasMicOnCamera && (
-                                    <>
-                                        <Toggle
-                                            label="Microphone Audio"
-                                            value={!audio?.muteMicrophone}
-                                            onChange={(v) => updateSettings({ audio: { muteMicrophone: !v } })}
-                                        />
-                                        {!audio?.muteMicrophone && (
-                                            <Slider
-                                                label="Volume"
-                                                min={0}
-                                                max={100}
-                                                value={Math.round((audio?.microphoneVolume ?? 1) * 100)}
-                                                onPointerDown={startInteraction}
-                                                onPointerUp={endInteraction}
-                                                onChange={(val) =>
-                                                    batchAction(() =>
-                                                        updateSettings({ audio: { microphoneVolume: val / 100 } })
-                                                    )
-                                                }
-                                                showTooltip
-                                                units="%"
-                                            />
-                                        )}
-                                    </>
+                            </>
+                        )}
+
+                        {/* Separate Microphone toggle */}
+                        {showMicToggle && (
+                            <>
+                                <Toggle
+                                    label="Microphone"
+                                    value={!audio?.muteMicrophone}
+                                    onChange={(v) => updateSettings({ audio: { muteMicrophone: !v } })}
+                                />
+                                {!audio?.muteMicrophone && (
+                                    <Slider
+                                        label="Volume"
+                                        min={0}
+                                        max={100}
+                                        value={Math.round((audio?.microphoneVolume ?? 1) * 100)}
+                                        onPointerDown={startInteraction}
+                                        onPointerUp={endInteraction}
+                                        onChange={(val) =>
+                                            batchAction(() =>
+                                                updateSettings({ audio: { microphoneVolume: val / 100 } })
+                                            )
+                                        }
+                                        showTooltip
+                                        units="%"
+                                    />
                                 )}
                             </>
                         )}
@@ -341,6 +354,7 @@ export const AudioSettingsPanel = () => {
             {/* Background Music */}
             <CollapsibleCard
                 title="Music"
+                icon={<TbMusic size={16} />}
                 previewItems={musicPreviewItems}
                 isExpanded={showCollapsibleMusic}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMusic', v)}

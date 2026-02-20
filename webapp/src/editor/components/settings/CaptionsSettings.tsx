@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { MdEdit } from 'react-icons/md';
+import { RiPaletteLine } from 'react-icons/ri';
+import { TbSparkles } from 'react-icons/tb';
+import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../types';
-import { Slider, DefaultButton, CollapsibleCard, Toggle, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, DefaultButton, CollapsibleCard, Toggle, Dropdown, Tooltip, type PreviewItem, type DropdownOption } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
 import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
@@ -39,6 +42,7 @@ export function CaptionsSettings() {
     const selectedSettingsPanel = useUIStore(state => state.selectedSettingsPanel);
 
     // Collapsible visibility state
+    const showCollapsibleCaptionAI = useUIStore(state => state.showCollapsibleCaptionAI);
     const showCollapsibleCaptionStyle = useUIStore(state => state.showCollapsibleCaptionStyle);
     const showCollapsibleCaptionPosition = useUIStore(state => state.showCollapsibleCaptionPosition);
     const setCollapsibleVisibility = useUIStore(state => state.setCollapsibleVisibility);
@@ -61,6 +65,7 @@ export function CaptionsSettings() {
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
     const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
+    const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
 
 
     // Focus when editing starts
@@ -342,42 +347,83 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
-            {/* Transcription Controls Card */}
-            {!isTranscribing && (
-                <div className="bg-surface-inset rounded-lg p-4 space-y-3">
-                    <p className="text-xs text-text-muted text-center">
-                        Powered by Whisper — runs locally in your browser. Your audio never leaves your device.
-                    </p>
-                    <PrimaryButton
-                        onClick={handleGenerate}
-                        className="w-full flex items-center justify-center"
+            {/* A.I. Transcription Card */}
+            {!isTranscribing && (() => {
+                // Derive A.I. status for preview
+                const hasGenerated = !!settings.generatedAt;
+                const generatedEmpty = hasGenerated && (!settings.baselineCaptions || settings.baselineCaptions.length === 0);
+                const generatedSuccess = hasGenerated && !generatedEmpty;
+
+                const aiPreviewItems: PreviewItem[] = generatedSuccess
+                    ? [{ type: 'text', content: '✓ Generated' }]
+                    : generatedEmpty
+                        ? [{ type: 'text', content: 'No speech detected' }]
+                        : [];
+
+                // Tooltip: warn on re-transcribe after empty result
+                const transcribeTooltip = !hasMicrophone
+                    ? 'No microphone detected'
+                    : emptyCaptionsNotice
+                        ? 'Re-transcribing with the same language will yield the same results. Transcription requires clear, spoken audio.'
+                        : '';
+
+                return (
+                    <CollapsibleCard
+                        title="A.I."
+                        icon={<TbSparkles size={16} />}
+                        previewItems={aiPreviewItems}
+                        isExpanded={showCollapsibleCaptionAI}
+                        onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionAI', v)}
                     >
-                        Transcribe
-                    </PrimaryButton>
+                        <div className="flex flex-col gap-3">
+                            <Tooltip text={transcribeTooltip} className="w-full">
+                                <PrimaryButton
+                                    onClick={handleGenerate}
+                                    disabled={!hasMicrophone}
+                                    className="w-full flex items-center justify-center"
+                                >
+                                    Transcribe
+                                </PrimaryButton>
+                            </Tooltip>
 
-                    {/* Language Dropdown */}
-                    <Dropdown
-                        options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
-                        value={selectedLanguage}
-                        onChange={setSelectedLanguage}
-                    />
+                            {/* Language Dropdown */}
+                            <Dropdown
+                                options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
+                                value={selectedLanguage}
+                                onChange={setSelectedLanguage}
+                            />
 
-                    {/* Restore Transcript Button */}
-                    {settings.baselineCaptions && settings.baselineCaptions.length > 0 &&
-                        JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
-                            <DefaultButton
-                                onClick={() => restoreCaptionsFromBaseline()}
-                                className="w-full"
-                            >
-                                Restore Transcript
-                            </DefaultButton>
-                        )}
-                </div>
-            )}
+                            <p className="subtext">
+                                Powered by Whisper — runs locally in your browser. Your audio never leaves your device.
+                            </p>
+
+                            {/* Restore Button */}
+                            {settings.baselineCaptions && settings.baselineCaptions.length > 0 &&
+                                JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
+                                    <Tooltip text="Restore transcription from the last AI-generated captions" className="w-full">
+                                        <DefaultButton
+                                            onClick={() => {
+                                                selectCaption(null);
+                                                setEditingId(null);
+                                                setCanvasMode(CanvasMode.Preview);
+                                                endInteraction();
+                                                restoreCaptionsFromBaseline();
+                                            }}
+                                            className="w-full"
+                                        >
+                                            Restore
+                                        </DefaultButton>
+                                    </Tooltip>
+                                )}
+                        </div>
+                    </CollapsibleCard>
+                );
+            })()}
 
             {/* Style Settings Card */}
             <CollapsibleCard
                 title="Style"
+                icon={<RiPaletteLine size={16} />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -452,22 +498,22 @@ export function CaptionsSettings() {
                 </div>
             </CollapsibleCard>
 
-            {emptyCaptionsNotice && (
-                <Notice>
-                    No audible speech was detected in the audio. Captions require clear, spoken English to generate.
-                </Notice>
-            )}
 
             {/* Captions Card - only show when there are segments */}
-            {captionSegments && captionSegments.length > 0 && (
-                <CollapsibleCard
-                    title="Captions"
-                    previewItems={[
-                        { type: 'text', content: `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}` }
-                    ]}
-                    isExpanded={showCollapsibleCaptionPosition}
-                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
-                >
+            <CollapsibleCard
+                title="Captions"
+                icon={<FaRegClosedCaptioning size={16} />}
+                previewItems={[
+                    {
+                        type: 'text', content: captionSegments && captionSegments.length > 0
+                            ? `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}`
+                            : 'None'
+                    }
+                ]}
+                isExpanded={showCollapsibleCaptionPosition}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
+            >
+                {captionSegments && captionSegments.length > 0 ? (
                     <div ref={captionsContainerRef}>
                         {captionSegments.map(segment => {
                             const outputStart = segment.outputStartTimeMs;
@@ -516,8 +562,12 @@ export function CaptionsSettings() {
                             );
                         })}
                     </div>
-                </CollapsibleCard>
-            )}
+                ) : (
+                    <p className="subtext">
+                        Transcribe automatically with AI or add manual on the captions track in the timeline.
+                    </p>
+                )}
+            </CollapsibleCard>
 
 
 

@@ -2,8 +2,11 @@
 // VISUAL CONSTANTS
 // ------------------------------------------------------------------
 
-/** Size of square corner resize handles (in CSS pixels) */
-export const CORNER_HANDLE_SIZE = 10;
+/** Length of each arm of the L-shaped corner handles (in CSS pixels) */
+export const CORNER_HANDLE_LENGTH = 16;
+
+/** Thickness of the L-shaped corner handle arms (in CSS pixels) */
+export const CORNER_HANDLE_THICKNESS = 2;
 
 /** Width of invisible edge hit areas (in CSS pixels) */
 export const EDGE_HIT_AREA_WIDTH = 8;
@@ -32,10 +35,10 @@ export const RADIUS_HANDLE_MIN_INSET = 12;
 // ------------------------------------------------------------------
 
 /** Primary color CSS variable reference */
-export const PRIMARY_COLOR = 'var(--primary)';
+export const PRIMARY_COLOR = 'rgba(255, 255, 255, 0.5)';
 
-/** Handle border color */
-export const HANDLE_BORDER_COLOR = 'white';
+/** Corner handle color */
+export const CORNER_HANDLE_COLOR = 'white';
 
 // ------------------------------------------------------------------
 // Z-INDEX LAYERS

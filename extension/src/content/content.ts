@@ -285,6 +285,7 @@ function showCancelToast() {
         fontSize: '14px',
         fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
         fontWeight: '500',
+        lineHeight: '1',
         zIndex: '2147483647',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
@@ -304,11 +305,13 @@ function showCancelToast() {
     Object.assign(logo.style, {
         width: '20px',
         height: '20px',
+        display: 'block',
         flexShrink: '0'
     });
     toast.appendChild(logo);
 
     const text = document.createElement('span');
+    text.style.lineHeight = '1';
     text.textContent = 'Recording cancelled';
     toast.appendChild(text);
 
@@ -347,6 +350,7 @@ function showTabSwitchToast() {
         fontSize: '14px',
         fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
         fontWeight: '500',
+        lineHeight: '1',
         zIndex: '2147483647',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
@@ -365,12 +369,14 @@ function showTabSwitchToast() {
     Object.assign(logo.style, {
         width: '20px',
         height: '20px',
+        display: 'block',
         flexShrink: '0'
     });
     toast.appendChild(logo);
 
     // Message text
     const text = document.createElement('span');
+    text.style.lineHeight = '1';
     text.textContent = "You're recording another tab";
     toast.appendChild(text);
 

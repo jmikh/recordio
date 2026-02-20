@@ -6,6 +6,8 @@ interface TooltipProps {
     text: string;
     /** The element to wrap with a tooltip */
     children: ReactNode;
+    /** Optional className for the wrapper element */
+    className?: string;
 }
 
 const VIEWPORT_PADDING = 8;
@@ -15,7 +17,7 @@ const VIEWPORT_PADDING = 8;
  * tooltip on hover, using the same pattern as InfoTooltip.
  * Clamps to viewport edges so content never goes off-screen.
  */
-export const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ text, children, className }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [position, setPosition] = useState({ left: 0, top: 0 });
     const ref = useRef<HTMLDivElement>(null);
@@ -53,6 +55,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
                 ref={ref}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
+                className={className}
                 style={{ display: 'inline-flex' }}
             >
                 {children}

@@ -3,6 +3,7 @@ import type { ProjectState } from '../useProjectStore';
 import type { CaptionSegment } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
+import { useUIStore } from '../useUIStore';
 
 
 export interface TranscriptionSlice {
@@ -56,6 +57,9 @@ export const createTranscriptionSlice: StateCreator<
                 }
             });
         });
+
+        // Auto-enable captions track visibility
+        useUIStore.getState().setTrackVisibility('captions', true);
     },
 
     restoreCaptionsFromBaseline: () => {
@@ -98,6 +102,9 @@ export const createTranscriptionSlice: StateCreator<
             },
             transcriptionError: null
         }));
+
+        // Auto-hide captions track visibility
+        useUIStore.getState().setTrackVisibility('captions', false);
     },
 
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {

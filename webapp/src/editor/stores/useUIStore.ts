@@ -2,6 +2,20 @@
 import { create } from 'zustand';
 import type { ID, TimeMs, Size } from '../../types';
 
+export interface TrackVisibility {
+    recording: boolean;
+    zoom: boolean;
+    spotlight: boolean;
+    captions: boolean;
+}
+
+const DEFAULT_TRACK_VISIBILITY: TrackVisibility = {
+    recording: true,
+    zoom: true,
+    spotlight: true,
+    captions: false,
+};
+
 export const CanvasMode = {
     Preview: 'preview',
     CropEdit: 'cropEdit',
@@ -16,12 +30,11 @@ export const SettingsPanel = {
     Project: 'project',
     Screen: 'screen',
     Camera: 'camera',
-    Zoom: 'zoom',
     Export: 'export',
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'project' | 'screen' | 'zoom' | 'effects' | 'background' | 'camera' | 'captions' | 'audio';
+export type SettingsPanelTab = 'project' | 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -79,8 +92,6 @@ export interface UIState {
 
     // Collapsible Card Visibility
     // -- Effects Settings
-    showCollapsibleZoom: boolean;
-    showCollapsibleSpotlight: boolean;
     showCollapsibleEffects: boolean;
     showCollapsibleMouse: boolean;
     // -- Background Settings
@@ -94,12 +105,17 @@ export interface UIState {
     showCollapsibleShape: boolean;
     showCollapsibleBorder: boolean;
     // -- Captions Settings
+    showCollapsibleCaptionAI: boolean;
     showCollapsibleCaptionStyle: boolean;
     showCollapsibleCaptionPosition: boolean;
     // -- Audio Settings
     showCollapsibleAudioToggles: boolean;
     showCollapsibleMusic: boolean;
     setCollapsibleVisibility: (key: string, value: boolean) => void;
+
+    // Track Visibility
+    trackVisibility: TrackVisibility;
+    setTrackVisibility: (track: keyof TrackVisibility, visible: boolean) => void;
 
     // Explicit reset to default state
     reset: () => void;
@@ -139,8 +155,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedWindowId: null,
                 selectedCaptionId: null,
                 canvasMode: CanvasMode.ZoomEdit,
-                settingsPanelActiveTab: 'zoom' as SettingsPanelTab,
-                showCollapsibleZoom: true,
+                settingsPanelActiveTab: 'effects' as SettingsPanelTab,
                 isPlaying: false,
             };
         }
@@ -161,8 +176,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedWindowId: null,
                 selectedCaptionId: null,
                 canvasMode: CanvasMode.SpotlightEdit,
-                settingsPanelActiveTab: 'zoom' as SettingsPanelTab,
-                showCollapsibleSpotlight: true,
+                settingsPanelActiveTab: 'effects' as SettingsPanelTab,
                 isPlaying: false,
             };
         }
@@ -185,6 +199,7 @@ export const useUIStore = create<UIState>((set, get) => ({
                 selectedSettingsPanel: SettingsPanel.Project,
                 settingsPanelActiveTab: 'captions' as SettingsPanelTab,
                 showCollapsibleCaptionPosition: true,
+                trackVisibility: { ...state.trackVisibility, captions: true },
             };
         }
         return { selectedCaptionId: null };
@@ -246,8 +261,6 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     // Collapsible Card Visibility
     // -- Effects Settings
-    showCollapsibleZoom: true, // Default expanded
-    showCollapsibleSpotlight: false,
     showCollapsibleEffects: false,
     showCollapsibleMouse: false,
     // -- Background Settings
@@ -261,12 +274,19 @@ export const useUIStore = create<UIState>((set, get) => ({
     showCollapsibleShape: true, // Default expanded
     showCollapsibleBorder: false,
     // -- Captions Settings
+    showCollapsibleCaptionAI: true, // Default expanded
     showCollapsibleCaptionStyle: true, // Default expanded
     showCollapsibleCaptionPosition: false,
     // -- Audio Settings
     showCollapsibleAudioToggles: true, // Default expanded
     showCollapsibleMusic: true, // Default expanded
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
+
+    // Track Visibility
+    trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
+    setTrackVisibility: (track, visible) => set((state) => ({
+        trackVisibility: { ...state.trackVisibility, [track]: visible }
+    })),
 
     reset: () => set({
         canvasMode: CanvasMode.Preview,
@@ -287,8 +307,6 @@ export const useUIStore = create<UIState>((set, get) => ({
         showDebugBar: false,
         showDebugOverlays: false,
         // Collapsible Card Visibility
-        showCollapsibleZoom: true,
-        showCollapsibleSpotlight: false,
         showCollapsibleEffects: false,
         showCollapsibleMouse: false,
         showCollapsibleBackground: true,
@@ -298,9 +316,11 @@ export const useUIStore = create<UIState>((set, get) => ({
         showCollapsibleCameraShape: true,
         showCollapsibleShape: true,
         showCollapsibleBorder: false,
+        showCollapsibleCaptionAI: true,
         showCollapsibleCaptionStyle: true,
         showCollapsibleCaptionPosition: false,
         showCollapsibleAudioToggles: true,
         showCollapsibleMusic: true,
+        trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
     })
 }));

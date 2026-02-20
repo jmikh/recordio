@@ -37,7 +37,7 @@ function defineFrame(
             bottom: (dimensions.height - (screen.y + screen.height)) / dimensions.height
         },
         customScaling,
-        thumbnailUrl: imageUrl.replace('/assets/devices/', '/assets/devices/thumbnails/')
+        thumbnailUrl: imageUrl.replace('.png', '-minified.png')
     };
 }
 

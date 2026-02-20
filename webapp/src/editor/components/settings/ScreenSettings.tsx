@@ -7,6 +7,8 @@ import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, DefaultButton, 
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
+import { CgToolbarTop } from 'react-icons/cg';
+import { TbResize, TbFrame } from 'react-icons/tb';
 
 interface Resolution {
     label: string;
@@ -116,6 +118,7 @@ export const ScreenSettings = () => {
             {/* Area 1: Size Settings */}
             <CollapsibleCard
                 title="Size"
+                icon={<TbResize size={16} />}
                 previewItems={sizePreviewItems}
                 isExpanded={showCollapsibleSize}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSize', v)}
@@ -180,6 +183,7 @@ export const ScreenSettings = () => {
                 return (
                     <CollapsibleCard
                         title="Toolbar"
+                        icon={<CgToolbarTop size={16} />}
                         previewItems={toolbarPreviewItems}
                         isExpanded={showCollapsibleToolbar}
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleToolbar', v)}
@@ -220,6 +224,7 @@ export const ScreenSettings = () => {
             {/* Area 2: Frame Settings */}
             <CollapsibleCard
                 title="Frame"
+                icon={<TbFrame size={16} />}
                 previewItems={framePreviewItems}
                 isExpanded={showCollapsibleFrame}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleFrame', v)}
@@ -243,8 +248,8 @@ export const ScreenSettings = () => {
                                                 screen: { ...screenConfig, deviceFrameId: frame.id }
                                             })}
                                             className={`cursor-pointer w-full aspect-[16/10] rounded-md flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
-                                                ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary bg-white'
-                                                : 'ring-1 ring-black/5 hover:ring-black/10 bg-white/70 hover:bg-white/85'
+                                                ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary'
+                                                : 'opacity-70 hover:opacity-90'
                                                 }`}
                                             title={frame.name}
                                         >

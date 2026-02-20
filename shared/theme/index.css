@@ -335,6 +335,11 @@ body,
       font-style: italic;
       pointer-events: none;
    }
+
+   /* Subtext - small muted centered helper text for settings panels */
+   .subtext {
+      @apply text-xs text-text-muted text-left;
+   }
 }
 
 /* ============================================================
