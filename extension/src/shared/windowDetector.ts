@@ -6,6 +6,8 @@
  * offsets, immune to video compression artifacts at marker edges.
  */
 
+import { captureException } from '../utils/sentry';
+
 // Marker Definition
 // Outer: 50x50 Primary (Purple/Magenta from OKLCH: oklch(0.58 0.19 290))
 // Inner: 20x20 Secondary (Lime/Green from OKLCH: oklch(0.80 0.15 78))
@@ -64,6 +66,7 @@ export async function detectControllerWindow(stream: MediaStream): Promise<Windo
                 resolve(result);
             } catch (e) {
                 console.error("[VideoValidation] Error extracting frame:", e);
+                captureException(e instanceof Error ? e : new Error(String(e)));
                 clearTimeout(timeoutId);
                 cleanup();
                 resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
@@ -168,7 +171,6 @@ function findMarkers(imageData: ImageData, dpr: number): WindowDetectionResult {
             const xOffset = centerX - markerCenter;
             const yOffset = centerY - markerCenter;
 
-            console.log(`[WindowDetector] Marker inner center at (${centerX}, ${centerY}), viewport offset: (${xOffset}, ${yOffset})`);
             return {
                 isControllerWindow: true,
                 xOffset: Math.max(0, xOffset),

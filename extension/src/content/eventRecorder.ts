@@ -83,7 +83,6 @@ export class EventRecorder {
         this.attachListeners();
         this.hoveredCardDetector.start();
         if (this.isActive()) this.sendUrlEventDirectly();
-        console.log("[ContentRecorder] Started capturing events.");
     }
 
     public stop() {
@@ -94,7 +93,6 @@ export class EventRecorder {
         this.hoveredCardDetector.stop();
         this.hideTypingOverlay();
         this.removeListeners();
-        console.log("[ContentRecorder] Stopped capturing events.");
     }
 
     private getRelativeTime(): number {

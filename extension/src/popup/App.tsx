@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { captureException } from '../utils/sentry';
 import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
@@ -267,6 +268,7 @@ function App() {
       }, (response: any) => {
         if (chrome.runtime.lastError) {
           console.error("Connection error:", chrome.runtime.lastError.message);
+          captureException(new Error(`Connection error: ${chrome.runtime.lastError.message}`));
           setStartError('Could not start recording. Please refresh the tab and try again.');
           return;
         }

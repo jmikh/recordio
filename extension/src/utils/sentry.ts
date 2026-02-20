@@ -64,8 +64,6 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
     sentryScope.setTag("extension.context", context);
 
     client.init(); // Must be called after setting client on scope
-
-    console.log(`[Sentry] Initialized for ${context} context (browser extension mode)`);
 }
 
 // Export helper functions that use our scope

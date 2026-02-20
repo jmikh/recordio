@@ -1,5 +1,6 @@
 
 import type { ID, RawRecording } from '@shared/types';
+import { captureException } from '../utils/sentry';
 
 // Project is a webapp-only type. The extension storage layer keeps these methods
 // for the Universal Storage Layer (webapp reads from the same IndexedDB), but the
@@ -70,6 +71,7 @@ export class ProjectStorage {
 
             request.onerror = (event) => {
                 console.error('RecordioDB open failed:', event);
+                captureException(new Error('RecordioDB open failed'));
                 reject((event.target as IDBOpenDBRequest).error);
             };
         });
@@ -84,7 +86,6 @@ export class ProjectStorage {
     static async loadProjectOrFail(projectId: ID): Promise<Project> {
         const existingProject = await this.loadProject(projectId);
         if (existingProject) {
-            console.log(`[ProjectStorage] Loaded existing project: ${projectId}`);
             return existingProject;
         }
 
@@ -204,7 +205,6 @@ export class ProjectStorage {
                     if (!existsInLibrary) {
                         // Re-add to library with same ID
                         await this.saveCustomBackgroundWithId(libraryId, blob);
-                        console.log(`[ProjectStorage] Auto-added missing background to library: ${libraryId}`);
                     }
                 }
             }

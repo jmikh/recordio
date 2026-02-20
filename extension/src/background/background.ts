@@ -9,7 +9,7 @@
  */
 
 import { type Size } from '@shared/types';
-import { initSentry } from '../utils/sentry';
+import { initSentry, captureException } from '../utils/sentry';
 
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
@@ -47,13 +47,12 @@ async function doEnsureState() {
         const result = await chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE);
         if (result[STORAGE_KEYS.RECORDING_STATE]) {
             currentState = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState;
-            console.log("State restored from storage:", currentState);
         } else {
             currentState = { ...DEFAULT_STATE };
-            console.log("No stored state found, using defaults.");
         }
     } catch (e) {
         console.error("Failed to restore state:", e);
+        captureException(e instanceof Error ? e : new Error(String(e)));
         // Fallback to defaults on error to allow extension to function
         currentState = { ...DEFAULT_STATE };
     }
@@ -140,7 +139,7 @@ async function setupOffscreenDocument(path: string) {
         try {
             await chrome.offscreen.closeDocument();
         } catch (e) {
-            console.log("[Background] Failed to close existing offscreen doc (might be already gone)", e);
+            // Closing existing offscreen doc failed — may already be gone
         }
     }
 
@@ -214,7 +213,6 @@ async function openControllerTab(): Promise<number> {
 import contentScriptPath from '../content/content.ts?script';
 
 chrome.runtime.onInstalled.addListener(async () => {
-    console.log("[Background] Extension Installed/Updated. Injecting content scripts...");
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
         if (tab.id && tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://") || tab.url.startsWith("file://"))) {
@@ -257,9 +255,10 @@ async function handleStartSession(message: any, sendResponse: Function) {
     } catch (err: any) {
         // User cancellation is not an error, just a normal user action
         if (err.message === "User cancelled desktop capture picker") {
-            console.log("User cancelled desktop capture picker");
+            // User cancelled — not an error
         } else {
             console.error("Error starting recording:", err);
+            captureException(err instanceof Error ? err : new Error(String(err)));
         }
         sendResponse({ success: false, error: err.message });
     }
@@ -526,7 +525,6 @@ async function handleStopSession(sendResponse: Function) {
     stopBadgeTimer();
 
     await ensureState(); // Ensure state is loaded
-    console.log("[Background] Sending STOP_RECORDING");
 
     const finalSessionId = currentState?.currentSessionId;
     // Capture the controller ID from state before we wipe the state
@@ -561,7 +559,7 @@ async function handleStopSession(sendResponse: Function) {
                 response = await chrome.tabs.sendMessage(controllerTabIdToClose, stopVideoMsg);
             }
 
-            console.log("[Background] Recorder stop response:", response);
+
 
 
 
@@ -570,6 +568,7 @@ async function handleStopSession(sendResponse: Function) {
             chrome.tabs.create({ url: importUrl });
         } catch (e) {
             console.error("Failed to stop video recording: ", e);
+            captureException(e instanceof Error ? e : new Error(String(e)));
         }
     }
     // Cleanup regardless of success
@@ -624,7 +623,6 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'screen') && currentState.controllerTabId === tabId;
 
     if (isRecordedTab || isControllerTab) {
-        console.log(`[Background] Detected closure of ${isRecordedTab ? 'recorded tab' : 'controller tab'}. Stopping session.`);
         handleStopSession(() => { }); // No response needed
     }
 });
@@ -703,7 +701,7 @@ const pendingHandoffs = new Map<string, {
 }>();
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-    console.log('[Background] External message:', message.type, 'from:', sender.origin);
+
 
     (async () => {
         switch (message.type) {
@@ -730,7 +728,6 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
  */
 async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse: Function) {
     const { recordingId } = payload;
-    console.log('[Background] Handoff request, fetching metadata:', recordingId);
 
     try {
         // Load RawRecording directly from storage
@@ -738,6 +735,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
 
         if (!recording) {
             console.error('[Background] Recording not found:', recordingId);
+            captureException(new Error(`Recording not found: ${recordingId}`));
             const errorResponse: HandoffErrorResponse = {
                 success: false,
                 error: 'Recording not found',
@@ -765,9 +763,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
         // Cache blobs for streaming phase
         pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob });
 
-        console.log('[Background] Sending metadata:', recordingId,
-            'screen size:', screenBlob.size,
-            'camera size:', cameraBlob?.size || 'none');
+
 
         // Send metadata response (small, under 64MB limit)
         const response: HandoffMetadataResponse = {
@@ -782,6 +778,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
 
     } catch (error) {
         console.error('[Background] Error fetching recording:', error);
+        captureException(error instanceof Error ? error : new Error(String(error)));
         const errorResponse: HandoffErrorResponse = {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
@@ -801,7 +798,7 @@ chrome.runtime.onConnectExternal.addListener((port) => {
         return;
     }
 
-    console.log('[Background] Port connected for streaming:', port.sender?.origin);
+
 
     port.onMessage.addListener(async (message) => {
         if (message.type === PORT_MSG.START_STREAM) {
@@ -810,7 +807,7 @@ chrome.runtime.onConnectExternal.addListener((port) => {
     });
 
     port.onDisconnect.addListener(() => {
-        console.log('[Background] Port disconnected');
+
     });
 });
 
@@ -819,7 +816,6 @@ chrome.runtime.onConnectExternal.addListener((port) => {
  */
 async function handleStartStream(port: chrome.runtime.Port, payload: StartStreamPayload) {
     const { recordingId } = payload;
-    console.log('[Background] Starting stream for:', recordingId);
 
     const cached = pendingHandoffs.get(recordingId);
     if (!cached) {
@@ -847,10 +843,11 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
             payload: { recordingId },
         });
 
-        console.log('[Background] Stream complete for:', recordingId);
+
 
     } catch (error) {
         console.error('[Background] Stream error:', error);
+        captureException(error instanceof Error ? error : new Error(String(error)));
         port.postMessage({
             type: PORT_MSG.STREAM_ERROR,
             payload: { error: error instanceof Error ? error.message : 'Unknown error' },
@@ -867,7 +864,6 @@ async function streamBlobChunks(
     source: 'screen' | 'camera'
 ) {
     const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
-    console.log(`[Background] Streaming ${source}: ${blob.size} bytes in ${totalChunks} chunks`);
 
     for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
@@ -890,7 +886,7 @@ async function streamBlobChunks(
             payload: chunkPayload,
         });
 
-        console.log(`[Background] Sent ${source} chunk ${i + 1}/${totalChunks}`);
+
     }
 }
 
@@ -899,7 +895,6 @@ async function streamBlobChunks(
  */
 async function handleHandoffComplete(payload: HandoffCompletePayload) {
     const { recordingId } = payload;
-    console.log('[Background] Handoff complete, cleaning up:', recordingId);
 
     // Clear cache
     pendingHandoffs.delete(recordingId);
@@ -907,9 +902,9 @@ async function handleHandoffComplete(payload: HandoffCompletePayload) {
     try {
         // Delete from extension storage after successful handoff
         await ProjectStorage.deleteRawRecording(recordingId);
-        console.log('[Background] Deleted recording from extension storage:', recordingId);
     } catch (error) {
         console.error('[Background] Failed to delete recording:', error);
+        captureException(error instanceof Error ? error : new Error(String(error)));
     }
 }
 

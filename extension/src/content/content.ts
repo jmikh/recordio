@@ -26,7 +26,6 @@ const cleanupEvent = new Event('recordio-cleanup');
 window.dispatchEvent(cleanupEvent);
 
 window.addEventListener('recordio-cleanup', () => {
-    console.log("[Recordio] Cleaning up old content script instance.");
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;
@@ -36,7 +35,6 @@ window.addEventListener('recordio-cleanup', () => {
 }, { once: true });
 
 // --- Initialization ---
-console.log("[Recordio] Content script loaded. Checking recording state...");
 
 chrome.runtime.sendMessage({
     type: MSG_TYPES.GET_RECORDING_STATE,
@@ -79,12 +77,10 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
             break;
 
         case MSG_TYPES.START_RECORDING_EVENTS:
-            console.log("[Content] Starting recording events...");
             handleStartRecording(message);
             break;
 
         case MSG_TYPES.STOP_RECORDING_EVENTS:
-            console.log("[Content] Stopping recording events...");
             handleStopRecording();
             break;
 
@@ -111,7 +107,6 @@ function handleCountdown(message: BaseMessage) {
     isPreparing = true;
     currentSessionId = message.payload?.sessionId;
     blurManager.disable(); // Ensure tool UI is gone before recording
-    console.log("[Content] Preparing recording (Countdown)", currentSessionId);
     startCountdown().then((result) => {
         isPreparing = false;
 
@@ -141,10 +136,7 @@ function handleCountdown(message: BaseMessage) {
 }
 
 function handleStateResponse(response: any) {
-    console.log(`[Content] Init State: Recording=${response.isRecording}`);
-
     if (response.isRecording) {
-        console.log("[Content] Auto-resuming recording...");
         startRecording(response.startTime || 0);
     }
 }
@@ -156,7 +148,6 @@ function handleStartRecording(message: any) {
 }
 
 function startRecording(startTime: number) {
-    console.log("[Content] Starting Recorder...");
     if (eventRecorder) {
         eventRecorder.stop();
     }
@@ -164,7 +155,6 @@ function startRecording(startTime: number) {
 }
 
 function handleStopRecording() {
-    console.log("[Content] Stopping Recording...");
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;

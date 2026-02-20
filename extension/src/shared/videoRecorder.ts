@@ -86,7 +86,6 @@ export class VideoRecorder {
             throw new Error(`Cannot prepare recording: Recorder is in ${this.state} state.`);
         }
 
-        console.log(`[VideoRecorder] Preparing session ${this.currentSessionId} in ${this.mode} mode.`, config);
 
         this.state = 'preparing';
         this.config = config; // Update config with potentially newer one
@@ -108,7 +107,7 @@ export class VideoRecorder {
                 // Ensure we stop the cloned tracks after detection
                 detectionStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
 
-                console.log("[VideoRecorder] Detection isControllerWindow:", this.detectionResult?.isControllerWindow);
+
 
                 // Store trackable content rect for later use (events + screenSource metadata)
                 if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
@@ -122,7 +121,7 @@ export class VideoRecorder {
             }
         }
 
-        console.log(`[VideoRecorder] Streams initialized (warmup complete).`);
+
 
         // Set up audio analyser to detect actual audio content
         this.setupAudioAnalyser();
@@ -143,7 +142,7 @@ export class VideoRecorder {
             this.config.sourceName = tabTitle;
         }
 
-        console.log(`[VideoRecorder] Starting session ${this.currentSessionId} in ${this.mode} mode.`, this.config);
+
 
 
         if (!this.screenRecorder) {
@@ -159,7 +158,7 @@ export class VideoRecorder {
         this.state = 'recording';
         this.startAudioDetection();
 
-        console.log(`[VideoRecorder] Recording started.`);
+
 
         // Window detection is now done in prepare()
 
@@ -177,7 +176,6 @@ export class VideoRecorder {
             return { durationMs: 0 };
         }
 
-        console.log(`[VideoRecorder] Finishing session ${sessionId}.`);
         this.state = 'stopping';
 
         // Stop Recorders
@@ -222,7 +220,7 @@ export class VideoRecorder {
         await Promise.all(stopPromises);
         this.stopAudioDetection();
 
-        console.log(`[VideoRecorder] Stopped recorders. Display Surface: ${displaySurface}, Detected audio: ${this.detectedScreenAudio}`);
+
 
         // Save Data
         // Use currentSessionId if not provided (should match due to validateSession)
@@ -268,7 +266,6 @@ export class VideoRecorder {
      */
     public async cancel(sessionId: string): Promise<void> {
         this.validateSession(sessionId);
-        console.log(`[VideoRecorder] Cancelling session ${sessionId}.`);
 
         this.releaseStreams();
     }
@@ -318,7 +315,7 @@ export class VideoRecorder {
 
         // 5. Mix Audio & Setup Recorders
         const mimeType = VideoRecorder.getSupportedMimeType();
-        console.log(`[VideoRecorder] Selected MimeType: ${mimeType}`);
+
 
         if (cameraStream) {
             // --- DUAL MODE ---
@@ -373,7 +370,6 @@ export class VideoRecorder {
     }
 
     private async getScreenStream(config: RecordingConfig): Promise<MediaStream> {
-        console.log("getScreenStream: ", this.mode);
         if (this.mode === 'tab') {
             const streamId = config.streamId;
             if (!streamId) throw new Error("Stream ID is required for tab recording mode.");
@@ -428,7 +424,6 @@ export class VideoRecorder {
 
         // 1. Save Screen Recording Blob
         const screenMimeType = this.screenRecorder?.mimeType || 'video/webm';
-        console.log(`[VideoRecorder] Saving Screen Blob with MimeType: ${screenMimeType}`);
         const screenBlob = new Blob(this.screenData, { type: screenMimeType });
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
@@ -461,7 +456,6 @@ export class VideoRecorder {
         let cameraSource: CameraMetadata | undefined;
         if (this.cameraData.length > 0) {
             const camMimeType = this.cameraRecorder?.mimeType || 'video/webm';
-            console.log(`[VideoRecorder] Saving Camera Blob with MimeType: ${camMimeType}`);
             const camBlob = new Blob(this.cameraData, { type: camMimeType });
             const camBlobId = `rec-${projectId}-camera`;
             await ProjectStorage.saveRecordingBlob(camBlobId, camBlob);
@@ -505,7 +499,7 @@ export class VideoRecorder {
         };
         await ProjectStorage.saveRawRecording(rawRecording);
 
-        console.log(`[VideoRecorder] RawRecording ${projectId} saved successfully.`);
+
     }
 
 

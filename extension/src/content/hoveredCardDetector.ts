@@ -63,8 +63,6 @@ export class HoveredCardDetector {
         document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
         window.addEventListener('scroll', this.handleScroll, { capture: true });
         window.addEventListener('resize', this.detectCardAtMousePosition);
-
-        console.log('[HoveredCardDetector] Started listening');
     }
 
     /**
@@ -84,7 +82,6 @@ export class HoveredCardDetector {
         }
 
         this.flush();
-        console.log('[HoveredCardDetector] Stopped listening');
     }
 
     /**
@@ -158,7 +155,6 @@ export class HoveredCardDetector {
                 Math.abs(currentRect.top - this.currentCardRect.top) > threshold;
 
             if (positionChanged) {
-                console.log('[HoveredCard] Card viewport position changed on scroll, flushing');
                 this.detectCardAtMousePosition();
             }
             // Otherwise, card is still in same position - do nothing
@@ -205,7 +201,6 @@ export class HoveredCardDetector {
 
         // Start observing for overlays
         this.startSessionObservers();
-        console.log('[HoveredCard] Detected:', result.element);
 
         // Update visual highlight
         this.updateHighlight(result);
@@ -228,7 +223,6 @@ export class HoveredCardDetector {
         let current: Element | null = elementAtPoint;
         while (current && current !== document.body && current !== document.documentElement) {
             if (current.tagName === 'IFRAME') {
-                console.log('[HoveredCard] Found iframe:', current);
                 const iframe = current as HTMLIFrameElement;
                 const iframeResult: ElementGroupResult = {
                     element: iframe,
@@ -251,7 +245,6 @@ export class HoveredCardDetector {
 
         // Emit event if session was stable for 2+ seconds
         if (this.currentCard && this.sessionStartTime && this.currentCardRect) {
-            console.log('[HoveredCard] Flushing session');
 
             const duration = Date.now() - this.sessionStartTime;
             if (duration >= MIN_SESSION_DURATION_MS) {
@@ -268,7 +261,6 @@ export class HoveredCardDetector {
                     cornerRadius: dprScaleRadius(this.currentCard.effectiveRadius),
                 };
 
-                console.log('[HoveredCard] Session ended:', event);
                 this.onEvent(event);
             }
         }
@@ -300,7 +292,6 @@ export class HoveredCardDetector {
                         // Check the added node and all its descendants
                         const culprit = this.findExtendingElement(node);
                         if (culprit) {
-                            console.log('[HoveredCard] Overlay extends outside card, flushing session. Culprit:', culprit);
                             this.detectCardAtMousePosition();
                             return;
                         }
@@ -328,7 +319,6 @@ export class HoveredCardDetector {
                 Math.abs(currentRect.top - initialRect.top) > threshold;
 
             if (sizeChanged || positionChanged) {
-                console.log('[HoveredCard] Card size/position changed, flushing session');
                 this.detectCardAtMousePosition();
             }
         });
