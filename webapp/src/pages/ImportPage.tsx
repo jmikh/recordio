@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
+import { trackProjectCreated } from '../core/analytics';
+import { useUserStore } from '../editor/stores/useUserStore';
 import { LogoLink } from '@shared/components';
 
 type ImportStatus =
@@ -87,6 +89,46 @@ export function ImportPage() {
                     setProjectId(project.id);
                     setStatus('success');
                     confirmHandoff(project.id);
+
+                    // --- Analytics: project_created ---
+                    try {
+                        const recording = state.recording!;
+                        const events = recording.userEvents;
+                        const { userId } = useUserStore.getState();
+
+                        // Strip first URL to domain only (privacy)
+                        let firstUrl: string | null = null;
+                        if (events.urlChanges.length > 0) {
+                            try {
+                                firstUrl = new URL(events.urlChanges[0].url).hostname;
+                            } catch { /* malformed URL – skip */ }
+                        }
+
+                        const userEventCount =
+                            events.mouseClicks.length +
+                            events.keyboardEvents.length +
+                            events.typingEvents.length +
+                            events.drags.length +
+                            events.hoveredCards.length;
+
+                        trackProjectCreated({
+                            duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
+                            microphone_on: recording.screenSource.hasMicrophone || !!recording.cameraSource?.hasMicrophone,
+                            webcam_on: !!state.cameraVideo,
+                            has_system_audio: recording.screenSource.hasAudio,
+                            first_url: firstUrl,
+                            recording_type: recording.screenSource.recordingType,
+                            user_id: userId,
+                            user_event_count: userEventCount,
+                            has_click_events: events.mouseClicks.length > 0,
+                            has_keyboard_events: events.keyboardEvents.length > 0,
+                            has_typing_events: events.typingEvents.length > 0,
+                            has_drag_events: events.drags.length > 0,
+                            has_hovered_cards: events.hoveredCards.length > 0,
+                            auto_zoom_count: project.timeline.zoomSegments.length,
+                            auto_spotlight_count: project.timeline.spotlightSegments.length,
+                        });
+                    } catch { /* analytics should never break the app */ }
 
                     setTimeout(() => {
                         window.location.href = `/editor?projectId=${project.id}`;
