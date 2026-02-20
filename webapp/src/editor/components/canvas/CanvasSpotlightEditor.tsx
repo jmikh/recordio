@@ -285,6 +285,18 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         );
     }, [zoomBoundsRect, scaledOutputRect, currentOutputRect]);
 
+    // Check if the enlarged spotlight exceeds the full output area
+    // (relevant when there's no zoom, so no zoom bounds rect is shown)
+    const exceedsOutputArea = useMemo(() => {
+        if (!scaledOutputRect) return false;
+        return (
+            scaledOutputRect.x < -1 ||
+            scaledOutputRect.y < -1 ||
+            scaledOutputRect.x + scaledOutputRect.width > outputSize.width + 1 ||
+            scaledOutputRect.y + scaledOutputRect.height > outputSize.height + 1
+        );
+    }, [scaledOutputRect, outputSize]);
+
     // If zoom bounds are smaller than 1.2× the minimum spotlight size,
     // they're too tight to be useful — show a warning banner instead.
     const minSpotlightSize = Math.min(outputSize.width, outputSize.height) / 5;
@@ -397,6 +409,30 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                     }}
                 >
                     ⚠ Spotlight exceeds zoom area
+                </div>
+            )}
+
+            {/* Output-area overflow warning (when no zoom bounds) */}
+            {!zoomBoundsRect && exceedsOutputArea && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: 8,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        background: 'var(--surface-overlay)',
+                        border: '1px solid var(--destructive)',
+                        color: 'var(--destructive)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                    }}
+                >
+                    ⚠ Spotlight will exceed video boundaries when enlarged
                 </div>
             )}
 
