@@ -23,10 +23,23 @@ export const AudioVisualizerWrapper: React.FC<AudioVisualizerWrapperProps> = ({ 
         const source = audioContext.createMediaStreamSource(stream);
 
         source.connect(analyser);
-        analyser.fftSize = 512; // higher number more bins
+        analyser.fftSize = 256;
 
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
+
+        // Cache colors outside the draw loop
+        const styles = getComputedStyle(document.documentElement);
+        const activeColor = styles.getPropertyValue('--primary').trim() || 'oklch(0.58 0.19 265)';
+        const inactiveColor = styles.getPropertyValue('--color-surface-raised').trim() || 'oklch(0.21 0.014 270)';
+
+        const totalSegments = 16;
+        const gap = 2;
+        let smoothedLevel = 0;
+
+        // Sensitivity tuning
+        const noiseGate = 0.04;  // Below this RMS, treat as silence
+        const boost = 2.5;       // Amplify so it reaches full at loud speech
 
         const draw = () => {
             if (!stream.active) return;
@@ -34,25 +47,44 @@ export const AudioVisualizerWrapper: React.FC<AudioVisualizerWrapperProps> = ({ 
             animationRef.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
 
+            // Compute RMS level across all frequency bins
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const normalized = dataArray[i] / 255;
+                sum += normalized * normalized;
+            }
+            let rms = Math.sqrt(sum / bufferLength);
+
+            // Apply noise gate and boost
+            rms = rms < noiseGate ? 0 : Math.min(1, (rms - noiseGate) * boost);
+
+            // Smooth the level for less jittery animation
+            smoothedLevel += (rms - smoothedLevel) * 0.3;
+
             const width = canvas.width;
             const height = canvas.height;
             ctx.clearRect(0, 0, width, height);
 
-            const barWidth = (width / bufferLength) * 2.5;
-            let barHeight;
-            let x = 0;
+            const segmentWidth = (width - gap * (totalSegments - 1)) / totalSegments;
+            const radius = 2;
+            const litCount = Math.round(smoothedLevel * totalSegments);
 
-            for (let i = 0; i < bufferLength; i++) {
-                barHeight = (dataArray[i] / 255) * height; // Normalize to canvas height
+            for (let i = 0; i < totalSegments; i++) {
+                const x = i * (segmentWidth + gap);
 
-                // Use primary color from design system
-                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
-                ctx.fillStyle = primaryColor || 'oklch(0.58 0.19 265)'; // Fallback to primary
-
-                // Simple rect for now, could be improved
-                ctx.fillRect(x, height - barHeight, barWidth, barHeight);
-
-                x += barWidth + 2;
+                if (i < litCount) {
+                    // Active segment: filled
+                    ctx.fillStyle = activeColor;
+                    ctx.beginPath();
+                    ctx.roundRect(x, 0, segmentWidth, height, radius);
+                    ctx.fill();
+                } else {
+                    // Inactive segment: filled with surface-raised
+                    ctx.fillStyle = inactiveColor;
+                    ctx.beginPath();
+                    ctx.roundRect(x, 0, segmentWidth, height, radius);
+                    ctx.fill();
+                }
             }
         };
 
@@ -67,12 +99,12 @@ export const AudioVisualizerWrapper: React.FC<AudioVisualizerWrapperProps> = ({ 
     if (!stream) return null;
 
     return (
-        <div className="w-full h-10 flex items-center justify-center bg-surface-overlay rounded-sm overflow-hidden border border-border">
+        <div className="w-full mt-2">
             <canvas
                 ref={canvasRef}
-                width={200}
-                height={30}
-                className="w-full h-full"
+                width={300}
+                height={16}
+                className="w-full h-4"
             />
         </div>
     );

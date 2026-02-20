@@ -1,5 +1,6 @@
 
-import { MdMic, MdMicOff, MdVideocam, MdVideocamOff } from 'react-icons/md';
+import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
+import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
 
 interface RecordingStatusProps {
     recordingDuration: number;
@@ -19,14 +20,14 @@ export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, ha
                     ? 'border-primary text-primary'
                     : 'border-disabled text-disabled'
                     }`}>
-                    {hasAudio ? <MdMic size={13} /> : <MdMicOff size={13} />}
+                    {hasAudio ? <BiMicrophone size={13} /> : <BiMicrophoneOff size={13} />}
                     Mic {hasAudio ? 'On' : 'Off'}
                 </div>
                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${hasCamera
                     ? 'border-primary text-primary'
                     : 'border-disabled text-disabled'
                     }`}>
-                    {hasCamera ? <MdVideocam size={13} /> : <MdVideocamOff size={13} />}
+                    {hasCamera ? <PiWebcamBold size={13} /> : <PiWebcamSlashBold size={13} />}
                     Camera {hasCamera ? 'On' : 'Off'}
                 </div>
             </div>

@@ -2,7 +2,8 @@ import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
 import { MultiToggle, Toggle, Dropdown, Notice } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
-import { MdMic, MdVideocam } from 'react-icons/md';
+import { BiMicrophone } from 'react-icons/bi';
+import { PiWebcamBold } from 'react-icons/pi';
 
 interface RecordingConfigProps {
     recordingMode: 'tab' | 'window' | 'screen';
@@ -81,7 +82,7 @@ export function RecordingConfig({
             <div className="w-full">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-text-main flex items-center gap-2">
-                        <MdMic size={16} />
+                        <BiMicrophone size={16} />
                         Microphone
                     </span>
                     <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
@@ -105,7 +106,7 @@ export function RecordingConfig({
             <div className="w-full">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-text-main flex items-center gap-2">
-                        <MdVideocam size={16} />
+                        <PiWebcamBold size={16} />
                         Camera
                     </span>
                     <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
@@ -134,7 +135,7 @@ export function RecordingConfig({
             <button
                 onClick={startRecording}
                 disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
-                className="interactive-primary flex items-center justify-center gap-2 mt-4 w-full"
+                className="interactive-primary flex items-center justify-center gap-2 mt-2 w-full"
             >
                 Start Recording
             </button>
