@@ -56,7 +56,6 @@ let eventRecorder: EventRecorder | null = null;
 let isPreparing = false;
 let currentSessionId = '';
 const blurManager = new BlurManager();
-let cursorHideStyle: HTMLStyleElement | null = null;
 
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
@@ -162,15 +161,6 @@ function startRecording(startTime: number) {
         eventRecorder.stop();
     }
     eventRecorder = new EventRecorder(startTime);
-
-    // Hide native cursor during recording (CSS-based, since Chrome
-    // doesn't support the cursor MediaTrackConstraint)
-    if (!cursorHideStyle) {
-        cursorHideStyle = document.createElement('style');
-        cursorHideStyle.id = 'recordio-cursor-hide';
-        cursorHideStyle.textContent = '*, *::before, *::after { cursor: none !important; }';
-        document.head.appendChild(cursorHideStyle);
-    }
 }
 
 function handleStopRecording() {
@@ -178,12 +168,6 @@ function handleStopRecording() {
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;
-    }
-
-    // Restore cursor
-    if (cursorHideStyle) {
-        cursorHideStyle.remove();
-        cursorHideStyle = null;
     }
 }
 
