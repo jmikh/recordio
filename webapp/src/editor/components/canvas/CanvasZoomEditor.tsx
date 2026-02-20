@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 
 import { BoundingBox } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
@@ -140,7 +140,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
 
     const onCancel = () => {
         // Just deselect. No "Cancel" of changes because they are applied live now via batcher.
-        useUIStore.getState().setCanvasMode(CanvasMode.Preview);
+        useUIStore.getState().selectZoom(null);
     };
 
     const onDelete = () => {

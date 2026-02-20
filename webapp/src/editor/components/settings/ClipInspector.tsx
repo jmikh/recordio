@@ -4,7 +4,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, GhostButton, Tooltip, CollapsibleCard } from '@shared/components';
 import type { OutputWindow } from '../../../types';
 import { MdDelete } from 'react-icons/md';
-import { PiVideo } from 'react-icons/pi';
+import { PiVideoBold } from 'react-icons/pi';
 
 export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
@@ -33,7 +33,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     }, [win.id, isLastWindow, removeOutputWindow]);
 
     return (
-        <CollapsibleCard title="Clip" icon={<PiVideo size={16} />} notCollapsible>
+        <CollapsibleCard title="Clip" icon={<PiVideoBold size={16} />} notCollapsible>
             <div className="flex flex-col gap-5">
                 {/* Duration (read-only) */}
                 <div className="flex items-center justify-between">

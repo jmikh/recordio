@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, GhostButton, CollapsibleCard, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
@@ -20,7 +20,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
     const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const selectSpotlight = useUIStore(s => s.selectSpotlight);
     const { batchAction } = useHistoryBatcher();
 
     const allSpotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
@@ -28,8 +28,8 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
 
     const handleDelete = useCallback(() => {
         deleteSpotlight(segment.id);
-        setCanvasMode(CanvasMode.Preview);
-    }, [segment.id, deleteSpotlight, setCanvasMode]);
+        selectSpotlight(null);
+    }, [segment.id, deleteSpotlight, selectSpotlight]);
 
     const handleDimOpacityChange = useCallback((val: number) => {
         batchAction(() => updateSpotlight(segment.id, { dimOpacity: val }));

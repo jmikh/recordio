@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
 import type { ID, TimeMs, Size } from '../../types';
+import { useProjectStore } from './useProjectStore';
 
 export interface TrackVisibility {
     recording: boolean;
@@ -51,6 +52,7 @@ export interface UIState {
     selectZoom: (id: ID | null) => void;
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
+    deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
     // Settings Panel Active Tab (lifted from SettingsPanel local state)
@@ -121,6 +123,22 @@ export interface UIState {
     reset: () => void;
 }
 
+/**
+ * If the currently selected caption has empty text, delete it from the project.
+ * Must be called BEFORE set() so the side-effect runs outside zustand's batch.
+ */
+function _cleanupEmptyCaption(get: () => UIState) {
+    const prevId = get().selectedCaptionId;
+    if (!prevId) return;
+    const projectState = useProjectStore.getState();
+    const segments = projectState.project?.timeline?.captionSegments;
+    const prev = segments?.find((s: { id: string }) => s.id === prevId);
+    console.log('[_cleanupEmptyCaption] prevId:', prevId, 'found:', !!prev, 'text:', JSON.stringify(prev?.text), 'empty:', !prev?.text?.trim());
+    if (prev && !prev.text?.trim()) {
+        projectState.deleteCaptionSegment(prevId);
+    }
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
     // Initial State
     canvasMode: CanvasMode.Preview,
@@ -132,78 +150,95 @@ export const useUIStore = create<UIState>((set, get) => ({
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
 
-    // Actions
+    setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
+
+    // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
         ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null } : { isPlaying: false })
     }),
-    setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
 
-    selectWindow: (selectedWindowId) => set({
-        selectedWindowId,
-        canvasMode: CanvasMode.Preview,
-        selectedZoomId: null,
-        selectedSpotlightId: null,
-        selectedCaptionId: null,
-    }),
+    selectWindow: (selectedWindowId) => {
+        if (selectedWindowId) {
+            get().selectZoom(null);
+            get().selectSpotlight(null);
+            get().selectCaption(null);
+        }
+        set({
+            selectedWindowId,
+            canvasMode: CanvasMode.Preview,
+        });
+    },
 
-    selectZoom: (selectedZoomId) => set((state) => {
+    selectZoom: (selectedZoomId) => {
         if (selectedZoomId) {
-            return {
-                selectedZoomId,
-                selectedSpotlightId: null,
-                selectedWindowId: null,
-                selectedCaptionId: null,
-                canvasMode: CanvasMode.ZoomEdit,
-                settingsPanelActiveTab: 'effects' as SettingsPanelTab,
-                isPlaying: false,
-            };
+            get().selectSpotlight(null);
+            get().selectCaption(null);
+            get().selectWindow(null);
         }
-        if (state.canvasMode === CanvasMode.ZoomEdit) {
-            return {
-                selectedZoomId: null,
-                canvasMode: CanvasMode.Preview,
-            };
-        }
-        return { selectedZoomId: null };
-    }),
+        set((state) => {
+            if (selectedZoomId) {
+                return {
+                    selectedZoomId,
+                    canvasMode: CanvasMode.ZoomEdit,
+                    isPlaying: false,
+                };
+            }
+            return { selectedZoomId: null, canvasMode: CanvasMode.Preview, };
+        });
+    },
 
-    selectSpotlight: (selectedSpotlightId) => set((state) => {
+    selectSpotlight: (selectedSpotlightId) => {
         if (selectedSpotlightId) {
-            return {
-                selectedSpotlightId,
-                selectedZoomId: null,
-                selectedWindowId: null,
-                selectedCaptionId: null,
-                canvasMode: CanvasMode.SpotlightEdit,
-                settingsPanelActiveTab: 'effects' as SettingsPanelTab,
-                isPlaying: false,
-            };
+            get().selectZoom(null);
+            get().selectCaption(null);
+            get().selectWindow(null);
         }
-        if (state.canvasMode === CanvasMode.SpotlightEdit) {
-            return {
-                selectedSpotlightId: null,
-                canvasMode: CanvasMode.Preview,
-            };
-        }
-        return { selectedSpotlightId: null };
-    }),
+        set((state) => {
+            if (selectedSpotlightId) {
+                return {
+                    selectedSpotlightId,
+                    canvasMode: CanvasMode.SpotlightEdit,
+                    isPlaying: false,
+                };
+            }
+            return { selectedSpotlightId: null, canvasMode: CanvasMode.Preview };
+        });
+    },
 
-    selectCaption: (selectedCaptionId) => set((state) => {
-        if (selectedCaptionId) {
-            return {
-                selectedCaptionId,
-                selectedZoomId: null,
-                selectedSpotlightId: null,
-                selectedWindowId: null,
-                selectedSettingsPanel: SettingsPanel.Project,
-                settingsPanelActiveTab: 'captions' as SettingsPanelTab,
-                showCollapsibleCaptionPosition: true,
-                trackVisibility: { ...state.trackVisibility, captions: true },
-            };
+    selectCaption: (selectedCaptionId) => {
+        console.log('[selectCaption] called with:', selectedCaptionId, 'current:', get().selectedCaptionId);
+        // Cleanup empty caption before changing selection
+        if (!selectedCaptionId || selectedCaptionId !== get().selectedCaptionId) {
+            _cleanupEmptyCaption(get);
         }
-        return { selectedCaptionId: null };
-    }),
+        if (selectedCaptionId) {
+            get().selectZoom(null);
+            get().selectSpotlight(null);
+            get().selectWindow(null);
+        }
+        set((state) => {
+            if (selectedCaptionId) {
+                return {
+                    selectedCaptionId,
+                    selectedSettingsPanel: SettingsPanel.Project,
+                    settingsPanelActiveTab: 'captions' as SettingsPanelTab,
+                    showCollapsibleCaptionPosition: true,
+                    trackVisibility: { ...state.trackVisibility, captions: true },
+                };
+            }
+            console.log('[selectCaption] setting to null');
+            return { selectedCaptionId: null };
+        });
+    },
+
+    deselectAllSegments: () => {
+        get().selectZoom(null);
+        get().selectSpotlight(null);
+        get().selectWindow(null);
+        get().selectCaption(null);
+        set({ canvasMode: CanvasMode.Preview });
+    },
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
     setSettingsPanelActiveTab: (settingsPanelActiveTab) => set({ settingsPanelActiveTab }),
@@ -288,39 +323,42 @@ export const useUIStore = create<UIState>((set, get) => ({
         trackVisibility: { ...state.trackVisibility, [track]: visible }
     })),
 
-    reset: () => set({
-        canvasMode: CanvasMode.Preview,
-        selectedZoomId: null,
-        selectedSpotlightId: null,
-        selectedWindowId: null,
-        selectedCaptionId: null,
-        selectedSettingsPanel: SettingsPanel.Project,
-        settingsPanelActiveTab: 'screen' as SettingsPanelTab,
-        timelineContainerRef: null,
-        pixelsPerSec: 100,
-        isPlaying: false,
-        currentTimeMs: 0,
-        previewTimeMs: null,
-        // fps: 0,
-        // frameTime: 0,
-        isResizingWindow: false,
-        showDebugBar: false,
-        showDebugOverlays: false,
-        // Collapsible Card Visibility
-        showCollapsibleEffects: false,
-        showCollapsibleMouse: false,
-        showCollapsibleBackground: true,
-        showCollapsibleSize: false,
-        showCollapsibleToolbar: false,
-        showCollapsibleFrame: false,
-        showCollapsibleCameraShape: true,
-        showCollapsibleShape: true,
-        showCollapsibleBorder: false,
-        showCollapsibleCaptionAI: true,
-        showCollapsibleCaptionStyle: true,
-        showCollapsibleCaptionPosition: false,
-        showCollapsibleAudioToggles: true,
-        showCollapsibleMusic: true,
-        trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
-    })
+    reset: () => {
+        get().selectCaption(null);
+        set({
+            canvasMode: CanvasMode.Preview,
+            selectedZoomId: null,
+            selectedSpotlightId: null,
+            selectedWindowId: null,
+            selectedCaptionId: null,
+            selectedSettingsPanel: SettingsPanel.Project,
+            settingsPanelActiveTab: 'screen' as SettingsPanelTab,
+            timelineContainerRef: null,
+            pixelsPerSec: 100,
+            isPlaying: false,
+            currentTimeMs: 0,
+            previewTimeMs: null,
+            // fps: 0,
+            // frameTime: 0,
+            isResizingWindow: false,
+            showDebugBar: false,
+            showDebugOverlays: false,
+            // Collapsible Card Visibility
+            showCollapsibleEffects: false,
+            showCollapsibleMouse: false,
+            showCollapsibleBackground: true,
+            showCollapsibleSize: false,
+            showCollapsibleToolbar: false,
+            showCollapsibleFrame: false,
+            showCollapsibleCameraShape: true,
+            showCollapsibleShape: true,
+            showCollapsibleBorder: false,
+            showCollapsibleCaptionAI: true,
+            showCollapsibleCaptionStyle: true,
+            showCollapsibleCaptionPosition: false,
+            showCollapsibleAudioToggles: true,
+            showCollapsibleMusic: true,
+            trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
+        });
+    }
 }));

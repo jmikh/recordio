@@ -10,7 +10,7 @@ import { AudioSettingsPanel } from './AudioSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
@@ -69,25 +69,12 @@ export const SettingsPanel = () => {
     const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
 
     const project = useProjectStore(s => s.project);
-    const canvasMode = useUIStore(s => s.canvasMode);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
     const hasCameraSource = !!project.cameraSource;
     const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
 
-    // Exit camera edit mode when switching away from camera tab
-    const selectZoom = useUIStore(s => s.selectZoom);
-    const selectSpotlight = useUIStore(s => s.selectSpotlight);
-    const selectWindow = useUIStore(s => s.selectWindow);
-
     const handleTabChange = (tab: SettingsPanelTab) => {
-        // Clear any timeline selection first
-        if (selectedZoomId) selectZoom(null);
-        if (selectedSpotlightId) selectSpotlight(null);
-        if (selectedWindowId) selectWindow(null);
-
-        if (canvasMode === CanvasMode.CameraEdit && tab !== 'camera') {
-            setCanvasMode(CanvasMode.Preview);
-        }
+        deselectAllSegments();
         setActiveTab(tab);
     };
 

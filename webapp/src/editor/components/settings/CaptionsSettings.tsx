@@ -405,7 +405,6 @@ export function CaptionsSettings() {
                                             onClick={() => {
                                                 selectCaption(null);
                                                 setEditingId(null);
-                                                setCanvasMode(CanvasMode.Preview);
                                                 endInteraction();
                                                 restoreCaptionsFromBaseline();
                                             }}

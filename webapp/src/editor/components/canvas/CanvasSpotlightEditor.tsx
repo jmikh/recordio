@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { Rect } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
@@ -163,7 +163,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     };
 
     const onCancel = () => {
-        useUIStore.getState().setCanvasMode(CanvasMode.Preview);
+        useUIStore.getState().selectSpotlight(null);
     };
 
     const onDelete = () => {

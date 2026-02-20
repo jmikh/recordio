@@ -19,7 +19,7 @@ import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { TrackVisibilityDropdown } from './TrackVisibilityDropdown';
 
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 
 
 // Constants - Unified track height for visual consistency
@@ -163,7 +163,7 @@ export function Timeline() {
     const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
     const selectCaption = useUIStore(s => s.selectCaption);
     const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -191,15 +191,13 @@ export function Timeline() {
                     (active as HTMLElement).blur();
                 }
 
-                if (selectedWindowId) selectWindow(null);
-                if (selectedCaptionId) selectCaption(null);
-                setCanvasMode(CanvasMode.Preview);
+                deselectAllSegments();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, setCanvasMode]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {

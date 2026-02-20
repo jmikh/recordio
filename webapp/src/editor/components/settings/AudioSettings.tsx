@@ -362,7 +362,7 @@ export const AudioSettingsPanel = () => {
                 <div className="flex flex-col gap-4 text-sm select-none">
                     {/* Enable toggle */}
                     <Toggle
-                        label="Enable Music"
+                        label="Enabled"
                         value={music?.enabled ?? false}
                         onChange={(v) => {
                             if (v && !music?.presetUrl && !music?.customRuntimeUrl) {

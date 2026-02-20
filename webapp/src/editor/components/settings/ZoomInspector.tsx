@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, GhostButton, CollapsibleCard, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
@@ -20,7 +20,7 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
+    const selectZoom = useUIStore(s => s.selectZoom);
     const { batchAction } = useHistoryBatcher();
 
     const allZoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
@@ -28,8 +28,8 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
 
     const handleDelete = useCallback(() => {
         deleteZoomSegment(segment.id);
-        setCanvasMode(CanvasMode.Preview);
-    }, [segment.id, deleteZoomSegment, setCanvasMode]);
+        selectZoom(null);
+    }, [segment.id, deleteZoomSegment, selectZoom]);
 
     const handleTransitionChange = useCallback((val: number) => {
         batchAction(() => updateZoomSegment(segment.id, { transitionDurationMs: Math.round(val) }));
