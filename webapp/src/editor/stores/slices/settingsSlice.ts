@@ -3,8 +3,6 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ProjectSettings } from '../../../types';
 import { isSubset } from '../../utils/subsetMatcher';
-import { calculateAutoZooms, ViewMapper } from '../../../core/zoom';
-import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 type DeepPartial<T> = {
     [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
@@ -79,48 +77,17 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                 updatedAt: new Date()
             };
 
-            // Recalculate Zooms if necessary conditions met
-            // 1. Zoom settings changed
-            // 2. Padding changed
-            let nextActions = state.project.timeline.zoomSegments;
-
-            // Check padding inside the now-merged settings or from updates
-            // Using merged settings is safer
-            const paddingChanged = nextSettings.screen.padding !== currentSettings.screen.padding;
-
-            // Check for any zoom related changes
-            const zoomUpdates = updates.zoom || {};
-            const zoomChanged = zoomUpdates.maxZoom !== undefined || zoomUpdates.isAuto !== undefined;
-            // Check for output size changes
+            // Clear zoom segments when output size changes (rects are invalid)
             const sizeChanged = nextSettings.outputSize.width !== currentSettings.outputSize.width ||
                 nextSettings.outputSize.height !== currentSettings.outputSize.height;
-
-            if (sizeChanged && !nextSettings.zoom.isAuto) {
-                // When output size changes with manual zooms, clear them since rects are invalid
-                nextActions = [];
-            } else if ((paddingChanged || zoomChanged || sizeChanged) && nextSettings.zoom.isAuto) {
-                const sourceSize = nextProject.screenSource.size;
-                if (sourceSize && sourceSize.width > 0) {
-                    const viewMapper = new ViewMapper(
-                        sourceSize, nextSettings.outputSize,
-                        nextSettings.screen.padding, nextSettings.screen.crop,
-                        nextProject.screenSource.trackableContentRect,
-                        nextSettings.screen.toolbar.enabled
-                    );
-                    const timeMapper = getTimeMapper(nextProject.timeline.outputWindows);
-                    nextActions = calculateAutoZooms(
-                        nextSettings.zoom, viewMapper, timeMapper, nextProject.timeline.focusAreas
-                    );
-                }
-            }
-            // Duration changes no longer require action - duration is derived dynamically
+            const nextZoomSegments = sizeChanged ? [] : state.project.timeline.zoomSegments;
 
             return {
                 project: {
                     ...nextProject,
                     timeline: {
                         ...nextProject.timeline,
-                        zoomSegments: nextActions
+                        zoomSegments: nextZoomSegments
                     }
                 }
             };

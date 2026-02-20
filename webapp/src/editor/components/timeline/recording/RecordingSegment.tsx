@@ -124,7 +124,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                     {width >= 40 && (
                         <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-none bg-black/40 rounded-lg">
                             {/* Speed indicator */}
-                            <span className="font-medium">
+                            <span className="font-medium opacity-80">
                                 {(() => {
                                     const speed = win.speed || 1.0;
                                     const formatted = speed.toFixed(2).replace(/\.?0+$/, '');

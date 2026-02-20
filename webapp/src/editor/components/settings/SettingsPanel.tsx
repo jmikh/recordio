@@ -7,6 +7,7 @@ import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
+import { ExportSettings } from './ExportSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -15,7 +16,7 @@ import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
-import { TbDeviceDesktop, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick } from 'react-icons/tb';
+import { TbDeviceDesktop, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
 
@@ -100,6 +101,11 @@ export const SettingsPanel = () => {
                 id: 'audio',
                 label: 'Audio',
                 icon: <TbMusic size={20} />,
+            },
+            {
+                id: 'export' as const,
+                label: 'Export',
+                icon: <TbDownload size={20} />,
             },
         ];
         return items;
@@ -209,6 +215,7 @@ export const SettingsPanel = () => {
                             {activeTab === 'effects' && <EffectsSettings />}
                             {activeTab === 'captions' && <CaptionsSettings />}
                             {activeTab === 'audio' && <AudioSettingsPanel />}
+                            {activeTab === 'export' && <ExportSettings />}
                         </>
                     )}
                 </div>

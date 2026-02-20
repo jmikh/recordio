@@ -36,13 +36,11 @@ const createDefaultSettings = (): ProjectSettings => ({
 
     zoom: {
         maxZoom: 2,
-        isAuto: true,
         transitionDurationMs: 750,
         easing: 'ease-in-out'
     },
 
     spotlight: {
-        isAuto: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
         transitionDurationMs: 300,
@@ -192,12 +190,6 @@ export class ProjectImpl {
         // Detect if user events were captured (Chrome tab/window vs desktop)
         const hasUserEvents = userEvents.mousePositions.length > 0;
 
-        // Disable auto effects if no user events
-        if (!hasUserEvents) {
-            settings.zoom.isAuto = false;
-            settings.spotlight.isAuto = false;
-        }
-
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
 
@@ -228,8 +220,8 @@ export class ProjectImpl {
             )
             : [];
 
-        // Calculate Spotlight Schedule (if auto-spotlights enabled and has events)
-        const spotlightSegments = (settings.spotlight.isAuto && hasUserEvents)
+        // Calculate Spotlight Schedule (if has events)
+        const spotlightSegments = hasUserEvents
             ? calculateAutoSpotlights(
                 viewMapper,
                 timeMapper,

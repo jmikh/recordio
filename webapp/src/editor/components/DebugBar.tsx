@@ -2,7 +2,7 @@ import { useProjectStore, useProjectData, useUserEvents } from '../stores/usePro
 import { useUIStore } from '../stores/useUIStore';
 import { getAllFocusAreas } from '../../core/zoom';
 import { getTimeMapper } from '../hooks/useTimeMapper';
-import { ProjectDebugExporter } from '../debug';
+
 import { useToast } from './Toast';
 
 export const DebugBar = () => {
@@ -12,13 +12,7 @@ export const DebugBar = () => {
     const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
     const { addToast, updateToast } = useToast();
 
-    const handleExportProject = async () => {
-        try {
-            await ProjectDebugExporter.exportProject(project);
-        } catch (error) {
-            console.error('[DebugBar] Export failed:', error);
-        }
-    };
+
 
     const logFocusAreas = () => {
         const screenSource = project.screenSource;
@@ -98,20 +92,7 @@ export const DebugBar = () => {
                 {showDebugOverlays ? '🔍 Overlays ON' : '🔍 Overlays OFF'}
             </button>
 
-            {/* Separator */}
-            <div className="w-px h-4 bg-gray-700 mx-2" />
 
-            {/* Export Project for Debugging */}
-            <button
-                className="px-2 py-0.5 bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 text-[10px] rounded cursor-pointer border border-cyan-800"
-                onClick={handleExportProject}
-                title="Export project as debug bundle (zip)"
-            >
-                📦 Export Project
-            </button>
-
-            {/* Separator */}
-            <div className="w-px h-4 bg-gray-700 mx-2" />
 
             {/* Toast Demo Buttons */}
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mr-1">Toasts</span>

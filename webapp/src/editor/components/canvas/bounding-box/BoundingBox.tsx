@@ -352,7 +352,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
                 <div
                     style={{
                         position: 'absolute',
-                        top: '-32px',
+                        top: '-24px',
                         left: '50%',
                         transform: 'translateX(-50%)',
                         zIndex: Z_INDEX_RADIUS_HANDLE,

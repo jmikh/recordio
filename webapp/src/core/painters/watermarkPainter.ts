@@ -1,11 +1,15 @@
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
 /**
- * Draws a watermark logo in the top-right corner of the canvas.
+ * Draws a watermark logo at the specified corner of the canvas.
  * Used for non-subscribed users during video export.
  */
 export function drawWatermark(
     ctx: CanvasRenderingContext2D,
     watermarkImg: HTMLImageElement,
-    canvasWidth: number
+    canvasWidth: number,
+    canvasHeight?: number,
+    position: WatermarkPosition = 'top-right'
 ): void {
     // Logo takes 15% of canvas width, maintaining aspect ratio
     const logoWidth = canvasWidth * 0.15;
@@ -18,9 +22,29 @@ export function drawWatermark(
     const bgPadding = 12 * scaleFactor;
     const borderRadius = 8 * scaleFactor;
 
-    // Position at top-right corner
-    const logoX = canvasWidth - logoWidth - padding;
-    const logoY = padding;
+    // Compute position based on corner
+    const h = canvasHeight ?? 0;
+    let logoX: number;
+    let logoY: number;
+
+    switch (position) {
+        case 'top-left':
+            logoX = padding;
+            logoY = padding;
+            break;
+        case 'top-right':
+            logoX = canvasWidth - logoWidth - padding;
+            logoY = padding;
+            break;
+        case 'bottom-left':
+            logoX = padding;
+            logoY = h - logoHeight - padding;
+            break;
+        case 'bottom-right':
+            logoX = canvasWidth - logoWidth - padding;
+            logoY = h - logoHeight - padding;
+            break;
+    }
 
     // Draw rounded black background with 80% opacity
     const bgX = logoX - bgPadding;

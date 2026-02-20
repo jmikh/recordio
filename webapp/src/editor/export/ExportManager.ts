@@ -3,6 +3,7 @@ import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../core/painters/watermarkPainter';
+import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
 import type { Project, SourceMetadata, ScreenMetadata } from '../../types';
@@ -22,7 +23,7 @@ export class ExportManager {
         project: Project,
         quality: ExportQuality,
         onProgress: (state: ExportProgress) => void,
-        options?: { useFreeCredit?: boolean }
+        options?: { useFreeCredit?: boolean; watermarkPosition?: WatermarkPosition }
     ): Promise<void> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -349,7 +350,7 @@ export class ExportManager {
 
                 // Draw watermark for non-pro users (last, on top of all layers; skipped in dev)
                 if (shouldShowWatermark && imageElements.watermark) {
-                    drawWatermark(ctx, imageElements.watermark, width);
+                    drawWatermark(ctx, imageElements.watermark, width, height, options?.watermarkPosition);
                 }
 
                 const durationMicros = 1000000 / fps;

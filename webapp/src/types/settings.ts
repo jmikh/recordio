@@ -113,7 +113,6 @@ export type BackgroundType = 'solid' | 'image';
 
 export interface ZoomSettings {
     maxZoom: number;
-    isAuto: boolean;
     /** Duration of zoom transition animations in milliseconds */
     transitionDurationMs: number;
     /** Easing curve applied to zoom transitions */
@@ -125,8 +124,6 @@ export interface ZoomSettings {
 // ==========================================
 
 export interface SpotlightSettings {
-    /** Whether to automatically generate spotlights from hovered cards. Default: true */
-    isAuto: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
     /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */

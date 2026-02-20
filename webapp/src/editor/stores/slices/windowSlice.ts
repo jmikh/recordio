@@ -1,8 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, Project } from '../../../types';
-import { calculateAutoZooms, ViewMapper } from '../../../core/zoom';
-import { calculateAutoSpotlights } from '../../../core/spotlight/autoSpotlight';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 
@@ -20,43 +18,12 @@ const getWindowDuration = (w: OutputWindow) => {
 
 const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project => {
     const timeMapper = getTimeMapper(nextWindows);
-    const sourceSize = project.screenSource.size;
-    const hasSourceSize = sourceSize && sourceSize.width > 0;
 
-    // Zoom
-    let nextZoomSegments;
-    if (project.settings.zoom.isAuto && hasSourceSize) {
-        const viewMapper = new ViewMapper(
-            sourceSize, project.settings.outputSize,
-            project.settings.screen.padding, project.settings.screen.crop,
-            project.screenSource.trackableContentRect,
-            project.settings.screen.toolbar.enabled
-        );
-        nextZoomSegments = calculateAutoZooms(
-            project.settings.zoom, viewMapper, timeMapper, project.timeline.focusAreas
-        );
-    } else {
-        nextZoomSegments = recomputeOutputTimes(project.timeline.zoomSegments, timeMapper);
-    }
+    // Zoom: recompute output times for existing segments
+    const nextZoomSegments = recomputeOutputTimes(project.timeline.zoomSegments, timeMapper);
 
-    // Spotlight
-    let nextSpotlightSegments;
-    if (project.settings.spotlight.isAuto && hasSourceSize) {
-        const viewMapper = new ViewMapper(
-            sourceSize, project.settings.outputSize,
-            project.settings.screen.padding, project.settings.screen.crop,
-            project.screenSource.trackableContentRect,
-            project.settings.screen.toolbar.enabled
-        );
-        nextSpotlightSegments = calculateAutoSpotlights(
-            viewMapper, timeMapper,
-            project.userEvents.hoveredCards || [],
-            nextZoomSegments, project.settings.zoom,
-            project.settings.spotlight
-        );
-    } else {
-        nextSpotlightSegments = recomputeOutputTimes(project.timeline.spotlightSegments, timeMapper);
-    }
+    // Spotlight: recompute output times for existing segments
+    const nextSpotlightSegments = recomputeOutputTimes(project.timeline.spotlightSegments, timeMapper);
 
     // Captions: always recompute output times
     const nextCaptionSegments = recomputeOutputTimes(project.timeline.captionSegments || [], timeMapper);

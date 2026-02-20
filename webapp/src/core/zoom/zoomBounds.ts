@@ -23,7 +23,8 @@ import { getIntersection } from '../geometry';
  * 3. Intersect all collected rects.
  * 
  * Returns null if there are no zooms in range (viewport = full output the
- * entire time) or if the intersection collapses to nothing.
+ * entire time). Returns a zero-size rect if the intersection collapses
+ * (zooms target incompatible areas) so the caller can show a warning.
  */
 export function getZoomBoundsForRange(
     zoomSegments: ZoomSegment[],
@@ -89,7 +90,12 @@ export function getZoomBoundsForRange(
     let bounds: Rect | null = rects[0];
     for (let i = 1; i < rects.length; i++) {
         bounds = getIntersection(bounds!, rects[i]);
-        if (!bounds) return null;
+        if (!bounds) {
+            // Intersection collapsed — zooms target incompatible areas.
+            // Return a zero-size rect so the caller can show a warning
+            // (rather than null, which means "no zoom effects at all").
+            return { x: 0, y: 0, width: 0, height: 0 };
+        }
     }
 
     // If the intersection equals the full viewport, no useful indication

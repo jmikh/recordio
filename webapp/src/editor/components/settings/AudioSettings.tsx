@@ -223,8 +223,11 @@ export const AudioSettingsPanel = () => {
     };
 
     // Build preview items for audio toggles card
+    const hasAudioSources = screenHasAudio || hasMicAnywhere;
     const audioTogglePreviewItems: PreviewItem[] = [];
-    if (showCombinedScreenMic && audio?.muteScreenAudio) {
+    if (!hasAudioSources) {
+        audioTogglePreviewItems.push({ type: 'text', content: 'Not detected' });
+    } else if (showCombinedScreenMic && audio?.muteScreenAudio) {
         audioTogglePreviewItems.push({ type: 'text', content: 'Muted' });
     } else {
         if ((showScreenAudioToggle || showCombinedScreenMic) && audio?.muteScreenAudio) {
@@ -234,7 +237,7 @@ export const AudioSettingsPanel = () => {
             audioTogglePreviewItems.push({ type: 'text', content: 'Mic muted' });
         }
     }
-    if (audioTogglePreviewItems.length === 0 && (screenHasAudio || hasMicAnywhere)) {
+    if (audioTogglePreviewItems.length === 0 && hasAudioSources) {
         audioTogglePreviewItems.push({ type: 'text', content: 'On' });
     }
 
@@ -255,14 +258,18 @@ export const AudioSettingsPanel = () => {
     return (
         <div className="flex flex-col gap-2">
             {/* Audio Source Toggles */}
-            {(screenHasAudio || hasMicAnywhere) && (
-                <CollapsibleCard
-                    title="Audio"
-                    icon={<TbVolume size={16} />}
-                    previewItems={audioTogglePreviewItems}
-                    isExpanded={showCollapsibleAudioToggles}
-                    onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
-                >
+            <CollapsibleCard
+                title="Audio"
+                icon={<TbVolume size={16} />}
+                previewItems={audioTogglePreviewItems}
+                isExpanded={showCollapsibleAudioToggles}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
+            >
+                {!hasAudioSources ? (
+                    <p className="text-xs text-text-muted">
+                        No microphone or system audio detected.
+                    </p>
+                ) : (
                     <div className="flex flex-col gap-3">
                         {/* Combined "Screen + Mic" toggle when both are on the screen source */}
                         {showCombinedScreenMic && (
@@ -348,8 +355,8 @@ export const AudioSettingsPanel = () => {
                             </>
                         )}
                     </div>
-                </CollapsibleCard>
-            )}
+                )}
+            </CollapsibleCard>
 
             {/* Background Music */}
             <CollapsibleCard

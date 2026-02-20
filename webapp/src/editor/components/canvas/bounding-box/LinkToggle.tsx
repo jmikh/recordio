@@ -18,14 +18,14 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                 e.stopPropagation();
                 onToggle(!linked);
             }}
-            className="flex items-center gap-1.5 px-2 py-1 rounded shadow-md border transition-colors bg-surface-overlay/90 border-border/50 hover:bg-surface-overlay"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded shadow-md border transition-colors bg-surface-overlay/90 border-border/50 hover:bg-surface-overlay"
             title={linked ? 'Unlink corners (edit independently)' : 'Link corners (edit together)'}
             style={{ pointerEvents: 'auto' }}
         >
             {/* Chain link icon */}
             <svg
-                width="14"
-                height="14"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -49,7 +49,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                     </>
                 )}
             </svg>
-            <span className={`text-xs ${linked ? 'text-text-default' : 'text-text-muted'}`}>
+            <span className={`text-[10px] ${linked ? 'text-text-default' : 'text-text-muted'}`}>
                 Corners
             </span>
         </button>

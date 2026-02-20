@@ -25,16 +25,9 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
             const stamped = recomputeOutputTimes(nextActions, timeMapper);
 
-            // FORCE AUTO ZOOM OFF if it was on
-            const nextSettings = {
-                ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, isAuto: false }
-            };
-
             return {
                 project: {
                     ...state.project,
-                    settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
                         zoomSegments: stamped
@@ -54,15 +47,9 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
             const stamped = recomputeOutputTimes(actions, timeMapper);
 
-            const nextSettings = {
-                ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, isAuto: false }
-            };
-
             return {
                 project: {
                     ...state.project,
-                    settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
                         zoomSegments: stamped
@@ -77,15 +64,9 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
         set(state => {
             const actions = state.project.timeline.zoomSegments.filter(m => m.id !== id);
 
-            const nextSettings = {
-                ...state.project.settings,
-                zoom: { ...state.project.settings.zoom, isAuto: false }
-            };
-
             return {
                 project: {
                     ...state.project,
-                    settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
                         zoomSegments: actions

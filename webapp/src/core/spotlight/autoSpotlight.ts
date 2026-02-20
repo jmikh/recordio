@@ -282,7 +282,7 @@ class SpotlightScheduler {
 /**
  * Calculates auto-spotlight actions based on hovered card events.
  * 
- * NOTE: Caller is responsible for checking isAuto before calling this function.
+ *
  * 
  * Logic:
  * 1. For each hoveredCard event, map its time range to output coordinates

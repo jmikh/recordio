@@ -3,12 +3,15 @@ import type { ProjectState } from '../useProjectStore';
 import type { ID, SpotlightSegment } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
+import { calculateAutoSpotlights } from '../../../core/spotlight/autoSpotlight';
+import { ViewMapper } from '../../../core/zoom';
 
 export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;
     addSpotlight: (spotlight: SpotlightSegment) => void;
     deleteSpotlight: (id: ID) => void;
     clearSpotlights: () => void;
+    resetSpotlights: () => void;
 }
 
 export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SpotlightSlice> = (set, _get, store) => ({
@@ -28,15 +31,9 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
             const stamped = recomputeOutputTimes(nextSpotlightSegments, timeMapper);
 
-            // If sourceRect is being changed, set isAuto to false
-            const nextSettings = updates.sourceRect
-                ? { ...state.project.settings, spotlight: { ...state.project.settings.spotlight, isAuto: false } }
-                : state.project.settings;
-
             return {
                 project: {
                     ...state.project,
-                    settings: nextSettings,
                     timeline: {
                         ...state.project.timeline,
                         spotlightSegments: stamped
@@ -56,17 +53,9 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
             const stamped = recomputeOutputTimes(spotlightSegments, timeMapper);
 
-            // Manual spotlight addition sets isAuto to false
             return {
                 project: {
                     ...state.project,
-                    settings: {
-                        ...state.project.settings,
-                        spotlight: {
-                            ...state.project.settings.spotlight,
-                            isAuto: false
-                        }
-                    },
                     timeline: {
                         ...state.project.timeline,
                         spotlightSegments: stamped
@@ -102,6 +91,47 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     timeline: {
                         ...state.project.timeline,
                         spotlightSegments: []
+                    }
+                }
+            };
+        });
+    },
+
+    resetSpotlights: () => {
+
+        set(state => {
+            const project = state.project;
+            const sourceSize = project.screenSource.size;
+            const hasUserEvents = project.userEvents.mousePositions.length > 0;
+
+            if (!sourceSize || sourceSize.width === 0 || !hasUserEvents) {
+                return state;
+            }
+
+            const viewMapper = new ViewMapper(
+                sourceSize,
+                project.settings.outputSize,
+                project.settings.screen.padding,
+                project.settings.screen.crop,
+                project.screenSource.trackableContentRect,
+                project.settings.screen.toolbar.enabled
+            );
+            const timeMapper = getTimeMapper(project.timeline.outputWindows);
+            const spotlightSegments = calculateAutoSpotlights(
+                viewMapper,
+                timeMapper,
+                project.userEvents.hoveredCards || [],
+                project.timeline.zoomSegments,
+                project.settings.zoom,
+                project.settings.spotlight
+            );
+
+            return {
+                project: {
+                    ...project,
+                    timeline: {
+                        ...project.timeline,
+                        spotlightSegments
                     }
                 }
             };

@@ -5,9 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, DefaultButton, CollapsibleCard, InfoTooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { SpotlightSegment } from '../../../types';
-import { MdDelete } from 'react-icons/md';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
-import { VscCopy } from 'react-icons/vsc';
 import { EasingTooltipContent } from './EasingTooltipContent';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
@@ -20,6 +18,8 @@ const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
 export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ segment }) => {
     const updateSpotlight = useProjectStore(s => s.updateSpotlight);
     const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
+    const clearSpotlights = useProjectStore(s => s.clearSpotlights);
+    const resetSpotlights = useProjectStore(s => s.resetSpotlights);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const selectSpotlight = useUIStore(s => s.selectSpotlight);
     const { batchAction } = useHistoryBatcher();
@@ -31,6 +31,16 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
         deleteSpotlight(segment.id);
         selectSpotlight(null);
     }, [segment.id, deleteSpotlight, selectSpotlight]);
+
+    const handleDeleteAll = useCallback(() => {
+        clearSpotlights();
+        selectSpotlight(null);
+    }, [clearSpotlights, selectSpotlight]);
+
+    const handleReset = useCallback(() => {
+        resetSpotlights();
+        selectSpotlight(null);
+    }, [resetSpotlights, selectSpotlight]);
 
     const handleDimOpacityChange = useCallback((val: number) => {
         batchAction(() => updateSpotlight(segment.id, { dimOpacity: val }));
@@ -86,7 +96,6 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
 
                 {/* Delete */}
                 <DefaultButton onClick={handleDelete} className="text-xs justify-start">
-                    <MdDelete size={16} />
                     <span>Delete Spotlight</span>
                 </DefaultButton>
 
@@ -132,8 +141,17 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
 
                     {/* Apply to All */}
                     <DefaultButton onClick={handleApplyToAll} className="text-xs justify-start">
-                        <VscCopy size={14} />
-                        <span>Apply to All Spotlights</span>
+                        <span>Apply to All</span>
+                    </DefaultButton>
+
+                    {/* Delete All */}
+                    <DefaultButton onClick={handleDeleteAll} className="text-xs justify-start">
+                        <span>Delete All</span>
+                    </DefaultButton>
+
+                    {/* Reset */}
+                    <DefaultButton onClick={handleReset} className="text-xs justify-start">
+                        <span>Reset</span>
                     </DefaultButton>
                 </div>
             </div>
