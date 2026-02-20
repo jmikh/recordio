@@ -4,6 +4,7 @@ export interface MultiToggleOption<T extends string> {
     value: T;
     label?: string;
     icon?: React.ReactNode;
+    tooltip?: string;
 }
 
 interface MultiToggleProps<T extends string> {
@@ -74,6 +75,7 @@ export const MultiToggle = <T extends string>({
                     <button
                         key={option.value}
                         data-value={option.value}
+                        title={option.tooltip}
                         onClick={() => onChange(option.value)}
                         className={`
                             relative flex-1 flex flex-row items-center justify-center gap-1.5 py-1 px-3 min-w-0

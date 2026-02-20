@@ -161,6 +161,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         batchAction(() => {
             updateSpotlight(editingSpotlightId, { sourceRect });
         });
+        endInteraction();
     };
 
     const onCancel = () => {
@@ -214,13 +215,11 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         }
     };
 
-    // Batch history during the entire editing session
-    useEffect(() => {
-        if (editingSpotlightId) {
-            startInteraction();
-            return () => endInteraction();
-        }
-    }, [editingSpotlightId, startInteraction, endInteraction]);
+    const handleCornerRadiiCommit = () => {
+        endInteraction();
+    };
+
+
 
     // Key Listener
     useEffect(() => {
@@ -447,10 +446,12 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                 constraintBounds={screenContentBounds}
                 onChange={handleRectChange}
                 onCommit={onCommit}
+                onDragStart={startInteraction}
                 // Corner radius editing
                 allowCornerEditing={true}
                 cornerRadii={currentCornerRadii}
                 onCornerRadiiChange={handleCornerRadiiChange}
+                onCornerRadiiCommit={handleCornerRadiiCommit}
             />
 
 

@@ -110,7 +110,6 @@ const createDefaultSettings = (): ProjectSettings => ({
             enabled: false,
             source: 'preset',
             volume: 0.3,
-            fadeOut: true,
             fadeOutDurationMs: 3000,
         },
     },

@@ -72,16 +72,16 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
                 />
 
                 {/* Easing */}
-                <div className="flex items-center gap-1.5">
-                    <Dropdown
-                        options={EASING_OPTIONS}
-                        value={segment.easing}
-                        onChange={handleEasingChange}
-                    />
-                    <InfoTooltip description="">
-                        <EasingTooltipContent />
-                    </InfoTooltip>
-                </div>
+                <Dropdown
+                    options={EASING_OPTIONS}
+                    value={segment.easing}
+                    onChange={handleEasingChange}
+                    suffix={
+                        <InfoTooltip description="">
+                            <EasingTooltipContent />
+                        </InfoTooltip>
+                    }
+                />
 
                 {/* Actions */}
                 <div className="flex flex-col gap-2 pt-2 border-t border-border">

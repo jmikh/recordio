@@ -410,6 +410,28 @@ export const AudioSettingsPanel = () => {
                                 units="%"
                             />
 
+                            {/* Fade Out */}
+                            <Slider
+                                label="Fade Out"
+                                min={0}
+                                max={50}
+                                value={Math.round((music.fadeOutDurationMs ?? 3000) / 100)}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => {
+                                    // Round to nearest 500ms (5 tenths)
+                                    const rounded = Math.round(val / 5) * 5;
+                                    const ms = rounded * 100;
+                                    batchAction(() =>
+                                        updateSettings({ audio: { music: { fadeOutDurationMs: ms } } })
+                                    );
+                                }}
+                                showTooltip
+                                decimals={1}
+                                valueTransform={(v) => v / 10}
+                                units="s"
+                            />
+
                             {/* Presets */}
                             <div className="flex flex-col gap-2">
                                 <span className="text-xs text-text-muted">Presets</span>
@@ -540,37 +562,6 @@ export const AudioSettingsPanel = () => {
                                 )}
                             </div>
 
-                            {/* Fade Out */}
-                            <div className="flex flex-col gap-3 pt-1 border-t border-border">
-                                <Toggle
-                                    label="Fade Out"
-                                    value={music.fadeOut ?? true}
-                                    onChange={(v) => updateSettings({ audio: { music: { fadeOut: v } } })}
-                                />
-
-                                {music.fadeOut && (
-                                    <Slider
-                                        label="Duration"
-                                        min={10}
-                                        max={50}
-                                        value={Math.round((music.fadeOutDurationMs ?? 3000) / 100)}
-                                        onPointerDown={startInteraction}
-                                        onPointerUp={endInteraction}
-                                        onChange={(val) => {
-                                            // Round to nearest 500ms (5 tenths)
-                                            const rounded = Math.round(val / 5) * 5;
-                                            const ms = rounded * 100;
-                                            batchAction(() =>
-                                                updateSettings({ audio: { music: { fadeOutDurationMs: ms } } })
-                                            );
-                                        }}
-                                        showTooltip
-                                        decimals={1}
-                                        valueTransform={(v) => v / 10}
-                                        units="s"
-                                    />
-                                )}
-                            </div>
                         </>
                     )}
                 </div>

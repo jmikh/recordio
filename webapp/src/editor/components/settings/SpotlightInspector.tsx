@@ -87,7 +87,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                     label="Enlarge"
                     value={segment.scale}
                     onChange={handleScaleChange}
-                    min={1}
+                    min={1.1}
                     max={2}
                     decimals={2}
                     units="x"
@@ -107,7 +107,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                         value={segment.dimOpacity}
                         onChange={handleDimOpacityChange}
                         min={0.1}
-                        max={1}
+                        max={0.9}
                         decimals={0}
                         units="%"
                         valueTransform={(v) => v * 100}
@@ -119,8 +119,8 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                         label="Transition"
                         value={segment.transitionDurationMs}
                         onChange={handleTransitionChange}
-                        min={0}
-                        max={1000}
+                        min={250}
+                        max={2000}
                         decimals={2}
                         valueTransform={(v) => v / 1000}
                         units="s"
@@ -128,16 +128,16 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                     />
 
                     {/* Easing */}
-                    <div className="flex items-center gap-1.5">
-                        <Dropdown
-                            options={EASING_OPTIONS}
-                            value={segment.easing}
-                            onChange={handleEasingChange}
-                        />
-                        <InfoTooltip description="">
-                            <EasingTooltipContent />
-                        </InfoTooltip>
-                    </div>
+                    <Dropdown
+                        options={EASING_OPTIONS}
+                        value={segment.easing}
+                        onChange={handleEasingChange}
+                        suffix={
+                            <InfoTooltip description="">
+                                <EasingTooltipContent />
+                            </InfoTooltip>
+                        }
+                    />
 
                     {/* Apply to All */}
                     <DefaultButton onClick={handleApplyToAll} className="text-xs justify-start">

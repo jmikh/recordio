@@ -23,6 +23,8 @@ interface DropdownProps<T> {
     buttonClassName?: string;
     /** Use full-width style (default: true) */
     fullWidth?: boolean;
+    /** Optional content rendered to the right of the trigger button (after the arrow) */
+    suffix?: React.ReactNode;
 }
 
 export function Dropdown<T>({
@@ -33,7 +35,8 @@ export function Dropdown<T>({
     placeholder = 'Select...',
     className = '',
     buttonClassName = '',
-    fullWidth = true
+    fullWidth = true,
+    suffix
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -137,10 +140,13 @@ export function Dropdown<T>({
                     {label && <span className="text-text-muted">{label}</span>}
                     <span>{displayLabel}</span>
                 </div>
-                <MdKeyboardArrowDown
-                    size={18}
-                    className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
+                <div className="flex items-center gap-1">
+                    <MdKeyboardArrowDown
+                        size={18}
+                        className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                    {suffix}
+                </div>
             </button>
 
             {/* Portal-rendered dropdown menu */}

@@ -272,8 +272,8 @@ export class ExportManager {
                         gainNode.gain.setValueAtTime(musicVolume, 0);
 
                         // Fade out at end
-                        if (audioSettings.music.fadeOut) {
-                            const fadeMs = audioSettings.music.fadeOutDurationMs ?? 3000;
+                        const fadeMs = audioSettings.music.fadeOutDurationMs ?? 3000;
+                        if (fadeMs > 0) {
                             const fadeStartSec = Math.max(0, totalDurationSec - (fadeMs / 1000));
                             gainNode.gain.setValueAtTime(musicVolume, fadeStartSec);
                             gainNode.gain.linearRampToValueAtTime(0, totalDurationSec);

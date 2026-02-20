@@ -211,9 +211,7 @@ export interface MusicSettings {
     customRuntimeUrl?: string;
     /** ID of the global music library entry */
     customLibraryId?: string;
-    /** Whether to fade out music near the end of the video */
-    fadeOut: boolean;
-    /** Fade out duration in milliseconds. Default: 3000 */
+    /** Fade out duration in milliseconds. 0 = no fade. Default: 3000 */
     fadeOutDurationMs: number;
 }
 

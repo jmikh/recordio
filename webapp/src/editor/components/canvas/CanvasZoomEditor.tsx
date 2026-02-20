@@ -86,6 +86,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         batchAction(() => {
             updateZoomSegment(editingZoomId, { rectPx: rect, type: 'manual' });
         });
+        endInteraction();
     };
 
     const onCancel = () => {
@@ -125,13 +126,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
         }
     };
 
-    // Batch history during the entire editing session
-    useEffect(() => {
-        if (editingZoomId) {
-            startInteraction();
-            return () => endInteraction();
-        }
-    }, [editingZoomId, startInteraction, endInteraction]);
+
 
     // Key Listener
     useEffect(() => {
@@ -165,6 +160,7 @@ export const ZoomEditor: React.FC<{ previewRectRef?: React.MutableRefObject<Rect
                 fixedAspectRatio={currentRect.width / currentRect.height}
                 onChange={handleRectChange}
                 onCommit={onCommit}
+                onDragStart={startInteraction}
             />
         </div>
     );

@@ -185,6 +185,7 @@ export function ExportSettings() {
                         options={WATERMARK_POSITIONS.map(pos => ({
                             value: pos.value,
                             icon: pos.icon,
+                            tooltip: pos.label,
                         }))}
                         value={watermarkPosition}
                         onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}

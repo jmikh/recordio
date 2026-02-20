@@ -177,18 +177,13 @@ export const CropEditor: React.FC<{ videoSize?: { width: number, height: number 
     const handleCornerRadiiCommit = (radii: CornerRadii) => {
         const newRadius = radii[0];
         batchAction(() => updateSettings({ screen: { borderRadiusPx: newRadius } }));
+        endInteraction();
     };
 
     // Close when clicking outside the canvas container
     const rootRef = useRef<HTMLDivElement>(null);
 
-    // Start history batch when entering crop mode, end when leaving
-    useEffect(() => {
-        startInteraction();
-        return () => {
-            endInteraction();
-        };
-    }, [startInteraction, endInteraction]);
+
 
     return (
         <div

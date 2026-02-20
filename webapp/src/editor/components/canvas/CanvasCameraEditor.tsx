@@ -103,7 +103,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     const dimOpacity = useProjectStore(s => s.project.settings.spotlight.dimOpacity);
 
     // Batcher for consistent history behavior
-    const { batchAction, startInteraction } = useHistoryBatcher();
+    const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
 
     // ------------------------------------------------------------------
     // INITIAL VALUE ONLY PATTERN
@@ -235,6 +235,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height
         };
         batchAction(() => updateSettings({ camera: newSettings }));
+        endInteraction();
         cameraRef.current = null;
     };
 
@@ -253,6 +254,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             borderRadiusPx: newRadius
         };
         batchAction(() => updateSettings({ camera: newSettings }));
+        endInteraction();
     };
 
     // ------------------------------------------------------------------

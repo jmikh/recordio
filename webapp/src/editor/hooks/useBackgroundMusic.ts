@@ -117,9 +117,8 @@ export const useBackgroundMusic = () => {
             }
 
             // Fade-out: ramp volume near the end of the output
-            const fadeOut = music?.fadeOut ?? true;
-            if (fadeOut) {
-                const fadeMs = music?.fadeOutDurationMs ?? 3000;
+            const fadeMs = music?.fadeOutDurationMs ?? 3000;
+            if (fadeMs > 0) {
                 const outputWindows = project?.timeline?.outputWindows;
                 if (outputWindows?.length) {
                     // Compute total output duration from windows
@@ -142,5 +141,5 @@ export const useBackgroundMusic = () => {
         }, 100);
 
         return () => clearInterval(interval);
-    }, [isPlaying, musicVolume, music?.fadeOut, music?.fadeOutDurationMs]);
+    }, [isPlaying, musicVolume, music?.fadeOutDurationMs]);
 };

@@ -93,6 +93,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                         top: fadeY,
                         width: fadeInWidth,
                         ...fadeInSegment.getStyle(),
+                        ...(holdWidth === 0 ? { borderRight: '2px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}
@@ -123,6 +124,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                         top: fadeY,
                         width: fadeOutWidth,
                         ...fadeOutSegment.getStyle(),
+                        ...(holdWidth === 0 ? { borderLeft: '2px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}

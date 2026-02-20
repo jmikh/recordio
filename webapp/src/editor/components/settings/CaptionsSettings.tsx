@@ -563,7 +563,7 @@ export function CaptionsSettings() {
                     </div>
                 ) : (
                     <p className="subtext">
-                        Transcribe automatically with AI or add manual on the captions track in the timeline.
+                        Transcribe automatically with AI or add them manually on the captions track in the timeline.
                     </p>
                 )}
             </CollapsibleCard>
