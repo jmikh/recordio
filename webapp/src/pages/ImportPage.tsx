@@ -83,7 +83,8 @@ export function ImportPage() {
             importFromRawRecording(
                 state.recording,
                 state.screenVideo,
-                state.cameraVideo || undefined
+                state.cameraVideo || undefined,
+                state.micAudio || undefined
             )
                 .then((project) => {
                     setProjectId(project.id);
@@ -113,7 +114,7 @@ export function ImportPage() {
 
                         trackProjectCreated({
                             duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
-                            microphone_on: recording.screenSource.hasMicrophone || !!recording.cameraSource?.hasMicrophone,
+                            microphone_on: !!recording.microphoneSource,
                             webcam_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
                             first_url: firstUrl,

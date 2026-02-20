@@ -52,14 +52,12 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     // AutoCut Visibility Logic:
-    // 1. Camera exists and has microphone
-    // OR
-    // 2. Camera doesn't exist (or no mic), Screen has microphone, and User Events exist
-    const cameraHasMic = cameraSource?.hasMicrophone && cameraSource?.runtimeUrl;
-    const screenHasMic = screenSource.hasMicrophone && screenSource.runtimeUrl;
+    // Mic source exists AND either camera exists or user events exist
+    const micSource = useProjectStore(s => s.project.microphoneSource);
+    const hasMic = !!micSource?.runtimeUrl;
     const hasUserEvents = userEvents.mousePositions.length > 0;
 
-    const showAutoCut = (cameraHasMic) || (screenHasMic && hasUserEvents);
+    const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
 
     // Handlers
 
@@ -92,13 +90,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         });
 
         try {
-            // Select audio source: Prefer Camera if it has mic, otherwise Screen if it has mic
-            const cameraHasMic = cameraSource?.hasMicrophone && cameraSource?.runtimeUrl;
-            const screenHasMic = screenSource.hasMicrophone && screenSource.runtimeUrl;
-
-            const audioUrl = cameraHasMic
-                ? (cameraSource?.runtimeUrl || '')
-                : (screenHasMic ? (screenSource.runtimeUrl || '') : '');
+            const audioUrl = micSource?.runtimeUrl || '';
 
             const hasAudio = Boolean(audioUrl);
 

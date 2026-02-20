@@ -14,7 +14,7 @@ const DEFAULT_TRACK_VISIBILITY: TrackVisibility = {
     recording: true,
     zoom: true,
     spotlight: true,
-    captions: false,
+    captions: true,
 };
 
 export const CanvasMode = {

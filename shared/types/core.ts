@@ -51,10 +51,6 @@ interface BaseSourceMetadata {
 
     /** Total duration of the source file in milliseconds */
     durationMs: TimeMs;
-    size: Size;
-    /** Actual negotiated frame rate from MediaRecorder (fps) */
-    frameRate?: number;
-    hasMicrophone: boolean;
     createdAt?: number;
 }
 
@@ -71,12 +67,24 @@ export interface ScreenMetadata extends BaseSourceMetadata {
      */
     trackableContentRect?: Rect;
     hasAudio: boolean;
+    size: Size;
+    /** Actual negotiated frame rate from MediaRecorder (fps) */
+    frameRate?: number;
 }
 
 /**
  * Metadata for a camera recording source.
  */
-export interface CameraMetadata extends BaseSourceMetadata { }
+export interface CameraMetadata extends BaseSourceMetadata {
+    size: Size;
+    /** Actual negotiated frame rate from MediaRecorder (fps) */
+    frameRate?: number;
+}
+
+/**
+ * Metadata for a microphone audio source (standalone audio track).
+ */
+export interface MicrophoneMetadata extends BaseSourceMetadata { }
 
 /** Union type for consumer code that handles both source types. */
 export type SourceMetadata = ScreenMetadata | CameraMetadata;
@@ -96,5 +104,6 @@ export interface RawRecording {
 
     screenSource: ScreenMetadata;
     cameraSource?: CameraMetadata;
+    microphoneSource?: MicrophoneMetadata;
     userEvents: UserEvents;
 }

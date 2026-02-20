@@ -1,4 +1,4 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
@@ -24,7 +24,6 @@ const createPlaceholderSource = (): ScreenMetadata => ({
     size: { width: 1920, height: 1080 },
     recordingType: 'tab',
     hasAudio: false,
-    hasMicrophone: false,
 });
 
 /**
@@ -177,7 +176,8 @@ export class ProjectImpl {
         screenSource: ScreenMetadata,
         userEvents: UserEvents,
         cameraSource?: CameraMetadata,
-        rawName?: string
+        rawName?: string,
+        microphoneSource?: MicrophoneMetadata
     ): Project {
         let name = rawName || "New Project";
         if (name.length > 40) {
@@ -248,6 +248,7 @@ export class ProjectImpl {
             updatedAt: new Date(),
             screenSource,
             cameraSource,
+            microphoneSource,
             userEvents,
             settings,
             timeline

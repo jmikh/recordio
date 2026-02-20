@@ -23,7 +23,7 @@ import { useUIStore } from '../../stores/useUIStore';
 
 
 // Constants - Unified track height for visual consistency
-const TRACK_HEIGHT = 40;
+const TRACK_HEIGHT = 32;
 const TRACK_GAP = 4; // Gap between track rows
 const HEADER_WIDTH = 100;
 

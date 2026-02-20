@@ -14,21 +14,19 @@ export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, ha
     const modeLabel = recordingMode.charAt(0).toUpperCase() + recordingMode.slice(1);
     return (
         <div className="flex flex-col items-center gap-4">
-            {/* Media Status Pills */}
-            <div className="flex items-center gap-2 w-full justify-center">
-                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${hasAudio
+            {/* Media Status Icons */}
+            <div className="flex items-center gap-3 w-full justify-center">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${hasAudio
                     ? 'border-primary text-primary'
                     : 'border-disabled text-disabled'
                     }`}>
-                    {hasAudio ? <BiMicrophone size={13} /> : <BiMicrophoneOff size={13} />}
-                    Mic {hasAudio ? 'On' : 'Off'}
+                    {hasAudio ? <BiMicrophone size={16} /> : <BiMicrophoneOff size={16} />}
                 </div>
-                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${hasCamera
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${hasCamera
                     ? 'border-primary text-primary'
                     : 'border-disabled text-disabled'
                     }`}>
-                    {hasCamera ? <PiWebcamBold size={13} /> : <PiWebcamSlashBold size={13} />}
-                    Camera {hasCamera ? 'On' : 'Off'}
+                    {hasCamera ? <PiWebcamBold size={16} /> : <PiWebcamSlashBold size={16} />}
                 </div>
             </div>
 

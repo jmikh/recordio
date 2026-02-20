@@ -72,7 +72,7 @@ export const SettingsPanel = () => {
     const project = useProjectStore(s => s.project);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
     const hasCameraSource = !!project.cameraSource;
-    const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
+    const hasMicrophone = !!project.microphoneSource;
 
     const handleTabChange = (tab: SettingsPanelTab) => {
         deselectAllSegments();

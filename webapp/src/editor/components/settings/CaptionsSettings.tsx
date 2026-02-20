@@ -65,7 +65,7 @@ export function CaptionsSettings() {
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
     const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
-    const hasMicrophone = project.cameraSource?.hasMicrophone || project.screenSource?.hasMicrophone;
+    const hasMicrophone = !!project.microphoneSource;
 
 
     // Focus when editing starts
@@ -134,31 +134,16 @@ export function CaptionsSettings() {
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
-        const { cameraSource, screenSource } = state.project;
+        const micSource = state.project.microphoneSource;
 
-        // Determine which source has microphone
-        let sourceToTranscribe: typeof cameraSource | typeof screenSource | null = null;
-        let sourceName = '';
-
-        // Check camera source first
-        if (cameraSource?.hasMicrophone) {
-            sourceToTranscribe = cameraSource;
-            sourceName = 'camera';
-        }
-
-        // Fall back to screen source if camera doesn't have microphone
-        if (!sourceToTranscribe && screenSource?.hasMicrophone) {
-            sourceToTranscribe = screenSource;
-            sourceName = 'screen';
-        }
-
-
-        // If no source has microphone, return early (this shouldn't happen as panel is hidden)
-        if (!sourceToTranscribe) {
-            console.error('[CaptionsSettings] No microphone audio available for transcription');
+        if (!micSource?.runtimeUrl) {
+            addToast({
+                type: 'error',
+                title: 'No microphone audio',
+                message: 'This recording does not have microphone audio to transcribe.'
+            });
             return;
         }
-
 
 
         try {
@@ -183,9 +168,9 @@ export function CaptionsSettings() {
             });
             toastIdRef.current = toastId;
 
-            // Fetch source video
-            const response = await fetch(sourceToTranscribe.runtimeUrl!);
-            if (!response.ok) throw new Error(`Failed to fetch video: ${response.statusText}`);
+            // Fetch microphone audio
+            const response = await fetch(micSource.runtimeUrl!);
+            if (!response.ok) throw new Error(`Failed to fetch audio: ${response.statusText}`);
             const videoBlob = await response.blob();
 
             if (signal.aborted) throw new Error('Aborted');
@@ -419,8 +404,8 @@ export function CaptionsSettings() {
                 );
             })()}
 
-            {/* Style Settings Card */}
-            <CollapsibleCard
+            {/* Style Settings Card - only show when captions exist */}
+            {captionSegments && captionSegments.length > 0 && <CollapsibleCard
                 title="Style"
                 icon={<RiPaletteLine size={16} />}
                 previewItems={[
@@ -495,7 +480,7 @@ export function CaptionsSettings() {
                         showAlpha
                     />
                 </div>
-            </CollapsibleCard>
+            </CollapsibleCard>}
 
 
             {/* Captions Card - only show when there are segments */}

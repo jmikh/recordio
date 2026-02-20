@@ -180,48 +180,34 @@ export class ExportManager {
 
             // --- Audio Source Filtering (Mute Settings) ---
             const audioSettings = renderProject.settings.audio;
-            const isSingleMode = renderProject.screenSource.hasMicrophone && !renderProject.cameraSource;
 
-            const filteredSources = sources.filter(source => {
-                // Screen has hasAudio; camera only has hasMicrophone
-                const isScreen = source.id === renderProject.screenSource.id;
-                const hasAnyAudio = isScreen
-                    ? (source as ScreenMetadata).hasAudio
-                    : source.hasMicrophone;
-                if (!hasAnyAudio) return false;
+            // Build audio sources independently: screen audio + mic audio
+            const audioSources: { url: string; volume: number }[] = [];
 
-                // Single mode: "Recording Audio" toggle controls the combined screen track
-                if (isSingleMode && source.id === renderProject.screenSource.id && audioSettings?.muteScreenAudio) {
-                    return false;
+            // Screen audio (system audio)
+            if ((renderProject.screenSource as ScreenMetadata).hasAudio && !audioSettings?.muteScreenAudio) {
+                const screenUrl = renderProject.screenSource.runtimeUrl;
+                if (screenUrl) {
+                    audioSources.push({
+                        url: screenUrl,
+                        volume: audioSettings?.screenVolume ?? 1,
+                    });
                 }
+            }
 
-                // Dual mode: separate toggles
-                if (!isSingleMode) {
-                    if (source.id === renderProject.screenSource.id && audioSettings?.muteScreenAudio) {
-                        return false;
-                    }
-                    if (source.id === renderProject.cameraSource?.id && audioSettings?.muteMicrophone) {
-                        return false;
-                    }
-                }
+            // Microphone audio (separate track)
+            if (renderProject.microphoneSource?.runtimeUrl && !audioSettings?.muteMicrophone) {
+                audioSources.push({
+                    url: renderProject.microphoneSource.runtimeUrl,
+                    volume: audioSettings?.microphoneVolume ?? 1,
+                });
+            }
 
-                return true;
-            });
-
-            await Promise.all(filteredSources.map(async (source) => {
+            await Promise.all(audioSources.map(async (audioSource) => {
                 try {
-                    const response = await fetch(source.runtimeUrl!);
+                    const response = await fetch(audioSource.url);
                     const arrayBuffer = await response.arrayBuffer();
                     const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
-
-                    // Determine volume for this source
-                    const isScreenSource = source.id === renderProject.screenSource.id;
-                    const isCameraSource = source.id === renderProject.cameraSource?.id;
-                    const sourceVolume = isScreenSource
-                        ? (audioSettings?.screenVolume ?? 1)
-                        : isCameraSource
-                            ? (audioSettings?.microphoneVolume ?? 1)
-                            : 1;
 
                     let outputAccSec = 0;
                     renderProject.timeline.outputWindows.forEach((window: any) => {
@@ -232,7 +218,7 @@ export class ExportManager {
 
                         // Apply per-source volume via GainNode
                         const gainNode = offlineCtx.createGain();
-                        gainNode.gain.setValueAtTime(sourceVolume, 0);
+                        gainNode.gain.setValueAtTime(audioSource.volume, 0);
                         sourceNode.connect(gainNode);
                         gainNode.connect(offlineCtx.destination);
 
@@ -246,7 +232,7 @@ export class ExportManager {
                         }
                     });
                 } catch (error) {
-                    console.warn(`[Export] Failed to decode audio for source ${source.id}:`, error);
+                    console.warn(`[Export] Failed to decode audio for source:`, error);
                 }
             }));
 

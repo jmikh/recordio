@@ -33,7 +33,7 @@ const EXTENSION_ID = import.meta.env.DEV
 
 export interface HandoffProgress {
     phase: 'metadata' | 'streaming' | 'complete';
-    source: 'screen' | 'camera' | null;
+    source: 'screen' | 'camera' | 'mic' | null;
     chunksReceived: number;
     totalChunks: number;
     bytesReceived: number;
@@ -49,6 +49,7 @@ export interface HandoffState {
     recording: RawRecording | null;
     screenVideo: Blob | null;
     cameraVideo: Blob | null;
+    micAudio: Blob | null;
 }
 
 // ============================================
@@ -138,13 +139,16 @@ export function useExtensionBridge() {
         recording: null,
         screenVideo: null,
         cameraVideo: null,
+        micAudio: null,
     });
 
     // Refs for chunk accumulation - use Map with index as key to handle out-of-order arrival
     const screenChunksRef = useRef<Map<number, Uint8Array>>(new Map());
     const cameraChunksRef = useRef<Map<number, Uint8Array>>(new Map());
+    const micChunksRef = useRef<Map<number, Uint8Array>>(new Map());
     const screenTotalRef = useRef<number>(0);
     const cameraTotalRef = useRef<number>(0);
+    const micTotalRef = useRef<number>(0);
     const metadataRef = useRef<HandoffMetadataResponse | null>(null);
 
     /**
@@ -157,8 +161,10 @@ export function useExtensionBridge() {
         // Reset state
         screenChunksRef.current = new Map();
         cameraChunksRef.current = new Map();
+        micChunksRef.current = new Map();
         screenTotalRef.current = 0;
         cameraTotalRef.current = 0;
+        micTotalRef.current = 0;
         metadataRef.current = null;
 
         setState({
@@ -169,6 +175,7 @@ export function useExtensionBridge() {
             recording: null,
             screenVideo: null,
             cameraVideo: null,
+            micAudio: null,
         });
 
         try {
@@ -184,7 +191,7 @@ export function useExtensionBridge() {
             }
 
             metadataRef.current = response;
-            const totalBytes = response.screenVideoSize + (response.cameraVideoSize || 0);
+            const totalBytes = response.screenVideoSize + (response.cameraVideoSize || 0) + (response.micAudioSize || 0);
 
 
 
@@ -222,6 +229,14 @@ export function useExtensionBridge() {
                 });
             }
 
+            let micAudio: Blob | null = null;
+            if (micChunksRef.current.size > 0 && micTotalRef.current > 0) {
+                const micChunksOrdered = reassembleChunks(micChunksRef.current, micTotalRef.current);
+                micAudio = new Blob(micChunksOrdered as BlobPart[], {
+                    type: metadataRef.current!.micAudioType!,
+                });
+            }
+
             // Debug: Calculate total bytes from chunks
             const screenChunkBytes = screenChunksOrdered.reduce((sum, chunk) => sum + chunk.byteLength, 0);
             const cameraChunkBytes = cameraVideo ?
@@ -246,6 +261,7 @@ export function useExtensionBridge() {
                 recording: response.recording,
                 screenVideo,
                 cameraVideo,
+                micAudio,
             }));
 
         } catch (error) {
@@ -282,9 +298,12 @@ export function useExtensionBridge() {
                             if (chunk.source === 'screen') {
                                 screenChunksRef.current.set(chunk.index, data);
                                 screenTotalRef.current = chunk.total; // Update expected total
-                            } else {
+                            } else if (chunk.source === 'camera') {
                                 cameraChunksRef.current.set(chunk.index, data);
                                 cameraTotalRef.current = chunk.total;
+                            } else if (chunk.source === 'mic') {
+                                micChunksRef.current.set(chunk.index, data);
+                                micTotalRef.current = chunk.total;
                             }
 
                             bytesReceived += data.byteLength;

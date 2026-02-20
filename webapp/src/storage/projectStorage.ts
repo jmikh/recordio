@@ -139,6 +139,12 @@ export class ProjectStorage {
             stripped.cameraSource = cameraRest as typeof stripped.cameraSource;
         }
 
+        // Strip runtimeUrl from microphone source
+        if (stripped.microphoneSource) {
+            const { runtimeUrl: _r, ...micRest } = stripped.microphoneSource;
+            stripped.microphoneSource = micRest as typeof stripped.microphoneSource;
+        }
+
         // Strip customRuntimeUrl from background settings
         if (stripped.settings?.background?.customRuntimeUrl) {
             const { customRuntimeUrl: _r, ...bgRest } = stripped.settings.background;
@@ -201,6 +207,18 @@ export class ProjectStorage {
             if (blob) {
                 project.cameraSource = {
                     ...project.cameraSource,
+                    runtimeUrl: URL.createObjectURL(blob)
+                };
+            }
+        }
+
+        // Hydrate microphone source runtimeUrl
+        if (project.microphoneSource?.storageUrl?.startsWith('recordio-blob://')) {
+            const blobId = project.microphoneSource.storageUrl.replace('recordio-blob://', '');
+            const blob = await this.getRecordingBlob(blobId);
+            if (blob) {
+                project.microphoneSource = {
+                    ...project.microphoneSource,
                     runtimeUrl: URL.createObjectURL(blob)
                 };
             }
@@ -581,7 +599,7 @@ export class ProjectStorage {
 // Import from RawRecording (for handoff flow)
 // ============================================
 
-import type { ScreenMetadata, CameraMetadata, UserEvents } from '../types';
+import type { ScreenMetadata, CameraMetadata, MicrophoneMetadata, UserEvents } from '../types';
 import { ProjectImpl } from '../core/Project';
 
 interface RawRecording {
@@ -590,13 +608,15 @@ interface RawRecording {
     timestamp: number;
     screenSource: ScreenMetadata;
     cameraSource?: CameraMetadata;
+    microphoneSource?: MicrophoneMetadata;
     userEvents: UserEvents;
 }
 
 export async function importFromRawRecording(
     recording: RawRecording,
     screenBlob: Blob,
-    cameraBlob?: Blob
+    cameraBlob?: Blob,
+    micBlob?: Blob
 ): Promise<Project> {
     const projectId = `proj-${recording.id}`;
 
@@ -608,6 +628,12 @@ export async function importFromRawRecording(
     if (cameraBlob) {
         cameraBlobId = `rec-${projectId}-camera`;
         await ProjectStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
+    }
+
+    let micBlobId: string | undefined;
+    if (micBlob) {
+        micBlobId = `rec-${projectId}-mic`;
+        await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
     }
 
     // 2. Build source metadata with new storage URLs
@@ -626,13 +652,23 @@ export async function importFromRawRecording(
         };
     }
 
+    let microphoneSource: MicrophoneMetadata | undefined;
+    if (recording.microphoneSource && micBlobId) {
+        microphoneSource = {
+            ...recording.microphoneSource,
+            id: `src-${projectId}-mic`,
+            storageUrl: `recordio-blob://${micBlobId}`,
+        };
+    }
+
     // 3. Create project with default settings
     const project = ProjectImpl.createFromSource(
         projectId,
         screenSource,
         recording.userEvents,
         cameraSource,
-        recording.name
+        recording.name,
+        microphoneSource
     );
 
     // 4. Save project

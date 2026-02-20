@@ -55,6 +55,7 @@ export const CanvasContainer = () => {
 
     // DOM Refs for Resources
     const internalVideoRefs = useRef<{ [sourceId: string]: HTMLVideoElement }>({});
+    const micAudioRef = useRef<HTMLAudioElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const bgRef = useRef<HTMLImageElement>(null);
     const deviceFrameRef = useRef<HTMLImageElement>(null);
@@ -216,6 +217,20 @@ export const CanvasContainer = () => {
                             }
                         }
                     });
+
+                    // Sync mic audio element (same timing as video sources)
+                    const micAudio = micAudioRef.current;
+                    if (micAudio) {
+                        if (sourceTimeMs === -1) {
+                            if (!micAudio.paused) micAudio.pause();
+                            micAudio.playbackRate = 1.0;
+                        } else {
+                            if (micAudio.playbackRate !== playbackSpeed) {
+                                micAudio.playbackRate = playbackSpeed;
+                            }
+                            syncVideo(micAudio, sourceTimeMs / 1000, uiState.isPlaying);
+                        }
+                    }
                 });
 
                 // 4. STRATEGY
@@ -359,15 +374,11 @@ export const CanvasContainer = () => {
                     {Object.values(sources).map((source) => {
                         const audioSettings = project.settings.audio;
                         const isScreenSource = source.id === project.screenSource?.id;
-                        const isCameraSource = source.id === project.cameraSource?.id;
-                        const settingsMuted = (isScreenSource && audioSettings?.muteScreenAudio)
-                            || (isCameraSource && audioSettings?.muteMicrophone);
+                        const settingsMuted = isScreenSource && audioSettings?.muteScreenAudio;
                         const isMuted = !isPlaying || mutedSources[source.id] || !!settingsMuted;
                         const volume = isScreenSource
                             ? (audioSettings?.screenVolume ?? 1)
-                            : isCameraSource
-                                ? (audioSettings?.microphoneVolume ?? 1)
-                                : 1;
+                            : 1;
                         return source.runtimeUrl ? (
                             <video
                                 key={source.id}
@@ -410,6 +421,23 @@ export const CanvasContainer = () => {
                             />
                         ) : null;
                     })}
+                    {/* Mic audio element (separate track, no video) */}
+                    {project.microphoneSource?.runtimeUrl && (
+                        <audio
+                            ref={el => {
+                                micAudioRef.current = el;
+                                if (el) {
+                                    el.volume = project.settings.audio?.microphoneVolume ?? 1;
+                                }
+                            }}
+                            src={project.microphoneSource.runtimeUrl}
+                            muted={!isPlaying || !!project.settings.audio?.muteMicrophone}
+                            preload="auto"
+                            onError={(e) => {
+                                console.error('[CanvasContainer] Mic audio error:', e);
+                            }}
+                        />
+                    )}
                 </div>
 
                 {/* MAIN CANVAS */}
@@ -448,14 +476,14 @@ export const CanvasContainer = () => {
 };
 
 // Helper
-const syncVideo = (video: HTMLVideoElement, desiredTimeS: number, isPlaying: boolean) => {
+const syncVideo = (media: HTMLMediaElement, desiredTimeS: number, isPlaying: boolean) => {
     if (isPlaying) {
-        if (video.paused) video.play().catch(() => { });
-        if (Math.abs(video.currentTime - desiredTimeS) > 0.4) {
-            video.currentTime = desiredTimeS;
+        if (media.paused) media.play().catch(() => { });
+        if (Math.abs(media.currentTime - desiredTimeS) > 0.4) {
+            media.currentTime = desiredTimeS;
         }
     } else {
-        if (!video.paused) video.pause();
-        if (Math.abs(video.currentTime - desiredTimeS) > 0.2) video.currentTime = desiredTimeS;
+        if (!media.paused) media.pause();
+        if (Math.abs(media.currentTime - desiredTimeS) > 0.2) media.currentTime = desiredTimeS;
     }
 };

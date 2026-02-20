@@ -698,6 +698,7 @@ const pendingHandoffs = new Map<string, {
     recording: RawRecording;
     screenBlob: Blob;
     cameraBlob?: Blob;
+    micBlob?: Blob;
 }>();
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
@@ -760,8 +761,15 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
         }
 
+        // Get mic blob if exists
+        let micBlob: Blob | undefined;
+        if (recording.microphoneSource?.storageUrl) {
+            const micBlobId = recording.microphoneSource.storageUrl.replace('recordio-blob://', '');
+            micBlob = await ProjectStorage.getRecordingBlob(micBlobId);
+        }
+
         // Cache blobs for streaming phase
-        pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob });
+        pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob, micBlob });
 
 
 
@@ -773,6 +781,8 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             screenVideoType: screenBlob.type,
             cameraVideoSize: cameraBlob?.size,
             cameraVideoType: cameraBlob?.type,
+            micAudioSize: micBlob?.size,
+            micAudioType: micBlob?.type,
         };
         sendResponse(response);
 
@@ -826,7 +836,7 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
         return;
     }
 
-    const { screenBlob, cameraBlob } = cached;
+    const { screenBlob, cameraBlob, micBlob } = cached;
 
     try {
         // Stream screen video chunks
@@ -835,6 +845,11 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
         // Stream camera video chunks if present
         if (cameraBlob) {
             await streamBlobChunks(port, cameraBlob, 'camera');
+        }
+
+        // Stream mic audio chunks if present
+        if (micBlob) {
+            await streamBlobChunks(port, micBlob, 'mic');
         }
 
         // Signal completion
@@ -861,7 +876,7 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
 async function streamBlobChunks(
     port: chrome.runtime.Port,
     blob: Blob,
-    source: 'screen' | 'camera'
+    source: 'screen' | 'camera' | 'mic'
 ) {
     const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
 

@@ -85,20 +85,12 @@ export const AudioSettingsPanel = () => {
 
     // Determine audio capabilities
     const screenSource = project.screenSource;
-    const cameraSource = project.cameraSource;
     const screenHasAudio = screenSource?.hasAudio ?? false;
-    const screenHasMic = screenSource?.hasMicrophone ?? false;
-    const cameraHasMic = cameraSource?.hasMicrophone ?? false;
-    const hasMicAnywhere = screenHasMic || cameraHasMic;
+    const hasMic = !!project.microphoneSource;
 
-    // Determine toggle layout:
-    // - Screen has audio AND mic on same source (no separate mic source) → "Screen + Mic"
-    // - Screen has audio AND mic on a different source → separate "Screen Audio" + "Microphone"
-    // - No screen audio, mic somewhere → "Microphone" only
-    // - Screen audio only, no mic → "Screen Audio" only
-    const showCombinedScreenMic = screenHasAudio && screenHasMic && !cameraHasMic;
-    const showScreenAudioToggle = screenHasAudio && !showCombinedScreenMic;
-    const showMicToggle = hasMicAnywhere && !showCombinedScreenMic;
+    // Toggle layout: screen audio and mic are always separate concerns
+    const showScreenAudioToggle = screenHasAudio;
+    const showMicToggle = hasMic;
 
     // Preview helper
     const togglePreview = (url: string) => {
@@ -223,14 +215,12 @@ export const AudioSettingsPanel = () => {
     };
 
     // Build preview items for audio toggles card
-    const hasAudioSources = screenHasAudio || hasMicAnywhere;
+    const hasAudioSources = screenHasAudio || hasMic;
     const audioTogglePreviewItems: PreviewItem[] = [];
     if (!hasAudioSources) {
         audioTogglePreviewItems.push({ type: 'text', content: 'Not detected' });
-    } else if (showCombinedScreenMic && audio?.muteScreenAudio) {
-        audioTogglePreviewItems.push({ type: 'text', content: 'Muted' });
     } else {
-        if ((showScreenAudioToggle || showCombinedScreenMic) && audio?.muteScreenAudio) {
+        if (showScreenAudioToggle && audio?.muteScreenAudio) {
             audioTogglePreviewItems.push({ type: 'text', content: 'Screen muted' });
         }
         if (showMicToggle && audio?.muteMicrophone) {
@@ -271,33 +261,6 @@ export const AudioSettingsPanel = () => {
                     </p>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {/* Combined "Screen + Mic" toggle when both are on the screen source */}
-                        {showCombinedScreenMic && (
-                            <>
-                                <Toggle
-                                    label="Screen + Mic"
-                                    value={!audio?.muteScreenAudio}
-                                    onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
-                                />
-                                {!audio?.muteScreenAudio && (
-                                    <Slider
-                                        label="Volume"
-                                        min={0}
-                                        max={100}
-                                        value={Math.round((audio?.screenVolume ?? 1) * 100)}
-                                        onPointerDown={startInteraction}
-                                        onPointerUp={endInteraction}
-                                        onChange={(val) =>
-                                            batchAction(() =>
-                                                updateSettings({ audio: { screenVolume: val / 100 } })
-                                            )
-                                        }
-                                        showTooltip
-                                        units="%"
-                                    />
-                                )}
-                            </>
-                        )}
 
                         {/* Separate Screen Audio toggle */}
                         {showScreenAudioToggle && (

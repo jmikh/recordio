@@ -12,7 +12,7 @@
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
-import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type Rect } from '@shared/types';
+import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 import type { RawRecording } from '@shared/types';
 
@@ -27,9 +27,11 @@ export class VideoRecorder {
     // Media State
     private screenRecorder: MediaRecorder | null = null;
     private cameraRecorder: MediaRecorder | null = null;
+    private micRecorder: MediaRecorder | null = null;
 
     private screenData: BlobPart[] = [];
     private cameraData: BlobPart[] = [];
+    private micData: BlobPart[] = [];
 
     // Streams
     private activeStreams: MediaStream[] = [];
@@ -91,6 +93,7 @@ export class VideoRecorder {
         this.config = config; // Update config with potentially newer one
         this.screenData = [];
         this.cameraData = [];
+        this.micData = [];
         this.activeStreams = [];
 
         await this.initializeStreams(this.config);
@@ -152,6 +155,9 @@ export class VideoRecorder {
         this.screenRecorder.start(100);
         if (this.cameraRecorder) {
             this.cameraRecorder.start(100);
+        }
+        if (this.micRecorder) {
+            this.micRecorder.start(100);
         }
 
         this.startTime = Date.now();
@@ -215,6 +221,15 @@ export class VideoRecorder {
             if (settings && settings.width && settings.height) {
                 this.cameraDimensions = { width: settings.width, height: settings.height };
             }
+        }
+
+        if (this.micRecorder && this.micRecorder.state !== 'inactive') {
+            stopPromises.push(new Promise(resolve => {
+                if (this.micRecorder) {
+                    this.micRecorder.onstop = () => resolve();
+                    this.micRecorder.stop();
+                } else resolve();
+            }));
         }
 
         await Promise.all(stopPromises);
@@ -301,7 +316,7 @@ export class VideoRecorder {
             this.activeStreams.push(micStream);
         }
 
-        // 4. Get Camera Stream (Dual Mode)
+        // 4. Get Camera Stream
         let cameraStream: MediaStream | null = null;
         if (config.hasCamera) {
             const videoConstraints: MediaTrackConstraints = {
@@ -313,47 +328,22 @@ export class VideoRecorder {
             this.activeStreams.push(cameraStream);
         }
 
-        // 5. Mix Audio & Setup Recorders
+        // 5. Setup Recorders
+        // Screen records video + system audio only (no mic mixing)
+        // Camera records video only (no mic muxing)
+        // Mic records as standalone audio-only track
         const mimeType = VideoRecorder.getSupportedMimeType();
 
+        this.screenRecorder = new MediaRecorder(screenStream, { mimeType });
 
         if (cameraStream) {
-            // --- DUAL MODE ---
-            // Camera Stream gets Microphone
-            let cameraFinalStream = new MediaStream(cameraStream.getVideoTracks());
-            if (micStream) {
-                micStream.getAudioTracks().forEach(t => cameraFinalStream.addTrack(t));
-            }
+            const cameraVideoOnly = new MediaStream(cameraStream.getVideoTracks());
+            this.cameraRecorder = new MediaRecorder(cameraVideoOnly, { mimeType });
+        }
 
-            // Screen Stream is just Screen (System Audio already inside + playing locally)
-            this.screenRecorder = new MediaRecorder(screenStream, { mimeType });
-            this.cameraRecorder = new MediaRecorder(cameraFinalStream, { mimeType });
-        } else {
-            // --- SINGLE MODE ---
-            // Screen Stream gets mixed: System (if any) + Mic
-            let finalScreenStream = screenStream;
-
-            if (micStream) {
-                if (!this.audioContext) this.audioContext = new AudioContext();
-                const dest = this.audioContext.createMediaStreamDestination();
-
-                // Mix System
-                if (screenStream.getAudioTracks().length > 0) {
-                    const sysSource = this.audioContext.createMediaStreamSource(screenStream);
-                    sysSource.connect(dest);
-                }
-
-                // Mix Mic
-                const micSource = this.audioContext.createMediaStreamSource(micStream);
-                micSource.connect(dest);
-
-                finalScreenStream = new MediaStream([
-                    ...screenStream.getVideoTracks(),
-                    dest.stream.getAudioTracks()[0]
-                ]);
-            }
-
-            this.screenRecorder = new MediaRecorder(finalScreenStream, { mimeType });
+        if (micStream) {
+            const micAudioOnly = new MediaStream(micStream.getAudioTracks());
+            this.micRecorder = new MediaRecorder(micAudioOnly, { mimeType: 'audio/webm;codecs=opus' });
         }
 
         // Data Handlers
@@ -365,6 +355,11 @@ export class VideoRecorder {
         if (this.cameraRecorder) {
             this.cameraRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) this.cameraData.push(e.data);
+            };
+        }
+        if (this.micRecorder) {
+            this.micRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) this.micData.push(e.data);
             };
         }
     }
@@ -448,7 +443,6 @@ export class VideoRecorder {
             recordingType: this.mode,
             trackableContentRect,
             hasAudio: screenHasAudio,
-            hasMicrophone: Boolean(this.config.hasAudio && this.cameraData.length === 0),
             createdAt: now,
         };
 
@@ -466,12 +460,27 @@ export class VideoRecorder {
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 frameRate: cameraFrameRate,
-                hasMicrophone: Boolean(this.config.hasAudio),
                 createdAt: now,
             };
         }
 
-        // 4. Prepare events (populate allEvents for FocusManager)
+        // 4. Save Microphone Recording Blob (If any)
+        let microphoneSource: MicrophoneMetadata | undefined;
+        if (this.micData.length > 0) {
+            const micMimeType = this.micRecorder?.mimeType || 'audio/webm';
+            const micBlob = new Blob(this.micData, { type: micMimeType });
+            const micBlobId = `rec-${projectId}-mic`;
+            await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
+
+            microphoneSource = {
+                id: `src-${projectId}-mic`,
+                storageUrl: `recordio-blob://${micBlobId}`,
+                durationMs: duration,
+                createdAt: now,
+            };
+        }
+
+        // 5. Prepare events (populate allEvents for FocusManager)
         const effectiveEvents: UserEvents = events ? {
             ...events,
             allEvents: [
@@ -488,13 +497,14 @@ export class VideoRecorder {
             scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
         };
 
-        // 5. Create & Save RawRecording (lightweight handoff format)
+        // 6. Create & Save RawRecording (lightweight handoff format)
         const rawRecording: RawRecording = {
             id: projectId,
             name: this.config.sourceName || this.mode,
             timestamp: now,
             screenSource,
             cameraSource,
+            microphoneSource,
             userEvents: effectiveEvents,
         };
         await ProjectStorage.saveRawRecording(rawRecording);

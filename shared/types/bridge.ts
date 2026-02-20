@@ -65,6 +65,8 @@ export interface HandoffMetadataResponse {
     screenVideoType: string;      // MIME type
     cameraVideoSize?: number;     // bytes (optional)
     cameraVideoType?: string;     // MIME type (optional)
+    micAudioSize?: number;        // bytes (optional)
+    micAudioType?: string;        // MIME type (optional)
 }
 
 /** Extension → Website: Error response */
@@ -93,7 +95,7 @@ export interface StartStreamPayload {
 
 /** Extension → Website: A chunk of video data */
 export interface ChunkPayload {
-    source: 'screen' | 'camera';
+    source: 'screen' | 'camera' | 'mic';
     index: number;
     total: number;
     data: number[];  // ArrayBuffer as number[] for structured clone
