@@ -6,10 +6,11 @@ import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
 import { drawToolbar, getUrlAtTime } from './toolbarPainter';
 
-const SHADOW_BLUR = 20;
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
-const SHADOW_OFFSET_Y = 10;
-const GLOW_BLUR = 25;
+const REF_SHADOW_OFFSET_Y = 10;
+const REF_GLOW_BLUR = 25;
 
 /**
  * Helper to define the rounded path for the FULL screen content.
@@ -146,6 +147,12 @@ export function drawScreen(
                 hasGlow = false
             } = screenConfig;
 
+            // Scale shadow/glow relative to output height
+            const effectScale = outputSize.height / REF_OUTPUT_HEIGHT;
+            const shadowBlur = REF_SHADOW_BLUR * effectScale;
+            const shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
+            const glowBlur = REF_GLOW_BLUR * effectScale;
+
             const renderBorderWidth = borderWidth;
 
             // --- PASS 1: GLOW ---
@@ -153,7 +160,7 @@ export function drawScreen(
                 ctx.save();
                 defineScreenPath(ctx, contentRect, borderRadius);
                 ctx.shadowColor = borderColor;
-                ctx.shadowBlur = GLOW_BLUR;
+                ctx.shadowBlur = glowBlur;
                 ctx.fillStyle = borderColor;
                 ctx.fill();
 
@@ -170,8 +177,8 @@ export function drawScreen(
                 ctx.save();
                 defineScreenPath(ctx, contentRect, borderRadius);
                 ctx.shadowColor = SHADOW_COLOR;
-                ctx.shadowBlur = SHADOW_BLUR;
-                ctx.shadowOffsetY = SHADOW_OFFSET_Y;
+                ctx.shadowBlur = shadowBlur;
+                ctx.shadowOffsetY = shadowOffsetY;
                 ctx.fillStyle = 'black';
                 ctx.fill();
 

@@ -40,7 +40,7 @@ function paintRing(
     const maxRadius = REF_CLICK_RADIUS * settings.size * scale;
     const currentRadius = maxRadius * progress;
     const opacity = 0.7 * a * (1 - progress);
-    const lineWidth = 3 * (1 - progress * 0.5);
+    const lineWidth = 3 * scale * (1 - progress * 0.5);
 
     ctx.beginPath();
     ctx.arc(x, y, currentRadius, 0, Math.PI * 2);

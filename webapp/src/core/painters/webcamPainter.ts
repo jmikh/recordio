@@ -1,9 +1,10 @@
 import type { CameraSettings, Size } from '../../types';
 
-const SHADOW_BLUR = 20;
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
-const SHADOW_OFFSET_Y = 10;
-const GLOW_BLUR = 25;
+const REF_SHADOW_OFFSET_Y = 10;
+const REF_GLOW_BLUR = 25;
 const FEATHER_SIZE = 40;
 
 // Canvas cache for feather effect (reuse to avoid creating new canvases every frame)
@@ -31,7 +32,7 @@ export function drawWebcam(
     video: HTMLVideoElement,
     inputSize: Size,
     settings: CameraSettings,
-    globalScale: number = 1
+    outputSize?: Size
 ) {
     const {
         xPx: x, yPx: y, widthPx: width, heightPx: height,
@@ -77,15 +78,14 @@ export function drawWebcam(
         sh = zoomedH;
     }
 
-    // Apply global scaling
-    // Note: x, y, width, height are already projected/scaled by the caller if needed.
-    // Here we primarily care about scaling the styles (border, shadow).
+    // Scale effect properties relative to output height
+    const effectScale = outputSize ? outputSize.height / REF_OUTPUT_HEIGHT : 1;
 
     // Scale Style Properties
-    const scaledBorderWidth = borderWidth * globalScale;
+    const scaledBorderWidth = borderWidth;
 
-    // borderRadius is in output pixels, scale it for exports
-    const scaledBorderRadius = borderRadius * globalScale;
+    // borderRadius is in output pixels — already scaled by ProjectImpl.scale
+    const scaledBorderRadius = borderRadius;
 
     // Helper to create the path based on shape
     const definePath = () => {
@@ -122,7 +122,7 @@ export function drawWebcam(
     // 1. Glow Pass (only in border mode)
     if (hasGlow && !hasFeather) {
         ctx.save();
-        ctx.shadowBlur = GLOW_BLUR * globalScale;
+        ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
         ctx.shadowColor = borderColor;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
@@ -142,10 +142,10 @@ export function drawWebcam(
     // 2. Shadow Pass (only in border mode)
     if (hasShadow && !hasFeather) {
         ctx.save();
-        ctx.shadowBlur = SHADOW_BLUR * globalScale;
+        ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
         ctx.shadowColor = SHADOW_COLOR;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = SHADOW_OFFSET_Y * globalScale;
+        ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
         definePath();
 
         ctx.fillStyle = 'black';

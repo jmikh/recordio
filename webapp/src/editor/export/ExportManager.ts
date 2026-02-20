@@ -66,7 +66,7 @@ export class ExportManager {
             codec: this.getCodecString(quality), // Dynamic codec based on resolution
             width,
             height,
-            bitrate: this.getBitrate(quality),
+            bitrate: this.getBitrate(quality, fps),
             framerate: fps
         });
 
@@ -448,15 +448,18 @@ export class ExportManager {
         }
     }
 
-    private getBitrate(q: ExportQuality): number {
-        // Conservative bitrates (bits per second)
+    private getBitrate(q: ExportQuality, fps: ExportFps): number {
+        // Base bitrates at 30fps (bits per second)
+        let base: number;
         switch (q) {
-            case '480p': return 2_000_000; // 2 Mbps
-            case '720p': return 5_000_000; // 5 Mbps
-            case '1080p': return 8_000_000; // 8 Mbps
-            case '2K': return 15_000_000; // 15 Mbps
-            case '4K': return 25_000_000; // 25 Mbps
+            case '480p': base = 2_000_000; break; // 2 Mbps
+            case '720p': base = 5_000_000; break; // 5 Mbps
+            case '1080p': base = 8_000_000; break; // 8 Mbps
+            case '2K': base = 15_000_000; break; // 15 Mbps
+            case '4K': base = 25_000_000; break; // 25 Mbps
         }
+        // Scale up 1.5x for 60fps to maintain per-frame quality
+        return fps === 60 ? Math.round(base * 1.5) : base;
     }
 
     private getTotalDuration(project: Project): number {

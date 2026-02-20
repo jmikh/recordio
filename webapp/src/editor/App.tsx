@@ -19,7 +19,22 @@ import { useToast } from './components/Toast';
 import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from './stores/useUserStore';
 
-
+/** Fetch a remote image once and return it as a data URL to avoid repeated network requests. */
+async function cacheAvatarUrl(url: string): Promise<string> {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return url;
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(url);
+            reader.readAsDataURL(blob);
+        });
+    } catch {
+        return url;
+    }
+}
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -76,7 +91,8 @@ function Editor() {
 
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
-                const userPicture = avatar_url || picture || null;
+                const rawPicture = avatar_url || picture || null;
+                const userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
 
                 setUser(session.user.id, session.user.email || '', userName, userPicture);
 
@@ -128,12 +144,13 @@ function Editor() {
         });
 
         // Check initial session
-        AuthManager.getSession().then((session) => {
+        AuthManager.getSession().then(async (session) => {
             if (session) {
                 const { setUser } = useUserStore.getState();
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
-                const userPicture = avatar_url || picture || null;
+                const rawPicture = avatar_url || picture || null;
+                const userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
 
                 setUser(session.user.id, session.user.email || '', userName, userPicture);
             }

@@ -97,7 +97,7 @@ export function drawDragEffects(
 
             if (settings.effectType === 'ring') {
                 ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.7 * a})`;
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 3 * scale;
                 ctx.stroke();
             } else {
                 // 'circle' — filled

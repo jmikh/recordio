@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 export type ExportFps = 30 | 60;
+
+const DEV_PRO_UID = import.meta.env.VITE_DEV_PRO_UID as string | undefined;
 export type Theme = 'light' | 'dark';
 
 export interface Subscription {
@@ -65,18 +67,26 @@ export const useUserStore = create<UserState>()(
             theme: 'dark',
 
             // Actions
-            setUser: (userId, email, name = null, picture = null) => set({
-                userId,
-                email,
-                name,
-                picture,
-                isAuthenticated: true
-            }),
+            setUser: (userId, email, name = null, picture = null) => {
+                const isDevPro = DEV_PRO_UID ? userId === DEV_PRO_UID : false;
+                set({
+                    userId,
+                    email,
+                    name,
+                    picture,
+                    isAuthenticated: true,
+                    ...(isDevPro ? { isPro: true } : {})
+                });
+            },
 
-            setSubscription: (subscription) => set({
-                subscription,
-                isPro: subscription.status === 'active' || subscription.status === 'trialing'
-            }),
+            setSubscription: (subscription) => {
+                const state = get();
+                const isDevPro = DEV_PRO_UID ? state.userId === DEV_PRO_UID : false;
+                set({
+                    subscription,
+                    isPro: isDevPro || subscription.status === 'active' || subscription.status === 'trialing'
+                });
+            },
 
             setFreeCreditsUsed: (count) => set({ freeCreditsUsed: count }),
 

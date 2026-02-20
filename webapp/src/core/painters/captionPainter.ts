@@ -126,7 +126,7 @@ export function drawCaptions(
         // Draw Background Box with backdrop blur effect
         ctx.fillStyle = hexToRgba(settings.backgroundColor, 1);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 * scale;
 
         ctx.beginPath();
         if (typeof ctx.roundRect === 'function') {
@@ -139,9 +139,9 @@ export function drawCaptions(
 
         // Draw Text with shadow - word by word with highlighting
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = 4 * scale;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 1;
+        ctx.shadowOffsetY = 1 * scale;
 
         // Draw each line with per-word opacity
         const textColor = settings.textColor;
@@ -160,7 +160,7 @@ export function drawCaptions(
         }
 
         // Move up for next caption (if any)
-        boxBottomY = boxY - Math.round(16 * settings.captionSize);
+        boxBottomY = boxY - Math.round(16 * settings.captionSize * scale);
     }
 
     ctx.restore();

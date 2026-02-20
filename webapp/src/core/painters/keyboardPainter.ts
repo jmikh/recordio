@@ -125,7 +125,7 @@ export function drawKeyboardOverlay(
     // Draw Background Box
     ctx.fillStyle = `rgba(30, 30, 30, ${0.85 * opacity})`;
     ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * opacity})`;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * scale;
 
     const boxX = x - boxWidth / 2;
     const boxY = y;
@@ -141,7 +141,7 @@ export function drawKeyboardOverlay(
 
     // Draw Text
     ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-    ctx.fillText(text, x, boxY + boxHeight / 2 + 4); // +4 for visual centering correction
+    ctx.fillText(text, x, boxY + boxHeight / 2 + 4 * scale); // +4 for visual centering correction
 
     ctx.restore();
 }

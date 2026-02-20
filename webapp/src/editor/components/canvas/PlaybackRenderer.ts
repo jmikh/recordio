@@ -163,7 +163,7 @@ export class PlaybackRenderer {
                     }
                 }
 
-                drawWebcam(ctx, video, cameraSource.size, effectiveCameraSettings);
+                drawWebcam(ctx, video, cameraSource.size, effectiveCameraSettings, outputSize);
             }
         }
 
