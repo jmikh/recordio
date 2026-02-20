@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
+export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
+export type ExportFps = 30 | 60;
 export type Theme = 'light' | 'dark';
 
 export interface Subscription {
@@ -39,6 +40,7 @@ export interface UserState {
 
     // Helper methods
     canExportQuality: (quality: ExportQuality) => boolean;
+    canExportFps: (fps: ExportFps) => boolean;
     hasFreeExportCredit: () => boolean;
 }
 
@@ -115,12 +117,19 @@ export const useUserStore = create<UserState>()(
             canExportQuality: (quality: ExportQuality) => {
                 const { isPro, hasFreeExportCredit } = get();
 
-                // Free users can export 360p and 720p (with watermark)
-                if (quality === '360p' || quality === '720p') {
+                // Free users can export 480p and 720p (with watermark)
+                if (quality === '480p' || quality === '720p') {
                     return true;
                 }
 
-                // Pro users or users with free credit can export 1080p and 4K
+                // Pro users or users with free credit can export 1080p, 2K, and 4K
+                return isPro || hasFreeExportCredit();
+            },
+
+            // Helper to check if user can export at fps
+            canExportFps: (fps: ExportFps) => {
+                const { isPro, hasFreeExportCredit } = get();
+                if (fps === 30) return true;
                 return isPro || hasFreeExportCredit();
             }
         }),

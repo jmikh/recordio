@@ -28,7 +28,7 @@ export function FreeExportConfirmModal({ isOpen, onClose, onConfirm, selectedQua
                 </p>
                 <p className="text-xs text-text-muted">
                     This will use your free credit to export in <strong className="text-text-highlighted">{selectedQuality}</strong>.
-                    After this, 1080p and 4K exports are only available with a Pro subscription.
+                    After this, 1080p+ and 60fps exports are only available with a Pro subscription.
                 </p>
             </div>
 

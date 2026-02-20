@@ -41,7 +41,8 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
 // ============================================================================
 
 export interface ExportCompletedParams {
-    quality: '360p' | '720p' | '1080p' | '4K';
+    quality: '480p' | '720p' | '1080p' | '2K' | '4K';
+    fps: 30 | 60;
     duration_seconds: number;
     is_authenticated: boolean;
     is_pro: boolean;

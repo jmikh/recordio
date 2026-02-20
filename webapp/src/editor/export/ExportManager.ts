@@ -9,7 +9,8 @@ import { TimeMapper } from '../../core/mappers/timeMapper';
 import type { Project, SourceMetadata, ScreenMetadata } from '../../types';
 import fullLogoPng from '@shared/assets/fulllogo-dark.png';
 
-export type ExportQuality = '360p' | '720p' | '1080p' | '4K';
+export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
+export type ExportFps = 30 | 60;
 
 export interface ExportProgress {
     progress: number;
@@ -22,6 +23,7 @@ export class ExportManager {
     async exportProject(
         project: Project,
         quality: ExportQuality,
+        fps: ExportFps,
         onProgress: (state: ExportProgress) => void,
         options?: { useFreeCredit?: boolean; watermarkPosition?: WatermarkPosition }
     ): Promise<void> {
@@ -65,7 +67,7 @@ export class ExportManager {
             width,
             height,
             bitrate: this.getBitrate(quality),
-            framerate: 30
+            framerate: fps
         });
 
         const audioEncoder = new AudioEncoder({
@@ -145,7 +147,7 @@ export class ExportManager {
 
             // --- Watermark & Credit Resolution ---
             const userState = (await import('../stores/useUserStore')).useUserStore.getState();
-            const isHdExport = quality === '1080p' || quality === '4K';
+            const isHdExport = quality === '1080p' || quality === '2K' || quality === '4K';
             let shouldShowWatermark = false;
 
             if (userState.isPro) {
@@ -161,7 +163,7 @@ export class ExportManager {
                 shouldShowWatermark = false;
             } else if (isHdExport) {
                 // Non-pro without free credit trying HD — should not reach here (UI gates this)
-                throw new Error('1080p and 4K exports require a Pro subscription.');
+                throw new Error('1080p+ exports require a Pro subscription.');
             } else {
                 // Non-pro, SD export: watermark in production
                 shouldShowWatermark = import.meta.env.MODE === 'production';
@@ -276,7 +278,7 @@ export class ExportManager {
 
             const renderedAudioBuffer = await offlineCtx.startRendering();
             this.processAudioBuffer(renderedAudioBuffer, audioEncoder);
-            const fps = 30;
+            // fps is now passed as a parameter
             const frameInterval = 1000 / fps;
             const totalFrames = Math.ceil(totalDurationMs / frameInterval);
 
@@ -427,9 +429,10 @@ export class ExportManager {
 
     private getHeightForQuality(q: ExportQuality): number {
         switch (q) {
-            case '360p': return 360;
+            case '480p': return 480;
             case '720p': return 720;
             case '1080p': return 1080;
+            case '2K': return 1440;
             case '4K': return 2160;
         }
     }
@@ -437,9 +440,10 @@ export class ExportManager {
     private getCodecString(q: ExportQuality): string {
         switch (q) {
             case '4K': return 'avc1.640033'; // High Profile, Level 5.1
+            case '2K': return 'avc1.640028'; // High Profile, Level 4.0
             case '1080p': return 'avc1.64002a'; // High Profile, Level 4.2
             case '720p':
-            case '360p':
+            case '480p':
             default: return 'avc1.42001f'; // Baseline Profile, Level 3.1
         }
     }
@@ -447,9 +451,10 @@ export class ExportManager {
     private getBitrate(q: ExportQuality): number {
         // Conservative bitrates (bits per second)
         switch (q) {
-            case '360p': return 1_000_000; // 1 Mbps
+            case '480p': return 2_000_000; // 2 Mbps
             case '720p': return 5_000_000; // 5 Mbps
             case '1080p': return 8_000_000; // 8 Mbps
+            case '2K': return 15_000_000; // 15 Mbps
             case '4K': return 25_000_000; // 25 Mbps
         }
     }

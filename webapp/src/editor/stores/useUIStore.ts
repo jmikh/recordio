@@ -113,9 +113,7 @@ export interface UIState {
     // -- Audio Settings
     showCollapsibleAudioToggles: boolean;
     showCollapsibleMusic: boolean;
-    // -- Export Settings
-    showCollapsibleExportQuality: boolean;
-    showCollapsibleExportWatermark: boolean;
+
     setCollapsibleVisibility: (key: string, value: boolean) => void;
 
     // Track Visibility
@@ -318,9 +316,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // -- Audio Settings
     showCollapsibleAudioToggles: true, // Default expanded
     showCollapsibleMusic: true, // Default expanded
-    // -- Export Settings
-    showCollapsibleExportQuality: true, // Default expanded
-    showCollapsibleExportWatermark: false,
+
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
     // Track Visibility
@@ -364,8 +360,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             showCollapsibleCaptionPosition: false,
             showCollapsibleAudioToggles: true,
             showCollapsibleMusic: true,
-            showCollapsibleExportQuality: true,
-            showCollapsibleExportWatermark: false,
+
             trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
         });
     }

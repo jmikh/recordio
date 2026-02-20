@@ -219,7 +219,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-sm">
                         <FaCheck className="text-green-500 shrink-0" size={14} />
-                        <span className="text-text-highlighted">Unlimited 1080p & 4K exports</span>
+                        <span className="text-text-highlighted">Unlimited 1080p+ & 60fps exports</span>
                     </li>
                     <li className="flex items-center gap-3 text-sm">
                         <FaCheck className="text-green-500 shrink-0" size={14} />

@@ -88,9 +88,7 @@ export const AudioSettingsPanel = () => {
     const screenHasAudio = screenSource?.hasAudio ?? false;
     const hasMic = !!project.microphoneSource;
 
-    // Toggle layout: screen audio and mic are always separate concerns
-    const showScreenAudioToggle = screenHasAudio;
-    const showMicToggle = hasMic;
+
 
     // Preview helper
     const togglePreview = (url: string) => {
@@ -215,19 +213,16 @@ export const AudioSettingsPanel = () => {
     };
 
     // Build preview items for audio toggles card
-    const hasAudioSources = screenHasAudio || hasMic;
     const audioTogglePreviewItems: PreviewItem[] = [];
-    if (!hasAudioSources) {
-        audioTogglePreviewItems.push({ type: 'text', content: 'Not detected' });
-    } else {
-        if (showScreenAudioToggle && audio?.muteScreenAudio) {
-            audioTogglePreviewItems.push({ type: 'text', content: 'Screen muted' });
-        }
-        if (showMicToggle && audio?.muteMicrophone) {
-            audioTogglePreviewItems.push({ type: 'text', content: 'Mic muted' });
-        }
+    if (screenHasAudio && audio?.muteScreenAudio) {
+        audioTogglePreviewItems.push({ type: 'text', content: 'Screen muted' });
     }
-    if (audioTogglePreviewItems.length === 0 && hasAudioSources) {
+    if (hasMic && audio?.muteMicrophone) {
+        audioTogglePreviewItems.push({ type: 'text', content: 'Mic muted' });
+    }
+    if (!screenHasAudio && !hasMic) {
+        audioTogglePreviewItems.push({ type: 'text', content: 'Not detected' });
+    } else if (audioTogglePreviewItems.length === 0) {
         audioTogglePreviewItems.push({ type: 'text', content: 'On' });
     }
 
@@ -255,70 +250,74 @@ export const AudioSettingsPanel = () => {
                 isExpanded={showCollapsibleAudioToggles}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
             >
-                {!hasAudioSources ? (
-                    <p className="text-xs text-text-muted">
-                        No microphone or system audio detected.
-                    </p>
-                ) : (
-                    <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3">
 
-                        {/* Separate Screen Audio toggle */}
-                        {showScreenAudioToggle && (
-                            <>
-                                <Toggle
-                                    label="Screen Audio"
-                                    value={!audio?.muteScreenAudio}
-                                    onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
+                    {/* Screen Audio */}
+                    {screenHasAudio ? (
+                        <>
+                            <Toggle
+                                label="Screen Audio"
+                                value={!audio?.muteScreenAudio}
+                                onChange={(v) => updateSettings({ audio: { muteScreenAudio: !v } })}
+                            />
+                            {!audio?.muteScreenAudio && (
+                                <Slider
+                                    label="Volume"
+                                    min={0}
+                                    max={100}
+                                    value={Math.round((audio?.screenVolume ?? 1) * 100)}
+                                    onPointerDown={startInteraction}
+                                    onPointerUp={endInteraction}
+                                    onChange={(val) =>
+                                        batchAction(() =>
+                                            updateSettings({ audio: { screenVolume: val / 100 } })
+                                        )
+                                    }
+                                    showTooltip
+                                    units="%"
                                 />
-                                {!audio?.muteScreenAudio && (
-                                    <Slider
-                                        label="Volume"
-                                        min={0}
-                                        max={100}
-                                        value={Math.round((audio?.screenVolume ?? 1) * 100)}
-                                        onPointerDown={startInteraction}
-                                        onPointerUp={endInteraction}
-                                        onChange={(val) =>
-                                            batchAction(() =>
-                                                updateSettings({ audio: { screenVolume: val / 100 } })
-                                            )
-                                        }
-                                        showTooltip
-                                        units="%"
-                                    />
-                                )}
-                            </>
-                        )}
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-muted">Screen Audio</span>
+                            <span className="text-xs text-text-disabled">Not Detected</span>
+                        </div>
+                    )}
 
-                        {/* Separate Microphone toggle */}
-                        {showMicToggle && (
-                            <>
-                                <Toggle
-                                    label="Microphone"
-                                    value={!audio?.muteMicrophone}
-                                    onChange={(v) => updateSettings({ audio: { muteMicrophone: !v } })}
+                    {/* Microphone */}
+                    {hasMic ? (
+                        <>
+                            <Toggle
+                                label="Microphone"
+                                value={!audio?.muteMicrophone}
+                                onChange={(v) => updateSettings({ audio: { muteMicrophone: !v } })}
+                            />
+                            {!audio?.muteMicrophone && (
+                                <Slider
+                                    label="Volume"
+                                    min={0}
+                                    max={100}
+                                    value={Math.round((audio?.microphoneVolume ?? 1) * 100)}
+                                    onPointerDown={startInteraction}
+                                    onPointerUp={endInteraction}
+                                    onChange={(val) =>
+                                        batchAction(() =>
+                                            updateSettings({ audio: { microphoneVolume: val / 100 } })
+                                        )
+                                    }
+                                    showTooltip
+                                    units="%"
                                 />
-                                {!audio?.muteMicrophone && (
-                                    <Slider
-                                        label="Volume"
-                                        min={0}
-                                        max={100}
-                                        value={Math.round((audio?.microphoneVolume ?? 1) * 100)}
-                                        onPointerDown={startInteraction}
-                                        onPointerUp={endInteraction}
-                                        onChange={(val) =>
-                                            batchAction(() =>
-                                                updateSettings({ audio: { microphoneVolume: val / 100 } })
-                                            )
-                                        }
-                                        showTooltip
-                                        units="%"
-                                    />
-                                )}
-                            </>
-                        )}
-                    </div>
-                )}
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-muted">Microphone</span>
+                            <span className="text-xs text-text-disabled">Not Detected</span>
+                        </div>
+                    )}
+                </div>
             </CollapsibleCard>
 
             {/* Background Music */}
