@@ -6,7 +6,7 @@ import { useUIStore, CanvasMode } from '../../../stores/useUIStore';
 import { getTimeMapper } from '../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
-import { SpeedControl } from './SpeedControl';
+
 import { RecordingSegment } from './RecordingSegment';
 import { MIN_WINDOW_DURATION_MS } from './constants';
 import { FaScissors } from 'react-icons/fa6';
@@ -31,11 +31,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const project = useProjectStore(s => s.project);
 
-    const [speedControlState, setSpeedControlState] = React.useState<{
-        windowId: string;
-        speed: number;
-        anchorEl: HTMLElement;
-    } | null>(null);
+
 
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -134,7 +130,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                             trackContentHeight={trackHeight}
                             selectWindow={selectWindow}
                             handleDragStart={handleDragStart}
-                            setSpeedControlState={setSpeedControlState}
+
                             containerRef={containerRef}
                             screenAudio={screenAudio}
                             cameraAudio={cameraAudio}
@@ -159,15 +155,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                 <FaScissors size={12} />
             </button>
 
-            {/* Speed Control Popover */}
-            {speedControlState && (
-                <SpeedControl
-                    windowId={speedControlState.windowId}
-                    currentSpeed={speedControlState.speed}
-                    anchorEl={speedControlState.anchorEl}
-                    onClose={() => setSpeedControlState(null)}
-                />
-            )}
+
         </div >
     );
 };

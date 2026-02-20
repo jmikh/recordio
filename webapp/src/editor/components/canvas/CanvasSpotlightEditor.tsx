@@ -404,7 +404,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             {/* Zoom Bounds indicator — dashed rect in output coords → CSS */}
             {zoomBoundsRect && !zoomBoundsTooSmall && (() => {
                 const displayRect = displayMapper.outputToDisplay(zoomBoundsRect);
-                const boundsColor = isOutOfBounds ? 'var(--color-destructive)' : 'var(--color-primary)';
+                const boundsColor = isOutOfBounds ? 'var(--color-destructive)' : 'white';
                 return (
                     <div
                         style={{

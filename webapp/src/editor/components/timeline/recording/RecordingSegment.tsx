@@ -14,11 +14,6 @@ interface RecordingSegmentProps {
     trackContentHeight: number;
     selectWindow: (id: string | null) => void;
     handleDragStart: (e: React.MouseEvent, id: string, type: 'left' | 'right') => void;
-    setSpeedControlState: React.Dispatch<React.SetStateAction<{
-        windowId: string;
-        speed: number;
-        anchorEl: HTMLElement;
-    } | null>>;
     containerRef: React.RefObject<HTMLDivElement | null>;
     screenAudio: AudioAnalysisResult;
     cameraAudio: AudioAnalysisResult;
@@ -37,7 +32,6 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
     trackContentHeight,
     selectWindow,
     handleDragStart,
-    setSpeedControlState,
     containerRef,
     screenAudio,
     cameraAudio,
@@ -127,30 +121,21 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                     </div>
 
                     {/* Speed & Duration Labels (overlaid on the block) */}
-                    <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-auto bg-black/40 rounded-lg">
-                        {/* Speed - always show (prioritized) */}
-                        <span
-                            className="cursor-pointer hover:text-secondary transition-colors font-medium"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSpeedControlState({
-                                    windowId: seg.id,
-                                    speed: win.speed || 1.0,
-                                    anchorEl: e.currentTarget as HTMLElement
-                                });
-                            }}
-                        >
-                            {(() => {
-                                const speed = win.speed || 1.0;
-                                // Format to remove trailing zeros
-                                const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
-                                return `${formatted}x`;
-                            })()}
-                        </span>
+                    {width >= 40 && (
+                        <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-none bg-black/40 rounded-lg">
+                            {/* Speed indicator */}
+                            <span className="font-medium">
+                                {(() => {
+                                    const speed = win.speed || 1.0;
+                                    const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
+                                    return `${formatted}x`;
+                                })()}
+                            </span>
 
-                        {/* Duration - hide if window too small, less priority than speed */}
-                        {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
-                    </div>
+                            {/* Duration - hide if window too small */}
+                            {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
+                        </div>
+                    )}
                 </div>
             </div>
 
