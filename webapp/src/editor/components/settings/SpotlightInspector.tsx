@@ -1,8 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, DefaultButton, CollapsibleCard, InfoTooltip, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { SpotlightSegment } from '../../../types';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
@@ -22,10 +22,17 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     const resetSpotlights = useProjectStore(s => s.resetSpotlights);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const selectSpotlight = useUIStore(s => s.selectSpotlight);
-    const { batchAction } = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const allSpotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
+    const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
+    const hasHoveredCards = useProjectStore(s => (s.project.userEvents.hoveredCards || []).length > 0);
+
+    // Per-setting "apply to all" checkboxes — reset on each mount
+    const [applyDimToAll, setApplyDimToAll] = useState(false);
+    const [applyTransitionToAll, setApplyTransitionToAll] = useState(false);
+    const [applyEasingToAll, setApplyEasingToAll] = useState(false);
 
     const handleDelete = useCallback(() => {
         deleteSpotlight(segment.id);
@@ -37,56 +44,115 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
         selectSpotlight(null);
     }, [clearSpotlights, selectSpotlight]);
 
-    const handleReset = useCallback(() => {
-        resetSpotlights();
-        selectSpotlight(null);
-    }, [resetSpotlights, selectSpotlight]);
-
-    const handleDimOpacityChange = useCallback((val: number) => {
-        batchAction(() => updateSpotlight(segment.id, { dimOpacity: val }));
-    }, [segment.id, batchAction, updateSpotlight]);
-
     const handleScaleChange = useCallback((val: number) => {
         batchAction(() => updateSpotlight(segment.id, { scale: val }));
     }, [segment.id, batchAction, updateSpotlight]);
 
+    const handleDimOpacityChange = useCallback((val: number) => {
+        batchAction(() => {
+            updateSpotlight(segment.id, { dimOpacity: val });
+
+            if (applyDimToAll) {
+                for (const s of allSpotlightSegments) {
+                    if (s.id !== segment.id) {
+                        updateSpotlight(s.id, { dimOpacity: val });
+                    }
+                }
+                updateSettings({
+                    spotlight: { ...spotlightSettings, dimOpacity: val }
+                });
+            }
+        });
+    }, [segment.id, batchAction, updateSpotlight, applyDimToAll, allSpotlightSegments, spotlightSettings, updateSettings]);
+
     const handleTransitionChange = useCallback((val: number) => {
-        batchAction(() => updateSpotlight(segment.id, { transitionDurationMs: Math.round(val) }));
-    }, [segment.id, batchAction, updateSpotlight]);
+        const rounded = Math.round(val);
+        batchAction(() => {
+            updateSpotlight(segment.id, { transitionDurationMs: rounded });
+
+            if (applyTransitionToAll) {
+                for (const s of allSpotlightSegments) {
+                    if (s.id !== segment.id) {
+                        updateSpotlight(s.id, { transitionDurationMs: rounded });
+                    }
+                }
+                updateSettings({
+                    spotlight: { ...spotlightSettings, transitionDurationMs: rounded }
+                });
+            }
+        });
+    }, [segment.id, batchAction, updateSpotlight, applyTransitionToAll, allSpotlightSegments, spotlightSettings, updateSettings]);
 
     const handleEasingChange = useCallback((val: EasingStyle) => {
         updateSpotlight(segment.id, { easing: val });
-    }, [segment.id, updateSpotlight]);
 
-    const handleApplyToAll = useCallback(() => {
-        const updates = {
-            dimOpacity: segment.dimOpacity,
-            transitionDurationMs: segment.transitionDurationMs,
-            easing: segment.easing,
-        };
-        for (const s of allSpotlightSegments) {
-            if (s.id !== segment.id) {
-                updateSpotlight(s.id, updates);
+        if (applyEasingToAll) {
+            for (const s of allSpotlightSegments) {
+                if (s.id !== segment.id) {
+                    updateSpotlight(s.id, { easing: val });
+                }
             }
+            updateSettings({
+                spotlight: { ...spotlightSettings, easing: val }
+            });
         }
-        updateSettings({
-            spotlight: {
-                ...spotlightSettings,
-                dimOpacity: segment.dimOpacity,
-                transitionDurationMs: segment.transitionDurationMs,
-                easing: segment.easing,
+    }, [segment.id, updateSpotlight, applyEasingToAll, allSpotlightSegments, spotlightSettings, updateSettings]);
+
+    // When a checkbox is toggled on, immediately apply current value to all
+    const handleToggleDimAll = useCallback((checked: boolean) => {
+        setApplyDimToAll(checked);
+        if (checked) {
+            for (const s of allSpotlightSegments) {
+                if (s.id !== segment.id) {
+                    updateSpotlight(s.id, { dimOpacity: segment.dimOpacity });
+                }
             }
-        });
+            updateSettings({
+                spotlight: { ...spotlightSettings, dimOpacity: segment.dimOpacity }
+            });
+        }
+    }, [segment, allSpotlightSegments, spotlightSettings, updateSpotlight, updateSettings]);
+
+    const handleToggleTransitionAll = useCallback((checked: boolean) => {
+        setApplyTransitionToAll(checked);
+        if (checked) {
+            for (const s of allSpotlightSegments) {
+                if (s.id !== segment.id) {
+                    updateSpotlight(s.id, { transitionDurationMs: segment.transitionDurationMs });
+                }
+            }
+            updateSettings({
+                spotlight: { ...spotlightSettings, transitionDurationMs: segment.transitionDurationMs }
+            });
+        }
+    }, [segment, allSpotlightSegments, spotlightSettings, updateSpotlight, updateSettings]);
+
+    const handleToggleEasingAll = useCallback((checked: boolean) => {
+        setApplyEasingToAll(checked);
+        if (checked) {
+            for (const s of allSpotlightSegments) {
+                if (s.id !== segment.id) {
+                    updateSpotlight(s.id, { easing: segment.easing });
+                }
+            }
+            updateSettings({
+                spotlight: { ...spotlightSettings, easing: segment.easing }
+            });
+        }
     }, [segment, allSpotlightSegments, spotlightSettings, updateSpotlight, updateSettings]);
 
     return (
         <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine size={16} />} notCollapsible>
             <div className="flex flex-col gap-5">
-                {/* Scale */}
+                <p className="subtext">Check the box to apply to all spotlights.</p>
+
+                {/* Scale — no checkbox, each is independent */}
                 <Slider
                     label="Enlarge"
                     value={segment.scale}
                     onChange={handleScaleChange}
+                    onPointerDown={startInteraction}
+                    onPointerUp={endInteraction}
                     min={1.1}
                     max={2}
                     decimals={2}
@@ -94,40 +160,66 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                     showTooltip
                 />
 
-                {/* Delete */}
-                <DefaultButton onClick={handleDelete} className="text-xs justify-start">
-                    <span>Delete Spotlight</span>
-                </DefaultButton>
-
-                {/* Separator + remaining settings */}
-                <div className="flex flex-col gap-5 pt-2 border-t border-border">
-                    {/* Dim Opacity */}
+                {/* Dim Opacity — custom label row with inline checkbox */}
+                <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                            <Tooltip text="Apply to all spotlights">
+                                <Checkbox
+                                    checked={applyDimToAll}
+                                    onChange={handleToggleDimAll}
+                                />
+                            </Tooltip>
+                            <span className="text-sm text-text-muted">Dim</span>
+                        </div>
+                        <span className="text-xs text-text-muted">
+                            {Math.round(segment.dimOpacity * 100)}%
+                        </span>
+                    </div>
                     <Slider
-                        label="Dim"
                         value={segment.dimOpacity}
                         onChange={handleDimOpacityChange}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
                         min={0.1}
                         max={0.9}
-                        decimals={0}
-                        units="%"
-                        valueTransform={(v) => v * 100}
-                        showTooltip
                     />
+                </div>
 
-                    {/* Transition Duration */}
+                {/* Transition Duration — custom label row with inline checkbox */}
+                <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                            <Tooltip text="Apply to all spotlights">
+                                <Checkbox
+                                    checked={applyTransitionToAll}
+                                    onChange={handleToggleTransitionAll}
+                                />
+                            </Tooltip>
+                            <span className="text-sm text-text-muted">Transition</span>
+                        </div>
+                        <span className="text-xs text-text-muted">
+                            {(segment.transitionDurationMs / 1000).toFixed(2)}s
+                        </span>
+                    </div>
                     <Slider
-                        label="Transition"
                         value={segment.transitionDurationMs}
                         onChange={handleTransitionChange}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
                         min={250}
                         max={2000}
-                        decimals={2}
-                        valueTransform={(v) => v / 1000}
-                        units="s"
-                        showTooltip
                     />
+                </div>
 
-                    {/* Easing */}
+                {/* Easing — checkbox inline to the left */}
+                <div className="flex items-center gap-2">
+                    <Tooltip text="Apply to all spotlights">
+                        <Checkbox
+                            checked={applyEasingToAll}
+                            onChange={handleToggleEasingAll}
+                        />
+                    </Tooltip>
                     <Dropdown
                         options={EASING_OPTIONS}
                         value={segment.easing}
@@ -138,22 +230,30 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                             </InfoTooltip>
                         }
                     />
-
-                    {/* Apply to All */}
-                    <DefaultButton onClick={handleApplyToAll} className="text-xs justify-start">
-                        <span>Apply to All</span>
-                    </DefaultButton>
-
-                    {/* Delete All */}
-                    <DefaultButton onClick={handleDeleteAll} className="text-xs justify-start">
-                        <span>Delete All</span>
-                    </DefaultButton>
-
-                    {/* Reset */}
-                    <DefaultButton onClick={handleReset} className="text-xs justify-start">
-                        <span>Reset</span>
-                    </DefaultButton>
                 </div>
+
+                {/* Delete */}
+                <div className="flex items-center gap-2">
+                    <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                        <span>Delete This</span>
+                    </button>
+                    <button onClick={handleDeleteAll} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                        <span>Delete All</span>
+                    </button>
+                </div>
+
+                {/* Auto Generate */}
+                {hasTrackableContent && (
+                    <Tooltip text={!hasHoveredCards ? 'Could not automatically detect areas in the recording suitable for spotlighting.' : ''}>
+                        <button
+                            onClick={() => { resetSpotlights(); selectSpotlight(null); }}
+                            className="interactive-primary flex items-center justify-center gap-2 text-xs w-full"
+                            disabled={!hasHoveredCards}
+                        >
+                            <span>Auto Generate Spotlights</span>
+                        </button>
+                    </Tooltip>
+                )}
             </div>
         </CollapsibleCard>
     );

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
-import { LogoLink, DefaultButton } from '@shared/components';
+import { LogoLink } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -68,15 +68,16 @@ export function DashboardPage() {
                         <div className="text-text-muted text-sm">
                             {projects.length} project{projects.length !== 1 ? 's' : ''}
                         </div>
-                        <DefaultButton onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
+                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-base flex items-center justify-center gap-2">
                             <BiSupport size={18} />
-                        </DefaultButton>
-                        <DefaultButton
+                        </button>
+                        <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            className="interactive-base flex items-center justify-center gap-2"
                         >
                             {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                        </DefaultButton>
+                        </button>
                     </div>
                 </div>
             </header>

@@ -1,6 +1,6 @@
 import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
-import { MultiToggle, Toggle, Dropdown, PrimaryButton, Notice } from '@shared/components';
+import { MultiToggle, Toggle, Dropdown, Notice } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
 import { MdMic, MdVideocam } from 'react-icons/md';
 
@@ -131,13 +131,13 @@ export function RecordingConfig({
                 </Notice>
             )}
 
-            <PrimaryButton
+            <button
                 onClick={startRecording}
                 disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
-                className="mt-4 w-full"
+                className="interactive-primary flex items-center justify-center gap-2 mt-4 w-full"
             >
                 Start Recording
-            </PrimaryButton>
+            </button>
         </div>
     );
 }

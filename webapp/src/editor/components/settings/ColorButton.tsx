@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ColorSettings } from './ColorSettings';
-import { DefaultButton } from '@shared/components/DefaultButton';
+
+
 
 interface ColorButtonProps {
     /** Current color value (hex format) */
@@ -70,10 +71,10 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
         <div className="flex items-center gap-3">
             <span className="text-sm text-text-muted w-[80px] shrink-0">{title}</span>
             <div className="flex-1 min-w-0">
-                <DefaultButton
+                <button
                     ref={buttonRef}
                     onClick={toggleColorPopover}
-                    className="w-full justify-start gap-3 px-2"
+                    className="interactive-base flex items-center justify-center gap-2 w-full justify-start gap-3 px-2"
                 >
                     <div
                         className="w-5 h-5 rounded-full border border-text-muted shrink-0"
@@ -85,7 +86,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                     <span className="text-xs font-mono text-text-muted uppercase">
                         {color}
                     </span>
-                </DefaultButton>
+                </button>
             </div>
 
             {showColorPopover && createPortal(

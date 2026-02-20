@@ -7,12 +7,12 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import type { CaptionSegment } from '../../../types';
-import { Slider, DefaultButton, CollapsibleCard, Toggle, Dropdown, Tooltip, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, CollapsibleCard, Toggle, Dropdown, Tooltip, type PreviewItem, type DropdownOption } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
 import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
 
-import { PrimaryButton } from '@shared/components';
+
 import { Notice } from '@shared/components';
 import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
@@ -377,13 +377,13 @@ export function CaptionsSettings() {
                     >
                         <div className="flex flex-col gap-3">
                             <Tooltip text={transcribeTooltip} className="w-full">
-                                <PrimaryButton
+                                <button
                                     onClick={handleGenerate}
                                     disabled={!hasMicrophone}
-                                    className="w-full flex items-center justify-center"
+                                    className="interactive-primary flex items-center justify-center gap-2 w-full"
                                 >
                                     Transcribe
-                                </PrimaryButton>
+                                </button>
                             </Tooltip>
 
                             {/* Language Dropdown */}
@@ -401,17 +401,17 @@ export function CaptionsSettings() {
                             {settings.baselineCaptions && settings.baselineCaptions.length > 0 &&
                                 JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
                                     <Tooltip text="Restore transcription from the last AI-generated captions" className="w-full">
-                                        <DefaultButton
+                                        <button
                                             onClick={() => {
                                                 selectCaption(null);
                                                 setEditingId(null);
                                                 endInteraction();
                                                 restoreCaptionsFromBaseline();
                                             }}
-                                            className="w-full"
+                                            className="interactive-base flex items-center justify-center gap-2 w-full"
                                         >
                                             Restore
-                                        </DefaultButton>
+                                        </button>
                                     </Tooltip>
                                 )}
                         </div>

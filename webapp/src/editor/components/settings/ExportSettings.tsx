@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaCrown, FaGift } from 'react-icons/fa';
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight } from 'react-icons/tb';
-import { PrimaryButton, CollapsibleCard, MultiToggle } from '@shared/components';
+import { CollapsibleCard, MultiToggle } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -205,13 +205,13 @@ export function ExportSettings() {
             )}
 
             {/* Export Button */}
-            <PrimaryButton
+            <button
                 onClick={handleExport}
-                className="w-full"
+                className="interactive-primary flex items-center justify-center gap-2 w-full"
                 disabled={isExporting}
             >
                 Export {selectedQuality}
-            </PrimaryButton>
+            </button>
 
             {/* Modals */}
             <AuthModal

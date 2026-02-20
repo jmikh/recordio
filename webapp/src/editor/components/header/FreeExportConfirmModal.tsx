@@ -1,5 +1,5 @@
 import { FaGift } from 'react-icons/fa';
-import { PrimaryButton, DefaultButton, XButton, Modal } from '@shared/components';
+import { XButton, Modal } from '@shared/components';
 import type { ExportQuality } from '../../export/ExportManager';
 
 interface FreeExportConfirmModalProps {
@@ -34,13 +34,13 @@ export function FreeExportConfirmModal({ isOpen, onClose, onConfirm, selectedQua
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-                <DefaultButton onClick={onClose} className="flex-1">
+                <button onClick={onClose} className="interactive-base flex items-center justify-center gap-2 flex-1">
                     Cancel
-                </DefaultButton>
-                <PrimaryButton onClick={onConfirm} className="flex-1 py-2">
+                </button>
+                <button onClick={onConfirm} className="interactive-primary flex items-center justify-center gap-2 flex-1 py-2">
                     <FaGift className="mr-2" size={14} />
                     Export Now — Free
-                </PrimaryButton>
+                </button>
             </div>
         </Modal>
     );

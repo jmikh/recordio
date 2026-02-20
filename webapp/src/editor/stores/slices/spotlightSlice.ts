@@ -102,9 +102,8 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
         set(state => {
             const project = state.project;
             const sourceSize = project.screenSource.size;
-            const hasUserEvents = project.userEvents.mousePositions.length > 0;
 
-            if (!sourceSize || sourceSize.width === 0 || !hasUserEvents) {
+            if (!project.screenSource.trackableContentRect) {
                 return state;
             }
 

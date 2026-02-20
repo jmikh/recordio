@@ -3,7 +3,7 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, DefaultButton, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
@@ -115,56 +115,7 @@ export const ScreenSettings = () => {
 
     return (
         <div className="flex flex-col gap-3">
-            {/* Area 1: Size Settings */}
-            <CollapsibleCard
-                title="Size"
-                icon={<TbResize size={16} />}
-                previewItems={sizePreviewItems}
-                isExpanded={showCollapsibleSize}
-                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSize', v)}
-            >
-                <div className="space-y-4">
-                    {/* Padding Slider */}
-                    <Slider
-                        label="Padding"
-                        min={0}
-                        max={0.25}
-                        value={screenConfig.padding || 0}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(val) => batchAction(() => updateSettings({
-                            screen: {
-                                ...screenConfig,
-                                padding: val
-                            }
-                        }))}
-                        showTooltip
-                        valueTransform={(val) => val * 100}
-                        units="%"
-                        decimals={0}
-                    />
-
-                    {/* Crop Screen Button */}
-                    <DefaultButton
-                        onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
-                        className={`w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
-                    >
-                        {isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-4 h-4" />}
-                        {isEditingCrop ? 'Done' : 'Crop Screen'}
-                    </DefaultButton>
-
-                    {/* Aspect Ratio Dropdown */}
-                    <Dropdown
-                        options={resolutionOptions}
-                        value={currentResolutionObj}
-                        onChange={handleResolutionChange}
-                        label="Aspect Ratio"
-                    />
-
-                </div>
-            </CollapsibleCard>
-
-            {/* Area 2: Toolbar Settings — only when viewport exists */}
+            {/* Toolbar Settings — only when viewport exists */}
             {project.screenSource.trackableContentRect && (() => {
                 const toolbarEnabled = screenConfig.toolbar.enabled;
 
@@ -221,7 +172,7 @@ export const ScreenSettings = () => {
                 );
             })()}
 
-            {/* Area 2: Frame Settings */}
+            {/* Frame Settings */}
             <CollapsibleCard
                 title="Frame"
                 icon={<TbFrame size={16} />}
@@ -334,6 +285,55 @@ export const ScreenSettings = () => {
                             />
                         </div>
                     )}
+                </div>
+            </CollapsibleCard>
+
+            {/* Size Settings */}
+            <CollapsibleCard
+                title="Size"
+                icon={<TbResize size={16} />}
+                previewItems={sizePreviewItems}
+                isExpanded={showCollapsibleSize}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSize', v)}
+            >
+                <div className="space-y-4">
+                    {/* Padding Slider */}
+                    <Slider
+                        label="Padding"
+                        min={0}
+                        max={0.25}
+                        value={screenConfig.padding || 0}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(val) => batchAction(() => updateSettings({
+                            screen: {
+                                ...screenConfig,
+                                padding: val
+                            }
+                        }))}
+                        showTooltip
+                        valueTransform={(val) => val * 100}
+                        units="%"
+                        decimals={0}
+                    />
+
+                    {/* Crop Screen Button */}
+                    <button
+                        onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
+                        className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
+                    >
+                        {isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-4 h-4" />}
+                        {isEditingCrop ? 'Done' : 'Crop Screen'}
+                    </button>
+
+                    {/* Aspect Ratio Dropdown */}
+                    <Dropdown
+                        options={resolutionOptions}
+                        value={currentResolutionObj}
+                        onChange={handleResolutionChange}
+                        label="Aspect Ratio"
+                    />
+
                 </div>
             </CollapsibleCard>
         </div>

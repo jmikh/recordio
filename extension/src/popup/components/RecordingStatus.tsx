@@ -1,4 +1,4 @@
-import { PrimaryButton } from '@shared/components';
+
 import { MdMic, MdMicOff, MdVideocam, MdVideocamOff } from 'react-icons/md';
 
 interface RecordingStatusProps {
@@ -46,12 +46,12 @@ export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, ha
             </div>
 
             {/* Finish Recording Button */}
-            <PrimaryButton
+            <button
                 onClick={stopRecording}
-                className="w-full py-2.5"
+                className="interactive-primary flex items-center justify-center gap-2 w-full py-2.5"
             >
                 Finish Recording
-            </PrimaryButton>
+            </button>
         </div>
     );
 }

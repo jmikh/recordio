@@ -11,7 +11,8 @@ export const XButton = ({ onClick, title = "Remove", className = "" }: XButtonPr
     return (
         <button
             onClick={onClick}
-            className={`w-5 h-5 flex items-center justify-center transition-colors ${className}`}
+            className={`w-5 h-5 flex items-center justify-center rounded-full transition-colors ${className}`}
+            style={{ backgroundColor: 'color-mix(in oklch, var(--color-surface) 70%, transparent)' }}
             title={title}
         >
             <svg className="w-3.5 h-3.5 text-text-muted hover:text-destructive transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">

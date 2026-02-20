@@ -6,7 +6,7 @@ const EASING_CURVES: Record<EasingStyle, string> = {
     'linear': 'M 4 28 L 28 4',
     'ease-in': 'M 4 28 C 4 28 20 28 28 4',
     'ease-out': 'M 4 28 C 4 4 24 4 28 4',
-    'ease-in-out': 'M 4 28 C 4 16 28 16 28 4',
+    'ease-in-out': 'M 4 28 C 14 28 16 16 16 16 S 18 4 28 4',
 };
 
 const EASING_DESCRIPTIONS: Record<EasingStyle, string> = {

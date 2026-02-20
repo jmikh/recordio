@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, GhostButton, Tooltip, CollapsibleCard } from '@shared/components';
+import { Slider, Tooltip, CollapsibleCard } from '@shared/components';
 import type { OutputWindow } from '../../../types';
 import { MdDelete } from 'react-icons/md';
 import { PiVideoBold } from 'react-icons/pi';
@@ -57,16 +57,16 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
                 <div className="flex flex-col gap-2 pt-2 border-t border-border">
                     {isLastWindow ? (
                         <Tooltip text="Cannot delete the last clip">
-                            <GhostButton disabled className="text-xs justify-start opacity-50">
+                            <button disabled className="interactive-ghost flex items-center justify-center gap-2 text-xs justify-start opacity-50">
                                 <MdDelete size={16} />
                                 <span>Delete Clip</span>
-                            </GhostButton>
+                            </button>
                         </Tooltip>
                     ) : (
-                        <GhostButton onClick={handleDelete} className="text-xs justify-start text-danger hover:text-danger">
+                        <button onClick={handleDelete} className="interactive-ghost flex items-center justify-center gap-2 text-xs justify-start text-danger hover:text-danger">
                             <MdDelete size={16} />
                             <span>Delete Clip</span>
-                        </GhostButton>
+                        </button>
                     )}
                 </div>
             </div>

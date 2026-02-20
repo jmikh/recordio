@@ -207,11 +207,10 @@ function Editor() {
                 return;
             }
 
-            // If a button is focused, Space natively triggers its click event.
-            // Skip our handler to avoid double-toggling play/pause.
+            // Blur any focused button so Space doesn't natively click it,
+            // then fall through to play/pause.
             if (e.code === 'Space' && activeTag === 'button') {
-                e.preventDefault();
-                return;
+                (document.activeElement as HTMLElement)?.blur();
             }
 
             if ((e.metaKey || e.ctrlKey) && e.key === 'z') {

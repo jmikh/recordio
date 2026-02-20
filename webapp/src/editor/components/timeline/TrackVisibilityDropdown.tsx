@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MdVisibility } from 'react-icons/md';
 import { useUIStore, type TrackVisibility } from '../../stores/useUIStore';
+import { Checkbox } from '@shared/components';
 
 const TRACKS: { key: keyof TrackVisibility; label: string }[] = [
     { key: 'zoom', label: 'Zoom' },
@@ -75,32 +76,7 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
                             }
                         `}
                     >
-                        {/* Checkbox indicator */}
-                        <div
-                            className={`
-                                w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 transition-colors
-                                ${isVisible
-                                    ? 'bg-primary border-primary'
-                                    : 'bg-transparent border-border-hover'
-                                }
-                            `}
-                        >
-                            {isVisible && (
-                                <svg
-                                    width="10"
-                                    height="10"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-primary-fg"
-                                >
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                            )}
-                        </div>
+                        <Checkbox checked={isVisible} onChange={() => setTrackVisibility(key, !isVisible)} />
                         <span>{label}</span>
                     </button>
                 );

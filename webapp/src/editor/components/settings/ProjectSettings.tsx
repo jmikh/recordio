@@ -4,7 +4,7 @@ import { ProjectStorage } from '../../../storage/projectStorage';
 import type { Project } from '../../../types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { ProjectCard } from '../../../components/ProjectCard';
-import { DefaultButton } from '@shared/components';
+
 import { XButton } from '@shared/components';
 
 export const ProjectSettings = () => {
@@ -86,12 +86,12 @@ export const ProjectSettings = () => {
             {/* Delete All Button */}
             {projects.length > 0 && (
                 <div className="mb-4">
-                    <DefaultButton
+                    <button
                         onClick={() => setShowDeleteAllModal(true)}
-                        className="w-full text-destructive hover:text-white hover:bg-destructive/80"
+                        className="interactive-base flex items-center justify-center gap-2 w-full text-destructive hover:text-white hover:bg-destructive/80"
                     >
                         Delete All Projects
-                    </DefaultButton>
+                    </button>
                 </div>
             )}
 
@@ -127,12 +127,13 @@ export const ProjectSettings = () => {
                         </p>
 
                         <div className="flex gap-3 justify-end">
-                            <DefaultButton
+                            <button
                                 onClick={() => setShowDeleteAllModal(false)}
                                 disabled={isDeleting}
+                                className="interactive-base flex items-center justify-center gap-2"
                             >
                                 Cancel
-                            </DefaultButton>
+                            </button>
                             <button
                                 onClick={handleDeleteAll}
                                 disabled={isDeleting}

@@ -1,13 +1,11 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, GhostButton, CollapsibleCard, InfoTooltip, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { ZoomSegment } from '../../../types';
-import { MdDelete } from 'react-icons/md';
 import { TbZoomIn } from 'react-icons/tb';
-import { VscCopy } from 'react-icons/vsc';
 import { EasingTooltipContent } from './EasingTooltipContent';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
@@ -20,80 +18,158 @@ const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
 export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) => {
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
+    const clearZoomSegments = useProjectStore(s => s.clearZoomSegments);
+    const resetZooms = useProjectStore(s => s.resetZooms);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const selectZoom = useUIStore(s => s.selectZoom);
-    const { batchAction } = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const allZoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
     const zoomSettings = useProjectStore(s => s.project.settings.zoom);
+    const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
+
+    // Per-setting "apply to all" checkboxes — reset on each mount
+    const [applyTransitionToAll, setApplyTransitionToAll] = useState(false);
+    const [applyEasingToAll, setApplyEasingToAll] = useState(false);
 
     const handleDelete = useCallback(() => {
         deleteZoomSegment(segment.id);
         selectZoom(null);
     }, [segment.id, deleteZoomSegment, selectZoom]);
 
+    const handleDeleteAll = useCallback(() => {
+        clearZoomSegments();
+        selectZoom(null);
+    }, [clearZoomSegments, selectZoom]);
+
     const handleTransitionChange = useCallback((val: number) => {
-        batchAction(() => updateZoomSegment(segment.id, { transitionDurationMs: Math.round(val) }));
-    }, [segment.id, batchAction, updateZoomSegment]);
+        const rounded = Math.round(val);
+        batchAction(() => {
+            updateZoomSegment(segment.id, { transitionDurationMs: rounded });
+
+            if (applyTransitionToAll) {
+                for (const z of allZoomSegments) {
+                    if (z.id !== segment.id) {
+                        updateZoomSegment(z.id, { transitionDurationMs: rounded });
+                    }
+                }
+                updateSettings({
+                    zoom: { ...zoomSettings, transitionDurationMs: rounded }
+                });
+            }
+        });
+    }, [segment.id, batchAction, updateZoomSegment, applyTransitionToAll, allZoomSegments, zoomSettings, updateSettings]);
 
     const handleEasingChange = useCallback((val: EasingStyle) => {
         updateZoomSegment(segment.id, { easing: val });
-    }, [segment.id, updateZoomSegment]);
 
-    const handleApplyToAll = useCallback(() => {
-        const updates = {
-            transitionDurationMs: segment.transitionDurationMs,
-            easing: segment.easing,
-        };
-        for (const z of allZoomSegments) {
-            if (z.id !== segment.id) {
-                updateZoomSegment(z.id, updates);
+        if (applyEasingToAll) {
+            for (const z of allZoomSegments) {
+                if (z.id !== segment.id) {
+                    updateZoomSegment(z.id, { easing: val });
+                }
             }
+            updateSettings({
+                zoom: { ...zoomSettings, easing: val }
+            });
         }
-        updateSettings({
-            zoom: { ...zoomSettings, transitionDurationMs: segment.transitionDurationMs, easing: segment.easing }
-        });
+    }, [segment.id, updateZoomSegment, applyEasingToAll, allZoomSegments, zoomSettings, updateSettings]);
+
+    // When a checkbox is toggled on, immediately apply current value to all
+    const handleToggleTransitionAll = useCallback((checked: boolean) => {
+        setApplyTransitionToAll(checked);
+        if (checked) {
+            for (const z of allZoomSegments) {
+                if (z.id !== segment.id) {
+                    updateZoomSegment(z.id, { transitionDurationMs: segment.transitionDurationMs });
+                }
+            }
+            updateSettings({
+                zoom: { ...zoomSettings, transitionDurationMs: segment.transitionDurationMs }
+            });
+        }
+    }, [segment, allZoomSegments, zoomSettings, updateZoomSegment, updateSettings]);
+
+    const handleToggleEasingAll = useCallback((checked: boolean) => {
+        setApplyEasingToAll(checked);
+        if (checked) {
+            for (const z of allZoomSegments) {
+                if (z.id !== segment.id) {
+                    updateZoomSegment(z.id, { easing: segment.easing });
+                }
+            }
+            updateSettings({
+                zoom: { ...zoomSettings, easing: segment.easing }
+            });
+        }
     }, [segment, allZoomSegments, zoomSettings, updateZoomSegment, updateSettings]);
 
     return (
         <CollapsibleCard title="Zoom" icon={<TbZoomIn size={16} />} notCollapsible>
             <div className="flex flex-col gap-5">
-                {/* Transition Duration */}
-                <Slider
-                    label="Transition"
-                    value={segment.transitionDurationMs}
-                    onChange={handleTransitionChange}
-                    min={100}
-                    max={1500}
-                    decimals={2}
-                    valueTransform={(v) => v / 1000}
-                    units="s"
-                    showTooltip
-                />
-
-                {/* Easing */}
-                <Dropdown
-                    options={EASING_OPTIONS}
-                    value={segment.easing}
-                    onChange={handleEasingChange}
-                    suffix={
-                        <InfoTooltip description="">
-                            <EasingTooltipContent />
-                        </InfoTooltip>
-                    }
-                />
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                    <GhostButton onClick={handleApplyToAll} className="text-xs justify-start">
-                        <VscCopy size={14} />
-                        <span>Apply to All Zooms</span>
-                    </GhostButton>
-                    <GhostButton onClick={handleDelete} className="text-xs justify-start text-danger hover:text-danger">
-                        <MdDelete size={16} />
-                        <span>Delete Zoom</span>
-                    </GhostButton>
+                <p className="subtext">Check the box to apply to all zooms.</p>
+                {/* Transition Duration — custom label row with inline checkbox */}
+                <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                            <Tooltip text="Apply to all zooms">
+                                <Checkbox
+                                    checked={applyTransitionToAll}
+                                    onChange={handleToggleTransitionAll}
+                                />
+                            </Tooltip>
+                            <span className="text-sm text-text-muted">Transition</span>
+                        </div>
+                        <span className="text-xs text-text-muted">
+                            {(segment.transitionDurationMs / 1000).toFixed(2)}s
+                        </span>
+                    </div>
+                    <Slider
+                        value={segment.transitionDurationMs}
+                        onChange={handleTransitionChange}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        min={250}
+                        max={2000}
+                    />
                 </div>
+
+                {/* Easing — checkbox inline to the left */}
+                <div className="flex items-center gap-2">
+                    <Tooltip text="Apply to all zooms">
+                        <Checkbox
+                            checked={applyEasingToAll}
+                            onChange={handleToggleEasingAll}
+                        />
+                    </Tooltip>
+                    <Dropdown
+                        options={EASING_OPTIONS}
+                        value={segment.easing}
+                        onChange={handleEasingChange}
+                        suffix={
+                            <InfoTooltip description="">
+                                <EasingTooltipContent />
+                            </InfoTooltip>
+                        }
+                    />
+                </div>
+
+                {/* Delete */}
+                <div className="flex items-center gap-2">
+                    <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                        <span>Delete This</span>
+                    </button>
+                    <button onClick={handleDeleteAll} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                        <span>Delete All</span>
+                    </button>
+                </div>
+
+                {/* Auto Generate */}
+                {hasTrackableContent && (
+                    <button onClick={() => { resetZooms(); selectZoom(null); }} className="interactive-primary flex items-center justify-center gap-2 text-xs">
+                        <span>Auto Generate Zooms</span>
+                    </button>
+                )}
             </div>
         </CollapsibleCard>
     );

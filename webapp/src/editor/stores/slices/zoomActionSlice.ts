@@ -3,12 +3,14 @@ import type { ProjectState } from '../useProjectStore';
 import type { ID, ZoomSegment } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
+import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
 
 export interface ZoomSegmentSlice {
     updateZoomSegment: (id: ID, action: Partial<ZoomSegment>) => void;
     addZoomSegment: (action: ZoomSegment) => void;
     deleteZoomSegment: (id: ID) => void;
     clearZoomSegments: () => void;
+    resetZooms: () => void;
 }
 
 export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomSegmentSlice> = (set, _get, store) => ({
@@ -85,6 +87,46 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     timeline: {
                         ...state.project.timeline,
                         zoomSegments: []
+                    }
+                }
+            };
+        });
+    },
+
+    resetZooms: () => {
+
+        set(state => {
+            const project = state.project;
+            const sourceSize = project.screenSource.size;
+            const hasUserEvents = project.userEvents.mousePositions.length > 0;
+
+            if (!project.screenSource.trackableContentRect) {
+                return state;
+            }
+
+            const viewMapper = new ViewMapper(
+                sourceSize,
+                project.settings.outputSize,
+                project.settings.screen.padding,
+                project.settings.screen.crop,
+                project.screenSource.trackableContentRect,
+                project.settings.screen.toolbar.enabled
+            );
+            const timeMapper = getTimeMapper(project.timeline.outputWindows);
+            const focusAreas = getAllFocusAreas(project.userEvents, sourceSize, project.screenSource.durationMs);
+            const zoomSegments = calculateAutoZooms(
+                project.settings.zoom,
+                viewMapper,
+                timeMapper,
+                focusAreas
+            );
+
+            return {
+                project: {
+                    ...project,
+                    timeline: {
+                        ...project.timeline,
+                        zoomSegments
                     }
                 }
             };

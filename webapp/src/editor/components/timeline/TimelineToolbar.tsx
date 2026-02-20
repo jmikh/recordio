@@ -8,7 +8,7 @@ import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdContentCut, MdRefresh } from 'react-icons/md';
-import { Slider, GhostButton, Tooltip } from '@shared/components';
+import { Slider, Tooltip } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -199,20 +199,20 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 {/* AutoCut Button */}
                 {showAutoCut && (
                     <Tooltip text="Remove silent/inactive segments">
-                        <GhostButton
+                        <button
                             onClick={handleAutoCut}
-                            className="px-3 py-1 text-xs flex items-center gap-1"
+                            className="interactive-ghost flex items-center justify-center gap-2 px-3 py-1 text-xs flex items-center gap-1"
                             disabled={isAnalyzing}
                         >
                             <MdContentCut size={14} />
                             AutoCut
-                        </GhostButton>
+                        </button>
                     </Tooltip>
                 )}
 
                 {/* Reset Windows Button */}
                 <Tooltip text="Reset to single window">
-                    <GhostButton
+                    <button
                         onClick={() => {
                             setOutputWindows([{
                                 id: crypto.randomUUID(),
@@ -221,11 +221,11 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                                 speed: 1.0
                             }]);
                         }}
-                        className="px-3 py-1 text-xs flex items-center gap-1"
+                        className="interactive-ghost flex items-center justify-center gap-2 px-3 py-1 text-xs flex items-center gap-1"
                     >
                         <MdRefresh size={14} />
                         Reset
-                    </GhostButton>
+                    </button>
                 </Tooltip>
             </div>
 
@@ -251,19 +251,19 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-                <GhostButton
+                <button
                     onClick={onFit}
-                    className="px-2 py-0.5 text-[10px]"
+                    className="interactive-ghost flex items-center justify-center gap-2 px-2 py-0.5 text-[10px]"
                     title="Fit timeline to screen"
                 >
                     Fit
-                </GhostButton>
-                <GhostButton
+                </button>
+                <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                    className="px-1"
+                    className="interactive-ghost flex items-center justify-center gap-2 px-1"
                 >
                     <MdRemove size={14} />
-                </GhostButton>
+                </button>
                 <div className="w-24">
                     <Slider
                         value={pixelsPerSec}
@@ -274,12 +274,12 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                         onPointerUp={batcher.endInteraction}
                     />
                 </div>
-                <GhostButton
+                <button
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                    className="px-1"
+                    className="interactive-ghost flex items-center justify-center gap-2 px-1"
                 >
                     <MdAdd size={14} />
-                </GhostButton>
+                </button>
             </div>
         </div>
     );

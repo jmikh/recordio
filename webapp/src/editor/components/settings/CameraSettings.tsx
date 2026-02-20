@@ -2,7 +2,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, InfoTooltip, DefaultButton, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { Slider, MultiToggle, Toggle, InfoTooltip, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { FaCheck, FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
 import { MdAspectRatio, MdStyle } from 'react-icons/md';
@@ -136,13 +136,13 @@ export const CameraSettings = () => {
 
                         {/* Adjust Button */}
                         <div className="flex flex-col gap-1">
-                            <DefaultButton
+                            <button
                                 onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                                className={`w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
+                                className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
                             >
                                 {isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight />}
                                 {isEditingCamera ? 'Done' : 'Adjust'}
-                            </DefaultButton>
+                            </button>
                             <span className="text-xs text-text-disabled text-center">Size, Position, Corner Radius</span>
                         </div>
                     </div>

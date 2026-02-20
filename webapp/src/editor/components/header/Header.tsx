@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { BiSupport } from 'react-icons/bi';
-import { DefaultButton } from '@shared/components';
+
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -36,22 +36,22 @@ export const Header = () => {
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
-                        <DefaultButton
+                        <button
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="p-1.5"
+                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
                         >
                             <FaUndo size={14} />
-                        </DefaultButton>
-                        <DefaultButton
+                        </button>
+                        <button
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="p-1.5"
+                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
                         >
                             <FaRedo size={14} />
-                        </DefaultButton>
+                        </button>
                         <span className="text-[10px] text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>
@@ -64,7 +64,7 @@ export const Header = () => {
                             {<button
                                 onClick={() => useUIStore.getState().toggleDebugBar()}
                                 title="Toggle Debug Bar"
-                                className="px-2 py-1 text-[10px] text-text-main hover:text-text-highlighted hover:bg-surface rounded border border-border"
+                                className="interactive-ghost px-2 py-1 h-auto text-[10px]"
                             >
                                 Debug
                             </button>}
@@ -88,19 +88,20 @@ export const Header = () => {
                     {isAuthenticated ? (
                         <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                     ) : (
-                        <DefaultButton onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
+                        <button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features" className="interactive-ghost flex items-center justify-center gap-2">
                             Sign In
-                        </DefaultButton>
+                        </button>
                     )}
-                    <DefaultButton onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
+                    <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center p-1.5 h-auto">
                         <BiSupport size={18} />
-                    </DefaultButton>
-                    <DefaultButton
+                    </button>
+                    <button
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                        className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
                     >
                         {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                    </DefaultButton>
+                    </button>
                 </div>
             </div>
 

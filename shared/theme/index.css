@@ -218,6 +218,11 @@ body,
    font-weight: 500;
 }
 
+/* Suppress browser focus ring on mouse-click; keep for keyboard navigation */
+:focus:not(:focus-visible) {
+   outline: none;
+}
+
 /* ============================================================
    Layer 4: Component Classes
    ============================================================ */
@@ -237,6 +242,12 @@ body,
    /* Interactive Base - for buttons, dropdowns, and other clickable controls */
    .interactive-base {
       @apply h-9 px-3 bg-state-inactive border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-state-inactive disabled:hover:text-text-main;
+      box-shadow: var(--shadow-button);
+   }
+
+   /* Interactive Primary - primary-colored variant */
+   .interactive-primary {
+      @apply h-9 px-3 bg-primary border border-border rounded-[var(--radius-interactive)] text-sm text-text-on-primary font-medium hover:bg-primary-highlighted transition-colors cursor-pointer disabled:cursor-default disabled:opacity-70 disabled:hover:bg-primary;
       box-shadow: var(--shadow-button);
    }
 
