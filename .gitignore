@@ -35,3 +35,6 @@ extension.zip
 
 # CDN assets (uploaded to R2)
 cdn/
+
+# TypeScript build info
+*.tsbuildinfo
