@@ -14,9 +14,9 @@ export const useHistoryBatcher = () => {
     const startInteraction = useCallback(() => {
         if (interactionCount === 0) {
             hasLatched = false;
-            // Safety check to ensure we aren't already paused from a stuck state
+            // Safety check: zundo v2 uses 'isTracking' (not 'isPaused')
             const temporalState = useProjectStore.temporal.getState() as any;
-            if (temporalState.isPaused) {
+            if (!temporalState.isTracking) {
                 temporalState.resume();
             }
         }
