@@ -92,9 +92,17 @@ function Editor() {
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
                 const rawPicture = avatar_url || picture || null;
-                const userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
 
-                setUser(session.user.id, session.user.email || '', userName, userPicture);
+                // Skip fetch if we already have a cached data URL for this source
+                const cached = useUserStore.getState();
+                let userPicture: string | null;
+                if (rawPicture && cached.pictureSourceUrl === rawPicture && cached.picture?.startsWith('data:')) {
+                    userPicture = cached.picture;
+                } else {
+                    userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
+                }
+
+                setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
 
                 // Fetch subscription status from database
                 try {
@@ -147,9 +155,17 @@ function Editor() {
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
                 const rawPicture = avatar_url || picture || null;
-                const userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
 
-                setUser(session.user.id, session.user.email || '', userName, userPicture);
+                // Skip fetch if we already have a cached data URL for this source
+                const cached = useUserStore.getState();
+                let userPicture: string | null;
+                if (rawPicture && cached.pictureSourceUrl === rawPicture && cached.picture?.startsWith('data:')) {
+                    userPicture = cached.picture;
+                } else {
+                    userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
+                }
+
+                setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
             }
         });
     }, []);

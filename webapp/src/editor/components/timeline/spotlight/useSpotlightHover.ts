@@ -8,6 +8,7 @@ import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils
 import type { TimeMapper } from '../../../../core/mappers/timeMapper';
 import { getZoomBoundsForRange } from '../../../../core/zoom/zoomBounds';
 import { ViewMapper } from '../../../../core/mappers/viewMapper';
+import { getDeviceFrame } from '../../../../core/deviceFrames';
 
 export interface HoverInfo {
     x: number; // Left position in pixels
@@ -150,6 +151,10 @@ export function useSpotlightHover(
         let initialSourceRect;
 
         if (zoomBoundsUsable && zoomBounds) {
+            const deviceFrame = project.settings.screen.mode === 'device'
+                ? getDeviceFrame(project.settings.screen.deviceFrameId)
+                : undefined;
+
             // Convert zoom bounds (output coords) → source coords via ViewMapper
             const viewMapper = new ViewMapper(
                 sourceSize,
@@ -157,7 +162,8 @@ export function useSpotlightHover(
                 project.settings.screen.padding,
                 project.settings.screen.crop,
                 project.screenSource.trackableContentRect,
-                project.settings.screen.toolbar.enabled
+                project.settings.screen.toolbar.enabled,
+                deviceFrame
             );
             const contentRect = viewMapper.contentRect;
 

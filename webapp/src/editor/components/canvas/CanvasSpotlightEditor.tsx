@@ -9,6 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 import { ViewMapper } from '../../../core/mappers/viewMapper';
+import { getDeviceFrame } from '../../../core/deviceFrames';
 import { getZoomBoundsForRange } from '../../../core/zoom/zoomBounds';
 
 import { type RenderResources } from './PlaybackRenderer';
@@ -77,19 +78,26 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         const screenSource = project.screenSource;
         if (!screenSource.id) return null;
 
+        const deviceFrame = project.settings.screen.mode === 'device'
+            ? getDeviceFrame(project.settings.screen.deviceFrameId)
+            : undefined;
+
         return new ViewMapper(
             screenSource.size,
             project.settings.outputSize,
             project.settings.screen.padding,
             project.settings.screen.crop,
             project.screenSource.trackableContentRect,
-            project.settings.screen.toolbar.enabled
+            project.settings.screen.toolbar.enabled,
+            deviceFrame
         );
     }, [
         project.screenSource,
         project.settings.outputSize,
         project.settings.screen.padding,
-        project.settings.screen.crop
+        project.settings.screen.crop,
+        project.settings.screen.mode,
+        project.settings.screen.deviceFrameId
     ]);
 
     // The content rect is where the screen content appears in output coordinates
@@ -336,7 +344,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                             top: displayRect.y,
                             width: displayRect.width,
                             height: displayRect.height,
-                            border: '1px dashed white',
+                            border: '1px solid white',
                             borderRadius: `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`,
                             pointerEvents: 'none',
                             boxSizing: 'border-box',

@@ -2,6 +2,7 @@ import { type Project, type ScreenMetadata, type CameraMetadata, type Microphone
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
+import { getDeviceFrame } from './deviceFrames';
 
 // Empty events constant
 const EMPTY_USER_EVENTS: UserEvents = {
@@ -199,13 +200,18 @@ export class ProjectImpl {
         }];
 
         // Calculate Zoom Schedule
+        const deviceFrame = settings.screen.mode === 'device'
+            ? getDeviceFrame(settings.screen.deviceFrameId)
+            : undefined;
+
         const viewMapper = new ViewMapper(
             screenSource.size,
             settings.outputSize,
             settings.screen.padding,
             undefined,
             screenSource.trackableContentRect,
-            settings.screen.toolbar.enabled
+            settings.screen.toolbar.enabled,
+            deviceFrame
         );
 
         const timeMapper = new TimeMapper(outputWindows);

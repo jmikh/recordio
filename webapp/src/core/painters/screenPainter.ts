@@ -60,12 +60,18 @@ export function drawScreen(
     // 3. Resolve View Mapping
     const outputSize = project.settings.outputSize;
     const padding = project.settings.screen.padding;
-    // Pass the crop settings to the ViewMapper
+
+    // Resolve device frame (if in device mode) so ViewMapper can apply frame-first padding
+    const isDeviceMode = screenConfig.mode === 'device';
+    const deviceFrame = isDeviceMode ? getDeviceFrame(screenConfig.deviceFrameId) : undefined;
+
+    // Pass the crop settings and device frame to the ViewMapper
     const viewMapper = new ViewMapper(
         inputSize, outputSize, padding,
         project.settings.screen.crop,
         project.screenSource.trackableContentRect,
-        project.settings.screen.toolbar.enabled
+        project.settings.screen.toolbar.enabled,
+        deviceFrame
     );
 
     // 4. Calculate Rects
@@ -80,8 +86,6 @@ export function drawScreen(
         const originY = logicalScreenRect.y;
         const projectedW = logicalScreenRect.width;
         const projectedH = logicalScreenRect.height;
-
-        const isDeviceMode = screenConfig.mode === 'device';
 
         // Compute the full content rect (toolbar + video) from ViewMapper
         // Scale toolbar height by zoom factor so it tracks with the content
@@ -129,10 +133,10 @@ export function drawScreen(
                 renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
             );
 
-            // Draw Device Frame Overlay — wraps the full frame (toolbar + content)
-            const deviceFrame = getDeviceFrame(screenConfig.deviceFrameId);
-            if (deviceFrame && deviceFrameImg?.complete) {
-                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, contentRect);
+            // Draw Device Frame Overlay — zoom-aware frame rect
+            const projectedFrameRect = viewMapper.getProjectedFrameRect(effectiveViewport);
+            if (deviceFrame && deviceFrameImg?.complete && projectedFrameRect) {
+                drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, projectedFrameRect);
             }
 
         } else {

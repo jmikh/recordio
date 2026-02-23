@@ -21,6 +21,7 @@ export interface UserState {
     email: string | null;
     name: string | null;
     picture: string | null;
+    pictureSourceUrl: string | null; // Original remote URL that was cached into `picture`
     isAuthenticated: boolean;
 
     // Subscription state
@@ -34,7 +35,7 @@ export interface UserState {
     theme: Theme;
 
     // Actions
-    setUser: (userId: string, email: string, name?: string | null, picture?: string | null) => void;
+    setUser: (userId: string, email: string, name?: string | null, picture?: string | null, pictureSourceUrl?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
     setFreeTrialUntil: (until: string | null) => void;
     setTheme: (theme: Theme) => void;
@@ -55,6 +56,7 @@ export const useUserStore = create<UserState>()(
             email: null,
             name: null,
             picture: null,
+            pictureSourceUrl: null,
             isAuthenticated: false,
             subscription: {
                 status: null,
@@ -68,13 +70,14 @@ export const useUserStore = create<UserState>()(
             theme: 'dark',
 
             // Actions
-            setUser: (userId, email, name = null, picture = null) => {
+            setUser: (userId, email, name = null, picture = null, pictureSourceUrl = null) => {
                 const isDevPro = DEV_PRO_UID ? userId === DEV_PRO_UID : false;
                 set({
                     userId,
                     email,
                     name,
                     picture,
+                    pictureSourceUrl,
                     isAuthenticated: true,
                     ...(isDevPro ? { isPro: true } : {})
                 });
@@ -106,6 +109,7 @@ export const useUserStore = create<UserState>()(
                 email: null,
                 name: null,
                 picture: null,
+                pictureSourceUrl: null,
                 isAuthenticated: false,
                 subscription: {
                     status: null,
@@ -156,6 +160,7 @@ export const useUserStore = create<UserState>()(
                 email: state.email,
                 name: state.name,
                 picture: state.picture,
+                pictureSourceUrl: state.pictureSourceUrl,
                 subscription: state.subscription,
                 theme: state.theme
             }),

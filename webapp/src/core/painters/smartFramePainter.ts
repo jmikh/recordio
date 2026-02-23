@@ -121,54 +121,104 @@ function drawSmartFrame(
 }
 
 /**
- * Draws a device frame overlay around the video screen bounds.
- * Handles positioning and scaling calculations for device frames.
- * 
+ * Computes where a source-space rectangle lands after 9-slice rendering.
+ * Uses the same slice math as drawSmartFrame so the result aligns pixel-perfectly
+ * with the rendered frame image.
+ *
+ * @param screenRect  The screen area in source image pixels (e.g., { x: 329, y: 137, w: 2562, h: 1608 })
+ * @param imageSize   The full source image dimensions
+ * @param destRect    Where the frame is drawn on the canvas (position + size)
+ * @param config      9-slice configuration
+ * @returns           The screen rect in canvas coordinates
+ */
+export function resolveScreenRect(
+    screenRect: { x: number; y: number; width: number; height: number },
+    imageSize: { width: number; height: number },
+    destRect: { x: number; y: number; width: number; height: number },
+    config: FrameScalingConfig
+): { x: number; y: number; width: number; height: number } {
+    const sw = imageSize.width;
+    const sh = imageSize.height;
+
+    const scaleX = destRect.width / sw;
+    const scaleY = destRect.height / sh;
+    const baseScale = Math.min(scaleX, scaleY);
+
+    // Map a source pixel position to destination position along one axis
+    function mapAxis(
+        srcPos: number,
+        srcLen: number,
+        totalSrc: number,
+        destTotal: number,
+        slices: SliceSegment[]
+    ): { pos: number; len: number } {
+        // Compute destination width of each slice
+        const sliceData = slices.map(s => {
+            const segSrc = (s.end - s.start) * totalSrc;
+            return { ...s, srcSize: segSrc };
+        });
+
+        const totalFixedSrc = sliceData.reduce((sum, s) => s.scalable ? sum : sum + s.srcSize, 0);
+        const totalFixedDst = totalFixedSrc * baseScale;
+        const availableScalable = Math.max(0, destTotal - totalFixedDst);
+        const totalScalableSrc = sliceData.reduce((sum, s) => s.scalable ? sum + s.srcSize : sum, 0);
+
+        const mapped = sliceData.map(s => {
+            const dstSize = s.scalable
+                ? (totalScalableSrc > 0 ? availableScalable * (s.srcSize / totalScalableSrc) : 0)
+                : s.srcSize * baseScale;
+            return { ...s, dstSize };
+        });
+
+        // Walk slices to find where srcPos and srcPos+srcLen land
+        function mapPoint(p: number): number {
+            let dstOffset = 0;
+            for (const s of mapped) {
+                const sliceSrcStart = s.start * totalSrc;
+                const sliceSrcEnd = s.end * totalSrc;
+                if (p <= sliceSrcStart) return dstOffset;
+                if (p >= sliceSrcEnd) {
+                    dstOffset += s.dstSize;
+                    continue;
+                }
+                // p is inside this slice
+                const frac = (p - sliceSrcStart) / s.srcSize;
+                return dstOffset + frac * s.dstSize;
+            }
+            return dstOffset;
+        }
+
+        const pos = mapPoint(srcPos);
+        const end = mapPoint(srcPos + srcLen);
+        return { pos, len: end - pos };
+    }
+
+    const hResult = mapAxis(screenRect.x, screenRect.width, sw, destRect.width, config.horizontal);
+    const vResult = mapAxis(screenRect.y, screenRect.height, sh, destRect.height, config.vertical);
+
+    return {
+        x: destRect.x + hResult.pos,
+        y: destRect.y + vResult.pos,
+        width: hResult.len,
+        height: vResult.len
+    };
+}
+
+/**
+ * Draws a device frame image at the given rectangle.
+ * The frameRect is pre-computed by ViewMapper to account for padding and centering.
+ *
  * @param ctx Canvas rendering context
- * @param deviceFrame Device frame metadata including dimensions and scaling config
+ * @param deviceFrame Device frame metadata including scaling config
  * @param img Pre-loaded device frame image element
- * @param videoScreenBounds The bounds of the video screen in canvas coordinates
+ * @param frameRect The output-space rectangle where the frame should be drawn
  */
 export function drawDeviceFrame(
     ctx: CanvasRenderingContext2D,
     deviceFrame: DeviceFrame,
     img: HTMLImageElement,
-    videoScreenBounds: { x: number; y: number; width: number; height: number }
+    frameRect: { x: number; y: number; width: number; height: number }
 ): void {
-    const { x: topLeftX, y: topLeftY, width: videoScreenW, height: videoScreenH } = videoScreenBounds;
-
-    const b = deviceFrame.borderData;
-    let frameW: number, frameH: number, frameX: number, frameY: number;
-
-    if (deviceFrame.customScaling) {
-        // Custom scaling approach: Calculate scale based on screen dimensions
-        const srcScreenW = deviceFrame.screenRect.width;
-        const srcScreenH = deviceFrame.screenRect.height;
-        const srcBezelLeft = deviceFrame.screenRect.x;
-        const srcBezelTop = deviceFrame.screenRect.y;
-        const srcBezelRight = deviceFrame.size.width - (srcBezelLeft + srcScreenW);
-        const srcBezelBottom = deviceFrame.size.height - (srcBezelTop + srcScreenH);
-
-        const scaleScreenW = videoScreenW / srcScreenW;
-        const scaleScreenH = videoScreenH / srcScreenH;
-        const baseScale = Math.min(scaleScreenW, scaleScreenH);
-
-        frameW = videoScreenW + (srcBezelLeft + srcBezelRight) * baseScale;
-        frameH = videoScreenH + (srcBezelTop + srcBezelBottom) * baseScale;
-        frameX = topLeftX - (srcBezelLeft * baseScale);
-        frameY = topLeftY - (srcBezelTop * baseScale);
-    } else {
-        // Border-based sizing approach
-        frameW = videoScreenW / (1 - b.left - b.right);
-        frameH = videoScreenH / (1 - b.top - b.bottom);
-        frameX = topLeftX - (frameW * b.left);
-        frameY = topLeftY - (frameH * b.top);
-    }
-
     ctx.imageSmoothingQuality = 'high';
-    if (deviceFrame.customScaling) {
-        drawSmartFrame(ctx, img, frameX, frameY, frameW, frameH, deviceFrame.customScaling);
-    } else {
-        ctx.drawImage(img, frameX, frameY, frameW, frameH);
-    }
+    drawSmartFrame(ctx, img, frameRect.x, frameRect.y, frameRect.width, frameRect.height, deviceFrame.customScaling);
 }

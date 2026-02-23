@@ -5,6 +5,7 @@ import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { calculateAutoSpotlights } from '../../../core/spotlight/autoSpotlight';
 import { ViewMapper } from '../../../core/zoom';
+import { getDeviceFrame } from '../../../core/deviceFrames';
 
 export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;
@@ -107,13 +108,18 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                 return state;
             }
 
+            const deviceFrame = project.settings.screen.mode === 'device'
+                ? getDeviceFrame(project.settings.screen.deviceFrameId)
+                : undefined;
+
             const viewMapper = new ViewMapper(
                 sourceSize,
                 project.settings.outputSize,
                 project.settings.screen.padding,
                 project.settings.screen.crop,
                 project.screenSource.trackableContentRect,
-                project.settings.screen.toolbar.enabled
+                project.settings.screen.toolbar.enabled,
+                deviceFrame
             );
             const timeMapper = getTimeMapper(project.timeline.outputWindows);
             const spotlightSegments = calculateAutoSpotlights(

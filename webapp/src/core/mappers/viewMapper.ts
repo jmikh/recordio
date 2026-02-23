@@ -1,5 +1,7 @@
 import type { Size, Point, Rect } from '../../types';
+import type { DeviceFrame } from '../../types/deviceFrames';
 import { getIntersection } from '../geometry';
+import { resolveScreenRect } from '../painters/smartFramePainter';
 
 export interface MappedPoint extends Point {
     visible: boolean;
@@ -13,6 +15,17 @@ export interface MappedPoint extends Point {
  *   Events like clicks and spotlights are recorded in this coordinate system.
  * - **Output coordinates**: The logical canvas resolution (e.g., 1920x1080).
  *   This is the standardized coordinate system used for rendering and project data.
+ * 
+ * ## Layout Modes
+ * 
+ * ### Border Mode (default)
+ * Padding shrinks the available area for the screen content. The screen is centered in the output.
+ * 
+ * ### Device Frame Mode (when `deviceFrame` is provided)
+ * Padding shrinks the available area for the **frame** (not the screen).
+ * The frame stretches to match the video's aspect ratio (9-slice handles visual stretching).
+ * The screen's contentRect is derived from the frame's screenRect proportions, so it may
+ * be off-center (e.g., MacBook has a thick bottom bezel).
  * 
  * ## Toolbar (Window Recordings)
  * Window recordings capture the full Chrome window (toolbar + content area). The `trackableContentRect`
@@ -38,14 +51,27 @@ export class ViewMapper {
     trackableContentRect?: Rect;
     toolbarEnabled: boolean;
 
+    /** Precomputed: effective source dimensions (crop or full source) */
+    private readonly effectiveSize: Size;
+
+    /** Precomputed: offset to apply when mapping from effective coords to full source coords */
+    private readonly cropOffset: Point;
+
     /** Offset to apply to event coordinates to convert from viewport to frame coords */
-    private eventOffset: Point;
+    private readonly eventOffset: Point;
 
     /**
      * The rectangle in Output Space where the video content is placed.
-     * When custom toolbar is active, this is shifted down to make room for the toolbar.
+     * In device frame mode, derived from the frame's screenRect.
+     * In border mode, centered in the padded output area.
      */
     public readonly contentRect: Rect;
+
+    /**
+     * The rectangle in Output Space where the device frame image should be drawn.
+     * Only set when a deviceFrame is provided.
+     */
+    public readonly frameRect?: Rect;
 
     /**
      * Height of the custom toolbar in Output Space (0 when no toolbar).
@@ -62,7 +88,8 @@ export class ViewMapper {
         paddingPercentage: number,
         cropRect?: Rect,
         trackableContentRect?: Rect,
-        toolbarEnabled: boolean = true
+        toolbarEnabled: boolean = true,
+        deviceFrame?: DeviceFrame
     ) {
         this.outputSize = outputSize;
         this.sourceSize = sourceSize;
@@ -70,82 +97,131 @@ export class ViewMapper {
         this.trackableContentRect = trackableContentRect;
         this.toolbarEnabled = toolbarEnabled;
 
-        // ══════════════════════════════════════════════════════════════════
-        // Step 1: Determine effective crop (respecting user crop while handling toolbar)
-        // ══════════════════════════════════════════════════════════════════
+        // ── Step 1: Resolve effective crop ──────────────────────────────
+        // When toolbar is enabled, clamp crop top to exclude native toolbar area.
         if (toolbarEnabled && trackableContentRect) {
-            // Custom toolbar mode: respect user crop but ensure native toolbar is excluded
             const baseCrop = cropRect ?? { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height };
 
-            // If user's crop starts above the viewport (includes native toolbar area),
-            // clamp the top to trackableContentRect.y to exclude it
             if (baseCrop.y < trackableContentRect.y) {
                 const clippedTop = trackableContentRect.y;
-                const lostHeight = clippedTop - baseCrop.y;
                 this.cropRect = {
                     x: baseCrop.x,
                     y: clippedTop,
                     width: baseCrop.width,
-                    height: baseCrop.height - lostHeight
+                    height: baseCrop.height - (clippedTop - baseCrop.y)
                 };
             } else {
-                // User's crop already starts at or below viewport — use as-is
                 this.cropRect = baseCrop;
             }
         } else {
-            // No toolbar or toolbar disabled: use user crop as-is (or no crop)
             this.cropRect = cropRect;
         }
 
-        // ══════════════════════════════════════════════════════════════════
-        // Step 2: Calculate event offset for trackable-content-relative coordinates
-        // ══════════════════════════════════════════════════════════════════
+        // ── Step 2: Precompute shared values ───────────────────────────
+        this.effectiveSize = this.cropRect
+            ? { width: this.cropRect.width, height: this.cropRect.height }
+            : sourceSize;
+
+        this.cropOffset = this.cropRect
+            ? { x: this.cropRect.x, y: this.cropRect.y }
+            : { x: 0, y: 0 };
+
         this.eventOffset = trackableContentRect
             ? { x: trackableContentRect.x, y: trackableContentRect.y }
             : { x: 0, y: 0 };
 
-        // ══════════════════════════════════════════════════════════════════
-        // Step 3: Calculate toolbar height and total frame dimensions
-        // ══════════════════════════════════════════════════════════════════
-
-        // Effective size = cropped region (or full source if no crop)
-        const effectiveSize = this.cropRect
-            ? { width: this.cropRect.width, height: this.cropRect.height }
-            : sourceSize;
-
-        // Toolbar height in source space (5% of trackable content height when enabled)
+        // ── Step 3: Compute toolbar + total content height ─────────────
         const hasCustomToolbar = toolbarEnabled && !!trackableContentRect;
         const toolbarSourceH = hasCustomToolbar
             ? trackableContentRect.height * ViewMapper.TOOLBAR_HEIGHT_RATIO
             : 0;
+        const totalSourceH = this.effectiveSize.height + toolbarSourceH;
 
-        // Total source frame = content + toolbar
-        const totalSourceH = effectiveSize.height + toolbarSourceH;
+        // ── Step 4: Compute layout (mode-specific) ─────────────────────
+        // Both modes produce: contentRect, toolbarOutputHeight, and optionally frameRect.
+        // The padded area is the region available after applying padding.
+        const paddedW = outputSize.width * (1 - 2 * paddingPercentage);
+        const paddedH = outputSize.height * (1 - 2 * paddingPercentage);
 
-        // ══════════════════════════════════════════════════════════════════
-        // Step 4: Calculate scale and output dimensions
-        // ══════════════════════════════════════════════════════════════════
+        if (deviceFrame) {
+            // ════════════════════════════════════════════════════════════
+            // DEVICE FRAME MODE
+            //
+            // All frames use 9-slice rendering, which stretches scalable
+            // regions differently from fixed regions. We can't use a simple
+            // formula to predict where the screen area ends up — instead,
+            // we use resolveScreenRect (same math as the 9-slice renderer)
+            // to find the frame aspect ratio that produces a screen area
+            // matching the video's aspect ratio.
+            // ════════════════════════════════════════════════════════════
 
-        // Scale factor to fit total frame into output (accounting for padding)
-        const scale = Math.max(
-            effectiveSize.width / (this.outputSize.width * (1 - 2 * this.paddingPercentage)),
-            totalSourceH / (this.outputSize.height * (1 - 2 * this.paddingPercentage))
-        );
+            const sr = deviceFrame.screenRect;
+            const videoAspect = this.effectiveSize.width / totalSourceH;
 
-        // Project dimensions to output space
-        const projectedWidth = effectiveSize.width / scale;
-        const projectedContentH = effectiveSize.height / scale;
-        this.toolbarOutputHeight = toolbarSourceH / scale;
-        const totalOutputH = projectedContentH + this.toolbarOutputHeight;
+            // Binary search for the frameAspect where the 9-slice-computed
+            // screen area matches videoAspect. ~20 iterations → precision < 0.001%.
+            const naturalAspect = deviceFrame.size.width / deviceFrame.size.height;
+            let lo = naturalAspect * 0.3;
+            let hi = naturalAspect * 3.0;
 
-        // ══════════════════════════════════════════════════════════════════
-        // Step 5: Center the combined frame and position content below toolbar
-        // ══════════════════════════════════════════════════════════════════
-        const x = (this.outputSize.width - projectedWidth) / 2;
-        const y = (this.outputSize.height - totalOutputH) / 2;
+            for (let i = 0; i < 25; i++) {
+                const mid = (lo + hi) / 2;
+                const testFrame = ViewMapper._fitAndCenter(mid, paddedW, paddedH, outputSize);
+                const screen = resolveScreenRect(sr, deviceFrame.size, testFrame.rect, deviceFrame.customScaling);
+                const screenAspect = screen.width / screen.height;
+                if (screenAspect < videoAspect) {
+                    lo = mid; // Need wider frame → wider screen
+                } else {
+                    hi = mid;
+                }
+            }
 
-        // contentRect: video content area (shifted down by toolbar height)
-        this.contentRect = { x, y: y + this.toolbarOutputHeight, width: projectedWidth, height: projectedContentH };
+            const frameAspect = (lo + hi) / 2;
+            const { rect: frame } = ViewMapper._fitAndCenter(frameAspect, paddedW, paddedH, outputSize);
+            this.frameRect = frame;
+
+            // Use resolveScreenRect to get the exact screen position
+            // (same math as the 9-slice renderer — pixel-perfect alignment)
+            const screen = resolveScreenRect(sr, deviceFrame.size, frame, deviceFrame.customScaling);
+            const screenX = screen.x;
+            const screenY = screen.y;
+            const screenW = screen.width;
+            const screenH = screen.height;
+
+            // Split video area into toolbar + content
+            const contentRatio = this.effectiveSize.height / totalSourceH;
+            const projectedContentH = screenH * contentRatio;
+            this.toolbarOutputHeight = screenH - projectedContentH;
+
+            this.contentRect = {
+                x: screenX,
+                y: screenY + this.toolbarOutputHeight,
+                width: screenW,
+                height: projectedContentH
+            };
+
+        } else {
+            // ════════════════════════════════════════════════════════════
+            // BORDER MODE — padding applies to the screen directly
+            // ════════════════════════════════════════════════════════════
+            const videoAspect = this.effectiveSize.width / totalSourceH;
+
+            const { rect: fitted } = ViewMapper._fitAndCenter(
+                videoAspect, paddedW, paddedH, outputSize
+            );
+
+            // Split fitted area into toolbar + content
+            const contentRatio = this.effectiveSize.height / totalSourceH;
+            const projectedContentH = fitted.height * contentRatio;
+            this.toolbarOutputHeight = fitted.height - projectedContentH;
+
+            this.contentRect = {
+                x: fitted.x,
+                y: fitted.y + this.toolbarOutputHeight,
+                width: fitted.width,
+                height: projectedContentH
+            };
+        }
     }
 
     // ═══════════════════════════════════════════════════════
@@ -162,10 +238,6 @@ export class ViewMapper {
         let effectiveY = point.y;
         let visible = true;
 
-        const effectiveSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.sourceSize;
-        const offsetX = this.cropRect ? this.cropRect.x : 0;
-        const offsetY = this.cropRect ? this.cropRect.y : 0;
-
         if (this.cropRect) {
             if (point.x < this.cropRect.x || point.x > this.cropRect.x + this.cropRect.width ||
                 point.y < this.cropRect.y || point.y > this.cropRect.y + this.cropRect.height) {
@@ -176,9 +248,9 @@ export class ViewMapper {
             effectiveY = Math.max(this.cropRect.y, Math.min(point.y, this.cropRect.y + this.cropRect.height));
         }
 
-        // Normalize relative to Crop (0..1)
-        const nx = (effectiveX - offsetX) / effectiveSize.width;
-        const ny = (effectiveY - offsetY) / effectiveSize.height;
+        // Normalize relative to effective area (0..1)
+        const nx = (effectiveX - this.cropOffset.x) / this.effectiveSize.width;
+        const ny = (effectiveY - this.cropOffset.y) / this.effectiveSize.height;
 
         // Map to ContentRect in Output Space
         return {
@@ -283,34 +355,29 @@ export class ViewMapper {
      */
     resolveRenderRects(viewport: Rect): { sourceRect: Rect, destRect: Rect } | null {
         const intersection = getIntersection(viewport, this.contentRect);
+        if (!intersection) return null;
 
-        if (!intersection) {
-            return null;
-        }
-
-        const effectiveSize = this.cropRect ? { width: this.cropRect.width, height: this.cropRect.height } : this.sourceSize;
-        const offsetX = this.cropRect ? this.cropRect.x : 0;
-        const offsetY = this.cropRect ? this.cropRect.y : 0;
-
-        const relSrcX = (intersection.x - this.contentRect.x) / this.contentRect.width * effectiveSize.width;
-        const relSrcY = (intersection.y - this.contentRect.y) / this.contentRect.height * effectiveSize.height;
-        const srcW = (intersection.width / this.contentRect.width) * effectiveSize.width;
-        const srcH = (intersection.height / this.contentRect.height) * effectiveSize.height;
-
-        const srcX = relSrcX + offsetX;
-        const srcY = relSrcY + offsetY;
+        const relSrcX = (intersection.x - this.contentRect.x) / this.contentRect.width * this.effectiveSize.width;
+        const relSrcY = (intersection.y - this.contentRect.y) / this.contentRect.height * this.effectiveSize.height;
+        const srcW = (intersection.width / this.contentRect.width) * this.effectiveSize.width;
+        const srcH = (intersection.height / this.contentRect.height) * this.effectiveSize.height;
 
         const scaleX = this.outputSize.width / viewport.width;
         const scaleY = this.outputSize.height / viewport.height;
 
-        const dstX = (intersection.x - viewport.x) * scaleX;
-        const dstY = (intersection.y - viewport.y) * scaleY;
-        const dstW = intersection.width * scaleX;
-        const dstH = intersection.height * scaleY;
-
         return {
-            sourceRect: { x: srcX, y: srcY, width: srcW, height: srcH },
-            destRect: { x: dstX, y: dstY, width: dstW, height: dstH }
+            sourceRect: {
+                x: relSrcX + this.cropOffset.x,
+                y: relSrcY + this.cropOffset.y,
+                width: srcW,
+                height: srcH
+            },
+            destRect: {
+                x: (intersection.x - viewport.x) * scaleX,
+                y: (intersection.y - viewport.y) * scaleY,
+                width: intersection.width * scaleX,
+                height: intersection.height * scaleY
+            }
         };
     }
 
@@ -336,16 +403,69 @@ export class ViewMapper {
         return this.projectSourceToOutput(subjectRect, viewport);
     }
 
+    /**
+     * Returns the frameRect projected through the viewport (zoom-aware).
+     * Applies the same zoom transform used for screen content positioning.
+     * Returns undefined if no device frame is set.
+     */
+    getProjectedFrameRect(viewport: Rect): Rect | undefined {
+        if (!this.frameRect) return undefined;
+        return this._projectRectToViewport(this.frameRect, viewport);
+    }
+
     // ═══════════════════════════════════════════════════════
     // Private helpers
     // ═══════════════════════════════════════════════════════
+
+    /**
+     * Fits a rectangle with the given aspect ratio into the available area,
+     * then centers it in the full output. Shared by both layout modes.
+     */
+    private static _fitAndCenter(
+        aspect: number,
+        availableW: number,
+        availableH: number,
+        outputSize: Size
+    ): { rect: Rect; innerScale: number } {
+        let w: number, h: number;
+        if (aspect > availableW / availableH) {
+            w = availableW;
+            h = availableW / aspect;
+        } else {
+            h = availableH;
+            w = availableH * aspect;
+        }
+
+        return {
+            rect: {
+                x: (outputSize.width - w) / 2,
+                y: (outputSize.height - h) / 2,
+                width: w,
+                height: h
+            },
+            innerScale: 0 // unused for border mode
+        };
+    }
+
+    /**
+     * Projects an output-space rect through a viewport (zoom transform).
+     */
+    private _projectRectToViewport(rect: Rect, viewport: Rect): Rect {
+        const scaleX = this.outputSize.width / viewport.width;
+        const scaleY = this.outputSize.height / viewport.height;
+        return {
+            x: (rect.x - viewport.x) * scaleX,
+            y: (rect.y - viewport.y) * scaleY,
+            width: rect.width * scaleX,
+            height: rect.height * scaleY
+        };
+    }
 
     /**
      * Projects a single source-space point through the viewport to Output coordinates.
      */
     private _projectPointToOutput(point: Point, viewport: Rect): MappedPoint {
         const outputPoint = this.sourceToOutputPoint(point);
-
         const scaleX = this.outputSize.width / viewport.width;
         const scaleY = this.outputSize.height / viewport.height;
 

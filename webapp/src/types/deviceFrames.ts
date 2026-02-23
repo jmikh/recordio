@@ -11,13 +11,12 @@ export interface DeviceFrame {
     name: string;
     imageUrl: string;
     thumbnailUrl: string;
-    // The inner screen rectangle in the frame image (relative to image 0,0)
-    // Used to calculate border thickness ratios
+    /** The inner screen rectangle in the frame image (pixels, relative to image 0,0) */
     screenRect: Rect;
-    // Total size of the frame image
+    /** Total size of the frame image in pixels */
     size: Size;
-    borderData: FrameBorderData;
-    customScaling?: FrameScalingConfig;
+    /** 9-slice scaling config for stretching the frame to fit different screen aspect ratios */
+    customScaling: FrameScalingConfig;
 }
 
 export interface FrameScalingConfig {
@@ -29,12 +28,4 @@ export interface SliceSegment {
     start: number;
     end: number;
     scalable: boolean;
-}
-
-export interface FrameBorderData {
-    // Ratios of border thickness to total size (0..1)
-    top: number;
-    bottom: number;
-    left: number;
-    right: number;
 }

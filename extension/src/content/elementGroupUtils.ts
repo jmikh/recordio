@@ -148,7 +148,10 @@ export function findElementGroup(element: Element, minSize: number = 200): Eleme
         const isFullyInViewport = rect.left >= 0 && rect.top >= 0 &&
             rect.right <= viewportWidth && rect.bottom <= viewportHeight;
 
-        if (meetsMinSize && meetsMaxSize && hasVisualSignal && isFullyInViewport) {
+        // Skip non-interactive wrappers (e.g., transparent modal containers)
+        const isInteractive = style.pointerEvents !== 'none';
+
+        if (meetsMinSize && meetsMaxSize && hasVisualSignal && isFullyInViewport && isInteractive) {
             farthestMatch = current;
             farthestMatchRadius = bubbledRadius;
         }

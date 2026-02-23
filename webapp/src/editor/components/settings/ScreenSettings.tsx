@@ -193,24 +193,25 @@ export const ScreenSettings = () => {
                             {DEVICE_FRAMES.map(frame => {
                                 const isSelected = screenConfig.deviceFrameId === frame.id;
                                 return (
-                                    <div key={frame.id} className="flex flex-col gap-1">
-                                        <div
-                                            onClick={() => updateSettings({
-                                                screen: { ...screenConfig, deviceFrameId: frame.id }
-                                            })}
-                                            className={`cursor-pointer w-full aspect-[16/10] rounded-md flex flex-col items-center justify-center relative overflow-hidden transition-all  ${isSelected
-                                                ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary'
-                                                : 'opacity-70 hover:opacity-90'
-                                                }`}
-                                            title={frame.name}
-                                        >
+                                    <div
+                                        key={frame.id}
+                                        onClick={() => updateSettings({
+                                            screen: { ...screenConfig, deviceFrameId: frame.id }
+                                        })}
+                                        className={`flex flex-col gap-1 cursor-pointer rounded-md transition-all ${isSelected
+                                            ? 'bg-state-active'
+                                            : 'opacity-70 hover:opacity-90'
+                                            }`}
+                                        title={frame.name}
+                                    >
+                                        <div className="w-full aspect-[16/10] flex flex-col items-center justify-center relative overflow-hidden">
                                             <img
                                                 src={frame.thumbnailUrl}
                                                 alt={frame.name}
-                                                className="w-full h-full object-contain p-1"
+                                                className={`w-full h-full object-contain p-1 transition-[filter] ${isSelected ? '' : 'grayscale'}`}
                                             />
                                         </div>
-                                        <span className={`text-[10px] tracking-wide text-center truncate px-1 transition-colors ${isSelected ? 'text-on-primary' : 'text-text-main'
+                                        <span className={`text-[10px] tracking-wide text-center truncate px-1 pb-1 transition-colors ${isSelected ? 'text-on-primary' : 'text-text-main'
                                             }`}>
                                             {frame.name}
                                         </span>

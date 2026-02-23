@@ -232,4 +232,105 @@ describe('ViewMapper', () => {
         expect(mapper.cropRect!.height).toBe(900);
         expect(mapper.toolbarOutputHeight).toBe(0);
     });
+
+    // Standard 9-slice config matching defineFrame()
+    const STANDARD_SCALING = {
+        vertical: [
+            { start: 0, end: 0.33, scalable: false },
+            { start: 0.33, end: 0.66, scalable: true },
+            { start: 0.66, end: 1, scalable: false }
+        ],
+        horizontal: [
+            { start: 0, end: 0.15, scalable: false },
+            { start: 0.15, end: 0.3, scalable: true },
+            { start: 0.3, end: 0.7, scalable: false },
+            { start: 0.7, end: 0.85, scalable: true },
+            { start: 0.85, end: 1, scalable: false }
+        ]
+    };
+
+    it('Case 12: Device frame — screen aspect matches video aspect', () => {
+        const frame = {
+            id: 'test-frame',
+            name: 'Test',
+            imageUrl: '',
+            thumbnailUrl: '',
+            size: { width: 100, height: 80 },
+            screenRect: { x: 10, y: 10, width: 80, height: 60 },
+            customScaling: STANDARD_SCALING,
+        };
+
+        const mapper = new ViewMapper(
+            { width: 800, height: 600 },
+            { width: 1000, height: 800 },
+            0,
+            undefined,
+            undefined,
+            true,
+            frame
+        );
+
+        expect(mapper.frameRect).toBeDefined();
+        // Screen aspect should match video aspect (4:3)
+        const screenAspect = mapper.contentRect.width / mapper.contentRect.height;
+        expect(screenAspect).toBeCloseTo(4 / 3, 2);
+    });
+
+    it('Case 13: Device frame with padding — frame is inset', () => {
+        const frame = {
+            id: 'test-frame',
+            name: 'Test',
+            imageUrl: '',
+            thumbnailUrl: '',
+            size: { width: 100, height: 80 },
+            screenRect: { x: 10, y: 10, width: 80, height: 60 },
+            customScaling: STANDARD_SCALING,
+        };
+
+        const mapper = new ViewMapper(
+            { width: 800, height: 600 },
+            { width: 1000, height: 800 },
+            0.1,
+            undefined,
+            undefined,
+            true,
+            frame
+        );
+
+        expect(mapper.frameRect).toBeDefined();
+        // Frame should be smaller than output (padding applied)
+        expect(mapper.frameRect!.width).toBeLessThanOrEqual(800);
+        expect(mapper.frameRect!.height).toBeLessThanOrEqual(640);
+        // Frame should be centered
+        const frameCenterX = mapper.frameRect!.x + mapper.frameRect!.width / 2;
+        expect(frameCenterX).toBeCloseTo(500, 0);
+    });
+
+    it('Case 14: Device frame stretches for different video aspect — no white space', () => {
+        const frame = {
+            id: 'macbook-test',
+            name: 'MacBook Test',
+            imageUrl: '',
+            thumbnailUrl: '',
+            size: { width: 100, height: 80 },
+            screenRect: { x: 10, y: 10, width: 80, height: 60 },
+            customScaling: STANDARD_SCALING,
+        };
+
+        // 16:9 video content (different from frame's 4:3 screen)
+        const mapper = new ViewMapper(
+            { width: 1920, height: 1080 },
+            { width: 1000, height: 1000 },
+            0,
+            undefined,
+            undefined,
+            true,
+            frame
+        );
+
+        expect(mapper.frameRect).toBeDefined();
+        // Video completely fills the screen area (no white space)
+        const screenAspect = mapper.contentRect.width / mapper.contentRect.height;
+        expect(screenAspect).toBeCloseTo(16 / 9, 2);
+    });
 });
