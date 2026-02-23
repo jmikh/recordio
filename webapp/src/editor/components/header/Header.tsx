@@ -52,12 +52,12 @@ export const Header = () => {
                         >
                             <FaRedo size={14} />
                         </button>
-                        <span className="text-[10px] text-text-muted ml-1 tabular-nums">
+                        {<span className="text-[10px] text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
-                        </span>
+                        </span>}
                     </div>
 
-                    {import.meta.env.MODE !== 'production' && (
+                    {import.meta.env.MODE !== 'production' && false && (
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 

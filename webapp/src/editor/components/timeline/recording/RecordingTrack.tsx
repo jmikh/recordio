@@ -38,6 +38,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     // Get sources directly from project
     const screenSource = project.screenSource;
     const cameraSource = project.cameraSource;
+    const microphoneSource = project.microphoneSource;
 
     // Create TimePixelMapper for coordinate conversions
     const coords = useMemo(() => {
@@ -45,8 +46,8 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeline.outputWindows, pixelsPerSec]);
 
-    // Prepare Audio Analysis for Screen and Camera
-    const screenAudio = useAudioAnalysis(screenSource.id, screenSource.runtimeUrl || '');
+    // Prepare Audio Analysis for Microphone and Camera
+    const screenAudio = useAudioAnalysis(microphoneSource?.id || '', microphoneSource?.runtimeUrl || '');
     const cameraAudio = useAudioAnalysis(cameraSource?.id || '', cameraSource?.runtimeUrl || '');
 
     const { dragState, handleDragStart } = useWindowDrag(timeline, coords);

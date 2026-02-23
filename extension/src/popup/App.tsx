@@ -315,9 +315,9 @@ function App() {
       const tab = tabs[0];
       if (!tab?.id) return;
 
-      chrome.tabs.sendMessage(tab.id, {
+      await chrome.tabs.sendMessage(tab.id, {
         type: MSG_TYPES.ENABLE_BLUR_MODE
-      });
+      }).catch(() => { });
       window.close();
     } catch (error) {
       console.error("Failed to enable blur mode:", error);
