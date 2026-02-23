@@ -112,6 +112,9 @@ export function findElementGroup(element: Element, minSize: number = 200): Eleme
         const meetsMinSize = rect.width >= minSize && rect.height >= minSize;
         const meetsMaxSize = rect.width <= viewportWidth * 0.8 && rect.height <= viewportHeight * 0.8;
 
+        // Early termination: no element larger than this can match
+        if (!meetsMaxSize) break;
+
         // Visual signals
         const hasBoxShadow = style.boxShadow && style.boxShadow !== 'none';
         const hasDropShadow = style.filter && style.filter.includes('drop-shadow');
@@ -166,6 +169,26 @@ export function findElementGroup(element: Element, minSize: number = 200): Eleme
             } else {
                 current = null;
             }
+        }
+    }
+
+    // Radius inheritance: if matched element has no radius, check same-sized
+    // parents for border-radius (handles non-interactive visual wrappers like
+    // elements with pointer-events:none that provide shadow/radius styling)
+    if (farthestMatch && farthestMatchRadius.every(r => r === 0)) {
+        const matchRect = farthestMatch.getBoundingClientRect();
+        let ancestor = farthestMatch.parentElement;
+        while (ancestor && ancestor !== document.body) {
+            const ancestorRect = ancestor.getBoundingClientRect();
+            const sameSize = Math.abs(ancestorRect.width - matchRect.width) < 2 &&
+                Math.abs(ancestorRect.height - matchRect.height) < 2;
+            if (!sameSize) break; // Size changed, stop looking
+            const radius = getCornerRadius(ancestor);
+            if (radius.some(r => r > 0)) {
+                farthestMatchRadius = radius;
+                break;
+            }
+            ancestor = ancestor.parentElement;
         }
     }
 
