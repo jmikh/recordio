@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { FaCrown, FaGift } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaCrown } from 'react-icons/fa';
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight } from 'react-icons/tb';
-import { CollapsibleCard, MultiToggle } from '@shared/components';
+import { CollapsibleCard, MultiToggle, Dropdown, Toggle } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -14,7 +14,6 @@ import { useToast } from '../Toast';
 
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
-import { FreeExportConfirmModal } from '../header/FreeExportConfirmModal';
 
 const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }[] = [
     { value: '480p', label: '480p', proOnly: false },
@@ -36,19 +35,43 @@ const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string; icon: Reac
     { value: 'bottom-right', label: 'Bottom Right', icon: <TbBoxAlignBottomRight size={18} /> },
 ];
 
+/** Format remaining trial time as a human-readable string */
+function formatTrialRemaining(freeTrialUntil: string): string {
+    const remaining = new Date(freeTrialUntil).getTime() - Date.now();
+    if (remaining <= 0) return '';
+    const days = Math.ceil(remaining / (1000 * 60 * 60 * 24));
+    if (days === 1) return '1 day left';
+    return `${days} days left`;
+}
+
 export function ExportSettings() {
     const { addToast } = useToast();
 
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('720p');
     const [selectedFps, setSelectedFps] = useState<ExportFps>(30);
     const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>('bottom-right');
+    const [showWatermark, setShowWatermark] = useState<boolean | null>(null); // null = use default
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-    const [isFreeExportModalOpen, setIsFreeExportModalOpen] = useState(false);
 
-    const { isAuthenticated, isPro, canExportQuality, canExportFps, hasFreeExportCredit } = useUserStore();
-    const hasCredit = hasFreeExportCredit();
-    const showWatermarkOptions = !isPro;
+    const { isAuthenticated, isPro, hasProAccess, hasFreeTrial, freeTrialUntil } = useUserStore();
+    const proAccess = hasProAccess();
+    const activeTrial = hasFreeTrial();
+
+    // Watermark defaults: OFF for pro/trial, ON for everyone else
+    const effectiveShowWatermark = showWatermark ?? !proAccess;
+    const canToggleWatermark = proAccess;
+
+    // Sync watermark preview to canvas via UIStore
+    const setWatermarkPreviewPosition = useUIStore(s => s.setWatermarkPreviewPosition);
+    useEffect(() => {
+        setWatermarkPreviewPosition(effectiveShowWatermark ? watermarkPosition : null);
+    }, [effectiveShowWatermark, watermarkPosition]);
+
+    // Clean up watermark preview on unmount
+    useEffect(() => {
+        return () => setWatermarkPreviewPosition(null);
+    }, []);
 
     const project = useProjectData();
     const setExportState = useProjectStore(s => s.setExportState);
@@ -57,22 +80,19 @@ export function ExportSettings() {
     const handleExport = () => {
         if (isExporting) return;
 
-        if (!canExportQuality(selectedQuality) || !canExportFps(selectedFps)) {
-            setIsUpgradeModalOpen(true);
-            return;
-        }
-
         const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K' || selectedFps === 60);
-        if (hasFreeExportCredit() && needsProFeature) {
-            setIsFreeExportModalOpen(true);
+
+        // If user has pro access (subscription or trial), export freely
+        if (proAccess || !needsProFeature) {
+            startExport(selectedQuality, selectedFps, { watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined });
             return;
         }
 
-        startExport(selectedQuality, selectedFps, { watermarkPosition });
+        // No access — show upgrade modal
+        setIsUpgradeModalOpen(true);
     };
 
-    const startExport = async (quality: ExportQuality, fps: ExportFps, options?: { useFreeCredit?: boolean; watermarkPosition?: WatermarkPosition }) => {
-        setIsFreeExportModalOpen(false);
+    const startExport = async (quality: ExportQuality, fps: ExportFps, options?: { watermarkPosition?: WatermarkPosition }) => {
         useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
@@ -111,69 +131,55 @@ export function ExportSettings() {
             >
                 <div className="flex flex-col gap-4">
                     {/* Quality Selection */}
-                    <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-text-muted">Quality</span>
-                        <div className="flex flex-col gap-1">
-                            {QUALITY_OPTIONS.map(opt => {
-                                const isActive = selectedQuality === opt.value;
-                                return (
-                                    <div
-                                        key={opt.value}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-                                            ? 'bg-primary/15 text-primary'
-                                            : 'bg-transparent text-text-main hover:bg-state-hover'
-                                            }`}
-                                        onClick={() => setSelectedQuality(opt.value)}
-                                    >
-                                        <span className="text-sm flex-1">{opt.label}</span>
-                                        {opt.proOnly && !isPro && (
-                                            <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
-                                                Pro
-                                            </span>
-                                        )}
-                                        {isActive && (
-                                            <span className="text-xs text-primary">●</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-text-muted w-1/2 shrink-0">Quality</span>
+                        <Dropdown
+                            options={QUALITY_OPTIONS.map(opt => ({
+                                value: opt.value,
+                                label: opt.label,
+                                disabled: opt.proOnly && !proAccess,
+                                suffix: opt.proOnly && !isPro ? (
+                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
+                                        Pro
+                                    </span>
+                                ) : undefined,
+                            }))}
+                            value={selectedQuality}
+                            onChange={(val) => setSelectedQuality(val)}
+                        />
                     </div>
 
                     {/* FPS Selection */}
-                    <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-text-muted">Frame Rate</span>
-                        <div className="flex flex-col gap-1">
-                            {FPS_OPTIONS.map(opt => {
-                                const isActive = selectedFps === opt.value;
-                                return (
-                                    <div
-                                        key={opt.value}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-                                            ? 'bg-primary/15 text-primary'
-                                            : 'bg-transparent text-text-main hover:bg-state-hover'
-                                            }`}
-                                        onClick={() => setSelectedFps(opt.value)}
-                                    >
-                                        <span className="text-sm flex-1">{opt.label}</span>
-                                        {opt.proOnly && !isPro && (
-                                            <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
-                                                Pro
-                                            </span>
-                                        )}
-                                        {isActive && (
-                                            <span className="text-xs text-primary">●</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-text-muted w-1/2 shrink-0">Frame Rate</span>
+                        <Dropdown
+                            options={FPS_OPTIONS.map(opt => ({
+                                value: opt.value,
+                                label: opt.label,
+                                disabled: opt.proOnly && !proAccess,
+                                suffix: opt.proOnly && !isPro ? (
+                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
+                                        Pro
+                                    </span>
+                                ) : undefined,
+                            }))}
+                            value={selectedFps}
+                            onChange={(val) => setSelectedFps(val)}
+                        />
                     </div>
 
-                    {/* Free Credit Status */}
+                    {/* Trial / Auth Status */}
                     {!isPro && (
-                        <div className="bg-state-inactive border border-border rounded-md px-3 py-2.5 mt-1">
-                            {!isAuthenticated ? (
+                        activeTrial && freeTrialUntil ? (
+                            /* Active trial reminder */
+                            <div className="bg-primary/10 border border-primary/20 rounded-md px-3 py-2.5">
+                                <p className="text-xs text-primary flex items-center gap-1.5">
+                                    <FaCrown className="shrink-0" size={11} />
+                                    Pro trial · {formatTrialRemaining(freeTrialUntil)}
+                                </p>
+                            </div>
+                        ) : !isAuthenticated ? (
+                            <div className="bg-state-inactive border border-border rounded-md px-3 py-2.5">
                                 <p className="text-xs text-text-muted">
                                     <button
                                         onClick={() => setIsAuthModalOpen(true)}
@@ -181,25 +187,27 @@ export function ExportSettings() {
                                     >
                                         Sign in
                                     </button>
-                                    {' '}to claim your free 4K export credit
+                                    {' '}to start your free Pro trial
                                 </p>
-                            ) : hasCredit ? (
-                                <p className="text-xs text-text-highlighted flex items-center gap-1.5">
-                                    <FaGift className="text-primary shrink-0" size={12} />
-                                    Free HD/4K credit available
-                                </p>
-                            ) : (
+                            </div>
+                        ) : (
+                            <div className="bg-state-inactive border border-border rounded-md px-3 py-2.5">
                                 <p className="text-xs text-text-muted">
-                                    Free credit used
+                                    Pro trial expired
                                 </p>
-                            )}
-                        </div>
+                            </div>
+                        )
                     )}
 
-                    {/* Watermark Placement */}
-                    {showWatermarkOptions && (
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-text-muted">Watermark Position</span>
+                    {/* Watermark Toggle */}
+                    <div className="flex flex-col gap-2">
+                        <Toggle
+                            label="Recordio Watermark"
+                            value={effectiveShowWatermark}
+                            onChange={(val) => setShowWatermark(val)}
+                            disabled={!canToggleWatermark}
+                        />
+                        {effectiveShowWatermark && (
                             <MultiToggle
                                 options={WATERMARK_POSITIONS.map(pos => ({
                                     value: pos.value,
@@ -209,8 +217,8 @@ export function ExportSettings() {
                                 value={watermarkPosition}
                                 onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}
                             />
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </CollapsibleCard>
 
@@ -231,7 +239,7 @@ export function ExportSettings() {
                 className="interactive-primary flex items-center justify-center gap-2 w-full"
                 disabled={isExporting}
             >
-                Export {selectedQuality}{selectedFps === 60 ? ' 60fps' : ''}
+                Export
             </button>
 
             {/* Modals */}
@@ -244,12 +252,6 @@ export function ExportSettings() {
                 isOpen={isUpgradeModalOpen}
                 onClose={() => setIsUpgradeModalOpen(false)}
                 onSignInRequest={() => setIsAuthModalOpen(true)}
-                selectedQuality={selectedQuality}
-            />
-            <FreeExportConfirmModal
-                isOpen={isFreeExportModalOpen}
-                onClose={() => setIsFreeExportModalOpen(false)}
-                onConfirm={() => startExport(selectedQuality, selectedFps, { useFreeCredit: true, watermarkPosition })}
                 selectedQuality={selectedQuality}
             />
         </div>

@@ -7,6 +7,7 @@ export interface DropdownOption<T> {
     label: string;
     icon?: React.ReactNode;
     suffix?: React.ReactNode;
+    disabled?: boolean;
 }
 
 interface DropdownProps<T> {
@@ -76,6 +77,7 @@ export function Dropdown<T>({
     }, [isOpen]);
 
     const handleSelect = (option: DropdownOption<T>) => {
+        if (option.disabled) return;
         onChange(option.value);
         setIsOpen(false);
     };
@@ -92,6 +94,7 @@ export function Dropdown<T>({
         >
             {options.map((option, index) => {
                 const isSelected = option.value === value;
+                const isDisabled = option.disabled;
 
                 return (
                     <button
@@ -99,30 +102,17 @@ export function Dropdown<T>({
                         onClick={() => handleSelect(option)}
                         className={`
                             w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 rounded-md
-                            ${isSelected
-                                ? 'bg-primary/20 text-primary-highlighted'
-                                : 'text-text-main hover:bg-state-hover'
+                            ${isDisabled
+                                ? 'text-text-disabled cursor-default'
+                                : isSelected
+                                    ? 'bg-primary/20 text-primary-highlighted'
+                                    : 'text-text-main hover:bg-state-hover'
                             }
                         `}
                     >
                         {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
                         <span className="flex-1">{option.label}</span>
                         {option.suffix && <span className="flex-shrink-0">{option.suffix}</span>}
-                        {isSelected && (
-                            <svg
-                                width="10"
-                                height="10"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="flex-shrink-0"
-                            >
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                        )}
                     </button>
                 );
             })}

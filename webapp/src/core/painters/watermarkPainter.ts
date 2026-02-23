@@ -1,8 +1,8 @@
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 /**
- * Draws a watermark logo at the specified corner of the canvas.
- * Used for non-subscribed users during video export.
+ * Draws a pre-rendered watermark image at the specified corner of the canvas.
+ * All sizing scales proportionally based on a 1920px reference width.
  */
 export function drawWatermark(
     ctx: CanvasRenderingContext2D,
@@ -11,55 +11,46 @@ export function drawWatermark(
     canvasHeight?: number,
     position: WatermarkPosition = 'top-right'
 ): void {
-    // Logo takes 15% of canvas width, maintaining aspect ratio
-    const logoWidth = canvasWidth * 0.15;
-    const aspectRatio = watermarkImg.naturalHeight / watermarkImg.naturalWidth;
-    const logoHeight = logoWidth * aspectRatio;
+    const h = canvasHeight ?? canvasWidth;
 
-    // Padding from edges (scaled based on 1920px reference)
-    const scaleFactor = canvasWidth / 1920;
-    const padding = 30 * scaleFactor;
-    const bgPadding = 12 * scaleFactor;
-    const borderRadius = 8 * scaleFactor;
+    // Watermark height = 12% of canvas height, maintain aspect ratio
+    const wmHeight = h * 0.12;
+    const aspect = watermarkImg.naturalWidth / watermarkImg.naturalHeight;
+    const wmWidth = wmHeight * aspect;
 
-    // Compute position based on corner
-    const h = canvasHeight ?? 0;
-    let logoX: number;
-    let logoY: number;
+    // Padding from edges (scaled from 1080px reference height)
+    const scaleFactor = h / 1080;
+    const padding = 20 * scaleFactor;
+
+    // Compute position
+    let x: number;
+    let y: number;
 
     switch (position) {
         case 'top-left':
-            logoX = padding;
-            logoY = padding;
+            x = padding;
+            y = padding;
             break;
         case 'top-right':
-            logoX = canvasWidth - logoWidth - padding;
-            logoY = padding;
+            x = canvasWidth - wmWidth - padding;
+            y = padding;
             break;
         case 'bottom-left':
-            logoX = padding;
-            logoY = h - logoHeight - padding;
+            x = padding;
+            y = h - wmHeight - padding;
             break;
         case 'bottom-right':
-            logoX = canvasWidth - logoWidth - padding;
-            logoY = h - logoHeight - padding;
+            x = canvasWidth - wmWidth - padding;
+            y = h - wmHeight - padding;
             break;
     }
 
-    // Draw rounded black background with 80% opacity
-    const bgX = logoX - bgPadding;
-    const bgY = logoY - bgPadding;
-    const bgWidth = logoWidth + bgPadding * 2;
-    const bgHeight = logoHeight + bgPadding * 2;
-
+    // Draw with rounded corners
+    const borderRadius = 12 * scaleFactor;
     ctx.save();
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle = '#000000';
     ctx.beginPath();
-    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius);
-    ctx.fill();
+    ctx.roundRect(x, y, wmWidth, wmHeight, borderRadius);
+    ctx.clip();
+    ctx.drawImage(watermarkImg, x, y, wmWidth, wmHeight);
     ctx.restore();
-
-    // Draw the logo on top
-    ctx.drawImage(watermarkImg, logoX, logoY, logoWidth, logoHeight);
 }

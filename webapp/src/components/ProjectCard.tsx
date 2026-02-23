@@ -100,7 +100,7 @@ export const ProjectCard = ({
                         >
                             {project.name}
                         </h3>
-                        {isActive && <span className="flex h-2 w-2 rounded-full flex-shrink-0 mt-1.5 bg-primary shadow-[0_0_5px_var(--primary)]"></span>}
+                        {isActive && <span className="chosen-dot mt-1.5"></span>}
                     </div>
                     <div className="flex items-center text-xs text-text-main space-x-2 mt-1">
                         <span>{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>

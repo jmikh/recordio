@@ -32,7 +32,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ color: linked ? 'var(--text-default)' : 'var(--text-muted)' }}
+                style={{ color: linked ? 'var(--text-main)' : 'var(--text-muted)' }}
             >
                 {linked ? (
                     // Linked chain
@@ -49,7 +49,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                     </>
                 )}
             </svg>
-            <span className={`text-[10px] ${linked ? 'text-text-default' : 'text-text-muted'}`}>
+            <span className={`text-[10px] ${linked ? 'text-text-main' : 'text-text-muted'}`}>
                 Corners
             </span>
         </button>

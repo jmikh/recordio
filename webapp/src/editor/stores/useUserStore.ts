@@ -27,8 +27,8 @@ export interface UserState {
     subscription: Subscription;
     isPro: boolean; // Computed from subscription.status
 
-    // Free export credit
-    freeCreditsUsed: number; // 0 = credit available, 1+ = used
+    // Free trial (server-authoritative timestamp)
+    freeTrialUntil: string | null; // ISO 8601 timestamp
 
     // Theme preference
     theme: Theme;
@@ -36,14 +36,15 @@ export interface UserState {
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
-    setFreeCreditsUsed: (count: number) => void;
+    setFreeTrialUntil: (until: string | null) => void;
     setTheme: (theme: Theme) => void;
     clearUser: () => void;
 
     // Helper methods
     canExportQuality: (quality: ExportQuality) => boolean;
     canExportFps: (fps: ExportFps) => boolean;
-    hasFreeExportCredit: () => boolean;
+    hasFreeTrial: () => boolean;
+    hasProAccess: () => boolean;
 }
 
 export const useUserStore = create<UserState>()(
@@ -63,7 +64,7 @@ export const useUserStore = create<UserState>()(
                 stripeCustomerId: null
             },
             isPro: false,
-            freeCreditsUsed: 0,
+            freeTrialUntil: null,
             theme: 'dark',
 
             // Actions
@@ -88,7 +89,7 @@ export const useUserStore = create<UserState>()(
                 });
             },
 
-            setFreeCreditsUsed: (count) => set({ freeCreditsUsed: count }),
+            setFreeTrialUntil: (until) => set({ freeTrialUntil: until }),
 
             setTheme: (theme) => {
                 // Apply theme class to document
@@ -114,33 +115,37 @@ export const useUserStore = create<UserState>()(
                     stripeCustomerId: null
                 },
                 isPro: false,
-                freeCreditsUsed: 0
+                freeTrialUntil: null
             }),
 
-            // Helper to check if user has a free export credit available
-            hasFreeExportCredit: () => {
-                const { isAuthenticated, isPro, freeCreditsUsed } = get();
-                return isAuthenticated && !isPro && freeCreditsUsed === 0;
+            // Helper to check if user has an active free trial
+            hasFreeTrial: () => {
+                const { isAuthenticated, freeTrialUntil } = get();
+                if (!isAuthenticated || !freeTrialUntil) return false;
+                return new Date(freeTrialUntil).getTime() > Date.now();
+            },
+
+            // Helper to check if user has pro access (subscription OR active trial)
+            hasProAccess: () => {
+                const { isPro, hasFreeTrial } = get();
+                return isPro || hasFreeTrial();
             },
 
             // Helper to check if user can export at quality
             canExportQuality: (quality: ExportQuality) => {
-                const { isPro, hasFreeExportCredit } = get();
-
                 // Free users can export 480p and 720p (with watermark)
                 if (quality === '480p' || quality === '720p') {
                     return true;
                 }
 
-                // Pro users or users with free credit can export 1080p, 2K, and 4K
-                return isPro || hasFreeExportCredit();
+                // Pro users or users with active trial can export 1080p, 2K, and 4K
+                return get().hasProAccess();
             },
 
             // Helper to check if user can export at fps
             canExportFps: (fps: ExportFps) => {
-                const { isPro, hasFreeExportCredit } = get();
                 if (fps === 30) return true;
-                return isPro || hasFreeExportCredit();
+                return get().hasProAccess();
             }
         }),
         {

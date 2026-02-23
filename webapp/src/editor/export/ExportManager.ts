@@ -7,7 +7,7 @@ import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
 import type { Project, SourceMetadata, ScreenMetadata } from '../../types';
-import fullLogoPng from '@shared/assets/fulllogo-dark.png';
+import watermarkPng from '../../assets/watermark.png';
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 export type ExportFps = 30 | 60;
@@ -25,7 +25,7 @@ export class ExportManager {
         quality: ExportQuality,
         fps: ExportFps,
         onProgress: (state: ExportProgress) => void,
-        options?: { useFreeCredit?: boolean; watermarkPosition?: WatermarkPosition }
+        options?: { watermarkPosition?: WatermarkPosition }
     ): Promise<void> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -145,32 +145,13 @@ export class ExportManager {
                 }
             }
 
-            // --- Watermark & Credit Resolution ---
-            const userState = (await import('../stores/useUserStore')).useUserStore.getState();
-            const isHdExport = quality === '1080p' || quality === '2K' || quality === '4K';
-            let shouldShowWatermark = false;
-
-            if (userState.isPro) {
-                // Pro user: no watermark at any quality
-                shouldShowWatermark = false;
-            } else if (options?.useFreeCredit) {
-                // Free credit path: consume credit or abort export
-                const { FreeCreditsService } = await import('../services/FreeCreditsService');
-                const { success, error } = await FreeCreditsService.consumeFreeCredit();
-                if (!success) {
-                    throw new Error(error?.message || 'Failed to use free export credit.');
-                }
-                shouldShowWatermark = false;
-            } else if (isHdExport) {
-                // Non-pro without free credit trying HD — should not reach here (UI gates this)
-                throw new Error('1080p+ exports require a Pro subscription.');
-            } else {
-                // Non-pro, SD export: watermark in production
-                shouldShowWatermark = import.meta.env.MODE === 'production';
-            }
+            // --- Watermark Resolution ---
+            // The UI layer decides whether to show the watermark based on pro/unlock status.
+            // If watermarkPosition is provided, show watermark; otherwise skip.
+            const shouldShowWatermark = !!options?.watermarkPosition;
 
             if (shouldShowWatermark) {
-                imageElements.watermark = await loadImage(fullLogoPng);
+                imageElements.watermark = await loadImage(watermarkPng);
             }
 
             const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
@@ -364,7 +345,7 @@ export class ExportManager {
             muxer.finalize();
 
             const { buffer } = muxer.target;
-            this.downloadBlob(new Blob([buffer], { type: 'video/mp4' }), `${project.name}.mp4`);
+            this.downloadBlob(new Blob([buffer], { type: 'video/mp4' }), `${project.name}_${quality}_${fps}fps.mp4`);
 
         } catch (e) {
             if (signal.aborted) {

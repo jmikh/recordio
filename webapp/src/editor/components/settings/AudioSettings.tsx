@@ -426,7 +426,7 @@ export const AudioSettingsPanel = () => {
                                                 <TbMusic size={14} className="flex-shrink-0 text-text-muted" />
                                                 <span className="text-sm truncate">{preset.name}</span>
                                                 {isActive && (
-                                                    <span className="ml-auto text-xs text-primary">●</span>
+                                                    <span className="chosen-dot ml-auto" />
                                                 )}
                                             </div>
                                         );
@@ -504,7 +504,7 @@ export const AudioSettingsPanel = () => {
                                                     <TbMusic size={14} className="flex-shrink-0 text-text-muted" />
                                                     <span className="text-sm truncate">{entry.name}</span>
                                                     {isActive && (
-                                                        <span className="text-xs text-primary ml-auto mr-1">●</span>
+                                                        <span className="chosen-dot ml-auto mr-1" />
                                                     )}
                                                     {!isActive && (
                                                         <XButton

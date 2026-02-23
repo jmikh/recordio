@@ -103,6 +103,21 @@ export function getSpotlightStateAtTime(
     // Map source rect to output coordinates using the viewport
     const mappedRect = viewMapper.projectEventToOutput(s.sourceRect, viewport);
 
+    // Scale border radius to match zoom projection.
+    // borderRadiusPx is stored in base output coords (no zoom).
+    // When zoom is active, the rect scales by outputSize/viewport.size,
+    // so radii must scale by the same factor.
+    const baseRect = viewMapper.eventToOutputRect(s.sourceRect);
+    const radiusScale = baseRect.width > 0
+        ? mappedRect.width / baseRect.width
+        : 1;
+    const zoomedBorderRadiusPx: [number, number, number, number] = [
+        s.borderRadiusPx[0] * radiusScale,
+        s.borderRadiusPx[1] * radiusScale,
+        s.borderRadiusPx[2] * radiusScale,
+        s.borderRadiusPx[3] * radiusScale,
+    ];
+
     // Check if the spotlight is visible in the viewport
     const outputSize = viewMapper.outputSize;
     const isVisible =
@@ -123,7 +138,7 @@ export function getSpotlightStateAtTime(
             originalRect: clampedRect,
             scaledRect,
             sourceRect: s.sourceRect,
-            borderRadiusPx: s.borderRadiusPx,
+            borderRadiusPx: zoomedBorderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };
@@ -135,7 +150,7 @@ export function getSpotlightStateAtTime(
             originalRect: null,
             scaledRect: null,
             sourceRect: s.sourceRect,
-            borderRadiusPx: s.borderRadiusPx,
+            borderRadiusPx: zoomedBorderRadiusPx,
             dimOpacity: currentDimOpacity,
             scale: currentScale
         };

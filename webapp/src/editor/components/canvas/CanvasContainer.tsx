@@ -12,7 +12,9 @@ import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor'
 import { renderCropEditor, CropEditor } from './CanvasCropEditor';
 import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
+import { drawWatermark } from '../../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
+import watermarkPng from '../../../assets/watermark.png';
 
 import type { CameraSettings, Rect, SourceMetadata } from '../../../types';
 
@@ -59,6 +61,7 @@ export const CanvasContainer = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const bgRef = useRef<HTMLImageElement>(null);
     const deviceFrameRef = useRef<HTMLImageElement>(null);
+    const watermarkRef = useRef<HTMLImageElement>(null);
 
     // Mutable State for Dragging (60fps preview)
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
@@ -280,6 +283,12 @@ export const CanvasContainer = () => {
                     }
                 });
 
+                // 6. WATERMARK PREVIEW (drawn last, on top of everything)
+                const watermarkPos = uiState.watermarkPreviewPosition;
+                if (watermarkPos && watermarkRef.current?.complete) {
+                    drawWatermark(ctx, watermarkRef.current, canvas.width, canvas.height, watermarkPos);
+                }
+
                 // Thumbnail capture (after rendering is complete)
                 if (pendingThumbnailCaptureRef.current) {
                     pendingThumbnailCaptureRef.current = false;
@@ -371,6 +380,8 @@ export const CanvasContainer = () => {
                     {deviceFrame && (
                         <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin={deviceFrame.imageUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
+                    {/* Watermark image for live preview */}
+                    <img ref={watermarkRef} src={watermarkPng} className="hidden" />
                     {Object.values(sources).map((source) => {
                         const audioSettings = project.settings.audio;
                         const isScreenSource = source.id === project.screenSource?.id;

@@ -150,13 +150,13 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Free Credit Banner (non-authenticated users only) */}
+            {/* Free Trial Banner (non-authenticated users only) */}
             {!isAuthenticated && (
                 <div className="mb-4 bg-primary/10 border border-primary/30 rounded-sm p-3 flex items-start gap-3">
                     <FaGift className="text-primary mt-0.5 shrink-0" size={16} />
                     <div>
                         <p className="text-sm text-text-highlighted">
-                            <strong>Get a free HD/4K export!</strong>
+                            <strong>Try Pro free for 7 days!</strong>
                         </p>
                         <p className="text-xs text-text-muted mt-0.5">
                             <button
@@ -165,7 +165,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                             >
                                 Sign in
                             </button>
-                            {' '}to claim your free export credit — no subscription needed.
+                            {' '}to start your free trial — no credit card needed.
                         </p>
                     </div>
                 </div>

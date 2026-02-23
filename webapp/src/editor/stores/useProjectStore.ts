@@ -38,6 +38,8 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSli
     // Export Actions
     exportState: import('../export/ExportManager').ExportProgress & { isExporting: boolean };
     setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
+
+
 }
 
 
@@ -53,6 +55,7 @@ export const useProjectStore = create<ProjectState>()(
 
                 // Export State
                 exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null },
+
 
                 // Slices
                 ...createWindowSlice(set, get, store),
@@ -154,7 +157,8 @@ export const useProjectStore = create<ProjectState>()(
                     set(state => ({
                         exportState: { ...state.exportState, ...updates }
                     }));
-                }
+                },
+
             }),
             {
                 // Zundo Configuration

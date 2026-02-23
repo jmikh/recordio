@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
 import type { ID, TimeMs, Size } from '../../types';
+import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { useProjectStore } from './useProjectStore';
 
 export interface TrackVisibility {
@@ -91,6 +92,10 @@ export interface UIState {
     // Debug Overlays (focus areas on canvas)
     showDebugOverlays: boolean;
     toggleDebugOverlays: () => void;
+
+    // Watermark Preview (live canvas preview when ExportSettings watermark is on)
+    watermarkPreviewPosition: WatermarkPosition | null;
+    setWatermarkPreviewPosition: (position: WatermarkPosition | null) => void;
 
     // Collapsible Card Visibility
     // -- Effects Settings
@@ -294,6 +299,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Debug Overlays
     showDebugOverlays: false,
     toggleDebugOverlays: () => set((state) => ({ showDebugOverlays: !state.showDebugOverlays })),
+
+    // Watermark Preview
+    watermarkPreviewPosition: null,
+    setWatermarkPreviewPosition: (position) => set({ watermarkPreviewPosition: position }),
 
     // Collapsible Card Visibility
     // -- Effects Settings
