@@ -31,7 +31,7 @@ function defineScreenPath(
  */
 export function drawScreen(
     ctx: CanvasRenderingContext2D,
-    video: HTMLVideoElement,
+    video: HTMLVideoElement | VideoFrame,
     project: Project,
     effectiveViewport: Rect, // Injected from caller
     deviceFrameImg: HTMLImageElement | null, // Cached device frame image
@@ -48,10 +48,12 @@ export function drawScreen(
         hasGlow: false
     };
 
-    // 1. Use video dimensions if available, otherwise project's screenSource size
-    const inputSize = video.videoWidth && video.videoHeight
-        ? { width: video.videoWidth, height: video.videoHeight }
-        : project.screenSource.size;
+    // 1. Resolve video dimensions: VideoFrame uses displayWidth/Height, HTMLVideoElement uses videoWidth/Height
+    const inputSize = video instanceof VideoFrame
+        ? { width: video.displayWidth, height: video.displayHeight }
+        : (video.videoWidth && video.videoHeight
+            ? { width: video.videoWidth, height: video.videoHeight }
+            : project.screenSource.size);
 
     if (!inputSize || inputSize.width === 0) {
         throw new Error(`[drawScreen] Invalid inputSize for screen.`);

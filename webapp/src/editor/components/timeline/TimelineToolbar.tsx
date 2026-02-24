@@ -1,14 +1,10 @@
-import React, { useState } from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
+import React from 'react';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { useToast } from '../Toast';
-import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
-import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
-import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdContentCut, MdRefresh } from 'react-icons/md';
-import { Slider, Tooltip } from '@shared/components';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
+import { Slider } from '@shared/components';
 
 
 interface TimelineToolbarProps {
@@ -25,9 +21,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     totalDurationMs,
     onFit,
 }) => {
-    // Stores
-    const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
-
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
     const isPlaying = useUIStore(s => s.isPlaying);
@@ -37,27 +30,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
     // History Batcher
     const batcher = useHistoryBatcher();
-
-    // Toast for AutoCut feedback
-    const { addToast, updateToast, removeToast } = useToast();
-
-    // AutoCut: Get user events and sources for audio analysis
-    const userEvents = useProjectStore(s => s.project.userEvents);
-    const screenSource = useProjectStore(s => s.project.screenSource);
-    const cameraSource = useProjectStore(s => s.project.cameraSource);
-    const setOutputWindows = useProjectStore(s => s.setOutputWindows);
-    const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);
-
-    // AutoCut loading state
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-    // AutoCut Visibility Logic:
-    // Mic source exists AND either camera exists or user events exist
-    const micSource = useProjectStore(s => s.project.microphoneSource);
-    const hasMic = !!micSource?.runtimeUrl;
-    const hasUserEvents = userEvents.mousePositions.length > 0;
-
-    const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
 
     // Handlers
 
@@ -74,76 +46,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         setIsPlaying(!isPlaying);
     };
 
-
-
-    // AutoCut handler (async VAD analysis)
-    const handleAutoCut = async () => {
-        if (isAnalyzing) return;
-
-        setIsAnalyzing(true);
-
-        // Show progress toast
-        const toastId = addToast({
-            type: 'progress',
-            title: 'Analyzing audio...',
-            message: 'Detecting speech segments'
-        });
-
-        try {
-            const audioUrl = micSource?.runtimeUrl || '';
-
-            const hasAudio = Boolean(audioUrl);
-
-            let speechSegments: { startMs: number; endMs: number }[] = [];
-
-            if (hasAudio) {
-                // Audio exists - use VAD
-                speechSegments = await getCachedSpeechSegments(audioUrl);
-
-                if (speechSegments.length === 0) {
-                    // VAD found no speech with audio present - something's wrong
-                    throw new Error('VAD detected no speech in audio. The audio may be silent or there may be an issue with the analysis.');
-                }
-            }
-            // If no audio, speechSegments stays empty and we rely on events only
-
-            // Run AutoCut analysis
-            const { windows, totalRemovedMs } = analyzeForAutoCut(
-                speechSegments,
-                userEvents,
-                sourceDurationMs
-            );
-
-            if (windows.length > 0) {
-                setOutputWindows(windows);
-
-                // Show success toast
-                const seconds = (totalRemovedMs / 1000).toFixed(1);
-                if (totalRemovedMs > 0) {
-                    updateToast(toastId, {
-                        type: 'success',
-                        title: `Trimmed ${seconds}s of silence`
-                    });
-                } else {
-                    updateToast(toastId, {
-                        type: 'info',
-                        title: 'No silence detected'
-                    });
-                }
-            } else {
-                removeToast(toastId);
-            }
-        } catch (error) {
-            console.error('AutoCut failed:', error);
-            updateToast(toastId, {
-                type: 'error',
-                title: 'AutoCut failed',
-                message: error instanceof Error ? error.message : 'Unknown error'
-            });
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
 
 
     // Helper format
@@ -187,38 +89,6 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     return (
         <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
             <div className="flex items-center gap-2">
-
-                {/* AutoCut Button */}
-                {showAutoCut && (
-                    <Tooltip text="Remove silent/inactive segments">
-                        <button
-                            onClick={handleAutoCut}
-                            className="interactive-ghost flex items-center justify-center gap-2 px-3 py-1 text-xs flex items-center gap-1"
-                            disabled={isAnalyzing}
-                        >
-                            <MdContentCut size={14} />
-                            AutoCut
-                        </button>
-                    </Tooltip>
-                )}
-
-                {/* Reset Windows Button */}
-                <Tooltip text="Reset to single window">
-                    <button
-                        onClick={() => {
-                            setOutputWindows([{
-                                id: crypto.randomUUID(),
-                                startMs: 0,
-                                endMs: sourceDurationMs,
-                                speed: 1.0
-                            }]);
-                        }}
-                        className="interactive-ghost flex items-center justify-center gap-2 px-3 py-1 text-xs flex items-center gap-1"
-                    >
-                        <MdRefresh size={14} />
-                        Reset
-                    </button>
-                </Tooltip>
             </div>
 
             <div className="flex items-center gap-3">

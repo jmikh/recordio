@@ -1,4 +1,5 @@
 import * as Mp4Muxer from 'mp4-muxer';
+import * as Sentry from '@sentry/react';
 import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
@@ -6,6 +7,7 @@ import { drawWatermark } from '../../core/painters/watermarkPainter';
 import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
+import { FrameExtractor } from './FrameExtractor';
 import type { Project, SourceMetadata, ScreenMetadata } from '../../types';
 import watermarkPng from '../../assets/watermark.png';
 
@@ -37,8 +39,6 @@ export class ExportManager {
         // Ensure even dimensions for encoder compatibility
         const width = targetWidth % 2 === 0 ? targetWidth : targetWidth + 1;
         const height = targetHeight % 2 === 0 ? targetHeight : targetHeight + 1;
-
-
 
         const renderProject = ProjectImpl.scale(project, { width, height });
 
@@ -85,7 +85,7 @@ export class ExportManager {
         const offscreenCanvas = new OffscreenCanvas(width, height);
         const ctx = offscreenCanvas.getContext('2d') as unknown as CanvasRenderingContext2D;
 
-        const videoElements: Record<string, HTMLVideoElement> = {};
+        const frameExtractors: Record<string, FrameExtractor> = {};
         const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null, watermark: HTMLImageElement | null } = { bg: null, device: null, watermark: null };
 
         const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -99,26 +99,16 @@ export class ExportManager {
             img.src = url;
         });
 
-        const loadVideo = (url: string) => new Promise<HTMLVideoElement>((resolve, reject) => {
-            const v = document.createElement('video');
-            // Only set crossOrigin for external URLs, not blob: URLs
-            if (!url.startsWith('blob:')) {
-                v.crossOrigin = 'anonymous';
-            }
-            v.muted = true;
-            v.autoplay = false;
-            v.playsInline = true;
-            v.onloadedmetadata = () => resolve(v);
-            v.onerror = reject;
-            v.src = url;
-            v.load();
-        });
-
         // Build sources map from project
         const sources: SourceMetadata[] = [renderProject.screenSource];
         if (renderProject.cameraSource) {
             sources.push(renderProject.cameraSource);
         }
+
+        // Tracking variables — hoisted for Sentry context in catch block
+        let totalDurationMs = 0;
+        let totalFrames = 0;
+        let framesProcessed = 0;
 
         try {
             const bgSettings = renderProject.settings.background;
@@ -138,10 +128,12 @@ export class ExportManager {
                 }
             }
 
-            // Load video elements for screen and camera sources
+            // Initialize frame extractors for screen and camera sources
             for (const source of sources) {
                 if (source.runtimeUrl) {
-                    videoElements[source.id] = await loadVideo(source.runtimeUrl);
+                    const extractor = new FrameExtractor(source.runtimeUrl);
+                    await extractor.initialize();
+                    frameExtractors[source.id] = extractor;
                 }
             }
 
@@ -155,7 +147,7 @@ export class ExportManager {
             }
 
             const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
-            const totalDurationMs = timeMapper.outputDuration;
+            totalDurationMs = timeMapper.outputDuration;
             const totalDurationSec = totalDurationMs / 1000;
             const sampleRate = 44100;
 
@@ -261,10 +253,10 @@ export class ExportManager {
             this.processAudioBuffer(renderedAudioBuffer, audioEncoder);
             // fps is now passed as a parameter
             const frameInterval = 1000 / fps;
-            const totalFrames = Math.ceil(totalDurationMs / frameInterval);
+            totalFrames = Math.ceil(totalDurationMs / frameInterval);
 
             const startTime = performance.now();
-            let framesProcessed = 0;
+            framesProcessed = 0;
 
             for (let i = 0; i < totalFrames; i++) {
                 if (signal.aborted) throw new Error("Export cancelled");
@@ -287,11 +279,11 @@ export class ExportManager {
                 }
 
                 const sourceTimeMs = timeMapper.mapOutputToSourceTime(currentTimeMs);
-                await Promise.all(Object.values(videoElements).map(async (v) => {
-                    v.currentTime = sourceTimeMs / 1000;
-                    await new Promise<void>(r => {
-                        v.addEventListener('seeked', () => r(), { once: true });
-                    });
+
+                // Decode frames at the target source time using WebCodecs
+                const currentFrameRefs: Record<string, VideoFrame> = {};
+                await Promise.all(Object.entries(frameExtractors).map(async ([id, ext]) => {
+                    currentFrameRefs[id] = await ext.getFrameAtTime(sourceTimeMs / 1000);
                 }));
 
                 // Render Frame
@@ -309,7 +301,7 @@ export class ExportManager {
                     canvas: offscreenCanvas as unknown as HTMLCanvasElement,
                     ctx,
                     bgRef: imageElements.bg,
-                    videoRefs: videoElements,
+                    videoRefs: currentFrameRefs,
                     deviceFrameImg: imageElements.device
                 }, {
                     project: renderProject,
@@ -323,13 +315,16 @@ export class ExportManager {
                 }
 
                 const durationMicros = 1000000 / fps;
-                const frame = new VideoFrame(offscreenCanvas, {
+                const encoderFrame = new VideoFrame(offscreenCanvas, {
                     timestamp: timestampMicros,
                     duration: durationMicros
                 });
 
-                videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
-                frame.close();
+                videoEncoder.encode(encoderFrame, { keyFrame: i % (fps * 2) === 0 });
+                encoderFrame.close();
+
+                // Close decoded source frames — they've been drawn to the canvas
+                Object.values(currentFrameRefs).forEach(f => f.close());
 
                 // Yield to the event loop only when the encoder is backed up
                 // or periodically for UI responsiveness (progress bar, cancel button)
@@ -347,14 +342,39 @@ export class ExportManager {
             const { buffer } = muxer.target;
             this.downloadBlob(new Blob([buffer], { type: 'video/mp4' }), `${project.name}_${quality}_${fps}fps.mp4`);
 
+            // Flag abnormally slow exports (>2× output duration)
+            const exportElapsedMs = performance.now() - startTime;
+            if (exportElapsedMs > totalDurationMs * 2) {
+                Sentry.withScope((scope) => {
+                    scope.setLevel('warning');
+                    scope.setTag('export.quality', quality);
+                    scope.setTag('export.fps', String(fps));
+                    scope.setExtra('outputDurationMs', totalDurationMs);
+                    scope.setExtra('exportElapsedMs', Math.round(exportElapsedMs));
+                    scope.setExtra('ratio', (exportElapsedMs / totalDurationMs).toFixed(2));
+                    scope.setExtra('totalFrames', totalFrames);
+                    Sentry.captureMessage(
+                        `Slow export: ${quality} ${fps}fps took ${(exportElapsedMs / totalDurationMs).toFixed(1)}× output duration`
+                    );
+                });
+            }
+
         } catch (e) {
             if (signal.aborted) {
-                // Export cancelled by user
+                // Export cancelled by user — not an error
             } else {
-                console.error("Export failed:", e);
+                Sentry.withScope((scope) => {
+                    scope.setTag('export.quality', quality);
+                    scope.setTag('export.fps', String(fps));
+                    scope.setExtra('outputDurationMs', totalDurationMs);
+                    scope.setExtra('framesProcessed', framesProcessed);
+                    scope.setExtra('totalFrames', totalFrames);
+                    Sentry.captureException(e instanceof Error ? e : new Error(String(e)));
+                });
                 throw e;
             }
         } finally {
+            Object.values(frameExtractors).forEach(ext => ext.dispose());
             this.abortController = null;
         }
     }

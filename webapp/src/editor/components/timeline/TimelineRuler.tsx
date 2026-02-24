@@ -107,10 +107,33 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
             ctx.stroke();
         };
 
-        // Wait for web fonts (Satoshi) to load before drawing
-        document.fonts.ready.then(draw);
+        // Draw with fallback immediately so the ruler isn't blank
+        draw();
 
-        return () => { cancelled = true; };
+        // Actively trigger + wait for the Satoshi font binary to download.
+        // document.fonts.load() returns a promise that resolves only once the
+        // font data is actually usable (unlike .check() which only tests if
+        // an @font-face rule is registered).
+        const fontSpec = '10px Satoshi';
+        document.fonts.load(fontSpec).then(() => {
+            if (!cancelled) draw();
+        });
+
+        // Safety net: if the CSS @import hasn't been parsed yet when load()
+        // was called, the promise resolves immediately with nothing. Listen
+        // for any future font-load events and redraw when Satoshi arrives.
+        const onFontLoad = () => {
+            if (!cancelled && document.fonts.check(fontSpec)) {
+                draw();
+                document.fonts.removeEventListener('loadingdone', onFontLoad);
+            }
+        };
+        document.fonts.addEventListener('loadingdone', onFontLoad);
+
+        return () => {
+            cancelled = true;
+            document.fonts.removeEventListener('loadingdone', onFontLoad);
+        };
     }, [totalWidth, pixelsPerSec, height, scrollLeft, containerWidth, headerWidth, theme]);
 
     return (

@@ -109,7 +109,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className="text-main opacity-50" size={BLOCK_ICON_SIZE} />
+                        <AiOutlineZoomIn className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}
@@ -142,7 +142,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {zoomOutWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomOut className="text-main opacity-50" size={BLOCK_ICON_SIZE} />
+                        <AiOutlineZoomOut className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}

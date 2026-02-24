@@ -29,7 +29,7 @@ let cachedMaskShape: 'circle' | 'rect' | 'square' | null = null;
  */
 export function drawWebcam(
     ctx: CanvasRenderingContext2D,
-    video: HTMLVideoElement,
+    video: HTMLVideoElement | VideoFrame,
     inputSize: Size,
     settings: CameraSettings,
     outputSize?: Size

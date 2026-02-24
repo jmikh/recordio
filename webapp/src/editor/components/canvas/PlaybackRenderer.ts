@@ -16,11 +16,14 @@ import type { TimeMapper } from '../../../core/mappers/timeMapper';
 import { type FocusArea } from '../../../types';
 import type { Project, Rect, CameraSettings } from '../../../types';
 
+/** A video source that can be drawn with ctx.drawImage — either a DOM video element or a decoded WebCodecs frame */
+export type VideoSource = HTMLVideoElement | VideoFrame;
+
 export interface RenderResources {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     bgRef: HTMLImageElement | null;
-    videoRefs: { [sourceId: string]: HTMLVideoElement };
+    videoRefs: { [sourceId: string]: VideoSource };
     deviceFrameImg: HTMLImageElement | null;
 }
 
