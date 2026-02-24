@@ -5,7 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, InfoTooltip, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { FaCheck, FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
-import { MdAspectRatio, MdStyle } from 'react-icons/md';
+import { MdAspectRatio } from 'react-icons/md';
+import { RiPaletteLine } from 'react-icons/ri';
 import { TbShape, TbBorderOuter } from 'react-icons/tb';
 
 export const CameraSettings = () => {
@@ -151,7 +152,7 @@ export const CameraSettings = () => {
                 {/* Style Settings */}
                 <CollapsibleCard
                     title="Style"
-                    icon={<MdStyle size={16} />}
+                    icon={<RiPaletteLine size={16} />}
                     previewItems={[
                         ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
                         ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),

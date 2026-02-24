@@ -7,7 +7,7 @@ interface ProjectCardProps {
     isActive?: boolean;
     variant?: 'sidebar' | 'grid';
     onOpen: (project: Project) => void;
-    onDelete: (project: Project) => Promise<void>;
+    onDelete?: (project: Project) => Promise<void>;
 }
 
 export const ProjectCard = ({
@@ -25,7 +25,7 @@ export const ProjectCard = ({
         <div
             onClick={() => !isDeleting && onOpen(project)}
             className={`
-                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden bg-surface-raised
+                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
                 ${isActive
                     ? 'border-border-primary scale-[1.02]'
@@ -34,7 +34,7 @@ export const ProjectCard = ({
             `}
         >
             {/* Delete Confirmation Overlay */}
-            {isDeleting && (
+            {onDelete && isDeleting && (
                 <div
                     className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
                     onClick={(e) => e.stopPropagation()}
@@ -109,7 +109,7 @@ export const ProjectCard = ({
             </div>
 
             {/* Actions (Hover) */}
-            {!isDeleting && (
+            {onDelete && !isDeleting && (
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 z-10">
                     <XButton
                         onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
