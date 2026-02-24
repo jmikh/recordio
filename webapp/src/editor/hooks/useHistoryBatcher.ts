@@ -33,13 +33,18 @@ export const useHistoryBatcher = () => {
     }, []);
 
     const batchAction = useCallback((action: () => void) => {
+        const beforeLen = (useProjectStore.temporal.getState() as any).pastStates.length;
+
         // Execute the action (which should trigger a store update)
         action();
 
-        // If we are interacting and haven't latched (paused) yet...
-        if (interactionCount > 0 && !hasLatched) {
-            // We just made the FIRST update. Zundo should have seen this change or will see it immediately.
-            // We pause history now so subsequent updates in this interaction are not recorded.
+        const afterLen = (useProjectStore.temporal.getState() as any).pastStates.length;
+        const historyAdded = afterLen > beforeLen;
+
+        // Only latch (pause tracking) if zundo actually recorded a history entry.
+        // This handles the case where the first batchAction doesn't change state
+        // (e.g. clicking on a slider thumb at its current position).
+        if (interactionCount > 0 && !hasLatched && historyAdded) {
             useProjectStore.temporal.getState().pause();
             hasLatched = true;
         }
