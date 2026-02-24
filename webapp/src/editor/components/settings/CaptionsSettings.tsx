@@ -101,13 +101,14 @@ export function CaptionsSettings() {
         if (!showCollapsibleCaptionPosition) {
             setCollapsibleVisibility('showCollapsibleCaptionPosition', true);
         }
-        // Defer scroll to allow DOM to update after expansion
-        requestAnimationFrame(() => {
+        // Defer scroll to allow CollapsibleCard expansion animation (200ms) to complete
+        const timeoutId = setTimeout(() => {
             const el = captionsContainerRef.current?.querySelector(`[data-caption-id="${selectedCaptionId}"]`);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-        });
+        }, 250);
+        return () => clearTimeout(timeoutId);
     }, [selectedCaptionId]);
 
     // Auto-select caption during playback (only in preview mode with captions panel)

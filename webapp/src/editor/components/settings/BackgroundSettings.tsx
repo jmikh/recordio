@@ -14,21 +14,21 @@ import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/pro
 
 
 const BACKGROUND_IMAGES = [
-    { name: 'Background 1', url: '/assets/backgrounds/bg1.avif', thumbnail: '/assets/backgrounds/bg1-small.avif' },
-    { name: 'Background 2', url: '/assets/backgrounds/bg2.avif', thumbnail: '/assets/backgrounds/bg2-small.avif' },
-    { name: 'Background 3', url: '/assets/backgrounds/bg3.avif', thumbnail: '/assets/backgrounds/bg3-small.avif' },
-    { name: 'Background 4', url: '/assets/backgrounds/bg4.avif', thumbnail: '/assets/backgrounds/bg4-small.avif' },
-    { name: 'Background 5', url: '/assets/backgrounds/bg5.avif', thumbnail: '/assets/backgrounds/bg5-small.avif' },
-    { name: 'Background 6', url: '/assets/backgrounds/bg6.avif', thumbnail: '/assets/backgrounds/bg6-small.avif' },
-    { name: 'Background 7', url: '/assets/backgrounds/bg7.avif', thumbnail: '/assets/backgrounds/bg7-small.avif' },
-    { name: 'Background 8', url: '/assets/backgrounds/bg8.avif', thumbnail: '/assets/backgrounds/bg8-small.avif' },
-    { name: 'Background 9', url: '/assets/backgrounds/bg9.avif', thumbnail: '/assets/backgrounds/bg9-small.avif' },
-    { name: 'Background 10', url: '/assets/backgrounds/bg10.avif', thumbnail: '/assets/backgrounds/bg10-small.avif' },
-    { name: 'Background 11', url: '/assets/backgrounds/bg11.avif', thumbnail: '/assets/backgrounds/bg11-small.avif' },
-    { name: 'Background 12', url: '/assets/backgrounds/bg12.avif', thumbnail: '/assets/backgrounds/bg12-small.avif' },
-    { name: 'Background 13', url: '/assets/backgrounds/bg13.avif', thumbnail: '/assets/backgrounds/bg13-small.avif' },
-    { name: 'Background 14', url: '/assets/backgrounds/bg14.avif', thumbnail: '/assets/backgrounds/bg14-small.avif' },
-    { name: 'Background 15', url: '/assets/backgrounds/bg15.avif', thumbnail: '/assets/backgrounds/bg15-small.avif' },
+    { name: 'Dark Glass', url: '/assets/backgrounds/bg4.avif', thumbnail: '/assets/backgrounds/bg4-small.avif' },
+    { name: 'Bubble Funky', url: '/assets/backgrounds/bg3.avif', thumbnail: '/assets/backgrounds/bg3-small.avif' },
+    { name: 'Dark Pink Washed', url: '/assets/backgrounds/bg6.avif', thumbnail: '/assets/backgrounds/bg6-small.avif' },
+    { name: 'Dark Pink Splatter', url: '/assets/backgrounds/bg5.avif', thumbnail: '/assets/backgrounds/bg5-small.avif' },
+    { name: 'Blue Purple Layers', url: '/assets/backgrounds/bg1.avif', thumbnail: '/assets/backgrounds/bg1-small.avif' },
+    { name: 'Layered Purples', url: '/assets/backgrounds/bg8.avif', thumbnail: '/assets/backgrounds/bg8-small.avif' },
+    { name: 'Blue Purple Wash', url: '/assets/backgrounds/bg2.avif', thumbnail: '/assets/backgrounds/bg2-small.avif' },
+    { name: 'Pink Blue Washed', url: '/assets/backgrounds/bg10.avif', thumbnail: '/assets/backgrounds/bg10-small.avif' },
+    { name: 'Pink Purple Funky', url: '/assets/backgrounds/bg15.avif', thumbnail: '/assets/backgrounds/bg15-small.avif' },
+    { name: 'Purple Pink Funky', url: '/assets/backgrounds/bg14.avif', thumbnail: '/assets/backgrounds/bg14-small.avif' },
+    { name: 'Pink Purple Splash', url: '/assets/backgrounds/bg12.avif', thumbnail: '/assets/backgrounds/bg12-small.avif' },
+    { name: 'Pink Clouds', url: '/assets/backgrounds/bg11.avif', thumbnail: '/assets/backgrounds/bg11-small.avif' },
+    { name: 'Orange Teal Funky', url: '/assets/backgrounds/bg9.avif', thumbnail: '/assets/backgrounds/bg9-small.avif' },
+    { name: 'Pink Teal Funky', url: '/assets/backgrounds/bg13.avif', thumbnail: '/assets/backgrounds/bg13-small.avif' },
+    { name: 'Fluorescent Stripes', url: '/assets/backgrounds/bg7.avif', thumbnail: '/assets/backgrounds/bg7-small.avif' },
 ];
 
 export const BackgroundSettings = () => {

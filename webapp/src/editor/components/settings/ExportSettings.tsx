@@ -219,28 +219,28 @@ export function ExportSettings() {
                             />
                         )}
                     </div>
+
+                    {/* Upgrade Button */}
+                    {!isPro && (
+                        <button
+                            onClick={() => setIsUpgradeModalOpen(true)}
+                            className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-primary border border-primary/30 rounded-[var(--radius-interactive)] hover:bg-primary/10 transition-colors cursor-pointer"
+                        >
+                            <FaCrown size={14} />
+                            Upgrade to Pro
+                        </button>
+                    )}
+
+                    {/* Export Button */}
+                    <button
+                        onClick={handleExport}
+                        className="interactive-primary flex items-center justify-center gap-2 w-full"
+                        disabled={isExporting}
+                    >
+                        Export
+                    </button>
                 </div>
             </CollapsibleCard>
-
-            {/* Upgrade Button */}
-            {!isPro && (
-                <button
-                    onClick={() => setIsUpgradeModalOpen(true)}
-                    className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-primary border border-primary/30 rounded-[var(--radius-interactive)] hover:bg-primary/10 transition-colors cursor-pointer"
-                >
-                    <FaCrown size={14} />
-                    Upgrade to Pro
-                </button>
-            )}
-
-            {/* Export Button */}
-            <button
-                onClick={handleExport}
-                className="interactive-primary flex items-center justify-center gap-2 w-full"
-                disabled={isExporting}
-            >
-                Export
-            </button>
 
             {/* Modals */}
             <AuthModal
