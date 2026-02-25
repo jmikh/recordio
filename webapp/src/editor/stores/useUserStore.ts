@@ -5,7 +5,6 @@ export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 export type ExportFps = 30 | 60;
 
 const DEV_PRO_UID = import.meta.env.VITE_DEV_PRO_UID as string | undefined;
-export type Theme = 'light' | 'dark';
 
 export interface Subscription {
     status: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
@@ -31,14 +30,12 @@ export interface UserState {
     // Free trial (server-authoritative timestamp)
     freeTrialUntil: string | null; // ISO 8601 timestamp
 
-    // Theme preference
-    theme: Theme;
+
 
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null, pictureSourceUrl?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
     setFreeTrialUntil: (until: string | null) => void;
-    setTheme: (theme: Theme) => void;
     clearUser: () => void;
 
     // Helper methods
@@ -67,7 +64,6 @@ export const useUserStore = create<UserState>()(
             },
             isPro: false,
             freeTrialUntil: null,
-            theme: 'dark',
 
             // Actions
             setUser: (userId, email, name = null, picture = null, pictureSourceUrl = null) => {
@@ -93,16 +89,6 @@ export const useUserStore = create<UserState>()(
             },
 
             setFreeTrialUntil: (until) => set({ freeTrialUntil: until }),
-
-            setTheme: (theme) => {
-                // Apply theme class to document
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-                set({ theme });
-            },
 
             clearUser: () => set({
                 userId: null,
@@ -162,18 +148,13 @@ export const useUserStore = create<UserState>()(
                 picture: state.picture,
                 pictureSourceUrl: state.pictureSourceUrl,
                 isAuthenticated: state.isAuthenticated,
-                subscription: state.subscription,
-                theme: state.theme
+                subscription: state.subscription
             }),
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     // Derive isAuthenticated from persisted userId (covers upgrade from before isAuthenticated was persisted)
                     if (state.userId && !state.isAuthenticated) {
                         useUserStore.setState({ isAuthenticated: true });
-                    }
-                    // Apply persisted theme on load (default is dark)
-                    if (state.theme !== 'light') {
-                        document.documentElement.classList.add('dark');
                     }
                 }
             }

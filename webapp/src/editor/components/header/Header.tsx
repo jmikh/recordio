@@ -12,6 +12,7 @@ import { SupportModal } from '../../../components/SupportModal';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
+import { useThemeStore } from '../../../stores/useThemeStore';
 import { LogoLink } from '@shared/components';
 import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { useToast } from '../Toast';
@@ -34,7 +35,8 @@ export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const { isAuthenticated, theme, setTheme, hasProAccess } = useUserStore();
+    const { isAuthenticated, hasProAccess } = useUserStore();
+    const { theme, setTheme } = useThemeStore();
     const { addToast } = useToast();
 
     const project = useProjectData();

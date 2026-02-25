@@ -7,6 +7,7 @@ import { LogoLink } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { useThemeStore } from '../stores/useThemeStore';
 import { SupportModal } from '../components/SupportModal';
 import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
@@ -21,7 +22,8 @@ export function DashboardPage() {
     const [analytics, setAnalytics] = useState<Record<string, VideoAnalytics>>({});
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { theme, setTheme, userId, hasProAccess } = useUserStore();
+    const { userId, hasProAccess } = useUserStore();
+    const { theme, setTheme } = useThemeStore();
     const isAuthenticated = !!userId;
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
