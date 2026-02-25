@@ -42,6 +42,9 @@ export class ExportManager {
 
         const renderProject = ProjectImpl.scale(project, { width, height });
 
+        // Probe audio codec support: prefer AAC, fall back to Opus
+        const audioCodec = await this.resolveAudioCodec();
+
         const muxer = new Mp4Muxer.Muxer({
             target: new Mp4Muxer.ArrayBufferTarget(),
             video: {
@@ -50,7 +53,7 @@ export class ExportManager {
                 height
             },
             audio: {
-                codec: 'aac',
+                codec: audioCodec.muxerCodec,
                 numberOfChannels: 2,
                 sampleRate: 44100
             },
@@ -70,13 +73,17 @@ export class ExportManager {
             framerate: fps
         });
 
+        let audioEncoderFailed = false;
         const audioEncoder = new AudioEncoder({
             output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-            error: (e) => console.error("AudioEncoder error:", e)
+            error: (e) => {
+                console.error("AudioEncoder error:", e);
+                audioEncoderFailed = true;
+            }
         });
 
         audioEncoder.configure({
-            codec: 'mp4a.40.2',
+            codec: audioCodec.encoderCodec,
             numberOfChannels: 2,
             sampleRate: 44100,
             bitrate: 128000
@@ -336,7 +343,11 @@ export class ExportManager {
             }
 
             await videoEncoder.flush();
-            await audioEncoder.flush();
+            if (audioEncoder.state !== 'closed') {
+                await audioEncoder.flush();
+            } else {
+                console.warn('[Export] Audio encoder closed unexpectedly — video may have no audio');
+            }
             muxer.finalize();
 
             const { buffer } = muxer.target;
@@ -392,6 +403,12 @@ export class ExportManager {
         const chunkSize = 44100;
 
         for (let frameOffset = 0; frameOffset < totalFrames; frameOffset += chunkSize) {
+            // Bail out if the encoder errored and closed itself
+            if (encoder.state === 'closed') {
+                console.warn('[Export] Audio encoder closed mid-encode — skipping remaining audio');
+                return;
+            }
+
             const size = Math.min(chunkSize, totalFrames - frameOffset);
             const destBuffer = new Float32Array(size * channels);
 
@@ -415,6 +432,35 @@ export class ExportManager {
             encoder.encode(audioData);
             audioData.close();
         }
+    }
+
+    /**
+     * Probe browser audio codec support.
+     * Prefer AAC (universal playback) → fall back to Opus (always available in Chromium,
+     * works around missing platform AAC on Linux / Brave).
+     */
+    private async resolveAudioCodec(): Promise<{
+        encoderCodec: string;
+        muxerCodec: 'aac' | 'opus';
+    }> {
+        const aacConfig = {
+            codec: 'mp4a.40.2',
+            numberOfChannels: 2,
+            sampleRate: 44100,
+            bitrate: 128000
+        };
+
+        try {
+            const aacResult = await AudioEncoder.isConfigSupported(aacConfig);
+            if (aacResult.supported) {
+                return { encoderCodec: 'mp4a.40.2', muxerCodec: 'aac' };
+            }
+        } catch {
+            // isConfigSupported itself can throw on some browsers
+        }
+
+        console.warn('[Export] AAC not supported — falling back to Opus');
+        return { encoderCodec: 'opus', muxerCodec: 'opus' };
     }
 
     private downloadBlob(blob: Blob, filename: string) {
