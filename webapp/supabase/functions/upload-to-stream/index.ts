@@ -109,6 +109,7 @@ serve(async (req) => {
         // 5. Upload to Cloudflare Stream
         const cfFormData = new FormData();
         cfFormData.append('file', videoFile, `${projectName}.mp4`);
+        cfFormData.append('creator', user.id);
 
         const cfResponse = await fetch(
             `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream`,

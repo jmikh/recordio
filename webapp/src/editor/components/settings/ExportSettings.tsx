@@ -232,14 +232,9 @@ export function ExportSettings() {
     const selectedFpsOption = FPS_OPTIONS.find(o => o.value === selectedFps);
     const needsProFeature = (selectedQualityOption?.proOnly || selectedFpsOption?.proOnly) && !proAccess;
 
-    // Inline trial/auth status badge
-    const statusBadge = !isPro ? (
-        activeTrial && freeTrialUntil ? (
-            <span className="text-[10px] text-primary font-semibold flex items-center gap-1">
-                <BiCrown size={10} />
-                Trial · {formatTrialRemaining(freeTrialUntil)}
-            </span>
-        ) : !isAuthenticated ? (
+    // Inline trial/auth status badge — only show when user doesn't have pro access
+    const statusBadge = proAccess ? null : (
+        !isAuthenticated ? (
             <button
                 onClick={() => setIsAuthModalOpen(true)}
                 className="text-[10px] text-primary hover:text-primary-highlighted underline cursor-pointer font-medium"
@@ -249,7 +244,7 @@ export function ExportSettings() {
         ) : (
             <span className="text-[10px] text-text-muted">Trial expired · <button onClick={() => setIsUpgradeModalOpen(true)} className="underline text-primary hover:text-primary-highlighted cursor-pointer">Upgrade</button></span>
         )
-    ) : null;
+    );
 
     const proBadge = (
         <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">

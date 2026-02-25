@@ -12,6 +12,7 @@ import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { ShareService, type SharedVideo, type VideoAnalytics, MAX_SHARED_VIDEOS } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
+import { useAuthListener } from '../hooks/useAuthListener';
 import * as Sentry from '@sentry/react';
 
 export function DashboardPage() {
@@ -20,10 +21,12 @@ export function DashboardPage() {
     const [analytics, setAnalytics] = useState<Record<string, VideoAnalytics>>({});
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { theme, setTheme, isAuthenticated } = useUserStore();
+    const { theme, setTheme, userId, hasProAccess } = useUserStore();
+    const isAuthenticated = !!userId;
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const { addToast } = useToast();
+    useAuthListener();
 
     useEffect(() => {
         // Check for error message in URL
@@ -37,17 +40,21 @@ export function DashboardPage() {
         loadProjects();
     }, []);
 
-    // Load shared videos + analytics
+    // Load shared videos + analytics (reactive to auth state)
     useEffect(() => {
+        if (!isAuthenticated) {
+            setSharedVideos([]);
+            setAnalytics({});
+            return;
+        }
         ShareService.getSharedVideos().then(videos => {
+            setSharedVideos(videos);
             if (videos.length > 0) {
-                setSharedVideos(videos);
-                // Fetch analytics for all videos
                 const uids = videos.map(v => v.cf_video_uid);
                 ShareService.getVideoAnalytics(uids).then(setAnalytics);
             }
         });
-    }, []);
+    }, [isAuthenticated]);
 
     const loadProjects = async () => {
         try {
@@ -79,13 +86,17 @@ export function DashboardPage() {
     };
 
     const handleUnshare = async (video: SharedVideo) => {
+        // Optimistic removal — remove from UI immediately
+        setSharedVideos(prev => prev.filter(v => v.id !== video.id));
+
         try {
             await ShareService.deleteSharedVideo(video.id);
-            setSharedVideos(prev => prev.filter(v => v.id !== video.id));
             addToast({ type: 'success', title: 'Video Unshared', message: `"${video.project_name}" is no longer shared` });
         } catch (e: any) {
             console.error('[Dashboard] Unshare failed:', e);
             Sentry.captureException(e, { extra: { shareId: video.id, phase: 'unshare' } });
+            // Restore the card on failure
+            setSharedVideos(prev => [...prev, video]);
             addToast({ type: 'error', title: 'Unshare Failed', message: e?.message || 'Something went wrong' });
         }
     };
@@ -96,6 +107,9 @@ export function DashboardPage() {
             <header className="border-b border-border">
                 <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center">
                     <LogoLink />
+                    {hasProAccess() && (
+                        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase ml-1">Pro</span>
+                    )}
                     <div className="flex-1 flex justify-center">
                         <span className="text-text-muted text-sm">
                             {projects.length} project{projects.length !== 1 ? 's' : ''} · {sharedVideos.length} published video{sharedVideos.length !== 1 ? 's' : ''}
@@ -143,12 +157,11 @@ export function DashboardPage() {
                 )}
 
                 {/* Published Videos Section */}
-                {sharedVideos.length > 0 && (() => {
-                    const localProjectIds = new Set(projects.map(p => p.id));
-                    return (
-                        <section className="p-6 pb-2">
-                            <div className="flex items-center gap-3 mb-4">
-                                <h2 className="text-lg font-medium text-text-highlighted">Published Videos</h2>
+                <section className="p-6 pb-2">
+                    <div className="flex items-center gap-3 mb-4">
+                        <h2 className="text-lg font-medium text-text-highlighted">Published Videos</h2>
+                        {isAuthenticated && sharedVideos.length > 0 && (
+                            <>
                                 <span className="text-xs text-text-muted">
                                     {sharedVideos.length} of {MAX_SHARED_VIDEOS}
                                 </span>
@@ -158,7 +171,16 @@ export function DashboardPage() {
                                         style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
                                     />
                                 </div>
-                            </div>
+                            </>
+                        )}
+                    </div>
+                    {!isAuthenticated ? (
+                        <p className="text-sm text-text-muted">Log in to see published videos</p>
+                    ) : sharedVideos.length === 0 ? (
+                        <p className="text-sm text-text-muted">You have no published videos</p>
+                    ) : (() => {
+                        const localProjectIds = new Set(projects.map(p => p.id));
+                        return (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {sharedVideos.map(video => (
                                     <SharedVideoCard
@@ -170,9 +192,9 @@ export function DashboardPage() {
                                     />
                                 ))}
                             </div>
-                        </section>
-                    );
-                })()}
+                        );
+                    })()}
+                </section>
 
                 {/* Projects Section */}
                 <main className="p-6">

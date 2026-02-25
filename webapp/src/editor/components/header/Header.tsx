@@ -34,7 +34,7 @@ export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const { isAuthenticated, theme, setTheme } = useUserStore();
+    const { isAuthenticated, theme, setTheme, hasProAccess } = useUserStore();
     const { addToast } = useToast();
 
     const project = useProjectData();
@@ -77,6 +77,9 @@ export const Header = () => {
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
                     <LogoLink className="mr-2" imgClassName="h-7" />
+                    {hasProAccess() && (
+                        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase -ml-3">Pro</span>
+                    )}
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">

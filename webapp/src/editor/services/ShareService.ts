@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import { supabase } from '../../auth/AuthManager';
+import { supabase, AuthManager } from '../../auth/AuthManager';
 
 const SHARE_BASE_URL = import.meta.env.PROD
     ? 'https://app.recordio.cc/watch'
@@ -224,39 +224,63 @@ export class ShareService {
 
     /**
      * Delete a shared video (unshare).
-     * Removes the DB record; the Edge Function handles CF video cleanup.
+     * Deletes from Cloudflare Stream first, then removes the DB record.
      */
     static async deleteSharedVideo(shareId: string): Promise<void> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        // First get the video UID for CF cleanup
+        // 1. Get the video UID and project_id
         const { data: share } = await supabase
             .from('shared_videos')
             .select('cf_video_uid, project_id')
             .eq('id', shareId)
             .single();
 
-        // Delete the DB record
+        if (!share?.cf_video_uid) {
+            throw new Error('Video not found');
+        }
+
+        // 2. Delete from Cloudflare Stream first (to avoid orphaned videos)
+        const session = await AuthManager.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const cfResponse = await fetch(`${supabaseUrl}/functions/v1/delete-from-stream`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ cf_video_uid: share.cf_video_uid }),
+        });
+
+        if (!cfResponse.ok) {
+            const errorData = await cfResponse.json().catch(() => ({}));
+            console.error('[Share] CF deletion failed:', errorData);
+            Sentry.captureException(new Error('CF video deletion failed'), {
+                extra: { phase: 'cf_delete', shareId, cfVideoUid: share.cf_video_uid, status: cfResponse.status }
+            });
+            throw new Error('Failed to delete video from Cloudflare');
+        }
+
+        // 3. Delete the DB record (CF video is already gone)
         const { error } = await supabase
             .from('shared_videos')
             .delete()
             .eq('id', shareId);
 
         if (error) {
-            console.error('[Share] Failed to delete share:', error);
-            Sentry.captureException(error, { extra: { phase: 'delete_share', shareId } });
+            console.error('[Share] Failed to delete share from DB:', error);
+            Sentry.captureException(error, { extra: { phase: 'delete_share_db', shareId } });
             throw new Error('Failed to unshare video');
         }
 
-        // Invalidate cache
-        if (share?.project_id) {
+        // 4. Invalidate cache
+        if (share.project_id) {
             ShareService.invalidateCache(share.project_id);
         } else {
             ShareService.invalidateCache();
         }
-
-        // Best-effort CF cleanup via a separate Edge Function call could go here
-        // For now the video will be orphaned on CF — can add cleanup later
     }
 
     /**

@@ -106,19 +106,31 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
 
                         <div className="flex items-center justify-between bg-background/50 rounded p-2 border border-border/50">
                             <span className="text-xs text-text-muted">Status</span>
-                            {isTrialing ? (
-                                <div className="flex items-center gap-1.5 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
-                                    <BiCrown size={10} />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Pro Trial</span>
-                                </div>
-                            ) : isPro ? (
-                                <div className="flex items-center gap-1.5 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
-                                    <BiCrown size={10} />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Pro</span>
-                                </div>
-                            ) : (
-                                <span className="text-[10px] font-medium text-text-muted bg-surface-light px-2 py-0.5 rounded-full">Free Plan</span>
-                            )}
+                            <div className="flex flex-col items-end gap-0.5">
+                                {isTrialing ? (
+                                    <div className="flex items-center gap-1.5 text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                                        <BiCrown size={10} />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Pro Trial</span>
+                                    </div>
+                                ) : isPro ? (
+                                    <div className="flex items-center gap-1.5 text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                                        <BiCrown size={10} />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Pro</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-[10px] font-medium text-text-muted bg-surface-light px-2 py-0.5 rounded-full">Free Plan</span>
+                                )}
+                                {isTrialing && freeTrialUntil && (
+                                    <span className="text-[10px] text-text-muted">
+                                        expires {new Date(freeTrialUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                )}
+                                {isPro && !isTrialing && subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
+                                    <span className="text-[10px] text-text-muted">
+                                        expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
