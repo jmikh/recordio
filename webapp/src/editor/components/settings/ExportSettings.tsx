@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FaCrown } from 'react-icons/fa';
+import { BiCrown } from 'react-icons/bi';
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight } from 'react-icons/tb';
-import { CollapsibleCard, MultiToggle, Dropdown, Toggle } from '@shared/components';
+import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -60,7 +60,6 @@ export function ExportSettings() {
 
     // Watermark defaults: OFF for pro/trial, ON for everyone else
     const effectiveShowWatermark = showWatermark ?? !proAccess;
-    const canToggleWatermark = proAccess;
 
     // Sync watermark preview to canvas via UIStore
     const setWatermarkPreviewPosition = useUIStore(s => s.setWatermarkPreviewPosition);
@@ -122,6 +121,36 @@ export function ExportSettings() {
         }
     };
 
+    // Determine if currently selected options require Pro
+    const selectedQualityOption = QUALITY_OPTIONS.find(o => o.value === selectedQuality);
+    const selectedFpsOption = FPS_OPTIONS.find(o => o.value === selectedFps);
+    const needsProFeature = (selectedQualityOption?.proOnly || selectedFpsOption?.proOnly) && !proAccess;
+
+    // Inline trial/auth status badge
+    const statusBadge = !isPro ? (
+        activeTrial && freeTrialUntil ? (
+            <span className="text-[10px] text-primary font-semibold flex items-center gap-1">
+                <BiCrown size={10} />
+                Trial · {formatTrialRemaining(freeTrialUntil)}
+            </span>
+        ) : !isAuthenticated ? (
+            <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="text-[10px] text-primary hover:text-primary-highlighted underline cursor-pointer font-medium"
+            >
+                Free trial →
+            </button>
+        ) : (
+            <span className="text-[10px] text-text-muted">Trial expired</span>
+        )
+    ) : null;
+
+    const proBadge = (
+        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
+            Pro
+        </span>
+    );
+
     return (
         <div className="flex flex-col gap-3 text-sm text-text-main">
             <CollapsibleCard
@@ -130,84 +159,60 @@ export function ExportSettings() {
                 notCollapsible
             >
                 <div className="flex flex-col gap-4">
-                    {/* Quality Selection */}
+                    {/* Quality Selection — all selectable, Pro badge as indicator */}
                     <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted w-1/2 shrink-0">Quality</span>
+                        <span className="text-sm text-text-muted w-1/3 shrink-0">Quality</span>
                         <Dropdown
                             options={QUALITY_OPTIONS.map(opt => ({
                                 value: opt.value,
                                 label: opt.label,
-                                disabled: opt.proOnly && !proAccess,
-                                suffix: opt.proOnly && !isPro ? (
-                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
-                                        Pro
-                                    </span>
-                                ) : undefined,
+                                suffix: opt.proOnly && !isPro ? proBadge : undefined,
                             }))}
                             value={selectedQuality}
                             onChange={(val) => setSelectedQuality(val)}
                         />
                     </div>
 
-                    {/* FPS Selection */}
+                    {/* FPS Selection — all selectable, Pro badge as indicator */}
                     <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted w-1/2 shrink-0">Frame Rate</span>
+                        <span className="text-sm text-text-muted w-1/3 shrink-0">Frame Rate</span>
                         <Dropdown
                             options={FPS_OPTIONS.map(opt => ({
                                 value: opt.value,
                                 label: opt.label,
-                                disabled: opt.proOnly && !proAccess,
-                                suffix: opt.proOnly && !isPro ? (
-                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
-                                        Pro
-                                    </span>
-                                ) : undefined,
+                                suffix: opt.proOnly && !isPro ? proBadge : undefined,
                             }))}
                             value={selectedFps}
                             onChange={(val) => setSelectedFps(val)}
                         />
                     </div>
 
-                    {/* Trial / Auth Status */}
-                    {!isPro && (
-                        activeTrial && freeTrialUntil ? (
-                            /* Active trial reminder */
-                            <div className="bg-primary/10 border border-primary/20 rounded-md px-3 py-2.5">
-                                <p className="text-xs text-primary flex items-center gap-1.5">
-                                    <FaCrown className="shrink-0" size={11} />
-                                    Pro trial · {formatTrialRemaining(freeTrialUntil)}
-                                </p>
+                    {/* Watermark — static line for non-Pro, toggle for Pro */}
+                    {proAccess ? (
+                        <div className="flex flex-col gap-2">
+                            <Toggle
+                                label="Recordio Watermark"
+                                value={effectiveShowWatermark}
+                                onChange={(val) => setShowWatermark(val)}
+                            />
+                            {effectiveShowWatermark && (
+                                <MultiToggle
+                                    options={WATERMARK_POSITIONS.map(pos => ({
+                                        value: pos.value,
+                                        icon: pos.icon,
+                                        tooltip: pos.label,
+                                    }))}
+                                    value={watermarkPosition}
+                                    onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}
+                                />
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-text-muted">Recordio Watermark</span>
+                                <span className="text-[10px] text-text-disabled">Pro to remove</span>
                             </div>
-                        ) : !isAuthenticated ? (
-                            <div className="bg-state-inactive border border-border rounded-md px-3 py-2.5">
-                                <p className="text-xs text-text-muted">
-                                    <button
-                                        onClick={() => setIsAuthModalOpen(true)}
-                                        className="text-primary hover:text-primary-highlighted underline font-medium cursor-pointer"
-                                    >
-                                        Sign in
-                                    </button>
-                                    {' '}to start your free Pro trial
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="bg-state-inactive border border-border rounded-md px-3 py-2.5">
-                                <p className="text-xs text-text-muted">
-                                    Pro trial expired
-                                </p>
-                            </div>
-                        )
-                    )}
-
-                    {/* Watermark Toggle */}
-                    <div className="flex flex-col gap-2">
-                        <Toggle
-                            label="Recordio Watermark"
-                            value={effectiveShowWatermark}
-                            onChange={(val) => setShowWatermark(val)}
-                            disabled={!canToggleWatermark}
-                        />
-                        {effectiveShowWatermark && (
                             <MultiToggle
                                 options={WATERMARK_POSITIONS.map(pos => ({
                                     value: pos.value,
@@ -217,28 +222,37 @@ export function ExportSettings() {
                                 value={watermarkPosition}
                                 onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}
                             />
-                        )}
-                    </div>
+                        </div>
+                    )}
 
-                    {/* Upgrade Button */}
-                    {!isPro && (
+                    {/* Export Button — disabled when Pro features selected by non-Pro */}
+                    <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
+                        <button
+                            onClick={handleExport}
+                            className="interactive-primary flex items-center justify-center gap-2 w-full"
+                            disabled={isExporting || needsProFeature}
+                        >
+                            Export
+                        </button>
+                    </Tooltip>
+
+                    {/* Upgrade Button — shown when user has no Pro access */}
+                    {!proAccess && (
                         <button
                             onClick={() => setIsUpgradeModalOpen(true)}
                             className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-primary border border-primary/30 rounded-[var(--radius-interactive)] hover:bg-primary/10 transition-colors cursor-pointer"
                         >
-                            <FaCrown size={14} />
+                            <BiCrown size={14} />
                             Upgrade to Pro
                         </button>
                     )}
 
-                    {/* Export Button */}
-                    <button
-                        onClick={handleExport}
-                        className="interactive-primary flex items-center justify-center gap-2 w-full"
-                        disabled={isExporting}
-                    >
-                        Export
-                    </button>
+                    {/* Inline status badge */}
+                    {statusBadge && (
+                        <div className="flex justify-center">
+                            {statusBadge}
+                        </div>
+                    )}
                 </div>
             </CollapsibleCard>
 

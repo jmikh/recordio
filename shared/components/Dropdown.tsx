@@ -130,7 +130,8 @@ export function Dropdown<T>({
                     {label && <span className="text-text-muted">{label}</span>}
                     <span>{displayLabel}</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                    {currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}
                     <MdKeyboardArrowDown
                         size={18}
                         className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}

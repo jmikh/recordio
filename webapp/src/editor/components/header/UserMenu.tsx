@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaUser, FaSignOutAlt, FaCrown, FaCog } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
+import { BiCrown } from 'react-icons/bi';
 import { useUserStore } from '../../stores/useUserStore';
 import { AuthManager } from '../../../auth/AuthManager';
 import { StripeService } from '../../stripe/StripeService';
@@ -9,7 +10,11 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
-    const { email, name, picture, isPro, subscription } = useUserStore();
+    const { email, name, picture, isPro, subscription, freeTrialUntil } = useUserStore();
+
+    // Detect trial state: Stripe trialing OR active free trial
+    const hasActiveFreeTriaI = freeTrialUntil ? new Date(freeTrialUntil).getTime() > Date.now() : false;
+    const isTrialing = subscription.status === 'trialing' || hasActiveFreeTriaI;
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +80,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                 )}
                 {isPro && (
                     <div className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-[1px]">
-                        <FaCrown size={10} className="text-yellow-500" />
+                        <BiCrown size={10} className="text-yellow-500" />
                     </div>
                 )}
             </button>
@@ -101,9 +106,14 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
 
                         <div className="flex items-center justify-between bg-background/50 rounded p-2 border border-border/50">
                             <span className="text-xs text-text-muted">Status</span>
-                            {isPro ? (
+                            {isTrialing ? (
                                 <div className="flex items-center gap-1.5 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
-                                    <FaCrown size={10} />
+                                    <BiCrown size={10} />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Pro Trial</span>
+                                </div>
+                            ) : isPro ? (
+                                <div className="flex items-center gap-1.5 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
+                                    <BiCrown size={10} />
                                     <span className="text-[10px] font-bold uppercase tracking-wider">Pro</span>
                                 </div>
                             ) : (
@@ -113,7 +123,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                     </div>
 
                     <div className="p-1.5 space-y-0.5">
-                        {isPro ? (
+                        {isPro && !isTrialing ? (
                             subscription.stripeCustomerId && (
                                 <button
                                     onClick={handleManageSubscription}
@@ -128,7 +138,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                 onClick={handleUpgrade}
                                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-primary/10 rounded-md transition-colors text-left font-medium group"
                             >
-                                <FaCrown size={14} className="group-hover:scale-110 transition-transform" />
+                                <BiCrown size={14} className="group-hover:scale-110 transition-transform" />
                                 Upgrade to Pro
                             </button>
                         )}

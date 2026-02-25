@@ -593,6 +593,47 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
     }
+
+    /**
+     * Estimate total IndexedDB usage in bytes by iterating all stores.
+     * Sums Blob sizes for binary entries, and rough JSON size for metadata.
+     */
+    static async estimateIndexedDBUsage(): Promise<number> {
+        const db = await this.getDB();
+        const storeNames = Array.from(db.objectStoreNames);
+        let totalBytes = 0;
+
+        const tx = db.transaction(storeNames, 'readonly');
+
+        const storePromises = storeNames.map(name => {
+            return new Promise<number>((resolve, reject) => {
+                const store = tx.objectStore(name);
+                const req = store.openCursor();
+                let storeBytes = 0;
+
+                req.onsuccess = (e) => {
+                    const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+                    if (cursor) {
+                        const val = cursor.value;
+                        if (val?.blob instanceof Blob) {
+                            storeBytes += val.blob.size;
+                        } else {
+                            // Rough estimate for metadata entries
+                            try { storeBytes += JSON.stringify(val).length * 2; } catch { /* skip */ }
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(storeBytes);
+                    }
+                };
+                req.onerror = () => reject(req.error);
+            });
+        });
+
+        const results = await Promise.all(storePromises);
+        totalBytes = results.reduce((sum, n) => sum + n, 0);
+        return totalBytes;
+    }
 }
 
 // ============================================

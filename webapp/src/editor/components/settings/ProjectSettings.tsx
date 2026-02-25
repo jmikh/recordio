@@ -69,10 +69,8 @@ export const ProjectSettings = () => {
 
     useEffect(() => {
         fetchProjects();
-        // Estimate storage usage
-        navigator.storage?.estimate?.().then(est => {
-            if (est.usage != null) setStorageUsed(est.usage);
-        });
+        // Estimate IndexedDB-only storage usage
+        ProjectStorage.estimateIndexedDBUsage().then(setStorageUsed).catch(console.error);
     }, [activeProject.id, isSaving]); // Refresh when active project changes or saving completes
 
     const fetchProjects = async () => {

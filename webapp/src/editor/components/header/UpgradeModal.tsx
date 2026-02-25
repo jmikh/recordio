@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FaCrown, FaCheck, FaGift } from 'react-icons/fa';
+import { FaCheck, FaGift } from 'react-icons/fa';
+import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
@@ -101,19 +102,14 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     };
 
     const monthlyPrice = 12;
-    const yearlyPrice = 59;
-    const yearlyMonthlyEquivalent = (yearlyPrice / 12).toFixed(2);
+    const yearlyPrice = 72;
+    const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[380px]">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                    <FaCrown className="text-yellow-500" size={24} />
-                    <h2 className="text-xl font-semibold text-text-highlighted">
-                        Upgrade to Pro
-                    </h2>
-                </div>
+            {/* Header */}
+            <div className="flex justify-end mb-2">
                 <XButton onClick={onClose} title="Close" />
             </div>
 
@@ -142,17 +138,75 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {selectedQuality && !success && !checkingStatus && (
-                <div className="mb-6 bg-primary/10 border border-primary/30 rounded-sm p-3">
-                    <p className="text-sm text-text-highlighted">
-                        <strong>{selectedQuality}</strong> exports are only available for Pro subscribers.
-                    </p>
-                </div>
-            )}
+            {/* Pro Title */}
+            <h2 className="text-2xl font-bold text-text-highlighted text-center mb-6 flex items-center justify-center gap-2">
+                Recordio
+                <span className="bg-primary text-text-on-primary text-xs font-bold px-2.5 py-1 rounded-full uppercase">
+                    Pro
+                </span>
+            </h2>
+
+            {/* Price Display */}
+            <div className="text-center mb-2">
+                <span className="text-5xl font-bold text-primary">
+                    ${billingInterval === 'monthly' ? monthlyPrice : yearlyMonthlyEquivalent}
+                </span>
+            </div>
+            <p className="text-sm text-text-muted text-center mb-1">
+                per month
+            </p>
+            <p className="text-xs text-text-muted text-center mb-5">
+                {billingInterval === 'yearly'
+                    ? `Billed at $${yearlyPrice} annually`
+                    : 'Billed monthly'
+                }
+            </p>
+
+            {/* Billing Toggle — pill style */}
+            <div className="flex items-center justify-center gap-1 mb-6 bg-surface-inset rounded-full p-1 mx-auto w-fit">
+                <button
+                    onClick={() => setBillingInterval('monthly')}
+                    className={`py-1.5 px-5 text-sm font-medium rounded-full transition-all ${billingInterval === 'monthly'
+                        ? 'bg-primary text-text-on-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Monthly
+                </button>
+                <button
+                    onClick={() => setBillingInterval('yearly')}
+                    className={`py-1.5 px-5 text-sm font-medium rounded-full transition-all ${billingInterval === 'yearly'
+                        ? 'bg-primary text-text-on-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Annual -{savingsPercent}%
+                </button>
+            </div>
+
+            {/* Feature List */}
+            <ul className="space-y-4 mb-6">
+                <li className="flex items-center gap-3 text-sm">
+                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
+                    <span className="text-text-highlighted font-medium">Everything in Free, plus:</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
+                    <span className="text-text-highlighted">Unlimited 4K exports</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
+                    <span className="text-text-highlighted">No watermarks</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
+                    <span className="text-text-highlighted">Priority support</span>
+                </li>
+            </ul>
 
             {/* Free Trial Banner (non-authenticated users only) */}
             {!isAuthenticated && (
-                <div className="mb-4 bg-primary/10 border border-primary/30 rounded-sm p-3 flex items-start gap-3">
+                <div className="mb-4 bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-start gap-3">
                     <FaGift className="text-primary mt-0.5 shrink-0" size={16} />
                     <div>
                         <p className="text-sm text-text-highlighted">
@@ -171,67 +225,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Billing Toggle */}
-            <div className="flex items-center justify-center gap-1 mb-5 bg-surface-inset rounded-lg p-1">
-                <button
-                    onClick={() => setBillingInterval('monthly')}
-                    className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-all ${billingInterval === 'monthly'
-                        ? 'bg-surface-raised text-text-highlighted shadow-sm'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Monthly
-                </button>
-                <button
-                    onClick={() => setBillingInterval('yearly')}
-                    className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${billingInterval === 'yearly'
-                        ? 'bg-surface-raised text-text-highlighted shadow-sm'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Yearly
-                    <span className="text-[11px] font-semibold text-success">Save {savingsPercent}%</span>
-                </button>
-            </div>
-
-            {/* Pricing Card */}
-            <div className="bg-surface rounded-lg p-6 mb-6 border border-border">
-                <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-4xl font-bold text-text-highlighted">
-                        ${billingInterval === 'monthly' ? monthlyPrice : yearlyPrice}
-                    </span>
-                    <span className="text-text-muted">
-                        /{billingInterval === 'monthly' ? 'month' : 'year'}
-                    </span>
-                </div>
-
-                {billingInterval === 'yearly' && (
-                    <p className="text-xs text-text-muted mb-4">
-                        That's just ${yearlyMonthlyEquivalent}/month
-                    </p>
-                )}
-                {billingInterval === 'monthly' && (
-                    <p className="text-xs text-text-muted mb-4">
-                        ${yearlyPrice}/yr if billed annually
-                    </p>
-                )}
-
-                <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm">
-                        <FaCheck className="text-green-500 shrink-0" size={14} />
-                        <span className="text-text-highlighted">Unlimited 1080p+ & 60fps exports</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm">
-                        <FaCheck className="text-green-500 shrink-0" size={14} />
-                        <span className="text-text-highlighted">No watermarks</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm">
-                        <FaCheck className="text-green-500 shrink-0" size={14} />
-                        <span className="text-text-highlighted">Priority support</span>
-                    </li>
-                </ul>
-            </div>
-
             {/* Error Message */}
             {error && (
                 <div className="mb-4 bg-red-900/20 border border-red-500/50 text-red-400 px-3 py-2 rounded-sm text-xs">
@@ -239,16 +232,14 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-                <button onClick={onClose} className="interactive-base flex items-center justify-center gap-2 flex-1" disabled={loading}>
-                    Maybe Later
-                </button>
-                <button onClick={handleUpgrade} className="interactive-primary flex items-center justify-center gap-2 flex-1 py-2" disabled={loading}>
-                    <FaCrown className="mr-2" size={14} />
-                    {loading ? 'Loading...' : 'Subscribe Now'}
-                </button>
-            </div>
+            {/* Get Pro Button */}
+            <button
+                onClick={handleUpgrade}
+                className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
+                disabled={loading}
+            >
+                {loading ? 'Loading...' : 'Get Pro'}
+            </button>
 
             <p className="text-center text-xs text-text-muted mt-4">
                 Secure payment processed by Stripe
