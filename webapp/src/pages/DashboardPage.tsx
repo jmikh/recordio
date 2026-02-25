@@ -8,19 +8,21 @@ import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { SupportModal } from '../components/SupportModal';
-import { ShareService, type SharedVideo } from '../editor/services/ShareService';
+import { UserMenu } from '../components/UserMenu';
+import { AuthModal } from '../editor/components/header/AuthModal';
+import { ShareService, type SharedVideo, type VideoAnalytics, MAX_SHARED_VIDEOS } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
 import * as Sentry from '@sentry/react';
-
-const MAX_SHARED_VIDEOS = 5;
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [sharedVideos, setSharedVideos] = useState<SharedVideo[]>([]);
+    const [analytics, setAnalytics] = useState<Record<string, VideoAnalytics>>({});
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { theme, setTheme, isAuthenticated } = useUserStore();
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const { addToast } = useToast();
 
     useEffect(() => {
@@ -35,12 +37,17 @@ export function DashboardPage() {
         loadProjects();
     }, []);
 
-    // Load shared videos when authenticated
+    // Load shared videos + analytics
     useEffect(() => {
-        if (isAuthenticated) {
-            ShareService.getSharedVideos().then(setSharedVideos);
-        }
-    }, [isAuthenticated]);
+        ShareService.getSharedVideos().then(videos => {
+            if (videos.length > 0) {
+                setSharedVideos(videos);
+                // Fetch analytics for all videos
+                const uids = videos.map(v => v.cf_video_uid);
+                ShareService.getVideoAnalytics(uids).then(setAnalytics);
+            }
+        });
+    }, []);
 
     const loadProjects = async () => {
         try {
@@ -87,22 +94,33 @@ export function DashboardPage() {
         <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
             <header className="border-b border-border">
-                <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center justify-between">
+                <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center">
                     <LogoLink />
+                    <div className="flex-1 flex justify-center">
+                        <span className="text-text-muted text-sm">
+                            {projects.length} project{projects.length !== 1 ? 's' : ''} · {sharedVideos.length} published video{sharedVideos.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
                     <div className="flex items-center gap-3">
-                        <div className="text-text-muted text-sm">
-                            {projects.length} project{projects.length !== 1 ? 's' : ''}
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center">
+                                <BiSupport size={18} />
+                            </button>
+                            <button
+                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                                className="interactive-ghost flex items-center justify-center"
+                            >
+                                {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
+                            </button>
                         </div>
-                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-base flex items-center justify-center gap-2">
-                            <BiSupport size={18} />
-                        </button>
-                        <button
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                            className="interactive-base flex items-center justify-center gap-2"
-                        >
-                            {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                        </button>
+                        {isAuthenticated ? (
+                            <UserMenu onOpenUpgradeModal={() => { }} />
+                        ) : (
+                            <button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features" className="interactive-ghost flex items-center justify-center gap-2">
+                                Sign In
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -124,49 +142,53 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {/* Shared Videos Section */}
-                {sharedVideos.length > 0 && (
-                    <section className="p-6 pb-2">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-base font-medium text-text-highlighted">Shared Videos</h2>
-                            <div className="flex items-center gap-3">
+                {/* Published Videos Section */}
+                {sharedVideos.length > 0 && (() => {
+                    const localProjectIds = new Set(projects.map(p => p.id));
+                    return (
+                        <section className="p-6 pb-2">
+                            <div className="flex items-center gap-3 mb-4">
+                                <h2 className="text-lg font-medium text-text-highlighted">Published Videos</h2>
                                 <span className="text-xs text-text-muted">
-                                    {sharedVideos.length} of {MAX_SHARED_VIDEOS} links used
+                                    {sharedVideos.length} of {MAX_SHARED_VIDEOS}
                                 </span>
-                                <div className="w-20 h-1.5 bg-surface rounded-full overflow-hidden">
+                                <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-primary rounded-full transition-all duration-300"
                                         style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
                                     />
                                 </div>
                             </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {sharedVideos.map(video => (
-                                <SharedVideoCard
-                                    key={video.id}
-                                    video={video}
-                                    onUnshare={handleUnshare}
-                                />
-                            ))}
-                        </div>
-                    </section>
-                )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {sharedVideos.map(video => (
+                                    <SharedVideoCard
+                                        key={video.id}
+                                        video={video}
+                                        localProjectExists={localProjectIds.has(video.project_id)}
+                                        analytics={analytics[video.cf_video_uid]}
+                                        onUnshare={handleUnshare}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    );
+                })()}
 
                 {/* Projects Section */}
                 <main className="p-6">
-                    {sharedVideos.length > 0 && (
-                        <h2 className="text-base font-medium text-text-highlighted mb-4">Projects</h2>
-                    )}
+                    <div className="flex items-baseline gap-2 mb-4">
+                        <h2 className="text-lg font-medium text-text-highlighted">Projects</h2>
+                        <span className="text-xs text-text-muted">· stored on this device</span>
+                    </div>
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <div className="text-text-muted">Loading projects...</div>
                         </div>
                     ) : projects.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-center">
-                            <div className="text-text-muted mb-2">No projects yet</div>
+                        <div className="flex flex-col items-center justify-center h-64 text-center max-w-md mx-auto">
+                            <div className="text-text-muted mb-2">No projects on this device</div>
                             <div className="text-text-muted text-sm">
-                                Record something with the extension to get started
+                                Projects are stored locally in your browser. If you recorded on a different browser or device, open Recordio there to find your projects.
                             </div>
                         </div>
                     ) : (
@@ -184,6 +206,11 @@ export function DashboardPage() {
                 </main>
             </div>
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                onAuthSuccess={() => { }}
+            />
         </div>
     );
 }

@@ -5,7 +5,7 @@ const SHARE_BASE_URL = import.meta.env.PROD
     ? 'https://app.recordio.cc/watch'
     : 'http://localhost:3001/watch';
 
-const MAX_SHARED_VIDEOS = 5;
+export const MAX_SHARED_VIDEOS = 5;
 
 // TODO: Add per-video view alerting when viewership exceeds thresholds (10k, 100k, 1M).
 // Use CF Stream Analytics API to poll view counts periodically (e.g., daily cron via Supabase pg_cron
@@ -14,8 +14,10 @@ const MAX_SHARED_VIDEOS = 5;
 
 export interface SharedVideo {
     id: string;
+    user_id: string;
     project_id: string;
     project_name: string;
+    description: string;
     cf_video_uid: string;
     version: number;
     created_at: string;
@@ -36,6 +38,13 @@ export interface ShareQuota {
     canShare: boolean;
 }
 
+export interface VideoAnalytics {
+    uid: string;
+    views: number;
+    minutesViewed: number;
+    durationSeconds: number;
+}
+
 // ─── In-memory cache ────────────────────────────────────────
 // Avoids hitting the DB every time ExportSettings or Header mounts.
 // Invalidated on publish, republish, and delete.
@@ -45,6 +54,8 @@ const cache = {
     byProject: new Map<string, SharedVideo | null>(),
     /** Cached list of all shared videos (null = not yet fetched) */
     allVideos: null as SharedVideo[] | null,
+    /** Cached analytics per video UID */
+    analytics: null as Record<string, VideoAnalytics> | null,
 };
 
 export class ShareService {
@@ -256,6 +267,111 @@ export class ShareService {
     }
 
     /**
+     * Get a thumbnail URL for a Cloudflare Stream video.
+     */
+    static getThumbnailUrl(cfVideoUid: string): string {
+        const subdomain = import.meta.env.VITE_CF_CUSTOMER_SUBDOMAIN || 'placeholder';
+        return `https://customer-${subdomain}.cloudflarestream.com/${cfVideoUid}/thumbnails/thumbnail.jpg`;
+    }
+
+    /**
+     * Fetch analytics for a batch of CF Stream video UIDs.
+     * Cached in-memory for the page session.
+     */
+    static async getVideoAnalytics(videoUids: string[]): Promise<Record<string, VideoAnalytics>> {
+        if (!supabase || videoUids.length === 0) return {};
+
+        // Return cached if available
+        if (cache.analytics !== null) return cache.analytics;
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return {};
+
+            const res = await supabase.functions.invoke('get-video-analytics', {
+                body: { videoUids },
+            });
+
+            if (res.error) {
+                console.error('[Share] Analytics fetch failed:', res.error);
+                return {};
+            }
+
+            cache.analytics = res.data?.analytics || {};
+            return cache.analytics!;
+        } catch (error) {
+            console.error('[Share] Analytics error:', error);
+            return {};
+        }
+    }
+
+    /**
+     * Fetch detailed analytics for a single video (includes daily breakdown).
+     * Used on the watch page for the owner panel.
+     */
+    static async getDetailedVideoAnalytics(videoUid: string): Promise<VideoAnalytics & { daily?: { date: string; views: number; minutesViewed: number }[] } | null> {
+        if (!supabase) return null;
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return null;
+
+            const res = await supabase.functions.invoke('get-video-analytics', {
+                body: { videoUids: [videoUid], detailed: true },
+            });
+
+            if (res.error) return null;
+            return res.data?.analytics?.[videoUid] || null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Get the current authenticated user's ID (or null).
+     */
+    static async getCurrentUserId(): Promise<string | null> {
+        if (!supabase) return null;
+        const { data: { user } } = await supabase.auth.getUser();
+        return user?.id || null;
+    }
+
+    /**
+     * Rename a shared video's title (independent from project name).
+     */
+    static async renameSharedVideo(shareId: string, newTitle: string): Promise<boolean> {
+        if (!supabase) return false;
+
+        try {
+            const { error } = await supabase
+                .from('shared_videos')
+                .update({ project_name: newTitle })
+                .eq('id', shareId);
+
+            if (error) {
+                console.error('[Share] Rename failed:', error);
+                return false;
+            }
+
+            // Update cache
+            if (cache.allVideos) {
+                const video = cache.allVideos.find(v => v.id === shareId);
+                if (video) video.project_name = newTitle;
+            }
+            for (const [, v] of cache.byProject) {
+                if (v?.id === shareId) {
+                    v.project_name = newTitle;
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[Share] Rename error:', error);
+            return false;
+        }
+    }
+
+    /**
      * Get a shared video by its public ID (for the watch page).
      * This doesn't require auth — anyone with the link can see metadata.
      * Not cached since it's a public lookup on a different page.
@@ -271,6 +387,38 @@ export class ShareService {
 
         if (error) return null;
         return data;
+    }
+
+    /**
+     * Update a shared video's title and/or description.
+     * Requires auth — only the owner can update (RLS enforced).
+     */
+    static async updateSharedVideoMeta(
+        shareId: string,
+        updates: { project_name?: string; description?: string }
+    ): Promise<boolean> {
+        if (!supabase) return false;
+
+        try {
+            const { error } = await supabase
+                .from('shared_videos')
+                .update(updates)
+                .eq('id', shareId);
+
+            if (error) {
+                console.error('[Share] Update meta failed:', error);
+                return false;
+            }
+
+            // Invalidate cache so dashboard picks up changes
+            cache.allVideos = null;
+            cache.byProject.clear();
+
+            return true;
+        } catch (error) {
+            console.error('[Share] Update meta error:', error);
+            return false;
+        }
     }
 
     /**

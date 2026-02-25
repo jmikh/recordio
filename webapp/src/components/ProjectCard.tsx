@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Project } from '../types';
 import { XButton } from '@shared/components';
+import { Tooltip } from '@shared/components/Tooltip';
 
 interface ProjectCardProps {
     project: Project;
@@ -93,17 +94,13 @@ export const ProjectCard = ({
 
             {/* Info */}
             <div className="w-full min-w-0 flex-shrink-0">
-                <div className="flex flex-col">
-                    <div className="flex justify-between items-start">
-                        <h3
-                            className={`font-normal truncate pr-2 text-text-highlighted text-sm`}
-                        >
-                            {project.name}
-                        </h3>
-                        {isActive && <span className="chosen-dot mt-1.5"></span>}
-                    </div>
-                    <div className="flex items-center text-xs text-text-main space-x-2 mt-1">
-                        <span>{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <div className="flex items-center justify-between">
+                    <h3 className="font-normal truncate pr-2 text-text-highlighted text-sm">
+                        {project.name}
+                    </h3>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-text-muted">{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                        {isActive && <span className="chosen-dot"></span>}
                     </div>
                 </div>
             </div>
@@ -111,10 +108,11 @@ export const ProjectCard = ({
             {/* Actions (Hover) */}
             {onDelete && !isDeleting && (
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 z-10">
-                    <XButton
-                        onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                        title="Delete"
-                    />
+                    <Tooltip text="Delete project">
+                        <XButton
+                            onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
+                        />
+                    </Tooltip>
                 </div>
             )}
         </div>

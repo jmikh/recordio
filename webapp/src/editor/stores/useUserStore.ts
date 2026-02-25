@@ -161,13 +161,20 @@ export const useUserStore = create<UserState>()(
                 name: state.name,
                 picture: state.picture,
                 pictureSourceUrl: state.pictureSourceUrl,
+                isAuthenticated: state.isAuthenticated,
                 subscription: state.subscription,
                 theme: state.theme
             }),
             onRehydrateStorage: () => (state) => {
-                // Apply persisted theme on load (default is dark)
-                if (state?.theme !== 'light') {
-                    document.documentElement.classList.add('dark');
+                if (state) {
+                    // Derive isAuthenticated from persisted userId (covers upgrade from before isAuthenticated was persisted)
+                    if (state.userId && !state.isAuthenticated) {
+                        useUserStore.setState({ isAuthenticated: true });
+                    }
+                    // Apply persisted theme on load (default is dark)
+                    if (state.theme !== 'light') {
+                        document.documentElement.classList.add('dark');
+                    }
                 }
             }
         }

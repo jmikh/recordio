@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
-import { useUserStore } from '../../stores/useUserStore';
-import { AuthManager } from '../../../auth/AuthManager';
-import { StripeService } from '../../stripe/StripeService';
+import { useUserStore } from '../editor/stores/useUserStore';
+import { AuthManager } from '../auth/AuthManager';
+import { StripeService } from '../editor/stripe/StripeService';
 
 interface UserMenuProps {
     onOpenUpgradeModal: () => void;

@@ -12,12 +12,12 @@ import type { WatermarkPosition } from '../../../core/painters/watermarkPainter'
 import { trackExportCompleted } from '../../../core/analytics';
 import { TimeMapper } from '../../../core/mappers/timeMapper';
 import { useToast } from '../Toast';
-import { ShareService, type SharedVideo } from '../../services/ShareService';
+import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../services/ShareService';
 
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
 
-const MAX_SHARED_VIDEOS = 5;
+
 
 const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }[] = [
     { value: '480p', label: '480p', proOnly: false },
@@ -188,8 +188,14 @@ export function ExportSettings() {
             setExportState({ isExporting: true, progress: 0.95, timeRemainingSeconds: null });
             const result = await ShareService.shareVideo(blob, project.id, project.name);
 
-            // Copy URL to clipboard
-            await navigator.clipboard.writeText(result.shareUrl);
+            // Try to copy URL to clipboard (non-blocking)
+            let linkCopied = false;
+            try {
+                await navigator.clipboard.writeText(result.shareUrl);
+                linkCopied = true;
+            } catch {
+                // Clipboard may fail if dev tools or another window is focused — not a publish failure
+            }
 
             // Refresh state
             const updatedShare = await ShareService.getShareForProject(project.id);
@@ -203,7 +209,7 @@ export function ExportSettings() {
             addToast({
                 type: 'success',
                 title: result.isUpdate ? 'Video Republished' : 'Video Published!',
-                message: 'Link copied to clipboard',
+                message: linkCopied ? 'Link copied to clipboard' : 'Published successfully',
             });
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;

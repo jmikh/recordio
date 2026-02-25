@@ -9,7 +9,7 @@ import { TbLink } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
-import { UserMenu } from './UserMenu';
+import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { LogoLink } from '@shared/components';
@@ -135,8 +135,19 @@ export const Header = () => {
                     )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                    {/* User Authentication */}
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center p-1.5 h-auto">
+                            <BiSupport size={18} />
+                        </button>
+                        <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                        >
+                            {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
+                        </button>
+                    </div>
                     {isAuthenticated ? (
                         <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                     ) : (
@@ -144,16 +155,6 @@ export const Header = () => {
                             Sign In
                         </button>
                     )}
-                    <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center p-1.5 h-auto">
-                        <BiSupport size={18} />
-                    </button>
-                    <button
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                        className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
-                    >
-                        {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                    </button>
                 </div>
             </div>
 
