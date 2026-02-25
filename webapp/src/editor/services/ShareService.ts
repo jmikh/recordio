@@ -1,0 +1,233 @@
+import * as Sentry from '@sentry/react';
+import { supabase } from '../../auth/AuthManager';
+
+const SHARE_BASE_URL = import.meta.env.PROD
+    ? 'https://app.recordio.cc/watch'
+    : 'http://localhost:3001/watch';
+
+const MAX_SHARED_VIDEOS = 5;
+
+export interface SharedVideo {
+    id: string;
+    project_id: string;
+    project_name: string;
+    cf_video_uid: string;
+    version: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ShareResult {
+    shareId: string;
+    shareUrl: string;
+    videoUid: string;
+    version: number;
+    isUpdate: boolean;
+}
+
+export interface ShareQuota {
+    current: number;
+    max: number;
+    canShare: boolean;
+}
+
+export class ShareService {
+    /**
+     * Check if the user can share (pre-flight quota check).
+     * Returns current usage and whether a new share is allowed.
+     * Re-shares of the same project don't count against the quota.
+     */
+    static async checkQuota(projectId?: string): Promise<ShareQuota> {
+        if (!supabase) {
+            return { current: 0, max: MAX_SHARED_VIDEOS, canShare: false };
+        }
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return { current: 0, max: MAX_SHARED_VIDEOS, canShare: false };
+            }
+
+            const { data, count } = await supabase
+                .from('shared_videos')
+                .select('project_id', { count: 'exact' })
+                .eq('user_id', user.id);
+
+            const currentCount = count ?? 0;
+
+            // If project already has a share, re-sharing doesn't consume a new slot
+            const isReshare = projectId && data?.some(v => v.project_id === projectId);
+            const canShare = isReshare || currentCount < MAX_SHARED_VIDEOS;
+
+            return { current: currentCount, max: MAX_SHARED_VIDEOS, canShare };
+        } catch (error) {
+            console.error('[Share] Quota check failed:', error);
+            Sentry.captureException(error, { extra: { phase: 'quota_check' } });
+            return { current: 0, max: MAX_SHARED_VIDEOS, canShare: false };
+        }
+    }
+
+    /**
+     * Get the existing shared video for a project (if any).
+     */
+    static async getShareForProject(projectId: string): Promise<SharedVideo | null> {
+        if (!supabase) return null;
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return null;
+
+            const { data } = await supabase
+                .from('shared_videos')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('project_id', projectId)
+                .maybeSingle();
+
+            return data;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Upload a video blob to Cloudflare Stream via the Edge Function.
+     */
+    static async shareVideo(
+        blob: Blob,
+        projectId: string,
+        projectName: string,
+        options?: { resetViews?: boolean },
+    ): Promise<ShareResult> {
+        if (!supabase) {
+            throw new Error('Supabase not configured');
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const formData = new FormData();
+        formData.append('video', blob, `${projectName}.mp4`);
+        formData.append('projectId', projectId);
+        formData.append('projectName', projectName);
+        if (options?.resetViews) {
+            formData.append('resetViews', 'true');
+        }
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/functions/v1/upload-to-stream`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+
+            if (errorData.error === 'quota_exceeded') {
+                throw new Error(errorData.message || `You've reached the limit of ${MAX_SHARED_VIDEOS} shared videos.`);
+            }
+
+            const errorMsg = errorData.error || `Upload failed (${response.status})`;
+            throw new Error(errorMsg);
+        }
+
+        const result = await response.json();
+
+        return {
+            shareId: result.shareId,
+            shareUrl: `${SHARE_BASE_URL}/${result.shareId}`,
+            videoUid: result.videoUid,
+            version: result.version,
+            isUpdate: result.isUpdate,
+        };
+    }
+
+    /**
+     * Get all shared videos for the current user.
+     */
+    static async getSharedVideos(): Promise<SharedVideo[]> {
+        if (!supabase) return [];
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
+
+            const { data, error } = await supabase
+                .from('shared_videos')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('updated_at', { ascending: false });
+
+            if (error) {
+                console.error('[Share] Failed to fetch shared videos:', error);
+                Sentry.captureException(error, { extra: { phase: 'list_shared' } });
+                return [];
+            }
+
+            return data || [];
+        } catch (error) {
+            console.error('[Share] Unexpected error:', error);
+            Sentry.captureException(error, { extra: { phase: 'list_shared' } });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a shared video (unshare).
+     * Removes the DB record; the Edge Function handles CF video cleanup.
+     */
+    static async deleteSharedVideo(shareId: string): Promise<void> {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        // First get the video UID for CF cleanup
+        const { data: share } = await supabase
+            .from('shared_videos')
+            .select('cf_video_uid')
+            .eq('id', shareId)
+            .single();
+
+        // Delete the DB record
+        const { error } = await supabase
+            .from('shared_videos')
+            .delete()
+            .eq('id', shareId);
+
+        if (error) {
+            console.error('[Share] Failed to delete share:', error);
+            Sentry.captureException(error, { extra: { phase: 'delete_share', shareId } });
+            throw new Error('Failed to unshare video');
+        }
+
+        // Best-effort CF cleanup via a separate Edge Function call could go here
+        // For now the video will be orphaned on CF — can add cleanup later
+    }
+
+    /**
+     * Get the public share URL for a shared video ID.
+     */
+    static getShareUrl(shareId: string): string {
+        return `${SHARE_BASE_URL}/${shareId}`;
+    }
+
+    /**
+     * Get a shared video by its public ID (for the watch page).
+     * This doesn't require auth — anyone with the link can see metadata.
+     */
+    static async getSharedVideoById(shareId: string): Promise<SharedVideo | null> {
+        if (!supabase) return null;
+
+        const { data, error } = await supabase
+            .from('shared_videos')
+            .select('*')
+            .eq('id', shareId)
+            .maybeSingle();
+
+        if (error) return null;
+        return data;
+    }
+}

@@ -27,8 +27,8 @@ export class ExportManager {
         quality: ExportQuality,
         fps: ExportFps,
         onProgress: (state: ExportProgress) => void,
-        options?: { watermarkPosition?: WatermarkPosition }
-    ): Promise<void> {
+        options?: { watermarkPosition?: WatermarkPosition; skipDownload?: boolean }
+    ): Promise<Blob> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
@@ -351,7 +351,11 @@ export class ExportManager {
             muxer.finalize();
 
             const { buffer } = muxer.target;
-            this.downloadBlob(new Blob([buffer], { type: 'video/mp4' }), `${project.name}_${quality}_${fps}fps.mp4`);
+            const blob = new Blob([buffer], { type: 'video/mp4' });
+
+            if (!options?.skipDownload) {
+                this.downloadBlob(blob, `${project.name}_${quality}_${fps}fps.mp4`);
+            }
 
             // Flag abnormally slow exports (>2× output duration)
             const exportElapsedMs = performance.now() - startTime;
@@ -370,20 +374,21 @@ export class ExportManager {
                 });
             }
 
+            return blob;
+
         } catch (e) {
             if (signal.aborted) {
-                // Export cancelled by user — not an error
-            } else {
-                Sentry.withScope((scope) => {
-                    scope.setTag('export.quality', quality);
-                    scope.setTag('export.fps', String(fps));
-                    scope.setExtra('outputDurationMs', totalDurationMs);
-                    scope.setExtra('framesProcessed', framesProcessed);
-                    scope.setExtra('totalFrames', totalFrames);
-                    Sentry.captureException(e instanceof Error ? e : new Error(String(e)));
-                });
-                throw e;
+                throw new Error('Export cancelled');
             }
+            Sentry.withScope((scope) => {
+                scope.setTag('export.quality', quality);
+                scope.setTag('export.fps', String(fps));
+                scope.setExtra('outputDurationMs', totalDurationMs);
+                scope.setExtra('framesProcessed', framesProcessed);
+                scope.setExtra('totalFrames', totalFrames);
+                Sentry.captureException(e instanceof Error ? e : new Error(String(e)));
+            });
+            throw e;
         } finally {
             Object.values(frameExtractors).forEach(ext => ext.dispose());
             this.abortController = null;

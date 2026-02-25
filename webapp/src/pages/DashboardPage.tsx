@@ -2,18 +2,26 @@ import { useState, useEffect } from 'react';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
+import { SharedVideoCard } from '../components/SharedVideoCard';
 import { LogoLink } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { SupportModal } from '../components/SupportModal';
+import { ShareService, type SharedVideo } from '../editor/services/ShareService';
+import { useToast } from '../editor/components/Toast';
+import * as Sentry from '@sentry/react';
+
+const MAX_SHARED_VIDEOS = 5;
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [sharedVideos, setSharedVideos] = useState<SharedVideo[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { theme, setTheme } = useUserStore();
+    const { theme, setTheme, isAuthenticated } = useUserStore();
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const { addToast } = useToast();
 
     useEffect(() => {
         // Check for error message in URL
@@ -21,17 +29,22 @@ export function DashboardPage() {
         const error = params.get('error');
         if (error) {
             setErrorMessage(error);
-            // Clear the error from URL without reload
             window.history.replaceState({}, '', window.location.pathname);
         }
 
         loadProjects();
     }, []);
 
+    // Load shared videos when authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            ShareService.getSharedVideos().then(setSharedVideos);
+        }
+    }, [isAuthenticated]);
+
     const loadProjects = async () => {
         try {
             const allProjects = await ProjectStorage.listProjects();
-            // Sort by updatedAt descending
             allProjects.sort((a: Project, b: Project) =>
                 new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
             );
@@ -55,6 +68,18 @@ export function DashboardPage() {
             setProjects(prev => prev.filter(p => p.id !== projectId));
         } catch (error) {
             console.error('Failed to delete project:', error);
+        }
+    };
+
+    const handleUnshare = async (video: SharedVideo) => {
+        try {
+            await ShareService.deleteSharedVideo(video.id);
+            setSharedVideos(prev => prev.filter(v => v.id !== video.id));
+            addToast({ type: 'success', title: 'Video Unshared', message: `"${video.project_name}" is no longer shared` });
+        } catch (e: any) {
+            console.error('[Dashboard] Unshare failed:', e);
+            Sentry.captureException(e, { extra: { shareId: video.id, phase: 'unshare' } });
+            addToast({ type: 'error', title: 'Unshare Failed', message: e?.message || 'Something went wrong' });
         }
     };
 
@@ -99,8 +124,40 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {/* Content */}
+                {/* Shared Videos Section */}
+                {sharedVideos.length > 0 && (
+                    <section className="p-6 pb-2">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-base font-medium text-text-highlighted">Shared Videos</h2>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-text-muted">
+                                    {sharedVideos.length} of {MAX_SHARED_VIDEOS} links used
+                                </span>
+                                <div className="w-20 h-1.5 bg-surface rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary rounded-full transition-all duration-300"
+                                        style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {sharedVideos.map(video => (
+                                <SharedVideoCard
+                                    key={video.id}
+                                    video={video}
+                                    onUnshare={handleUnshare}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Projects Section */}
                 <main className="p-6">
+                    {sharedVideos.length > 0 && (
+                        <h2 className="text-base font-medium text-text-highlighted mb-4">Projects</h2>
+                    )}
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <div className="text-text-muted">Loading projects...</div>

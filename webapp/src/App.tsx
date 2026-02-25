@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
+import { WatchPage } from './pages/WatchPage';
 import { ToastProvider } from './editor/components/Toast';
 
 export function App() {
@@ -21,6 +22,10 @@ export function App() {
 
         if (path === '/editor' || path.startsWith('/editor')) {
             return <EditorPage />;
+        }
+
+        if (path.startsWith('/watch/')) {
+            return <WatchPage />;
         }
 
         // Default to dashboard
