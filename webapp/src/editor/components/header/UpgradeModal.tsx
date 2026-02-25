@@ -200,6 +200,10 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </li>
                 <li className="flex items-center gap-3 text-sm">
                     <FaCheck className="text-yellow-500 shrink-0" size={14} />
+                    <span className="text-text-highlighted">5 Shareable links</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
                     <span className="text-text-highlighted">Priority support</span>
                 </li>
             </ul>
