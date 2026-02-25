@@ -13,9 +13,7 @@ export const LogoLink = ({ className, imgClassName, ...props }: LogoProps) => {
 
     return (
         <a
-            href="https://recordio.cc"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/"
             className={`opacity-90 hover:opacity-100 transition-opacity duration-200 ${className || ''}`}
             {...props}
         >
