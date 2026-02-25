@@ -18,6 +18,7 @@ import { useToast } from './components/Toast';
 // Auth imports
 import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from './stores/useUserStore';
+import { ShareService } from './services/ShareService';
 
 /** Fetch a remote image once and return it as a data URL to avoid repeated network requests. */
 async function cacheAvatarUrl(url: string): Promise<string> {
@@ -188,6 +189,12 @@ function Editor() {
                 const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
                 setIsLoading(false);
+
+                // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
+                if (useUserStore.getState().isAuthenticated) {
+                    ShareService.getShareForProject(loadedProject.id);
+                    ShareService.getSharedVideos();
+                }
 
                 // Show creation toast only if project was created in the last 10 seconds
                 const projectAge = Date.now() - new Date(loadedProject.createdAt).getTime();

@@ -63,9 +63,7 @@ export const ProjectSettings = () => {
         return projects.reduce((acc, p) => acc + getProjectDurationMs(p), 0);
     }, [projects]);
 
-    const otherProjectsCount = useMemo(() => {
-        return projects.filter(p => p.id !== activeProject.id).length;
-    }, [projects, activeProject.id]);
+
 
     useEffect(() => {
         fetchProjects();
@@ -108,14 +106,13 @@ export const ProjectSettings = () => {
     const handleDeleteAll = async () => {
         setIsDeleting(true);
         try {
-            // Delete all projects EXCEPT the current one
+            // Delete all projects including the current one
             for (const project of projects) {
-                if (project.id === activeProject.id) continue;
                 await ProjectStorage.deleteProject(project.id);
             }
             setShowDeleteAllModal(false);
             setIsDeleting(false);
-            fetchProjects();
+            window.location.reload();
         } catch (error) {
             console.error('Failed to delete projects:', error);
             setIsDeleting(false);
@@ -155,16 +152,13 @@ export const ProjectSettings = () => {
                     </div>
 
                     {/* Delete All Button */}
-                    {otherProjectsCount > 0 && (
-                        <>
-                            <button
-                                onClick={() => setShowDeleteAllModal(true)}
-                                className="interactive-base flex items-center justify-center gap-2 w-full text-destructive hover:text-white hover:bg-destructive/80"
-                            >
-                                Delete All Projects
-                            </button>
-                            <p className="subtext" style={{ textAlign: 'center' }}>Keeps current project</p>
-                        </>
+                    {projects.length > 0 && (
+                        <button
+                            onClick={() => setShowDeleteAllModal(true)}
+                            className="interactive-base flex items-center justify-center gap-2 w-full text-destructive hover:text-white hover:bg-destructive/80"
+                        >
+                            Delete All Projects
+                        </button>
                     )}
                 </div>
             </CollapsibleCard>
@@ -210,7 +204,7 @@ export const ProjectSettings = () => {
                         </div>
 
                         <p className="text-sm text-text-main mb-6">
-                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{otherProjectsCount}</span> project{otherProjectsCount !== 1 ? 's' : ''}? The current project will be kept. This action cannot be undone.
+                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{projects.length}</span> project{projects.length !== 1 ? 's' : ''}, including the current one? This action cannot be undone.
                         </p>
 
                         <div className="flex gap-3 justify-end">

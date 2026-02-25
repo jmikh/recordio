@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShareService, type SharedVideo } from '../editor/services/ShareService';
+import { LogoLink } from '@shared/components/LogoLink';
 
 /** Branded watch page for shared Recordio videos */
 export function WatchPage() {
@@ -68,9 +69,7 @@ export function WatchPage() {
         <div className="min-h-screen bg-surface flex flex-col">
             {/* Minimal header */}
             <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-                <a href="https://recordio.cc" className="flex items-center gap-2 text-text-main hover:text-primary transition-colors">
-                    <span className="text-lg font-semibold">Recordio</span>
-                </a>
+                <LogoLink href="https://recordio.cc" target="_blank" rel="noopener noreferrer" />
                 <span className="text-xs text-text-muted">Shared Video</span>
             </header>
 

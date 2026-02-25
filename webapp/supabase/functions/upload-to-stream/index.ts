@@ -40,7 +40,32 @@ serve(async (req) => {
             );
         }
 
-        // 2. Parse multipart form data
+        // 2.5. Verify Pro subscription (defense-in-depth — UI also gates this)
+        const { data: subscription } = await supabase
+            .from('subscriptions')
+            .select('status')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        const hasProAccess = subscription?.status === 'active' || subscription?.status === 'trialing';
+
+        // Also check free trial
+        const { data: metadata } = await supabase
+            .from('user_metadata')
+            .select('free_trial_until')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        const hasFreeTrial = metadata?.free_trial_until && new Date(metadata.free_trial_until) > new Date();
+
+        if (!hasProAccess && !hasFreeTrial) {
+            return new Response(
+                JSON.stringify({ error: 'pro_required', message: 'Shareable links are a Pro feature.' }),
+                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        // 3. Parse multipart form data
         const formData = await req.formData();
         const videoFile = formData.get('video') as File;
         const projectId = formData.get('projectId') as string;

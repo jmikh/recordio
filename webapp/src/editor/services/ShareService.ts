@@ -7,6 +7,11 @@ const SHARE_BASE_URL = import.meta.env.PROD
 
 const MAX_SHARED_VIDEOS = 5;
 
+// TODO: Add per-video view alerting when viewership exceeds thresholds (10k, 100k, 1M).
+// Use CF Stream Analytics API to poll view counts periodically (e.g., daily cron via Supabase pg_cron
+// or a CF Worker). When a threshold is crossed, send an email/notification to the admin.
+// Consider auto-pausing or restricting the video if it exceeds a hard cap to control streaming costs.
+
 export interface SharedVideo {
     id: string;
     project_id: string;
@@ -30,6 +35,17 @@ export interface ShareQuota {
     max: number;
     canShare: boolean;
 }
+
+// ─── In-memory cache ────────────────────────────────────────
+// Avoids hitting the DB every time ExportSettings or Header mounts.
+// Invalidated on publish, republish, and delete.
+
+const cache = {
+    /** Cached share per project ID */
+    byProject: new Map<string, SharedVideo | null>(),
+    /** Cached list of all shared videos (null = not yet fetched) */
+    allVideos: null as SharedVideo[] | null,
+};
 
 export class ShareService {
     /**
@@ -69,9 +85,15 @@ export class ShareService {
 
     /**
      * Get the existing shared video for a project (if any).
+     * Uses in-memory cache — only hits the DB on first call per project.
      */
     static async getShareForProject(projectId: string): Promise<SharedVideo | null> {
         if (!supabase) return null;
+
+        // Return cached value if available
+        if (cache.byProject.has(projectId)) {
+            return cache.byProject.get(projectId) ?? null;
+        }
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +106,7 @@ export class ShareService {
                 .eq('project_id', projectId)
                 .maybeSingle();
 
+            cache.byProject.set(projectId, data);
             return data;
         } catch {
             return null;
@@ -92,6 +115,7 @@ export class ShareService {
 
     /**
      * Upload a video blob to Cloudflare Stream via the Edge Function.
+     * Invalidates the cache on success.
      */
     static async shareVideo(
         blob: Blob,
@@ -138,6 +162,9 @@ export class ShareService {
 
         const result = await response.json();
 
+        // Invalidate cache so next reads are fresh
+        ShareService.invalidateCache(projectId);
+
         return {
             shareId: result.shareId,
             shareUrl: `${SHARE_BASE_URL}/${result.shareId}`,
@@ -149,9 +176,15 @@ export class ShareService {
 
     /**
      * Get all shared videos for the current user.
+     * Uses in-memory cache — only hits the DB on first call.
      */
     static async getSharedVideos(): Promise<SharedVideo[]> {
         if (!supabase) return [];
+
+        // Return cached value if available
+        if (cache.allVideos !== null) {
+            return cache.allVideos;
+        }
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -169,7 +202,8 @@ export class ShareService {
                 return [];
             }
 
-            return data || [];
+            cache.allVideos = data || [];
+            return cache.allVideos;
         } catch (error) {
             console.error('[Share] Unexpected error:', error);
             Sentry.captureException(error, { extra: { phase: 'list_shared' } });
@@ -187,7 +221,7 @@ export class ShareService {
         // First get the video UID for CF cleanup
         const { data: share } = await supabase
             .from('shared_videos')
-            .select('cf_video_uid')
+            .select('cf_video_uid, project_id')
             .eq('id', shareId)
             .single();
 
@@ -201,6 +235,13 @@ export class ShareService {
             console.error('[Share] Failed to delete share:', error);
             Sentry.captureException(error, { extra: { phase: 'delete_share', shareId } });
             throw new Error('Failed to unshare video');
+        }
+
+        // Invalidate cache
+        if (share?.project_id) {
+            ShareService.invalidateCache(share.project_id);
+        } else {
+            ShareService.invalidateCache();
         }
 
         // Best-effort CF cleanup via a separate Edge Function call could go here
@@ -217,6 +258,7 @@ export class ShareService {
     /**
      * Get a shared video by its public ID (for the watch page).
      * This doesn't require auth — anyone with the link can see metadata.
+     * Not cached since it's a public lookup on a different page.
      */
     static async getSharedVideoById(shareId: string): Promise<SharedVideo | null> {
         if (!supabase) return null;
@@ -229,5 +271,18 @@ export class ShareService {
 
         if (error) return null;
         return data;
+    }
+
+    /**
+     * Invalidate the in-memory cache.
+     * Called after publish, republish, or delete.
+     */
+    static invalidateCache(projectId?: string): void {
+        if (projectId) {
+            cache.byProject.delete(projectId);
+        } else {
+            cache.byProject.clear();
+        }
+        cache.allVideos = null;
     }
 }

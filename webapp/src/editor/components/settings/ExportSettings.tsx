@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Sentry from '@sentry/react';
 import { BiCrown } from 'react-icons/bi';
-import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbCopy } from 'react-icons/tb';
+import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload } from 'react-icons/tb';
 import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -16,6 +16,8 @@ import { ShareService, type SharedVideo } from '../../services/ShareService';
 
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
+
+const MAX_SHARED_VIDEOS = 5;
 
 const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }[] = [
     { value: '480p', label: '480p', proOnly: false },
@@ -58,7 +60,8 @@ export function ExportSettings() {
 
     // Share state
     const [existingShare, setExistingShare] = useState<SharedVideo | null>(null);
-    const [isSharing, setIsSharing] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [publishedCount, setPublishedCount] = useState(0);
 
     const { isAuthenticated, isPro, hasProAccess, hasFreeTrial, freeTrialUntil } = useUserStore();
     const proAccess = hasProAccess();
@@ -82,89 +85,30 @@ export function ExportSettings() {
     const setExportState = useProjectStore(s => s.setExportState);
     const isExporting = useProjectStore(s => s.exportState.isExporting);
 
-    // Check for existing share on mount
+    // Check for existing share and quota on mount
     useEffect(() => {
         if (isAuthenticated && project?.id) {
             ShareService.getShareForProject(project.id).then(setExistingShare);
+            ShareService.getSharedVideos().then(videos => setPublishedCount(videos.length));
         }
     }, [isAuthenticated, project?.id]);
 
-    const handleExport = () => {
+    // ─── Download ───────────────────────────────────────────────
+
+    const handleDownload = () => {
         if (isExporting) return;
 
         const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K' || selectedFps === 60);
 
         if (proAccess || !needsProFeature) {
-            startExport(selectedQuality, selectedFps, { watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined });
+            startDownload(selectedQuality, selectedFps, { watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined });
             return;
         }
 
         setIsUpgradeModalOpen(true);
     };
 
-    const handleShare = async () => {
-        if (isExporting || isSharing) return;
-
-        // Auth gate
-        if (!isAuthenticated) {
-            setIsAuthModalOpen(true);
-            return;
-        }
-
-        // Pre-flight quota check (before expensive export)
-        const quota = await ShareService.checkQuota(project.id);
-        if (!quota.canShare) {
-            addToast({
-                type: 'error',
-                title: 'Share Limit Reached',
-                message: `You've used ${quota.current} of ${quota.max} shared video slots. Delete an existing share to free up a slot.`,
-            });
-            return;
-        }
-
-        // Export the video (skip download — we'll upload instead)
-        setIsSharing(true);
-        try {
-            const blob = await startExportForShare(selectedQuality, selectedFps, {
-                watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
-            });
-
-            if (!blob) return; // cancelled
-
-            // Upload to Cloudflare Stream
-            setExportState({ isExporting: true, progress: 0.95, timeRemainingSeconds: null });
-
-            const result = await ShareService.shareVideo(blob, project.id, project.name);
-
-            // Copy URL to clipboard
-            await navigator.clipboard.writeText(result.shareUrl);
-
-            // Refresh the existing share state
-            const updatedShare = await ShareService.getShareForProject(project.id);
-            setExistingShare(updatedShare);
-
-            addToast({
-                type: 'success',
-                title: result.isUpdate ? 'Shared Link Updated' : 'Video Shared!',
-                message: `Link copied to clipboard`,
-            });
-        } catch (e: any) {
-            if (e?.message === 'Export cancelled') return;
-            console.error('[Share] Failed:', e);
-            Sentry.captureException(e, { extra: { projectId: project.id, phase: 'share' } });
-            addToast({
-                type: 'error',
-                title: 'Share Failed',
-                message: e?.message || 'Something went wrong while sharing. Please try again.',
-            });
-        } finally {
-            setIsSharing(false);
-            setExportState({ isExporting: false });
-            (window as any).__activeExportManager = null;
-        }
-    };
-
-    const startExport = async (quality: ExportQuality, fps: ExportFps, options?: { watermarkPosition?: WatermarkPosition }) => {
+    const startDownload = async (quality: ExportQuality, fps: ExportFps, options?: { watermarkPosition?: WatermarkPosition }) => {
         useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
@@ -195,12 +139,38 @@ export function ExportSettings() {
         }
     };
 
-    /** Export variant that returns the blob for sharing (skips download) */
-    const startExportForShare = async (
-        quality: ExportQuality,
-        fps: ExportFps,
-        options?: { watermarkPosition?: WatermarkPosition },
-    ): Promise<Blob | null> => {
+    // ─── Publish ────────────────────────────────────────────────
+
+    const handlePublish = async () => {
+        if (isExporting || isPublishing) return;
+
+        // Auth gate
+        if (!isAuthenticated) {
+            setIsAuthModalOpen(true);
+            return;
+        }
+
+        // Pro gate (defense-in-depth — UI also disables the button)
+        if (!proAccess) {
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
+        // Pre-flight quota check (skip if re-publishing same project)
+        if (!existingShare) {
+            const quota = await ShareService.checkQuota(project.id);
+            if (!quota.canShare) {
+                addToast({
+                    type: 'error',
+                    title: 'Publish Limit Reached',
+                    message: `You've used ${quota.current} of ${quota.max} published video slots. Unpublish an existing video to free up a slot.`,
+                });
+                return;
+            }
+        }
+
+        // Export (skip download) then upload
+        setIsPublishing(true);
         useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
 
@@ -209,22 +179,46 @@ export function ExportSettings() {
 
         try {
             (window as any).__activeExportManager = manager;
-            const blob = await manager.exportProject(project, quality, fps, onProgress, {
-                ...options,
+            const blob = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
+                watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
-            return blob;
-        } catch (e: any) {
-            if (e?.message === 'Export cancelled') return null;
-            throw e;
-        }
-    };
 
-    const copyShareLink = async () => {
-        if (!existingShare) return;
-        const url = ShareService.getShareUrl(existingShare.id);
-        await navigator.clipboard.writeText(url);
-        addToast({ type: 'success', title: 'Link Copied', message: url });
+            // Upload to Cloudflare Stream
+            setExportState({ isExporting: true, progress: 0.95, timeRemainingSeconds: null });
+            const result = await ShareService.shareVideo(blob, project.id, project.name);
+
+            // Copy URL to clipboard
+            await navigator.clipboard.writeText(result.shareUrl);
+
+            // Refresh state
+            const updatedShare = await ShareService.getShareForProject(project.id);
+            setExistingShare(updatedShare);
+            const videos = await ShareService.getSharedVideos();
+            setPublishedCount(videos.length);
+
+            // Notify Header
+            window.dispatchEvent(new Event('share-updated'));
+
+            addToast({
+                type: 'success',
+                title: result.isUpdate ? 'Video Republished' : 'Video Published!',
+                message: 'Link copied to clipboard',
+            });
+        } catch (e: any) {
+            if (e?.message === 'Export cancelled') return;
+            console.error('[Publish] Failed:', e);
+            Sentry.captureException(e, { extra: { projectId: project.id, phase: 'publish' } });
+            addToast({
+                type: 'error',
+                title: 'Publish Failed',
+                message: e?.message || 'Something went wrong. Please try again.',
+            });
+        } finally {
+            setIsPublishing(false);
+            setExportState({ isExporting: false });
+            (window as any).__activeExportManager = null;
+        }
     };
 
     // Determine if currently selected options require Pro
@@ -247,7 +241,7 @@ export function ExportSettings() {
                 Free trial →
             </button>
         ) : (
-            <span className="text-[10px] text-text-muted">Trial expired</span>
+            <span className="text-[10px] text-text-muted">Trial expired · <button onClick={() => setIsUpgradeModalOpen(true)} className="underline text-primary hover:text-primary-highlighted cursor-pointer">Upgrade</button></span>
         )
     ) : null;
 
@@ -256,6 +250,8 @@ export function ExportSettings() {
             Pro
         </span>
     );
+
+    const busy = isExporting || isPublishing;
 
     return (
         <div className="flex flex-col gap-3 text-sm text-text-main">
@@ -331,54 +327,46 @@ export function ExportSettings() {
                         </div>
                     )}
 
-                    {/* Export Button */}
+                    {/* Download Button */}
                     <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
                         <button
-                            onClick={handleExport}
-                            className="interactive-primary flex items-center justify-center gap-2 w-full"
-                            disabled={isExporting || needsProFeature}
+                            onClick={handleDownload}
+                            className="interactive-base flex items-center justify-center gap-2 w-full text-sm font-medium"
+                            disabled={busy || needsProFeature}
                         >
-                            Export
+                            <TbDownload size={16} />
+                            Download
                         </button>
                     </Tooltip>
 
-                    {/* Already-shared indicator */}
-                    {existingShare && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
-                            <TbLink size={14} className="text-primary shrink-0" />
-                            <span className="text-xs text-primary truncate flex-1">
-                                This project has a shared link
-                            </span>
-                            <button
-                                onClick={copyShareLink}
-                                className="text-primary hover:text-primary-highlighted transition-colors cursor-pointer"
-                                title="Copy link"
-                            >
-                                <TbCopy size={14} />
-                            </button>
-                        </div>
-                    )}
+                    {/* Publish / Republish Button (Primary) */}
+                    {(() => {
+                        const quotaFull = proAccess && publishedCount >= MAX_SHARED_VIDEOS && !existingShare;
+                        const publishDisabled = busy || !proAccess || quotaFull;
+                        const tooltipText = !proAccess
+                            ? 'Shareable links are a Pro feature'
+                            : quotaFull
+                                ? `You've used all ${MAX_SHARED_VIDEOS} slots. Delist a shared video from the dashboard to free up a slot.`
+                                : '';
 
-                    {/* Share Button */}
-                    <button
-                        onClick={handleShare}
-                        className="interactive-base flex items-center justify-center gap-2 w-full text-sm font-medium"
-                        disabled={isExporting || isSharing}
-                    >
-                        <TbLink size={16} />
-                        {existingShare ? 'Update Shared Link' : 'Share Link'}
-                    </button>
-
-                    {/* Upgrade Button */}
-                    {!proAccess && (
-                        <button
-                            onClick={() => setIsUpgradeModalOpen(true)}
-                            className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-primary border border-primary/30 rounded-[var(--radius-interactive)] hover:bg-primary/10 transition-colors cursor-pointer"
-                        >
-                            <BiCrown size={14} />
-                            Upgrade to Pro
-                        </button>
-                    )}
+                        return (
+                            <div className="flex flex-col items-center gap-1.5">
+                                <Tooltip text={tooltipText} className="w-full">
+                                    <button
+                                        onClick={proAccess ? handlePublish : () => setIsUpgradeModalOpen(true)}
+                                        className={`interactive-primary flex items-center justify-center gap-2 w-full text-sm font-medium ${publishDisabled ? 'pointer-events-none' : ''}`}
+                                        disabled={publishDisabled}
+                                    >
+                                        <TbLink size={16} />
+                                        {isPublishing ? 'Publishing...' : existingShare ? 'Republish' : 'Publish'}
+                                    </button>
+                                </Tooltip>
+                                {proAccess && !existingShare && (
+                                    <span className="subtext">{publishedCount} of {MAX_SHARED_VIDEOS} published</span>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Inline status badge */}
                     {statusBadge && (
