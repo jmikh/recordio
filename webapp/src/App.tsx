@@ -3,6 +3,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
 import { WatchPage } from './pages/WatchPage';
+import { WelcomePage } from './pages/WelcomePage';
+import { UninstallPage } from './pages/UninstallPage';
 import { ToastProvider } from './editor/components/Toast';
 
 export function App() {
@@ -16,6 +18,14 @@ export function App() {
 
     // Simple routing
     const getPage = () => {
+        if (path === '/welcome') {
+            return <WelcomePage />;
+        }
+
+        if (path === '/uninstall') {
+            return <UninstallPage />;
+        }
+
         if (path === '/import' || path.startsWith('/import')) {
             return <ImportPage />;
         }

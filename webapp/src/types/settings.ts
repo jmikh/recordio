@@ -262,5 +262,9 @@ export interface ProjectSettings {
 
     // Audio
     audio: AudioSettings;
+
+    // Analytics
+    /** Set to true when user applies AutoCut. Never reset. */
+    autoCutApplied?: boolean;
 }
 

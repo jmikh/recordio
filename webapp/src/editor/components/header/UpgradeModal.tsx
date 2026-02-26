@@ -5,6 +5,7 @@ import { XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
 import { supabase } from '../../../auth/AuthManager';
+import { trackUpgradeModalViewed, trackUpgradeModalDismissed, trackGetProClicked } from '../../../core/analytics';
 
 interface UpgradeModalProps {
     isOpen: boolean;
@@ -76,8 +77,15 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             setCheckingStatus(false);
             setSuccess(false);
             setError(null);
+        } else {
+            trackUpgradeModalViewed();
         }
     }, [isOpen]);
+
+    const handleClose = () => {
+        trackUpgradeModalDismissed();
+        onClose();
+    };
 
     const handleUpgrade = async () => {
         if (!userId || !email) {
@@ -86,6 +94,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             return;
         }
 
+        trackGetProClicked(billingInterval);
         setLoading(true);
         setError(null);
 
@@ -107,10 +116,10 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[380px]">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]">
             {/* Header */}
             <div className="flex justify-end mb-2">
-                <XButton onClick={onClose} title="Close" />
+                <XButton onClick={handleClose} title="Close" />
             </div>
 
             {/* Success Message */}

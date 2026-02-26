@@ -107,6 +107,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
 
             if (windows.length > 0) {
                 setOutputWindows(windows);
+                useProjectStore.getState().updateSettings({ autoCutApplied: true });
                 const seconds = (totalRemovedMs / 1000).toFixed(1);
                 if (totalRemovedMs > 0) {
                     updateToast(toastId, { type: 'success', title: `Trimmed ${seconds}s of silence` });

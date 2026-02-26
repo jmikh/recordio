@@ -9,8 +9,7 @@ import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality, ExportFps } from '../../export/ExportManager';
 import type { WatermarkPosition } from '../../../core/painters/watermarkPainter';
-import { trackExportCompleted } from '../../../core/analytics';
-import { TimeMapper } from '../../../core/mappers/timeMapper';
+import { trackExportCompleted, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../services/ShareService';
 
@@ -116,22 +115,36 @@ export function ExportSettings() {
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
 
+        const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
             await manager.exportProject(project, quality, fps, onProgress, options);
+            const exportDuration = (Date.now() - exportStart) / 1000;
 
-            const totalDurationMs = new TimeMapper(project.timeline.outputWindows).outputDuration;
             trackExportCompleted({
+                ...extractProjectProperties(project),
                 quality,
                 fps,
-                duration_seconds: Math.floor(totalDurationMs / 1000),
                 export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
+                export_duration_seconds: Math.round(exportDuration),
+                success: true,
             });
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error(e);
+            trackExportCompleted({
+                ...extractProjectProperties(project),
+                quality,
+                fps,
+                export_type: 'download',
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+                export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
+                success: false,
+                error: e?.message || 'Unknown error',
+            });
             if (e?.message) {
                 addToast({ type: 'error', title: 'Export Failed', message: e.message });
             }
@@ -179,16 +192,20 @@ export function ExportSettings() {
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
 
+        const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
             const blob = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
+            const exportDuration = (Date.now() - exportStart) / 1000;
 
             // Upload to Cloudflare Stream
             setExportState({ isExporting: true, progress: 0.95, timeRemainingSeconds: null });
+            const uploadStart = Date.now();
             const result = await ShareService.shareVideo(blob, project.id, project.name);
+            const uploadDuration = (Date.now() - uploadStart) / 1000;
 
             // Try to copy URL to clipboard (non-blocking)
             let linkCopied = false;
@@ -208,14 +225,16 @@ export function ExportSettings() {
             // Notify Header
             window.dispatchEvent(new Event('share-updated'));
 
-            const totalDurationMs = new TimeMapper(project.timeline.outputWindows).outputDuration;
             trackExportCompleted({
+                ...extractProjectProperties(project),
                 quality: selectedQuality,
                 fps: selectedFps,
-                duration_seconds: Math.floor(totalDurationMs / 1000),
                 export_type: 'publish',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
+                export_duration_seconds: Math.round(exportDuration),
+                upload_duration_seconds: Math.round(uploadDuration),
+                success: true,
             });
 
             addToast({
@@ -227,6 +246,17 @@ export function ExportSettings() {
             if (e?.message === 'Export cancelled') return;
             console.error('[Publish] Failed:', e);
             Sentry.captureException(e, { extra: { projectId: project.id, phase: 'publish' } });
+            trackExportCompleted({
+                ...extractProjectProperties(project),
+                quality: selectedQuality,
+                fps: selectedFps,
+                export_type: 'publish',
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+                export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
+                success: false,
+                error: e?.message || 'Unknown error',
+            });
             addToast({
                 type: 'error',
                 title: 'Publish Failed',

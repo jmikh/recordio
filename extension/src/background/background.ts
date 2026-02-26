@@ -16,6 +16,7 @@ import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState,
 import {
     BRIDGE_MSG,
     buildImportUrl,
+    getEditorOrigin,
     type HandoffCompletePayload,
 } from '@shared/types/bridge';
 import type { RawRecording } from '@shared/types';
@@ -212,7 +213,15 @@ async function openControllerTab(): Promise<number> {
 
 import contentScriptPath from '../content/content.ts?script';
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
+    // Open welcome page on fresh install (not updates)
+    if (details.reason === 'install') {
+        chrome.tabs.create({ url: getEditorOrigin() + '/welcome' });
+    }
+
+    // Set farewell page for uninstall (always, so updates pick it up too)
+    chrome.runtime.setUninstallURL(getEditorOrigin() + '/uninstall');
+
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
         if (tab.id && tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://") || tab.url.startsWith("file://"))) {

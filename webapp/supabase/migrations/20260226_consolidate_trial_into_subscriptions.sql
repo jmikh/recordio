@@ -40,14 +40,35 @@ where um.free_trial_until is not null
     select 1 from public.subscriptions s where s.user_id = um.id
   );
 
--- 3. Update the auth trigger to only create a trialing subscription row.
---    (user_metadata table is being retired entirely)
+-- 3. Update the auth trigger to only create a trialing subscription row
+--    and set Mixpanel profile via pg_net.
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+    mp_token text := '773bc18d036f7f77ec70ec94e7eec508';
+    trial_end timestamptz := now() + interval '7 days';
 begin
     -- Create trialing subscription (7-day free trial)
     insert into public.subscriptions (user_id, status, current_period_end, cancel_at_period_end, updated_at)
-    values (new.id, 'trialing', now() + interval '7 days', true, now());
+    values (new.id, 'trialing', trial_end, true, now());
+
+    -- Set Mixpanel profile (non-blocking HTTP via pg_net)
+    perform net.http_post(
+        url := 'https://api.mixpanel.com/engage#profile-set',
+        body := jsonb_build_array(jsonb_build_object(
+            '$token', mp_token,
+            '$distinct_id', new.id,
+            '$set', jsonb_build_object(
+                '$email', new.email,
+                'current_plan_type', 'pro_trial',
+                'subscription_status', 'trialing',
+                'cancel_at_period_end', true,
+                'current_period_end', to_char(trial_end, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+                'signup_date', to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+        )),
+        headers := '{"Content-Type": "application/json", "Accept": "text/plain"}'::jsonb
+    );
 
     return new;
 end;

@@ -15,9 +15,14 @@
 
 | Event | Trigger | Properties |
 |---|---|---|
-| `export_completed` | Download or publish finishes | `quality`, `fps`, `duration_seconds`, `export_type` (`download`\|`publish`), `is_authenticated`, `is_pro` |
+| `export_completed` | Download or publish finishes (or fails) | `quality`, `fps`, `export_type`, `is_authenticated`, `is_pro`, `export_duration_seconds`, `upload_duration_seconds` (publish only), `success`, `error` (on failure), `recording_type`, `input_duration`, `output_duration`, `first_url`, `events_clicks`, `events_keyboard`, `events_typing`, `events_drags`, `events_hovered_cards`, `events_url_changes`, `screen_mode`, `screen_border_radius`, `screen_padding`, `screen_device_frame_id`, `screen_toolbar_enabled`, `output_crop`, `has_camera`, `camera_shape`, `camera_feather`, `background_type`, `background_color_mode`, `background_image_choice`, `music_enabled`, `music_choice`, `mic_muted`, `screen_audio_muted`, `click_effect_enabled`, `click_sound_enabled`, `drag_effect_enabled`, `hotkeys_enabled`, `zoom_count`, `spotlight_count`, `caption_count`, `captions_generated`, `captions_visible`, `auto_cut_used` |
 | `captions_generated` | Transcription succeeds | `segment_count`, `is_authenticated`, `is_pro` |
 | `project_created` | New project initialized | `duration_seconds`, `recording_type`, `microphone_on`, `webcam_on`, `has_system_audio`, `first_url`, `user_id`, `user_event_count`, `has_click_events`, `has_keyboard_events`, `has_typing_events`, `has_drag_events`, `has_hovered_cards`, `auto_zoom_count`, `auto_spotlight_count`, `screen_frame_rate`, `camera_frame_rate`, `total_projects_created` |
+| `upgrade_modal_viewed` | Upgrade modal opened | — |
+| `upgrade_modal_dismissed` | Upgrade modal closed without action | — |
+| `get_pro_clicked` | "Get Pro" button clicked | `billing_interval` (`monthly`\|`yearly`) |
+| `extension_installed` | Extension freshly installed (fired from welcome page) | — |
+| `extension_uninstalled` | Extension removed (fired from farewell page) | — |
 
 ## Profile Properties (`people.set`)
 
@@ -33,8 +38,6 @@
 | `subscription_status` | Server | string \| null | Raw Stripe status |
 | `cancel_at_period_end` | Server | boolean | Auto-renews? (false = auto-renews) |
 | `current_period_end` | Server | ISO date \| null | When plan expires/renews |
-| `total_projects_created` | Client (increment) | number | Lifetime projects created |
-| `total_exports` | Client (increment) | number | Lifetime exports completed |
 | `last_active_date` | Client | ISO date | Last event timestamp |
 
 ## Revenue Tracking
