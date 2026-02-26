@@ -277,12 +277,15 @@ export function ExportSettings() {
     // Inline trial/auth status badge — only show when user doesn't have pro access
     const statusBadge = proAccess ? null : (
         !isAuthenticated ? (
-            <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="text-[10px] text-primary hover:text-primary-highlighted underline cursor-pointer font-medium"
-            >
-                Free trial →
-            </button>
+            <span className="text-[10px] text-text-muted">
+                <button
+                    onClick={() => setIsAuthModalOpen(true)}
+                    className="underline text-primary hover:text-primary-highlighted cursor-pointer font-medium"
+                >
+                    Log in
+                </button>
+                {' '}to claim free pro trial
+            </span>
         ) : (
             <span className="text-[10px] text-text-muted">Trial expired · <button onClick={() => setIsUpgradeModalOpen(true)} className="underline text-primary hover:text-primary-highlighted cursor-pointer">Upgrade</button></span>
         )

@@ -175,6 +175,11 @@ export function DashboardPage() {
                                 </div>
                             </>
                         )}
+                        {isAuthenticated && sharedVideos.length >= MAX_SHARED_VIDEOS && (
+                            <span className="text-xs text-text-muted">
+                                Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
+                            </span>
+                        )}
                     </div>
                     {!isAuthenticated ? (
                         <p className="text-sm text-text-muted">Log in to see published videos</p>

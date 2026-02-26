@@ -5,7 +5,7 @@ const SHARE_BASE_URL = import.meta.env.PROD
     ? 'https://app.recordio.cc/watch'
     : 'http://localhost:3001/watch';
 
-export const MAX_SHARED_VIDEOS = 5;
+export const MAX_SHARED_VIDEOS = 10;
 
 // TODO: Add per-video view alerting when viewership exceeds thresholds (10k, 100k, 1M).
 // Use CF Stream Analytics API to poll view counts periodically (e.g., daily cron via Supabase pg_cron

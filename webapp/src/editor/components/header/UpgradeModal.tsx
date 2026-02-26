@@ -3,6 +3,7 @@ import { FaCheck, FaGift } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
+import { MAX_SHARED_VIDEOS } from '../../services/ShareService';
 import { useUserStore } from '../../stores/useUserStore';
 import { supabase } from '../../../auth/AuthManager';
 import { trackUpgradeModalViewed, trackUpgradeModalDismissed, trackGetProClicked } from '../../../core/analytics';
@@ -209,7 +210,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </li>
                 <li className="flex items-center gap-3 text-sm">
                     <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">5 Shareable links</span>
+                    <span className="text-text-highlighted">{MAX_SHARED_VIDEOS} Shareable links</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm">
                     <FaCheck className="text-yellow-500 shrink-0" size={14} />
