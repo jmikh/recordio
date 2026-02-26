@@ -10,11 +10,10 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
-    const { email, name, picture, isPro, subscription, freeTrialUntil } = useUserStore();
+    const { email, name, picture, isPro, subscription } = useUserStore();
 
-    // Detect trial state: Stripe trialing OR active free trial
-    const hasActiveFreeTriaI = freeTrialUntil ? new Date(freeTrialUntil).getTime() > Date.now() : false;
-    const isTrialing = subscription.status === 'trialing' || hasActiveFreeTriaI;
+    // Trial state comes from subscriptions table
+    const isTrialing = subscription.status === 'trialing';
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -120,9 +119,9 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                 ) : (
                                     <span className="text-[10px] font-medium text-text-muted bg-surface-light px-2 py-0.5 rounded-full">Free Plan</span>
                                 )}
-                                {isTrialing && freeTrialUntil && (
+                                {isTrialing && subscription.currentPeriodEnd && (
                                     <span className="text-[10px] text-text-muted">
-                                        expires {new Date(freeTrialUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 )}
                                 {isPro && !isTrialing && subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (

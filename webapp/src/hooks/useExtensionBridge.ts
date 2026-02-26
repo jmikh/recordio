@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useState, useRef } from 'react';
+import { captureImportError } from '../utils/sentry';
 import {
     BRIDGE_MSG,
     PORT_MSG,
@@ -245,11 +246,22 @@ export function useExtensionBridge() {
 
 
             if (screenChunkBytes !== response.screenVideoSize) {
-                console.error('[useExtensionBridge] ⚠️ SCREEN SIZE MISMATCH!', {
+                const mismatchInfo = {
                     expected: response.screenVideoSize,
                     actual: screenChunkBytes,
                     difference: response.screenVideoSize - screenChunkBytes,
-                });
+                };
+                console.error('[useExtensionBridge] ⚠️ SCREEN SIZE MISMATCH!', mismatchInfo);
+                captureImportError(
+                    new Error(`Screen blob size mismatch: expected ${response.screenVideoSize}, got ${screenChunkBytes}`),
+                    {
+                        recordingId,
+                        phase: 'streaming',
+                        screenVideoSize: response.screenVideoSize,
+                        cameraVideoSize: response.cameraVideoSize,
+                        extra: mismatchInfo,
+                    }
+                );
             }
 
 
@@ -266,6 +278,25 @@ export function useExtensionBridge() {
 
         } catch (error) {
             console.error('[useExtensionBridge] Error:', error);
+            captureImportError(error, {
+                recordingId,
+                phase: metadataRef.current ? 'streaming' : 'receiving',
+                bridgeStatus: metadataRef.current ? 'post-metadata' : 'pre-metadata',
+                screenVideoSize: metadataRef.current?.screenVideoSize,
+                cameraVideoSize: metadataRef.current?.cameraVideoSize,
+                micAudioSize: metadataRef.current?.micAudioSize,
+                progress: {
+                    bytesReceived: screenChunksRef.current.size > 0
+                        ? [...screenChunksRef.current.values()].reduce((s, c) => s + c.byteLength, 0)
+                        : 0,
+                    totalBytes: metadataRef.current
+                        ? (metadataRef.current.screenVideoSize + (metadataRef.current.cameraVideoSize || 0) + (metadataRef.current.micAudioSize || 0))
+                        : 0,
+                    chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
+                    totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                    source: null,
+                },
+            });
             setState(prev => ({
                 ...prev,
                 status: 'error',
@@ -334,6 +365,20 @@ export function useExtensionBridge() {
 
                         case PORT_MSG.STREAM_ERROR:
                             console.error('[useExtensionBridge] Stream error:', message.payload);
+                            captureImportError(
+                                new Error(message.payload.error || 'Stream error from extension'),
+                                {
+                                    recordingId,
+                                    phase: 'streaming',
+                                    progress: {
+                                        bytesReceived,
+                                        totalBytes,
+                                        chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
+                                        totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                                        source: null,
+                                    },
+                                }
+                            );
                             port.disconnect();
                             reject(new Error(message.payload.error));
                             break;
@@ -343,7 +388,20 @@ export function useExtensionBridge() {
                 port.onDisconnect.addListener(() => {
                     const chrome = (window as unknown as { chrome?: typeof globalThis.chrome }).chrome;
                     if (chrome?.runtime?.lastError) {
-                        reject(new Error(chrome.runtime.lastError.message || 'Port disconnected'));
+                        const err = new Error(chrome.runtime.lastError.message || 'Port disconnected');
+                        captureImportError(err, {
+                            recordingId,
+                            phase: 'streaming',
+                            bridgeStatus: 'port-disconnected',
+                            progress: {
+                                bytesReceived,
+                                totalBytes,
+                                chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
+                                totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                                source: null,
+                            },
+                        });
+                        reject(err);
                     }
                 });
 

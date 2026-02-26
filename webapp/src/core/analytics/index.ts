@@ -1,9 +1,12 @@
 /**
- * @fileoverview Google Analytics 4 Integration via gtag.js
+ * @fileoverview Analytics Integration (GA4 + Mixpanel)
  * 
- * The gtag.js script is loaded in index.html. This module provides
- * typed helper functions for tracking custom events.
+ * GA4 is loaded via gtag.js in index.html.
+ * Mixpanel is initialized here via the npm SDK.
+ * All events are dual-tracked to both platforms.
  */
+
+import mixpanel from 'mixpanel-browser';
 
 // Declare gtag on window
 declare global {
@@ -13,8 +16,16 @@ declare global {
 }
 
 // ============================================================================
-// Anonymous Local User ID
-// Persistent UUID per installation, sent with every event for user correlation.
+// Mixpanel Initialization
+// ============================================================================
+
+mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+    autocapture: false,
+    record_sessions_percent: 0,
+});
+
+// ============================================================================
+// Anonymous Local User ID (GA4 only — Mixpanel uses identify/reset)
 // ============================================================================
 
 const LOCAL_USER_ID_KEY = 'recordio-local-user-id';
@@ -28,28 +39,68 @@ function getOrCreateLocalUserId(): string {
     return id;
 }
 
+// ============================================================================
+// Mixpanel User Identity
+// ============================================================================
+
+/**
+ * Identify the user in Mixpanel with their Supabase user ID.
+ * Called from useUserStore.setUser on login and session restore.
+ * Merges any anonymous events into the identified profile.
+ */
+export function identifyUser(userId: string, email: string) {
+    mixpanel.identify(userId);
+    mixpanel.people.set({ $email: email });
+    // Set signup_date only once (won't overwrite on subsequent sessions)
+    mixpanel.people.set_once({ signup_date: new Date().toISOString() });
+}
+
+/**
+ * Reset Mixpanel to anonymous state.
+ * Called from useUserStore.clearUser on sign-out.
+ */
+export function resetUser() {
+    mixpanel.reset();
+}
+
+// ============================================================================
+// Event Tracking (dual: GA4 + Mixpanel)
+// ============================================================================
+
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
-    if (typeof window.gtag !== 'function') return;
-    window.gtag('event', eventName, {
-        local_user_id: getOrCreateLocalUserId(),
-        ...params,
-    });
+    // GA4
+    if (typeof window.gtag === 'function') {
+        window.gtag('event', eventName, {
+            local_user_id: getOrCreateLocalUserId(),
+            ...params,
+        });
+    }
+
+    // Mixpanel
+    mixpanel.track(eventName, params);
+
+    // Update last active date on every event
+    mixpanel.people.set({ last_active_date: new Date().toISOString() });
 }
 
 // ============================================================================
 // Public API - Specific Event Tracking Functions
 // ============================================================================
 
+export type ExportType = 'download' | 'publish';
+
 export interface ExportCompletedParams {
     quality: '480p' | '720p' | '1080p' | '2K' | '4K';
     fps: 30 | 60;
     duration_seconds: number;
+    export_type: ExportType;
     is_authenticated: boolean;
     is_pro: boolean;
 }
 
 export function trackExportCompleted(params: ExportCompletedParams) {
     trackEvent('export_completed', params);
+    mixpanel.people.increment('total_exports');
 }
 
 export interface CaptionsGeneratedParams {
@@ -100,5 +151,6 @@ export interface ProjectCreatedParams {
 export function trackProjectCreated(params: ProjectCreatedParams) {
     const totalProjectsCreated = incrementProjectCount();
     trackEvent('project_created', { ...params, total_projects_created: totalProjectsCreated });
+    mixpanel.people.increment('total_projects_created');
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
+import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { LogoLink } from '@shared/components';
@@ -139,12 +140,35 @@ export function ImportPage() {
                 })
                 .catch((error) => {
                     console.error('[ImportPage] Storage failed:', error);
+                    captureImportError(error, {
+                        recordingId,
+                        phase: 'storing',
+                        bridgeStatus: state.status,
+                        screenVideoSize: state.screenVideo?.size,
+                        cameraVideoSize: state.cameraVideo?.size ?? undefined,
+                        micAudioSize: state.micAudio?.size ?? undefined,
+                    });
                     setStatus('error-storage');
                     setErrorDetails(error.message);
                 });
         }
 
         if (state.status === 'error') {
+            captureImportError(
+                new Error(state.error || 'Extension bridge error'),
+                {
+                    recordingId,
+                    phase: 'receiving',
+                    bridgeStatus: state.status,
+                    progress: state.progress ? {
+                        bytesReceived: state.progress.bytesReceived,
+                        totalBytes: state.progress.totalBytes,
+                        chunksReceived: state.progress.chunksReceived,
+                        totalChunks: state.progress.totalChunks,
+                        source: state.progress.source,
+                    } : null,
+                }
+            );
             setStatus('error-extension');
             setErrorDetails(state.error);
         }

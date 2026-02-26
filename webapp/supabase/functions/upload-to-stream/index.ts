@@ -49,16 +49,7 @@ serve(async (req) => {
 
         const hasProAccess = subscription?.status === 'active' || subscription?.status === 'trialing';
 
-        // Also check free trial
-        const { data: metadata } = await supabase
-            .from('user_metadata')
-            .select('free_trial_until')
-            .eq('id', user.id)
-            .maybeSingle();
-
-        const hasFreeTrial = metadata?.free_trial_until && new Date(metadata.free_trial_until) > new Date();
-
-        if (!hasProAccess && !hasFreeTrial) {
+        if (!hasProAccess) {
             return new Response(
                 JSON.stringify({ error: 'pro_required', message: 'Shareable links are a Pro feature.' }),
                 { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

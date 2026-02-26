@@ -40,8 +40,9 @@ const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string; icon: Reac
 ];
 
 /** Format remaining trial time as a human-readable string */
-function formatTrialRemaining(freeTrialUntil: string): string {
-    const remaining = new Date(freeTrialUntil).getTime() - Date.now();
+function formatTrialRemaining(endDate: Date | null): string {
+    if (!endDate) return '';
+    const remaining = endDate.getTime() - Date.now();
     if (remaining <= 0) return '';
     const days = Math.ceil(remaining / (1000 * 60 * 60 * 24));
     if (days === 1) return '1 day left';
@@ -63,7 +64,7 @@ export function ExportSettings() {
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishedCount, setPublishedCount] = useState(0);
 
-    const { isAuthenticated, isPro, hasProAccess, hasFreeTrial, freeTrialUntil } = useUserStore();
+    const { isAuthenticated, isPro, hasProAccess, hasFreeTrial } = useUserStore();
     const proAccess = hasProAccess();
     const activeTrial = hasFreeTrial();
 
@@ -124,6 +125,7 @@ export function ExportSettings() {
                 quality,
                 fps,
                 duration_seconds: Math.floor(totalDurationMs / 1000),
+                export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
             });
@@ -205,6 +207,16 @@ export function ExportSettings() {
 
             // Notify Header
             window.dispatchEvent(new Event('share-updated'));
+
+            const totalDurationMs = new TimeMapper(project.timeline.outputWindows).outputDuration;
+            trackExportCompleted({
+                quality: selectedQuality,
+                fps: selectedFps,
+                duration_seconds: Math.floor(totalDurationMs / 1000),
+                export_type: 'publish',
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+            });
 
             addToast({
                 type: 'success',

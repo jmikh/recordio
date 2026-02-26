@@ -84,7 +84,7 @@ function Editor() {
 
         // Initialize auth state listener
         AuthManager.initAuthListener(async (session) => {
-            const { setUser, setSubscription, setFreeTrialUntil, clearUser } = useUserStore.getState();
+            const { setUser, setSubscription, clearUser } = useUserStore.getState();
 
             if (session) {
                 // User is logged in
@@ -127,21 +127,6 @@ function Editor() {
                     }
                 } catch (error) {
                     // Subscription table not configured yet
-                }
-
-                // Fetch free trial expiry from user metadata
-                try {
-                    const { data: profile, error: profileError } = await supabase!
-                        .from('user_metadata')
-                        .select('free_trial_until')
-                        .eq('id', session.user.id)
-                        .maybeSingle();
-
-                    if (!profileError && profile) {
-                        setFreeTrialUntil(profile.free_trial_until ?? null);
-                    }
-                } catch (error) {
-                    // user_metadata table not configured yet
                 }
             } else {
                 // User is logged out

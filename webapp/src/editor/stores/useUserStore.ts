@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { identifyUser, resetUser } from '../../core/analytics';
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 export type ExportFps = 30 | 60;
@@ -23,19 +24,13 @@ export interface UserState {
     pictureSourceUrl: string | null; // Original remote URL that was cached into `picture`
     isAuthenticated: boolean;
 
-    // Subscription state
+    // Subscription state (includes free trial — status: 'trialing')
     subscription: Subscription;
     isPro: boolean; // Computed from subscription.status
-
-    // Free trial (server-authoritative timestamp)
-    freeTrialUntil: string | null; // ISO 8601 timestamp
-
-
 
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null, pictureSourceUrl?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
-    setFreeTrialUntil: (until: string | null) => void;
     clearUser: () => void;
 
     // Helper methods
@@ -63,7 +58,6 @@ export const useUserStore = create<UserState>()(
                 stripeCustomerId: null
             },
             isPro: false,
-            freeTrialUntil: null,
 
             // Actions
             setUser: (userId, email, name = null, picture = null, pictureSourceUrl = null) => {
@@ -77,6 +71,7 @@ export const useUserStore = create<UserState>()(
                     isAuthenticated: true,
                     ...(isDevPro ? { isPro: true } : {})
                 });
+                identifyUser(userId, email);
             },
 
             setSubscription: (subscription) => {
@@ -88,31 +83,34 @@ export const useUserStore = create<UserState>()(
                 });
             },
 
-            setFreeTrialUntil: (until) => set({ freeTrialUntil: until }),
+            clearUser: () => {
+                resetUser();
+                set({
+                    userId: null,
+                    email: null,
+                    name: null,
+                    picture: null,
+                    pictureSourceUrl: null,
+                    isAuthenticated: false,
+                    subscription: {
+                        status: null,
+                        planId: null,
+                        currentPeriodEnd: null,
+                        cancelAtPeriodEnd: false,
+                        stripeCustomerId: null
+                    },
+                    isPro: false,
+                });
+            },
 
-            clearUser: () => set({
-                userId: null,
-                email: null,
-                name: null,
-                picture: null,
-                pictureSourceUrl: null,
-                isAuthenticated: false,
-                subscription: {
-                    status: null,
-                    planId: null,
-                    currentPeriodEnd: null,
-                    cancelAtPeriodEnd: false,
-                    stripeCustomerId: null
-                },
-                isPro: false,
-                freeTrialUntil: null
-            }),
-
-            // Helper to check if user has an active free trial
+            // Helper to check if user has an active free trial (now via subscriptions table)
             hasFreeTrial: () => {
-                const { isAuthenticated, freeTrialUntil } = get();
-                if (!isAuthenticated || !freeTrialUntil) return false;
-                return new Date(freeTrialUntil).getTime() > Date.now();
+                const { isAuthenticated, subscription } = get();
+                if (!isAuthenticated) return false;
+                if (subscription.status !== 'trialing') return false;
+                // Check if trial hasn't expired (defense-in-depth — cron handles expiry server-side)
+                if (subscription.currentPeriodEnd && new Date(subscription.currentPeriodEnd).getTime() < Date.now()) return false;
+                return true;
             },
 
             // Helper to check if user has pro access (subscription OR active trial)

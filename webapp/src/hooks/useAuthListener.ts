@@ -26,7 +26,7 @@ async function cacheAvatarUrl(url: string): Promise<string | null> {
 export function useAuthListener() {
     useEffect(() => {
         AuthManager.initAuthListener(async (session) => {
-            const { setUser, setSubscription, setFreeTrialUntil, clearUser } = useUserStore.getState();
+            const { setUser, setSubscription, clearUser } = useUserStore.getState();
 
             if (session) {
                 const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
@@ -44,7 +44,7 @@ export function useAuthListener() {
 
                 setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
 
-                // Fetch subscription status
+                // Fetch subscription status (includes free trial as status: 'trialing')
                 if (supabase) {
                     try {
                         const { data, error } = await supabase
@@ -64,21 +64,6 @@ export function useAuthListener() {
                         }
                     } catch {
                         // Subscription table not configured yet
-                    }
-
-                    // Fetch free trial expiry
-                    try {
-                        const { data: profile, error: profileError } = await supabase
-                            .from('user_metadata')
-                            .select('free_trial_until')
-                            .eq('id', session.user.id)
-                            .maybeSingle();
-
-                        if (!profileError && profile) {
-                            setFreeTrialUntil(profile.free_trial_until ?? null);
-                        }
-                    } catch {
-                        // user_metadata table not configured yet
                     }
                 }
             } else {
