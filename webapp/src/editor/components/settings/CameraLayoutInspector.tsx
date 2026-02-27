@@ -5,7 +5,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, MultiToggle, Toggle, InfoTooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { CameraLayoutSegment } from '../../../types';
-import { TbCamera } from 'react-icons/tb';
+import { PiWebcamBold } from 'react-icons/pi';
+import { RxEnterFullScreen } from 'react-icons/rx';
 import { EasingTooltipContent } from './EasingTooltipContent';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
@@ -76,10 +77,21 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
         updateCameraLayout(segment.id, { hidden: val });
     }, [segment.id, updateCameraLayout]);
 
+    const handleFillScreen = useCallback(() => {
+        updateCameraLayout(segment.id, {
+            xPx: 0,
+            yPx: 0,
+            widthPx: outputSize.width,
+            heightPx: outputSize.height,
+            shape: 'rect',
+            borderRadiusPx: 0,
+        });
+    }, [segment.id, outputSize, updateCameraLayout]);
+
     const isHidden = !!segment.hidden;
 
     return (
-        <CollapsibleCard title="Camera Layout" icon={<TbCamera size={16} />} notCollapsible>
+        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold size={16} />} notCollapsible>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Adjust the webcam position, size, and shape for this segment.</p>
 
@@ -94,10 +106,10 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
                     />
                 </Toggle>
 
-                {/* Shape & Corner Radius — only shown when not hidden */}
+                {/* Shape & actions — only shown when not hidden */}
                 {!isHidden && (
                     <>
-                        {/* Shape Toggle (MultiToggle like CameraSettings) */}
+                        {/* Shape Toggle */}
                         <MultiToggle
                             options={[
                                 { value: 'rect', label: 'Free' },
@@ -108,6 +120,14 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
                             onChange={handleShapeChange}
                         />
 
+                        {/* Fill Screen */}
+                        <button
+                            onClick={handleFillScreen}
+                            className="interactive-base flex items-center justify-center gap-1.5 w-full text-xs text-text-muted hover:text-text"
+                        >
+                            <RxEnterFullScreen size={14} />
+                            <span>Fill Screen</span>
+                        </button>
                     </>
                 )}
 
@@ -151,6 +171,6 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
                     </button>
                 </div>
             </div>
-        </CollapsibleCard>
+        </CollapsibleCard >
     );
 };
