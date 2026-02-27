@@ -6,6 +6,10 @@ import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
 import { TimePixelMapper } from '../../../utils/timePixelMapper';
 import { MIN_WINDOW_DURATION_MS } from './constants';
 
+// Minimum pixel over-drag past the zero-gap boundary before triggering a merge.
+// Prevents accidental merges from sub-pixel jitter.
+const MERGE_THRESHOLD_PX = 5;
+
 export interface DragState {
     windowId: string;
     type: 'left' | 'right';
@@ -17,10 +21,13 @@ export interface DragState {
         minStart: number;
         maxEnd: number;
     };
+    adjacentWindowId: string | null;
+    pendingMerge: boolean;
 }
 
 export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
+    const mergeWindows = useProjectStore(s => s.mergeWindows);
     const setPreviewTime = useUIStore(s => s.setPreviewTime);
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
@@ -56,10 +63,38 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
                 const proposedStart = win.startMs + sourceDeltaMs;
                 // Cannot go before minStart, cannot cross endMs (min dur 100ms)
                 newStartMs = Math.min(Math.max(proposedStart, minStart), win.endMs - MIN_WINDOW_DURATION_MS);
+
+                // Merge detection: track pending merge state for commit on mouseup
+                if (dragState.adjacentWindowId && proposedStart < minStart) {
+                    const overDragPx = Math.abs(deltaX) - Math.abs(coords.msToX((minStart - win.startMs) / speed));
+                    if (overDragPx > MERGE_THRESHOLD_PX) {
+                        if (!dragState.pendingMerge) {
+                            setDragState(prev => prev ? { ...prev, pendingMerge: true } : null);
+                        }
+                    } else if (dragState.pendingMerge) {
+                        setDragState(prev => prev ? { ...prev, pendingMerge: false } : null);
+                    }
+                } else if (dragState.pendingMerge) {
+                    setDragState(prev => prev ? { ...prev, pendingMerge: false } : null);
+                }
             } else if (dragState.type === 'right') {
                 const proposedEnd = win.endMs + sourceDeltaMs;
                 // Cannot go past maxEnd, cannot cross startMs
                 newEndMs = Math.max(Math.min(proposedEnd, maxEnd), win.startMs + MIN_WINDOW_DURATION_MS);
+
+                // Merge detection: track pending merge state for commit on mouseup
+                if (dragState.adjacentWindowId && proposedEnd > maxEnd) {
+                    const overDragPx = Math.abs(deltaX) - Math.abs(coords.msToX((maxEnd - win.endMs) / speed));
+                    if (overDragPx > MERGE_THRESHOLD_PX) {
+                        if (!dragState.pendingMerge) {
+                            setDragState(prev => prev ? { ...prev, pendingMerge: true } : null);
+                        }
+                    } else if (dragState.pendingMerge) {
+                        setDragState(prev => prev ? { ...prev, pendingMerge: false } : null);
+                    }
+                } else if (dragState.pendingMerge) {
+                    setDragState(prev => prev ? { ...prev, pendingMerge: false } : null);
+                }
             }
 
             // Only update if values changed
@@ -99,6 +134,14 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
 
         const handleGlobalMouseUp = () => {
             if (dragState) {
+                // Commit merge if pending
+                if (dragState.pendingMerge && dragState.adjacentWindowId) {
+                    const keepId = dragState.type === 'left' ? dragState.adjacentWindowId : dragState.windowId;
+                    const removeId = dragState.type === 'left' ? dragState.windowId : dragState.adjacentWindowId;
+                    batchAction(() => {
+                        mergeWindows(keepId, removeId);
+                    });
+                }
                 endInteraction();
                 setIsResizingWindow(false);
             }
@@ -112,7 +155,7 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [dragState, coords, updateOutputWindow, batchAction, endInteraction, setPreviewTime, setCurrentTime, setIsResizingWindow]);
+    }, [dragState, coords, updateOutputWindow, mergeWindows, batchAction, endInteraction, setPreviewTime, setCurrentTime, setIsResizingWindow]);
 
     const handleDragStart = (e: React.MouseEvent, id: string, type: 'left' | 'right') => {
         e.preventDefault();
@@ -133,10 +176,21 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
             outputStartMs += (w.endMs - w.startMs) / speed;
         }
 
-        if (winIndex > 0) {
+        // Determine adjacent window for potential merge
+        let adjacentWindowId: string | null = null;
+        if (type === 'left' && winIndex > 0) {
+            minStart = timeline.outputWindows[winIndex - 1].endMs;
+            adjacentWindowId = timeline.outputWindows[winIndex - 1].id;
+        }
+        if (type === 'right' && winIndex < timeline.outputWindows.length - 1) {
+            maxEnd = timeline.outputWindows[winIndex + 1].startMs;
+            adjacentWindowId = timeline.outputWindows[winIndex + 1].id;
+        }
+        // Still need constraints for the non-drag side
+        if (type === 'right' && winIndex > 0) {
             minStart = timeline.outputWindows[winIndex - 1].endMs;
         }
-        if (winIndex < timeline.outputWindows.length - 1) {
+        if (type === 'left' && winIndex < timeline.outputWindows.length - 1) {
             maxEnd = timeline.outputWindows[winIndex + 1].startMs;
         }
 
@@ -159,7 +213,9 @@ export const useWindowDrag = (timeline: TimelineType, coords: TimePixelMapper) =
             outputStartMs,
             initialWindow: cleanWindow,
             currentWindow: cleanWindow,
-            constraints: { minStart, maxEnd }
+            constraints: { minStart, maxEnd },
+            adjacentWindowId,
+            pendingMerge: false
         });
     };
 

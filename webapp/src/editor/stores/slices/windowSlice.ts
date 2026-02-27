@@ -8,6 +8,7 @@ export interface WindowSlice {
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
     removeOutputWindow: (id: ID) => void;
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
+    mergeWindows: (keepId: ID, removeId: ID) => void;
     setOutputWindows: (windows: OutputWindow[]) => void;
 }
 
@@ -107,6 +108,29 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
                     updatedAt: new Date()
                 }
             };
+        });
+    },
+
+    mergeWindows: (keepId, removeId) => {
+        set((state) => {
+            const currentWindows = state.project.timeline.outputWindows;
+            const keepWin = currentWindows.find(w => w.id === keepId);
+            const removeWin = currentWindows.find(w => w.id === removeId);
+            if (!keepWin || !removeWin) return state;
+
+            const mergedWindow: OutputWindow = {
+                id: keepId,
+                startMs: Math.min(keepWin.startMs, removeWin.startMs),
+                endMs: Math.max(keepWin.endMs, removeWin.endMs),
+                speed: keepWin.speed
+            };
+
+            const nextOutputWindows = currentWindows
+                .filter(w => w.id !== removeId)
+                .map(w => w.id === keepId ? mergedWindow : w)
+                .sort((a, b) => a.startMs - b.startMs);
+
+            return { project: applyNewWindows(state.project, nextOutputWindows) };
         });
     },
 

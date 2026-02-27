@@ -53,6 +53,14 @@
    --color-secondary-fg: var(--text-on-secondary);
 
    /* ─────────────────────────────────────────────────────────
+     Tertiary
+     ───────────────────────────────────────────────────────── */
+   --color-tertiary: var(--tertiary);
+   --color-tertiary-muted: var(--tertiary-muted);
+   --color-tertiary-highlighted: var(--tertiary-highlighted);
+   --color-tertiary-fg: var(--text-on-tertiary);
+
+   /* ─────────────────────────────────────────────────────────
      Semantic States
      ───────────────────────────────────────────────────────── */
    --color-destructive: var(--destructive);
@@ -112,6 +120,7 @@
    --hue-primary: 290;
    /* 290 */
    --hue-secondary: 58;
+   --hue-tertiary: 155;
 
    /* Primary Color Variants */
    --primary: oklch(0.55 0.22 var(--hue-primary));
@@ -124,6 +133,11 @@
    --secondary-muted: oklch(0.60 0.12 var(--hue-secondary));
    --secondary-highlighted: oklch(0.80 0.20 var(--hue-secondary));
    --secondary-disabled: oklch(0.70 0.08 var(--hue-secondary));
+
+   /* Tertiary Color Variants */
+   --tertiary: oklch(0.65 0.18 var(--hue-tertiary));
+   --tertiary-muted: oklch(0.55 0.12 var(--hue-tertiary));
+   --tertiary-highlighted: oklch(0.72 0.20 var(--hue-tertiary));
 
    /* Focus Ring */
    --ring-color: oklch(0.65 0.22 var(--hue-secondary));
@@ -174,6 +188,7 @@
    --text-disabled: oklch(0.15 0 0 / 50%);
    --text-on-primary: oklch(87.003% 0.00438 16);
    --text-on-secondary: oklch(0.15 0 0);
+   --text-on-tertiary: oklch(0.98 0 0);
 }
 
 /* ============================================================
