@@ -1,5 +1,5 @@
 import React from 'react';
-import { TbCamera } from 'react-icons/tb';
+import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
 import {
     transitionInSegment,
     transitionOutSegment,
@@ -11,7 +11,7 @@ import {
     DRAG_HANDLE_HEIGHT,
     SEGMENT_RADIUS,
 } from './CameraLayoutTrackStyles';
-import { BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface CameraLayoutBlockProps {
     left: number;
@@ -25,6 +25,8 @@ interface CameraLayoutBlockProps {
     onClick: (e: React.MouseEvent) => void;
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
+    /** Whether the block represents a hidden camera state */
+    isHidden?: boolean;
 }
 
 export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
@@ -39,6 +41,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
     onClick,
     onResizeStartMouseDown,
     onResizeEndMouseDown,
+    isHidden,
 }) => {
     const clampedTransitionIn = Math.min(transitionInWidth, width / 2);
     const clampedTransitionOut = Math.min(transitionOutWidth, width / 2);
@@ -72,24 +75,21 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
             {/* Transition-in segment (left) */}
             {clampedTransitionIn > 0 && (
                 <div
-                    className={`${transitionInSegment.base} ${transitionInColor} flex items-center justify-center overflow-hidden`}
+                    className={`${transitionInSegment.base} ${transitionInColor}`}
                     style={{
                         left: 0,
                         top: segmentY,
                         width: clampedTransitionIn,
                         ...inStyle,
+                        ...(holdWidth === 0 ? { borderRight: '2px solid var(--block-bg)' } : {}),
                     }}
-                >
-                    {clampedTransitionIn >= MIN_ICON_WIDTH_PX && (
-                        <TbCamera className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
-                    )}
-                </div>
+                />
             )}
 
             {/* Hold segment (middle) */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass}`}
+                    className={`${holdSegment.base} ${holdColorClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: clampedTransitionIn,
                         top: segmentY,
@@ -103,24 +103,27 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                                     ? `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`
                                     : 0,
                     }}
-                />
+                >
+                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                        isHidden
+                            ? <PiWebcamSlashBold className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                            : <PiWebcamBold className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                    )}
+                </div>
             )}
 
             {/* Transition-out segment (right) */}
             {clampedTransitionOut > 0 && (
                 <div
-                    className={`${transitionOutSegment.base} ${transitionOutColor} flex items-center justify-center overflow-hidden`}
+                    className={`${transitionOutSegment.base} ${transitionOutColor}`}
                     style={{
                         left: clampedTransitionIn + holdWidth,
                         top: segmentY,
                         width: clampedTransitionOut,
                         ...outStyle,
+                        ...(holdWidth === 0 ? { borderLeft: '2px solid var(--block-bg)' } : {}),
                     }}
-                >
-                    {clampedTransitionOut >= MIN_ICON_WIDTH_PX && (
-                        <TbCamera className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
-                    )}
-                </div>
+                />
             )}
 
             {/* Left resize handle */}

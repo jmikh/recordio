@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TbCamera } from 'react-icons/tb';
+import { PiWebcamBold } from 'react-icons/pi';
 import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useTimeMapper } from '../../../hooks/useTimeMapper';
@@ -103,6 +103,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
+                            isHidden={s.hidden}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -149,26 +150,22 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                             {/* Ghost transition-in */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={`${ghostCameraLayout.transitionIn.className} flex items-center justify-center overflow-hidden`}
+                                    className={ghostCameraLayout.transitionIn.className}
                                     style={{
                                         position: 'absolute',
                                         left: 0,
                                         top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostCameraLayout.transitionIn.getStyle(),
-                                        ...(holdWidth <= 0 && clampedTransitionWidth * 2 >= hoverInfo.width ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
+                                        ...(holdWidth <= 0 ? { borderRight: '2px solid var(--block-bg)' } : {}),
                                     }}
-                                >
-                                    {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                                        <TbCamera className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
-                                    )}
-                                </div>
+                                />
                             )}
 
                             {/* Ghost hold */}
                             {holdWidth > 0 && (
                                 <div
-                                    className={ghostCameraLayout.hold.className}
+                                    className={`${ghostCameraLayout.hold.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
                                         left: clampedTransitionWidth,
@@ -176,20 +173,24 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                                         width: holdWidth,
                                         ...ghostCameraLayout.hold.getStyle(),
                                     }}
-                                />
+                                >
+                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                                        <PiWebcamBold className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                    )}
+                                </div>
                             )}
 
                             {/* Ghost transition-out */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={`${ghostCameraLayout.transitionOut.className} overflow-hidden`}
+                                    className={ghostCameraLayout.transitionOut.className}
                                     style={{
                                         position: 'absolute',
                                         right: 0,
                                         top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostCameraLayout.transitionOut.getStyle(),
-                                        ...(holdWidth <= 0 && clampedTransitionWidth * 2 >= hoverInfo.width ? { borderLeft: '', borderRadius: SEGMENT_RADIUS } : {}),
+                                        ...(holdWidth <= 0 ? { borderLeft: '2px solid var(--block-bg)' } : {}),
                                     }}
                                 />
                             )}

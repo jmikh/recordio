@@ -243,56 +243,95 @@ export function getResolvedCameraStateAtTime(
                     borderRadius = bakedBorderRadius(prevVisible.shape, prevVisible.borderRadiusPx, prevVisible.widthPx, prevVisible.heightPx);
                 }
 
-                if (elapsed < td) {
-                    // Fade out (1 → 0)
-                    const t = applyEasing(Math.min(1, elapsed / td), activeSegment.easing);
-                    opacity = lerp(1, 0, t);
+                const duration = activeSegment.outputEndTimeMs - activeSegment.outputStartTimeMs;
+                const halfDuration = duration / 2;
+
+                // Compute fade progress (0 = fully visible, 1 = fully hidden)
+                // Mirrors spotlightAnimator: pivot at half for short blocks.
+                let fadeProgress: number;
+
+                if (duration < td * 2) {
+                    if (elapsed <= halfDuration) {
+                        fadeProgress = elapsed / td;
+                    } else {
+                        const peakProgress = halfDuration / td;
+                        const fadeOutElapsed = elapsed - halfDuration;
+                        fadeProgress = peakProgress - (fadeOutElapsed / td) * peakProgress;
+                    }
+                } else if (elapsed < td) {
+                    fadeProgress = elapsed / td;
                 } else if (remaining < td) {
-                    // Fade in (0 → 1), interpolate toward auto-shrunk post-block state
-                    const t = applyEasing(Math.min(1, 1 - remaining / td), activeSegment.easing);
-                    opacity = lerp(0, 1, t);
-                    const shrunk = getAutoShrunkRect(activeSegment.outputEndTimeMs + 1, { x, y, w, h });
-                    x = lerp(x, shrunk.x, t);
-                    y = lerp(y, shrunk.y, t);
-                    w = lerp(w, shrunk.w, t);
-                    h = lerp(h, shrunk.h, t);
+                    fadeProgress = remaining / td;
                 } else {
-                    opacity = 0;
+                    fadeProgress = 1.0;
+                }
+
+                const t = applyEasing(Math.min(1, Math.max(0, fadeProgress)), activeSegment.easing);
+                opacity = lerp(1, 0, t);
+
+                // During fade-in from hidden, interpolate toward auto-shrunk post-block state
+                if (elapsed > halfDuration && t < 1.0) {
+                    const shrunk = getAutoShrunkRect(activeSegment.outputEndTimeMs + 1, { x, y, w, h });
+                    const reverseT = 1 - t; // How far we are from fully hidden
+                    x = lerp(x, shrunk.x, reverseT);
+                    y = lerp(y, shrunk.y, reverseT);
+                    w = lerp(w, shrunk.w, reverseT);
+                    h = lerp(h, shrunk.h, reverseT);
                 }
             } else {
                 // Active visible block — self-contained transitions from/to defaults
                 const segBR = bakedBorderRadius(activeSegment.shape, activeSegment.borderRadiusPx, activeSegment.widthPx, activeSegment.heightPx);
+                const duration = activeSegment.outputEndTimeMs - activeSegment.outputStartTimeMs;
+                const halfDuration = duration / 2;
 
-                if (elapsed < td) {
-                    // Transition IN: auto-shrunk defaults → active segment
-                    const t = applyEasing(Math.min(1, elapsed / td), activeSegment.easing);
-                    const src = getAutoShrunkRect(activeSegment.outputStartTimeMs - 1, { x, y, w, h });
-                    x = lerp(src.x, activeSegment.xPx, t);
-                    y = lerp(src.y, activeSegment.yPx, t);
-                    w = lerp(src.w, activeSegment.widthPx, t);
-                    h = lerp(src.h, activeSegment.heightPx, t);
-                    borderRadius = lerp(borderRadius, segBR, t);
-                    shape = activeSegment.shape;
+                // Compute animation progress (0 = defaults, 1 = fully at segment values)
+                // Mirrors spotlightAnimator: pivot at half for short blocks.
+                let animationProgress: number;
 
+                if (duration < td * 2) {
+                    // Short block: fade in until halfway, then reverse from peak
+                    if (elapsed <= halfDuration) {
+                        animationProgress = elapsed / td;
+                    } else {
+                        const peakProgress = halfDuration / td;
+                        const fadeOutElapsed = elapsed - halfDuration;
+                        animationProgress = peakProgress - (fadeOutElapsed / td) * peakProgress;
+                    }
+                } else if (elapsed < td) {
+                    // Transition IN
+                    animationProgress = elapsed / td;
                 } else if (remaining < td) {
-                    // Transition OUT: active segment → auto-shrunk defaults
-                    const t = applyEasing(Math.min(1, 1 - remaining / td), activeSegment.easing);
-                    const dst = getAutoShrunkRect(activeSegment.outputEndTimeMs + 1, { x, y, w, h });
-                    x = lerp(activeSegment.xPx, dst.x, t);
-                    y = lerp(activeSegment.yPx, dst.y, t);
-                    w = lerp(activeSegment.widthPx, dst.w, t);
-                    h = lerp(activeSegment.heightPx, dst.h, t);
-                    borderRadius = lerp(segBR, borderRadius, t);
-                    shape = activeSegment.shape;
-
+                    // Transition OUT
+                    animationProgress = remaining / td;
                 } else {
                     // Steady state
+                    animationProgress = 1.0;
+                }
+
+                const t = applyEasing(Math.min(1, Math.max(0, animationProgress)), activeSegment.easing);
+
+                if (t >= 1.0) {
+                    // Fully at segment values
                     x = activeSegment.xPx;
                     y = activeSegment.yPx;
                     w = activeSegment.widthPx;
                     h = activeSegment.heightPx;
                     shape = activeSegment.shape;
                     borderRadius = segBR;
+                } else {
+                    // Transitioning — interpolate between auto-shrunk defaults and segment
+                    // Use pre-block shrink for transition-in, post-block for transition-out
+                    const peekTime = elapsed < halfDuration
+                        ? activeSegment.outputStartTimeMs - 1
+                        : activeSegment.outputEndTimeMs + 1;
+                    const shrunkDefault = getAutoShrunkRect(peekTime, { x, y, w, h });
+
+                    x = lerp(shrunkDefault.x, activeSegment.xPx, t);
+                    y = lerp(shrunkDefault.y, activeSegment.yPx, t);
+                    w = lerp(shrunkDefault.w, activeSegment.widthPx, t);
+                    h = lerp(shrunkDefault.h, activeSegment.heightPx, t);
+                    borderRadius = lerp(borderRadius, segBR, t);
+                    shape = activeSegment.shape;
                 }
             }
         }
