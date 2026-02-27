@@ -229,6 +229,17 @@ export interface AudioSettings {
 }
 
 // ==========================================
+// CAMERA LAYOUT
+// ==========================================
+
+export interface CameraLayoutSettings {
+    /** Default transition duration for new camera layout blocks (ms) */
+    transitionDurationMs: number;
+    /** Default easing for new camera layout blocks */
+    easing: EasingStyle;
+}
+
+// ==========================================
 // PROJECT SETTINGS (aggregated)
 // ==========================================
 
@@ -256,6 +267,9 @@ export interface ProjectSettings {
 
     // Camera
     camera?: CameraSettings;
+
+    // Camera Layout (dynamic position/size blocks)
+    cameraLayout?: CameraLayoutSettings;
 
     // Captions
     captions: CaptionSettings;

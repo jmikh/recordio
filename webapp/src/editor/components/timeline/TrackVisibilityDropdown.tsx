@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MdVisibility } from 'react-icons/md';
 import { useUIStore, type TrackVisibility } from '../../stores/useUIStore';
+import { useProjectStore } from '../../stores/useProjectStore';
 import { Checkbox } from '@shared/components';
 
-const TRACKS: { key: keyof TrackVisibility; label: string }[] = [
+const ALL_TRACKS: { key: keyof TrackVisibility; label: string; requiresCamera?: boolean }[] = [
     { key: 'zoom', label: 'Zoom' },
     { key: 'spotlight', label: 'Spotlight' },
     { key: 'captions', label: 'Captions' },
+    { key: 'cameraLayout', label: 'Camera Layout', requiresCamera: true },
 ];
 
 interface TrackVisibilityDropdownProps {
@@ -22,6 +24,12 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
 
     const trackVisibility = useUIStore(s => s.trackVisibility);
     const setTrackVisibility = useUIStore(s => s.setTrackVisibility);
+    const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
+
+    const tracks = useMemo(() =>
+        ALL_TRACKS.filter(t => !t.requiresCamera || hasCameraSource),
+        [hasCameraSource]
+    );
 
     // Calculate menu position when opening
     useEffect(() => {
@@ -61,7 +69,7 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
             className="bg-surface-overlay border border-border rounded-lg shadow-float py-1 px-1"
             style={menuStyle}
         >
-            {TRACKS.map(({ key, label }) => {
+            {tracks.map(({ key, label }) => {
                 const isVisible = trackVisibility[key];
 
                 return (

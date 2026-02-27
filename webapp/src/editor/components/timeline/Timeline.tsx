@@ -7,6 +7,7 @@ import { ZoomTrack } from './zoom/ZoomTrack';
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
 import { SpotlightLegend } from './spotlight/SpotlightLegend';
 import { CaptionTrack } from './caption/CaptionTrack';
+import { CameraLayoutTrack } from './cameraLayout/CameraLayoutTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -106,6 +107,7 @@ export function Timeline() {
 
     // -- Stores --
     const timeline = useProjectTimeline();
+    const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
 
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
@@ -162,6 +164,9 @@ export function Timeline() {
     const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
     const selectCaption = useUIStore(s => s.selectCaption);
     const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
+    const selectedCameraLayoutId = useUIStore(s => s.selectedCameraLayoutId);
+    const selectCameraLayout = useUIStore(s => s.selectCameraLayout);
+    const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -179,6 +184,10 @@ export function Timeline() {
                     e.preventDefault();
                     deleteCaptionSegment(selectedCaptionId);
                     selectCaption(null);
+                } else if (selectedCameraLayoutId) {
+                    e.preventDefault();
+                    deleteCameraLayout(selectedCameraLayoutId);
+                    selectCameraLayout(null);
                 }
             }
 
@@ -196,7 +205,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraLayoutId, deleteCameraLayout, selectCameraLayout, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -294,6 +303,16 @@ export function Timeline() {
                         </div>
                     )}
 
+                    {/* Header: Camera Layout */}
+                    {trackVisibility.cameraLayout && (
+                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                            <TimelineHeaderCell
+                                title="Layout"
+                                height={TRACK_HEIGHT}
+                            />
+                        </div>
+                    )}
+
                 </div>
 
                 {/* RIGHT COLUMN: CONTENT */}
@@ -381,6 +400,13 @@ export function Timeline() {
                                     {trackVisibility.captions && (
                                         <TimelineTrackRow height={TRACK_HEIGHT}>
                                             <CaptionTrack height={TRACK_HEIGHT} />
+                                        </TimelineTrackRow>
+                                    )}
+
+                                    {/* Camera Layout Track */}
+                                    {trackVisibility.cameraLayout && (
+                                        <TimelineTrackRow height={TRACK_HEIGHT}>
+                                            <CameraLayoutTrack height={TRACK_HEIGHT} />
                                         </TimelineTrackRow>
                                     )}
 

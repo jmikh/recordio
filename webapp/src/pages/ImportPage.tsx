@@ -131,6 +131,7 @@ export function ImportPage() {
                             auto_spotlight_count: project.timeline.spotlightSegments.length,
                             screen_frame_rate: recording.screenSource.frameRate ?? null,
                             camera_frame_rate: recording.cameraSource?.frameRate ?? null,
+                            success: true,
                         });
                     } catch { /* analytics should never break the app */ }
 
@@ -150,6 +151,42 @@ export function ImportPage() {
                     });
                     setStatus('error-storage');
                     setErrorDetails(error.message);
+
+                    // --- Analytics: project_created (storage failure) ---
+                    try {
+                        const recording = state.recording!;
+                        const events = recording.userEvents;
+                        const { userId } = useUserStore.getState();
+
+                        let firstUrl: string | null = null;
+                        if (events.urlChanges.length > 0) {
+                            try { firstUrl = new URL(events.urlChanges[0].url).hostname; } catch { /* skip */ }
+                        }
+
+                        trackProjectCreated({
+                            duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
+                            microphone_on: !!recording.microphoneSource,
+                            webcam_on: !!state.cameraVideo,
+                            has_system_audio: recording.screenSource.hasAudio,
+                            first_url: firstUrl,
+                            recording_type: recording.screenSource.recordingType,
+                            user_id: userId,
+                            user_event_count:
+                                events.mouseClicks.length + events.keyboardEvents.length +
+                                events.typingEvents.length + events.drags.length + events.hoveredCards.length,
+                            has_click_events: events.mouseClicks.length > 0,
+                            has_keyboard_events: events.keyboardEvents.length > 0,
+                            has_typing_events: events.typingEvents.length > 0,
+                            has_drag_events: events.drags.length > 0,
+                            has_hovered_cards: events.hoveredCards.length > 0,
+                            auto_zoom_count: 0,
+                            auto_spotlight_count: 0,
+                            screen_frame_rate: recording.screenSource.frameRate ?? null,
+                            camera_frame_rate: recording.cameraSource?.frameRate ?? null,
+                            success: false,
+                            error: error.message,
+                        });
+                    } catch { /* analytics should never break the app */ }
                 });
         }
 
@@ -171,6 +208,43 @@ export function ImportPage() {
             );
             setStatus('error-extension');
             setErrorDetails(state.error);
+
+            // --- Analytics: project_created (extension bridge failure) ---
+            try {
+                const { userId } = useUserStore.getState();
+                const recording = state.recording;
+                const events = recording?.userEvents;
+
+                let firstUrl: string | null = null;
+                if (events && events.urlChanges.length > 0) {
+                    try { firstUrl = new URL(events.urlChanges[0].url).hostname; } catch { /* skip */ }
+                }
+
+                trackProjectCreated({
+                    duration_seconds: recording ? Math.round(recording.screenSource.durationMs / 1000) : 0,
+                    microphone_on: !!recording?.microphoneSource,
+                    webcam_on: !!state.cameraVideo,
+                    has_system_audio: recording?.screenSource.hasAudio ?? false,
+                    first_url: firstUrl,
+                    recording_type: recording?.screenSource.recordingType ?? 'tab',
+                    user_id: userId,
+                    user_event_count: events
+                        ? events.mouseClicks.length + events.keyboardEvents.length +
+                        events.typingEvents.length + events.drags.length + events.hoveredCards.length
+                        : 0,
+                    has_click_events: (events?.mouseClicks.length ?? 0) > 0,
+                    has_keyboard_events: (events?.keyboardEvents.length ?? 0) > 0,
+                    has_typing_events: (events?.typingEvents.length ?? 0) > 0,
+                    has_drag_events: (events?.drags.length ?? 0) > 0,
+                    has_hovered_cards: (events?.hoveredCards.length ?? 0) > 0,
+                    auto_zoom_count: 0,
+                    auto_spotlight_count: 0,
+                    screen_frame_rate: recording?.screenSource.frameRate ?? null,
+                    camera_frame_rate: recording?.cameraSource?.frameRate ?? null,
+                    success: false,
+                    error: state.error ?? 'Extension bridge error',
+                });
+            } catch { /* analytics should never break the app */ }
         }
     }, [state, confirmHandoff]);
 

@@ -11,6 +11,7 @@ import { ZoomEditor, renderZoomEditor } from './CanvasZoomEditor';
 import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor';
 import { renderCropEditor, CropEditor } from './CanvasCropEditor';
 import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
+import { CameraLayoutEditor, renderCameraLayoutEditor } from './CanvasCameraLayoutEditor';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
@@ -23,6 +24,7 @@ export const CanvasContainer = () => {
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
     const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const activeCameraLayoutId = useUIStore(s => s.selectedCameraLayoutId);
 
     // Background music sync with playback
     useBackgroundMusic();
@@ -142,7 +144,7 @@ export const CanvasContainer = () => {
 
             const uiState = useUIStore.getState();
             const { project } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId } = uiState;
+            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraLayoutId: activeCameraLayoutId } = uiState;
 
             // Build sources from project
             const sources: Record<string, SourceMetadata> = {};
@@ -271,6 +273,12 @@ export const CanvasContainer = () => {
                             currentTimeMs: effectiveTimeMs,
                             overrideCameraSettings: previewCameraSettingsRef.current
                         });
+                    } else if (canvasMode === CanvasMode.CameraLayoutEdit && activeCameraLayoutId) {
+                        renderCameraLayoutEditor(resources, {
+                            project,
+                            currentTimeMs: effectiveTimeMs,
+                            overrideCameraSettings: previewCameraSettingsRef.current
+                        });
                     } else {
                         PlaybackRenderer.render(resources, {
                             project,
@@ -355,7 +363,8 @@ export const CanvasContainer = () => {
     const isEditorMode = canvasMode === CanvasMode.ZoomEdit ||
         canvasMode === CanvasMode.CropEdit ||
         canvasMode === CanvasMode.SpotlightEdit ||
-        canvasMode === CanvasMode.CameraEdit;
+        canvasMode === CanvasMode.CameraEdit ||
+        canvasMode === CanvasMode.CameraLayoutEdit;
 
     return (
         <div id="canvas-container" className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
@@ -480,6 +489,11 @@ export const CanvasContainer = () => {
                 {/* SPOTLIGHT OVERLAY */}
                 {canvasMode === CanvasMode.SpotlightEdit && activeSpotlightId && (
                     <SpotlightEditor previewRectRef={previewSpotlightRectRef} />
+                )}
+
+                {/* CAMERA LAYOUT OVERLAY */}
+                {canvasMode === CanvasMode.CameraLayoutEdit && activeCameraLayoutId && (
+                    <CameraLayoutEditor cameraRef={previewCameraSettingsRef} />
                 )}
             </div>
         </div>

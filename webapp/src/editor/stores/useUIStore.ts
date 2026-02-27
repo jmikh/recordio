@@ -9,6 +9,7 @@ export interface TrackVisibility {
     zoom: boolean;
     spotlight: boolean;
     captions: boolean;
+    cameraLayout: boolean;
 }
 
 const DEFAULT_TRACK_VISIBILITY: TrackVisibility = {
@@ -16,12 +17,14 @@ const DEFAULT_TRACK_VISIBILITY: TrackVisibility = {
     zoom: true,
     spotlight: true,
     captions: true,
+    cameraLayout: true,
 };
 
 export const CanvasMode = {
     Preview: 'preview',
     CropEdit: 'cropEdit',
     CameraEdit: 'cameraEdit',
+    CameraLayoutEdit: 'cameraLayoutEdit',
     ZoomEdit: 'zoomEdit',
     SpotlightEdit: 'spotlightEdit',
     CaptionEdit: 'captionEdit',
@@ -44,6 +47,7 @@ export interface UIState {
     selectedSpotlightId: ID | null;
     selectedWindowId: ID | null;
     selectedCaptionId: ID | null;
+    selectedCameraLayoutId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
@@ -53,6 +57,7 @@ export interface UIState {
     selectZoom: (id: ID | null) => void;
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
+    selectCameraLayout: (id: ID | null) => void;
     deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
@@ -152,6 +157,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedSpotlightId: null,
     selectedWindowId: null,
     selectedCaptionId: null,
+    selectedCameraLayoutId: null,
     selectedSettingsPanel: SettingsPanel.Project,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
@@ -161,7 +167,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraLayoutId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => {
@@ -169,6 +175,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectCaption(null);
+            get().selectCameraLayout(null);
         }
         set({
             selectedWindowId,
@@ -181,6 +188,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectWindow(null);
+            get().selectCameraLayout(null);
         }
         set((state) => {
             if (selectedZoomId) {
@@ -199,6 +207,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectCaption(null);
             get().selectWindow(null);
+            get().selectCameraLayout(null);
         }
         set((state) => {
             if (selectedSpotlightId) {
@@ -222,6 +231,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectWindow(null);
+            get().selectCameraLayout(null);
         }
         set((state) => {
             if (selectedCaptionId) {
@@ -238,11 +248,31 @@ export const useUIStore = create<UIState>((set, get) => ({
         });
     },
 
+    selectCameraLayout: (selectedCameraLayoutId) => {
+        if (selectedCameraLayoutId) {
+            get().selectZoom(null);
+            get().selectSpotlight(null);
+            get().selectCaption(null);
+            get().selectWindow(null);
+        }
+        set((state) => {
+            if (selectedCameraLayoutId) {
+                return {
+                    selectedCameraLayoutId,
+                    canvasMode: CanvasMode.CameraLayoutEdit,
+                    isPlaying: false,
+                };
+            }
+            return { selectedCameraLayoutId: null, canvasMode: CanvasMode.Preview };
+        });
+    },
+
     deselectAllSegments: () => {
         get().selectZoom(null);
         get().selectSpotlight(null);
         get().selectWindow(null);
         get().selectCaption(null);
+        get().selectCameraLayout(null);
         set({ canvasMode: CanvasMode.Preview });
     },
 
@@ -271,7 +301,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraLayoutId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -342,6 +372,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedSpotlightId: null,
             selectedWindowId: null,
             selectedCaptionId: null,
+            selectedCameraLayoutId: null,
             selectedSettingsPanel: SettingsPanel.Project,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,
             timelineContainerRef: null,

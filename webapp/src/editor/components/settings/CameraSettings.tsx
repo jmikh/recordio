@@ -37,8 +37,11 @@ export const CameraSettings = () => {
     const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
         let newSettings = { ...cameraConfig, shape: newShape };
 
-        // Reset corner radius to 10px when switching to square or free
-        if (newShape === 'square' || newShape === 'rect') {
+        // Bake borderRadiusPx based on shape — painter renders purely on radius
+        if (newShape === 'circle') {
+            const size = Math.min(newSettings.widthPx, newSettings.heightPx);
+            newSettings.borderRadiusPx = size / 2;
+        } else {
             newSettings.borderRadiusPx = 10;
         }
 

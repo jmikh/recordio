@@ -117,6 +117,36 @@ export interface SpotlightSegment extends TimeSegment {
 }
 
 // ==========================================
+// CAMERA LAYOUT SEGMENTS
+// ==========================================
+
+/**
+ * A camera layout segment overrides the default webcam position, size,
+ * shape, and border radius for a specific time range.
+ * Source-time anchored for trim/speed stability.
+ */
+export interface CameraLayoutSegment extends TimeSegment {
+    /** Position X in output-space pixels */
+    xPx: number;
+    /** Position Y in output-space pixels */
+    yPx: number;
+    /** Width in output-space pixels */
+    widthPx: number;
+    /** Height in output-space pixels */
+    heightPx: number;
+    /** Shape override for this block */
+    shape: 'circle' | 'rect' | 'square';
+    /** Corner radius in output pixels for this block */
+    borderRadiusPx: number;
+    /** Whether the webcam is hidden during this block */
+    hidden?: boolean;
+    /** Transition duration for entering this block (inherited from global on creation) */
+    transitionDurationMs: number;
+    /** Easing curve for this block's transition */
+    easing: EasingStyle;
+}
+
+// ==========================================
 // TIMELINE
 // ==========================================
 
@@ -142,6 +172,8 @@ export interface Timeline {
     spotlightSegments: SpotlightSegment[];
     /** Caption segments from webcam audio transcription */
     captionSegments: CaptionSegment[];
+    /** Camera layout overrides for dynamic webcam position/size changes */
+    cameraLayoutSegments: CameraLayoutSegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
 }

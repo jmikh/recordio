@@ -9,9 +9,10 @@ import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice'
 import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActionSlice';
 import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSlice';
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
+import { createCameraLayoutSlice, type CameraLayoutSlice } from './slices/cameraLayoutSlice';
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraLayoutSlice {
     project: Project;
     isSaving: boolean;
 
@@ -63,6 +64,7 @@ export const useProjectStore = create<ProjectState>()(
                 ...createZoomSegmentSlice(set, get, store),
                 ...createSpotlightSlice(set, get, store),
                 ...createTranscriptionSlice(set, get, store),
+                ...createCameraLayoutSlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {

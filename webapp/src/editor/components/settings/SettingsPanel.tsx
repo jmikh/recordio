@@ -16,6 +16,7 @@ import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
+import { CameraLayoutInspector } from './CameraLayoutInspector';
 import { TbDeviceDesktop, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
@@ -124,15 +125,18 @@ export const SettingsPanel = () => {
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
-    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId);
+    const selectedCameraLayoutId = useUIStore(s => s.selectedCameraLayoutId);
+    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraLayoutId);
 
     const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
     const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
+    const cameraLayoutSegments = useProjectStore(s => s.project.timeline.cameraLayoutSegments);
 
     const selectedZoom = selectedZoomId ? zoomSegments.find(z => z.id === selectedZoomId) : null;
     const selectedSpotlight = selectedSpotlightId ? spotlightSegments.find(s => s.id === selectedSpotlightId) : null;
     const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
+    const selectedCameraLayout = selectedCameraLayoutId ? (cameraLayoutSegments || []).find(s => s.id === selectedCameraLayoutId) : null;
 
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
@@ -205,6 +209,7 @@ export const SettingsPanel = () => {
                             {selectedZoom && <ZoomInspector segment={selectedZoom} />}
                             {selectedSpotlight && <SpotlightInspector segment={selectedSpotlight} />}
                             {selectedWindow && <ClipInspector window={selectedWindow} />}
+                            {selectedCameraLayout && <CameraLayoutInspector segment={selectedCameraLayout} />}
                         </>
                     ) : (
                         <>

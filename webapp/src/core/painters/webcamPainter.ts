@@ -87,24 +87,17 @@ export function drawWebcam(
     // borderRadius is in output pixels — already scaled by ProjectImpl.scale
     const scaledBorderRadius = borderRadius;
 
-    // Helper to create the path based on shape
+    // Helper to create the clipping path
+    // Always use borderRadius for rendering — the resolver converts shape to
+    // effective radius (circle = min(w,h)/2) and interpolates during transitions.
+    // Shape is only used by the bounding box for aspect ratio constraints.
     const definePath = () => {
         ctx.beginPath();
-        if (shape === 'circle') {
-            const centerX = x + width / 2;
-            const centerY = y + height / 2;
-            const radius = Math.min(width, height) / 2;
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        const r = Math.min(scaledBorderRadius, width / 2, height / 2);
+        if (r > 0) {
+            ctx.roundRect(x, y, width, height, r);
         } else {
-            // Rect or Square
-            if (scaledBorderRadius > 0) {
-                // Use roundRect for true circular arcs matching CSS border-radius
-                // Clamp to half of smaller dimension to avoid overlap
-                const r = Math.min(scaledBorderRadius, width / 2, height / 2);
-                ctx.roundRect(x, y, width, height, r);
-            } else {
-                ctx.rect(x, y, width, height);
-            }
+            ctx.rect(x, y, width, height);
         }
         ctx.closePath();
     };

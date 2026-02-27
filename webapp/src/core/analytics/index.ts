@@ -329,6 +329,8 @@ export interface ProjectCreatedParams {
     auto_spotlight_count: number;
     screen_frame_rate: number | null;
     camera_frame_rate: number | null;
+    success: boolean;
+    error?: string;
 }
 
 export function trackProjectCreated(params: ProjectCreatedParams) {

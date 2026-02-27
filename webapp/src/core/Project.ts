@@ -1,4 +1,4 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraLayoutSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
@@ -130,6 +130,11 @@ const createDefaultSettings = (): ProjectSettings => ({
         autoShrink: true,
         shrinkScale: 0.5
     },
+
+    cameraLayout: {
+        transitionDurationMs: 500,
+        easing: 'ease-in-out'
+    },
 });
 
 /**
@@ -140,6 +145,7 @@ const createDefaultTimeline = (): Timeline => ({
     durationMs: 0,
     zoomSegments: [],
     spotlightSegments: [],
+    cameraLayoutSegments: [],
     outputWindows: [],
     focusAreas: [],
     captionSegments: []
@@ -244,7 +250,8 @@ export class ProjectImpl {
             zoomSegments: zoomSegments,
             spotlightSegments: spotlightSegments,
             focusAreas: focusAreas,
-            captionSegments: []
+            captionSegments: [],
+            cameraLayoutSegments: []
         };
 
         return {
@@ -362,6 +369,9 @@ export class ProjectImpl {
                 ),
                 spotlightSegments: project.timeline.spotlightSegments.map((sa: SpotlightSegment) =>
                     ProjectImpl.scalePixelValues(sa, scale) as SpotlightSegment
+                ),
+                cameraLayoutSegments: (project.timeline.cameraLayoutSegments || []).map((cl: CameraLayoutSegment) =>
+                    ProjectImpl.scalePixelValues(cl, scale) as CameraLayoutSegment
                 ),
             }
         };

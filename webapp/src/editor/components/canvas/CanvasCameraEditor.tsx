@@ -221,18 +221,25 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // ------------------------------------------------------------------
 
     const handleChange = (rect: Rect) => {
-
-        const newSettings = { ...currentSettings, xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height };
+        const cameraShape = currentSettings.shape;
+        const newSettings = {
+            ...currentSettings,
+            xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height,
+            // Keep borderRadiusPx in sync for circles — painter renders purely on radius
+            ...(cameraShape === 'circle' ? { borderRadiusPx: Math.min(rect.width, rect.height) / 2 } : {}),
+        };
         setCurrentSettings(newSettings);
         cameraRef.current = newSettings; // Update canvas live preview
     };
 
     const onCommit = (rect: Rect) => {
-
+        const cameraShape = currentSettings.shape;
         // Merge all local changes with rect and commit to store
         const newSettings: CameraSettings = {
             ...currentSettings,
-            xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height
+            xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height,
+            // Keep borderRadiusPx in sync for circles
+            ...(cameraShape === 'circle' ? { borderRadiusPx: Math.min(rect.width, rect.height) / 2 } : {}),
         };
         batchAction(() => updateSettings({ camera: newSettings }));
         endInteraction();
