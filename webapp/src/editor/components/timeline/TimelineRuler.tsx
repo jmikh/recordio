@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { formatTimeCode } from '../../utils';
-import { useUserStore } from '../../stores/useUserStore';
+import { useThemeStore } from '../../../stores/useThemeStore';
 
 interface TimelineRulerProps {
     totalWidth: number;
@@ -23,7 +23,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Subscribe to theme changes to force redraw
-    const theme = useUserStore((s) => s.theme);
+    const theme = useThemeStore((s) => s.theme);
 
     useEffect(() => {
         const canvas = canvasRef.current;
