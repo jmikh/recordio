@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, CameraLayoutSegment } from '../../../types';
+import type { ID, CameraLayoutSegment, CameraLayoutSettings } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
@@ -9,6 +9,7 @@ export interface CameraLayoutSlice {
     updateCameraLayout: (id: ID, updates: Partial<CameraLayoutSegment>) => void;
     deleteCameraLayout: (id: ID) => void;
     clearCameraLayouts: () => void;
+    toggleCameraLayoutEnabled: () => void;
 }
 
 export const createCameraLayoutSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], CameraLayoutSlice> = (set, _get, store) => ({
@@ -85,6 +86,25 @@ export const createCameraLayoutSlice: StateCreator<ProjectState, [["zustand/subs
                     timeline: {
                         ...state.project.timeline,
                         cameraLayoutSegments: []
+                    }
+                }
+            };
+        });
+    },
+
+    toggleCameraLayoutEnabled: () => {
+        set(state => {
+            const cameraLayout = state.project.settings.cameraLayout!;
+            const currentEnabled = cameraLayout.enabled ?? true;
+            return {
+                project: {
+                    ...state.project,
+                    settings: {
+                        ...state.project.settings,
+                        cameraLayout: {
+                            ...cameraLayout,
+                            enabled: !currentEnabled,
+                        } as CameraLayoutSettings
                     }
                 }
             };

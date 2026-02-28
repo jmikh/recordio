@@ -27,6 +27,8 @@ interface CameraLayoutBlockProps {
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
     /** Whether the block represents a hidden camera state */
     isHidden?: boolean;
+    /** Whether the track is disabled */
+    disabled?: boolean;
 }
 
 export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
@@ -42,15 +44,16 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
     onResizeStartMouseDown,
     onResizeEndMouseDown,
     isHidden,
+    disabled = false,
 }) => {
     const clampedTransitionIn = Math.min(transitionInWidth, width / 2);
     const clampedTransitionOut = Math.min(transitionOutWidth, width / 2);
     const holdWidth = Math.max(0, width - clampedTransitionIn - clampedTransitionOut);
     const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
 
-    const transitionInColor = isSelected ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
-    const transitionOutColor = isSelected ? transitionOutSegment.selectedClass : transitionOutSegment.defaultClass;
-    const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
+    const transitionInColor = (isSelected && !disabled) ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
+    const transitionOutColor = (isSelected && !disabled) ? transitionOutSegment.selectedClass : transitionOutSegment.defaultClass;
+    const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
 
     // When no hold, round both transition ends
     const inStyle = holdWidth === 0 && clampedTransitionOut === 0
@@ -62,15 +65,17 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
 
     return (
         <div
-            className={`${cameraLayoutContainer.base} group ${isDragging ? cameraLayoutContainer.dragging : cameraLayoutContainer.idle} ${!isSelected ? cameraLayoutContainer.hoverClass : ''}`}
+            className={`${cameraLayoutContainer.base} group ${isDragging ? cameraLayoutContainer.dragging : cameraLayoutContainer.idle} ${(!isSelected && !disabled) ? cameraLayoutContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
                 zIndex: isSelected ? 20 : 10,
+                opacity: disabled ? 0.7 : 1,
+                cursor: disabled ? 'default' : undefined,
             }}
-            onMouseDown={onMouseDown}
-            onClick={onClick}
+            onMouseDown={disabled ? undefined : onMouseDown}
+            onClick={disabled ? undefined : onClick}
         >
             {/* Transition-in segment (left) */}
             {clampedTransitionIn > 0 && (

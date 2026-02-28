@@ -27,8 +27,9 @@ export const renderCameraLayoutEditor = (
     const { project, currentTimeMs } = state;
     const outputSize = project.settings.outputSize;
 
+    const zoomEnabled = project.settings.zoom.enabled ?? true;
     const effectiveViewport = getViewportStateAtTime(
-        project.timeline.zoomSegments || [],
+        zoomEnabled ? (project.timeline.zoomSegments || []) : [],
         currentTimeMs,
         outputSize,
         project.settings.zoom

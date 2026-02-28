@@ -64,7 +64,7 @@ export function CaptionsSettings() {
 
     const captionSegments = project.timeline.captionSegments;
     const outputWindows = project.timeline.outputWindows;
-    const settings = project.settings.captions || { visible: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
+    const settings = project.settings.captions || { enabled: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
     const hasMicrophone = !!project.microphoneSource;
 
 
@@ -426,12 +426,6 @@ export function CaptionsSettings() {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionStyle', v)}
             >
                 <div className="flex flex-col gap-4">
-                    <Toggle
-                        label="Visible"
-                        value={settings.visible}
-                        onChange={(value) => updateSettings({ captions: { ...settings, visible: value } })}
-                    />
-
                     <Toggle
                         label="Word Highlight"
                         value={settings.wordHighlight ?? true}

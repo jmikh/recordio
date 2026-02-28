@@ -26,7 +26,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                     w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 transition-colors
                     ${checked
                         ? 'bg-primary border-primary'
-                        : 'bg-transparent border-border-hover'
+                        : 'bg-transparent border-text-disabled hover:border-text-muted'
                     }
                 `}
             >

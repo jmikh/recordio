@@ -13,6 +13,7 @@ import {
     SEGMENT_RADIUS,
 } from './CameraLayoutTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 import type { CameraLayoutSegment } from '../../../../types';
 
 interface CameraLayoutTrackProps {
@@ -34,6 +35,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
 
     const project = useProjectStore(s => s.project);
     const globalTransitionDurationMs = project.settings.cameraLayout?.transitionDurationMs ?? 500;
+    const cameraLayoutEnabled = project.settings.cameraLayout?.enabled ?? true;
 
     const timeMapper = useTimeMapper();
     const coords = useMemo(() => new TimePixelMapper(timeMapper, pixelsPerSec), [timeMapper, pixelsPerSec]);
@@ -75,12 +77,14 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
         <div
             className="w-full relative select-none flex"
             style={{ height }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={handleClick}
+            onMouseMove={cameraLayoutEnabled ? handleMouseMove : undefined}
+            onMouseLeave={cameraLayoutEnabled ? handleMouseLeave : undefined}
+            onPointerDown={cameraLayoutEnabled ? (e) => e.stopPropagation() : undefined}
+            onClick={cameraLayoutEnabled ? handleClick : undefined}
+            title={!cameraLayoutEnabled ? 'Enable layouts to interact' : undefined}
         >
             <div className="relative flex-1" style={{ height }}>
+                {!cameraLayoutEnabled && <DisabledTrackOverlay height={height} />}
                 {/* Camera layout blocks */}
                 {segments.map((s: CameraLayoutSegment) => {
                     const startX = coords.msToX(s.outputStartTimeMs);
@@ -104,6 +108,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                             isDragging={isDragging}
                             trackHeight={height}
                             isHidden={s.hidden}
+                            disabled={!cameraLayoutEnabled}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -128,7 +133,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                 })}
 
                 {/* Ghost block */}
-                {hoverInfo && !selectedId && !dragState && (() => {
+                {cameraLayoutEnabled && hoverInfo && !selectedId && !dragState && (() => {
                     const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
                     const totalTransitions = ghostTransitionWidthPx * 2;
                     const clampedTransitionWidth = totalTransitions > hoverInfo.width

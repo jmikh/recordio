@@ -5,7 +5,8 @@ import { TimelineRuler } from './TimelineRuler';
 import { ZoomTrack } from './zoom/ZoomTrack';
 
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
-import { SpotlightLegend } from './spotlight/SpotlightLegend';
+import { SpotlightHeaderCell } from './SpotlightHeaderCell';
+import { LayoutHeaderCell } from './LayoutHeaderCell';
 import { CaptionTrack } from './caption/CaptionTrack';
 import { CameraLayoutTrack } from './cameraLayout/CameraLayoutTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
@@ -19,6 +20,8 @@ import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { TrackVisibilityDropdown } from './TrackVisibilityDropdown';
+import { ZoomHeaderCell } from './ZoomHeaderCell';
+import { CaptionsHeaderCell } from './CaptionsHeaderCell';
 
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -26,7 +29,7 @@ import { useUIStore } from '../../stores/useUIStore';
 // Constants - Unified track height for visual consistency
 const TRACK_HEIGHT = 32;
 const TRACK_GAP = 4; // Gap between track rows
-const HEADER_WIDTH = 100;
+const HEADER_WIDTH = 120;
 
 export function Timeline() {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -275,41 +278,28 @@ export function Timeline() {
                     {/* Header: Zoom */}
                     {trackVisibility.zoom && (
                         <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineHeaderCell
-                                title="Zoom"
-                                height={TRACK_HEIGHT}
-                            />
+                            <ZoomHeaderCell height={TRACK_HEIGHT} />
                         </div>
                     )}
 
                     {/* Header: Spotlight */}
                     {trackVisibility.spotlight && (
                         <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineHeaderCell
-                                title="Spotlight"
-                                height={TRACK_HEIGHT}
-                                infoElement={<SpotlightLegend />}
-                            />
+                            <SpotlightHeaderCell height={TRACK_HEIGHT} />
                         </div>
                     )}
 
                     {/* Header: Captions */}
                     {trackVisibility.captions && (
                         <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineHeaderCell
-                                title="Captions"
-                                height={TRACK_HEIGHT}
-                            />
+                            <CaptionsHeaderCell height={TRACK_HEIGHT} />
                         </div>
                     )}
 
                     {/* Header: Camera Layout */}
                     {trackVisibility.cameraLayout && (
                         <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineHeaderCell
-                                title="Layout"
-                                height={TRACK_HEIGHT}
-                            />
+                            <LayoutHeaderCell height={TRACK_HEIGHT} />
                         </div>
                     )}
 

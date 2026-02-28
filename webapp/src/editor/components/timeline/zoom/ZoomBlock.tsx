@@ -38,6 +38,8 @@ interface ZoomBlockProps {
     hasZoomOut?: boolean;
     /** Width of the zoom-out segment in pixels (0 = no zoom-out visible) */
     zoomOutWidth?: number;
+    /** Whether the zoom track is disabled (visual only, no interaction) */
+    disabled?: boolean;
 }
 
 /**
@@ -60,6 +62,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     onResizeEndMouseDown,
     hasZoomOut = false,
     zoomOutWidth = 0,
+    disabled = false,
 }) => {
     // Clamp transition-in width so it never exceeds the block
     const clampedTransitionWidth = Math.min(transitionInWidth, width);
@@ -68,10 +71,10 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     // Vertical centering — same height for both segments
     const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
 
-    const transitionColorClass = isSelected ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
-    const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
-    const transitionHoverClass = isSelected ? '' : transitionInSegment.hoverClass;
-    const holdHoverClass = isSelected ? '' : holdSegment.hoverClass;
+    const transitionColorClass = isSelected && !disabled ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
+    const holdColorClass = isSelected && !disabled ? holdSegment.selectedClass : holdSegment.defaultClass;
+    const transitionHoverClass = (isSelected || disabled) ? '' : transitionInSegment.hoverClass;
+    const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     // If hold is zero width, give the transition-in segment rounded right corners too
     // (unless a zoom-out block follows — then keep right corners flat)
@@ -87,15 +90,17 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
 
     return (
         <div
-            className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle} ${!isSelected ? zoomContainer.hoverClass : ''}`}
+            className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle} ${(!isSelected && !disabled) ? zoomContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
                 zIndex: isSelected ? 20 : 10,
+                opacity: disabled ? 0.7 : 1,
+                cursor: disabled ? 'default' : undefined,
             }}
-            onMouseDown={onMouseDown}
-            onClick={onClick}
+            onMouseDown={disabled ? undefined : onMouseDown}
+            onClick={disabled ? undefined : onClick}
         >
             {/* Transition-in segment */}
             {clampedTransitionWidth > 0 && (

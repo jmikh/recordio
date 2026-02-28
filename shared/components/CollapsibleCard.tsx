@@ -23,6 +23,8 @@ interface CollapsibleCardProps {
     previewItems?: PreviewItem[];
     /** When true, the card is always expanded with no toggle or chevron */
     notCollapsible?: boolean;
+    /** Optional element rendered right-aligned in the header row (e.g., info icon) */
+    headerAction?: React.ReactNode;
     className?: string;
 }
 
@@ -38,6 +40,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     onExpandChange,
     previewItems = [],
     notCollapsible = false,
+    headerAction,
     className = ''
 }) => {
     // Support both controlled and uncontrolled modes
@@ -165,6 +168,13 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                     >
                         <polyline points="6 9 12 15 18 9" />
                     </svg>
+                )}
+
+                {/* Header action (right-aligned, e.g. info icon) */}
+                {headerAction && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        {headerAction}
+                    </div>
                 )}
             </button>
 

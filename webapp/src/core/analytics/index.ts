@@ -261,7 +261,7 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
         spotlight_count: timeline.spotlightSegments.length,
         caption_count: timeline.captionSegments.length,
         captions_generated: !!settings.captions.generatedAt,
-        captions_visible: settings.captions.visible,
+        captions_visible: settings.captions.enabled ?? true,
         auto_cut_used: settings.autoCutApplied ?? false,
     };
 }

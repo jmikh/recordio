@@ -264,10 +264,12 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     // ── Zoom Bounds ────────────────────────────────────────────────
     // Compute intersection of all zoom viewports during this spotlight.
     // All rects here are in OUTPUT coordinates.
+    const zoomEnabled = project.settings.zoom.enabled ?? true;
+    const effectiveZoomSegments = zoomEnabled ? project.timeline.zoomSegments : [];
     const zoomBoundsRect = useMemo(() => {
         if (!spotlight) return null;
         return getZoomBoundsForRange(
-            project.timeline.zoomSegments,
+            effectiveZoomSegments,
             spotlight.outputStartTimeMs,
             spotlight.outputEndTimeMs,
             outputSize,
@@ -276,7 +278,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     }, [
         spotlight?.outputStartTimeMs,
         spotlight?.outputEndTimeMs,
-        project.timeline.zoomSegments,
+        effectiveZoomSegments,
         outputSize,
         project.settings.zoom,
     ]);

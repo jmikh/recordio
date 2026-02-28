@@ -112,6 +112,8 @@ export type BackgroundType = 'solid' | 'image';
 // ==========================================
 
 export interface ZoomSettings {
+    /** Whether zoom effects are active. When false, zooms are visually disabled and have no effect. Default: true. */
+    enabled?: boolean;
     maxZoom: number;
     /** Duration of zoom transition animations in milliseconds */
     transitionDurationMs: number;
@@ -124,6 +126,8 @@ export interface ZoomSettings {
 // ==========================================
 
 export interface SpotlightSettings {
+    /** Whether spotlight effects are active. When false, spotlights are visually disabled and have no effect. Default: true. */
+    enabled?: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
     /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */
@@ -176,7 +180,8 @@ export interface KeyboardSettings {
 // ==========================================
 
 export interface CaptionSettings {
-    visible: boolean;
+    /** Whether caption rendering is active. When false, captions are visually disabled. Default: true. */
+    enabled?: boolean;
     /** Size multiplier for captions (0.5–2.0). Scales font, padding, etc. */
     captionSize: number;
     width: number; // Maximum width as percentage of canvas width (0-100)
@@ -233,6 +238,8 @@ export interface AudioSettings {
 // ==========================================
 
 export interface CameraLayoutSettings {
+    /** Whether camera layout effects are active. When false, layouts are visually disabled and have no effect. Default: true. */
+    enabled?: boolean;
     /** Default transition duration for new camera layout blocks (ms) */
     transitionDurationMs: number;
     /** Default easing for new camera layout blocks */

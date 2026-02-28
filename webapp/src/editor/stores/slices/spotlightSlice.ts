@@ -13,6 +13,7 @@ export interface SpotlightSlice {
     deleteSpotlight: (id: ID) => void;
     clearSpotlights: () => void;
     resetSpotlights: () => void;
+    toggleSpotlightEnabled: () => void;
 }
 
 export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SpotlightSlice> = (set, _get, store) => ({
@@ -137,6 +138,24 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     timeline: {
                         ...project.timeline,
                         spotlightSegments
+                    }
+                }
+            };
+        });
+    },
+
+    toggleSpotlightEnabled: () => {
+        set(state => {
+            const currentEnabled = state.project.settings.spotlight.enabled ?? true;
+            return {
+                project: {
+                    ...state.project,
+                    settings: {
+                        ...state.project.settings,
+                        spotlight: {
+                            ...state.project.settings.spotlight,
+                            enabled: !currentEnabled,
+                        }
                     }
                 }
             };

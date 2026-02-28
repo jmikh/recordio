@@ -55,7 +55,9 @@ export class PlaybackRenderer {
         // -----------------------------------------------------------
         let effectiveViewport: Rect;
 
-        const zoomSegments = timeline.zoomSegments || [];
+        const zoomSegments = (project.settings.zoom.enabled ?? true)
+            ? (timeline.zoomSegments || [])
+            : [];
         const { timeMapper } = state;
 
         effectiveViewport = getViewportStateAtTime(
@@ -106,7 +108,7 @@ export class PlaybackRenderer {
 
         // Render Spotlight Overlay (after screen + effects, before keyboard/camera)
         // Spotlight samples the canvas as-is, so mouse clicks/drags are captured
-        if (viewMapper) {
+        if (viewMapper && (project.settings.spotlight.enabled ?? true)) {
             const spotlightState = getSpotlightStateAtTime(
                 timeline.spotlightSegments || [],
                 project.settings.spotlight,
@@ -147,9 +149,10 @@ export class PlaybackRenderer {
                     drawWebcam(ctx, video, cameraSource.size, state.overrideCameraSettings, outputSize);
                 } else {
                     // Use the unified resolver: layout blocks → transitions → auto-shrink
+                    const cameraLayoutEnabled = project.settings.cameraLayout?.enabled ?? true;
                     const resolved = getResolvedCameraStateAtTime(
                         cameraSettings,
-                        timeline.cameraLayoutSegments || [],
+                        cameraLayoutEnabled ? (timeline.cameraLayoutSegments || []) : [],
                         zoomSegments,
                         currentTimeMs,
                         outputSize,
@@ -182,7 +185,7 @@ export class PlaybackRenderer {
         }
 
         // Render Captions (on top of everything including spotlight)
-        if (project.settings.captions.visible) {
+        if (project.settings.captions.enabled ?? true) {
             drawCaptions(
                 ctx,
                 timeline.captionSegments,

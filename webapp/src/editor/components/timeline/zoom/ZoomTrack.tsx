@@ -13,6 +13,7 @@ import {
     HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
+import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import type { ZoomSegment } from '../../../../types';
 
@@ -41,6 +42,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
 
     const project = useProjectStore(s => s.project);
     const { transitionDurationMs: globalTransitionDurationMs } = project.settings.zoom;
+    const zoomEnabled = project.settings.zoom.enabled ?? true;
 
     const timeMapper = useTimeMapper();
 
@@ -123,12 +125,14 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         <div
             className="w-full relative select-none flex"
             style={{ height }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={handleClick}
+            onMouseMove={zoomEnabled ? handleMouseMove : undefined}
+            onMouseLeave={zoomEnabled ? handleMouseLeave : undefined}
+            onPointerDown={zoomEnabled ? (e) => e.stopPropagation() : undefined}
+            onClick={zoomEnabled ? handleClick : undefined}
+            title={!zoomEnabled ? 'Enable zooms to interact' : undefined}
         >
             <div className="relative flex-1" style={{ height }}>
+                {!zoomEnabled && <DisabledTrackOverlay height={height} />}
 
 
                 {/* Zoom blocks */}
@@ -154,6 +158,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             trackHeight={height}
                             hasZoomOut={zoomOutWidthMap.has(s.id)}
                             zoomOutWidth={zoomOutWidthMap.get(s.id) ?? 0}
+                            disabled={!zoomEnabled}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -178,7 +183,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                 })}
 
                 {/* Ghost block — shown when hovering to add a new zoom */}
-                {hoverInfo && !editingZoomId && !dragState && (() => {
+                {zoomEnabled && hoverInfo && !editingZoomId && !dragState && (() => {
                     const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
                     const clampedTransitionWidth = Math.min(ghostTransitionWidthPx, hoverInfo.width);
                     const holdWidth = Math.max(0, hoverInfo.width - clampedTransitionWidth);

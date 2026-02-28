@@ -23,7 +23,7 @@ interface LegendTooltipProps {
  */
 export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, description, children }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [position, setPosition] = useState({ left: 0, bottom: 0 });
+    const [position, setPosition] = useState({ left: 0, top: 0 });
     const iconRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -31,7 +31,7 @@ export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, descript
             const rect = iconRef.current.getBoundingClientRect();
             setPosition({
                 left: rect.right + 8, // 8px margin from icon
-                bottom: window.innerHeight - rect.bottom,
+                top: rect.top,
             });
         }
     }, [isHovered]);
@@ -55,7 +55,7 @@ export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, descript
                 createPortal(
                     <div
                         className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-5 py-3 w-[500px] flex flex-col items-center"
-                        style={{ left: position.left, bottom: position.bottom }}
+                        style={{ left: position.left, top: position.top }}
                         onMouseEnter={() => setIsHovered(true)}
                         onMouseLeave={() => setIsHovered(false)}
                     >
@@ -80,7 +80,7 @@ export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, descript
                         <div className="flex items-center justify-center gap-6 text-xs text-text-main whitespace-nowrap">
                             {children}
                         </div>
-                    </div>,
+                    </div >,
                     document.body
                 )}
         </>

@@ -12,6 +12,7 @@ export interface ZoomSegmentSlice {
     deleteZoomSegment: (id: ID) => void;
     clearZoomSegments: () => void;
     resetZooms: () => void;
+    toggleZoomEnabled: () => void;
 }
 
 export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomSegmentSlice> = (set, _get, store) => ({
@@ -133,6 +134,24 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     timeline: {
                         ...project.timeline,
                         zoomSegments
+                    }
+                }
+            };
+        });
+    },
+
+    toggleZoomEnabled: () => {
+        set(state => {
+            const currentEnabled = state.project.settings.zoom.enabled ?? true;
+            return {
+                project: {
+                    ...state.project,
+                    settings: {
+                        ...state.project.settings,
+                        zoom: {
+                            ...state.project.settings.zoom,
+                            enabled: !currentEnabled,
+                        }
                     }
                 }
             };

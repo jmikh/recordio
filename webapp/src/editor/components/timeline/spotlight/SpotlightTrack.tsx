@@ -15,6 +15,7 @@ import {
     HOLD_HEIGHT
 } from './SpotlightTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface SpotlightTrackProps {
     height: number;
@@ -40,6 +41,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
 
     const project = useProjectStore(s => s.project);
     const globalTransitionDurationMs = project.settings.spotlight.transitionDurationMs;
+    const spotlightEnabled = project.settings.spotlight.enabled ?? true;
 
     // Memoize TimeMapper and TimePixelMapper
     const timeMapper = useTimeMapper();
@@ -96,13 +98,15 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
         <div
             className="w-full relative select-none flex"
             style={{ height }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={handleClick}
+            onMouseMove={spotlightEnabled ? handleMouseMove : undefined}
+            onMouseLeave={spotlightEnabled ? handleMouseLeave : undefined}
+            onPointerDown={spotlightEnabled ? (e) => e.stopPropagation() : undefined}
+            onClick={spotlightEnabled ? handleClick : undefined}
+            title={!spotlightEnabled ? 'Enable spotlights to interact' : undefined}
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
+                {!spotlightEnabled && <DisabledTrackOverlay height={height} />}
                 {/* Existing Spotlights */}
                 {spotlightSegments.map((s) => {
                     const startX = coords.msToX(s.outputStartTimeMs);
@@ -128,6 +132,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
+                            disabled={!spotlightEnabled}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -157,7 +162,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                 })}
 
                 {/* Add Spotlight Ghost Indicator */}
-                {hoverInfo && !editingSpotlightId && !dragState && (
+                {spotlightEnabled && hoverInfo && !editingSpotlightId && !dragState && (
                     <div
                         className={ghostSpotlight.container}
                         style={{

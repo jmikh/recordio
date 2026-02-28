@@ -11,6 +11,7 @@ import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
 import { ghostCaption, CAPTION_BLOCK_HEIGHT } from './CaptionTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface CaptionTrackProps {
     height: number;
@@ -33,6 +34,8 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
     const selectCaption = useUIStore(s => s.selectCaption);
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const setSettingsPanelActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
+
+    const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
 
     // Memoize TimeMapper and TimePixelMapper
     const timeMapper = useTimeMapper();
@@ -92,13 +95,15 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         <div
             className="w-full relative select-none flex"
             style={{ height }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={handleClick}
+            onMouseMove={captionsEnabled ? handleMouseMove : undefined}
+            onMouseLeave={captionsEnabled ? handleMouseLeave : undefined}
+            onPointerDown={captionsEnabled ? (e) => e.stopPropagation() : undefined}
+            onClick={captionsEnabled ? handleClick : undefined}
+            title={!captionsEnabled ? 'Enable captions to interact' : undefined}
         >
             {/* Content Area */}
             <div className="relative flex-1" style={{ height }}>
+                {!captionsEnabled && <DisabledTrackOverlay height={height} />}
                 {/* Existing Captions */}
                 {captionSegments.map((s) => {
                     const startX = coords.msToX(s.outputStartTimeMs);
@@ -119,6 +124,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                             isDragging={isDragging}
                             trackHeight={height}
                             text={s.text || '[empty]'}
+                            disabled={!captionsEnabled}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -149,7 +155,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                 })}
 
                 {/* Add Caption Ghost Indicator */}
-                {hoverInfo && !selectedCaptionId && !dragState && (
+                {captionsEnabled && hoverInfo && !selectedCaptionId && !dragState && (
                     <div
                         className={ghostCaption.container}
                         style={{

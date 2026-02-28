@@ -32,6 +32,8 @@ interface CaptionBlockProps {
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
     /** Mouse down handler for right resize */
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
+    /** Whether the track is disabled (visual only, no interaction) */
+    disabled?: boolean;
 }
 
 /**
@@ -49,10 +51,11 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
     onClick,
     onResizeStartMouseDown,
     onResizeEndMouseDown,
+    disabled = false,
 }) => {
     const blockY = (trackHeight - CAPTION_BLOCK_HEIGHT) / 2;
-    const colorClass = isSelected ? captionBlock.selectedClass : captionBlock.defaultClass;
-    const hoverClass = isSelected ? '' : captionBlock.hoverClass;
+    const colorClass = (isSelected && !disabled) ? captionBlock.selectedClass : captionBlock.defaultClass;
+    const hoverClass = (isSelected || disabled) ? '' : captionBlock.hoverClass;
 
     // Tooltip hover state
     const [isHovered, setIsHovered] = useState(false);
@@ -73,17 +76,19 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle} ${!isSelected ? captionContainer.hoverClass : ''}`}
+                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle} ${(!isSelected && !disabled) ? captionContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
                     height: trackHeight,
                     zIndex: isSelected ? 20 : 10,
+                    opacity: disabled ? 0.7 : 1,
+                    cursor: disabled ? 'default' : undefined,
                 }}
-                onMouseDown={onMouseDown}
-                onClick={onClick}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+                onMouseDown={disabled ? undefined : onMouseDown}
+                onClick={disabled ? undefined : onClick}
+                onMouseEnter={disabled ? undefined : () => setIsHovered(true)}
+                onMouseLeave={disabled ? undefined : () => setIsHovered(false)}
             >
                 {/* Caption Block */}
                 <div

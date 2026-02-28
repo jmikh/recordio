@@ -28,25 +28,25 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
             className="flex items-center justify-between px-3 bg-surface-overlay rounded-sm"
             style={{ height, minHeight: height }}
         >
-            <div className="flex items-center gap-1.5">
-                <span className="text-sm text-text-main truncate select-none" title={title}>
-                    {title}
-                </span>
-                {infoElement}
-            </div>
+            <span className="text-sm text-text-main truncate select-none" title={title}>
+                {title}
+            </span>
 
-            {hasAudio && onToggleMute && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleMute();
-                    }}
-                    className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
-                    title={isMuted ? "Unmute" : "Mute"}
-                >
-                    {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
-                </button>
-            )}
+            <div className="flex items-center gap-1">
+                {infoElement}
+                {hasAudio && onToggleMute && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleMute();
+                        }}
+                        className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
+                        title={isMuted ? "Unmute" : "Mute"}
+                    >
+                        {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
+                    </button>
+                )}
+            </div>
         </div>
     );
 };

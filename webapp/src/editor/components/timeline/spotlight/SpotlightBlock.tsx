@@ -36,6 +36,8 @@ interface SpotlightBlockProps {
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
     /** Mouse down handler for right resize */
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
+    /** Whether the track is disabled */
+    disabled?: boolean;
 }
 
 /**
@@ -56,6 +58,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     onClick,
     onResizeStartMouseDown,
     onResizeEndMouseDown,
+    disabled = false,
 }) => {
     // Calculate hold width
     const holdWidth = Math.max(0, width - fadeInWidth - fadeOutWidth);
@@ -65,24 +68,26 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     const holdY = (trackHeight - HOLD_HEIGHT) / 2;
 
     // Get color classes based on selection state
-    const fadeColorClass = isSelected ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
-    const holdColorClass = isSelected ? holdSegment.selectedClass : holdSegment.defaultClass;
+    const fadeColorClass = (isSelected && !disabled) ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
+    const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
 
-    // Only apply hover effects when not selected
-    const fadeHoverClass = isSelected ? '' : fadeInSegment.hoverClass;
-    const holdHoverClass = isSelected ? '' : holdSegment.hoverClass;
+    // Only apply hover effects when not selected and not disabled
+    const fadeHoverClass = (isSelected || disabled) ? '' : fadeInSegment.hoverClass;
+    const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     return (
         <div
-            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle} ${!isSelected ? spotlightContainer.hoverClass : ''}`}
+            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle} ${(!isSelected && !disabled) ? spotlightContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
                 zIndex: isSelected ? 20 : 10,
+                opacity: disabled ? 0.7 : 1,
+                cursor: disabled ? 'default' : undefined,
             }}
-            onMouseDown={onMouseDown}
-            onClick={onClick}
+            onMouseDown={disabled ? undefined : onMouseDown}
+            onClick={disabled ? undefined : onClick}
         >
             {/* Fade In Segment */}
             {fadeInWidth > 0 && (

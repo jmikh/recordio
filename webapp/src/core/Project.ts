@@ -35,12 +35,14 @@ const createDefaultSettings = (): ProjectSettings => ({
     frameRate: 60,
 
     zoom: {
+        enabled: true,
         maxZoom: 2,
         transitionDurationMs: 750,
         easing: 'ease-in-out'
     },
 
     spotlight: {
+        enabled: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
         transitionDurationMs: 300,
@@ -94,7 +96,7 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     captions: {
-        visible: true,
+        enabled: true,
         captionSize: 1.0,
         width: 75,
         textColor: '#ffffff',
@@ -132,6 +134,7 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     cameraLayout: {
+        enabled: true,
         transitionDurationMs: 500,
         easing: 'ease-in-out'
     },
