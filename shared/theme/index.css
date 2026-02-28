@@ -183,8 +183,8 @@
 
    /* Text Colors - Dark */
    --text-highlighted: oklch(0.15 0 0);
-   --text-main: oklch(0.15 0 0 / 80%);
-   --text-muted: oklch(0.15 0 0 / 70%);
+   --text-main: oklch(0.15 0 0 / 85%);
+   --text-muted: oklch(0.15 0 0 / 65%);
    --text-disabled: oklch(0.15 0 0 / 50%);
    --text-on-primary: oklch(87.003% 0.00438 16);
    --text-on-secondary: oklch(0.15 0 0);

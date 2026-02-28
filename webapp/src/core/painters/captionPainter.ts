@@ -52,7 +52,7 @@ export function drawCaptions(
     outputSize: Size
 ) {
     // Don't render if captions are disabled or missing
-    if (!settings.visible || !captionSegments || captionSegments.length === 0) {
+    if (!(settings.enabled ?? true) || !captionSegments || captionSegments.length === 0) {
         return;
     }
 
@@ -261,7 +261,7 @@ function drawLineWithHighlight(
 
     for (let i = 0; i < words.length; i++) {
         const { word, globalIndex } = words[i];
-        const isHighlighted = globalIndex === highlightedWordIndex;
+        const isHighlighted = globalIndex <= highlightedWordIndex;
 
         // Set opacity based on highlight state (all full opacity if highlighting disabled)
         const opacity = !highlightEnabled || isHighlighted ? 1 : DIM_OPACITY;

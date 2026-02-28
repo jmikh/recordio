@@ -134,21 +134,7 @@ export interface UIState {
     reset: () => void;
 }
 
-/**
- * If the currently selected caption has empty text, delete it from the project.
- * Must be called BEFORE set() so the side-effect runs outside zustand's batch.
- */
-function _cleanupEmptyCaption(get: () => UIState) {
-    const prevId = get().selectedCaptionId;
-    if (!prevId) return;
-    const projectState = useProjectStore.getState();
-    const segments = projectState.project?.timeline?.captionSegments;
-    const prev = segments?.find((s: { id: string }) => s.id === prevId);
 
-    if (prev && !prev.text?.trim()) {
-        projectState.deleteCaptionSegment(prevId);
-    }
-}
 
 export const useUIStore = create<UIState>((set, get) => ({
     // Initial State
@@ -222,11 +208,6 @@ export const useUIStore = create<UIState>((set, get) => ({
     },
 
     selectCaption: (selectedCaptionId) => {
-
-        // Cleanup empty caption before changing selection
-        if (!selectedCaptionId || selectedCaptionId !== get().selectedCaptionId) {
-            _cleanupEmptyCaption(get);
-        }
         if (selectedCaptionId) {
             get().selectZoom(null);
             get().selectSpotlight(null);

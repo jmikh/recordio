@@ -253,10 +253,10 @@ export function CaptionsSettings() {
     };
 
     const formatTime = (ms: number) => {
-        const seconds = ms / 1000;
-        const mins = Math.floor(seconds / 60);
-        const secs = (seconds % 60).toFixed(1);
-        return `${mins}:${secs.padStart(4, '0')}`;
+        const totalSeconds = Math.floor(ms / 1000);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins}:${String(secs).padStart(2, '0')}`;
     };
 
     // Handle clicking on a caption segment
@@ -493,20 +493,23 @@ export function CaptionsSettings() {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
             >
                 {captionSegments && captionSegments.length > 0 ? (
-                    <div ref={captionsContainerRef}>
+                    <div ref={captionsContainerRef} className="flex flex-col gap-0.5">
                         {captionSegments.map(segment => {
-                            const outputStart = segment.outputStartTimeMs;
-                            const outputEnd = segment.outputEndTimeMs;
                             const isSelected = selectedCaptionId === segment.id;
                             const isEditing = isSelected || editingId === segment.id;
 
                             return (
-                                <span
+                                <div
                                     key={segment.id}
                                     data-caption-id={segment.id}
                                     onClick={() => handleSegmentClick(segment)}
-                                    className="relative inline"
+                                    className="group relative flex items-baseline gap-1 cursor-pointer"
                                 >
+                                    {/* Timestamp */}
+                                    <span className="text-xs text-text-disabled tabular-nums shrink-0 select-none" style={{ minWidth: '3.2em', lineHeight: 2 }}>
+                                        {formatTime(segment.outputStartTimeMs)}
+                                    </span>
+
                                     {/* Caption text - inline editable */}
                                     <span
                                         ref={isEditing ? inputRef : null}
@@ -516,28 +519,34 @@ export function CaptionsSettings() {
                                         onKeyDown={handleKeyDown}
                                         onBlur={handleBlur}
                                         data-placeholder="[empty]"
-                                        className={`text-xs transition-all outline-none editable-placeholder ${isEditing
-                                            ? 'text-text-highlighted bg-secondary/20 border-b-2 border-secondary'
-                                            : 'text-text-muted cursor-pointer hover:text-text-main'
+                                        className={`text-xs transition-all outline-none editable-placeholder flex-1 ${isEditing
+                                            ? 'text-text-highlighted bg-secondary/20'
+                                            : 'text-text-muted hover:text-text-main'
                                             }`}
                                         style={{
-                                            lineHeight: 2.2,
+                                            lineHeight: 2,
                                             padding: isEditing ? '2px 4px' : '2px 0',
                                             borderRadius: isEditing ? '3px' : '0',
                                             minWidth: isEditing ? '20px' : undefined,
                                         }}
                                     >
-                                        {/* While editing, render the frozen snapshot so React never
-                                           overwrites the DOM — this preserves cursor position and
-                                           the browser's native undo stack. Store updates still
-                                           happen on each keystroke for live canvas rendering. */}
                                         {isEditing
                                             ? (editStartTextRef.current || '')
                                             : (segment.text || '')
                                         }
                                     </span>
-                                    <span> </span>
-                                </span>
+
+                                    {/* Delete button - floating top-right on hover */}
+                                    <span className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <XButton
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(segment.id);
+                                            }}
+                                            title="Delete caption"
+                                        />
+                                    </span>
+                                </div>
                             );
                         })}
                     </div>

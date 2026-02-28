@@ -17,7 +17,8 @@ import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraLayoutInspector } from './CameraLayoutInspector';
-import { TbDeviceDesktop, TbBackground, TbCamera, TbArticle, TbFolder, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
+import { TbDeviceDesktop, TbBackground, TbArticle, TbFolder, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
+import { PiWebcamBold } from 'react-icons/pi';
 import { FaChevronRight } from 'react-icons/fa';
 
 
@@ -89,7 +90,7 @@ export const SettingsPanel = () => {
             {
                 id: 'camera',
                 label: 'Webcam',
-                icon: <TbCamera size={20} />,
+                icon: <PiWebcamBold size={20} />,
                 disabled: !hasCameraSource,
                 disabledTooltip: 'No webcam detected'
             },
