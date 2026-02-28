@@ -14,7 +14,7 @@ export const BLOCK_ICON_SIZE = 16;
 export const MIN_ICON_WIDTH_PX = 28;
 
 /** Tailwind opacity class for block icons */
-export const BLOCK_ICON_OPACITY = 'opacity-75';
+export const BLOCK_ICON_OPACITY = 'opacity-100';
 
 /** Returns the full className for a block icon */
 export function blockIconClass(variant: 'primary' | 'secondary'): string {
@@ -61,18 +61,18 @@ export const ghostContainerBase =
 
 // ============= HOLD SHAPE =============
 
-/** Common hold shape properties (solid fill with shadow) */
+/** Common hold shape properties (primary/80 gradient fill + segment shadow) */
 export function holdShapeBase(height: number): CSSProperties {
     return {
         height,
         boxShadow: 'var(--shadow-segment)',
-        backgroundColor: 'var(--block-bg)',
+        background: 'linear-gradient(to bottom, color-mix(in srgb, var(--block-bg) 90%, transparent), color-mix(in srgb, var(--block-bg) 70%, transparent))',
     };
 }
 
 // ============= TRANSITION / FADE SHAPE =============
 
-/** Common semi-transparent shape for transition/fade segments */
+/** Common semi-transparent shape for transition/fade segments (primary/50 fill) */
 export function transitionShapeBase(height: number): CSSProperties {
     return {
         height,

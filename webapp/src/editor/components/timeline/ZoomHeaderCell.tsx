@@ -15,6 +15,7 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height }) => {
         <TimelineHeaderCell
             title="Zoom"
             height={height}
+            disabled={!zoomEnabled}
             infoElement={
                 <Checkbox
                     checked={zoomEnabled}

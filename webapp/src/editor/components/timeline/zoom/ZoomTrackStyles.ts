@@ -73,7 +73,7 @@ export const transitionInSegment = {
 // ============= HOLD SEGMENT (main body) =============
 
 export const holdSegment = {
-    base: 'absolute flex-shrink-0 rounded-sm transition-colors z-10',
+    base: 'absolute flex-shrink-0 rounded-sm transition-colors z-10 border-2 border-[var(--block-bg)]',
     defaultClass: '',
     selectedClass: 'border-2 border-secondary',
     hoverClass: '',
@@ -102,7 +102,7 @@ export const ghostZoom = {
         getStyle: (): CSSProperties => transitionInShape(),
     },
     hold: {
-        className: '',
+        className: 'border-2 border-[var(--block-bg)]',
         getStyle: (): CSSProperties => ({
             ...holdShape(),
             borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
@@ -115,8 +115,7 @@ export const ghostZoom = {
 export const zoomOutBlock = {
     base: 'absolute pointer-events-none flex items-center justify-center overflow-hidden border-2 border-[var(--primary)]',
     getStyle: (): CSSProperties => ({
-        height: HOLD_HEIGHT,
-        backgroundColor: 'color-mix(in srgb, var(--primary) 50%, transparent)',
+        ...transitionShapeBase(HOLD_HEIGHT),
         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
         borderLeft: 'none',
     }),

@@ -15,6 +15,7 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
         <TimelineHeaderCell
             title="Spotlight"
             height={height}
+            disabled={!spotlightEnabled}
             infoElement={
                 <Checkbox
                     checked={spotlightEnabled}

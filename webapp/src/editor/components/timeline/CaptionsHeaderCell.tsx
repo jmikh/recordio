@@ -20,6 +20,7 @@ export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height }
         <TimelineHeaderCell
             title="Captions"
             height={height}
+            disabled={!captionsEnabled}
             infoElement={
                 <Checkbox
                     checked={captionsEnabled}

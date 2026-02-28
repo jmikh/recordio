@@ -32,7 +32,7 @@ export { SEGMENT_RADIUS };
 
 /** Caption block — solid fill driven by --block-bg */
 export const captionBlock = {
-    base: 'absolute flex items-center overflow-hidden transition-colors',
+    base: 'absolute flex items-center overflow-hidden transition-colors border-2 border-[var(--block-bg)]',
     defaultClass: '',
     selectedClass: 'border border-secondary border-2',
     hoverClass: '',
@@ -70,12 +70,10 @@ export const ghostCaption = {
     container: ghostContainerBase,
     label: ghostLabel,
     block: {
-        className: 'border border-[var(--block-bg)]',
+        className: 'border-2 border-[var(--block-bg)]',
         getStyle: (): CSSProperties => ({
-            height: CAPTION_BLOCK_HEIGHT,
+            ...holdShapeBase(CAPTION_BLOCK_HEIGHT),
             borderRadius: SEGMENT_RADIUS,
-            backgroundColor: 'var(--block-bg)',
-            boxShadow: 'var(--shadow-segment)',
         }),
     },
 };

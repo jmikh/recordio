@@ -13,8 +13,9 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height }) =>
 
     return (
         <TimelineHeaderCell
-            title="Layout"
+            title="Cam Layout"
             height={height}
+            disabled={!cameraLayoutEnabled}
             infoElement={
                 <Checkbox
                     checked={cameraLayoutEnabled}

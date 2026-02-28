@@ -9,6 +9,8 @@ interface TimelineHeaderCellProps {
     onToggleMute?: () => void;
     /** Optional element to show next to the title (e.g., legend icon) */
     infoElement?: React.ReactNode;
+    /** When true, dims the title text to indicate the track is inactive */
+    disabled?: boolean;
 }
 
 /**
@@ -21,14 +23,15 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
     hasAudio,
     isMuted,
     onToggleMute,
-    infoElement
+    infoElement,
+    disabled
 }) => {
     return (
         <div
             className="flex items-center justify-between px-3 bg-surface-overlay rounded-sm"
             style={{ height, minHeight: height }}
         >
-            <span className="text-sm text-text-main truncate select-none" title={title}>
+            <span className={`text-sm truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`} title={title}>
                 {title}
             </span>
 

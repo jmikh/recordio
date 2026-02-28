@@ -97,12 +97,19 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
             }}
         >
             {/* Visual Window Content (Clipped) */}
-            <div className={`absolute inset-0 group border rounded-lg overflow-hidden border-2 transition-colors ${isSelected ? 'border-secondary' : 'border-primary-muted hover:border-border-primary'}`}>
+            <div className={`absolute inset-0 group border rounded-lg overflow-hidden border-2 transition-colors ${isSelected ? 'border-secondary' : 'border-primary hover:border-primary-highlighted'}`}>
                 {/* Primary Color Block */}
                 <div className={`absolute inset-0 overflow-hidden transition-all cursor-pointer flex items-center`}>
 
                     {/* Background fill - highlighted when selected or hovering */}
-                    <div className={`absolute inset-0 transition-colors ${isSelected ? 'bg-primary-highlighted' : 'bg-primary group-hover:bg-primary-highlighted'}`} />
+                    <div
+                        className="absolute inset-0 transition-colors"
+                        style={{
+                            background: isSelected
+                                ? 'linear-gradient(to bottom, color-mix(in srgb, var(--primary-highlighted) 90%, transparent), color-mix(in srgb, var(--primary-highlighted) 70%, transparent))'
+                                : 'linear-gradient(to bottom, color-mix(in srgb, var(--primary) 90%, transparent), color-mix(in srgb, var(--primary) 70%, transparent))',
+                        }}
+                    />
 
                     {/* Audio Waveform */}
                     <div className="absolute inset-0 pointer-events-none flex items-end justify-center overflow-hidden z-10">
