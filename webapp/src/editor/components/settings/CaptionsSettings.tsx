@@ -111,27 +111,7 @@ export function CaptionsSettings() {
         return () => clearTimeout(timeoutId);
     }, [selectedCaptionId]);
 
-    // Auto-select caption during playback (only in preview mode with captions panel)
-    useEffect(() => {
-        if (!isPlaying || canvasMode !== CanvasMode.Preview || selectedSettingsPanel !== 'project') return;
-        if (!captionSegments || captionSegments.length === 0) return;
 
-        // Find segment containing current time
-        const currentSegment = captionSegments.find(segment =>
-            segment.visible && currentTimeMs >= segment.outputStartTimeMs && currentTimeMs <= segment.outputEndTimeMs
-        );
-
-        if (currentSegment) {
-            if (selectedCaptionId !== currentSegment.id) {
-                selectCaption(currentSegment.id);
-            }
-        } else {
-            // Deselect when not in any segment
-            if (selectedCaptionId) {
-                selectCaption(null);
-            }
-        }
-    }, [isPlaying, currentTimeMs, captionSegments, canvasMode, selectedSettingsPanel, selectedCaptionId, selectCaption]);
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
