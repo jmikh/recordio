@@ -91,6 +91,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     return (
         <div
             className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle} ${(!isSelected && !disabled) ? zoomContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            data-part="block-container"
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -106,6 +107,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {clampedTransitionWidth > 0 && (
                 <div
                     className={`${transitionInSegment.base} ${transitionColorClass} ${transitionHoverClass} flex items-center justify-center overflow-hidden`}
+                    data-part="transition-in"
                     style={{
                         left: 0,
                         top: segmentY,
@@ -114,7 +116,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
+                        <AiOutlineZoomIn className="text-main opacity-60" size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}
@@ -123,6 +125,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {holdWidth > 0 && (
                 <div
                     className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
+                    data-part="hold"
                     style={{
                         left: clampedTransitionWidth,
                         top: segmentY,
@@ -138,6 +141,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {zoomOutWidth > 0 && (
                 <div
                     className={`${zoomOutBlock.base} pointer-events-auto ${isSelected ? 'border-secondary' : ''}`}
+                    data-part="zoom-out"
                     style={{
                         left: width,
                         top: segmentY,

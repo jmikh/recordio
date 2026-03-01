@@ -332,7 +332,6 @@ export const ScreenSettings = () => {
                         options={resolutionOptions}
                         value={currentResolutionObj}
                         onChange={handleResolutionChange}
-                        label="Aspect Ratio"
                     />
 
                 </div>

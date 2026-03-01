@@ -201,7 +201,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                     }}
                                 >
                                     {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
-                                        <RiLightbulbFlashLine className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                        <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
                                     )}
                                 </div>
                             );

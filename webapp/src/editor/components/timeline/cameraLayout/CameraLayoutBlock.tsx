@@ -86,7 +86,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                         top: segmentY,
                         width: clampedTransitionIn,
                         ...inStyle,
-                        ...(holdWidth === 0 ? { borderRight: '2px solid var(--block-bg)' } : {}),
+                        ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}
@@ -111,8 +111,8 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                 >
                     {holdWidth >= MIN_ICON_WIDTH_PX && (
                         isHidden
-                            ? <PiWebcamSlashBold className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
-                            : <PiWebcamBold className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                            ? <PiWebcamSlashBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                            : <PiWebcamBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}
@@ -126,7 +126,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                         top: segmentY,
                         width: clampedTransitionOut,
                         ...outStyle,
-                        ...(holdWidth === 0 ? { borderLeft: '2px solid var(--block-bg)' } : {}),
+                        ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}

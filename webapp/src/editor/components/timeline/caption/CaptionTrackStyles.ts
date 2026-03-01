@@ -7,6 +7,7 @@ import {
     ghostLabel,
     ghostContainerBase,
     holdShapeBase,
+    blockBorder,
 } from '../TimelineBlockStyles';
 
 // ============================================================================
@@ -23,7 +24,7 @@ import {
 export const CAPTION_BLOCK_HEIGHT = 18;
 
 /** Height of the visible drag handle indicator */
-export const DRAG_HANDLE_HEIGHT = 24;
+export const DRAG_HANDLE_HEIGHT = 32;
 
 // Re-export shared values used by components
 export { SEGMENT_RADIUS };
@@ -32,9 +33,9 @@ export { SEGMENT_RADIUS };
 
 /** Caption block — solid fill driven by --block-bg */
 export const captionBlock = {
-    base: 'absolute flex items-center overflow-hidden transition-colors border-2 border-[var(--block-bg)]',
+    base: `absolute flex items-center overflow-hidden transition-colors ${blockBorder.base} ${blockBorder.highlighted}`,
     defaultClass: '',
-    selectedClass: 'border border-secondary border-2',
+    selectedClass: blockBorder.selected,
     hoverClass: '',
     height: CAPTION_BLOCK_HEIGHT,
     getStyle: (): CSSProperties => ({
@@ -70,7 +71,7 @@ export const ghostCaption = {
     container: ghostContainerBase,
     label: ghostLabel,
     block: {
-        className: 'border-2 border-[var(--block-bg)]',
+        className: blockBorder.base,
         getStyle: (): CSSProperties => ({
             ...holdShapeBase(CAPTION_BLOCK_HEIGHT),
             borderRadius: SEGMENT_RADIUS,

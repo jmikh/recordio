@@ -78,6 +78,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     return (
         <div
             className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle} ${(!isSelected && !disabled) ? spotlightContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            data-part="block-container"
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -93,12 +94,13 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {fadeInWidth > 0 && (
                 <div
                     className={`${fadeInSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    data-part="fade-in"
                     style={{
                         left: 0,
                         top: fadeY,
                         width: fadeInWidth,
                         ...fadeInSegment.getStyle(),
-                        ...(holdWidth === 0 ? { borderRight: '2px solid var(--block-bg)' } : {}),
+                        ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}
@@ -107,6 +109,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {holdWidth > 0 && (
                 <div
                     className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
+                    data-part="hold"
                     style={{
                         left: fadeInWidth,
                         top: holdY,
@@ -115,7 +118,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     }}
                 >
                     {holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <RiLightbulbFlashLine className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                        <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}
@@ -124,12 +127,13 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {fadeOutWidth > 0 && (
                 <div
                     className={`${fadeOutSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    data-part="fade-out"
                     style={{
                         left: fadeInWidth + holdWidth,
                         top: fadeY,
                         width: fadeOutWidth,
                         ...fadeOutSegment.getStyle(),
-                        ...(holdWidth === 0 ? { borderLeft: '2px solid var(--block-bg)' } : {}),
+                        ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}

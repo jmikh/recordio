@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { OutputWindow } from '../../../../types';
 import { StaticAudioWave } from './StaticAudioWave';
+import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator } from '../TimelineBlockStyles';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../hooks/useAudioAnalysis';
 
@@ -88,7 +89,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
 
     return (
         <div
-            className="absolute top-0 bottom-0"
+            className={`absolute top-0 bottom-0 [--block-bg:var(--primary)] group`}
             style={{ left: `${left}px`, width: `${width}px` }}
             onMouseDown={() => {
                 // Just handle selection (no deselect on re-click)
@@ -96,65 +97,81 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 selectWindow(seg.id);
             }}
         >
-            {/* Visual Window Content (Clipped) */}
-            <div className={`absolute inset-0 group border rounded-lg overflow-hidden border-2 transition-colors ${isSelected ? 'border-secondary' : 'border-primary hover:border-primary-highlighted'}`}>
-                {/* Primary Color Block */}
-                <div className={`absolute inset-0 overflow-hidden transition-all cursor-pointer flex items-center`}>
-
-                    {/* Background fill - highlighted when selected or hovering */}
-                    <div
-                        className="absolute inset-0 transition-colors"
-                        style={{
-                            background: isSelected
-                                ? 'linear-gradient(to bottom, color-mix(in srgb, var(--primary-highlighted) 90%, transparent), color-mix(in srgb, var(--primary-highlighted) 70%, transparent))'
-                                : 'linear-gradient(to bottom, color-mix(in srgb, var(--primary) 90%, transparent), color-mix(in srgb, var(--primary) 70%, transparent))',
-                        }}
-                    />
-
-                    {/* Audio Waveform */}
-                    <div className="absolute inset-0 pointer-events-none flex items-end justify-center overflow-hidden z-10">
-                        {displayMode !== 'none' && (
-                            <StaticAudioWave
-                                peaks={displayPeaks}
-                                sourceStartTimeMs={sourceStartTimeMs}
-                                sourceEndTimeMs={sourceEndTimeMs}
-                                width={width}
-                                height={trackContentHeight}
-                                scrollLeft={scrollLeft}
-                                containerWidth={containerWidth}
-                                segmentLeft={left}
-                            />
-                        )}
-                    </div>
-
-                    {/* Speed & Duration Labels (overlaid on the block) */}
-                    {width >= 40 && (
-                        <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-none bg-black/40 rounded-lg">
-                            {/* Speed indicator */}
-                            <span className="font-medium opacity-80">
-                                {(() => {
-                                    const speed = win.speed || 1.0;
-                                    const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
-                                    return `${formatted}x`;
-                                })()}
-                            </span>
-
-                            {/* Duration - hide if window too small */}
-                            {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
-                        </div>
+            {/* Main block — border + background on same element (matching other tracks) */}
+            <div
+                className={`absolute inset-0 rounded overflow-hidden cursor-pointer flex items-center transition-colors ${blockBorder.base} ${isSelected ? blockBorder.selected : blockBorder.highlighted}`}
+                style={{
+                    ...holdShapeBase(0),
+                    height: '100%',
+                }}
+            >
+                {/* Audio Waveform */}
+                <div className="absolute inset-0 pointer-events-none flex items-end justify-center overflow-hidden z-10">
+                    {displayMode !== 'none' && (
+                        <StaticAudioWave
+                            peaks={displayPeaks}
+                            sourceStartTimeMs={sourceStartTimeMs}
+                            sourceEndTimeMs={sourceEndTimeMs}
+                            width={width}
+                            height={trackContentHeight}
+                            scrollLeft={scrollLeft}
+                            containerWidth={containerWidth}
+                            segmentLeft={left}
+                        />
                     )}
                 </div>
+
+                {/* Speed & Duration Labels (overlaid on the block) */}
+                {width >= 40 && (
+                    <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-none bg-black/40 rounded-lg">
+                        {/* Speed indicator */}
+                        <span className="font-medium opacity-80">
+                            {(() => {
+                                const speed = win.speed || 1.0;
+                                const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
+                                return `${formatted}x`;
+                            })()}
+                        </span>
+
+                        {/* Duration - hide if window too small */}
+                        {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
+                    </div>
+                )}
             </div>
 
-            {/* Resize Handles (Overlay entire group) */}
+            {/* Left resize handle */}
             <div
-                className="absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize hover:bg-state-active z-20 rounded-l-lg"
+                className={resizeHandle.base}
+                style={{
+                    left: -resizeHandle.width / 2,
+                    width: resizeHandle.width,
+                    top: (trackContentHeight - 32) / 2,
+                    height: resizeHandle.height,
+                }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
-            />
+            >
+                <div
+                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: dragHandleIndicator.height }}
+                />
+            </div>
+
+            {/* Right resize handle */}
             <div
-                className="absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize hover:bg-state-active z-20 rounded-r-lg"
+                className={resizeHandle.base}
+                style={{
+                    right: -resizeHandle.width / 2,
+                    width: resizeHandle.width,
+                    top: (trackContentHeight - 32) / 2,
+                    height: resizeHandle.height,
+                }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}
-            />
+            >
+                <div
+                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: dragHandleIndicator.height }}
+                />
+            </div>
 
             {/* Gap Bubble (Portal) */}
             {dragState && dragState.windowId === seg.id && (() => {

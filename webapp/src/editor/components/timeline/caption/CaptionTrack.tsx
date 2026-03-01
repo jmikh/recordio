@@ -179,7 +179,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                             }}
                         >
                             {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
-                                <FaRegClosedCaptioning className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                <FaRegClosedCaptioning className={blockIconClass} size={BLOCK_ICON_SIZE} />
                             )}
                         </div>
                     </div>

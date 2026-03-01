@@ -81,7 +81,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                     left: `${left}px`,
                     width: `${width}px`,
                     height: trackHeight,
-                    zIndex: isSelected ? 20 : 10,
+                    zIndex: isSelected ? 20 : isHovered ? 15 : 10,
                     opacity: disabled ? 0.7 : 1,
                     cursor: disabled ? 'default' : undefined,
                 }}
@@ -101,7 +101,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                     }}
                 >
                     {width >= MIN_ICON_WIDTH_PX && (
-                        <FaRegClosedCaptioning className={blockIconClass('primary')} size={BLOCK_ICON_SIZE} />
+                        <FaRegClosedCaptioning className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
 

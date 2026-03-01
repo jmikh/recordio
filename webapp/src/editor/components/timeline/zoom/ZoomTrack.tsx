@@ -213,7 +213,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                                     }}
                                 >
                                     {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={blockIconClass('secondary')} size={BLOCK_ICON_SIZE} />
+                                        <AiOutlineZoomIn className={blockIconClass} size={BLOCK_ICON_SIZE} />
                                     )}
                                 </div>
                             )}

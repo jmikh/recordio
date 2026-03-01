@@ -8,6 +8,7 @@ import {
     ghostContainerBase,
     holdShapeBase,
     transitionShapeBase,
+    blockBorder,
 } from '../TimelineBlockStyles';
 
 // ============================================================================
@@ -56,9 +57,9 @@ export const cameraLayoutContainer = {
 // ============= TRANSITION-IN SEGMENT =============
 
 export const transitionInSegment = {
-    base: 'absolute flex-shrink-0 border-2 border-[var(--block-bg)] transition-colors z-[5]',
+    base: `absolute flex-shrink-0 ${blockBorder.base} ${blockBorder.highlighted} transition-colors z-[5]`,
     defaultClass: '',
-    selectedClass: 'border-secondary',
+    selectedClass: blockBorder.selected,
     hoverClass: '',
     getStyle: (): CSSProperties => transitionInShape(),
 };
@@ -66,9 +67,9 @@ export const transitionInSegment = {
 // ============= HOLD SEGMENT =============
 
 export const holdSegment = {
-    base: 'absolute flex-shrink-0 rounded-sm transition-colors z-10 border-2 border-[var(--block-bg)]',
+    base: `absolute flex-shrink-0 rounded-sm transition-colors z-10 ${blockBorder.base} ${blockBorder.highlighted}`,
     defaultClass: '',
-    selectedClass: 'border-2 border-secondary',
+    selectedClass: blockBorder.selected,
     hoverClass: '',
     getStyle: (): CSSProperties => holdShape(),
 };
@@ -76,9 +77,9 @@ export const holdSegment = {
 // ============= TRANSITION-OUT SEGMENT =============
 
 export const transitionOutSegment = {
-    base: 'absolute flex-shrink-0 border-2 border-[var(--block-bg)] transition-colors z-[5]',
+    base: `absolute flex-shrink-0 ${blockBorder.base} ${blockBorder.highlighted} transition-colors z-[5]`,
     defaultClass: '',
-    selectedClass: 'border-secondary',
+    selectedClass: blockBorder.selected,
     hoverClass: '',
     getStyle: (): CSSProperties => transitionOutShape(),
 };
@@ -101,18 +102,18 @@ export const ghostCameraLayout = {
     container: ghostContainerBase,
     label: ghostLabel,
     transitionIn: {
-        className: 'border-2 border-[var(--block-bg)]',
+        className: blockBorder.base,
         getStyle: (): CSSProperties => transitionInShape(),
     },
     hold: {
-        className: 'border-2 border-[var(--block-bg)]',
+        className: blockBorder.base,
         getStyle: (): CSSProperties => ({
             ...holdShape(),
             borderRadius: `0`,
         }),
     },
     transitionOut: {
-        className: 'border-2 border-[var(--block-bg)]',
+        className: blockBorder.base,
         getStyle: (): CSSProperties => transitionOutShape(),
     },
 };

@@ -13,18 +13,26 @@ export const BLOCK_ICON_SIZE = 16;
 /** Minimum hold width (in px) before the icon is hidden */
 export const MIN_ICON_WIDTH_PX = 28;
 
-/** Tailwind opacity class for block icons */
-export const BLOCK_ICON_OPACITY = 'opacity-100';
-
 /** Returns the full className for a block icon */
-export function blockIconClass(variant: 'primary' | 'secondary'): string {
-    return `text-text-on-${variant} ${BLOCK_ICON_OPACITY}`;
-}
+export const blockIconClass = 'text-text-on-primary/70';
 
 // ============= SEGMENT RADIUS =============
 
 /** Unified corner radius for all track segments */
 export const SEGMENT_RADIUS = 4;
+
+/** Shared border width for all block segments */
+export const BLOCK_BORDER_WIDTH = 1;
+
+/** Shared block border classes — change these to restyle all blocks at once */
+export const blockBorder = {
+    /** Default border color (applied on each segment's base class) */
+    base: 'border border-text-main/30',
+    /** Highlighted border color (applied via group-hover on segments) */
+    highlighted: 'group-hover:border-text-main/50',
+    /** Selected border (2px + secondary color) */
+    selected: 'border-2 !border-secondary',
+};
 
 // ============= CONTAINER CURSORS =============
 
@@ -38,8 +46,9 @@ export const containerCursors = {
 
 /** Resize handle styles — invisible hit area for resizing */
 export const resizeHandle = {
-    base: 'absolute cursor-ew-resize z-20 flex items-center justify-center',
+    base: 'absolute cursor-ew-resize z-30 flex items-center justify-center',
     width: 12,
+    height: 32,
 };
 
 /** Visible drag handle indicator that appears on hover */
@@ -47,6 +56,7 @@ export const dragHandleIndicator = {
     base: 'w-1 rounded-full transition-all duration-150 opacity-0 group-hover:opacity-100',
     defaultClass: 'bg-primary-highlighted',
     selectedClass: 'bg-secondary',
+    height: 32,
 };
 
 // ============= GHOST STYLES =============
@@ -61,7 +71,7 @@ export const ghostContainerBase =
 
 // ============= HOLD SHAPE =============
 
-/** Common hold shape properties (primary/80 gradient fill + segment shadow) */
+/** Common hold shape properties (gradient fill + top highlight + segment shadow) */
 export function holdShapeBase(height: number): CSSProperties {
     return {
         height,
