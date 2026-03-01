@@ -26,9 +26,9 @@ function getInitialTheme(): Theme {
         // Corrupt or missing — fall through to default
     }
 
-    // 3. Default to dark
-    localStorage.setItem(THEME_KEY, 'dark');
-    return 'dark';
+    // 3. Default to light
+    localStorage.setItem(THEME_KEY, 'light');
+    return 'light';
 }
 
 interface ThemeState {
