@@ -14,7 +14,7 @@
 
 import type { UrlChangeEvent, Rect } from '@shared/types';
 import type { ToolbarSettings } from '../../types/settings';
-import logoUrl from '@shared/assets/logo_background.svg';
+import logoUrl from '@shared/assets/logo.svg';
 import puzzleUrl from '@shared/assets/puzzle_icon.svg';
 
 // ══════════════════════════════════════════

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { SharedVideoCard } from '../components/SharedVideoCard';
-import { LogoLink } from '@shared/components';
+import { LogoLink, XButton } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -28,6 +29,9 @@ export function DashboardPage() {
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const { addToast } = useToast();
+    const [storageUsed, setStorageUsed] = useState<number | null>(null);
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     useAuthListener();
 
     useEffect(() => {
@@ -40,6 +44,7 @@ export function DashboardPage() {
         }
 
         loadProjects();
+        ProjectStorage.estimateIndexedDBUsage().then(setStorageUsed).catch(console.error);
     }, []);
 
     // Load shared videos + analytics (reactive to auth state)
@@ -77,14 +82,35 @@ export function DashboardPage() {
     };
 
     const handleDelete = async (projectId: string) => {
-        if (!confirm('Are you sure you want to delete this project?')) return;
-
         try {
             await ProjectStorage.deleteProject(projectId);
             setProjects(prev => prev.filter(p => p.id !== projectId));
         } catch (error) {
             console.error('Failed to delete project:', error);
         }
+    };
+
+    const handleDeleteAll = async () => {
+        setIsDeleting(true);
+        try {
+            for (const project of projects) {
+                await ProjectStorage.deleteProject(project.id);
+            }
+            setProjects([]);
+            setShowDeleteAllModal(false);
+            addToast({ type: 'success', title: 'All Projects Deleted', message: `${projects.length} project${projects.length !== 1 ? 's' : ''} deleted` });
+        } catch (error) {
+            console.error('Failed to delete projects:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const formatBytes = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     };
 
     const handleUnshare = async (video: SharedVideo) => {
@@ -207,7 +233,17 @@ export function DashboardPage() {
                 <main className="p-6">
                     <div className="flex items-baseline gap-2 mb-4">
                         <h2 className="text-lg font-medium text-text-highlighted">Projects</h2>
-                        <span className="text-xs text-text-muted">· stored on this device</span>
+                        <span className="text-xs text-text-muted">
+                            · stored on this device{storageUsed != null ? ` · ${formatBytes(storageUsed)}` : ''}
+                        </span>
+                        {projects.length > 1 && (
+                            <button
+                                onClick={() => setShowDeleteAllModal(true)}
+                                className="ml-auto text-xs text-text-muted hover:text-destructive transition-colors"
+                            >
+                                Delete All
+                            </button>
+                        )}
                     </div>
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
@@ -240,6 +276,43 @@ export function DashboardPage() {
                 onClose={() => setIsAuthModalOpen(false)}
                 onAuthSuccess={() => { }}
             />
+
+            {/* Delete All Confirmation Modal */}
+            {showDeleteAllModal && createPortal(
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
+                    <div className="bg-surface-raised rounded-lg p-6 w-full max-w-[400px] border border-border">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-semibold text-text-highlighted">Delete All Projects</h2>
+                            <XButton
+                                onClick={() => setShowDeleteAllModal(false)}
+                                title="Close"
+                            />
+                        </div>
+
+                        <p className="text-sm text-text-main mb-6">
+                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{projects.length}</span> project{projects.length !== 1 ? 's' : ''}? This action cannot be undone.
+                        </p>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowDeleteAllModal(false)}
+                                disabled={isDeleting}
+                                className="interactive-base flex items-center justify-center gap-2"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteAll}
+                                disabled={isDeleting}
+                                className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-sm shadow-sm transition-colors disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete All'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 }

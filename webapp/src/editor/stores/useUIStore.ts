@@ -32,14 +32,13 @@ export const CanvasMode = {
 export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
 
 export const SettingsPanel = {
-    Project: 'project',
     Screen: 'screen',
     Camera: 'camera',
     Export: 'export',
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'project' | 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio' | 'export';
+export type SettingsPanelTab = 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio' | 'export';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -144,7 +143,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedWindowId: null,
     selectedCaptionId: null,
     selectedCameraLayoutId: null,
-    selectedSettingsPanel: SettingsPanel.Project,
+    selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
 
@@ -218,7 +217,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             if (selectedCaptionId) {
                 return {
                     selectedCaptionId,
-                    selectedSettingsPanel: SettingsPanel.Project,
+                    selectedSettingsPanel: SettingsPanel.Screen,
                     settingsPanelActiveTab: 'captions' as SettingsPanelTab,
                     showCollapsibleCaptionPosition: true,
                     trackVisibility: { ...state.trackVisibility, captions: true },
@@ -354,7 +353,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedWindowId: null,
             selectedCaptionId: null,
             selectedCameraLayoutId: null,
-            selectedSettingsPanel: SettingsPanel.Project,
+            selectedSettingsPanel: SettingsPanel.Screen,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,
             timelineContainerRef: null,
             pixelsPerSec: 100,

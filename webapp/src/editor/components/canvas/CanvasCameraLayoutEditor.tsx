@@ -113,27 +113,15 @@ export const CameraLayoutEditor: React.FC<{
 
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Re-sync when non-positional settings change externally (from inspector)
+    // Re-sync when settings change externally (from inspector or fill-screen)
     useEffect(() => {
         if (segment && currentSettings) {
-            const merged = {
-                ...buildEffectiveSettings(segment),
-                xPx: currentSettings.xPx,
-                yPx: currentSettings.yPx,
-                widthPx: currentSettings.widthPx,
-                heightPx: currentSettings.heightPx,
-            };
-            if (segment.shape !== currentSettings.shape) {
-                merged.xPx = segment.xPx;
-                merged.yPx = segment.yPx;
-                merged.widthPx = segment.widthPx;
-                merged.heightPx = segment.heightPx;
-            }
+            const merged = buildEffectiveSettings(segment);
             setCurrentSettings(merged);
             cameraRef.current = merged;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [segmentShape, segmentBorderRadius, cameraRef]);
+    }, [segmentShape, segmentBorderRadius, segment?.xPx, segment?.yPx, segment?.widthPx, segment?.heightPx, cameraRef]);
 
     // When hidden, clear cameraRef so webcam isn't drawn on canvas
     useEffect(() => {

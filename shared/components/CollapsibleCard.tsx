@@ -78,7 +78,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     return (
         <div
             className={`
-                bg-surface-inset rounded-lg
+                bg-surface rounded-lg
                 overflow-hidden
                 ${className}
             `}

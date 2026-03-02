@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Modal } from './Modal';
+import logoSvg from '../assets/logo.svg';
 
 interface ProgressModalProps {
     isOpen: boolean;
@@ -51,7 +52,10 @@ export const ProgressModal = ({
         <Modal isOpen={isOpen} maxWidth="max-w-md">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-text-highlighted font-semibold text-lg">{title}</h2>
+                    <div className="flex items-center gap-2">
+                        <img src={logoSvg} alt="" className="w-7 h-7" />
+                        <h2 className="text-text-highlighted font-semibold text-lg">{title}</h2>
+                    </div>
                     <div className="spinner w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
 

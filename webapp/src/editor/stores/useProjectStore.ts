@@ -55,7 +55,7 @@ export const useProjectStore = create<ProjectState>()(
                 mutedSources: {},
 
                 // Export State
-                exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null },
+                exportState: { isExporting: false, progress: 0, timeRemainingSeconds: null, phase: undefined },
 
 
                 // Slices

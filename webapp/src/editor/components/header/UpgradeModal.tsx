@@ -173,7 +173,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             </p>
 
             {/* Billing Toggle — pill style */}
-            <div className="flex items-center justify-center gap-1 mb-6 bg-surface-inset rounded-full p-1 mx-auto w-fit">
+            <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
                 <button
                     onClick={() => setBillingInterval('monthly')}
                     className={`py-1.5 px-5 text-sm font-medium rounded-full transition-all ${billingInterval === 'monthly'
@@ -210,7 +210,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </li>
                 <li className="flex items-center gap-3 text-sm">
                     <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">{MAX_SHARED_VIDEOS} Shareable links</span>
+                    <span className="text-text-highlighted">Shareable links</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm">
                     <FaCheck className="text-yellow-500 shrink-0" size={14} />

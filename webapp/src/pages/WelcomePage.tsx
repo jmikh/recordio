@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { trackExtensionInstalled } from '../core/analytics';
-import logoBackground from '@shared/assets/logo_background.svg';
+import logoBackground from '@shared/assets/logo.svg';
 
 const steps = [
     {

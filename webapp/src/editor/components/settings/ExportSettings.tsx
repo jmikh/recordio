@@ -110,7 +110,7 @@ export function ExportSettings() {
 
     const startDownload = async (quality: ExportQuality, fps: ExportFps, options?: { watermarkPosition?: WatermarkPosition }) => {
         useUIStore.getState().setIsPlaying(false);
-        setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
+        setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
 
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
@@ -187,7 +187,7 @@ export function ExportSettings() {
         // Export (skip download) then upload
         setIsPublishing(true);
         useUIStore.getState().setIsPlaying(false);
-        setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null });
+        setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
 
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
@@ -202,9 +202,11 @@ export function ExportSettings() {
             const exportDuration = (Date.now() - exportStart) / 1000;
 
             // Upload to Cloudflare Stream
-            setExportState({ isExporting: true, progress: 0.95, timeRemainingSeconds: null });
+            setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'uploading' });
             const uploadStart = Date.now();
-            const result = await ShareService.shareVideo(blob, project.id, project.name);
+            const result = await ShareService.shareVideo(blob, project.id, project.name, {
+                onUploadProgress: (fraction) => setExportState({ progress: fraction }),
+            });
             const uploadDuration = (Date.now() - uploadStart) / 1000;
 
             // Try to copy URL to clipboard (non-blocking)

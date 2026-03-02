@@ -55,6 +55,7 @@ function Editor() {
     const isExporting = useProjectStore(s => s.exportState.isExporting);
     const exportProgress = useProjectStore(s => s.exportState.progress);
     const timeRemainingSeconds = useProjectStore(s => s.exportState.timeRemainingSeconds);
+    const exportPhase = useProjectStore(s => s.exportState.phase);
 
 
     // Initialization State
@@ -369,13 +370,15 @@ function Editor() {
 
             <ProgressModal
                 isOpen={isExporting}
-                title="Exporting Project"
+                title={exportPhase === 'uploading' ? 'Publishing Video' : 'Exporting Project'}
                 projectName={project.name}
                 progress={exportProgress}
                 statusText={
-                    timeRemainingSeconds !== null
-                        ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
-                        : 'Estimating time...'
+                    exportPhase === 'uploading'
+                        ? `Uploading... ${Math.round(exportProgress * 100)}%`
+                        : timeRemainingSeconds !== null
+                            ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
+                            : 'Estimating time...'
                 }
                 onCancel={() => {
                     const manager = (window as any).__activeExportManager;

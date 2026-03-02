@@ -28,7 +28,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
 }) => {
     return (
         <div
-            className="flex items-center justify-between px-3 bg-surface-overlay rounded-sm"
+            className="flex items-center justify-between px-3 bg-surface-raised rounded-sm"
             style={{ height, minHeight: height }}
         >
             <span className={`text-sm truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`} title={title}>

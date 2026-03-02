@@ -76,7 +76,7 @@ export function holdShapeBase(height: number): CSSProperties {
     return {
         height,
         boxShadow: 'var(--shadow-segment)',
-        background: 'linear-gradient(to bottom, color-mix(in srgb, var(--block-bg) 90%, transparent), color-mix(in srgb, var(--block-bg) 70%, transparent))',
+        background: 'linear-gradient(to bottom, color-mix(in srgb, var(--block-bg) 100%, transparent), color-mix(in srgb, var(--block-bg) 75%, transparent))',
     };
 }
 

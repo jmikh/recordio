@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
-import { ProjectSettings } from './ProjectSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
@@ -17,7 +16,7 @@ import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraLayoutInspector } from './CameraLayoutInspector';
-import { TbDeviceDesktop, TbBackground, TbArticle, TbFolder, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
+import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
 import { PiWebcamBold } from 'react-icons/pi';
 import { FaChevronRight } from 'react-icons/fa';
 
@@ -83,7 +82,7 @@ export const SettingsPanel = () => {
 
     const navItems = useMemo(() => {
         const items: { id: SettingsPanelTab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
-            { id: 'project', label: 'Projects', icon: <TbFolder size={20} /> },
+
             { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
             { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
             { id: 'effects', label: 'Effects', icon: <TbClick size={20} /> },
@@ -214,7 +213,7 @@ export const SettingsPanel = () => {
                         </>
                     ) : (
                         <>
-                            {activeTab === 'project' && <ProjectSettings />}
+
                             {activeTab === 'background' && <BackgroundSettings />}
                             {activeTab === 'screen' && <ScreenSettings />}
                             {activeTab === 'camera' && <CameraSettings />}

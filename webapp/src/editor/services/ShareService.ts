@@ -132,7 +132,7 @@ export class ShareService {
         blob: Blob,
         projectId: string,
         projectName: string,
-        options?: { resetViews?: boolean },
+        options?: { resetViews?: boolean; onUploadProgress?: (fraction: number) => void },
     ): Promise<ShareResult> {
         if (!supabase) {
             throw new Error('Supabase not configured');
@@ -152,26 +152,38 @@ export class ShareService {
         }
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const response = await fetch(`${supabaseUrl}/functions/v1/upload-to-stream`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: formData,
-        });
+        const url = `${supabaseUrl}/functions/v1/upload-to-stream`;
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+        // Use XMLHttpRequest for upload progress tracking
+        const result = await new Promise<any>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
 
-            if (errorData.error === 'quota_exceeded') {
-                throw new Error(errorData.message || `You've reached the limit of ${MAX_SHARED_VIDEOS} shared videos.`);
+            if (options?.onUploadProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        options.onUploadProgress!(e.loaded / e.total);
+                    }
+                };
             }
 
-            const errorMsg = errorData.error || `Upload failed (${response.status})`;
-            throw new Error(errorMsg);
-        }
+            xhr.onload = () => {
+                let data: any;
+                try { data = JSON.parse(xhr.responseText); } catch { data = {}; }
 
-        const result = await response.json();
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(data);
+                } else if (data.error === 'quota_exceeded') {
+                    reject(new Error(data.message || `You've reached the limit of ${MAX_SHARED_VIDEOS} shared videos.`));
+                } else {
+                    reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.send(formData);
+        });
 
         // Invalidate cache so next reads are fresh
         ShareService.invalidateCache(projectId);

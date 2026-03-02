@@ -196,10 +196,10 @@
    ============================================================ */
 .dark {
    /* Surfaces - Deep grays */
-   --surface-body: oklch(0.13 0.01 270);
+   --surface-body: oklch(0.10 0.01 270);
    --surface-default: oklch(0.17 0.012 270);
-   --surface-raised: oklch(0.21 0.014 270);
-   --surface-overlay: oklch(0.25 0.016 270);
+   --surface-raised: oklch(0.25 0.014 270);
+   --surface-overlay: oklch(0.30 0.016 270);
    --surface-inset: oklch(0.17 0.012 270);
 
    /* Interactive State Overlays - Original values */

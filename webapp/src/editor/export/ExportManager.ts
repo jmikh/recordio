@@ -17,6 +17,7 @@ export type ExportFps = 30 | 60;
 export interface ExportProgress {
     progress: number;
     timeRemainingSeconds: number | null;
+    phase?: 'exporting' | 'uploading';
 }
 
 export class ExportManager {
