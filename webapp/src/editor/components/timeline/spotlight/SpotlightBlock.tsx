@@ -7,11 +7,9 @@ import {
     spotlightContainer,
     resizeHandle,
     dragHandleIndicator,
-    FADE_HEIGHT,
-    HOLD_HEIGHT,
     DRAG_HANDLE_HEIGHT
 } from './SpotlightTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX, SEGMENT_RADIUS } from '../TimelineBlockStyles';
 
 interface SpotlightBlockProps {
     /** Left position in pixels */
@@ -38,6 +36,8 @@ interface SpotlightBlockProps {
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
     /** Whether the track is disabled */
     disabled?: boolean;
+    /** Whether the track is in collapsed state (hides icons) */
+    isCollapsed?: boolean;
 }
 
 /**
@@ -59,13 +59,14 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     onResizeStartMouseDown,
     onResizeEndMouseDown,
     disabled = false,
+    isCollapsed = false,
 }) => {
     // Calculate hold width
     const holdWidth = Math.max(0, width - fadeInWidth - fadeOutWidth);
 
-    // Calculate vertical centering positions
-    const fadeY = (trackHeight - FADE_HEIGHT) / 2;
-    const holdY = (trackHeight - HOLD_HEIGHT) / 2;
+    // All segments fill the track with 1px padding top/bottom
+    const segmentHeight = trackHeight - 2;
+    const segmentY = 1;
 
     // Get color classes based on selection state
     const fadeColorClass = (isSelected && !disabled) ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
@@ -97,9 +98,12 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     data-part="fade-in"
                     style={{
                         left: 0,
-                        top: fadeY,
+                        top: segmentY,
                         width: fadeInWidth,
                         ...fadeInSegment.getStyle(),
+                        height: segmentHeight,
+                        borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
+                        ...(holdWidth === 0 && fadeOutWidth === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
                         ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
@@ -112,12 +116,20 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     data-part="hold"
                     style={{
                         left: fadeInWidth,
-                        top: holdY,
+                        top: segmentY,
                         width: holdWidth,
                         ...holdSegment.getStyle(),
+                        height: segmentHeight,
+                        borderRadius: fadeInWidth === 0 && fadeOutWidth === 0
+                            ? SEGMENT_RADIUS
+                            : fadeInWidth === 0
+                                ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
+                                : fadeOutWidth === 0
+                                    ? `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`
+                                    : 0,
                     }}
                 >
-                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                    {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
                         <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
@@ -130,9 +142,12 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     data-part="fade-out"
                     style={{
                         left: fadeInWidth + holdWidth,
-                        top: fadeY,
+                        top: segmentY,
                         width: fadeOutWidth,
                         ...fadeOutSegment.getStyle(),
+                        height: segmentHeight,
+                        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
+                        ...(holdWidth === 0 && fadeInWidth === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
                         ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />

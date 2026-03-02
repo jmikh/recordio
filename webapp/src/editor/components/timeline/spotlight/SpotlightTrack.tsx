@@ -11,14 +11,13 @@ import type { SpotlightSegment } from '../../../../types';
 
 import {
     ghostSpotlight,
-    FADE_HEIGHT,
-    HOLD_HEIGHT
 } from './SpotlightTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface SpotlightTrackProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
 /**
@@ -29,7 +28,7 @@ interface SpotlightTrackProps {
  * - Hold segment (taller, solid fill)
  * - Fade Out segment (shorter, striped, -45° angle)
  */
-export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
+export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
@@ -90,9 +89,8 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
     // Ghost fade width uses global transition duration
     const ghostFadeWidthPx = coords.msToX(globalTransitionDurationMs);
 
-    // Calculate vertical positions for ghost
-    const fadeY = (height - FADE_HEIGHT) / 2;
-    const holdY = (height - HOLD_HEIGHT) / 2;
+    // Ghost vertical position — 1px padding
+    const ghostY = 1;
 
     return (
         <div
@@ -133,6 +131,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             isDragging={isDragging}
                             trackHeight={height}
                             disabled={!spotlightEnabled}
+                            isCollapsed={isCollapsed}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -180,7 +179,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             style={{
                                 position: 'absolute',
                                 left: 0,
-                                top: fadeY,
+                                top: ghostY,
                                 width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeIn.getStyle(),
                             }}
@@ -195,7 +194,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                                     style={{
                                         position: 'absolute',
                                         left: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
-                                        top: holdY,
+                                        top: ghostY,
                                         width: ghostHoldWidth,
                                         ...ghostSpotlight.hold.getStyle(),
                                     }}
@@ -213,7 +212,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height }) => {
                             style={{
                                 position: 'absolute',
                                 right: 0,
-                                top: fadeY,
+                                top: ghostY,
                                 width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeOut.getStyle(),
                             }}

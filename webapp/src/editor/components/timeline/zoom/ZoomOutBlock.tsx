@@ -1,6 +1,6 @@
 import React from 'react';
 import { AiOutlineZoomOut } from 'react-icons/ai';
-import { zoomOutBlock, HOLD_HEIGHT } from './ZoomTrackStyles';
+import { zoomOutBlock } from './ZoomTrackStyles';
 import { BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 
 interface ZoomOutBlockProps {
@@ -17,7 +17,7 @@ interface ZoomOutBlockProps {
  * that occurs in the gap after a zoom block ends.
  */
 export const ZoomOutBlock: React.FC<ZoomOutBlockProps> = ({ left, width, trackHeight }) => {
-    const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
+    const segmentY = 1;
 
     return (
         <div
@@ -27,6 +27,7 @@ export const ZoomOutBlock: React.FC<ZoomOutBlockProps> = ({ left, width, trackHe
                 top: segmentY,
                 width,
                 ...zoomOutBlock.getStyle(),
+                height: trackHeight - 2,
                 zIndex: 2,
             }}
         >

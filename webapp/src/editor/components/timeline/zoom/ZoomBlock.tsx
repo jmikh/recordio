@@ -6,7 +6,6 @@ import {
     zoomContainer,
     resizeHandle,
     dragHandleIndicator,
-    HOLD_HEIGHT,
     DRAG_HANDLE_HEIGHT,
     SEGMENT_RADIUS,
     zoomOutBlock,
@@ -40,6 +39,8 @@ interface ZoomBlockProps {
     zoomOutWidth?: number;
     /** Whether the zoom track is disabled (visual only, no interaction) */
     disabled?: boolean;
+    /** Whether the track is in collapsed state (hides icons) */
+    isCollapsed?: boolean;
 }
 
 /**
@@ -63,13 +64,15 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     hasZoomOut = false,
     zoomOutWidth = 0,
     disabled = false,
+    isCollapsed = false,
 }) => {
     // Clamp transition-in width so it never exceeds the block
     const clampedTransitionWidth = Math.min(transitionInWidth, width);
     const holdWidth = Math.max(0, width - clampedTransitionWidth);
 
-    // Vertical centering — same height for both segments
-    const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
+    // All segments fill the track with 1px padding top/bottom
+    const segmentHeight = trackHeight - 2;
+    const segmentY = 1;
 
     const transitionColorClass = isSelected && !disabled ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
     const holdColorClass = isSelected && !disabled ? holdSegment.selectedClass : holdSegment.defaultClass;
@@ -113,9 +116,10 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         top: segmentY,
                         width: clampedTransitionWidth,
                         ...transitionStyle,
+                        height: segmentHeight,
                     }}
                 >
-                    {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
+                    {!isCollapsed && clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
                         <AiOutlineZoomIn className="text-main opacity-60" size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
@@ -131,6 +135,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         top: segmentY,
                         width: holdWidth,
                         ...holdSegment.getStyle(),
+                        height: segmentHeight,
                         borderRadius: hasZoomOut ? 0 : `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                         borderRight: hasZoomOut && !isSelected ? 'none' : undefined,
                     }}
@@ -147,10 +152,11 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         top: segmentY,
                         width: zoomOutWidth,
                         ...zoomOutBlock.getStyle(),
+                        height: segmentHeight,
                         zIndex: 2,
                     }}
                 >
-                    {zoomOutWidth >= MIN_ICON_WIDTH_PX && (
+                    {!isCollapsed && zoomOutWidth >= MIN_ICON_WIDTH_PX && (
                         <AiOutlineZoomOut className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
                     )}
                 </div>

@@ -35,14 +35,12 @@ export { SEGMENT_RADIUS };
 
 // ============= SHARED SHAPE HELPERS =============
 
-/** Fade shape: semi-transparent fill, rounded on one side */
+/** Fade shape: semi-transparent fill, no rounded corners */
 function fadeShape(side: 'left' | 'right'): CSSProperties {
     const isLeft = side === 'left';
     return {
         ...transitionShapeBase(FADE_HEIGHT),
-        borderRadius: isLeft
-            ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
-            : `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
+        borderRadius: 0,
         ...(isLeft ? { borderRight: 'none' } : { borderLeft: 'none' }),
     };
 }
@@ -51,7 +49,7 @@ function fadeShape(side: 'left' | 'right'): CSSProperties {
 function holdShape(): CSSProperties {
     return {
         ...holdShapeBase(HOLD_HEIGHT),
-        borderRadius: SEGMENT_RADIUS,
+        borderRadius: 0,
     };
 }
 
@@ -78,7 +76,7 @@ export const fadeInSegment = {
 
 /** Hold segment (center) - taller with solid fill, border when selected */
 export const holdSegment = {
-    base: `absolute flex-shrink-0 rounded-sm transition-colors z-10 ${blockBorder.base} ${blockBorder.highlighted}`,
+    base: `absolute flex-shrink-0 transition-colors z-10 ${blockBorder.base} ${blockBorder.highlighted}`,
     defaultClass: '',
     selectedClass: blockBorder.selected,
     hoverClass: '',

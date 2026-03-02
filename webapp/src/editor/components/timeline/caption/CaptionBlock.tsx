@@ -6,7 +6,6 @@ import {
     captionContainer,
     resizeHandle,
     dragHandleIndicator,
-    CAPTION_BLOCK_HEIGHT,
     DRAG_HANDLE_HEIGHT,
 } from './CaptionTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
@@ -34,6 +33,8 @@ interface CaptionBlockProps {
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
     /** Whether the track is disabled (visual only, no interaction) */
     disabled?: boolean;
+    /** Whether the track is in collapsed state (hides icons) */
+    isCollapsed?: boolean;
 }
 
 /**
@@ -52,8 +53,10 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
     onResizeStartMouseDown,
     onResizeEndMouseDown,
     disabled = false,
+    isCollapsed = false,
 }) => {
-    const blockY = (trackHeight - CAPTION_BLOCK_HEIGHT) / 2;
+    const segmentHeight = trackHeight - 2;
+    const blockY = 1;
     const colorClass = (isSelected && !disabled) ? captionBlock.selectedClass : captionBlock.defaultClass;
     const hoverClass = (isSelected || disabled) ? '' : captionBlock.hoverClass;
 
@@ -98,9 +101,10 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                         top: blockY,
                         width: '100%',
                         ...captionBlock.getStyle(),
+                        height: segmentHeight,
                     }}
                 >
-                    {width >= MIN_ICON_WIDTH_PX && (
+                    {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (
                         <FaRegClosedCaptioning className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>

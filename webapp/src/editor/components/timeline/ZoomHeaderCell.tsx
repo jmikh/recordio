@@ -5,9 +5,10 @@ import { Checkbox } from '@shared/components';
 
 interface ZoomHeaderCellProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
-export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height }) => {
+export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollapsed }) => {
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
     const toggleZoomEnabled = useProjectStore(s => s.toggleZoomEnabled);
 
@@ -16,6 +17,7 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height }) => {
             title="Zoom"
             height={height}
             disabled={!zoomEnabled}
+            isCollapsed={isCollapsed}
             infoElement={
                 <Checkbox
                     checked={zoomEnabled}

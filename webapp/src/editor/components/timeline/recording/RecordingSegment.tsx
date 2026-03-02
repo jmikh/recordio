@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { OutputWindow } from '../../../../types';
 import { StaticAudioWave } from './StaticAudioWave';
-import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator } from '../TimelineBlockStyles';
+import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator, SEGMENT_RADIUS } from '../TimelineBlockStyles';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../hooks/useAudioAnalysis';
 
@@ -87,22 +87,26 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
         return merged;
     }, [displayMode, screenAudio.peaks, cameraAudio.peaks]);
 
+    const segmentHeight = trackContentHeight - 2;
+
     return (
         <div
-            className={`absolute top-0 bottom-0 [--block-bg:var(--primary)] group`}
-            style={{ left: `${left}px`, width: `${width}px` }}
+            className={`absolute [--block-bg:var(--primary)] group`}
+            style={{ left: `${left}px`, width: `${width}px`, height: trackContentHeight }}
             onMouseDown={() => {
                 // Just handle selection (no deselect on re-click)
                 // Let event bubble up to Timeline for CTI movement
                 selectWindow(seg.id);
             }}
         >
-            {/* Main block — border + background on same element (matching other tracks) */}
+            {/* Main block — border + background (matching other tracks: top:1, height: trackHeight-2) */}
             <div
-                className={`absolute inset-0 rounded overflow-hidden cursor-pointer flex items-center transition-colors ${blockBorder.base} ${isSelected ? blockBorder.selected : blockBorder.highlighted}`}
+                className={`absolute left-0 right-0 overflow-hidden cursor-pointer flex items-center transition-colors ${blockBorder.base} ${isSelected ? blockBorder.selected : blockBorder.highlighted}`}
                 style={{
-                    ...holdShapeBase(0),
-                    height: '100%',
+                    top: 1,
+                    height: segmentHeight,
+                    ...holdShapeBase(segmentHeight),
+                    borderRadius: SEGMENT_RADIUS,
                 }}
             >
                 {/* Audio Waveform */}
@@ -113,7 +117,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                             sourceStartTimeMs={sourceStartTimeMs}
                             sourceEndTimeMs={sourceEndTimeMs}
                             width={width}
-                            height={trackContentHeight}
+                            height={segmentHeight}
                             scrollLeft={scrollLeft}
                             containerWidth={containerWidth}
                             segmentLeft={left}
@@ -145,7 +149,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 style={{
                     left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackContentHeight - 32) / 2,
+                    top: (trackContentHeight - resizeHandle.height) / 2,
                     height: resizeHandle.height,
                 }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
@@ -162,7 +166,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 style={{
                     right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackContentHeight - 32) / 2,
+                    top: (trackContentHeight - resizeHandle.height) / 2,
                     height: resizeHandle.height,
                 }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}

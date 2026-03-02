@@ -7,7 +7,6 @@ import {
     cameraLayoutContainer,
     resizeHandle,
     dragHandleIndicator,
-    HOLD_HEIGHT,
     DRAG_HANDLE_HEIGHT,
     SEGMENT_RADIUS,
 } from './CameraLayoutTrackStyles';
@@ -29,6 +28,8 @@ interface CameraLayoutBlockProps {
     isHidden?: boolean;
     /** Whether the track is disabled */
     disabled?: boolean;
+    /** Whether the track is in collapsed state (hides icons) */
+    isCollapsed?: boolean;
 }
 
 export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
@@ -45,11 +46,13 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
     onResizeEndMouseDown,
     isHidden,
     disabled = false,
+    isCollapsed = false,
 }) => {
     const clampedTransitionIn = Math.min(transitionInWidth, width / 2);
     const clampedTransitionOut = Math.min(transitionOutWidth, width / 2);
     const holdWidth = Math.max(0, width - clampedTransitionIn - clampedTransitionOut);
-    const segmentY = (trackHeight - HOLD_HEIGHT) / 2;
+    const segmentHeight = trackHeight - 2;
+    const segmentY = 1;
 
     const transitionInColor = (isSelected && !disabled) ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
     const transitionOutColor = (isSelected && !disabled) ? transitionOutSegment.selectedClass : transitionOutSegment.defaultClass;
@@ -86,6 +89,9 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                         top: segmentY,
                         width: clampedTransitionIn,
                         ...inStyle,
+                        height: segmentHeight,
+                        borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
+                        ...(holdWidth === 0 && clampedTransitionOut === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
                         ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
@@ -100,6 +106,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                         top: segmentY,
                         width: holdWidth,
                         ...holdSegment.getStyle(),
+                        height: segmentHeight,
                         borderRadius: clampedTransitionIn === 0 && clampedTransitionOut === 0
                             ? SEGMENT_RADIUS
                             : clampedTransitionIn === 0
@@ -109,7 +116,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                                     : 0,
                     }}
                 >
-                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                    {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
                         isHidden
                             ? <PiWebcamSlashBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
                             : <PiWebcamBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
@@ -126,6 +133,9 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                         top: segmentY,
                         width: clampedTransitionOut,
                         ...outStyle,
+                        height: segmentHeight,
+                        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
+                        ...(holdWidth === 0 && clampedTransitionIn === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
                         ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />

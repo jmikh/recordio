@@ -10,7 +10,6 @@ import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
-    HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './ZoomTrackStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
@@ -19,6 +18,7 @@ import type { ZoomSegment } from '../../../../types';
 
 interface ZoomTrackProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
 /**
@@ -31,7 +31,7 @@ interface ZoomTrackProps {
  * Interactions mirror the Spotlight track: move, resize-start, resize-end,
  * ghost on hover, click to add (deleting overlapping blocks).
  */
-export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
+export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
@@ -55,8 +55,8 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
         [timeline.zoomSegments]);
 
 
-    // Ghost vertical position — both segments are same height now
-    const ghostY = (height - HOLD_HEIGHT) / 2;
+    // Ghost vertical position — 1px padding
+    const ghostY = 1;
 
     const updateZoomSegment = useProjectStore(s => s.updateZoomSegment);
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
@@ -159,6 +159,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height }) => {
                             hasZoomOut={zoomOutWidthMap.has(s.id)}
                             zoomOutWidth={zoomOutWidthMap.get(s.id) ?? 0}
                             disabled={!zoomEnabled}
+                            isCollapsed={isCollapsed}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();

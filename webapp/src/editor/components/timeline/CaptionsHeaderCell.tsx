@@ -5,9 +5,10 @@ import { Checkbox } from '@shared/components';
 
 interface CaptionsHeaderCellProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
-export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height }) => {
+export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height, isCollapsed }) => {
     const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
     const updateSettings = useProjectStore(s => s.updateSettings);
 
@@ -21,6 +22,7 @@ export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height }
             title="Captions"
             height={height}
             disabled={!captionsEnabled}
+            isCollapsed={isCollapsed}
             infoElement={
                 <Checkbox
                     checked={captionsEnabled}

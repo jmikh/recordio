@@ -9,7 +9,6 @@ import { useCameraLayoutHover } from './useCameraLayoutHover';
 import { CameraLayoutBlock } from './CameraLayoutBlock';
 import {
     ghostCameraLayout,
-    HOLD_HEIGHT,
     SEGMENT_RADIUS,
 } from './CameraLayoutTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
@@ -18,13 +17,14 @@ import type { CameraLayoutSegment } from '../../../../types';
 
 interface CameraLayoutTrackProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
 /**
  * CameraLayoutTrack renders camera layout segments as time-range blocks.
  * Follows the same visual pattern as ZoomTrack: transition-in zone + hold zone.
  */
-export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) => {
+export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
@@ -45,7 +45,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
         (timeline.cameraLayoutSegments || []).filter((s: CameraLayoutSegment) => s.visible),
         [timeline.cameraLayoutSegments]);
 
-    const ghostY = (height - HOLD_HEIGHT) / 2;
+    const ghostY = 1;
 
     const updateCameraLayout = useProjectStore(s => s.updateCameraLayout);
     const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
@@ -109,6 +109,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height }) 
                             trackHeight={height}
                             isHidden={s.hidden}
                             disabled={!cameraLayoutEnabled}
+                            isCollapsed={isCollapsed}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();

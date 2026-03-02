@@ -6,9 +6,10 @@ import { SpotlightTooltip } from '../shared/MediaTooltips';
 
 interface SpotlightHeaderCellProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
-export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height }) => {
+export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height, isCollapsed }) => {
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
     const toggleSpotlightEnabled = useProjectStore(s => s.toggleSpotlightEnabled);
 
@@ -17,6 +18,7 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
             title="Spotlight"
             height={height}
             disabled={!spotlightEnabled}
+            isCollapsed={isCollapsed}
             titleElement={
                 <SpotlightTooltip
                     placement="top-right"

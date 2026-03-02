@@ -6,9 +6,10 @@ import { CameraLayoutTooltip } from '../shared/MediaTooltips';
 
 interface LayoutHeaderCellProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
-export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height }) => {
+export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCollapsed }) => {
     const cameraLayoutEnabled = useProjectStore(s => s.project.settings.cameraLayout?.enabled ?? true);
     const toggleCameraLayoutEnabled = useProjectStore(s => s.toggleCameraLayoutEnabled);
 
@@ -17,6 +18,7 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height }) =>
             title="Cam Layout"
             height={height}
             disabled={!cameraLayoutEnabled}
+            isCollapsed={isCollapsed}
             titleElement={
                 <CameraLayoutTooltip
                     placement="top-right"

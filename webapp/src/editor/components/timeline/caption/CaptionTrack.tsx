@@ -9,12 +9,13 @@ import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useCaptionHover } from './useCaptionHover';
 import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
-import { ghostCaption, CAPTION_BLOCK_HEIGHT } from './CaptionTrackStyles';
+import { ghostCaption } from './CaptionTrackStyles';
 import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface CaptionTrackProps {
     height: number;
+    isCollapsed?: boolean;
 }
 
 /**
@@ -25,7 +26,7 @@ interface CaptionTrackProps {
  * - Ghost "add caption" indicator on hover in empty gaps
  * - Resize handles on each block edge
  */
-export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
+export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
@@ -89,7 +90,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
         timeMapper
     );
 
-    const blockY = (height - CAPTION_BLOCK_HEIGHT) / 2;
+    const blockY = 1;
 
     return (
         <div
@@ -125,6 +126,7 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height }) => {
                             trackHeight={height}
                             text={s.text || '[empty]'}
                             disabled={!captionsEnabled}
+                            isCollapsed={isCollapsed}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
                                 e.stopPropagation();

@@ -129,6 +129,10 @@ export interface UIState {
     trackVisibility: TrackVisibility;
     setTrackVisibility: (track: keyof TrackVisibility, visible: boolean) => void;
 
+    // Track Hover (for expand-on-hover)
+    hoveredTrack: keyof TrackVisibility | null;
+    setHoveredTrack: (track: keyof TrackVisibility | null) => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -344,6 +348,10 @@ export const useUIStore = create<UIState>((set, get) => ({
         trackVisibility: { ...state.trackVisibility, [track]: visible }
     })),
 
+    // Track Hover
+    hoveredTrack: null,
+    setHoveredTrack: (hoveredTrack) => set({ hoveredTrack }),
+
     reset: () => {
         get().selectCaption(null);
         set({
@@ -382,6 +390,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             showCollapsibleMusic: true,
 
             trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
+            hoveredTrack: null,
         });
     }
 }));
