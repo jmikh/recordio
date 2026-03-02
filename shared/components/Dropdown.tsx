@@ -26,6 +26,8 @@ interface DropdownProps<T> {
     fullWidth?: boolean;
     /** Optional content rendered to the right of the trigger button (after the arrow) */
     suffix?: React.ReactNode;
+    /** If true, hides option suffixes in the trigger button (still shown in the menu) */
+    hideSuffixInTrigger?: boolean;
 }
 
 export function Dropdown<T>({
@@ -37,7 +39,8 @@ export function Dropdown<T>({
     className = '',
     buttonClassName = '',
     fullWidth = true,
-    suffix
+    suffix,
+    hideSuffixInTrigger = false
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -131,7 +134,7 @@ export function Dropdown<T>({
                     <span>{displayLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    {currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}
+                    {!hideSuffixInTrigger && currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}
                     <MdKeyboardArrowDown
                         size={18}
                         className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
