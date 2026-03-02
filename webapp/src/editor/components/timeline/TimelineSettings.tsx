@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdVisibility } from 'react-icons/md';
+import { MdOutlineSettingsInputComponent } from 'react-icons/md';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { Checkbox, Toggle } from '@shared/components';
@@ -50,11 +50,11 @@ function buildTrackConfigs(): TrackConfig[] {
     ];
 }
 
-interface TrackVisibilityDropdownProps {
+interface TimelineSettingsProps {
     height: number;
 }
 
-export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps) {
+export function TimelineSettings({ height }: TimelineSettingsProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
     const triggerRef = useRef<HTMLDivElement>(null);
@@ -189,7 +189,7 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
                 className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-main transition-colors cursor-pointer select-none"
                 title="Track settings"
             >
-                <MdVisibility size={18} />
+                <MdOutlineSettingsInputComponent size={18} />
             </button>
 
             {/* Portal-rendered popover */}

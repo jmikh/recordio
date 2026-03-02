@@ -34,7 +34,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
 }) => {
     return (
         <div
-            className="flex items-center justify-between px-3 bg-surface-raised rounded-sm overflow-hidden"
+            className="flex items-center justify-between px-3 bg-surface-raised rounded-sm overflow-hidden mx-1"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
             {titleElement ?? (

@@ -19,7 +19,7 @@ import { TimelineHeaderCell } from './TimelineHeaderCell';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
-import { TrackVisibilityDropdown } from './TrackVisibilityDropdown';
+import { TimelineSettings } from './TimelineSettings';
 import { ZoomHeaderCell } from './ZoomHeaderCell';
 import { CaptionsHeaderCell } from './CaptionsHeaderCell';
 import { useTrackSizing, TRACK_GAP } from './useTrackSizing';
@@ -251,7 +251,7 @@ export function Timeline() {
                 >
                     {/* Track Visibility Dropdown — matches ruler height exactly */}
                     <div style={{ height: RULER_HEIGHT }} className="border-b border-border shrink-0 flex items-center">
-                        <TrackVisibilityDropdown height={RULER_HEIGHT} />
+                        <TimelineSettings height={RULER_HEIGHT} />
                     </div>
 
                     {/* Track headers wrapper — mirrors the tracks container on the right */}
