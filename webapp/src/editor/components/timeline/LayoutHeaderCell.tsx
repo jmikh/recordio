@@ -1,7 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { Checkbox } from '@shared/components';
 import { CameraLayoutTooltip } from '../shared/MediaTooltips';
 
 interface LayoutHeaderCellProps {
@@ -11,7 +10,6 @@ interface LayoutHeaderCellProps {
 
 export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCollapsed }) => {
     const cameraLayoutEnabled = useProjectStore(s => s.project.settings.cameraLayout?.enabled ?? true);
-    const toggleCameraLayoutEnabled = useProjectStore(s => s.toggleCameraLayoutEnabled);
 
     return (
         <TimelineHeaderCell
@@ -30,12 +28,6 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
                             Webcam
                         </span>
                     }
-                />
-            }
-            infoElement={
-                <Checkbox
-                    checked={cameraLayoutEnabled}
-                    onChange={() => toggleCameraLayoutEnabled()}
                 />
             }
         />

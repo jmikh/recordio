@@ -1,7 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { Checkbox } from '@shared/components';
 
 interface ZoomHeaderCellProps {
     height: number;
@@ -10,7 +9,6 @@ interface ZoomHeaderCellProps {
 
 export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollapsed }) => {
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
-    const toggleZoomEnabled = useProjectStore(s => s.toggleZoomEnabled);
 
     return (
         <TimelineHeaderCell
@@ -18,12 +16,6 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollap
             height={height}
             disabled={!zoomEnabled}
             isCollapsed={isCollapsed}
-            infoElement={
-                <Checkbox
-                    checked={zoomEnabled}
-                    onChange={() => toggleZoomEnabled()}
-                />
-            }
         />
     );
 };

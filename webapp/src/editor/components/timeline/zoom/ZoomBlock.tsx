@@ -91,8 +91,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             borderRight: hasZoomOut ? 'none' : undefined,
         }
         : {
-            ...transitionSegment.getStyle(),
-            borderRight: 'none',
+            ...transitionInStyle(),
         };
 
     return (

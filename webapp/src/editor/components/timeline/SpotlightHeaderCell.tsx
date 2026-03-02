@@ -1,7 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { Checkbox } from '@shared/components';
 import { SpotlightTooltip } from '../shared/MediaTooltips';
 
 interface SpotlightHeaderCellProps {
@@ -11,7 +10,6 @@ interface SpotlightHeaderCellProps {
 
 export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height, isCollapsed }) => {
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
-    const toggleSpotlightEnabled = useProjectStore(s => s.toggleSpotlightEnabled);
 
     return (
         <TimelineHeaderCell
@@ -30,12 +28,6 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
                             Spotlight
                         </span>
                     }
-                />
-            }
-            infoElement={
-                <Checkbox
-                    checked={spotlightEnabled}
-                    onChange={() => toggleSpotlightEnabled()}
                 />
             }
         />

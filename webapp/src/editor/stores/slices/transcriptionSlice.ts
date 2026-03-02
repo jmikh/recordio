@@ -59,7 +59,7 @@ export const createTranscriptionSlice: StateCreator<
         });
 
         // Auto-enable captions track visibility
-        useUIStore.getState().setTrackVisibility('captions', true);
+        useUIStore.getState().setTrackShow('show_captions', true);
     },
 
     restoreCaptionsFromBaseline: () => {
@@ -103,7 +103,7 @@ export const createTranscriptionSlice: StateCreator<
         }));
 
         // Auto-hide captions track visibility
-        useUIStore.getState().setTrackVisibility('captions', false);
+        useUIStore.getState().setTrackShow('show_captions', false);
     },
 
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {

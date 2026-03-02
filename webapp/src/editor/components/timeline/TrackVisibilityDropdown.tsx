@@ -1,16 +1,54 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MdVisibility } from 'react-icons/md';
-import { useUIStore, type TrackVisibility } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { Checkbox } from '@shared/components';
+import { Checkbox, Toggle } from '@shared/components';
+import type { DisplaySettings } from '../../../types/timeline';
 
-const ALL_TRACKS: { key: keyof TrackVisibility; label: string; requiresCamera?: boolean }[] = [
-    { key: 'zoom', label: 'Zoom' },
-    { key: 'spotlight', label: 'Spotlight' },
-    { key: 'captions', label: 'Captions' },
-    { key: 'cameraLayout', label: 'Webcam', requiresCamera: true },
-];
+interface TrackConfig {
+    showKey: keyof DisplaySettings;
+    label: string;
+    requiresCamera?: boolean;
+    /** Selector to read the enabled state from ProjectStore */
+    getEnabled: (s: any) => boolean;
+    /** Action to toggle enabled state */
+    toggle: () => void;
+}
+
+function buildTrackConfigs(): TrackConfig[] {
+    return [
+        {
+            showKey: 'show_zoom',
+            label: 'Zoom',
+            getEnabled: (s) => s.project.settings.zoom.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleZoomEnabled(),
+        },
+        {
+            showKey: 'show_spotlight',
+            label: 'Spotlight',
+            getEnabled: (s) => s.project.settings.spotlight.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleSpotlightEnabled(),
+        },
+        {
+            showKey: 'show_captions',
+            label: 'Captions',
+            getEnabled: (s) => s.project.settings.captions.enabled ?? true,
+            toggle: () => {
+                const state = useProjectStore.getState();
+                const captions = state.project.settings.captions;
+                state.updateSettings({ captions: { ...captions, enabled: !(captions.enabled ?? true) } });
+            },
+        },
+        {
+            showKey: 'show_cameraLayout',
+            label: 'Webcam',
+            requiresCamera: true,
+            getEnabled: (s) => s.project.settings.cameraLayout?.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleCameraLayoutEnabled(),
+        },
+    ];
+}
 
 interface TrackVisibilityDropdownProps {
     height: number;
@@ -22,14 +60,30 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
     const triggerRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const trackVisibility = useUIStore(s => s.trackVisibility);
-    const setTrackVisibility = useUIStore(s => s.setTrackVisibility);
+    const displaySettings = useProjectStore(s => s.project.timeline.displaySettings);
+    const setTrackShow = useUIStore(s => s.setTrackShow);
+    const toggleTracksCollapsed = useUIStore(s => s.toggleTracksCollapsed);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
 
+    // Read enabled states from ProjectStore
+    const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
+    const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
+    const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
+    const cameraLayoutEnabled = useProjectStore(s => s.project.settings.cameraLayout?.enabled ?? true);
+
+    const trackConfigs = useMemo(() => buildTrackConfigs(), []);
+
     const tracks = useMemo(() =>
-        ALL_TRACKS.filter(t => !t.requiresCamera || hasCameraSource),
-        [hasCameraSource]
+        trackConfigs.filter(t => !t.requiresCamera || hasCameraSource),
+        [hasCameraSource, trackConfigs]
     );
+
+    const enabledMap: Record<string, boolean> = {
+        show_zoom: zoomEnabled,
+        show_spotlight: spotlightEnabled,
+        show_captions: captionsEnabled,
+        show_cameraLayout: cameraLayoutEnabled,
+    };
 
     // Calculate menu position when opening
     useEffect(() => {
@@ -39,8 +93,8 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
         setMenuStyle({
             position: 'fixed',
             bottom: window.innerHeight - rect.top + 4,
-            left: rect.left + 4,
-            minWidth: 160,
+            left: rect.left + 8,
+            minWidth: 220,
             zIndex: 9999,
         });
     }, [isOpen]);
@@ -63,33 +117,68 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
 
-    const dropdownMenu = (
+    const popoverContent = (
         <div
             ref={menuRef}
-            className="bg-surface-overlay border border-border rounded-lg shadow-float py-1 px-1"
+            className="bg-surface-overlay border border-border rounded-lg shadow-float py-3 px-4"
             style={menuStyle}
         >
-            {tracks.map(({ key, label }) => {
-                const isVisible = trackVisibility[key];
+            {/* Header */}
+            <div className="text-sm font-medium text-text-highlighted mb-2">Timeline Settings</div>
 
-                return (
-                    <div
-                        key={key}
-                        role="button"
-                        onClick={() => setTrackVisibility(key, !isVisible)}
-                        className={`
-                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2.5 rounded-md cursor-pointer
-                            ${isVisible
-                                ? 'text-text-main hover:bg-state-hover'
-                                : 'text-text-disabled hover:bg-state-hover'
-                            }
-                        `}
-                    >
-                        <Checkbox checked={isVisible} onChange={() => setTrackVisibility(key, !isVisible)} />
-                        <span>{label}</span>
-                    </div>
-                );
-            })}
+            {/* Column headers */}
+            <div className="flex items-center gap-2 mb-1">
+                <span className="flex-1"></span>
+                <span className="w-10 text-center text-xs text-text-disabled">Show</span>
+                <span className="w-10 text-center text-xs text-text-disabled">Enable</span>
+            </div>
+
+            {/* Track rows */}
+            <div className="flex flex-col">
+                {tracks.map(({ showKey, label, toggle }) => {
+                    const isVisible = displaySettings[showKey] as boolean;
+                    const isEnabled = enabledMap[showKey] ?? true;
+
+                    return (
+                        <div
+                            key={showKey}
+                            className="flex items-center gap-2 py-1.5"
+                        >
+                            <span className={`flex-1 text-sm ${isEnabled ? 'text-text-muted' : 'text-text-disabled'}`}>
+                                {label}
+                            </span>
+                            <div className="w-10 flex justify-center">
+                                <Checkbox
+                                    checked={isVisible}
+                                    onChange={() => setTrackShow(showKey, !isVisible)}
+                                />
+                            </div>
+                            <div className="w-10 flex justify-center">
+                                <Checkbox
+                                    checked={isEnabled}
+                                    onChange={() => toggle()}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Helper text */}
+            <div className="mt-2 flex flex-col gap-0.5 subtext">
+                <span><span className="font-medium">Show</span> — display track in timeline</span>
+                <span><span className="font-medium">Enable</span> — apply effects during playback</span>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border my-2.5" />
+
+            {/* Collapse toggle */}
+            <Toggle
+                label="Collapse Tracks"
+                value={displaySettings.collapsed}
+                onChange={() => toggleTracksCollapsed()}
+            />
         </div>
     );
 
@@ -98,13 +187,13 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-main transition-colors cursor-pointer select-none"
-                title="Toggle track visibility"
+                title="Track settings"
             >
                 <MdVisibility size={18} />
             </button>
 
-            {/* Portal-rendered dropdown menu */}
-            {isOpen && createPortal(dropdownMenu, document.body)}
+            {/* Portal-rendered popover */}
+            {isOpen && createPortal(popoverContent, document.body)}
         </div>
     );
 }

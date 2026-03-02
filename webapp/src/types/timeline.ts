@@ -147,6 +147,23 @@ export interface CameraLayoutSegment extends TimeSegment {
 }
 
 // ==========================================
+// DISPLAY SETTINGS
+// ==========================================
+
+/**
+ * Controls timeline track visibility and collapse behavior.
+ * Persisted per-project as part of the Timeline.
+ */
+export interface DisplaySettings {
+    show_zoom: boolean;
+    show_spotlight: boolean;
+    show_captions: boolean;
+    show_cameraLayout: boolean;
+    /** Whether hover-to-expand collapse is active */
+    collapsed: boolean;
+}
+
+// ==========================================
 // TIMELINE
 // ==========================================
 
@@ -176,4 +193,6 @@ export interface Timeline {
     cameraLayoutSegments: CameraLayoutSegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
+    /** Timeline display settings (track visibility, collapse state) */
+    displaySettings: DisplaySettings;
 }

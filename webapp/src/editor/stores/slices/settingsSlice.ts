@@ -70,7 +70,7 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                 outputSize: {
                     ...currentSettings.outputSize,
                     ...(updates.outputSize || {})
-                }
+                },
             };
 
             const nextProject = {

@@ -9,6 +9,7 @@ import {
     blockIconClass,
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
+    SEGMENT_RADIUS,
 } from '../TimelineBlockStyles';
 
 interface CaptionBlockProps {
@@ -103,6 +104,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                         width: '100%',
                         ...holdSegment.getStyle(),
                         height: segmentHeight,
+                        borderRadius: SEGMENT_RADIUS,
                     }}
                 >
                     {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (

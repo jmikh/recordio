@@ -151,7 +151,14 @@ const createDefaultTimeline = (): Timeline => ({
     cameraLayoutSegments: [],
     outputWindows: [],
     focusAreas: [],
-    captionSegments: []
+    captionSegments: [],
+    displaySettings: {
+        show_zoom: true,
+        show_spotlight: true,
+        show_captions: false,
+        show_cameraLayout: false,
+        collapsed: false,
+    },
 });
 
 /**
@@ -254,7 +261,14 @@ export class ProjectImpl {
             spotlightSegments: spotlightSegments,
             focusAreas: focusAreas,
             captionSegments: [],
-            cameraLayoutSegments: []
+            cameraLayoutSegments: [],
+            displaySettings: {
+                show_zoom: true,
+                show_spotlight: true,
+                show_captions: false,
+                show_cameraLayout: false,
+                collapsed: false,
+            },
         };
 
         return {

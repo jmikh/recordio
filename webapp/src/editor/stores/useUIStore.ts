@@ -1,24 +1,8 @@
-
 import { create } from 'zustand';
 import type { ID, TimeMs, Size } from '../../types';
 import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { useProjectStore } from './useProjectStore';
-
-export interface TrackVisibility {
-    recording: boolean;
-    zoom: boolean;
-    spotlight: boolean;
-    captions: boolean;
-    cameraLayout: boolean;
-}
-
-const DEFAULT_TRACK_VISIBILITY: TrackVisibility = {
-    recording: true,
-    zoom: true,
-    spotlight: true,
-    captions: true,
-    cameraLayout: true,
-};
+import type { DisplaySettings } from '../../types/timeline';
 
 export const CanvasMode = {
     Preview: 'preview',
@@ -125,13 +109,13 @@ export interface UIState {
 
     setCollapsibleVisibility: (key: string, value: boolean) => void;
 
-    // Track Visibility
-    trackVisibility: TrackVisibility;
-    setTrackVisibility: (track: keyof TrackVisibility, visible: boolean) => void;
+    // Track Visibility & Collapse (delegates to ProjectStore timeline.displaySettings)
+    setTrackShow: (key: keyof DisplaySettings, visible: boolean) => void;
+    toggleTracksCollapsed: () => void;
 
     // Track Hover (for expand-on-hover)
-    hoveredTrack: keyof TrackVisibility | null;
-    setHoveredTrack: (track: keyof TrackVisibility | null) => void;
+    hoveredTrack: string | null;
+    setHoveredTrack: (track: string | null) => void;
 
     // Explicit reset to default state
     reset: () => void;
@@ -219,12 +203,24 @@ export const useUIStore = create<UIState>((set, get) => ({
         }
         set((state) => {
             if (selectedCaptionId) {
+                // Also ensure captions track is visible in project timeline
+                const ds = useProjectStore.getState().project.timeline.displaySettings;
+                if (!ds.show_captions) {
+                    useProjectStore.setState(s => ({
+                        project: {
+                            ...s.project,
+                            timeline: {
+                                ...s.project.timeline,
+                                displaySettings: { ...s.project.timeline.displaySettings, show_captions: true }
+                            }
+                        }
+                    }));
+                }
                 return {
                     selectedCaptionId,
                     selectedSettingsPanel: SettingsPanel.Screen,
                     settingsPanelActiveTab: 'captions' as SettingsPanelTab,
                     showCollapsibleCaptionPosition: true,
-                    trackVisibility: { ...state.trackVisibility, captions: true },
                 };
             }
 
@@ -342,11 +338,30 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
-    // Track Visibility
-    trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
-    setTrackVisibility: (track, visible) => set((state) => ({
-        trackVisibility: { ...state.trackVisibility, [track]: visible }
-    })),
+    // Track Visibility & Collapse (delegates to ProjectStore timeline.displaySettings)
+    setTrackShow: (key, visible) => {
+        useProjectStore.setState(s => ({
+            project: {
+                ...s.project,
+                timeline: {
+                    ...s.project.timeline,
+                    displaySettings: { ...s.project.timeline.displaySettings, [key]: visible }
+                }
+            }
+        }));
+    },
+    toggleTracksCollapsed: () => {
+        const current = useProjectStore.getState().project.timeline.displaySettings.collapsed;
+        useProjectStore.setState(s => ({
+            project: {
+                ...s.project,
+                timeline: {
+                    ...s.project.timeline,
+                    displaySettings: { ...s.project.timeline.displaySettings, collapsed: !current }
+                }
+            }
+        }));
+    },
 
     // Track Hover
     hoveredTrack: null,
@@ -389,7 +404,6 @@ export const useUIStore = create<UIState>((set, get) => ({
             showCollapsibleAudioToggles: true,
             showCollapsibleMusic: true,
 
-            trackVisibility: { ...DEFAULT_TRACK_VISIBILITY },
             hoveredTrack: null,
         });
     }

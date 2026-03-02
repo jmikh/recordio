@@ -115,9 +115,9 @@ export function Timeline() {
 
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
-    const trackVisibility = useUIStore(s => s.trackVisibility);
+    const displaySettings = useProjectStore(s => s.project.timeline.displaySettings);
     const setHoveredTrack = useUIStore(s => s.setHoveredTrack);
-    const { tracks: trackSizing, totalHeight: timelineTotalHeight } = useTrackSizing();
+    const { tracks: trackSizing, recordingHeight, totalHeight: timelineTotalHeight } = useTrackSizing();
 
 
     // Memoize TimeMapper
@@ -256,40 +256,37 @@ export function Timeline() {
 
                     {/* Track headers wrapper — mirrors the tracks container on the right */}
                     <div className="flex flex-col" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
-                        {/* Header: Recording */}
-                        {trackVisibility.recording && (
-                            <div className="shrink-0" style={{ height: trackSizing.recording.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('recording')}>
-                                <TimelineHeaderCell
-                                    title="Recording"
-                                    height={trackSizing.recording.height}
-                                    isCollapsed={trackSizing.recording.isCollapsed}
-                                />
-                            </div>
-                        )}
+                        {/* Header: Recording (always visible) */}
+                        <div className="shrink-0" style={{ height: recordingHeight, transition: TRANSITION_STYLE }}>
+                            <TimelineHeaderCell
+                                title="Recording"
+                                height={recordingHeight}
+                            />
+                        </div>
 
                         {/* Header: Zoom */}
-                        {trackVisibility.zoom && (
+                        {displaySettings.show_zoom && (
                             <div className="shrink-0" style={{ height: trackSizing.zoom.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('zoom')}>
                                 <ZoomHeaderCell height={trackSizing.zoom.height} isCollapsed={trackSizing.zoom.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Spotlight */}
-                        {trackVisibility.spotlight && (
+                        {displaySettings.show_spotlight && (
                             <div className="shrink-0" style={{ height: trackSizing.spotlight.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                 <SpotlightHeaderCell height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Captions */}
-                        {trackVisibility.captions && (
+                        {displaySettings.show_captions && (
                             <div className="shrink-0" style={{ height: trackSizing.captions.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('captions')}>
                                 <CaptionsHeaderCell height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Camera Layout */}
-                        {trackVisibility.cameraLayout && hasCameraSource && (
+                        {displaySettings.show_cameraLayout && hasCameraSource && (
                             <div className="shrink-0" style={{ height: trackSizing.cameraLayout.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
                                 <LayoutHeaderCell height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
                             </div>
@@ -352,42 +349,40 @@ export function Timeline() {
 
                                 {/* Tracks Container */}
                                 <div id="timeline-tracks" className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
-                                    {/* Recording Track */}
-                                    {trackVisibility.recording && (
-                                        <TimelineTrackRow height={trackSizing.recording.height} onMouseEnter={() => setHoveredTrack('recording')}>
-                                            <RecordingTrack
-                                                timeline={timeline}
-                                                pixelsPerSec={pixelsPerSec}
-                                                trackHeight={trackSizing.recording.height}
-                                                scrollLeft={rulerScrollLeft}
-                                                containerWidth={containerWidth}
-                                            />
-                                        </TimelineTrackRow>
-                                    )}
+                                    {/* Recording Track (always visible) */}
+                                    <TimelineTrackRow height={recordingHeight}>
+                                        <RecordingTrack
+                                            timeline={timeline}
+                                            pixelsPerSec={pixelsPerSec}
+                                            trackHeight={recordingHeight}
+                                            scrollLeft={rulerScrollLeft}
+                                            containerWidth={containerWidth}
+                                        />
+                                    </TimelineTrackRow>
 
                                     {/* Zoom Track */}
-                                    {trackVisibility.zoom && (
+                                    {displaySettings.show_zoom && (
                                         <TimelineTrackRow height={trackSizing.zoom.height} onMouseEnter={() => setHoveredTrack('zoom')}>
                                             <ZoomTrack height={trackSizing.zoom.height} isCollapsed={trackSizing.zoom.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Spotlight Track */}
-                                    {trackVisibility.spotlight && (
+                                    {displaySettings.show_spotlight && (
                                         <TimelineTrackRow height={trackSizing.spotlight.height} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                             <SpotlightTrack height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Caption Track */}
-                                    {trackVisibility.captions && (
+                                    {displaySettings.show_captions && (
                                         <TimelineTrackRow height={trackSizing.captions.height} onMouseEnter={() => setHoveredTrack('captions')}>
                                             <CaptionTrack height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Camera Layout Track */}
-                                    {trackVisibility.cameraLayout && hasCameraSource && (
+                                    {displaySettings.show_cameraLayout && hasCameraSource && (
                                         <TimelineTrackRow height={trackSizing.cameraLayout.height} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
                                             <CameraLayoutTrack height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
                                         </TimelineTrackRow>

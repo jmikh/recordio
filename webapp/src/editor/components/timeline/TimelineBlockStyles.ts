@@ -187,7 +187,11 @@ export const ghostSpotlight = {
     label: ghostLabel,
     fadeIn: {
         className: blockBorder.base,
-        getStyle: (): CSSProperties => transitionShapeBase(),
+        getStyle: (): CSSProperties => ({
+            ...transitionShapeBase(),
+            borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
+            borderRight: 'none',
+        }),
     },
     hold: {
         className: blockBorder.base,
@@ -195,7 +199,11 @@ export const ghostSpotlight = {
     },
     fadeOut: {
         className: blockBorder.base,
-        getStyle: (): CSSProperties => transitionShapeBase(),
+        getStyle: (): CSSProperties => ({
+            ...transitionShapeBase(),
+            borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
+            borderLeft: 'none',
+        }),
     },
 };
 
