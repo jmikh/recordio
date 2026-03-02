@@ -2,7 +2,8 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, InfoTooltip, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { Slider, MultiToggle, Toggle, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { AutoShrinkTooltip } from '../shared/MediaTooltips';
 import { FaCheck, FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
 import { MdAspectRatio } from 'react-icons/md';
@@ -192,10 +193,7 @@ export const CameraSettings = () => {
                             value={autoShrink}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
                         >
-                            <InfoTooltip
-                                description="Automatically shrinks the camera when screen zoom is active."
-                                videoSrc="https://cdn.recordio.cc/demos/autoshrink-demo.mp4"
-                            />
+                            <AutoShrinkTooltip />
                         </Toggle>
 
                         {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}

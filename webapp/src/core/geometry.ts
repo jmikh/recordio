@@ -10,7 +10,7 @@ import type { Rect, Point, Size } from '../types';
 // ============================================================================
 
 /** Default factor to enlarge target rects by (0.1 = 10% bigger) */
-export const DEFAULT_ENLARGE_FACTOR = 0.1;
+export const DEFAULT_ENLARGE_FACTOR = 0.25;
 
 // ============================================================================
 // Rect Scaling

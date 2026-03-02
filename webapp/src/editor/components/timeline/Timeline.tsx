@@ -2,6 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
+import { MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
 import { ZoomTrack } from './zoom/ZoomTrack';
 
 import { SpotlightTrack } from './spotlight/SpotlightTrack';
@@ -12,7 +13,6 @@ import { CameraLayoutTrack } from './cameraLayout/CameraLayoutTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
-import { TimelineToolbar, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
 import { RecordingTrack } from './recording/RecordingTrack';
 
 import { TimelineHeaderCell } from './TimelineHeaderCell';
@@ -125,24 +125,15 @@ export function Timeline() {
     const totalOutputDuration = timeMapper.getOutputDuration();
     const totalWidth = (totalOutputDuration / 1000) * pixelsPerSec + 25;
 
-    const handleFit = () => {
-        if (!containerRef.current) return;
-        // minimal padding
-        const availableWidth = containerRef.current.clientWidth - 50;
-
-        if (totalOutputDuration > 0) {
-            const fitPps = (availableWidth * 1000) / totalOutputDuration;
-            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
-            setPixelsPerSec(clampedPps);
-        }
-    };
-
     // Auto-fit timeline zoom on initial mount
     const hasFittedRef = useRef(false);
     useEffect(() => {
         if (!hasFittedRef.current && containerRef.current && totalOutputDuration > 0) {
             hasFittedRef.current = true;
-            handleFit();
+            const availableWidth = containerRef.current.clientWidth - 50;
+            const fitPps = (availableWidth * 1000) / totalOutputDuration;
+            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
+            setPixelsPerSec(clampedPps);
         }
     }, [containerEl, totalOutputDuration]);
 
@@ -247,11 +238,6 @@ export function Timeline() {
 
     return (
         <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
-            {/* 1. Toolbar */}
-            <TimelineToolbar
-                totalDurationMs={totalOutputDuration}
-                onFit={handleFit}
-            />
 
             {/* 2. Timeline Body (Split Pane) */}
             <div id="timeline-body" className="flex flex-1 bg-surface overflow-hidden relative">
@@ -300,7 +286,7 @@ export function Timeline() {
                         )}
 
                         {/* Header: Camera Layout */}
-                        {trackVisibility.cameraLayout && (
+                        {trackVisibility.cameraLayout && hasCameraSource && (
                             <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
                                 <LayoutHeaderCell height={TRACK_HEIGHT} />
                             </div>
@@ -398,7 +384,7 @@ export function Timeline() {
                                     )}
 
                                     {/* Camera Layout Track */}
-                                    {trackVisibility.cameraLayout && (
+                                    {trackVisibility.cameraLayout && hasCameraSource && (
                                         <TimelineTrackRow height={TRACK_HEIGHT}>
                                             <CameraLayoutTrack height={TRACK_HEIGHT} />
                                         </TimelineTrackRow>

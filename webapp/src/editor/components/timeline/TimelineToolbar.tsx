@@ -7,28 +7,23 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { Slider } from '@shared/components';
 
-interface TimelineToolbarProps {
-    totalDurationMs: number;
-    onFit: () => void;
-}
-
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
 
 
 
-export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
-    totalDurationMs,
-    onFit,
-}) => {
+export const TimelineToolbar: React.FC = () => {
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
     const isPlaying = useUIStore(s => s.isPlaying);
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
+    const timelineContainerRef = useUIStore(s => s.timelineContainerRef);
 
-
+    // Derive totalDurationMs internally
+    const timeMapper = useTimeMapper();
+    const totalDurationMs = timeMapper.getOutputDuration();
 
     // History Batcher
     const batcher = useHistoryBatcher();
@@ -39,8 +34,17 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         setPixelsPerSec(newScale);
     };
 
+    const handleFit = () => {
+        const container = timelineContainerRef?.current;
+        if (!container) return;
+        const availableWidth = container.clientWidth - 50;
+        if (totalDurationMs > 0) {
+            const fitPps = (availableWidth * 1000) / totalDurationMs;
+            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
+            setPixelsPerSec(clampedPps);
+        }
+    };
 
-    const timeMapper = useTimeMapper();
     const onTogglePlay = () => {
         if (!isPlaying && useUIStore.getState().currentTimeMs >= timeMapper.outputDuration) {
             useUIStore.getState().setCurrentTime(0);
@@ -113,7 +117,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
             <div className="flex items-center gap-2">
                 <button
-                    onClick={onFit}
+                    onClick={handleFit}
                     className="interactive-ghost flex items-center justify-center gap-2 px-2 py-0.5 text-[10px]"
                     title="Fit timeline to screen"
                 >
@@ -145,3 +149,4 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
         </div>
     );
 };
+

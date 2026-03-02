@@ -45,7 +45,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         enabled: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
-        transitionDurationMs: 300,
+        transitionDurationMs: 750,
         minHoldDurationMs: 200,
         defaultHoldDurationMs: 1000,
         easing: 'ease-in-out'

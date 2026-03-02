@@ -2,7 +2,7 @@
 export { Checkbox } from './Checkbox';
 export { CollapsibleCard } from './CollapsibleCard';
 export type { PreviewItem } from './CollapsibleCard';
-export { InfoTooltip } from './InfoTooltip';
+export { InfoTooltip, type TooltipPlacement } from './InfoTooltip';
 export { Tooltip } from './Tooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';

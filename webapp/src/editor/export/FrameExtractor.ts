@@ -25,8 +25,6 @@ import type { DemuxedVideoPacket } from './webmDemuxer';
 /** How far ahead (ms) to feed packets beyond the requested time. */
 const FEED_AHEAD_MS = 200;
 
-/** Maximum time (ms) to wait for the decoder to produce a frame. */
-const DECODE_TIMEOUT_MS = 5_000;
 
 /**
  * Extracts decoded {@link VideoFrame}s from a WebM video source using WebCodecs.
@@ -143,25 +141,28 @@ export class FrameExtractor {
             fed++;
         }
 
-        // 3. One-time flush after all packets have been fed.
+        // 3. Wait for all fed chunks to be decoded (deterministic sync).
+        //    Uses the 'dequeue' event to await the decoder draining its queue,
+        //    instead of timer-based polling which is performance-dependent.
+        if (fed > 0) {
+            await this.awaitDecoderDrain();
+        }
+
+        // 4. One-time flush after all packets have been consumed to drain
+        //    any remaining frames from the decoder pipeline.
         if (this.nextPacketIndex >= this.packets.length && !this.flushed) {
             this.flushed = true;
             await this.decoder.flush();
         }
 
-        // 4. Wait for the decoder to produce at least one frame.
-        let waitedMs = 0;
-        while (this.decodedFrames.length === 0) {
-            if (waitedMs >= DECODE_TIMEOUT_MS) {
-                throw new Error(
-                    `[FrameExtractor] Timeout waiting for decoded frame at ${timeMs.toFixed(0)} ms`
-                );
-            }
-            await new Promise(r => setTimeout(r, 10));
-            waitedMs += 10;
+        // 5. After sync, all fed frames are guaranteed to be in decodedFrames.
+        if (this.decodedFrames.length === 0) {
+            throw new Error(
+                `[FrameExtractor] No decoded frames available at ${timeMs.toFixed(0)} ms`
+            );
         }
 
-        // 5. Pick the best frame: latest whose timestamp ≤ target.
+        // 6. Pick the best frame: latest whose timestamp ≤ target.
         //    Falls back to index 0 when the target is before the first frame.
         let bestIndex = 0;
         for (let i = 1; i < this.decodedFrames.length; i++) {
@@ -179,6 +180,22 @@ export class FrameExtractor {
         // Return a clone; the original stays in the buffer for reuse by
         // future calls that map to the same source frame.
         return this.decodedFrames[0].clone();
+    }
+
+    /**
+     * Wait for the decoder to process all queued chunks.
+     * Uses the 'dequeue' event which fires each time a chunk finishes decoding,
+     * providing deterministic synchronization without timer-based polling.
+     */
+    private async awaitDecoderDrain(): Promise<void> {
+        if (!this.decoder || this.decoder.state === 'closed') return;
+        while (this.decoder.decodeQueueSize > 0) {
+            await new Promise<void>(resolve => {
+                this.decoder!.addEventListener('dequeue', () => resolve(), { once: true });
+            });
+        }
+        // Yield one micro-tick to let the final output callback fire
+        await new Promise(r => setTimeout(r, 0));
     }
 
     /** Release all GPU resources and internal state. */

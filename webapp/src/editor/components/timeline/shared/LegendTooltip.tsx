@@ -1,53 +1,72 @@
 import React, { useState, useRef, useEffect, type ReactNode } from 'react';
 import { MdInfoOutline } from 'react-icons/md';
 import { createPortal } from 'react-dom';
+import type { TooltipPlacement } from '@shared/components/InfoTooltip';
 
 interface LegendTooltipProps {
     /** Path to the demo video */
     videoSrc: string;
     /** Description text explaining the feature */
     description: string;
+    /** Tooltip placement relative to trigger. Default: 'right' */
+    placement?: TooltipPlacement;
+    /** Custom trigger element. Defaults to the info "ⓘ" icon */
+    trigger?: ReactNode;
     /** Legend items to display below the video */
     children: ReactNode;
+}
+
+/** Compute tooltip position from trigger rect based on placement */
+function getTooltipPosition(rect: DOMRect, placement: TooltipPlacement) {
+    switch (placement) {
+        case 'top-right':
+            return { left: rect.right + 8, top: rect.top, transform: 'translateY(-100%)' };
+        case 'bottom-center':
+            return { left: rect.left + rect.width / 2, top: rect.bottom + 8, transform: 'translateX(-50%)' };
+        case 'right':
+        default:
+            return { left: rect.right + 8, top: rect.top, transform: undefined };
+    }
 }
 
 /**
  * LegendTooltip provides a consistent tooltip experience for track legends.
  * Features:
- * - Info icon trigger
+ * - Configurable trigger element (defaults to info icon)
+ * - Configurable placement (right, top-right, bottom-center)
  * - Portal-rendered tooltip (escapes stacking contexts)
- * - Fixed 480px video that doesn't shrink
+ * - Fixed 480px video
  * - Description text under video
  * - Centered legend items below video
- * - Maximum z-index for overlay priority
  */
-export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, description, children }) => {
+export const LegendTooltip: React.FC<LegendTooltipProps> = ({
+    videoSrc, description, placement = 'right', trigger, children
+}) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [position, setPosition] = useState({ left: 0, top: 0 });
-    const iconRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ left: 0, top: 0, transform: undefined as string | undefined });
+    const triggerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (isHovered && iconRef.current) {
-            const rect = iconRef.current.getBoundingClientRect();
-            setPosition({
-                left: rect.right + 8, // 8px margin from icon
-                top: rect.top,
-            });
+        if (isHovered && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setPosition(getTooltipPosition(rect, placement));
         }
-    }, [isHovered]);
+    }, [isHovered, placement]);
 
     return (
         <>
             <div
-                ref={iconRef}
+                ref={triggerRef}
                 className="relative"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                <MdInfoOutline
-                    size={14}
-                    className="text-text-muted hover:text-text-highlighted cursor-pointer transition-colors"
-                />
+                {trigger ?? (
+                    <MdInfoOutline
+                        size={14}
+                        className="text-text-muted hover:text-text-highlighted cursor-pointer transition-colors"
+                    />
+                )}
             </div>
 
             {/* Tooltip - rendered via portal to escape stacking contexts */}
@@ -55,7 +74,11 @@ export const LegendTooltip: React.FC<LegendTooltipProps> = ({ videoSrc, descript
                 createPortal(
                     <div
                         className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-5 py-3 w-[500px] flex flex-col items-center"
-                        style={{ left: position.left, top: position.top }}
+                        style={{
+                            left: position.left,
+                            top: position.top,
+                            ...(position.transform ? { transform: position.transform } : {}),
+                        }}
                         onMouseEnter={() => setIsHovered(true)}
                         onMouseLeave={() => setIsHovered(false)}
                     >

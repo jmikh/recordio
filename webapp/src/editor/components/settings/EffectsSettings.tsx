@@ -3,7 +3,8 @@ import React from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, InfoTooltip, type PreviewItem } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { HotkeyTooltip } from '../shared/MediaTooltips';
 import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
 import { TbPlayerPlay } from 'react-icons/tb';
@@ -205,11 +206,8 @@ export const EffectsSettings = () => {
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                            <label className="text-sm text-text-muted">Hotkeys</label>
-                            <InfoTooltip
-                                description="Shows keyboard shortcuts as an overlay during playback."
-                                imageSrc="/assets/images/hotkey-demo.png"
-                            />
+                            <label className="text-sm text-text-muted">Hotkeys Enabled</label>
+                            <HotkeyTooltip />
                         </div>
                         <Toggle
                             value={keyboardSettings.showHotkeys ?? true}
