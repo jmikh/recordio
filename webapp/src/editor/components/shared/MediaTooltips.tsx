@@ -14,7 +14,7 @@ interface MediaTooltipProps {
 export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <LegendTooltip
         videoSrc="https://cdn.recordio.cc/demos/spotlight-demo.mp4"
-        description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on clearly defined areas."}
+        description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
         placement={placement}
         trigger={trigger}
     >
@@ -53,6 +53,16 @@ export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trig
     <InfoTooltip
         description="Automatically shrinks the camera when screen zoom is active."
         videoSrc="https://cdn.recordio.cc/demos/autoshrink-demo.mp4"
+        placement={placement}
+        trigger={trigger}
+    />
+);
+
+/** Camera layout tooltip with demo video */
+export const CameraLayoutTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
+    <InfoTooltip
+        description={"Change the camera layout for any section of the video.\nGreat for full-screen intros, outros, and transitions."}
+        videoSrc="https://cdn.recordio.cc/demos/camera-layout-demo.mp4"
         placement={placement}
         trigger={trigger}
     />

@@ -126,7 +126,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
                         )}
 
                         {/* Description text */}
-                        <div className={(videoSrc || imageSrc) ? 'mt-2 text-center' : 'px-3 py-2'}>
+                        <div className={(videoSrc || imageSrc) ? 'mt-2 text-center whitespace-pre-line' : 'px-3 py-2'}>
                             {description}
                         </div>
 

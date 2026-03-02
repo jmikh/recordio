@@ -186,6 +186,9 @@ export class FrameExtractor {
      * Wait for the decoder to process all queued chunks.
      * Uses the 'dequeue' event which fires each time a chunk finishes decoding,
      * providing deterministic synchronization without timer-based polling.
+     *
+     * After the queue drains, we also wait for the output callback to fire
+     * (it runs asynchronously after the internal dequeue), with a safety timeout.
      */
     private async awaitDecoderDrain(): Promise<void> {
         if (!this.decoder || this.decoder.state === 'closed') return;
@@ -194,8 +197,14 @@ export class FrameExtractor {
                 this.decoder!.addEventListener('dequeue', () => resolve(), { once: true });
             });
         }
-        // Yield one micro-tick to let the final output callback fire
-        await new Promise(r => setTimeout(r, 0));
+        // The output callback fires asynchronously after dequeue — yield until
+        // at least one frame appears, with a safety timeout to prevent infinite hangs.
+        const prevCount = this.decodedFrames.length;
+        let waited = 0;
+        while (this.decodedFrames.length === prevCount && waited < 2000) {
+            await new Promise(r => setTimeout(r, 1));
+            waited++;
+        }
     }
 
     /** Release all GPU resources and internal state. */

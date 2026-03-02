@@ -73,11 +73,12 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
                 const isVisible = trackVisibility[key];
 
                 return (
-                    <button
+                    <div
                         key={key}
+                        role="button"
                         onClick={() => setTrackVisibility(key, !isVisible)}
                         className={`
-                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2.5 rounded-md
+                            w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2.5 rounded-md cursor-pointer
                             ${isVisible
                                 ? 'text-text-main hover:bg-state-hover'
                                 : 'text-text-disabled hover:bg-state-hover'
@@ -86,7 +87,7 @@ export function TrackVisibilityDropdown({ height }: TrackVisibilityDropdownProps
                     >
                         <Checkbox checked={isVisible} onChange={() => setTrackVisibility(key, !isVisible)} />
                         <span>{label}</span>
-                    </button>
+                    </div>
                 );
             })}
         </div>
