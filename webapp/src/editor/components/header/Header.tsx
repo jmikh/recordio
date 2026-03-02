@@ -115,7 +115,7 @@ export const Header = () => {
                         >
                             <FaRedo size={14} />
                         </button>
-                        {false && <span className="text-[10px] text-text-muted ml-1 tabular-nums">
+                        {<span className="text-[10px] text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>}
                     </div>

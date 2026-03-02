@@ -189,7 +189,7 @@ export const CameraSettings = () => {
 
                         {/* Auto Shrink */}
                         <Toggle
-                            label="Auto Shrink"
+                            label="Enable Shr"
                             value={autoShrink}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
                         >

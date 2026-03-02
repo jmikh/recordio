@@ -7,7 +7,7 @@ import type { EasingStyle } from '../../../core/easing';
 import type { SpotlightSegment } from '../../../types';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { EasingTooltipContent } from './EasingTooltipContent';
-import { SpotlightLegend } from '../timeline/spotlight/SpotlightLegend';
+import { SpotlightTooltip } from '../shared/MediaTooltips';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
     { value: 'linear', label: 'Linear' },
@@ -143,7 +143,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     }, [segment, allSpotlightSegments, spotlightSettings, updateSpotlight, updateSettings]);
 
     return (
-        <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine size={16} />} notCollapsible headerAction={<SpotlightLegend />}>
+        <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine size={16} />} notCollapsible headerAction={<SpotlightTooltip />}>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Check the box to apply to all spotlights.</p>
 

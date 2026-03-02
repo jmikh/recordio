@@ -1,7 +1,5 @@
 import React from 'react';
 import { InfoTooltip, type TooltipPlacement } from '@shared/components';
-import { LegendTooltip, LegendItem } from '../timeline/shared/LegendTooltip';
-import { legendItem } from '../timeline/spotlight/SpotlightTrackStyles';
 
 interface MediaTooltipProps {
     /** Tooltip placement relative to trigger */
@@ -10,42 +8,14 @@ interface MediaTooltipProps {
     trigger?: React.ReactNode;
 }
 
-/** Spotlight tooltip with demo video and legend items */
+/** Spotlight tooltip with demo video */
 export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
-    <LegendTooltip
-        videoSrc="https://cdn.recordio.cc/demos/spotlight-demo.mp4"
+    <InfoTooltip
         description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
+        videoSrc="https://cdn.recordio.cc/demos/spotlight-demo.mp4"
         placement={placement}
         trigger={trigger}
-    >
-        <LegendItem
-            indicator={
-                <div
-                    className={legendItem.fadeIn.className}
-                    style={legendItem.fadeIn.style}
-                />
-            }
-            label="Fade in"
-        />
-        <LegendItem
-            indicator={
-                <div
-                    className={legendItem.hold.className}
-                    style={legendItem.hold.style}
-                />
-            }
-            label="Hold"
-        />
-        <LegendItem
-            indicator={
-                <div
-                    className={legendItem.fadeOut.className}
-                    style={legendItem.fadeOut.style}
-                />
-            }
-            label="Fade out"
-        />
-    </LegendTooltip>
+    />
 );
 
 /** Auto-shrink tooltip with demo video */
