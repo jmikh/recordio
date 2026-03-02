@@ -1,16 +1,17 @@
 import React from 'react';
 import { AiOutlineZoomIn, AiOutlineZoomOut } from 'react-icons/ai';
 import {
-    transitionInSegment,
+    transitionSegment,
     holdSegment,
-    zoomContainer,
+    blockContainer,
     resizeHandle,
     dragHandleIndicator,
-    DRAG_HANDLE_HEIGHT,
-    SEGMENT_RADIUS,
     zoomOutBlock,
-} from './ZoomTrackStyles';
-import { BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+    transitionInStyle,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
+    SEGMENT_RADIUS,
+} from '../TimelineBlockStyles';
 
 interface ZoomBlockProps {
     /** Left position in pixels */
@@ -74,26 +75,29 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     const segmentHeight = trackHeight - 2;
     const segmentY = 1;
 
-    const transitionColorClass = isSelected && !disabled ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
+    const transitionColorClass = isSelected && !disabled ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = isSelected && !disabled ? holdSegment.selectedClass : holdSegment.defaultClass;
-    const transitionHoverClass = (isSelected || disabled) ? '' : transitionInSegment.hoverClass;
+    const transitionHoverClass = (isSelected || disabled) ? '' : transitionSegment.hoverClass;
     const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     // If hold is zero width, give the transition-in segment rounded right corners too
     // (unless a zoom-out block follows — then keep right corners flat)
     const transitionStyle = holdWidth === 0
         ? {
-            ...transitionInSegment.getStyle(),
+            ...transitionSegment.getStyle(),
             borderRadius: hasZoomOut
                 ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
                 : SEGMENT_RADIUS,
             borderRight: hasZoomOut ? 'none' : undefined,
         }
-        : transitionInSegment.getStyle();
+        : {
+            ...transitionSegment.getStyle(),
+            borderRight: 'none',
+        };
 
     return (
         <div
-            className={`${zoomContainer.base} group ${isDragging ? zoomContainer.dragging : zoomContainer.idle} ${(!isSelected && !disabled) ? zoomContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             data-part="block-container"
             style={{
                 left: `${left}px`,
@@ -109,7 +113,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {/* Transition-in segment */}
             {clampedTransitionWidth > 0 && (
                 <div
-                    className={`${transitionInSegment.base} ${transitionColorClass} ${transitionHoverClass} flex items-center justify-center overflow-hidden`}
+                    className={`${transitionSegment.base} ${transitionColorClass} ${transitionHoverClass} flex items-center justify-center overflow-hidden`}
                     data-part="transition-in"
                     style={{
                         left: 0,
@@ -168,14 +172,14 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                 style={{
                     left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeStartMouseDown}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
 
@@ -185,14 +189,14 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                 style={{
                     right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeEndMouseDown}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
         </div>

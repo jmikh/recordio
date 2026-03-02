@@ -9,7 +9,7 @@ const ALL_TRACKS: { key: keyof TrackVisibility; label: string; requiresCamera?: 
     { key: 'zoom', label: 'Zoom' },
     { key: 'spotlight', label: 'Spotlight' },
     { key: 'captions', label: 'Captions' },
-    { key: 'cameraLayout', label: 'Camera Layout', requiresCamera: true },
+    { key: 'cameraLayout', label: 'Webcam', requiresCamera: true },
 ];
 
 interface TrackVisibilityDropdownProps {

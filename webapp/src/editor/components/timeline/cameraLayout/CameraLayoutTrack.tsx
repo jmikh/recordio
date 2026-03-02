@@ -9,9 +9,12 @@ import { useCameraLayoutHover } from './useCameraLayoutHover';
 import { CameraLayoutBlock } from './CameraLayoutBlock';
 import {
     ghostCameraLayout,
+    blockIconClass,
+    ghostIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from './CameraLayoutTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+} from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 import type { CameraLayoutSegment } from '../../../../types';
 
@@ -163,6 +166,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                                         top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostCameraLayout.transitionIn.getStyle(),
+                                        height: height - 2,
                                         ...(holdWidth <= 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                                     }}
                                 />
@@ -178,10 +182,11 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                                         top: ghostY,
                                         width: holdWidth,
                                         ...ghostCameraLayout.hold.getStyle(),
+                                        height: height - 2,
                                     }}
                                 >
                                     {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <PiWebcamBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                                        <PiWebcamBold className={ghostIconClass} size={BLOCK_ICON_SIZE} />
                                     )}
                                 </div>
                             )}
@@ -196,6 +201,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                                         top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostCameraLayout.transitionOut.getStyle(),
+                                        height: height - 2,
                                         ...(holdWidth <= 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                                     }}
                                 />

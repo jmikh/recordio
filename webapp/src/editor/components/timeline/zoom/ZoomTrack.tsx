@@ -10,10 +10,13 @@ import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
+    blockIconClass,
+    ghostIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from './ZoomTrackStyles';
+} from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import type { ZoomSegment } from '../../../../types';
 
 interface ZoomTrackProps {
@@ -210,11 +213,12 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                         top: ghostY,
                                         width: clampedTransitionWidth,
                                         ...ghostZoom.transitionIn.getStyle(),
+                                        height: height - 2,
                                         ...(holdWidth <= 0 ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
                                     }}
                                 >
                                     {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                                        <AiOutlineZoomIn className={ghostIconClass} size={BLOCK_ICON_SIZE} />
                                     )}
                                 </div>
                             )}
@@ -229,6 +233,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                         top: ghostY,
                                         width: holdWidth,
                                         ...ghostZoom.hold.getStyle(),
+                                        height: height - 2,
                                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                                     }}
                                 />

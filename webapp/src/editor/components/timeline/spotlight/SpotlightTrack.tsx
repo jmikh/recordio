@@ -11,8 +11,12 @@ import type { SpotlightSegment } from '../../../../types';
 
 import {
     ghostSpotlight,
-} from './SpotlightTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+    blockIconClass,
+    ghostIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
+    SEGMENT_RADIUS,
+} from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface SpotlightTrackProps {
@@ -182,6 +186,8 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                                 top: ghostY,
                                 width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeIn.getStyle(),
+                                height: height - 2,
+                                borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
                             }}
                         />
 
@@ -197,10 +203,12 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                                         top: ghostY,
                                         width: ghostHoldWidth,
                                         ...ghostSpotlight.hold.getStyle(),
+                                        height: height - 2,
+                                        borderRadius: 0,
                                     }}
                                 >
                                     {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
-                                        <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                                        <RiLightbulbFlashLine className={ghostIconClass} size={BLOCK_ICON_SIZE} />
                                     )}
                                 </div>
                             );
@@ -215,6 +223,8 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                                 top: ghostY,
                                 width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
                                 ...ghostSpotlight.fadeOut.getStyle(),
+                                height: height - 2,
+                                borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                             }}
                         />
                     </div>

@@ -1,15 +1,18 @@
 import React from 'react';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
 import {
-    fadeInSegment,
+    transitionSegment,
     holdSegment,
-    fadeOutSegment,
-    spotlightContainer,
+    blockContainer,
     resizeHandle,
     dragHandleIndicator,
-    DRAG_HANDLE_HEIGHT
-} from './SpotlightTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX, SEGMENT_RADIUS } from '../TimelineBlockStyles';
+    fadeStyle,
+    holdStyle,
+    blockIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
+    SEGMENT_RADIUS,
+} from '../TimelineBlockStyles';
 
 interface SpotlightBlockProps {
     /** Left position in pixels */
@@ -69,16 +72,16 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     const segmentY = 1;
 
     // Get color classes based on selection state
-    const fadeColorClass = (isSelected && !disabled) ? fadeInSegment.selectedClass : fadeInSegment.defaultClass;
+    const fadeColorClass = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
 
     // Only apply hover effects when not selected and not disabled
-    const fadeHoverClass = (isSelected || disabled) ? '' : fadeInSegment.hoverClass;
+    const fadeHoverClass = (isSelected || disabled) ? '' : transitionSegment.hoverClass;
     const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     return (
         <div
-            className={`${spotlightContainer.base} group ${isDragging ? spotlightContainer.dragging : spotlightContainer.idle} ${(!isSelected && !disabled) ? spotlightContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             data-part="block-container"
             style={{
                 left: `${left}px`,
@@ -94,16 +97,17 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Fade In Segment */}
             {fadeInWidth > 0 && (
                 <div
-                    className={`${fadeInSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    className={`${transitionSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
                     data-part="fade-in"
                     style={{
                         left: 0,
                         top: segmentY,
                         width: fadeInWidth,
-                        ...fadeInSegment.getStyle(),
+                        ...transitionSegment.getStyle(),
                         height: segmentHeight,
                         borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-                        ...(holdWidth === 0 && fadeOutWidth === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
+                        borderRight: 'none',
+                        ...(holdWidth === 0 && fadeOutWidth === 0 ? { borderRadius: SEGMENT_RADIUS, borderRight: undefined } : {}),
                         ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
@@ -118,7 +122,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                         left: fadeInWidth,
                         top: segmentY,
                         width: holdWidth,
-                        ...holdSegment.getStyle(),
+                        ...holdStyle(),
                         height: segmentHeight,
                         borderRadius: fadeInWidth === 0 && fadeOutWidth === 0
                             ? SEGMENT_RADIUS
@@ -138,16 +142,17 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
             {/* Fade Out Segment */}
             {fadeOutWidth > 0 && (
                 <div
-                    className={`${fadeOutSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    className={`${transitionSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
                     data-part="fade-out"
                     style={{
                         left: fadeInWidth + holdWidth,
                         top: segmentY,
                         width: fadeOutWidth,
-                        ...fadeOutSegment.getStyle(),
+                        ...transitionSegment.getStyle(),
                         height: segmentHeight,
                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                        ...(holdWidth === 0 && fadeInWidth === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
+                        borderLeft: 'none',
+                        ...(holdWidth === 0 && fadeInWidth === 0 ? { borderRadius: SEGMENT_RADIUS, borderLeft: undefined } : {}),
                         ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
@@ -159,15 +164,15 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                 style={{
                     left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeStartMouseDown}
             >
                 {/* Visible drag handle indicator */}
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
 
@@ -177,15 +182,15 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                 style={{
                     right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeEndMouseDown}
             >
                 {/* Visible drag handle indicator */}
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
         </div>

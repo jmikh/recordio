@@ -1,16 +1,16 @@
 import React from 'react';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
 import {
-    transitionInSegment,
-    transitionOutSegment,
+    transitionSegment,
     holdSegment,
-    cameraLayoutContainer,
+    blockContainer,
     resizeHandle,
     dragHandleIndicator,
-    DRAG_HANDLE_HEIGHT,
+    blockIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from './CameraLayoutTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+} from '../TimelineBlockStyles';
 
 interface CameraLayoutBlockProps {
     left: number;
@@ -54,21 +54,21 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
     const segmentHeight = trackHeight - 2;
     const segmentY = 1;
 
-    const transitionInColor = (isSelected && !disabled) ? transitionInSegment.selectedClass : transitionInSegment.defaultClass;
-    const transitionOutColor = (isSelected && !disabled) ? transitionOutSegment.selectedClass : transitionOutSegment.defaultClass;
+    const transitionInColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
+    const transitionOutColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
 
     // When no hold, round both transition ends
     const inStyle = holdWidth === 0 && clampedTransitionOut === 0
-        ? { ...transitionInSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : transitionInSegment.getStyle();
+        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
+        : { ...transitionSegment.getStyle(), borderRight: 'none' as const };
     const outStyle = holdWidth === 0 && clampedTransitionIn === 0
-        ? { ...transitionOutSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : transitionOutSegment.getStyle();
+        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
+        : { ...transitionSegment.getStyle(), borderLeft: 'none' as const };
 
     return (
         <div
-            className={`${cameraLayoutContainer.base} group ${isDragging ? cameraLayoutContainer.dragging : cameraLayoutContainer.idle} ${(!isSelected && !disabled) ? cameraLayoutContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -83,7 +83,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
             {/* Transition-in segment (left) */}
             {clampedTransitionIn > 0 && (
                 <div
-                    className={`${transitionInSegment.base} ${transitionInColor}`}
+                    className={`${transitionSegment.base} ${transitionInColor}`}
                     style={{
                         left: 0,
                         top: segmentY,
@@ -127,7 +127,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
             {/* Transition-out segment (right) */}
             {clampedTransitionOut > 0 && (
                 <div
-                    className={`${transitionOutSegment.base} ${transitionOutColor}`}
+                    className={`${transitionSegment.base} ${transitionOutColor}`}
                     style={{
                         left: clampedTransitionIn + holdWidth,
                         top: segmentY,
@@ -147,14 +147,14 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                 style={{
                     left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeStartMouseDown}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
 
@@ -164,14 +164,14 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                 style={{
                     right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={onResizeEndMouseDown}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
         </div>

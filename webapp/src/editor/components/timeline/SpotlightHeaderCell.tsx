@@ -23,7 +23,10 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
                 <SpotlightTooltip
                     placement="top-right"
                     trigger={
-                        <span className={`text-sm truncate select-none ${!spotlightEnabled ? 'text-text-muted' : 'text-text-main'}`}>
+                        <span
+                            className={`truncate select-none ${!spotlightEnabled ? 'text-text-muted' : 'text-text-main'}`}
+                            style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
+                        >
                             Spotlight
                         </span>
                     }

@@ -15,7 +15,7 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
 
     return (
         <TimelineHeaderCell
-            title="Cam Layout"
+            title="Webcam"
             height={height}
             disabled={!cameraLayoutEnabled}
             isCollapsed={isCollapsed}
@@ -23,8 +23,11 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
                 <CameraLayoutTooltip
                     placement="top-right"
                     trigger={
-                        <span className={`text-sm truncate select-none ${!cameraLayoutEnabled ? 'text-text-muted' : 'text-text-main'}`}>
-                            Cam Layout
+                        <span
+                            className={`truncate select-none ${!cameraLayoutEnabled ? 'text-text-muted' : 'text-text-main'}`}
+                            style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
+                        >
+                            Webcam
                         </span>
                     }
                 />

@@ -149,14 +149,14 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 style={{
                     left: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackContentHeight - resizeHandle.height) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
 
@@ -166,14 +166,14 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 style={{
                     right: -resizeHandle.width / 2,
                     width: resizeHandle.width,
-                    top: (trackContentHeight - resizeHandle.height) / 2,
-                    height: resizeHandle.height,
+                    top: -1,
+                    bottom: -1,
                 }}
                 onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}
             >
                 <div
-                    className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                    style={{ height: dragHandleIndicator.height }}
+                    className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                    style={{ height: 'calc(100% - 2px)' }}
                 />
             </div>
 

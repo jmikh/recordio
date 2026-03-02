@@ -37,32 +37,32 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
             className="flex items-center justify-between px-3 bg-surface-raised rounded-sm overflow-hidden"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
-            {isCollapsed ? (
-                <span className="text-text-muted text-xs select-none w-full text-center">…</span>
-            ) : (
-                <>
-                    {titleElement ?? (
-                        <span className={`text-sm truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`} title={title}>
-                            {title}
-                        </span>
-                    )}
+            {titleElement ?? (
+                <span
+                    className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
+                    style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
+                    title={title}
+                >
+                    {title}
+                </span>
+            )}
 
-                    <div className="flex items-center gap-1">
-                        {infoElement}
-                        {hasAudio && onToggleMute && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleMute();
-                                }}
-                                className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
-                                title={isMuted ? "Unmute" : "Mute"}
-                            >
-                                {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
-                            </button>
-                        )}
-                    </div>
-                </>
+            {!isCollapsed && (
+                <div className="flex items-center gap-1">
+                    {infoElement}
+                    {hasAudio && onToggleMute && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleMute();
+                            }}
+                            className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
+                            title={isMuted ? "Unmute" : "Mute"}
+                        >
+                            {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
+                        </button>
+                    )}
+                </div>
             )}
         </div>
     );

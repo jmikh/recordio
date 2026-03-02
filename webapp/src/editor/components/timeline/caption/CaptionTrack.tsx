@@ -9,8 +9,7 @@ import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
 import { useCaptionHover } from './useCaptionHover';
 import type { CaptionSegment } from '../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
-import { ghostCaption } from './CaptionTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { ghostCaption, blockIconClass, ghostIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
 
 interface CaptionTrackProps {
@@ -178,10 +177,11 @@ export const CaptionTrack: React.FC<CaptionTrackProps> = ({ height, isCollapsed 
                                 top: blockY,
                                 width: '100%',
                                 ...ghostCaption.block.getStyle(),
+                                height: height - 2,
                             }}
                         >
                             {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
-                                <FaRegClosedCaptioning className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                                <FaRegClosedCaptioning className={ghostIconClass} size={BLOCK_ICON_SIZE} />
                             )}
                         </div>
                     </div>

@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { createPortal } from 'react-dom';
 import {
-    captionBlock,
-    captionContainer,
+    holdSegment,
+    blockContainer,
     resizeHandle,
     dragHandleIndicator,
-    DRAG_HANDLE_HEIGHT,
-} from './CaptionTrackStyles';
-import { blockIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+    blockIconClass,
+    BLOCK_ICON_SIZE,
+    MIN_ICON_WIDTH_PX,
+} from '../TimelineBlockStyles';
 
 interface CaptionBlockProps {
     /** Left position in pixels */
@@ -57,8 +58,8 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
 }) => {
     const segmentHeight = trackHeight - 2;
     const blockY = 1;
-    const colorClass = (isSelected && !disabled) ? captionBlock.selectedClass : captionBlock.defaultClass;
-    const hoverClass = (isSelected || disabled) ? '' : captionBlock.hoverClass;
+    const colorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
+    const hoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     // Tooltip hover state
     const [isHovered, setIsHovered] = useState(false);
@@ -79,7 +80,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`${captionContainer.base} group ${isDragging ? captionContainer.dragging : captionContainer.idle} ${(!isSelected && !disabled) ? captionContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+                className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
@@ -95,12 +96,12 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
             >
                 {/* Caption Block */}
                 <div
-                    className={`${captionBlock.base} ${colorClass} ${hoverClass} flex items-center justify-center overflow-hidden`}
+                    className={`${holdSegment.base} ${colorClass} ${hoverClass} flex items-center justify-center overflow-hidden`}
                     style={{
                         left: 0,
                         top: blockY,
                         width: '100%',
-                        ...captionBlock.getStyle(),
+                        ...holdSegment.getStyle(),
                         height: segmentHeight,
                     }}
                 >
@@ -115,14 +116,14 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                     style={{
                         left: -resizeHandle.width / 2,
                         width: resizeHandle.width,
-                        top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                        height: resizeHandle.height,
+                        top: -1,
+                        bottom: -1,
                     }}
                     onMouseDown={onResizeStartMouseDown}
                 >
                     <div
-                        className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                        style={{ height: dragHandleIndicator.height }}
+                        className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                        style={{ height: 'calc(100% - 2px)' }}
                     />
                 </div>
 
@@ -132,14 +133,14 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
                     style={{
                         right: -resizeHandle.width / 2,
                         width: resizeHandle.width,
-                        top: (trackHeight - DRAG_HANDLE_HEIGHT) / 2,
-                        height: resizeHandle.height,
+                        top: -1,
+                        bottom: -1,
                     }}
                     onMouseDown={onResizeEndMouseDown}
                 >
                     <div
-                        className={`${dragHandleIndicator.base} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
-                        style={{ height: dragHandleIndicator.height }}
+                        className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
+                        style={{ height: 'calc(100% - 2px)' }}
                     />
                 </div>
             </div>
