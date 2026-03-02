@@ -1,5 +1,4 @@
 import { type ZoomSegment, type Size, type Rect, type CameraSettings, type CameraLayoutSegment, type ZoomSettings } from '../../types';
-import { getViewportStateAtTime } from './zoomAnimator';
 import { applyEasing } from '../easing';
 
 /**
@@ -90,29 +89,19 @@ export function scaleCameraSettings<T extends Pick<CameraSettings, 'xPx' | 'yPx'
     };
 }
 
-/**
- * Checks if a viewport rect represents a full-screen (no zoom) state.
- */
-function isFullScreen(rect: Rect, outputSize: Size): boolean {
-    return Math.abs(rect.x) < 1 &&
-        Math.abs(rect.y) < 1 &&
-        Math.abs(rect.width - outputSize.width) < 1 &&
-        Math.abs(rect.height - outputSize.height) < 1;
-}
 
 
 /**
  * Calculates the effective camera state at a given time based on viewport motions.
- * 
- * Derives camera shrink from the authoritative viewport interpolator
- * (getViewportStateAtTime), so the camera scale is always proportional to
- * and perfectly synchronized with the viewport zoom level — including the
- * gap-based zoom-out transitions that have no explicit ZoomSegment.
- * 
+ *
+ * Mirrors the phase logic of getViewportStateAtTime so the camera shrink
+ * uses the exact same transition duration and easing as the zoom itself.
+ * shrinkScale is an absolute target: when zoomed, sizeScale = shrinkScale.
+ *
  * @param actions - Array of zoom segments from the timeline
  * @param currentTimeMs - Current playback time in milliseconds (OUTPUT time)
  * @param outputSize - The output video size
- * @param shrinkScale - Target scale when fully shrunk (e.g., 0.5 for 50%)
+ * @param shrinkScale - Target scale when fully shrunk (e.g., 0.25 for 25%)
  * @param zoomSettings - Zoom settings (transitionDurationMs, easing)
  * @returns The current camera state including scale factor
  */
@@ -127,23 +116,79 @@ export function getCameraStateAtTime(
         return { sizeScale: 1.0, isTransitioning: false };
     }
 
-    // Use the same interpolation engine as the viewport itself
-    const viewport = getViewportStateAtTime(actions, currentTimeMs, outputSize, zoomSettings);
+    const globalT = zoomSettings.transitionDurationMs;
+    const globalEasing = zoomSettings.easing ?? 'ease-in-out';
 
-    if (isFullScreen(viewport, outputSize)) {
+    const firstVisible = actions.find(s => s.visible);
+    if (!firstVisible) return { sizeScale: 1.0, isTransitioning: false };
+
+    // Before the first block starts — no zoom, no shrink
+    if (currentTimeMs < firstVisible.outputStartTimeMs) {
         return { sizeScale: 1.0, isTransitioning: false };
     }
 
-    // Calculate how zoomed-in the viewport is (1.0 = full screen, 0 = infinitely zoomed)
-    const zoomRatio = viewport.width / outputSize.width;
+    // Walk the same phases as getViewportStateAtTime
+    // Track the "incoming" shrink state at the start of each block
+    let currentScale = 1.0;
 
-    // Map zoom ratio to camera scale: full screen → 1.0, fully zoomed → shrinkScale
-    const sizeScale = shrinkScale + (1.0 - shrinkScale) * zoomRatio;
+    for (let i = 0; i < actions.length; i++) {
+        const block = actions[i];
+        if (!block.visible) continue;
 
-    return {
-        sizeScale,
-        isTransitioning: zoomRatio > 0.01 && zoomRatio < 0.99,
-    };
+        const T = block.transitionDurationMs ?? globalT;
+        const easing = block.easing ?? globalEasing;
+
+        let nextBlock: ZoomSegment | null = null;
+        for (let j = i + 1; j < actions.length; j++) {
+            if (actions[j].visible) { nextBlock = actions[j]; break; }
+        }
+
+        const blockStart = block.outputStartTimeMs;
+        const blockEnd = block.outputEndTimeMs;
+        const transitionInEnd = Math.min(blockStart + T, blockEnd);
+
+        // ---- PHASE 1a: Transition IN (zoom in → shrink to shrinkScale) ----
+        if (currentTimeMs >= blockStart && currentTimeMs < transitionInEnd) {
+            const elapsed = currentTimeMs - blockStart;
+            const t = applyEasing(Math.min(elapsed / T, 1), easing);
+            const sizeScale = currentScale + (shrinkScale - currentScale) * t;
+            return { sizeScale, isTransitioning: true };
+        }
+
+        // ---- PHASE 1b: Hold (fully zoomed → fully shrunk) ----
+        if (currentTimeMs >= transitionInEnd && currentTimeMs < blockEnd) {
+            return { sizeScale: shrinkScale, isTransitioning: false };
+        }
+
+        // Past this block — compute scale at block end
+        const scaleAtBlockEnd = (blockEnd - blockStart) >= T
+            ? shrinkScale
+            : currentScale + (shrinkScale - currentScale) * applyEasing(Math.min((blockEnd - blockStart) / T, 1), easing);
+
+        const gapStart = blockEnd;
+        const gapEnd = nextBlock ? nextBlock.outputStartTimeMs : gapStart + T;
+
+        if (currentTimeMs >= gapStart && currentTimeMs < gapEnd) {
+            // ---- PHASE 2: Gap zoom-out (unshrink back to 1.0) ----
+            const elapsed = currentTimeMs - gapStart;
+            const t = applyEasing(Math.min(elapsed / T, 1), easing);
+            const sizeScale = scaleAtBlockEnd + (1.0 - scaleAtBlockEnd) * t;
+            return { sizeScale, isTransitioning: t < 1 };
+        }
+
+        if (currentTimeMs >= gapEnd && !nextBlock) {
+            return { sizeScale: 1.0, isTransitioning: false };
+        }
+
+        // Advance currentScale to wherever the gap reached at next block start
+        if (nextBlock) {
+            const gapElapsed = nextBlock.outputStartTimeMs - gapStart;
+            const t = applyEasing(Math.min(gapElapsed / T, 1), easing);
+            currentScale = scaleAtBlockEnd + (1.0 - scaleAtBlockEnd) * t;
+        }
+    }
+
+    return { sizeScale: currentScale, isTransitioning: false };
 }
 
 
