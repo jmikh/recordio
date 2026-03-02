@@ -13,7 +13,8 @@ import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { useThemeStore } from '../../../stores/useThemeStore';
-import { LogoLink } from '@shared/components';
+import { LogoLink, Dropdown, type DropdownOption } from '@shared/components';
+import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
 import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { useToast } from '../Toast';
 
@@ -31,6 +32,12 @@ function timeAgo(dateStr: string): string {
     return `${days}d ago`;
 }
 
+const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
+    value: preset,
+    label: preset.label,
+    suffix: preset.orientation ? <span className="text-text-muted text-xs">{preset.orientation}</span> : undefined,
+}));
+
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -41,6 +48,13 @@ export const Header = () => {
 
     const project = useProjectData();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
+    const outputSize = useProjectStore(s => s.project.settings.outputSize);
+    const updateSettings = useProjectStore(s => s.updateSettings);
+    const currentPreset = findPreset(outputSize);
+
+    const handleAspectRatioChange = (preset: AspectRatioPreset) => {
+        updateSettings({ outputSize: { width: preset.width, height: preset.height } });
+    };
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const pastStates = useProjectHistory(state => state.pastStates);
@@ -121,7 +135,7 @@ export const Header = () => {
                     )}
                 </div>
 
-                {/* Project Name + Share Link (Centered) */}
+                {/* Project Name + Aspect Ratio + Share Link (Centered) */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                     <input
                         id="project-name-input"
@@ -129,8 +143,16 @@ export const Header = () => {
                         value={project.name}
                         onChange={(e) => updateProjectName(e.target.value)}
                         maxLength={40}
-                        className="bg-state-inactive text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-state-hover hover:border-border-highlighted focus:bg-state-hover focus:border-border-highlighted rounded px-2 py-0.5 transition-colors placeholder-text-main w-[300px] focus-ring"
+                        className="h-9 bg-state-inactive text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-state-hover hover:border-border-highlighted focus:bg-state-hover focus:border-border-highlighted rounded-[var(--radius-interactive)] px-2 transition-colors placeholder-text-main w-[240px] focus-ring"
                         placeholder="Untitled Project"
+                    />
+                    <Dropdown
+                        options={aspectRatioOptions}
+                        value={currentPreset}
+                        onChange={handleAspectRatioChange}
+                        fullWidth={false}
+                        buttonClassName="px-2 text-xs"
+                        hideSuffixInTrigger
                     />
                     {existingShare && (
                         <ShareLinkButton

@@ -3,27 +3,13 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, CollapsibleCard, Dropdown, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { CgToolbarTop } from 'react-icons/cg';
 import { TbResize, TbFrame } from 'react-icons/tb';
 
-interface Resolution {
-    label: string;
-    width: number;
-    height: number;
-    orientation?: string;
-}
-
-const RESOLUTIONS: Resolution[] = [
-    { label: '1:1', width: 1080 * 2, height: 1080 * 2 },
-    { label: '4:3', width: 1440 * 2, height: 1080 * 2, orientation: 'Horizontal' },
-    { label: '16:9', width: 1920 * 2, height: 1080 * 2, orientation: 'Horizontal' },
-    { label: '3:4', width: 1080 * 2, height: 1440 * 2, orientation: 'Vertical' },
-    { label: '9:16', width: 1080 * 2, height: 1920 * 2, orientation: 'Vertical' },
-];
 
 export const ScreenSettings = () => {
     const project = useProjectStore(s => s.project);
@@ -47,25 +33,10 @@ export const ScreenSettings = () => {
         });
     };
 
-    // Current resolution
-    const currentResolution = project.settings.outputSize;
-    const currentResolutionObj = RESOLUTIONS.find(
-        r => r.width === currentResolution?.width && r.height === currentResolution?.height
-    ) || RESOLUTIONS[2]; // Default to 16:9
 
-    const resolutionOptions: DropdownOption<Resolution>[] = RESOLUTIONS.map(res => ({
-        value: res,
-        label: res.label,
-        suffix: res.orientation ? <span className="text-text-muted text-xs">{res.orientation}</span> : undefined,
-    }));
-
-    const handleResolutionChange = (resolution: Resolution) => {
-        updateSettings({ outputSize: { width: resolution.width, height: resolution.height } });
-    };
 
     // Build preview items for collapsed Size state
     const sizePreviewItems: PreviewItem[] = [];
-    sizePreviewItems.push({ type: 'text', content: currentResolutionObj.label });
     const paddingPercent = Math.round((screenConfig.padding || 0) * 100);
     if (paddingPercent > 0) {
         sizePreviewItems.push({ type: 'text', content: `${paddingPercent}%` });
@@ -326,13 +297,6 @@ export const ScreenSettings = () => {
                         {isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-4 h-4" />}
                         {isEditingCrop ? 'Done' : 'Crop Screen'}
                     </button>
-
-                    {/* Aspect Ratio Dropdown */}
-                    <Dropdown
-                        options={resolutionOptions}
-                        value={currentResolutionObj}
-                        onChange={handleResolutionChange}
-                    />
 
                 </div>
             </CollapsibleCard>

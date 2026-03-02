@@ -30,6 +30,7 @@ import { useUIStore } from '../../stores/useUIStore';
 const TRACK_HEIGHT = 32;
 const TRACK_GAP = 4; // Gap between track rows
 const HEADER_WIDTH = 120;
+const RULER_HEIGHT = 26; // 24px canvas + 2px borders (border-t + border-b on ruler wrapper)
 
 export function Timeline() {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -258,50 +259,53 @@ export function Timeline() {
                 {/* LEFT COLUMN: HEADERS */}
                 <div
                     className="flex-shrink-0 flex flex-col z-[var(--z-index-overlay)] border-r border-border"
-                    style={{ width: HEADER_WIDTH, gap: TRACK_GAP, paddingTop: TRACK_GAP }}
+                    style={{ width: HEADER_WIDTH }}
                 >
-                    {/* Track Visibility Dropdown (ruler spacer area) */}
-                    <div style={{ height: 24 - TRACK_GAP }} className="border-b border-border shrink-0 flex items-center">
-                        <TrackVisibilityDropdown height={24 - TRACK_GAP} />
+                    {/* Track Visibility Dropdown — matches ruler height exactly */}
+                    <div style={{ height: RULER_HEIGHT }} className="border-b border-border shrink-0 flex items-center">
+                        <TrackVisibilityDropdown height={RULER_HEIGHT} />
                     </div>
 
-                    {/* Header: Recording */}
-                    {trackVisibility.recording && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <TimelineHeaderCell
-                                title="Recording"
-                                height={TRACK_HEIGHT}
-                            />
-                        </div>
-                    )}
+                    {/* Track headers wrapper — mirrors the tracks container on the right */}
+                    <div className="flex flex-col" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
+                        {/* Header: Recording */}
+                        {trackVisibility.recording && (
+                            <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                                <TimelineHeaderCell
+                                    title="Recording"
+                                    height={TRACK_HEIGHT}
+                                />
+                            </div>
+                        )}
 
-                    {/* Header: Zoom */}
-                    {trackVisibility.zoom && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <ZoomHeaderCell height={TRACK_HEIGHT} />
-                        </div>
-                    )}
+                        {/* Header: Zoom */}
+                        {trackVisibility.zoom && (
+                            <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                                <ZoomHeaderCell height={TRACK_HEIGHT} />
+                            </div>
+                        )}
 
-                    {/* Header: Spotlight */}
-                    {trackVisibility.spotlight && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <SpotlightHeaderCell height={TRACK_HEIGHT} />
-                        </div>
-                    )}
+                        {/* Header: Spotlight */}
+                        {trackVisibility.spotlight && (
+                            <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                                <SpotlightHeaderCell height={TRACK_HEIGHT} />
+                            </div>
+                        )}
 
-                    {/* Header: Captions */}
-                    {trackVisibility.captions && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <CaptionsHeaderCell height={TRACK_HEIGHT} />
-                        </div>
-                    )}
+                        {/* Header: Captions */}
+                        {trackVisibility.captions && (
+                            <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                                <CaptionsHeaderCell height={TRACK_HEIGHT} />
+                            </div>
+                        )}
 
-                    {/* Header: Camera Layout */}
-                    {trackVisibility.cameraLayout && (
-                        <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
-                            <LayoutHeaderCell height={TRACK_HEIGHT} />
-                        </div>
-                    )}
+                        {/* Header: Camera Layout */}
+                        {trackVisibility.cameraLayout && (
+                            <div className="shrink-0" style={{ height: TRACK_HEIGHT }}>
+                                <LayoutHeaderCell height={TRACK_HEIGHT} />
+                            </div>
+                        )}
+                    </div>
 
                 </div>
 

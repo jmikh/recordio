@@ -100,7 +100,6 @@ serve(async (req) => {
         // 5. Upload to Cloudflare Stream
         const cfFormData = new FormData();
         cfFormData.append('file', videoFile, `${projectName}.mp4`);
-        cfFormData.append('creator', user.id);
 
         const cfResponse = await fetch(
             `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream`,
@@ -122,6 +121,24 @@ serve(async (req) => {
 
         const cfData = await cfResponse.json();
         const newVideoUid = cfData.result.uid;
+
+        // 5b. Set creator on the uploaded video (basic upload ignores form fields other than 'file')
+        try {
+            await fetch(
+                `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${newVideoUid}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${CF_API_TOKEN}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ creator: user.id }),
+                }
+            );
+        } catch (e) {
+            // Non-critical — log but don't fail the upload
+            console.error('[Stream] Failed to set creator:', e);
+        }
 
         // 6. Upsert shared_videos record
         const oldVideoUid = existingShare?.cf_video_uid;

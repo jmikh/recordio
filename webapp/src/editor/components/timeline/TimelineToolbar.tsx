@@ -1,11 +1,11 @@
 import React from 'react';
 import { useUIStore } from '../../stores/useUIStore';
+
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { Slider } from '@shared/components';
-
 
 interface TimelineToolbarProps {
     totalDurationMs: number;
@@ -27,6 +27,8 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
+
+
 
     // History Batcher
     const batcher = useHistoryBatcher();
@@ -88,13 +90,10 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
 
     return (
         <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
-            <div className="flex items-center gap-2">
-            </div>
-
             <div className="flex items-center gap-3">
                 <button
                     onClick={onTogglePlay}
-                    className="w-7 h-7 rounded-full border-2 border-primary text-primary hover:border-primary-highlighted hover:text-primary-highlighted hover:bg-state-hover hover:scale-110 transition-all flex items-center justify-center shrink-0"
+                    className="w-7 h-7 rounded-full border-2 border-primary text-primary hover:border-primary-highlighted hover:text-primary-highlighted hover:scale-110 transition-all flex items-center justify-center shrink-0"
                 >
                     {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
                 </button>
