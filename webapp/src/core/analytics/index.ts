@@ -92,18 +92,45 @@ export function resetUser() {
 // Event Tracking (dual: GA4 + Mixpanel)
 // ============================================================================
 
+// Lazy-resolved to avoid circular dependency (useUserStore imports from this module)
+let _getUserStore: (() => { isAuthenticated: boolean; subscription: { status: string | null } }) | null = null;
+function getUserStore() {
+    if (!_getUserStore) {
+        // Dynamic require — module is already loaded by the time any event fires
+        const { useUserStore } = require('../../editor/stores/useUserStore');
+        _getUserStore = () => useUserStore.getState();
+    }
+    return _getUserStore();
+}
+
+function getGlobalProperties(): Record<string, any> {
+    try {
+        const { isAuthenticated, subscription } = getUserStore();
+        const planType = subscription.status === 'active' ? 'pro'
+            : subscription.status === 'trialing' ? 'pro_trial'
+                : 'basic';
+        return { is_authenticated: isAuthenticated, plan_type: planType };
+    } catch {
+        // Store not yet initialized (e.g. during early boot)
+        return { is_authenticated: false, plan_type: 'basic' };
+    }
+}
+
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
+    const globalProps = getGlobalProperties();
+    const allParams = { ...globalProps, ...params };
+
     // GA4
     if (typeof window.gtag === 'function') {
         window.gtag('event', eventName, {
             local_user_id: getOrCreateLocalUserId(),
-            ...params,
+            ...allParams,
         });
     }
 
     // Mixpanel (disabled in local dev)
     if (!IS_LOCAL) {
-        mixpanel.track(eventName, params);
+        mixpanel.track(eventName, allParams);
         mixpanel.people.set({ last_active_date: new Date().toISOString() });
     }
 }

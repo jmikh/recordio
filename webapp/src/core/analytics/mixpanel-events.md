@@ -13,6 +13,8 @@
 
 ## Client-Side Events (Browser SDK)
 
+> **Global properties** — Every client event automatically includes `is_authenticated` (boolean) and `plan_type` (`basic` | `pro_trial` | `pro`).
+
 | Event | Trigger | Properties |
 |---|---|---|
 | `export_completed` | Download or publish finishes (or fails) | `quality`, `fps`, `export_type`, `is_authenticated`, `is_pro`, `export_duration_seconds`, `upload_duration_seconds` (publish only), `success`, `error` (on failure), `recording_type`, `input_duration`, `output_duration`, `first_url`, `events_clicks`, `events_keyboard`, `events_typing`, `events_drags`, `events_hovered_cards`, `events_url_changes`, `screen_mode`, `screen_border_radius`, `screen_padding`, `screen_device_frame_id`, `screen_toolbar_enabled`, `output_crop`, `has_camera`, `camera_shape`, `camera_feather`, `background_type`, `background_color_mode`, `background_image_choice`, `music_enabled`, `music_choice`, `mic_muted`, `screen_audio_muted`, `click_effect_enabled`, `click_sound_enabled`, `drag_effect_enabled`, `hotkeys_enabled`, `zoom_count`, `spotlight_count`, `camera_move_count`, `caption_count`, `captions_generated`, `captions_visible`, `auto_cut_used` |
