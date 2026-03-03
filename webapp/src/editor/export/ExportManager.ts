@@ -66,13 +66,22 @@ export class ExportManager {
             error: (e) => console.error("VideoEncoder error:", e)
         });
 
-        videoEncoder.configure({
+        const videoConfig: VideoEncoderConfig = {
             codec: this.getCodecString(quality), // Dynamic codec based on resolution
             width,
             height,
             bitrate: this.getBitrate(quality, fps),
             framerate: fps
-        });
+        };
+
+        const support = await VideoEncoder.isConfigSupported(videoConfig);
+        if (!support.supported) {
+            const msg = `VideoEncoder config not supported: ${videoConfig.codec} @ ${width}×${height}`;
+            console.error(`[Export] ${msg}`, videoConfig);
+            throw new Error(msg);
+        }
+
+        videoEncoder.configure(videoConfig);
 
         let audioEncoderFailed = false;
         const audioEncoder = new AudioEncoder({
@@ -493,7 +502,7 @@ export class ExportManager {
     private getCodecString(q: ExportQuality): string {
         switch (q) {
             case '4K': return 'avc1.640033'; // High Profile, Level 5.1
-            case '2K': return 'avc1.640028'; // High Profile, Level 4.0
+            case '2K': return 'avc1.640033'; // High Profile, Level 5.1
             case '1080p': return 'avc1.64002a'; // High Profile, Level 4.2
             case '720p':
             case '480p':

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCheck } from 'react-icons/fa';
+import { FaCheck, FaCog } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
@@ -25,7 +25,10 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [billingInterval, setBillingInterval] = useState<BillingInterval>(initialInterval ?? 'yearly');
-    const { userId, email, isAuthenticated } = useUserStore();
+    const { userId, email, isAuthenticated, isPro, subscription } = useUserStore();
+
+    // Active paid subscriber (not trialing)
+    const isActiveSubscriber = isPro && subscription.status === 'active';
 
     // Poll for subscription status after checkout opens
     useEffect(() => {
@@ -115,11 +118,91 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
     };
 
+    const handleManageSubscription = async () => {
+        if (!subscription.stripeCustomerId) {
+            console.error('[UpgradeModal] No Stripe customer ID found');
+            return;
+        }
+
+        setLoading(true);
+        const { url, error } = await StripeService.createPortalSession(subscription.stripeCustomerId);
+        setLoading(false);
+
+        if (error || !url) {
+            console.error('[UpgradeModal] Failed to create portal session:', error);
+            return;
+        }
+
+        window.open(url, '_blank');
+    };
+
     const monthlyPrice = 15;
     const yearlyPrice = 72;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
 
+    // ── Already-Pro View ──
+    if (isActiveSubscriber) {
+        return (
+            <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_60px_-5px_var(--color-primary)]">
+                <div className="flex justify-end mb-2">
+                    <XButton onClick={handleClose} title="Close" />
+                </div>
+
+                {/* Pro Title */}
+                <h2 className="text-2xl font-bold text-text-highlighted text-center mb-6 flex items-center justify-center gap-2">
+                    Recordio
+                    <span className="bg-primary text-text-on-primary text-xs font-bold px-2.5 py-1 rounded-full uppercase">
+                        Pro
+                    </span>
+                </h2>
+
+                {/* Crown + Message */}
+                <div className="flex flex-col items-center gap-3 mb-6">
+                    <BiCrown className="text-primary" size={48} />
+                    <p className="text-lg font-semibold text-text-highlighted text-center">
+                        You're already a Pro member
+                    </p>
+                    <p className="text-sm text-text-muted text-center">
+                        You have full access to all Pro features including unlimited 4K exports, no watermarks, and shareable links.
+                    </p>
+                </div>
+
+                {/* Subscription Info */}
+                {subscription.currentPeriodEnd && (
+                    <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
+                        <p className="text-xs text-text-muted">
+                            {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
+                        </p>
+                        <p className="text-sm text-text-highlighted font-medium mt-0.5">
+                            {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
+                    </div>
+                )}
+
+                {/* Manage Subscription */}
+                {subscription.stripeCustomerId && (
+                    <button
+                        onClick={handleManageSubscription}
+                        disabled={loading}
+                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
+                    >
+                        <FaCog size={14} />
+                        {loading ? 'Loading...' : 'Manage Subscription'}
+                    </button>
+                )}
+
+                <button
+                    onClick={handleClose}
+                    className="w-full py-2.5 mt-2 text-sm text-text-muted hover:text-text-main transition-colors rounded-lg"
+                >
+                    Close
+                </button>
+            </Modal>
+        );
+    }
+
+    // ── Standard Upgrade Flow ──
     return (
         <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_60px_-5px_var(--color-primary)]">
             {/* Header */}
