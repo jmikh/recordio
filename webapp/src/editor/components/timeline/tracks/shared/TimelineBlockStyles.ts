@@ -27,7 +27,7 @@ export const ghostIconClass = 'text-text-on-secondary/70';
 // ============= SEGMENT RADIUS =============
 
 /** Unified corner radius for all track segments */
-export const SEGMENT_RADIUS = 4;
+export const SEGMENT_RADIUS = 8;
 
 /** Shared border width for all block segments */
 export const BLOCK_BORDER_WIDTH = 1;
