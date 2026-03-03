@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCheck, FaGift } from 'react-icons/fa';
+import { FaCheck } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
@@ -13,16 +13,18 @@ interface UpgradeModalProps {
     onClose: () => void;
     onSignInRequest: () => void;
     selectedQuality?: string | null;
+    initialInterval?: BillingInterval;
+    autoCheckout?: boolean;
 }
 
 type BillingInterval = 'monthly' | 'yearly';
 
-export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality }: UpgradeModalProps) {
+export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality, initialInterval, autoCheckout }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
     const [checkingStatus, setCheckingStatus] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [billingInterval, setBillingInterval] = useState<BillingInterval>('yearly');
+    const [billingInterval, setBillingInterval] = useState<BillingInterval>(initialInterval ?? 'yearly');
     const { userId, email, isAuthenticated } = useUserStore();
 
     // Poll for subscription status after checkout opens
@@ -83,6 +85,8 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
     }, [isOpen]);
 
+
+
     const handleClose = () => {
         trackUpgradeModalDismissed();
         onClose();
@@ -117,7 +121,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
 
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_60px_-5px_var(--color-primary)]">
             {/* Header */}
             <div className="flex justify-end mb-2">
                 <XButton onClick={handleClose} title="Close" />
@@ -218,26 +222,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </li>
             </ul>
 
-            {/* Free Trial Banner (non-authenticated users only) */}
-            {!isAuthenticated && (
-                <div className="mb-4 bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-start gap-3">
-                    <FaGift className="text-primary mt-0.5 shrink-0" size={16} />
-                    <div>
-                        <p className="text-sm text-text-highlighted">
-                            <strong>Try Pro free for 7 days!</strong>
-                        </p>
-                        <p className="text-xs text-text-muted mt-0.5">
-                            <button
-                                onClick={() => { onClose(); onSignInRequest(); }}
-                                className="text-primary hover:text-primary-highlighted underline"
-                            >
-                                Sign in
-                            </button>
-                            {' '}to start your free trial — no credit card needed.
-                        </p>
-                    </div>
-                </div>
-            )}
+
 
             {/* Error Message */}
             {error && (
@@ -252,7 +237,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
                 disabled={loading}
             >
-                {loading ? 'Loading...' : 'Get Pro'}
+                {loading ? 'Loading...' : autoCheckout && isAuthenticated ? 'Continue to Checkout' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
             </button>
 
             <p className="text-center text-xs text-text-muted mt-4">

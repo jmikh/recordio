@@ -6,6 +6,7 @@ import { useUserStore } from '../editor/stores/useUserStore';
 async function cacheAvatarUrl(url: string): Promise<string | null> {
     try {
         const res = await fetch(url);
+        if (!res.ok) return null;
         const blob = await res.blob();
         return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -14,7 +15,7 @@ async function cacheAvatarUrl(url: string): Promise<string | null> {
             reader.readAsDataURL(blob);
         });
     } catch {
-        return url; // fall back to remote URL
+        return null;
     }
 }
 
@@ -33,12 +34,16 @@ export function useAuthListener() {
                 const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
                 const rawPicture = avatar_url || picture || null;
 
-                // Skip fetch if we already have a cached data URL for this source
+                // Skip fetch if we already initiated a cache for this source URL.
+                // The UI uses initials as a fallback while the data URL loads.
                 const cached = useUserStore.getState();
                 let userPicture: string | null;
-                if (rawPicture && cached.pictureSourceUrl === rawPicture && cached.picture?.startsWith('data:')) {
+                if (rawPicture && cached.pictureSourceUrl === rawPicture) {
                     userPicture = cached.picture;
                 } else {
+                    // Set pictureSourceUrl immediately so subsequent rapid
+                    // onAuthStateChange callbacks see the match and skip (prevents 429s)
+                    setUser(session.user.id, session.user.email || '', userName, null, rawPicture);
                     userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
                 }
 

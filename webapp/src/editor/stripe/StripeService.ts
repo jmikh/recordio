@@ -38,8 +38,10 @@ export class StripeService {
 
             // Open Stripe Checkout in new tab
             // User completes payment there and can close tab when done
-
-            window.open(data.url, '_blank');
+            const popup = window.open(data.url, '_blank');
+            if (!popup) {
+                return { error: new Error('Popup blocked — please click the button to open checkout') };
+            }
 
             return {};
         } catch (error) {

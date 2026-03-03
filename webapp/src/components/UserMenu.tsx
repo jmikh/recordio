@@ -71,17 +71,13 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                 title={name || email || 'User Menu'}
             >
                 {picture ? (
-                    <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" />
+                    <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
                 ) : (
                     <div className="w-full h-full bg-surface-raised flex items-center justify-center text-text-muted">
                         <FaUser size={14} />
                     </div>
                 )}
-                {isPro && (
-                    <div className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-[1px]">
-                        <BiCrown size={10} className="text-yellow-500" />
-                    </div>
-                )}
+
             </button>
 
             {isOpen && (
@@ -90,7 +86,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">
                                 {picture ? (
-                                    <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" />
+                                    <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
                                 ) : (
                                     <div className="w-full h-full bg-surface-light flex items-center justify-center text-text-muted">
                                         <FaUser size={16} />
@@ -103,30 +99,22 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between bg-background/50 rounded p-2 border border-border/50">
+                        <div className="flex flex-col gap-1 mt-1">
                             <span className="text-xs text-text-muted">Status</span>
-                            <div className="flex flex-col items-end gap-0.5">
-                                {isTrialing ? (
-                                    <div className="flex items-center gap-1.5 text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                        <BiCrown size={10} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider">Pro Trial</span>
-                                    </div>
-                                ) : isPro ? (
-                                    <div className="flex items-center gap-1.5 text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                        <BiCrown size={10} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider">Pro</span>
-                                    </div>
+                            <div className="flex items-center justify-between">
+                                {isPro ? (
+                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">Pro</span>
                                 ) : (
-                                    <span className="text-[10px] font-medium text-text-muted bg-surface-light px-2 py-0.5 rounded-full">Free Plan</span>
+                                    <span className="bg-text-disabled text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">Free</span>
                                 )}
                                 {isTrialing && subscription.currentPeriodEnd && (
-                                    <span className="text-[10px] text-text-muted">
-                                        expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    <span className="text-[11px] text-text-muted">
+                                        Trial ends {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 )}
-                                {isPro && !isTrialing && subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
-                                    <span className="text-[10px] text-text-muted">
-                                        expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                {isPro && !isTrialing && subscription.currentPeriodEnd && (
+                                    <span className="text-[11px] text-text-muted">
+                                        Expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 )}
                             </div>

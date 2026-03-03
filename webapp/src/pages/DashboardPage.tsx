@@ -36,13 +36,29 @@ export function DashboardPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     useAuthListener();
 
+    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | undefined>();
+
     useEffect(() => {
         // Check for error message in URL
         const params = new URLSearchParams(window.location.search);
         const error = params.get('error');
         if (error) {
             setErrorMessage(error);
-            window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Check for checkout intent from marketing site (e.g. ?checkout=yearly)
+        const checkout = params.get('checkout');
+        if (checkout === 'monthly' || checkout === 'yearly') {
+            setCheckoutInterval(checkout);
+            setIsUpgradeModalOpen(true);
+        }
+
+        // Clean up only our params — preserve hash fragment for Supabase auth token processing
+        if (error || checkout) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('checkout');
+            url.searchParams.delete('error');
+            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
         }
 
         loadProjects();
@@ -280,8 +296,16 @@ export function DashboardPage() {
             />
             <UpgradeModal
                 isOpen={isUpgradeModalOpen}
-                onClose={() => setIsUpgradeModalOpen(false)}
-                onSignInRequest={() => { setIsUpgradeModalOpen(false); setIsAuthModalOpen(true); }}
+                onClose={() => { setIsUpgradeModalOpen(false); setCheckoutInterval(undefined); }}
+                onSignInRequest={() => {
+                    // Preserve checkout intent in URL so it survives OAuth redirect
+                    const interval = checkoutInterval || 'yearly';
+                    window.history.replaceState({}, '', `/?checkout=${interval}`);
+                    setIsUpgradeModalOpen(false);
+                    setIsAuthModalOpen(true);
+                }}
+                initialInterval={checkoutInterval}
+                autoCheckout={!!checkoutInterval && isAuthenticated}
             />
 
             {/* Delete All Confirmation Modal */}
