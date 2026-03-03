@@ -12,6 +12,7 @@ import { useThemeStore } from '../stores/useThemeStore';
 import { SupportModal } from '../components/SupportModal';
 import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
+import { UpgradeModal } from '../editor/components/header/UpgradeModal';
 import { ShareService, type SharedVideo, type VideoAnalytics, MAX_SHARED_VIDEOS } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
 import { useAuthListener } from '../hooks/useAuthListener';
@@ -28,6 +29,7 @@ export function DashboardPage() {
     const isAuthenticated = !!userId;
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
     const [storageUsed, setStorageUsed] = useState<number | null>(null);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -157,7 +159,7 @@ export function DashboardPage() {
                             </button>
                         </div>
                         {isAuthenticated ? (
-                            <UserMenu onOpenUpgradeModal={() => { }} />
+                            <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                         ) : (
                             <button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features" className="interactive-ghost flex items-center justify-center gap-2">
                                 Sign In
@@ -275,6 +277,11 @@ export function DashboardPage() {
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
                 onAuthSuccess={() => { }}
+            />
+            <UpgradeModal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                onSignInRequest={() => { setIsUpgradeModalOpen(false); setIsAuthModalOpen(true); }}
             />
 
             {/* Delete All Confirmation Modal */}

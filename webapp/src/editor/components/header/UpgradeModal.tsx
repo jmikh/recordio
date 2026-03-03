@@ -111,7 +111,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
     };
 
-    const monthlyPrice = 12;
+    const monthlyPrice = 15;
     const yearlyPrice = 72;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);

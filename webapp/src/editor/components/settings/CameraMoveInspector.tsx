@@ -8,6 +8,7 @@ import type { CameraMoveSegment } from '../../../types';
 import { PiWebcamBold } from 'react-icons/pi';
 import { RxEnterFullScreen } from 'react-icons/rx';
 import { EasingTooltipContent } from './EasingTooltipContent';
+import { CameraMoveTooltip } from '../shared/MediaTooltips';
 
 const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
     { value: 'linear', label: 'Linear' },
@@ -91,7 +92,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
     const isHidden = !!segment.hidden;
 
     return (
-        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold size={16} />} notCollapsible>
+        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold size={16} />} notCollapsible headerAction={<CameraMoveTooltip />}>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Adjust the camera position, size, and shape for this segment.</p>
 

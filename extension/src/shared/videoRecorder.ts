@@ -12,6 +12,7 @@
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
+import { captureException } from '../utils/sentry';
 import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 import type { RawRecording } from '@shared/types';
@@ -318,13 +319,18 @@ export class VideoRecorder {
         // 4. Get Camera Stream
         let cameraStream: MediaStream | null = null;
         if (config.hasCamera) {
-            const videoConstraints: MediaTrackConstraints = {
-                ...(config.videoDeviceId && { deviceId: { exact: config.videoDeviceId } }),
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-            };
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-            this.activeStreams.push(cameraStream);
+            try {
+                const videoConstraints: MediaTrackConstraints = {
+                    ...(config.videoDeviceId && { deviceId: { exact: config.videoDeviceId } }),
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                };
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+                this.activeStreams.push(cameraStream);
+            } catch (e) {
+                console.warn('[VideoRecorder] Camera getUserMedia failed:', e);
+                captureException(e instanceof Error ? e : new Error(String(e)));
+            }
         }
 
         // 5. Setup Recorders
