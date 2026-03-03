@@ -121,6 +121,9 @@ export const IMPORT_PATH = '/import';
 /** Timeout for handoff to complete (ms) */
 export const HANDOFF_TIMEOUT_MS = 30000;
 
+/** Chrome Web Store URL for the Recordio extension */
+export const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/recordio-smart-screen-rec/bbcdpipjplklaneplfmlhhibnllhinii';
+
 /** Origin of the editor website (production) */
 export const EDITOR_ORIGIN_PROD = 'https://app.recordio.cc';
 

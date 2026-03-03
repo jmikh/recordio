@@ -271,6 +271,22 @@ body,
       @apply h-9 px-3 bg-transparent border-none rounded-full text-sm text-text-muted hover:text-text-highlighted hover:bg-state-hover transition-colors cursor-pointer disabled:text-text-disabled disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-text-disabled;
    }
 
+   /* Interactive Icon - circular icon-only button with scale hover */
+   .interactive-icon {
+      @apply size-9 p-0 bg-transparent border-none rounded-full text-text-muted cursor-pointer flex items-center justify-center;
+      transition: color 0.15s, transform 0.15s;
+   }
+
+   .interactive-icon:hover {
+      @apply text-text-highlighted;
+      transform: scale(1.15);
+   }
+
+   .interactive-icon:disabled {
+      @apply text-text-disabled cursor-default;
+      transform: none;
+   }
+
    /* Interactive Selected State - secondary border with glow */
    .interactive-selected {
       @apply border-secondary;

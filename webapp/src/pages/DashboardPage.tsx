@@ -5,6 +5,7 @@ import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { SharedVideoCard } from '../components/SharedVideoCard';
 import { LogoLink, XButton, Modal } from '@shared/components';
+import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -17,6 +18,7 @@ import { ShareService, type SharedVideo, type VideoAnalytics, MAX_SHARED_VIDEOS 
 import { useToast } from '../editor/components/Toast';
 import { useAuthListener } from '../hooks/useAuthListener';
 import * as Sentry from '@sentry/react';
+import { trackProjectOpened } from '../core/analytics';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -103,6 +105,7 @@ export function DashboardPage() {
     };
 
     const handleOpen = (projectId: string) => {
+        trackProjectOpened();
         window.location.href = `/editor?projectId=${projectId}`;
     };
 
@@ -163,20 +166,16 @@ export function DashboardPage() {
                     {hasProAccess() && (
                         <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase ml-1">Pro</span>
                     )}
-                    <div className="flex-1 flex justify-center">
-                        <span className="text-text-muted text-sm">
-                            {projects.length} project{projects.length !== 1 ? 's' : ''} · {sharedVideos.length} published video{sharedVideos.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
+                    <div className="flex-1" />
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
-                            <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center">
+                            <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-icon">
                                 <BiSupport size={18} />
                             </button>
                             <button
                                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                                 title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                                className="interactive-ghost flex items-center justify-center"
+                                className="interactive-icon"
                             >
                                 {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
                             </button>
@@ -270,13 +269,15 @@ export function DashboardPage() {
                             </button>
                         )}
                     </div>
+                    <p className="text-sm text-text-muted mb-4">
+                        Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
+                    </p>
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <div className="text-text-muted">Loading projects...</div>
                         </div>
                     ) : projects.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-center max-w-md mx-auto">
-                            <div className="text-text-muted mb-2">No projects on this device</div>
                             <div className="text-text-muted text-sm">
                                 Projects are stored locally in your browser. If you recorded on a different browser or device, open Recordio there to find your projects.
                             </div>

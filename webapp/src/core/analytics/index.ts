@@ -5,6 +5,8 @@
  * Mixpanel is initialized here via the npm SDK.
  * All events are dual-tracked to both platforms.
  * 
+ * Mixpanel is disabled in local dev mode (import.meta.env.DEV).
+ * 
  * ⚠️  When adding or modifying events/properties, update ./mixpanel-events.md
  */
 
@@ -18,13 +20,21 @@ declare global {
 }
 
 // ============================================================================
+// Local Mode Gate — Mixpanel is disabled in dev
+// ============================================================================
+
+const IS_LOCAL = import.meta.env.DEV;
+
+// ============================================================================
 // Mixpanel Initialization
 // ============================================================================
 
-mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
-    autocapture: false,
-    record_sessions_percent: 0,
-});
+if (!IS_LOCAL) {
+    mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+        autocapture: false,
+        record_sessions_percent: 0,
+    });
+}
 
 // ============================================================================
 // Anonymous Local User ID (GA4 only — Mixpanel uses identify/reset)
@@ -51,6 +61,7 @@ function getOrCreateLocalUserId(): string {
  * Merges any anonymous events into the identified profile.
  */
 export function identifyUser(userId: string, email: string) {
+    if (IS_LOCAL) return;
     mixpanel.identify(userId);
     mixpanel.people.set({ $email: email });
     // Set signup_date only once (won't overwrite on subsequent sessions)
@@ -63,6 +74,7 @@ export function identifyUser(userId: string, email: string) {
  * get their plan type set on first load (not just via webhook).
  */
 export function updatePlanType(status: string | null) {
+    if (IS_LOCAL) return;
     const planType = status === 'active' ? 'pro' : status === 'trialing' ? 'pro_trial' : 'basic';
     mixpanel.people.set({ current_plan_type: planType });
 }
@@ -72,6 +84,7 @@ export function updatePlanType(status: string | null) {
  * Called from useUserStore.clearUser on sign-out.
  */
 export function resetUser() {
+    if (IS_LOCAL) return;
     mixpanel.reset();
 }
 
@@ -88,11 +101,11 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
         });
     }
 
-    // Mixpanel
-    mixpanel.track(eventName, params);
-
-    // Update last active date on every event
-    mixpanel.people.set({ last_active_date: new Date().toISOString() });
+    // Mixpanel (disabled in local dev)
+    if (!IS_LOCAL) {
+        mixpanel.track(eventName, params);
+        mixpanel.people.set({ last_active_date: new Date().toISOString() });
+    }
 }
 
 // ============================================================================
@@ -158,6 +171,7 @@ export interface ExportCompletedParams {
     // Timeline features
     zoom_count: number;
     spotlight_count: number;
+    camera_move_count: number;
     caption_count: number;
     captions_generated: boolean;
     captions_visible: boolean;
@@ -259,6 +273,7 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
         // Timeline features
         zoom_count: timeline.zoomSegments.length,
         spotlight_count: timeline.spotlightSegments.length,
+        camera_move_count: timeline.cameraMoveSegments.length,
         caption_count: timeline.captionSegments.length,
         captions_generated: !!settings.captions.generatedAt,
         captions_visible: settings.captions.enabled ?? true,
@@ -336,6 +351,10 @@ export interface ProjectCreatedParams {
 export function trackProjectCreated(params: ProjectCreatedParams) {
     const totalProjectsCreated = incrementProjectCount();
     trackEvent('project_created', { ...params, total_projects_created: totalProjectsCreated });
+}
+
+export function trackProjectOpened() {
+    trackEvent('project_opened');
 }
 
 export function trackExtensionInstalled() {

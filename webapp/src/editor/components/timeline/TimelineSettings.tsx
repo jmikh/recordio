@@ -186,7 +186,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         <div ref={triggerRef} className="relative w-full" style={{ height }}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-main transition-colors cursor-pointer select-none"
+                className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-highlighted hover:scale-115 transition-all cursor-pointer select-none"
                 title="Track settings"
             >
                 <MdOutlineSettingsInputComponent size={18} />

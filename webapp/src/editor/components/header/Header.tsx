@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { BiSupport } from 'react-icons/bi';
-import { TbLink } from 'react-icons/tb';
+import { TbLink, TbFolder } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -103,7 +103,7 @@ export const Header = () => {
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                            className="interactive-icon"
                         >
                             <FaUndo size={14} />
                         </button>
@@ -111,7 +111,7 @@ export const Header = () => {
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                            className="interactive-icon"
                         >
                             <FaRedo size={14} />
                         </button>
@@ -164,13 +164,16 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-ghost flex items-center justify-center p-1.5 h-auto">
+                        <button onClick={() => window.location.href = '/'} title="Dashboard" className="interactive-icon">
+                            <TbFolder size={18} />
+                        </button>
+                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-icon">
                             <BiSupport size={18} />
                         </button>
                         <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                            className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                            className="interactive-icon"
                         >
                             {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
                         </button>
@@ -227,7 +230,7 @@ function ShareLinkButton({ onClick, snapshotDate }: { onClick: () => void; snaps
                 onClick={onClick}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                className="interactive-icon"
             >
                 <TbLink size={16} />
             </button>

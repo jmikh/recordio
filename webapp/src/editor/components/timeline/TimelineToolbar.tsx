@@ -125,7 +125,7 @@ export const TimelineToolbar: React.FC = () => {
                 </button>
                 <button
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                    className="interactive-ghost flex items-center justify-center gap-2 px-1"
+                    className="interactive-icon"
                 >
                     <MdRemove size={14} />
                 </button>
@@ -141,7 +141,7 @@ export const TimelineToolbar: React.FC = () => {
                 </div>
                 <button
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                    className="interactive-ghost flex items-center justify-center gap-2 px-1"
+                    className="interactive-icon"
                 >
                     <MdAdd size={14} />
                 </button>

@@ -64,6 +64,7 @@ export const SettingsPanel = () => {
     const setActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
     const [accentTop, setAccentTop] = useState(0);
+    const [accentHeight, setAccentHeight] = useState(0);
     const navRef = useRef<HTMLElement>(null);
 
     // Tooltip state for disabled tabs
@@ -117,7 +118,8 @@ export const SettingsPanel = () => {
         if (!navRef.current) return;
         const activeButton = navRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement;
         if (activeButton) {
-            setAccentTop(activeButton.offsetTop + (activeButton.offsetHeight - 28) / 2); // 28px = accent height (h-7)
+            setAccentTop(activeButton.offsetTop);
+            setAccentHeight(activeButton.offsetHeight);
         }
     }, [activeTab, navItems]);
 
@@ -141,12 +143,12 @@ export const SettingsPanel = () => {
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             {/* Sidebar Navigation */}
-            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 px-3 border-r border-border">
+            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 pl-0 pr-3 border-r border-border">
                 {/* Sliding accent bar — hidden when inspector is active */}
                 {!hasSelection && (
                     <div
-                        className="absolute left-3 w-[3px] h-7 bg-primary transition-all duration-200 ease-out"
-                        style={{ top: accentTop }}
+                        className="absolute left-0 w-[3px] bg-primary rounded-r-sm transition-all duration-200 ease-out"
+                        style={{ top: accentTop, height: accentHeight }}
                     />
                 )}
 
@@ -172,24 +174,26 @@ export const SettingsPanel = () => {
                                 }
                             }}
                             onMouseLeave={() => setHoveredDisabledTab(null)}
-                            className={`group flex items-center gap-4 py-3 px-4 bg-transparent border-none rounded-lg transition-colors duration-200 ${isDisabled
-                                ? 'opacity-50'
-                                : 'cursor-pointer'
+                            className={`group flex items-center gap-4 py-3 px-4 border-none rounded-r-lg transition-colors duration-200 ${isDisabled
+                                ? 'opacity-50 bg-transparent'
+                                : showActive
+                                    ? 'bg-primary/15 cursor-pointer'
+                                    : 'bg-transparent cursor-pointer hover:bg-surface-hover'
                                 }`}
                         >
-                            <span className={`flex transition-colors ${isDisabled
+                            <span className={`flex transition-all ${isDisabled
                                 ? 'text-text-disabled'
                                 : showActive
-                                    ? 'text-primary'
+                                    ? 'text-primary scale-110'
                                     : 'text-text-muted group-hover:text-text-main'
                                 }`}>
                                 {item.icon}
                             </span>
-                            <span className={`text-sm font-medium transition-colors ${isDisabled
-                                ? 'text-text-disabled'
+                            <span className={`text-sm transition-colors ${isDisabled
+                                ? 'text-text-disabled font-medium'
                                 : showActive
-                                    ? 'text-text-highlighted'
-                                    : 'text-text-muted group-hover:text-text-main'
+                                    ? 'text-text-highlighted font-semibold'
+                                    : 'text-text-muted font-medium group-hover:text-text-main'
                                 }`}>
                                 {item.label}
                             </span>

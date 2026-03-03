@@ -10,7 +10,9 @@ export class StripeService {
         }
 
         try {
-
+            // Open popup IMMEDIATELY in the synchronous click handler stack.
+            // This prevents mobile Safari and other browsers from blocking it.
+            const popup = window.open('about:blank', '_blank');
 
             const redirectUrl = `${window.location.origin}/?subscription-success`;
 
@@ -27,20 +29,21 @@ export class StripeService {
             if (error) {
                 console.error('[Stripe] Error creating checkout session:', error);
                 console.error('[Stripe] Error details:', JSON.stringify(error, null, 2));
+                popup?.close();
                 return { error };
             }
 
-
-
             if (!data?.url) {
+                popup?.close();
                 return { error: new Error('No checkout URL returned') };
             }
 
-            // Open Stripe Checkout in new tab
-            // User completes payment there and can close tab when done
-            const popup = window.open(data.url, '_blank');
-            if (!popup) {
-                return { error: new Error('Popup blocked — please click the button to open checkout') };
+            if (popup) {
+                popup.location.href = data.url;
+            } else {
+                // Fallback: redirect current page if popup was still somehow blocked
+                console.error('[Stripe] Popup was blocked despite synchronous open, falling back to redirect');
+                window.location.href = data.url;
             }
 
             return {};

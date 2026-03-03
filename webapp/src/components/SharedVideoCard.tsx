@@ -156,7 +156,7 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, onUnshar
                         <Tooltip text="Copy share link">
                             <button
                                 onClick={copyLink}
-                                className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                                className="interactive-icon"
                             >
                                 <TbLink size={14} />
                             </button>
@@ -164,7 +164,7 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, onUnshar
                         <Tooltip text="Open watch page">
                             <button
                                 onClick={openWatchPage}
-                                className="interactive-ghost flex items-center justify-center p-1.5 h-auto"
+                                className="interactive-icon"
                             >
                                 <TbExternalLink size={14} />
                             </button>
