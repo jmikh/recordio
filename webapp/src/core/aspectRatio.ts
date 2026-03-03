@@ -9,14 +9,16 @@ export interface AspectRatioPreset {
 
 export const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
     { label: '1:1', width: 1080, height: 1080, orientation: 'Square' },
+    { label: '5:4', width: 1350, height: 1080, orientation: 'Horizontal' },
     { label: '4:3', width: 1440, height: 1080, orientation: 'Horizontal' },
     { label: '16:9', width: 1920, height: 1080, orientation: 'Horizontal' },
     { label: '3:4', width: 1080, height: 1440, orientation: 'Vertical' },
+    { label: '4:5', width: 1080, height: 1350, orientation: 'Vertical' },
     { label: '9:16', width: 1080, height: 1920, orientation: 'Vertical' },
 ];
 
 /** Default preset (16:9) */
-const DEFAULT_PRESET = ASPECT_RATIO_PRESETS[2];
+const DEFAULT_PRESET = ASPECT_RATIO_PRESETS.find(p => p.label === '16:9')!;
 
 /**
  * Find the matching aspect ratio preset for an outputSize.

@@ -65,7 +65,7 @@ export interface CameraSettings extends StyleSettings {
 // ==========================================
 
 /** Supported aspect ratio presets for output video crop */
-export type OutputCropOption = 'none' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
+export type OutputCropOption = 'none' | '16:9' | '5:4' | '4:3' | '1:1' | '3:4' | '4:5' | '9:16';
 
 export interface ToolbarSettings {
     /** Whether to render the custom branded toolbar. Default: true. */
