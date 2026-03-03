@@ -1,21 +1,21 @@
 import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import type { CameraSettings, CameraLayoutSegment, Rect, Project } from '../../../types';
+import type { CameraSettings, CameraMoveSegment, Rect, Project } from '../../../types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
+import { drawCamera } from '../../../core/painters/cameraPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 
 // ------------------------------------------------------------------
-// LOGIC: Render Strategy (for CameraLayoutEdit mode)
+// LOGIC: Render Strategy (for CameraMoveEdit mode)
 // Same as CameraEdit: no auto-shrink, zoom viewport preserved.
 // ------------------------------------------------------------------
-export const renderCameraLayoutEditor = (
+export const renderCameraMoveEditor = (
     resources: RenderResources,
     state: {
         project: Project,
@@ -51,7 +51,7 @@ export const renderCameraLayoutEditor = (
     if (cameraSource && cameraSettings) {
         const video = videoRefs[cameraSource.id];
         if (video) {
-            drawWebcam(ctx, video, cameraSource.size, cameraSettings);
+            drawCamera(ctx, video, cameraSource.size, cameraSettings);
         }
     }
 };
@@ -62,17 +62,17 @@ export const renderCameraLayoutEditor = (
 
 const MIN_CAMERA_SIZE = 100;
 
-export const CameraLayoutEditor: React.FC<{
+export const CameraMoveEditor: React.FC<{
     cameraRef: React.MutableRefObject<CameraSettings | null>;
 }> = ({ cameraRef }) => {
-    const selectCameraLayout = useUIStore(s => s.selectCameraLayout);
-    const updateCameraLayout = useProjectStore(s => s.updateCameraLayout);
-    const selectedCameraLayoutId = useUIStore(s => s.selectedCameraLayoutId);
+    const selectCameraMove = useUIStore(s => s.selectCameraMove);
+    const updateCameraMove = useProjectStore(s => s.updateCameraMove);
+    const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
 
     // Get the selected segment
     const segment = useProjectStore(s => {
-        const segs = s.project.timeline.cameraLayoutSegments || [];
-        return segs.find((seg: CameraLayoutSegment) => seg.id === selectedCameraLayoutId) ?? null;
+        const segs = s.project.timeline.cameraMoveSegments || [];
+        return segs.find((seg: CameraMoveSegment) => seg.id === selectedCameraMoveId) ?? null;
     });
 
     // Get camera source for aspect ratio
@@ -93,7 +93,7 @@ export const CameraLayoutEditor: React.FC<{
 
     // Build effective camera settings from the segment
     // Bake borderRadiusPx for circles since the painter renders purely on radius
-    const buildEffectiveSettings = (seg: CameraLayoutSegment): CameraSettings => ({
+    const buildEffectiveSettings = (seg: CameraMoveSegment): CameraSettings => ({
         ...(globalCameraSettings as CameraSettings),
         xPx: seg.xPx,
         yPx: seg.yPx,
@@ -123,7 +123,7 @@ export const CameraLayoutEditor: React.FC<{
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [segmentShape, segmentBorderRadius, segment?.xPx, segment?.yPx, segment?.widthPx, segment?.heightPx, cameraRef]);
 
-    // When hidden, clear cameraRef so webcam isn't drawn on canvas
+    // When hidden, clear cameraRef so camera isn't drawn on canvas
     useEffect(() => {
         if (segmentHidden) {
             cameraRef.current = null;
@@ -148,13 +148,13 @@ export const CameraLayoutEditor: React.FC<{
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                selectCameraLayout(null);
+                selectCameraMove(null);
                 cameraRef.current = null;
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectCameraLayout, cameraRef]);
+    }, [selectCameraMove, cameraRef]);
 
     if (!segment || !currentSettings) return null;
 
@@ -198,7 +198,7 @@ export const CameraLayoutEditor: React.FC<{
     };
 
     const onCommit = (rect: Rect) => {
-        batchAction(() => updateCameraLayout(segment.id, {
+        batchAction(() => updateCameraMove(segment.id, {
             xPx: rect.x,
             yPx: rect.y,
             widthPx: rect.width,
@@ -219,7 +219,7 @@ export const CameraLayoutEditor: React.FC<{
 
     const handleCornerRadiiCommit = (radii: CornerRadii) => {
         const newRadius = radii[0];
-        batchAction(() => updateCameraLayout(segment.id, { borderRadiusPx: newRadius }));
+        batchAction(() => updateCameraMove(segment.id, { borderRadiusPx: newRadius }));
         endInteraction();
     };
 

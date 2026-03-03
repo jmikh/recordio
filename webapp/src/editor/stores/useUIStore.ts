@@ -8,7 +8,7 @@ export const CanvasMode = {
     Preview: 'preview',
     CropEdit: 'cropEdit',
     CameraEdit: 'cameraEdit',
-    CameraLayoutEdit: 'cameraLayoutEdit',
+    CameraMoveEdit: 'cameraMoveEdit',
     ZoomEdit: 'zoomEdit',
     SpotlightEdit: 'spotlightEdit',
     CaptionEdit: 'captionEdit',
@@ -30,7 +30,7 @@ export interface UIState {
     selectedSpotlightId: ID | null;
     selectedWindowId: ID | null;
     selectedCaptionId: ID | null;
-    selectedCameraLayoutId: ID | null;
+    selectedCameraMoveId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
@@ -40,7 +40,7 @@ export interface UIState {
     selectZoom: (id: ID | null) => void;
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
-    selectCameraLayout: (id: ID | null) => void;
+    selectCameraMove: (id: ID | null) => void;
     deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
@@ -130,7 +130,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedSpotlightId: null,
     selectedWindowId: null,
     selectedCaptionId: null,
-    selectedCameraLayoutId: null,
+    selectedCameraMoveId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
@@ -140,7 +140,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraLayoutId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => {
@@ -148,7 +148,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectCaption(null);
-            get().selectCameraLayout(null);
+            get().selectCameraMove(null);
         }
         set({
             selectedWindowId,
@@ -161,7 +161,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectWindow(null);
-            get().selectCameraLayout(null);
+            get().selectCameraMove(null);
         }
         set((state) => {
             if (selectedZoomId) {
@@ -180,7 +180,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectCaption(null);
             get().selectWindow(null);
-            get().selectCameraLayout(null);
+            get().selectCameraMove(null);
         }
         set((state) => {
             if (selectedSpotlightId) {
@@ -199,7 +199,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectWindow(null);
-            get().selectCameraLayout(null);
+            get().selectCameraMove(null);
         }
         set((state) => {
             if (selectedCaptionId) {
@@ -228,22 +228,22 @@ export const useUIStore = create<UIState>((set, get) => ({
         });
     },
 
-    selectCameraLayout: (selectedCameraLayoutId) => {
-        if (selectedCameraLayoutId) {
+    selectCameraMove: (selectedCameraMoveId) => {
+        if (selectedCameraMoveId) {
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectWindow(null);
         }
         set((state) => {
-            if (selectedCameraLayoutId) {
+            if (selectedCameraMoveId) {
                 return {
-                    selectedCameraLayoutId,
-                    canvasMode: CanvasMode.CameraLayoutEdit,
+                    selectedCameraMoveId,
+                    canvasMode: CanvasMode.CameraMoveEdit,
                     isPlaying: false,
                 };
             }
-            return { selectedCameraLayoutId: null, canvasMode: CanvasMode.Preview };
+            return { selectedCameraMoveId: null, canvasMode: CanvasMode.Preview };
         });
     },
 
@@ -252,7 +252,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         get().selectSpotlight(null);
         get().selectWindow(null);
         get().selectCaption(null);
-        get().selectCameraLayout(null);
+        get().selectCameraMove(null);
         set({ canvasMode: CanvasMode.Preview });
     },
 
@@ -281,7 +281,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraLayoutId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -375,7 +375,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedSpotlightId: null,
             selectedWindowId: null,
             selectedCaptionId: null,
-            selectedCameraLayoutId: null,
+            selectedCameraMoveId: null,
             selectedSettingsPanel: SettingsPanel.Screen,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,
             timelineContainerRef: null,

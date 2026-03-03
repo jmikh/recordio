@@ -20,14 +20,14 @@ export const TRACK_HEIGHT = 32;
 /** Collapsed track height (~40% of full) */
 export const COLLAPSED_HEIGHT = 13;
 
-type EffectTrack = 'zoom' | 'spotlight' | 'captions' | 'cameraLayout';
+type EffectTrack = 'zoom' | 'spotlight' | 'captions' | 'cameraMove';
 
 /** Track ordering for effect tracks (recording is handled separately) */
 const EFFECT_TRACK_ORDER: EffectTrack[] = [
     'zoom',
     'spotlight',
     'captions',
-    'cameraLayout',
+    'cameraMove',
 ];
 
 /** Maps effect track keys to their DisplaySettings show_ field */
@@ -35,7 +35,7 @@ const SHOW_KEY: Record<EffectTrack, keyof DisplaySettings> = {
     zoom: 'showZoom',
     spotlight: 'showSpotlight',
     captions: 'showCaptions',
-    cameraLayout: 'showCameraLayout',
+    cameraMove: 'showCameraMove',
 };
 
 /** Gap between track rows */
@@ -65,7 +65,7 @@ export function useTrackSizing(): TrackSizingResult {
     return useMemo(() => {
         // Determine which effect tracks are actually visible
         const visibleEffects = EFFECT_TRACK_ORDER.filter(key => {
-            if (key === 'cameraLayout' && !hasCameraSource) return false;
+            if (key === 'cameraMove' && !hasCameraSource) return false;
             return displaySettings[SHOW_KEY[key]];
         });
 

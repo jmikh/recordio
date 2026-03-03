@@ -1,46 +1,46 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, CameraLayoutSegment, CameraLayoutSettings } from '../../../types';
+import type { ID, CameraMoveSegment, CameraMoveSettings } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
-export interface CameraLayoutSlice {
-    addCameraLayout: (segment: CameraLayoutSegment) => void;
-    updateCameraLayout: (id: ID, updates: Partial<CameraLayoutSegment>) => void;
-    deleteCameraLayout: (id: ID) => void;
-    clearCameraLayouts: () => void;
-    toggleCameraLayoutEnabled: () => void;
+export interface CameraMoveSlice {
+    addCameraMove: (segment: CameraMoveSegment) => void;
+    updateCameraMove: (id: ID, updates: Partial<CameraMoveSegment>) => void;
+    deleteCameraMove: (id: ID) => void;
+    clearCameraMoves: () => void;
+    toggleCameraMoveEnabled: () => void;
 }
 
-export const createCameraLayoutSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], CameraLayoutSlice> = (set, _get, store) => ({
-    addCameraLayout: (segment) => {
+export const createCameraMoveSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], CameraMoveSlice> = (set, _get, store) => ({
+    addCameraMove: (segment) => {
         set(state => {
-            const cameraLayoutSegments = [...(state.project.timeline.cameraLayoutSegments || []), segment]
+            const cameraMoveSegments = [...(state.project.timeline.cameraMoveSegments || []), segment]
                 .sort((a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs);
 
             // Stamp output times
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
-            const stamped = recomputeOutputTimes(cameraLayoutSegments, timeMapper);
+            const stamped = recomputeOutputTimes(cameraMoveSegments, timeMapper);
 
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        cameraLayoutSegments: stamped
+                        cameraMoveSegments: stamped
                     }
                 }
             };
         });
     },
 
-    updateCameraLayout: (id, updates) => {
+    updateCameraMove: (id, updates) => {
         set(state => {
-            const cameraLayoutSegments = state.project.timeline.cameraLayoutSegments || [];
-            const idx = cameraLayoutSegments.findIndex(s => s.id === id);
+            const cameraMoveSegments = state.project.timeline.cameraMoveSegments || [];
+            const idx = cameraMoveSegments.findIndex(s => s.id === id);
             if (idx === -1) return state;
 
-            const nextSegments = [...cameraLayoutSegments];
+            const nextSegments = [...cameraMoveSegments];
             nextSegments[idx] = { ...nextSegments[idx], ...updates };
 
             // Sort by start time to maintain order
@@ -55,56 +55,56 @@ export const createCameraLayoutSlice: StateCreator<ProjectState, [["zustand/subs
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        cameraLayoutSegments: stamped
+                        cameraMoveSegments: stamped
                     }
                 }
             };
         });
     },
 
-    deleteCameraLayout: (id) => {
+    deleteCameraMove: (id) => {
         set(state => {
-            const cameraLayoutSegments = (state.project.timeline.cameraLayoutSegments || []).filter(s => s.id !== id);
+            const cameraMoveSegments = (state.project.timeline.cameraMoveSegments || []).filter(s => s.id !== id);
 
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        cameraLayoutSegments
+                        cameraMoveSegments
                     }
                 }
             };
         });
     },
 
-    clearCameraLayouts: () => {
+    clearCameraMoves: () => {
         set(state => {
             return {
                 project: {
                     ...state.project,
                     timeline: {
                         ...state.project.timeline,
-                        cameraLayoutSegments: []
+                        cameraMoveSegments: []
                     }
                 }
             };
         });
     },
 
-    toggleCameraLayoutEnabled: () => {
+    toggleCameraMoveEnabled: () => {
         set(state => {
-            const cameraLayout = state.project.settings.cameraLayout!;
-            const currentEnabled = cameraLayout.enabled ?? true;
+            const cameraMove = state.project.settings.cameraMove!;
+            const currentEnabled = cameraMove.enabled ?? true;
             return {
                 project: {
                     ...state.project,
                     settings: {
                         ...state.project.settings,
-                        cameraLayout: {
-                            ...cameraLayout,
+                        cameraMove: {
+                            ...cameraMove,
                             enabled: !currentEnabled,
-                        } as CameraLayoutSettings
+                        } as CameraMoveSettings
                     }
                 }
             };

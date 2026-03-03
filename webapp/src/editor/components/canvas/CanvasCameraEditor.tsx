@@ -8,7 +8,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
+import { drawCamera } from '../../../core/painters/cameraPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 
 // ------------------------------------------------------------------
@@ -59,7 +59,7 @@ export const renderCameraEditor = (
     if (cameraSource && cameraSettings) {
         const video = videoRefs[cameraSource.id];
         if (video) {
-            drawWebcam(ctx, video, cameraSource.size, cameraSettings);
+            drawCamera(ctx, video, cameraSource.size, cameraSettings);
         }
     }
 };

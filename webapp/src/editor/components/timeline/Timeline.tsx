@@ -7,9 +7,9 @@ import { ZoomTrack } from './tracks/zoom/ZoomTrack';
 
 import { SpotlightTrack } from './tracks/spotlight/SpotlightTrack';
 import { SpotlightHeaderCell } from './tracks/spotlight/SpotlightHeaderCell';
-import { LayoutHeaderCell } from './tracks/cameraLayout/LayoutHeaderCell';
+import { LayoutHeaderCell } from './tracks/cameraMove/LayoutHeaderCell';
 import { CaptionTrack } from './tracks/caption/CaptionTrack';
-import { CameraLayoutTrack } from './tracks/cameraLayout/CameraLayoutTrack';
+import { CameraMoveTrack } from './tracks/cameraMove/CameraMoveTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -162,9 +162,9 @@ export function Timeline() {
     const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
     const selectCaption = useUIStore(s => s.selectCaption);
     const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
-    const selectedCameraLayoutId = useUIStore(s => s.selectedCameraLayoutId);
-    const selectCameraLayout = useUIStore(s => s.selectCameraLayout);
-    const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
+    const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
+    const selectCameraMove = useUIStore(s => s.selectCameraMove);
+    const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -182,10 +182,10 @@ export function Timeline() {
                     e.preventDefault();
                     deleteCaptionSegment(selectedCaptionId);
                     selectCaption(null);
-                } else if (selectedCameraLayoutId) {
+                } else if (selectedCameraMoveId) {
                     e.preventDefault();
-                    deleteCameraLayout(selectedCameraLayoutId);
-                    selectCameraLayout(null);
+                    deleteCameraMove(selectedCameraMoveId);
+                    selectCameraMove(null);
                 }
             }
 
@@ -203,7 +203,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraLayoutId, deleteCameraLayout, selectCameraLayout, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -287,9 +287,9 @@ export function Timeline() {
                         )}
 
                         {/* Header: Camera Layout */}
-                        {displaySettings.showCameraLayout && hasCameraSource && (
-                            <div className="shrink-0" style={{ height: trackSizing.cameraLayout.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
-                                <LayoutHeaderCell height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
+                        {displaySettings.showCameraMove && hasCameraSource && (
+                            <div className="shrink-0" style={{ height: trackSizing.cameraMove.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('cameraMove')}>
+                                <LayoutHeaderCell height={trackSizing.cameraMove.height} isCollapsed={trackSizing.cameraMove.isCollapsed} />
                             </div>
                         )}
                     </div>
@@ -383,9 +383,9 @@ export function Timeline() {
                                     )}
 
                                     {/* Camera Layout Track */}
-                                    {displaySettings.showCameraLayout && hasCameraSource && (
-                                        <TimelineTrackRow height={trackSizing.cameraLayout.height} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
-                                            <CameraLayoutTrack height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
+                                    {displaySettings.showCameraMove && hasCameraSource && (
+                                        <TimelineTrackRow height={trackSizing.cameraMove.height} onMouseEnter={() => setHoveredTrack('cameraMove')}>
+                                            <CameraMoveTrack height={trackSizing.cameraMove.height} isCollapsed={trackSizing.cameraMove.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 

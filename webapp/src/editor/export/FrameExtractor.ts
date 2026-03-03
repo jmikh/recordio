@@ -15,7 +15,7 @@
  *   resets decoder state and requires the next chunk to be a keyframe. A single
  *   flush occurs only after all packets have been consumed.
  * - Returns **cloned** VideoFrames, keeping originals in the buffer for reuse.
- *   This is critical for low-fps sources (e.g. webcam at 6 fps) that must serve
+ *   This is critical for low-fps sources (e.g. camera at 6 fps) that must serve
  *   multiple export frames (at 30 fps) from the same decoded frame.
  */
 

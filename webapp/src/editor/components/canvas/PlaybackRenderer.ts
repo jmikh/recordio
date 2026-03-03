@@ -2,7 +2,7 @@ import { drawScreen } from '../../../core/painters/screenPainter';
 import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
 import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
-import { drawWebcam } from '../../../core/painters/webcamPainter';
+import { drawCamera } from '../../../core/painters/cameraPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
 import { drawCaptions } from '../../../core/painters/captionPainter';
 import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
@@ -133,7 +133,7 @@ export class PlaybackRenderer {
         }
 
 
-        // Render Webcam Layer (after spotlight, so camera always appears on top)
+        // Render Camera Layer (after spotlight, so camera always appears on top)
         if (cameraSource) {
             const video = videoRefs[cameraSource.id];
             if (video) {
@@ -146,13 +146,13 @@ export class PlaybackRenderer {
 
                 if (state.overrideCameraSettings) {
                     // Override mode (drag preview): use provided settings directly, no resolver
-                    drawWebcam(ctx, video, cameraSource.size, state.overrideCameraSettings, outputSize);
+                    drawCamera(ctx, video, cameraSource.size, state.overrideCameraSettings, outputSize);
                 } else {
                     // Use the unified resolver: layout blocks → transitions → auto-shrink
-                    const cameraLayoutEnabled = project.settings.cameraLayout?.enabled ?? true;
+                    const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
                     const resolved = getResolvedCameraStateAtTime(
                         cameraSettings,
-                        cameraLayoutEnabled ? (timeline.cameraLayoutSegments || []) : [],
+                        cameraMoveEnabled ? (timeline.cameraMoveSegments || []) : [],
                         zoomSegments,
                         currentTimeMs,
                         outputSize,
@@ -174,10 +174,10 @@ export class PlaybackRenderer {
                         if (resolved.opacity < 1) {
                             ctx.save();
                             ctx.globalAlpha = resolved.opacity;
-                            drawWebcam(ctx, video, cameraSource.size, effectiveSettings, outputSize);
+                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize);
                             ctx.restore();
                         } else {
-                            drawWebcam(ctx, video, cameraSource.size, effectiveSettings, outputSize);
+                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize);
                         }
                     }
                 }

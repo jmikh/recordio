@@ -29,7 +29,7 @@ export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trig
 );
 
 /** Camera layout tooltip with demo video */
-export const CameraLayoutTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
+export const CameraMoveTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
         description={"Change the camera layout for any section of the video.\nGreat for full-screen intros, outros, and transitions."}
         videoSrc="https://cdn.recordio.cc/demos/camera-layout-demo.mp4"

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
-import { CameraLayoutTooltip } from '../../../shared/MediaTooltips';
+import { CameraMoveTooltip } from '../../../shared/MediaTooltips';
 
 interface LayoutHeaderCellProps {
     height: number;
@@ -9,23 +9,23 @@ interface LayoutHeaderCellProps {
 }
 
 export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCollapsed }) => {
-    const cameraLayoutEnabled = useProjectStore(s => s.project.settings.cameraLayout?.enabled ?? true);
+    const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
 
     return (
         <TimelineHeaderCell
-            title="Webcam"
+            title="Camera"
             height={height}
-            disabled={!cameraLayoutEnabled}
+            disabled={!cameraMoveEnabled}
             isCollapsed={isCollapsed}
             titleElement={
-                <CameraLayoutTooltip
+                <CameraMoveTooltip
                     placement="top-right"
                     trigger={
                         <span
-                            className={`truncate select-none ${!cameraLayoutEnabled ? 'text-text-muted' : 'text-text-main'}`}
+                            className={`truncate select-none ${!cameraMoveEnabled ? 'text-text-muted' : 'text-text-main'}`}
                             style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
                         >
-                            Webcam
+                            Camera
                         </span>
                     }
                 />

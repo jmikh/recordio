@@ -116,7 +116,7 @@ export function ImportPage() {
                         trackProjectCreated({
                             duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
                             microphone_on: !!recording.microphoneSource,
-                            webcam_on: !!state.cameraVideo,
+                            camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
                             first_url: firstUrl,
                             recording_type: recording.screenSource.recordingType,
@@ -166,7 +166,7 @@ export function ImportPage() {
                         trackProjectCreated({
                             duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
                             microphone_on: !!recording.microphoneSource,
-                            webcam_on: !!state.cameraVideo,
+                            camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
                             first_url: firstUrl,
                             recording_type: recording.screenSource.recordingType,
@@ -223,7 +223,7 @@ export function ImportPage() {
                 trackProjectCreated({
                     duration_seconds: recording ? Math.round(recording.screenSource.durationMs / 1000) : 0,
                     microphone_on: !!recording?.microphoneSource,
-                    webcam_on: !!state.cameraVideo,
+                    camera_on: !!state.cameraVideo,
                     has_system_audio: recording?.screenSource.hasAudio ?? false,
                     first_url: firstUrl,
                     recording_type: recording?.screenSource.recordingType ?? 'tab',

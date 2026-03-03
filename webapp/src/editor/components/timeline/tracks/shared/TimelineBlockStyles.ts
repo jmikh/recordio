@@ -218,7 +218,7 @@ export const ghostCaption = {
 };
 
 /** Ghost camera layout block — transitionIn + hold + transitionOut */
-export const ghostCameraLayout = {
+export const ghostCameraMove = {
     container: ghostContainerBase,
     label: ghostLabel,
     transitionIn: {

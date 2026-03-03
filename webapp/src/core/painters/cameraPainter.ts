@@ -20,14 +20,14 @@ let cachedMaskHeight = 0;
 let cachedMaskShape: 'circle' | 'rect' | 'square' | null = null;
 
 /**
- * Draws the webcam overlay (Picture-in-Picture) onto the canvas.
+ * Draws the camera overlay (Picture-in-Picture) onto the canvas.
  * 
  * @param ctx - The 2D rendering context.
- * @param video - The source video element for the webcam.
- * @param inputSize - The dimensions of the source webcam video.
+ * @param video - The source video element for the camera.
+ * @param inputSize - The dimensions of the source camera video.
  * @param settings - Configuration for position/size.
  */
-export function drawWebcam(
+export function drawCamera(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement | VideoFrame,
     inputSize: Size,

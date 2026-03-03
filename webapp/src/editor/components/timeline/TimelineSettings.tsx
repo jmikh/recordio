@@ -41,11 +41,11 @@ function buildTrackConfigs(): TrackConfig[] {
             },
         },
         {
-            showKey: 'showCameraLayout',
-            label: 'Webcam',
+            showKey: 'showCameraMove',
+            label: 'Camera',
             requiresCamera: true,
-            getEnabled: (s) => s.project.settings.cameraLayout?.enabled ?? true,
-            toggle: () => useProjectStore.getState().toggleCameraLayoutEnabled(),
+            getEnabled: (s) => s.project.settings.cameraMove?.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleCameraMoveEnabled(),
         },
     ];
 }
@@ -69,7 +69,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
     const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
-    const cameraLayoutEnabled = useProjectStore(s => s.project.settings.cameraLayout?.enabled ?? true);
+    const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
 
     const trackConfigs = useMemo(() => buildTrackConfigs(), []);
 
@@ -82,7 +82,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         showZoom: zoomEnabled,
         showSpotlight: spotlightEnabled,
         showCaptions: captionsEnabled,
-        showCameraLayout: cameraLayoutEnabled,
+        showCameraMove: cameraMoveEnabled,
     };
 
     // Calculate menu position when opening
@@ -130,7 +130,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
             <div className="flex items-center gap-2 mb-1">
                 <span className="flex-1"></span>
                 <span className="w-10 text-center text-xs text-text-disabled">Show</span>
-                <span className="w-10 text-center text-xs text-text-disabled">Enable</span>
+                <span className="w-10 text-center text-xs text-text-disabled">Apply</span>
             </div>
 
             {/* Track rows */}
@@ -167,7 +167,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
             {/* Helper text */}
             <div className="mt-2 flex flex-col gap-0.5 subtext">
                 <span><span className="font-medium">Show</span> — display track in timeline</span>
-                <span><span className="font-medium">Enable</span> — apply effects during playback</span>
+                <span><span className="font-medium">Apply</span> — apply effects during playback</span>
             </div>
 
             {/* Divider */}

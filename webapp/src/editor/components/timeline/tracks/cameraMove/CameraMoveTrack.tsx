@@ -5,10 +5,10 @@ import { useUIStore } from '../../../../stores/useUIStore';
 import { useTimeMapper } from '../../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
-import { useCameraLayoutHover } from './useCameraLayoutHover';
-import { CameraLayoutBlock } from './CameraLayoutBlock';
+import { useCameraMoveHover } from './useCameraMoveHover';
+import { CameraMoveBlock } from './CameraMoveBlock';
 import {
-    ghostCameraLayout,
+    ghostCameraMove,
     blockIconClass,
     ghostIconClass,
     BLOCK_ICON_SIZE,
@@ -16,56 +16,56 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
-import type { CameraLayoutSegment } from '../../../../../types';
+import type { CameraMoveSegment } from '../../../../../types';
 
-interface CameraLayoutTrackProps {
+interface CameraMoveTrackProps {
     height: number;
     isCollapsed?: boolean;
 }
 
 /**
- * CameraLayoutTrack renders camera layout segments as time-range blocks.
+ * CameraMoveTrack renders camera layout segments as time-range blocks.
  * Follows the same visual pattern as ZoomTrack: transition-in zone + hold zone.
  */
-export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, isCollapsed }) => {
+export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
-    const selectedId = useUIStore(s => s.selectedCameraLayoutId);
+    const selectedId = useUIStore(s => s.selectedCameraMoveId);
     const setSelected = (id: string | null) => {
-        useUIStore.getState().selectCameraLayout(id);
+        useUIStore.getState().selectCameraMove(id);
     };
 
     const project = useProjectStore(s => s.project);
-    const globalTransitionDurationMs = project.settings.cameraLayout?.transitionDurationMs ?? 500;
-    const cameraLayoutEnabled = project.settings.cameraLayout?.enabled ?? true;
+    const globalTransitionDurationMs = project.settings.cameraMove?.transitionDurationMs ?? 500;
+    const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
 
     const timeMapper = useTimeMapper();
     const coords = useMemo(() => new TimePixelMapper(timeMapper, pixelsPerSec), [timeMapper, pixelsPerSec]);
     const outputDuration = useMemo(() => timeMapper.getOutputDuration(), [timeMapper]);
 
     const segments = useMemo(() =>
-        (timeline.cameraLayoutSegments || []).filter((s: CameraLayoutSegment) => s.visible),
-        [timeline.cameraLayoutSegments]);
+        (timeline.cameraMoveSegments || []).filter((s: CameraMoveSegment) => s.visible),
+        [timeline.cameraMoveSegments]);
 
     const ghostY = 1;
 
-    const updateCameraLayout = useProjectStore(s => s.updateCameraLayout);
-    const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
+    const updateCameraMove = useProjectStore(s => s.updateCameraMove);
+    const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
 
-    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<CameraLayoutSegment>({
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<CameraMoveSegment>({
         segments,
         outputDuration,
         coords,
         timeMapper,
         onSelect: setSelected,
         onUpdate: (id, sourceStart, sourceEnd) =>
-            updateCameraLayout(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
-        onDelete: deleteCameraLayout,
-        getAllSegments: () => timeline.cameraLayoutSegments ?? [],
+            updateCameraMove(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
+        onDelete: deleteCameraMove,
+        getAllSegments: () => timeline.cameraMoveSegments ?? [],
     });
 
-    const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useCameraLayoutHover(
+    const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useCameraMoveHover(
         project,
         coords,
         dragState,
@@ -80,16 +80,16 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
         <div
             className="w-full relative select-none flex"
             style={{ height }}
-            onMouseMove={cameraLayoutEnabled ? handleMouseMove : undefined}
-            onMouseLeave={cameraLayoutEnabled ? handleMouseLeave : undefined}
-            onPointerDown={cameraLayoutEnabled ? (e) => e.stopPropagation() : undefined}
-            onClick={cameraLayoutEnabled ? handleClick : undefined}
-            title={!cameraLayoutEnabled ? 'Enable layouts to interact' : undefined}
+            onMouseMove={cameraMoveEnabled ? handleMouseMove : undefined}
+            onMouseLeave={cameraMoveEnabled ? handleMouseLeave : undefined}
+            onPointerDown={cameraMoveEnabled ? (e) => e.stopPropagation() : undefined}
+            onClick={cameraMoveEnabled ? handleClick : undefined}
+            title={!cameraMoveEnabled ? 'Enable layouts to interact' : undefined}
         >
             <div className="relative flex-1" style={{ height }}>
-                {!cameraLayoutEnabled && <DisabledTrackOverlay height={height} />}
+                {!cameraMoveEnabled && <DisabledTrackOverlay height={height} />}
                 {/* Camera layout blocks */}
-                {segments.map((s: CameraLayoutSegment) => {
+                {segments.map((s: CameraMoveSegment) => {
                     const startX = coords.msToX(s.outputStartTimeMs);
                     const endX = coords.msToX(s.outputEndTimeMs);
                     const blockWidth = Math.max(endX - startX, 2);
@@ -101,7 +101,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                     const segTransitionWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
 
                     return (
-                        <CameraLayoutBlock
+                        <CameraMoveBlock
                             key={s.id}
                             left={startX}
                             width={blockWidth}
@@ -111,7 +111,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                             isDragging={isDragging}
                             trackHeight={height}
                             isHidden={s.hidden}
-                            disabled={!cameraLayoutEnabled}
+                            disabled={!cameraMoveEnabled}
                             isCollapsed={isCollapsed}
                             onMouseDown={(e) => handleDragStart(e, 'move', s, isSelected)}
                             onClick={(e) => {
@@ -137,7 +137,7 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                 })}
 
                 {/* Ghost block */}
-                {cameraLayoutEnabled && hoverInfo && !selectedId && !dragState && (() => {
+                {cameraMoveEnabled && hoverInfo && !selectedId && !dragState && (() => {
                     const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
                     const totalTransitions = ghostTransitionWidthPx * 2;
                     const clampedTransitionWidth = totalTransitions > hoverInfo.width
@@ -147,25 +147,25 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
 
                     return (
                         <div
-                            className={ghostCameraLayout.container}
+                            className={ghostCameraMove.container}
                             style={{
                                 left: `${hoverInfo.x}px`,
                                 width: `${hoverInfo.width}px`,
                                 height,
                             }}
                         >
-                            <span className={ghostCameraLayout.label}>+ Layout</span>
+                            <span className={ghostCameraMove.label}>+ Layout</span>
 
                             {/* Ghost transition-in */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={ghostCameraLayout.transitionIn.className}
+                                    className={ghostCameraMove.transitionIn.className}
                                     style={{
                                         position: 'absolute',
                                         left: 0,
                                         top: ghostY,
                                         width: clampedTransitionWidth,
-                                        ...ghostCameraLayout.transitionIn.getStyle(),
+                                        ...ghostCameraMove.transitionIn.getStyle(),
                                         height: height - 2,
                                         ...(holdWidth <= 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                                     }}
@@ -175,13 +175,13 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                             {/* Ghost hold */}
                             {holdWidth > 0 && (
                                 <div
-                                    className={`${ghostCameraLayout.hold.className} flex items-center justify-center overflow-hidden`}
+                                    className={`${ghostCameraMove.hold.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
                                         left: clampedTransitionWidth,
                                         top: ghostY,
                                         width: holdWidth,
-                                        ...ghostCameraLayout.hold.getStyle(),
+                                        ...ghostCameraMove.hold.getStyle(),
                                         height: height - 2,
                                     }}
                                 >
@@ -194,13 +194,13 @@ export const CameraLayoutTrack: React.FC<CameraLayoutTrackProps> = ({ height, is
                             {/* Ghost transition-out */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={ghostCameraLayout.transitionOut.className}
+                                    className={ghostCameraMove.transitionOut.className}
                                     style={{
                                         position: 'absolute',
                                         right: 0,
                                         top: ghostY,
                                         width: clampedTransitionWidth,
-                                        ...ghostCameraLayout.transitionOut.getStyle(),
+                                        ...ghostCameraMove.transitionOut.getStyle(),
                                         height: height - 2,
                                         ...(holdWidth <= 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                                     }}

@@ -1,17 +1,17 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraLayoutSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraMoveSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 // Default display settings for tracks — single source of truth
 const DEFAULT_DISPLAY_SETTINGS = {
     showZoom: true,
     showSpotlight: true,
     showCaptions: false,
-    showCameraLayout: false,
+    showCameraMove: false,
     collapsed: false,
 };
 
@@ -146,7 +146,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         featherAmount: 0.15,
     },
 
-    cameraLayout: {
+    cameraMove: {
         enabled: true,
         transitionDurationMs: 500,
         easing: 'ease-in-out'
@@ -163,7 +163,7 @@ const createDefaultTimeline = (): Timeline => ({
     durationMs: 0,
     zoomSegments: [],
     spotlightSegments: [],
-    cameraLayoutSegments: [],
+    cameraMoveSegments: [],
     outputWindows: [],
     focusAreas: [],
     captionSegments: [],
@@ -272,7 +272,7 @@ export class ProjectImpl {
             spotlightSegments: spotlightSegments,
             focusAreas: focusAreas,
             captionSegments: [],
-            cameraLayoutSegments: [],
+            cameraMoveSegments: [],
             displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
         };
 
@@ -393,8 +393,8 @@ export class ProjectImpl {
                 spotlightSegments: project.timeline.spotlightSegments.map((sa: SpotlightSegment) =>
                     ProjectImpl.scalePixelValues(sa, scale) as SpotlightSegment
                 ),
-                cameraLayoutSegments: (project.timeline.cameraLayoutSegments || []).map((cl: CameraLayoutSegment) =>
-                    ProjectImpl.scalePixelValues(cl, scale) as CameraLayoutSegment
+                cameraMoveSegments: (project.timeline.cameraMoveSegments || []).map((cl: CameraMoveSegment) =>
+                    ProjectImpl.scalePixelValues(cl, scale) as CameraMoveSegment
                 ),
             }
         };

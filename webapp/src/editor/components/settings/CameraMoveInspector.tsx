@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, MultiToggle, Toggle, InfoTooltip, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
-import type { CameraLayoutSegment } from '../../../types';
+import type { CameraMoveSegment } from '../../../types';
 import { PiWebcamBold } from 'react-icons/pi';
 import { RxEnterFullScreen } from 'react-icons/rx';
 import { EasingTooltipContent } from './EasingTooltipContent';
@@ -16,32 +16,32 @@ const EASING_OPTIONS: DropdownOption<EasingStyle>[] = [
     { value: 'ease-in-out', label: 'Ease In Out' },
 ];
 
-export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> = ({ segment }) => {
-    const updateCameraLayout = useProjectStore(s => s.updateCameraLayout);
-    const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
-    const clearCameraLayouts = useProjectStore(s => s.clearCameraLayouts);
-    const selectCameraLayout = useUIStore(s => s.selectCameraLayout);
+export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ segment }) => {
+    const updateCameraMove = useProjectStore(s => s.updateCameraMove);
+    const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
+    const clearCameraMoves = useProjectStore(s => s.clearCameraMoves);
+    const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     const handleDelete = useCallback(() => {
-        deleteCameraLayout(segment.id);
-        selectCameraLayout(null);
-    }, [segment.id, deleteCameraLayout, selectCameraLayout]);
+        deleteCameraMove(segment.id);
+        selectCameraMove(null);
+    }, [segment.id, deleteCameraMove, selectCameraMove]);
 
     const handleDeleteAll = useCallback(() => {
-        clearCameraLayouts();
-        selectCameraLayout(null);
-    }, [clearCameraLayouts, selectCameraLayout]);
+        clearCameraMoves();
+        selectCameraMove(null);
+    }, [clearCameraMoves, selectCameraMove]);
 
     const handleTransitionChange = useCallback((val: number) => {
         batchAction(() => {
-            updateCameraLayout(segment.id, { transitionDurationMs: Math.round(val) });
+            updateCameraMove(segment.id, { transitionDurationMs: Math.round(val) });
         });
-    }, [segment.id, batchAction, updateCameraLayout]);
+    }, [segment.id, batchAction, updateCameraMove]);
 
     const handleEasingChange = useCallback((val: EasingStyle) => {
-        updateCameraLayout(segment.id, { easing: val });
-    }, [segment.id, updateCameraLayout]);
+        updateCameraMove(segment.id, { easing: val });
+    }, [segment.id, updateCameraMove]);
 
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
 
@@ -66,19 +66,19 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
         x = Math.max(0, Math.min(x, outputSize.width - w));
         y = Math.max(0, Math.min(y, outputSize.height - h));
 
-        updateCameraLayout(segment.id, {
+        updateCameraMove(segment.id, {
             shape: newShape, borderRadiusPx: newRadius,
             widthPx: w, heightPx: h, xPx: x, yPx: y,
         });
-    }, [segment.id, segment.widthPx, segment.heightPx, segment.xPx, segment.yPx, outputSize, updateCameraLayout]);
+    }, [segment.id, segment.widthPx, segment.heightPx, segment.xPx, segment.yPx, outputSize, updateCameraMove]);
 
 
     const handleHiddenToggle = useCallback((val: boolean) => {
-        updateCameraLayout(segment.id, { hidden: val });
-    }, [segment.id, updateCameraLayout]);
+        updateCameraMove(segment.id, { hidden: val });
+    }, [segment.id, updateCameraMove]);
 
     const handleFillScreen = useCallback(() => {
-        updateCameraLayout(segment.id, {
+        updateCameraMove(segment.id, {
             xPx: 0,
             yPx: 0,
             widthPx: outputSize.width,
@@ -86,14 +86,14 @@ export const CameraLayoutInspector: React.FC<{ segment: CameraLayoutSegment }> =
             shape: 'rect',
             borderRadiusPx: 0,
         });
-    }, [segment.id, outputSize, updateCameraLayout]);
+    }, [segment.id, outputSize, updateCameraMove]);
 
     const isHidden = !!segment.hidden;
 
     return (
         <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold size={16} />} notCollapsible>
             <div className="flex flex-col gap-5">
-                <p className="subtext">Adjust the webcam position, size, and shape for this segment.</p>
+                <p className="subtext">Adjust the camera position, size, and shape for this segment.</p>
 
                 {/* Hide Camera Toggle */}
                 <Toggle

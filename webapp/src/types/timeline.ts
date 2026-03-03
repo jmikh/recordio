@@ -121,11 +121,11 @@ export interface SpotlightSegment extends TimeSegment {
 // ==========================================
 
 /**
- * A camera layout segment overrides the default webcam position, size,
+ * A camera layout segment overrides the default camera position, size,
  * shape, and border radius for a specific time range.
  * Source-time anchored for trim/speed stability.
  */
-export interface CameraLayoutSegment extends TimeSegment {
+export interface CameraMoveSegment extends TimeSegment {
     /** Position X in output-space pixels */
     xPx: number;
     /** Position Y in output-space pixels */
@@ -138,7 +138,7 @@ export interface CameraLayoutSegment extends TimeSegment {
     shape: 'circle' | 'rect' | 'square';
     /** Corner radius in output pixels for this block */
     borderRadiusPx: number;
-    /** Whether the webcam is hidden during this block */
+    /** Whether the camera is hidden during this block */
     hidden?: boolean;
     /** Transition duration for entering this block (inherited from global on creation) */
     transitionDurationMs: number;
@@ -158,7 +158,7 @@ export interface DisplaySettings {
     showZoom: boolean;
     showSpotlight: boolean;
     showCaptions: boolean;
-    showCameraLayout: boolean;
+    showCameraMove: boolean;
     /** Whether hover-to-expand collapse is active */
     collapsed: boolean;
 }
@@ -187,10 +187,10 @@ export interface Timeline {
     zoomSegments: ZoomSegment[];
     /** Spotlight action keyframes for spotlight effect (non-overlapping) */
     spotlightSegments: SpotlightSegment[];
-    /** Caption segments from webcam audio transcription */
+    /** Caption segments from camera audio transcription */
     captionSegments: CaptionSegment[];
-    /** Camera layout overrides for dynamic webcam position/size changes */
-    cameraLayoutSegments: CameraLayoutSegment[];
+    /** Camera layout overrides for dynamic camera position/size changes */
+    cameraMoveSegments: CameraMoveSegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
     /** Timeline display settings (track visibility, collapse state) */

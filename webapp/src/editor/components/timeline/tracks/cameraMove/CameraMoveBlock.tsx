@@ -12,7 +12,7 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 
-interface CameraLayoutBlockProps {
+interface CameraMoveBlockProps {
     left: number;
     width: number;
     transitionInWidth: number;
@@ -32,7 +32,7 @@ interface CameraLayoutBlockProps {
     isCollapsed?: boolean;
 }
 
-export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
+export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
     left,
     width,
     transitionInWidth,

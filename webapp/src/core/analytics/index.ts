@@ -314,7 +314,7 @@ function incrementProjectCount(): number {
 export interface ProjectCreatedParams {
     duration_seconds: number;
     microphone_on: boolean;
-    webcam_on: boolean;
+    camera_on: boolean;
     has_system_audio: boolean;
     first_url: string | null;
     recording_type: 'tab' | 'window' | 'screen';

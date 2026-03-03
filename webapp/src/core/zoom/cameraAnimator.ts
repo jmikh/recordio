@@ -1,4 +1,4 @@
-import { type ZoomSegment, type Size, type Rect, type CameraSettings, type CameraLayoutSegment, type ZoomSettings } from '../../types';
+import { type ZoomSegment, type Size, type Rect, type CameraSettings, type CameraMoveSegment, type ZoomSettings } from '../../types';
 import { applyEasing } from '../easing';
 
 /**
@@ -235,7 +235,7 @@ function bakedBorderRadius(shape: string, borderRadiusPx: number, widthPx: numbe
  */
 export function getResolvedCameraStateAtTime(
     cameraSettings: CameraSettings,
-    cameraLayoutSegments: CameraLayoutSegment[],
+    cameraMoveSegments: CameraMoveSegment[],
     zoomSegments: ZoomSegment[],
     currentTimeMs: number,
     outputSize: Size,
@@ -260,7 +260,7 @@ export function getResolvedCameraStateAtTime(
         return { x: scaled.xPx, y: scaled.yPx, w: scaled.widthPx, h: scaled.heightPx };
     };
 
-    const visibleSegments = (cameraLayoutSegments || []).filter(s => s.visible !== false);
+    const visibleSegments = (cameraMoveSegments || []).filter(s => s.visible !== false);
     let insideLayoutBlock = false;
 
     if (visibleSegments.length > 0) {

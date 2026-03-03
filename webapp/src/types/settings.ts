@@ -241,7 +241,7 @@ export interface AudioSettings {
 // CAMERA LAYOUT
 // ==========================================
 
-export interface CameraLayoutSettings {
+export interface CameraMoveSettings {
     /** Whether camera layout effects are active. When false, layouts are visually disabled and have no effect. */
     enabled: boolean;
     /** Default transition duration for new camera layout blocks (ms) */
@@ -280,7 +280,7 @@ export interface ProjectSettings {
     camera?: CameraSettings;
 
     // Camera Layout (dynamic position/size blocks)
-    cameraLayout?: CameraLayoutSettings;
+    cameraMove?: CameraMoveSettings;
 
     // Captions
     captions: CaptionSettings;

@@ -2,32 +2,32 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
-import type { CameraLayoutSegment } from '../../../../../types';
+import type { CameraMoveSegment } from '../../../../../types';
 import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
 import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
 
-export interface CameraLayoutHoverInfo {
+export interface CameraMoveHoverInfo {
     x: number;
     outputStartTimeMs: number;
     outputEndTimeMs: number;
     width: number;
 }
 
-export function useCameraLayoutHover(
+export function useCameraMoveHover(
     project: any,
     coords: TimePixelMapper,
     dragState: DragState | null,
     selectedId: string | null,
     setSelected: (id: string | null) => void,
     outputDuration: number,
-    segments: CameraLayoutSegment[],
+    segments: CameraMoveSegment[],
     timeMapper: TimeMapper
 ) {
-    const addCameraLayout = useProjectStore(s => s.addCameraLayout);
-    const deleteCameraLayout = useProjectStore(s => s.deleteCameraLayout);
-    const [hoverInfo, setHoverInfo] = useState<CameraLayoutHoverInfo | null>(null);
+    const addCameraMove = useProjectStore(s => s.addCameraMove);
+    const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
+    const [hoverInfo, setHoverInfo] = useState<CameraMoveHoverInfo | null>(null);
     const hoverInfoSetAtRef = useRef<number>(0);
 
     useEffect(() => {
@@ -91,7 +91,7 @@ export function useCameraLayoutHover(
         e.stopPropagation();
         if (dragState) return;
 
-        const currentSelectedId = useUIStore.getState().selectedCameraLayoutId;
+        const currentSelectedId = useUIStore.getState().selectedCameraMoveId;
         if (currentSelectedId) {
             setSelected(null);
             setHoverInfo(null);
@@ -105,7 +105,7 @@ export function useCameraLayoutHover(
 
         // Use current camera settings as defaults for the new block
         const cameraSettings = project.settings.camera;
-        const cameraLayoutSettings = project.settings.cameraLayout;
+        const cameraMoveSettings = project.settings.cameraMove;
 
         const w = cameraSettings?.widthPx ?? 300;
         const h = cameraSettings?.heightPx ?? 300;
@@ -115,7 +115,7 @@ export function useCameraLayoutHover(
             ? Math.min(w, h) / 2
             : (cameraSettings?.borderRadiusPx ?? 10);
 
-        const newSegment: CameraLayoutSegment = {
+        const newSegment: CameraMoveSegment = {
             id: crypto.randomUUID(),
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
@@ -128,19 +128,19 @@ export function useCameraLayoutHover(
             heightPx: h,
             shape: shapeVal,
             borderRadiusPx: bakedRadius,
-            transitionDurationMs: cameraLayoutSettings?.transitionDurationMs ?? 500,
-            easing: cameraLayoutSettings?.easing ?? 'ease-in-out',
+            transitionDurationMs: cameraMoveSettings?.transitionDurationMs ?? 500,
+            easing: cameraMoveSettings?.easing ?? 'ease-in-out',
         };
 
         // Delete overlapping blocks
-        const allSegments = project.timeline?.cameraLayoutSegments || [];
+        const allSegments = project.timeline?.cameraMoveSegments || [];
         for (const existing of allSegments) {
             if (doSourceRangesOverlap(newSegment, existing)) {
-                deleteCameraLayout(existing.id);
+                deleteCameraMove(existing.id);
             }
         }
 
-        addCameraLayout(newSegment);
+        addCameraMove(newSegment);
         setSelected(newSegment.id);
         setHoverInfo(null);
     };

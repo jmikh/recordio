@@ -1,7 +1,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ProjectSettings, CameraSettings, CameraLayoutSegment } from '../../../types';
+import type { ProjectSettings, CameraSettings, CameraMoveSegment } from '../../../types';
 import type { Size } from '@shared/types';
 import { isSubset } from '../../utils/subsetMatcher';
 import { getCameraAnchor, type CameraAnchor } from '../../../core/zoom/cameraAnimator';
@@ -93,11 +93,11 @@ export const createSettingsSlice: StateCreator<ProjectState, [["zustand/subscrib
                 nextSettings.camera = repositionCamera(cam, oldSize, newSize);
 
                 // Also reposition camera layout segments
-                if (nextProject.timeline.cameraLayoutSegments?.length) {
+                if (nextProject.timeline.cameraMoveSegments?.length) {
                     nextProject.timeline = {
                         ...nextProject.timeline,
-                        cameraLayoutSegments: nextProject.timeline.cameraLayoutSegments.map(seg =>
-                            repositionCameraLayoutSegment(seg, oldSize, newSize)
+                        cameraMoveSegments: nextProject.timeline.cameraMoveSegments.map(seg =>
+                            repositionCameraMoveSegment(seg, oldSize, newSize)
                         )
                     };
                 }
@@ -178,10 +178,10 @@ function repositionCamera(
     return { ...cam, xPx: x, yPx: y };
 }
 
-function repositionCameraLayoutSegment(
-    seg: CameraLayoutSegment,
+function repositionCameraMoveSegment(
+    seg: CameraMoveSegment,
     oldSize: Size, newSize: Size
-): CameraLayoutSegment {
+): CameraMoveSegment {
     const { x, y } = repositionByAnchor(
         seg.xPx, seg.yPx, seg.widthPx, seg.heightPx,
         oldSize, newSize
