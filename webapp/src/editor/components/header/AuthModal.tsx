@@ -75,7 +75,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                 </button>
 
                 <p className="text-center text-[10px] text-text-muted px-4">
-                    By continuing, you agree to our <a href="https://recordio.site/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms of Service</a> and <a href="https://recordio.site/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
+                    By continuing, you agree to our <a href="https://recordio.cc/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms of Service</a> and <a href="https://recordio.cc/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
                 </p>
             </div>
         </Modal>

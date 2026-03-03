@@ -4,7 +4,7 @@ import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { SharedVideoCard } from '../components/SharedVideoCard';
-import { LogoLink, XButton } from '@shared/components';
+import { LogoLink, XButton, Modal } from '@shared/components';
 import { BiSupport } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -34,6 +34,7 @@ export function DashboardPage() {
     const [storageUsed, setStorageUsed] = useState<number | null>(null);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     useAuthListener();
 
     const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | undefined>();
@@ -53,11 +54,17 @@ export function DashboardPage() {
             setIsUpgradeModalOpen(true);
         }
 
+        // Check for subscription success redirect from Stripe
+        if (params.has('subscription-success')) {
+            setShowSubscriptionSuccess(true);
+        }
+
         // Clean up only our params — preserve hash fragment for Supabase auth token processing
-        if (error || checkout) {
+        if (error || checkout || params.has('subscription-success')) {
             const url = new URL(window.location.href);
             url.searchParams.delete('checkout');
             url.searchParams.delete('error');
+            url.searchParams.delete('subscription-success');
             window.history.replaceState({}, '', url.pathname + url.search + url.hash);
         }
 
@@ -344,6 +351,21 @@ export function DashboardPage() {
                 </div>,
                 document.body
             )}
+
+            {/* Subscription Success Modal */}
+            <Modal isOpen={showSubscriptionSuccess} onClose={() => setShowSubscriptionSuccess(false)} maxWidth="max-w-[400px]" className="text-center">
+                <div className="text-4xl mb-4">🎉</div>
+                <h2 className="text-lg font-semibold text-text-highlighted mb-2">Welcome to Pro!</h2>
+                <p className="text-sm text-text-main mb-6">
+                    Your subscription is now active. Enjoy unlimited exports, publishing, and all Pro features.
+                </p>
+                <button
+                    onClick={() => setShowSubscriptionSuccess(false)}
+                    className="interactive-primary w-full"
+                >
+                    Get Started
+                </button>
+            </Modal>
         </div>
     );
 }

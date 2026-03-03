@@ -12,7 +12,7 @@ export class StripeService {
         try {
 
 
-            const redirectUrl = 'https://recordio.site/subscription-success';
+            const redirectUrl = `${window.location.origin}/?subscription-success`;
 
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
