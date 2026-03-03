@@ -1,6 +1,7 @@
 
 import type { ID, Project } from '../types';
 import { EDITOR_ORIGIN_DEV, EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
+import { migrateProject } from '../core/migrateProject';
 
 // Use different DB for website vs extension
 // Website (localhost:3001 or app.recordio.cc) uses 'recordio-editor'
@@ -186,7 +187,8 @@ export class ProjectStorage {
         if (!projectRaw) return null;
 
         // Re-hydrate embedded source runtimeUrls
-        const project = { ...projectRaw };
+        // Migrate schema before hydration
+        const project = { ...migrateProject(projectRaw) };
 
         // Hydrate screen source runtimeUrl
         if (project.screenSource?.storageUrl?.startsWith('recordio-blob://')) {
@@ -286,7 +288,7 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
 
-        return projectRaw || null;
+        return projectRaw ? migrateProject(projectRaw) : null;
     }
 
     /**

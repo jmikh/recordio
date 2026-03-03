@@ -4,7 +4,8 @@
  * Centralized easing functions used by zoom and spotlight transitions.
  */
 
-export type EasingStyle = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+import type { EasingStyle } from '../types/settings';
+export type { EasingStyle };
 
 /**
  * Applies the specified easing curve to a linear progress value.

@@ -19,19 +19,19 @@ interface TrackConfig {
 function buildTrackConfigs(): TrackConfig[] {
     return [
         {
-            showKey: 'show_zoom',
+            showKey: 'showZoom',
             label: 'Zoom',
             getEnabled: (s) => s.project.settings.zoom.enabled ?? true,
             toggle: () => useProjectStore.getState().toggleZoomEnabled(),
         },
         {
-            showKey: 'show_spotlight',
+            showKey: 'showSpotlight',
             label: 'Spotlight',
             getEnabled: (s) => s.project.settings.spotlight.enabled ?? true,
             toggle: () => useProjectStore.getState().toggleSpotlightEnabled(),
         },
         {
-            showKey: 'show_captions',
+            showKey: 'showCaptions',
             label: 'Captions',
             getEnabled: (s) => s.project.settings.captions.enabled ?? true,
             toggle: () => {
@@ -41,7 +41,7 @@ function buildTrackConfigs(): TrackConfig[] {
             },
         },
         {
-            showKey: 'show_cameraLayout',
+            showKey: 'showCameraLayout',
             label: 'Webcam',
             requiresCamera: true,
             getEnabled: (s) => s.project.settings.cameraLayout?.enabled ?? true,
@@ -79,10 +79,10 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     );
 
     const enabledMap: Record<string, boolean> = {
-        show_zoom: zoomEnabled,
-        show_spotlight: spotlightEnabled,
-        show_captions: captionsEnabled,
-        show_cameraLayout: cameraLayoutEnabled,
+        showZoom: zoomEnabled,
+        showSpotlight: spotlightEnabled,
+        showCaptions: captionsEnabled,
+        showCameraLayout: cameraLayoutEnabled,
     };
 
     // Calculate menu position when opening

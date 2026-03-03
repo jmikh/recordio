@@ -72,10 +72,4 @@ export interface UserEvents {
     typingEvents: BaseEvent[];
     urlChanges: UrlChangeEvent[];
     hoveredCards: HoveredCardEvent[];
-
-    /**
-     * Pre-sorted aggregate of all non-mouse-position events.
-     * Computed at runtime when events are loaded. NOT persisted to storage.
-     */
-    allEvents: BaseEvent[];
 }

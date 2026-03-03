@@ -4,6 +4,17 @@ import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 
+export const CURRENT_SCHEMA_VERSION = 1;
+
+// Default display settings for tracks — single source of truth
+const DEFAULT_DISPLAY_SETTINGS = {
+    showZoom: true,
+    showSpotlight: true,
+    showCaptions: false,
+    showCameraLayout: false,
+    collapsed: false,
+};
+
 // Empty events constant
 const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
@@ -14,7 +25,6 @@ const EMPTY_USER_EVENTS: UserEvents = {
     typingEvents: [],
     urlChanges: [],
     hoveredCards: [],
-    allEvents: []
 };
 
 // Create a placeholder source for empty projects
@@ -100,7 +110,8 @@ const createDefaultSettings = (): ProjectSettings => ({
         captionSize: 1.0,
         width: 75,
         textColor: '#ffffff',
-        backgroundColor: '#000000cc'
+        backgroundColor: '#000000cc',
+        wordHighlight: true,
     },
 
     audio: {
@@ -130,7 +141,9 @@ const createDefaultSettings = (): ProjectSettings => ({
         hasFeather: false,
         cropZoom: 1,
         autoShrink: true,
-        shrinkScale: 0.5
+        shrinkScale: 0.5,
+        mirrored: false,
+        featherAmount: 0.15,
     },
 
     cameraLayout: {
@@ -138,6 +151,8 @@ const createDefaultSettings = (): ProjectSettings => ({
         transitionDurationMs: 500,
         easing: 'ease-in-out'
     },
+
+    autoCutApplied: false,
 });
 
 /**
@@ -152,13 +167,7 @@ const createDefaultTimeline = (): Timeline => ({
     outputWindows: [],
     focusAreas: [],
     captionSegments: [],
-    displaySettings: {
-        show_zoom: true,
-        show_spotlight: true,
-        show_captions: false,
-        show_cameraLayout: false,
-        collapsed: false,
-    },
+    displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
 });
 
 /**
@@ -172,6 +181,7 @@ export class ProjectImpl {
     static create(name: string = "New Project"): Project {
         return {
             id: crypto.randomUUID(),
+            schemaVersion: CURRENT_SCHEMA_VERSION,
             name,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -212,7 +222,8 @@ export class ProjectImpl {
         const outputWindows = [{
             id: crypto.randomUUID(),
             startMs: 0,
-            endMs: durationMs
+            endMs: durationMs,
+            speed: 1,
         }];
 
         // Calculate Zoom Schedule
@@ -262,17 +273,12 @@ export class ProjectImpl {
             focusAreas: focusAreas,
             captionSegments: [],
             cameraLayoutSegments: [],
-            displaySettings: {
-                show_zoom: true,
-                show_spotlight: true,
-                show_captions: false,
-                show_cameraLayout: false,
-                collapsed: false,
-            },
+            displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
         };
 
         return {
             id: projectId,
+            schemaVersion: CURRENT_SCHEMA_VERSION,
             name,
             createdAt: new Date(),
             updatedAt: new Date(),

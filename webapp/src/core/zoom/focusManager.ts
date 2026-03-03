@@ -35,6 +35,7 @@ const K_CLICK_FALLBACK_BOX_FRACTION = 0.10;
  */
 class FocusManager {
     private readonly events: UserEvents;
+    private readonly sortedEvents: BaseEvent[];
     private readonly fullViewportRect: Rect;
     private readonly clickFallbackBoxSize: number;
     private readonly clickMaxRectSize: number;
@@ -44,11 +45,12 @@ class FocusManager {
     /** Current position in source timeline */
     private currentSourceTime: number = 0;
 
-    /** Index into allEvents array */
-    private allEventsIdx: number = 0;
+    /** Index into sortedEvents array */
+    private sortedEventsIdx: number = 0;
 
     constructor(events: UserEvents, sourceSize: Size, sourceDurationMs: number) {
         this.events = events;
+        this.sortedEvents = FocusManager.buildSortedEvents(events);
         this.sourceDuration = sourceDurationMs;
 
         const largerDimension = Math.max(sourceSize.width, sourceSize.height);
@@ -61,6 +63,22 @@ class FocusManager {
             events.mousePositions,
             largerDimension
         );
+    }
+
+    /**
+     * Builds a chronologically sorted aggregate of all non-mouse-position events.
+     * This replaces the previously-persisted allEvents field on UserEvents.
+     */
+    private static buildSortedEvents(events: UserEvents): BaseEvent[] {
+        return [
+            ...events.mouseClicks,
+            ...events.keyboardEvents,
+            ...events.drags,
+            ...events.scrolls,
+            ...events.typingEvents,
+            ...events.urlChanges,
+            ...events.hoveredCards,
+        ].sort((a, b) => a.timestamp - b.timestamp);
     }
 
     // ========================================================================
@@ -97,7 +115,7 @@ class FocusManager {
         if (hover) {
             return hover;
         } else if (nextEvent) {
-            this.allEventsIdx++; // Consume the event
+            this.sortedEventsIdx++; // Consume the event
             return nextEvent;
         }
 
@@ -110,12 +128,12 @@ class FocusManager {
      * Handles range events that started before currentSourceTime but are still ongoing.
      */
     private peekNextValidEvent(): BaseEvent | null {
-        while (this.allEventsIdx < this.events.allEvents.length) {
-            const event = this.events.allEvents[this.allEventsIdx];
+        while (this.sortedEventsIdx < this.sortedEvents.length) {
+            const event = this.sortedEvents[this.sortedEventsIdx];
 
             // Skip events that aren't valid for focus
             if (!this.isValidFocusEvent(event)) {
-                this.allEventsIdx++;
+                this.sortedEventsIdx++;
                 continue;
             }
 
@@ -129,7 +147,7 @@ class FocusManager {
                     }
                 }
                 // Point event or range event that has ended - skip
-                this.allEventsIdx++;
+                this.sortedEventsIdx++;
                 continue;
             }
 

@@ -32,10 +32,10 @@ const EFFECT_TRACK_ORDER: EffectTrack[] = [
 
 /** Maps effect track keys to their DisplaySettings show_ field */
 const SHOW_KEY: Record<EffectTrack, keyof DisplaySettings> = {
-    zoom: 'show_zoom',
-    spotlight: 'show_spotlight',
-    captions: 'show_captions',
-    cameraLayout: 'show_cameraLayout',
+    zoom: 'showZoom',
+    spotlight: 'showSpotlight',
+    captions: 'showCaptions',
+    cameraLayout: 'showCameraLayout',
 };
 
 /** Gap between track rows */

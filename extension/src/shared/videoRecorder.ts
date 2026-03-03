@@ -53,7 +53,6 @@ export class VideoRecorder {
         typingEvents: [],
         urlChanges: [],
         hoveredCards: [],
-        allEvents: []
     };
 
     // Detection Result (Window Mode)
@@ -480,24 +479,7 @@ export class VideoRecorder {
             };
         }
 
-        // 5. Prepare events (populate allEvents for FocusManager)
-        const effectiveEvents: UserEvents = events ? {
-            ...events,
-            allEvents: [
-                ...(events.mouseClicks || []),
-                ...(events.keyboardEvents || []),
-                ...(events.drags || []),
-                ...(events.scrolls || []),
-                ...(events.typingEvents || []),
-                ...(events.urlChanges || []),
-                ...(events.hoveredCards || []),
-            ].sort((a, b) => a.timestamp - b.timestamp)
-        } : {
-            mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [],
-            scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [], allEvents: []
-        };
-
-        // 6. Create & Save RawRecording (lightweight handoff format)
+        // 5. Create & Save RawRecording (lightweight handoff format)
         const rawRecording: RawRecording = {
             id: projectId,
             name: this.config.sourceName || this.mode,
@@ -505,7 +487,10 @@ export class VideoRecorder {
             screenSource,
             cameraSource,
             microphoneSource,
-            userEvents: effectiveEvents,
+            userEvents: events ?? {
+                mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [],
+                scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [],
+            },
         };
         await ProjectStorage.saveRawRecording(rawRecording);
 

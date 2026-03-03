@@ -30,6 +30,7 @@ import { useUIStore } from '../../stores/useUIStore';
 // Constants
 const HEADER_WIDTH = 120;
 const RULER_HEIGHT = 26; // 24px canvas + 2px borders (border-t + border-b on ruler wrapper)
+const SCROLLBAR_GUTTER = 8; // Space below tracks so horizontal scrollbar doesn't overlap bottom track
 const TRANSITION_STYLE = 'height 150ms ease';
 
 export function Timeline() {
@@ -242,7 +243,7 @@ export function Timeline() {
         <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div id="timeline-body" className="flex bg-surface overflow-hidden relative" style={{ height: timelineTotalHeight }} onMouseLeave={() => setHoveredTrack(null)}>
+            <div id="timeline-body" className="flex bg-surface overflow-hidden relative" style={{ height: timelineTotalHeight + SCROLLBAR_GUTTER }} onMouseLeave={() => setHoveredTrack(null)}>
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -265,28 +266,28 @@ export function Timeline() {
                         </div>
 
                         {/* Header: Zoom */}
-                        {displaySettings.show_zoom && (
+                        {displaySettings.showZoom && (
                             <div className="shrink-0" style={{ height: trackSizing.zoom.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('zoom')}>
                                 <ZoomHeaderCell height={trackSizing.zoom.height} isCollapsed={trackSizing.zoom.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Spotlight */}
-                        {displaySettings.show_spotlight && (
+                        {displaySettings.showSpotlight && (
                             <div className="shrink-0" style={{ height: trackSizing.spotlight.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                 <SpotlightHeaderCell height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Captions */}
-                        {displaySettings.show_captions && (
+                        {displaySettings.showCaptions && (
                             <div className="shrink-0" style={{ height: trackSizing.captions.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('captions')}>
                                 <CaptionsHeaderCell height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                             </div>
                         )}
 
                         {/* Header: Camera Layout */}
-                        {displaySettings.show_cameraLayout && hasCameraSource && (
+                        {displaySettings.showCameraLayout && hasCameraSource && (
                             <div className="shrink-0" style={{ height: trackSizing.cameraLayout.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
                                 <LayoutHeaderCell height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
                             </div>
@@ -361,28 +362,28 @@ export function Timeline() {
                                     </TimelineTrackRow>
 
                                     {/* Zoom Track */}
-                                    {displaySettings.show_zoom && (
+                                    {displaySettings.showZoom && (
                                         <TimelineTrackRow height={trackSizing.zoom.height} onMouseEnter={() => setHoveredTrack('zoom')}>
                                             <ZoomTrack height={trackSizing.zoom.height} isCollapsed={trackSizing.zoom.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Spotlight Track */}
-                                    {displaySettings.show_spotlight && (
+                                    {displaySettings.showSpotlight && (
                                         <TimelineTrackRow height={trackSizing.spotlight.height} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                             <SpotlightTrack height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Caption Track */}
-                                    {displaySettings.show_captions && (
+                                    {displaySettings.showCaptions && (
                                         <TimelineTrackRow height={trackSizing.captions.height} onMouseEnter={() => setHoveredTrack('captions')}>
                                             <CaptionTrack height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
                                     {/* Camera Layout Track */}
-                                    {displaySettings.show_cameraLayout && hasCameraSource && (
+                                    {displaySettings.showCameraLayout && hasCameraSource && (
                                         <TimelineTrackRow height={trackSizing.cameraLayout.height} onMouseEnter={() => setHoveredTrack('cameraLayout')}>
                                             <CameraLayoutTrack height={trackSizing.cameraLayout.height} isCollapsed={trackSizing.cameraLayout.isCollapsed} />
                                         </TimelineTrackRow>

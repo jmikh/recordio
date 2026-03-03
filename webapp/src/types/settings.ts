@@ -6,7 +6,11 @@
 
 import type { ID, Size, Rect } from '@shared/types';
 import type { CaptionSegment } from './timeline';
-import type { EasingStyle } from '../core/easing';
+// ==========================================
+// EASING
+// ==========================================
+
+export type EasingStyle = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 
 // ==========================================
 // STYLE (base for camera/screen)
@@ -44,16 +48,16 @@ export interface CameraSettings extends StyleSettings {
     cropZoom: number;
 
     /** Enable auto-shrink when screen is zoomed in */
-    autoShrink?: boolean;
+    autoShrink: boolean;
 
-    /** Scale factor when shrunk (0.25 = 25%, 0.5 = 50%, 0.75 = 75%). Default: 0.5 */
-    shrinkScale?: number;
+    /** Scale factor when shrunk (0.25 = 25%, 0.5 = 50%, 0.75 = 75%) */
+    shrinkScale: number;
 
     /** Horizontally flip the camera feed */
-    mirrored?: boolean;
+    mirrored: boolean;
 
-    /** Amount of edge feathering as percentage of size (0.0 = 0%, 0.25 = 25%). Default: 0.15 */
-    featherAmount?: number;
+    /** Amount of edge feathering as percentage of size (0.0 = 0%, 0.25 = 25%) */
+    featherAmount: number;
 }
 
 // ==========================================
@@ -105,15 +109,14 @@ export interface BackgroundSettings {
     backgroundBlurPx: number;
 }
 
-export type BackgroundType = 'solid' | 'image';
 
 // ==========================================
 // ZOOM
 // ==========================================
 
 export interface ZoomSettings {
-    /** Whether zoom effects are active. When false, zooms are visually disabled and have no effect. Default: true. */
-    enabled?: boolean;
+    /** Whether zoom effects are active. When false, zooms are visually disabled and have no effect. */
+    enabled: boolean;
     maxZoom: number;
     /** Duration of zoom transition animations in milliseconds */
     transitionDurationMs: number;
@@ -126,8 +129,8 @@ export interface ZoomSettings {
 // ==========================================
 
 export interface SpotlightSettings {
-    /** Whether spotlight effects are active. When false, spotlights are visually disabled and have no effect. Default: true. */
-    enabled?: boolean;
+    /** Whether spotlight effects are active. When false, spotlights are visually disabled and have no effect. */
+    enabled: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
     /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */
@@ -180,19 +183,20 @@ export interface KeyboardSettings {
 // ==========================================
 
 export interface CaptionSettings {
-    /** Whether caption rendering is active. When false, captions are visually disabled. Default: true. */
-    enabled?: boolean;
+    /** Whether caption rendering is active. When false, captions are visually disabled. */
+    enabled: boolean;
     /** Size multiplier for captions (0.5–2.0). Scales font, padding, etc. */
     captionSize: number;
     width: number; // Maximum width as percentage of canvas width (0-100)
     textColor: string; // Text color in hex format (e.g. '#ffffff')
     backgroundColor: string; // Background box color in 8-char hex with alpha (e.g. '#000000cc')
-    wordHighlight?: boolean; // Whether to progressively highlight words (karaoke-style)
+    wordHighlight: boolean; // Whether to progressively highlight words (karaoke-style)
 
     /** Baseline captions from last successful transcription (never modified by editing) */
     baselineCaptions?: CaptionSegment[];
     /** When captions were generated (if any) */
-    generatedAt?: Date;
+    /** When captions were generated (Unix timestamp ms), if any */
+    generatedAt?: number;
 }
 
 // ==========================================
@@ -238,8 +242,8 @@ export interface AudioSettings {
 // ==========================================
 
 export interface CameraLayoutSettings {
-    /** Whether camera layout effects are active. When false, layouts are visually disabled and have no effect. Default: true. */
-    enabled?: boolean;
+    /** Whether camera layout effects are active. When false, layouts are visually disabled and have no effect. */
+    enabled: boolean;
     /** Default transition duration for new camera layout blocks (ms) */
     transitionDurationMs: number;
     /** Default easing for new camera layout blocks */
@@ -285,7 +289,7 @@ export interface ProjectSettings {
     audio: AudioSettings;
 
     // Analytics
-    /** Set to true when user applies AutoCut. Never reset. */
-    autoCutApplied?: boolean;
+    /** Whether user has applied AutoCut */
+    autoCutApplied: boolean;
 }
 

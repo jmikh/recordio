@@ -205,13 +205,13 @@ export const useUIStore = create<UIState>((set, get) => ({
             if (selectedCaptionId) {
                 // Also ensure captions track is visible in project timeline
                 const ds = useProjectStore.getState().project.timeline.displaySettings;
-                if (!ds.show_captions) {
+                if (!ds.showCaptions) {
                     useProjectStore.setState(s => ({
                         project: {
                             ...s.project,
                             timeline: {
                                 ...s.project.timeline,
-                                displaySettings: { ...s.project.timeline.displaySettings, show_captions: true }
+                                displaySettings: { ...s.project.timeline.displaySettings, showCaptions: true }
                             }
                         }
                     }));

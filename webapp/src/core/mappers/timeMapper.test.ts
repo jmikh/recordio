@@ -5,7 +5,7 @@ import type { OutputWindow } from '../../types';
 describe('TimeMapper', () => {
     it('Case 1: Simple Continuous Window', () => {
         const windows: OutputWindow[] = [
-            { id: '1', startMs: 0, endMs: 1000 }
+            { id: '1', startMs: 0, endMs: 1000, speed: 1 }
         ];
         const mapper = new TimeMapper(windows);
 
@@ -24,8 +24,8 @@ describe('TimeMapper', () => {
 
     it('Case 2: Windows with Gap', () => {
         const windows: OutputWindow[] = [
-            { id: '1', startMs: 0, endMs: 500 },
-            { id: '2', startMs: 1000, endMs: 1500 }
+            { id: '1', startMs: 0, endMs: 500, speed: 1 },
+            { id: '2', startMs: 1000, endMs: 1500, speed: 1 }
         ];
         const mapper = new TimeMapper(windows);
 
@@ -55,8 +55,8 @@ describe('TimeMapper', () => {
 
     it('Case 4: Range Mapping with Partial Visibility', () => {
         const windows: OutputWindow[] = [
-            { id: '1', startMs: 0, endMs: 500 },
-            { id: '2', startMs: 1000, endMs: 2000 }
+            { id: '1', startMs: 0, endMs: 500, speed: 1 },
+            { id: '2', startMs: 1000, endMs: 2000, speed: 1 }
         ];
         const mapper = new TimeMapper(windows);
 

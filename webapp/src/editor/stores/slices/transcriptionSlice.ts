@@ -50,7 +50,7 @@ export const createTranscriptionSlice: StateCreator<
                         captions: {
                             ...state.project.settings.captions,
                             baselineCaptions: segments.map(s => ({ ...s })),
-                            generatedAt: new Date()
+                            generatedAt: Date.now()
                         }
                     },
                     updatedAt: new Date()
@@ -59,7 +59,7 @@ export const createTranscriptionSlice: StateCreator<
         });
 
         // Auto-enable captions track visibility
-        useUIStore.getState().setTrackShow('show_captions', true);
+        useUIStore.getState().setTrackShow('showCaptions', true);
     },
 
     restoreCaptionsFromBaseline: () => {
@@ -103,7 +103,7 @@ export const createTranscriptionSlice: StateCreator<
         }));
 
         // Auto-hide captions track visibility
-        useUIStore.getState().setTrackShow('show_captions', false);
+        useUIStore.getState().setTrackShow('showCaptions', false);
     },
 
     updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {

@@ -5,7 +5,7 @@
  */
 
 import type { ID, TimeMs, Rect } from '@shared/types';
-import type { EasingStyle } from '../core/easing';
+import type { EasingStyle } from './settings';
 
 // ==========================================
 // BASE SEGMENT INTERFACE
@@ -71,8 +71,8 @@ export interface OutputWindow {
     startMs: TimeMs;
     /** Timeline-based end time */
     endMs: TimeMs;
-    /** Playback speed multiplier (default: 1.0). 2.0 = 2x speed, 0.5 = 0.5x speed */
-    speed?: number;
+    /** Playback speed multiplier. 2.0 = 2x speed, 0.5 = 0.5x speed */
+    speed: number;
 }
 
 // ==========================================
@@ -155,10 +155,10 @@ export interface CameraLayoutSegment extends TimeSegment {
  * Persisted per-project as part of the Timeline.
  */
 export interface DisplaySettings {
-    show_zoom: boolean;
-    show_spotlight: boolean;
-    show_captions: boolean;
-    show_cameraLayout: boolean;
+    showZoom: boolean;
+    showSpotlight: boolean;
+    showCaptions: boolean;
+    showCameraLayout: boolean;
     /** Whether hover-to-expand collapse is active */
     collapsed: boolean;
 }
