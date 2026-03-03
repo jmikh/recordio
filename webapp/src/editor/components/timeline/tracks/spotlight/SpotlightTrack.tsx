@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
-import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
+import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useTimeMapper } from '../../../../hooks/useTimeMapper';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
 import { useSpotlightHover } from './useSpotlightHover';
 import { SpotlightBlock } from './SpotlightBlock';
-import type { SpotlightSegment } from '../../../../types';
+import type { SpotlightSegment } from '../../../../../types';
 
 import {
     ghostSpotlight,
@@ -16,8 +16,8 @@ import {
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from '../TimelineBlockStyles';
-import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
+} from '../shared/TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
 
 interface SpotlightTrackProps {
     height: number;

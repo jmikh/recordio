@@ -1,6 +1,6 @@
 import React from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
-import { TimelineHeaderCell } from './TimelineHeaderCell';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 
 interface CaptionsHeaderCellProps {
     height: number;

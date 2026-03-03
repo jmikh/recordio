@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { PiWebcamBold } from 'react-icons/pi';
-import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
+import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useTimeMapper } from '../../../../hooks/useTimeMapper';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
 import { useCameraLayoutHover } from './useCameraLayoutHover';
 import { CameraLayoutBlock } from './CameraLayoutBlock';
 import {
@@ -14,9 +14,9 @@ import {
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from '../TimelineBlockStyles';
-import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
-import type { CameraLayoutSegment } from '../../../../types';
+} from '../shared/TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
+import type { CameraLayoutSegment } from '../../../../../types';
 
 interface CameraLayoutTrackProps {
     height: number;

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { useProjectStore } from '../../stores/useProjectStore';
-import type { DisplaySettings } from '../../../types/timeline';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import type { DisplaySettings } from '../../../../../types/timeline';
 
 // ============================================================================
 // TRACK SIZING HOOK

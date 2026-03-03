@@ -1,42 +1,59 @@
 import React from 'react';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
+import { RiLightbulbFlashLine } from 'react-icons/ri';
 import {
     transitionSegment,
     holdSegment,
     blockContainer,
     resizeHandle,
     dragHandleIndicator,
+    fadeStyle,
+    holdStyle,
     blockIconClass,
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from '../TimelineBlockStyles';
+} from '../shared/TimelineBlockStyles';
 
-interface CameraLayoutBlockProps {
+interface SpotlightBlockProps {
+    /** Left position in pixels */
     left: number;
+    /** Total width of the spotlight block in pixels */
     width: number;
-    transitionInWidth: number;
-    transitionOutWidth: number;
+    /** Width of the fade-in segment in pixels */
+    fadeInWidth: number;
+    /** Width of the fade-out segment in pixels */
+    fadeOutWidth: number;
+    /** Whether this spotlight is selected */
     isSelected: boolean;
+    /** Whether this spotlight is being dragged */
     isDragging: boolean;
+    /** Track height for centering */
     trackHeight: number;
+    /** Mouse down handler for move drag */
     onMouseDown: (e: React.MouseEvent) => void;
+    /** Click handler for selection */
     onClick: (e: React.MouseEvent) => void;
+    /** Mouse down handler for left resize */
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
+    /** Mouse down handler for right resize */
     onResizeEndMouseDown: (e: React.MouseEvent) => void;
-    /** Whether the block represents a hidden camera state */
-    isHidden?: boolean;
     /** Whether the track is disabled */
     disabled?: boolean;
     /** Whether the track is in collapsed state (hides icons) */
     isCollapsed?: boolean;
 }
 
-export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
+/**
+ * Renders a spotlight block on the timeline with three visual segments:
+ * - Fade In (left): shorter with diagonal stripes pointing inward
+ * - Hold (center): taller with solid fill
+ * - Fade Out (right): shorter with diagonal stripes pointing outward
+ */
+export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
     left,
     width,
-    transitionInWidth,
-    transitionOutWidth,
+    fadeInWidth,
+    fadeOutWidth,
     isSelected,
     isDragging,
     trackHeight,
@@ -44,31 +61,28 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
     onClick,
     onResizeStartMouseDown,
     onResizeEndMouseDown,
-    isHidden,
     disabled = false,
     isCollapsed = false,
 }) => {
-    const clampedTransitionIn = Math.min(transitionInWidth, width / 2);
-    const clampedTransitionOut = Math.min(transitionOutWidth, width / 2);
-    const holdWidth = Math.max(0, width - clampedTransitionIn - clampedTransitionOut);
+    // Calculate hold width
+    const holdWidth = Math.max(0, width - fadeInWidth - fadeOutWidth);
+
+    // All segments fill the track with 1px padding top/bottom
     const segmentHeight = trackHeight - 2;
     const segmentY = 1;
 
-    const transitionInColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
-    const transitionOutColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
+    // Get color classes based on selection state
+    const fadeColorClass = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
 
-    // When no hold, round both transition ends
-    const inStyle = holdWidth === 0 && clampedTransitionOut === 0
-        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : { ...transitionSegment.getStyle(), borderRight: 'none' as const };
-    const outStyle = holdWidth === 0 && clampedTransitionIn === 0
-        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : { ...transitionSegment.getStyle(), borderLeft: 'none' as const };
+    // Only apply hover effects when not selected and not disabled
+    const fadeHoverClass = (isSelected || disabled) ? '' : transitionSegment.hoverClass;
+    const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
 
     return (
         <div
             className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            data-part="block-container"
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -80,62 +94,65 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
             onMouseDown={disabled ? undefined : onMouseDown}
             onClick={disabled ? undefined : onClick}
         >
-            {/* Transition-in segment (left) */}
-            {clampedTransitionIn > 0 && (
+            {/* Fade In Segment */}
+            {fadeInWidth > 0 && (
                 <div
-                    className={`${transitionSegment.base} ${transitionInColor}`}
+                    className={`${transitionSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    data-part="fade-in"
                     style={{
                         left: 0,
                         top: segmentY,
-                        width: clampedTransitionIn,
-                        ...inStyle,
+                        width: fadeInWidth,
+                        ...transitionSegment.getStyle(),
                         height: segmentHeight,
                         borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-                        ...(holdWidth === 0 && clampedTransitionOut === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
+                        borderRight: 'none',
+                        ...(holdWidth === 0 && fadeOutWidth === 0 ? { borderRadius: SEGMENT_RADIUS, borderRight: undefined } : {}),
                         ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
             )}
 
-            {/* Hold segment (middle) */}
+            {/* Hold Segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass} flex items-center justify-center overflow-hidden`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
+                    data-part="hold"
                     style={{
-                        left: clampedTransitionIn,
+                        left: fadeInWidth,
                         top: segmentY,
                         width: holdWidth,
-                        ...holdSegment.getStyle(),
+                        ...holdStyle(),
                         height: segmentHeight,
-                        borderRadius: clampedTransitionIn === 0 && clampedTransitionOut === 0
+                        borderRadius: fadeInWidth === 0 && fadeOutWidth === 0
                             ? SEGMENT_RADIUS
-                            : clampedTransitionIn === 0
+                            : fadeInWidth === 0
                                 ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
-                                : clampedTransitionOut === 0
+                                : fadeOutWidth === 0
                                     ? `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`
                                     : 0,
                     }}
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        isHidden
-                            ? <PiWebcamSlashBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
-                            : <PiWebcamBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                        <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
                     )}
                 </div>
             )}
 
-            {/* Transition-out segment (right) */}
-            {clampedTransitionOut > 0 && (
+            {/* Fade Out Segment */}
+            {fadeOutWidth > 0 && (
                 <div
-                    className={`${transitionSegment.base} ${transitionOutColor}`}
+                    className={`${transitionSegment.base} ${fadeColorClass} ${fadeHoverClass}`}
+                    data-part="fade-out"
                     style={{
-                        left: clampedTransitionIn + holdWidth,
+                        left: fadeInWidth + holdWidth,
                         top: segmentY,
-                        width: clampedTransitionOut,
-                        ...outStyle,
+                        width: fadeOutWidth,
+                        ...transitionSegment.getStyle(),
                         height: segmentHeight,
                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                        ...(holdWidth === 0 && clampedTransitionIn === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
+                        borderLeft: 'none',
+                        ...(holdWidth === 0 && fadeInWidth === 0 ? { borderRadius: SEGMENT_RADIUS, borderLeft: undefined } : {}),
                         ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
                     }}
                 />
@@ -152,6 +169,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                 }}
                 onMouseDown={onResizeStartMouseDown}
             >
+                {/* Visible drag handle indicator */}
                 <div
                     className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
                     style={{ height: 'calc(100% - 2px)' }}
@@ -169,6 +187,7 @@ export const CameraLayoutBlock: React.FC<CameraLayoutBlockProps> = ({
                 }}
                 onMouseDown={onResizeEndMouseDown}
             >
+                {/* Visible drag handle indicator */}
                 <div
                     className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
                     style={{ height: 'calc(100% - 2px)' }}

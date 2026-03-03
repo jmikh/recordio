@@ -1,8 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
-import type { ID } from '../../../../types';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useHistoryBatcher } from '../../../../hooks/useHistoryBatcher';
+import type { ID } from '../../../../../types';
 
 interface SpeedControlProps {
     windowId: ID;

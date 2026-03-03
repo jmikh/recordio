@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { CameraLayoutSegment } from '../../../../types';
-import type { TimelineSegmentDragState as DragState } from '../useTimelineSegmentDrag';
-import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
-import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
-import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import type { CameraLayoutSegment } from '../../../../../types';
+import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
+import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
+import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
 
 export interface CameraLayoutHoverInfo {
     x: number;

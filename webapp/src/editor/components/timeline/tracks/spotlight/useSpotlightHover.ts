@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { SpotlightSegment } from '../../../../types';
-import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS, type TimelineSegmentDragState } from '../useTimelineSegmentDrag';
-import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
-import type { TimeMapper } from '../../../../core/mappers/timeMapper';
-import { getZoomBoundsForRange } from '../../../../core/zoom/zoomBounds';
-import { ViewMapper } from '../../../../core/mappers/viewMapper';
-import { getDeviceFrame } from '../../../../core/deviceFrames';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import type { SpotlightSegment } from '../../../../../types';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS, type TimelineSegmentDragState } from '../shared/useTimelineSegmentDrag';
+import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
+import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
+import { getZoomBoundsForRange } from '../../../../../core/zoom/zoomBounds';
+import { ViewMapper } from '../../../../../core/mappers/viewMapper';
+import { getDeviceFrame } from '../../../../../core/deviceFrames';
 
 export interface HoverInfo {
     x: number; // Left position in pixels

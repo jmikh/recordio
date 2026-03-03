@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { TimePixelMapper } from '../../utils/timePixelMapper';
-import type { TimeSegment } from '../../../types';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useHistoryBatcher } from '../../../../hooks/useHistoryBatcher';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import type { TimeSegment } from '../../../../../types';
 import { getBlockBounds, doSourceRangesOverlap } from './timelineTrackUtils';
-import type { TimeMapper } from '../../../core/mappers/timeMapper';
+import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
 
 // ============================================================================
 // SHARED TIMELINE SEGMENT DRAG

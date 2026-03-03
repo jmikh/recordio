@@ -1,7 +1,7 @@
 import React from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
-import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { SpotlightTooltip } from '../shared/MediaTooltips';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
+import { SpotlightTooltip } from '../../../shared/MediaTooltips';
 
 interface SpotlightHeaderCellProps {
     height: number;

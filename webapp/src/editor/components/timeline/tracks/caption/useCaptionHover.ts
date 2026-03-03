@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { CaptionSegment } from '../../../../types';
-import type { TimelineSegmentDragState as CaptionDragState } from '../useTimelineSegmentDrag';
-import { getValidBlockRange } from '../timelineTrackUtils';
-import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
-import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import type { CaptionSegment } from '../../../../../types';
+import type { TimelineSegmentDragState as CaptionDragState } from '../shared/useTimelineSegmentDrag';
+import { getValidBlockRange } from '../shared/timelineTrackUtils';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
+import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
 
 export interface CaptionHoverInfo {
     x: number;

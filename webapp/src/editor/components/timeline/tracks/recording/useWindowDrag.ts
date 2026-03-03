@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import type { OutputWindow, Timeline as TimelineType } from '../../../../types';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { useHistoryBatcher } from '../../../hooks/useHistoryBatcher';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import type { OutputWindow, Timeline as TimelineType } from '../../../../../types';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useHistoryBatcher } from '../../../../hooks/useHistoryBatcher';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { MIN_WINDOW_DURATION_MS } from './constants';
 
 // Minimum pixel over-drag past the zero-gap boundary before triggering a merge.

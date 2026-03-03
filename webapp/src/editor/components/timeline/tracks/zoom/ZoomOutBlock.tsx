@@ -1,6 +1,6 @@
 import React from 'react';
 import { AiOutlineZoomOut } from 'react-icons/ai';
-import { zoomOutBlock, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
+import { zoomOutBlock, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../shared/TimelineBlockStyles';
 
 interface ZoomOutBlockProps {
     /** Left position in pixels */

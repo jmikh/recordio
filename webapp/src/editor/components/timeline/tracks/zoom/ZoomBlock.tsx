@@ -11,7 +11,7 @@ import {
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from '../TimelineBlockStyles';
+} from '../shared/TimelineBlockStyles';
 
 interface ZoomBlockProps {
     /** Left position in pixels */

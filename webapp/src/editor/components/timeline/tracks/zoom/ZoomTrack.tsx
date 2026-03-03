@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { AiOutlineZoomIn } from 'react-icons/ai';
-import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
+import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { useTimeMapper } from '../../../../hooks/useTimeMapper';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
 import { useZoomHover } from './useZoomHover';
 import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
@@ -15,9 +15,9 @@ import {
     BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
-} from '../TimelineBlockStyles';
-import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
-import type { ZoomSegment } from '../../../../types';
+} from '../shared/TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
+import type { ZoomSegment } from '../../../../../types';
 
 interface ZoomTrackProps {
     height: number;

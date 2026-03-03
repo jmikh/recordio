@@ -3,26 +3,26 @@ import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
 import { MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
-import { ZoomTrack } from './zoom/ZoomTrack';
+import { ZoomTrack } from './tracks/zoom/ZoomTrack';
 
-import { SpotlightTrack } from './spotlight/SpotlightTrack';
-import { SpotlightHeaderCell } from './SpotlightHeaderCell';
-import { LayoutHeaderCell } from './LayoutHeaderCell';
-import { CaptionTrack } from './caption/CaptionTrack';
-import { CameraLayoutTrack } from './cameraLayout/CameraLayoutTrack';
+import { SpotlightTrack } from './tracks/spotlight/SpotlightTrack';
+import { SpotlightHeaderCell } from './tracks/spotlight/SpotlightHeaderCell';
+import { LayoutHeaderCell } from './tracks/cameraLayout/LayoutHeaderCell';
+import { CaptionTrack } from './tracks/caption/CaptionTrack';
+import { CameraLayoutTrack } from './tracks/cameraLayout/CameraLayoutTrack';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
-import { RecordingTrack } from './recording/RecordingTrack';
+import { RecordingTrack } from './tracks/recording/RecordingTrack';
 
-import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { TimelineTrackRow } from './TimelineTrackRow';
+import { TimelineHeaderCell } from './tracks/shared/TimelineHeaderCell';
+import { TimelineTrackRow } from './tracks/shared/TimelineTrackRow';
 import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { TimelineSettings } from './TimelineSettings';
-import { ZoomHeaderCell } from './ZoomHeaderCell';
-import { CaptionsHeaderCell } from './CaptionsHeaderCell';
-import { useTrackSizing, TRACK_GAP } from './useTrackSizing';
+import { ZoomHeaderCell } from './tracks/zoom/ZoomHeaderCell';
+import { CaptionsHeaderCell } from './tracks/caption/CaptionsHeaderCell';
+import { useTrackSizing, TRACK_GAP } from './tracks/shared/useTrackSizing';
 
 import { useUIStore } from '../../stores/useUIStore';
 

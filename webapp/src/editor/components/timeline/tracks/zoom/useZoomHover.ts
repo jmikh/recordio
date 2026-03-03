@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useUIStore } from '../../../stores/useUIStore';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
-import type { ZoomSegment } from '../../../../types';
-import type { TimelineSegmentDragState as DragState } from '../useTimelineSegmentDrag';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useUIStore } from '../../../../stores/useUIStore';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
+import type { ZoomSegment } from '../../../../../types';
+import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 
-import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../useTimelineSegmentDrag';
-import { getValidBlockRange, doSourceRangesOverlap } from '../timelineTrackUtils';
-import { rectFromCenter } from '../../../../core/geometry';
-import type { TimeMapper } from '../../../../core/mappers/timeMapper';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
+import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
+import { rectFromCenter } from '../../../../../core/geometry';
+import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
 
 export interface HoverInfo {
     x: number;

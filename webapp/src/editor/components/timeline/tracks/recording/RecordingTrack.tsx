@@ -1,10 +1,10 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import type { Timeline as TimelineType } from '../../../../types';
-import { useProjectStore } from '../../../stores/useProjectStore';
-import { useAudioAnalysis } from '../../../hooks/useAudioAnalysis';
-import { useUIStore, CanvasMode } from '../../../stores/useUIStore';
-import { getTimeMapper } from '../../../hooks/useTimeMapper';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import type { Timeline as TimelineType } from '../../../../../types';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useAudioAnalysis } from '../../../../hooks/useAudioAnalysis';
+import { useUIStore, CanvasMode } from '../../../../stores/useUIStore';
+import { getTimeMapper } from '../../../../hooks/useTimeMapper';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
 
 import { RecordingSegment } from './RecordingSegment';

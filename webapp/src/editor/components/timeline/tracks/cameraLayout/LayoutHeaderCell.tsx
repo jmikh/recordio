@@ -1,7 +1,7 @@
 import React from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
-import { TimelineHeaderCell } from './TimelineHeaderCell';
-import { CameraLayoutTooltip } from '../shared/MediaTooltips';
+import { useProjectStore } from '../../../../stores/useProjectStore';
+import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
+import { CameraLayoutTooltip } from '../../../shared/MediaTooltips';
 
 interface LayoutHeaderCellProps {
     height: number;

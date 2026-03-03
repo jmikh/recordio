@@ -1,16 +1,16 @@
 import React, { useMemo } from 'react';
 import { FaRegClosedCaptioning } from 'react-icons/fa';
-import { useProjectStore, useProjectTimeline } from '../../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../../stores/useUIStore';
-import { useTimeMapper } from '../../../hooks/useTimeMapper';
-import { TimePixelMapper } from '../../../utils/timePixelMapper';
+import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
+import { useUIStore, CanvasMode } from '../../../../stores/useUIStore';
+import { useTimeMapper } from '../../../../hooks/useTimeMapper';
+import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { CaptionBlock } from './CaptionBlock';
-import { useTimelineSegmentDrag } from '../useTimelineSegmentDrag';
+import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
 import { useCaptionHover } from './useCaptionHover';
-import type { CaptionSegment } from '../../../../types';
+import type { CaptionSegment } from '../../../../../types';
 import { K_MIN_CAPTION_DURATION_MS } from './CaptionTrackUtils';
-import { ghostCaption, blockIconClass, ghostIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../TimelineBlockStyles';
-import { DisabledTrackOverlay } from '../DisabledTrackOverlay';
+import { ghostCaption, blockIconClass, ghostIconClass, BLOCK_ICON_SIZE, MIN_ICON_WIDTH_PX } from '../shared/TimelineBlockStyles';
+import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
 
 interface CaptionTrackProps {
     height: number;
