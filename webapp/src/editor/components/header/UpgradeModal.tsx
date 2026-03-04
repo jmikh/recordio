@@ -137,14 +137,14 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     };
 
     const monthlyPrice = 15;
-    const yearlyPrice = 72;
+    const yearlyPrice = 48;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
 
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
         return (
-            <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_60px_-5px_var(--color-primary)]">
+            <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_30px_-5px_var(--color-primary)]">
                 <div className="flex justify-end mb-2">
                     <XButton onClick={handleClose} title="Close" />
                 </div>
@@ -204,7 +204,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
     // ── Standard Upgrade Flow ──
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_60px_-5px_var(--color-primary)]">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_30px_-5px_var(--color-primary)]">
             {/* Header */}
             <div className="flex justify-end mb-2">
                 <XButton onClick={handleClose} title="Close" />
