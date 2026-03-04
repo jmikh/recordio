@@ -13,8 +13,8 @@ export function drawWatermark(
 ): void {
     const h = canvasHeight ?? canvasWidth;
 
-    // Watermark height = 12% of canvas height, maintain aspect ratio
-    const wmHeight = h * 0.12;
+    // Watermark height = 8.4% of canvas height (30% smaller than original 12%), maintain aspect ratio
+    const wmHeight = h * 0.084;
     const aspect = watermarkImg.naturalWidth / watermarkImg.naturalHeight;
     const wmWidth = wmHeight * aspect;
 
