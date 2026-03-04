@@ -28,6 +28,41 @@ const DEBUG_SHOW_HOVERED_CARD = __DEBUG_OVERLAY__;
 // Minimum duration (ms) for a hovered card session to be reported
 const MIN_SESSION_DURATION_MS = 2000;
 
+/**
+ * Iteratively pierce open shadow DOMs to find the deepest element at a point.
+ * document.elementFromPoint only returns shadow hosts, not their internals.
+ */
+function deepElementFromPoint(x: number, y: number): Element | null {
+    let element = document.elementFromPoint(x, y);
+    while (element?.shadowRoot) {
+        const inner = element.shadowRoot.elementFromPoint(x, y);
+        if (!inner || inner === element) break;
+        element = inner;
+    }
+    return element;
+}
+
+/**
+ * Check if target is a descendant of ancestor, crossing shadow DOM boundaries.
+ */
+function isDescendantOrSelf(target: Node, ancestor: Element): boolean {
+    let current: Node | null = target;
+    while (current) {
+        if (current === ancestor) return true;
+        if (current.parentNode) {
+            current = current.parentNode;
+        } else {
+            const root = current.getRootNode();
+            if (root instanceof ShadowRoot) {
+                current = root.host;
+            } else {
+                break;
+            }
+        }
+    }
+    return false;
+}
+
 export class HoveredCardDetector {
     private highlightElement: HTMLDivElement | null = null;
     private currentCard: ElementGroupResult | null = null;
@@ -45,6 +80,10 @@ export class HoveredCardDetector {
     // Mouse position tracking
     private lastMouseX: number = 0;
     private lastMouseY: number = 0;
+    private lastDebugLogTime: number = 0;
+    // Performance: throttle detection and cache non-matches
+    private lastDetectionTime: number = 0;
+    private lastNonMatchTarget: Element | null = null;
     private isListening: boolean = false;
 
     private onEvent: (event: HoveredCardEvent) => void;
@@ -61,6 +100,7 @@ export class HoveredCardDetector {
         this.isListening = true;
 
         document.addEventListener('mousemove', this.handleMouseMove, { capture: true });
+        document.addEventListener('mouseleave', this.handleMouseLeave);
         window.addEventListener('scroll', this.handleScroll, { capture: true });
         window.addEventListener('resize', this.detectCardAtMousePosition);
     }
@@ -73,6 +113,7 @@ export class HoveredCardDetector {
         this.isListening = false;
 
         document.removeEventListener('mousemove', this.handleMouseMove, { capture: true });
+        document.removeEventListener('mouseleave', this.handleMouseLeave);
         window.removeEventListener('scroll', this.handleScroll, { capture: true });
         window.removeEventListener('resize', this.detectCardAtMousePosition);
 
@@ -97,23 +138,47 @@ export class HoveredCardDetector {
             this.mouseInactivityTimeout = null;
         }
 
-        if (this.currentCard && this.currentCardRect) {
-            // Session active - just check if mouse is still within card bounds
-            if (this.isMouseInCardBounds()) {
-                // Still in bounds - update highlight position in case card moved
-                this.updateHighlightPosition(this.currentCard, this.currentCardRect);
-                return;
-            }
-            // Mouse left the card - flush session and fall through to detection
-            this.flush();
-        }
+        // Throttle debug logs to once per second
+        const now = Date.now();
+        const debugThisFrame = DEBUG_SHOW_HOVERED_CARD && (now - this.lastDebugLogTime >= 1000);
 
         // Get the actual deepest element (traverses into Shadow DOM)
         const composedPath = e.composedPath();
         const target = (composedPath[0] || e.target) as Element;
 
+        if (this.currentCard && this.currentCardRect) {
+            if (this.isMouseInCardBounds()) {
+                // Mouse is in geometric bounds, but verify target is actually
+                // part of the current card (not a dropdown/popover covering it)
+                if (isDescendantOrSelf(target, this.currentCard.element)) {
+                    this.updateHighlightPosition(this.currentCard, this.currentCardRect);
+                    return;
+                }
+                // Different element is on top - flush and re-detect
+                if (debugThisFrame) {
+                    console.log('[HoveredCard] Different element on top of card, re-detecting');
+                }
+            } else if (debugThisFrame) {
+                console.log('[HoveredCard] Mouse left card bounds, flushing');
+            }
+            this.flush();
+        }
+
+        if (debugThisFrame) {
+            this.lastDebugLogTime = now;
+            const tag = target.tagName?.toLowerCase();
+            const cls = typeof (target as HTMLElement).className === 'string' ? (target as HTMLElement).className.split(' ')[0] : '';
+            console.log(`[HoveredCard] Target: <${tag}${cls ? '.' + cls : ''}>`, target);
+        }
+
         // No active session or mouse left bounds - detect card at target
-        this.detectCardFromTarget(target);
+        // Perf: skip if same target already returned no match
+        if (target === this.lastNonMatchTarget) return;
+        // Perf: throttle detection to max once per 100ms
+        if (now - this.lastDetectionTime < 100) return;
+        this.lastDetectionTime = now;
+
+        this.detectCardFromTarget(target, debugThisFrame);
 
         // Start inactivity timer to detect when mouse enters an iframe
         // (mouse events stop firing when absorbed by cross-origin iframe)
@@ -126,11 +191,22 @@ export class HoveredCardDetector {
      * Check if the mouse is still within the current card's bounds
      */
     private isMouseInCardBounds(): boolean {
-        if (!this.currentCardRect) return false;
+        if (!this.currentCardRect || !this.currentCard) return false;
+
+        // Guard against detached elements (e.g., shadow DOM re-render)
+        if (!this.currentCard.element.isConnected) {
+            if (DEBUG_SHOW_HOVERED_CARD) {
+                console.log('[HoveredCard] Card element detached from DOM');
+            }
+            return false;
+        }
 
         // Re-get the rect as it may have changed (e.g., animation)
-        const rect = this.currentCard?.element.getBoundingClientRect();
+        const rect = this.currentCard.element.getBoundingClientRect();
         if (!rect) return false;
+
+        // Element hidden or collapsed (e.g., overlay dismissed)
+        if (rect.width === 0 && rect.height === 0) return false;
 
         // Update stored rect
         this.currentCardRect = rect;
@@ -166,11 +242,23 @@ export class HoveredCardDetector {
     };
 
     /**
-     * Detect which card is at the current mouse position (for scroll/resize handlers)
+     * Handle mouse leaving the document (e.g., to DevTools, other windows).
+     * Flushes any active session so the highlight doesn't stick.
+     */
+    private handleMouseLeave = (): void => {
+        if (DEBUG_SHOW_HOVERED_CARD && this.currentCard) {
+            console.log('[HoveredCard] Mouse left document, flushing');
+        }
+        this.flush();
+    };
+
+    /**
+     * Detect which card is at the current mouse position (for scroll/resize handlers).
+     * Uses deepElementFromPoint to pierce open shadow DOMs.
      */
     private detectCardAtMousePosition = (): void => {
         this.flush();
-        const target = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
+        const target = deepElementFromPoint(this.lastMouseX, this.lastMouseY);
         if (!target) {
             return;
         }
@@ -180,11 +268,24 @@ export class HoveredCardDetector {
     /**
      * Detect which card contains the given target element
      */
-    private detectCardFromTarget(target: Element): void {
+    private detectCardFromTarget(target: Element, debugThisFrame: boolean = false): void {
         const result = findElementGroup(target);
         if (!result) {
+            // Cache this target to skip re-detection
+            this.lastNonMatchTarget = target;
+            // No match — show walk-up only when throttle allows
+            if (debugThisFrame) {
+                findElementGroup(target, undefined, true);
+            }
             this.flush();
             return;
+        }
+        // Match found — clear non-match cache
+        this.lastNonMatchTarget = null;
+        // Match found — always log the walk-up (matches are rare events)
+        if (DEBUG_SHOW_HOVERED_CARD) {
+            findElementGroup(target, undefined, true);
+            console.log('[HoveredCard] Card detected:', result.element.tagName, result.element);
         }
         this.startCardSession(result);
     }
@@ -216,7 +317,7 @@ export class HoveredCardDetector {
         // Skip if we already have an active session
         if (this.currentCard) return;
 
-        const elementAtPoint = document.elementFromPoint(this.lastMouseX, this.lastMouseY);
+        const elementAtPoint = deepElementFromPoint(this.lastMouseX, this.lastMouseY);
         if (!elementAtPoint) return;
 
         // Check if the element or any ancestor is an iframe
@@ -270,6 +371,7 @@ export class HoveredCardDetector {
         this.currentCard = null;
         this.currentCardRect = null;
         this.sessionStartTime = null;
+        this.lastNonMatchTarget = null;
     }
 
     /**
@@ -412,7 +514,7 @@ export class HoveredCardDetector {
             pointer-events: none;
             z-index: 2147483646;
             box-sizing: border-box;
-            border: 12px solid #ec4899;
+            border: 3px solid #ec4899;
             border-radius: ${adjustedRadius};
         `;
         document.body.appendChild(this.highlightElement);
