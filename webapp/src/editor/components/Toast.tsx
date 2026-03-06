@@ -6,6 +6,8 @@ import { FaCheck, FaCircleExclamation } from 'react-icons/fa6';
 // Toast types
 export type ToastType = 'info' | 'success' | 'error' | 'progress';
 
+export type ToastDismissReason = 'expired' | 'dismissed' | 'clicked';
+
 export interface Toast {
     id: string;
     type: ToastType;
@@ -14,6 +16,8 @@ export interface Toast {
     progress?: number; // 0-1 for progress type
     duration?: number; // ms, 0 = persistent
     onCancel?: () => void;
+    action?: { label: string; href: string };
+    onDismiss?: (reason: ToastDismissReason) => void;
 }
 
 interface ToastContextType {
@@ -36,14 +40,23 @@ export const useToast = () => {
 const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, onRemove }) => {
     const timerRef = useRef<number | null>(null);
     const [isExiting, setIsExiting] = useState(false);
+    const dismissReasonRef = useRef<ToastDismissReason>('expired');
+
+    const startExit = useCallback((reason: ToastDismissReason) => {
+        dismissReasonRef.current = reason;
+        setIsExiting(true);
+        setTimeout(() => {
+            toast.onDismiss?.(reason);
+            onRemove();
+        }, 300);
+    }, [toast, onRemove]);
 
     useEffect(() => {
         // Auto-dismiss non-progress toasts after duration
         if (toast.type !== 'progress' && toast.duration !== 0) {
             const duration = toast.duration ?? 5000;
             timerRef.current = window.setTimeout(() => {
-                setIsExiting(true);
-                setTimeout(onRemove, 300); // 300ms for slide-out animation
+                startExit('expired');
             }, duration);
         }
 
@@ -52,7 +65,7 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
                 clearTimeout(timerRef.current);
             }
         };
-    }, [toast.type, toast.duration, onRemove]);
+    }, [toast.type, toast.duration, startExit]);
 
 
 
@@ -75,12 +88,22 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
         return null;
     };
 
+    const handleActionClick = () => {
+        window.open(toast.action!.href, '_blank', 'noopener');
+        startExit('clicked');
+    };
+
     return (
         <div className={`toast toast-${toast.type} ${isExiting ? 'toast-exiting' : ''}`}>
             {getStatusIcon()}
             <div className="toast-content">
                 <div className="toast-title">{toast.title}</div>
                 {toast.message && <div className="toast-message">{toast.message}</div>}
+                {toast.action && (
+                    <button className="toast-action" onClick={handleActionClick}>
+                        {toast.action.label}
+                    </button>
+                )}
                 {toast.type === 'progress' && toast.progress !== undefined && (
                     <div className="toast-progress-container">
                         <div
@@ -90,7 +113,7 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
                     </div>
                 )}
             </div>
-            <XButton onClick={toast.onCancel ?? onRemove} />
+            <XButton onClick={toast.onCancel ?? (() => startExit('dismissed'))} />
         </div>
     );
 };

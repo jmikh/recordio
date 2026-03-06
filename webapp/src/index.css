@@ -123,3 +123,21 @@
     border-radius: 2px;
     transition: width 0.2s ease-out;
 }
+
+.toast-action {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    transition: color 0.15s ease;
+}
+
+.toast-action:hover {
+    color: var(--primary-highlighted);
+    text-decoration: underline;
+}

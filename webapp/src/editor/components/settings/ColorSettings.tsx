@@ -53,6 +53,14 @@ export const ColorSettings = ({
     // In solidOnly mode, always use the solid color
     const activeColorValue = (isSolid || solidOnly) ? color : safeGradient.colors[activeGradientIndex];
 
+    // Local hex input state — allows typing freely while only propagating valid values
+    const isValidHex = (v: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
+    const [hexInput, setHexInput] = useState(activeColorValue.replace('#', ''));
+    // Sync local input when upstream color changes (picker, palette, gradient switch)
+    useEffect(() => {
+        setHexInput(activeColorValue.replace('#', ''));
+    }, [activeColorValue]);
+
     // Handle color update from picker - updates both active color AND selected palette color
     const handleColorUpdate = (newColor: string) => {
         // Always update the active Start/End color
@@ -203,17 +211,27 @@ export const ColorSettings = ({
             {/* Hex Input */}
             <div className="space-y-1">
                 <div className="text-[10px] text-text-main font-semibold">Hex Color</div>
-                <div className="flex bg-surface border border-border rounded px-2 py-1.5 items-center gap-2">
+                <div className={`flex bg-surface border rounded px-2 py-1.5 items-center gap-2 ${isValidHex(`#${hexInput}`) ? 'border-border' : 'border-red-400'}`}>
                     <span className="text-text-main mr-2 select-none">#</span>
                     <input
                         type="text"
-                        value={activeColorValue.replace('#', '')}
-                        onChange={(e) => handleColorUpdate(`#${e.target.value}`)}
+                        value={hexInput}
+                        onChange={(e) => {
+                            const raw = e.target.value;
+                            setHexInput(raw);
+                            const candidate = `#${raw}`;
+                            if (isValidHex(candidate)) {
+                                handleColorUpdate(candidate);
+                            }
+                        }}
                         className="bg-transparent border-none outline-none text-xs font-mono text-text-highlighted w-full"
                         maxLength={showAlpha ? 8 : 6}
                     />
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
                 </div>
+                {!isValidHex(`#${hexInput}`) && (
+                    <div className="text-[10px] text-red-400">Invalid hex color</div>
+                )}
             </div>
 
 

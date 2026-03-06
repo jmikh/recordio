@@ -120,7 +120,7 @@ export const Header = () => {
                         </span>}
                     </div>
 
-                    {import.meta.env.MODE !== 'production' && false && (
+                    {import.meta.env.MODE !== 'production' && (
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 

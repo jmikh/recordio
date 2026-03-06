@@ -26,6 +26,7 @@
 | `extension_installed` | Extension freshly installed (fired from welcome page) | — |
 | `extension_uninstalled` | Extension removed (fired from farewell page) | — |
 | `project_opened` | Project opened from dashboard | — |
+| `review_toast` | Review incentive toast lifecycle | `action` (`shown`\|`expired`\|`dismissed`\|`clicked`) |
 
 ## Profile Properties (`people.set`)
 

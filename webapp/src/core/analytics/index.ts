@@ -392,3 +392,11 @@ export function trackExtensionUninstalled() {
     trackEvent('extension_uninstalled', {});
 }
 
+// ============================================================================
+// Review Toast
+// ============================================================================
+
+export function trackReviewToast(action: 'shown' | 'expired' | 'dismissed' | 'clicked') {
+    trackEvent('review_toast', { action });
+}
+

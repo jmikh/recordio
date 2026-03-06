@@ -1,6 +1,17 @@
 import type { BackgroundSettings } from '../../types';
 
 /**
+ * Validates whether a string is a parseable CSS color.
+ * Uses an OffscreenCanvas context which silently rejects invalid values.
+ */
+const _colorValidationCtx = new OffscreenCanvas(1, 1).getContext('2d')!;
+const isValidCssColor = (color: string): boolean => {
+    _colorValidationCtx.fillStyle = '#000000'; // reset to known value
+    _colorValidationCtx.fillStyle = color;
+    return _colorValidationCtx.fillStyle !== '#000000' || color === '#000000';
+};
+
+/**
  * Draws the project background (solid color or image) onto the canvas.
  */
 export const drawBackground = (
@@ -12,6 +23,10 @@ export const drawBackground = (
 ) => {
     // 1. Solid Color
     if (background.type === 'color' && background.colorMode === 'solid' && background.color) {
+        if (!isValidCssColor(background.color)) {
+            console.error(`[backgroundPainter] Invalid solid color: "${background.color}"`);
+            return;
+        }
         ctx.fillStyle = background.color;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
@@ -36,8 +51,13 @@ export const drawBackground = (
         const y1 = centerY + Math.sin(angleRad) * diagonal;
 
         const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-        gradient.addColorStop(0, gradientColors[0]);
-        gradient.addColorStop(1, gradientColors[1]);
+        const color0 = isValidCssColor(gradientColors[0]) ? gradientColors[0] : '#000000';
+        const color1 = isValidCssColor(gradientColors[1]) ? gradientColors[1] : '#000000';
+        if (color0 !== gradientColors[0] || color1 !== gradientColors[1]) {
+            console.error(`[backgroundPainter] Invalid gradient color: "${gradientColors[0]}", "${gradientColors[1]}"`);
+        }
+        gradient.addColorStop(0, color0);
+        gradient.addColorStop(1, color1);
 
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, w, h);

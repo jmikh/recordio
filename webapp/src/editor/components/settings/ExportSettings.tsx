@@ -15,6 +15,7 @@ import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../service
 
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
+import { ReviewModal, shouldShowReviewModal } from '../header/ReviewModal';
 
 
 
@@ -57,6 +58,7 @@ export function ExportSettings() {
     const [showWatermark, setShowWatermark] = useState<boolean | null>(null);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
     // Share state
     const [existingShare, setExistingShare] = useState<SharedVideo | null>(null);
@@ -131,6 +133,7 @@ export function ExportSettings() {
                 export_duration_seconds: Math.round(exportDuration),
                 success: true,
             });
+            if (shouldShowReviewModal()) setIsReviewModalOpen(true);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error(e);
@@ -244,6 +247,7 @@ export function ExportSettings() {
                 title: result.isUpdate ? 'Video Republished' : 'Video Published!',
                 message: linkCopied ? 'Link copied to clipboard' : 'Published successfully',
             });
+            if (shouldShowReviewModal()) setIsReviewModalOpen(true);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error('[Publish] Failed:', e);
@@ -436,6 +440,10 @@ export function ExportSettings() {
                 onClose={() => setIsUpgradeModalOpen(false)}
                 onSignInRequest={() => setIsAuthModalOpen(true)}
                 selectedQuality={selectedQuality}
+            />
+            <ReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
             />
         </div>
     );
