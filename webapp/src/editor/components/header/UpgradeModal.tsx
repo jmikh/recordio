@@ -355,8 +355,16 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
                     <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Lifetime</h3>
 
+                    {/* Launch Sale Badge */}
+                    <div className="flex justify-center mb-3">
+                        <span className="bg-surface px-3 py-1 rounded-full text-xs font-semibold text-primary border border-border">
+                            🚀 Launch Sale
+                        </span>
+                    </div>
+
                     {/* Price */}
-                    <div className="text-center mb-1">
+                    <div className="text-center mb-1 flex items-baseline justify-center gap-2">
+                        <span className="text-lg text-text-muted line-through">$119</span>
                         <span className="text-4xl font-bold text-primary">
                             ${lifetimePrice}
                         </span>
