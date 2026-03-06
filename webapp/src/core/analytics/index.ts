@@ -393,10 +393,18 @@ export function trackExtensionUninstalled() {
 }
 
 // ============================================================================
-// Review Toast
+// Review Modal
 // ============================================================================
 
-export function trackReviewToast(action: 'shown' | 'expired' | 'dismissed' | 'clicked') {
-    trackEvent('review_toast', { action });
+export function trackReviewModalShown() {
+    trackEvent('review_modal_shown');
+}
+
+export function trackReviewModalDismissed() {
+    trackEvent('review_modal_dismissed');
+}
+
+export function trackReviewModalReviewClicked() {
+    trackEvent('review_modal_review_clicked');
 }
 

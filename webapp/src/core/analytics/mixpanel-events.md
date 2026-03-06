@@ -26,7 +26,9 @@
 | `extension_installed` | Extension freshly installed (fired from welcome page) | — |
 | `extension_uninstalled` | Extension removed (fired from farewell page) | — |
 | `project_opened` | Project opened from dashboard | — |
-| `review_toast` | Review incentive toast lifecycle | `action` (`shown`\|`expired`\|`dismissed`\|`clicked`) |
+| `review_modal_shown` | Review modal qualified to show | — |
+| `review_modal_dismissed` | Review modal closed without action | — |
+| `review_modal_review_clicked` | "Leave a Review" button clicked | — |
 
 ## Profile Properties (`people.set`)
 

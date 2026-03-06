@@ -133,7 +133,7 @@ export function ExportSettings() {
                 export_duration_seconds: Math.round(exportDuration),
                 success: true,
             });
-            if (shouldShowReviewModal()) setIsReviewModalOpen(true);
+            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error(e);
@@ -247,7 +247,7 @@ export function ExportSettings() {
                 title: result.isUpdate ? 'Video Republished' : 'Video Published!',
                 message: linkCopied ? 'Link copied to clipboard' : 'Published successfully',
             });
-            if (shouldShowReviewModal()) setIsReviewModalOpen(true);
+            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error('[Publish] Failed:', e);
