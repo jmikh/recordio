@@ -52,6 +52,7 @@ const CLUSTER_TIMECODE = 0xe7;
 const SIMPLE_BLOCK = 0xa3;
 const BLOCK_GROUP = 0xa0;
 const BLOCK = 0xa1;
+const REFERENCE_BLOCK = 0xfb;
 
 // Timecode scale
 const TIMECODE_SCALE_ID = 0x2ad7b1;
@@ -375,9 +376,15 @@ function parseCluster(
                 break;
 
             case BLOCK_GROUP: {
-                // Parse BlockGroup for Block element
+                // Parse BlockGroup: keyframe is determined by absence of ReferenceBlock,
+                // NOT by the Block's flags byte (which doesn't carry keyframe info).
                 let bgPos = pos;
                 const bgEnd = pos + elementSize;
+                let blockOffset = -1;
+                let blockSize = 0;
+                let hasReferenceBlock = false;
+
+                // First pass: scan for Block and ReferenceBlock elements
                 while (bgPos < bgEnd) {
                     const bgId = readElementId(data, bgPos);
                     if (!bgId) break;
@@ -387,9 +394,17 @@ function parseCluster(
                     bgPos += bgSz[1];
 
                     if (bgId[0] === BLOCK) {
-                        parseSimpleBlock(data, bgPos, bgSz[0], clusterTimecode, packets, timecodeScale);
+                        blockOffset = bgPos;
+                        blockSize = bgSz[0];
+                    } else if (bgId[0] === REFERENCE_BLOCK) {
+                        hasReferenceBlock = true;
                     }
                     bgPos += bgSz[0];
+                }
+
+                // Parse the Block with correct keyframe status
+                if (blockOffset >= 0) {
+                    parseBlock(data, blockOffset, blockSize, clusterTimecode, packets, timecodeScale, !hasReferenceBlock);
                 }
                 pos += elementSize;
                 break;
@@ -452,9 +467,66 @@ function parseSimpleBlock(
     const rawTimestamp = clusterTimecode + timecodeOffset;
     const timestampMs = (rawTimestamp * timecodeScale) / 1_000_000;
 
+    // First packet must be a keyframe (MediaRecorder always starts with one,
+    // but some codecs like VP8 don't set the flag in the container)
+    const effectiveKeyframe = packets.length === 0 ? true : isKeyframe;
+
     packets.push({
         data: frameData,
         timestampMs,
-        isKeyframe
+        isKeyframe: effectiveKeyframe
+    });
+}
+
+/**
+ * Parse a Block element (inside BlockGroup).
+ * Similar to SimpleBlock but keyframe status is passed explicitly
+ * (determined by absence of ReferenceBlock in the parent BlockGroup).
+ */
+function parseBlock(
+    data: Uint8Array,
+    offset: number,
+    size: number,
+    clusterTimecode: number,
+    packets: DemuxedVideoPacket[],
+    timecodeScale: number,
+    isKeyframe: boolean
+) {
+    let pos = offset;
+    const blockEnd = offset + size;
+
+    // Track number (VINT)
+    const trackResult = readVint(data, pos);
+    if (!trackResult) return;
+    const trackNum = trackResult[0];
+    pos += trackResult[1];
+
+    if (trackNum !== 1) return;
+
+    // Timecode offset (signed 16-bit)
+    if (pos + 2 > blockEnd) return;
+    const timecodeOffset = (data[pos] << 8 | data[pos + 1]) << 16 >> 16;
+    pos += 2;
+
+    // Flags (skip — keyframe is determined by the BlockGroup, not flags)
+    if (pos >= blockEnd) return;
+    const flags = data[pos];
+    pos += 1;
+
+    const lacing = (flags >> 1) & 0x03;
+    if (lacing !== 0) return;
+
+    const frameData = data.slice(pos, blockEnd);
+
+    const rawTimestamp = clusterTimecode + timecodeOffset;
+    const timestampMs = (rawTimestamp * timecodeScale) / 1_000_000;
+
+    // First packet must be a keyframe
+    const effectiveKeyframe = packets.length === 0 ? true : isKeyframe;
+
+    packets.push({
+        data: frameData,
+        timestampMs,
+        isKeyframe: effectiveKeyframe
     });
 }

@@ -148,7 +148,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
         return (
-            <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_30px_-5px_var(--color-primary)]">
+            <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!bg-surface !shadow-[0_0_30px_-5px_var(--color-primary)]">
                 <div className="flex justify-end mb-2">
                     <XButton onClick={handleClose} title="Close" />
                 </div>
@@ -212,8 +212,31 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     }
 
     // ── Standard Upgrade Flow ──
+
+    const handleUpgradeWithInterval = async (interval: BillingInterval) => {
+        if (!userId || !email) {
+            onClose();
+            onSignInRequest();
+            return;
+        }
+
+        trackGetProClicked(interval);
+        setLoading(true);
+        setError(null);
+
+        const { error: checkoutError } = await StripeService.createCheckoutSession(userId, email, interval);
+
+        if (checkoutError) {
+            setError(checkoutError.message || 'Failed to start checkout. Please try again.');
+            setLoading(false);
+        } else {
+            setLoading(false);
+            setCheckingStatus(true);
+        }
+    };
+
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[380px]" className="!shadow-[0_0_30px_-5px_var(--color-primary)]">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[740px]" className="!bg-surface !shadow-[0_0_30px_-5px_var(--color-primary)]">
             {/* Header */}
             <div className="flex justify-end mb-2">
                 <XButton onClick={handleClose} title="Close" />
@@ -244,89 +267,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Pro Title */}
-            <h2 className="text-2xl font-bold text-text-highlighted text-center mb-6 flex items-center justify-center gap-2">
-                Recordio
-                <span className="bg-primary text-text-on-primary text-xs font-bold px-2.5 py-1 rounded-full uppercase">
-                    Pro
-                </span>
-            </h2>
-
-            {/* Price Display */}
-            <div className="text-center mb-2">
-                <span className="text-5xl font-bold text-primary">
-                    ${isLifetime ? lifetimePrice : billingInterval === 'monthly' ? monthlyPrice : yearlyMonthlyEquivalent}
-                </span>
-            </div>
-            <p className="text-sm text-text-muted text-center mb-1">
-                {isLifetime ? 'one-time' : 'per month'}
-            </p>
-            <p className="text-xs text-text-muted text-center mb-5">
-                {isLifetime
-                    ? 'Pay once, yours forever'
-                    : billingInterval === 'yearly'
-                        ? `Billed at $${yearlyPrice} annually`
-                        : 'Billed monthly'
-                }
-            </p>
-
-            {/* Billing Toggle — pill style */}
-            <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
-                <button
-                    onClick={() => setBillingInterval('monthly')}
-                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${billingInterval === 'monthly'
-                        ? 'bg-primary text-text-on-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Monthly
-                </button>
-                <button
-                    onClick={() => setBillingInterval('yearly')}
-                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${billingInterval === 'yearly'
-                        ? 'bg-primary text-text-on-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Annual -{savingsPercent}%
-                </button>
-                <button
-                    onClick={() => setBillingInterval('lifetime')}
-                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${isLifetime
-                        ? 'bg-primary text-text-on-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-main'
-                        }`}
-                >
-                    Lifetime
-                </button>
-            </div>
-
-            {/* Feature List */}
-            <ul className="space-y-4 mb-6">
-                <li className="flex items-center gap-3 text-sm">
-                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted font-medium">Everything in Free, plus:</span>
-                </li>
-                <li className="flex items-center gap-3 text-sm">
-                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">Unlimited 4K exports</span>
-                </li>
-                <li className="flex items-center gap-3 text-sm">
-                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">No watermarks</span>
-                </li>
-                <li className="flex items-center gap-3 text-sm">
-                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">Shareable links</span>
-                </li>
-                <li className="flex items-center gap-3 text-sm">
-                    <FaCheck className="text-yellow-500 shrink-0" size={14} />
-                    <span className="text-text-highlighted">Priority support</span>
-                </li>
-            </ul>
-
-
-
             {/* Error Message */}
             {error && (
                 <div className="mb-4 bg-red-900/20 border border-red-500/50 text-red-400 px-3 py-2 rounded-sm text-xs">
@@ -334,14 +274,127 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Get Pro Button */}
-            <button
-                onClick={handleUpgrade}
-                className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
-                disabled={loading}
-            >
-                {loading ? 'Loading...' : autoCheckout && isAuthenticated ? 'Continue to Checkout' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
-            </button>
+            {/* Two-Card Layout */}
+            <div className="flex gap-4">
+                {/* ── Pro Card ── */}
+                <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
+                    <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Pro</h3>
+
+                    {/* Price */}
+                    <div className="text-center mb-1">
+                        <span className="text-4xl font-bold text-primary">
+                            ${billingInterval === 'monthly' ? monthlyPrice : yearlyPrice}
+                        </span>
+                        {billingInterval === 'yearly' && (
+                            <span className="text-sm text-text-muted ml-1">/ year</span>
+                        )}
+                        {billingInterval === 'monthly' && (
+                            <span className="text-sm text-text-muted ml-1">/ month</span>
+                        )}
+                    </div>
+                    <p className="text-xs text-text-muted text-center mb-5">
+                        {billingInterval === 'yearly'
+                            ? `Just $${yearlyMonthlyEquivalent}/month`
+                            : `$${yearlyPrice}/year with annual billing`
+                        }
+                    </p>
+
+                    {/* Monthly / Annual Toggle */}
+                    <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
+                        <button
+                            onClick={() => setBillingInterval('monthly')}
+                            className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all ${billingInterval === 'monthly'
+                                ? 'bg-primary text-text-on-primary shadow-sm'
+                                : 'text-text-muted hover:text-text-main'
+                                }`}
+                        >
+                            Monthly
+                        </button>
+                        <button
+                            onClick={() => setBillingInterval('yearly')}
+                            className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all ${billingInterval === 'yearly'
+                                ? 'bg-primary text-text-on-primary shadow-sm'
+                                : 'text-text-muted hover:text-text-main'
+                                }`}
+                        >
+                            Annual -{savingsPercent}%
+                        </button>
+                    </div>
+
+                    {/* Feature List */}
+                    <ul className="space-y-3 mb-6 flex-1">
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted font-medium">Everything in Free, plus:</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">Unlimited 4K exports</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">No watermarks</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">Shareable links</span>
+                        </li>
+                    </ul>
+
+                    {/* Get Pro Button */}
+                    <button
+                        onClick={() => handleUpgradeWithInterval(billingInterval === 'monthly' ? 'monthly' : 'yearly')}
+                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold rounded-lg"
+                        disabled={loading}
+                    >
+                        {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
+                    </button>
+                </div>
+
+                {/* ── Lifetime Card ── */}
+                <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
+                    <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Lifetime</h3>
+
+                    {/* Price */}
+                    <div className="text-center mb-1">
+                        <span className="text-4xl font-bold text-primary">
+                            ${lifetimePrice}
+                        </span>
+                    </div>
+                    <p className="text-xs text-text-muted text-center mb-5">
+                        one-time
+                    </p>
+
+                    {/* Feature List */}
+                    <ul className="space-y-3 mb-6 flex-1">
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted font-medium">Everything in Pro</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">Pay once, yours forever</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">Lifetime updates</span>
+                        </li>
+                        <li className="flex items-center gap-3 text-sm">
+                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <span className="text-text-highlighted">Priority support</span>
+                        </li>
+                    </ul>
+
+                    {/* Get Lifetime Button */}
+                    <button
+                        onClick={() => handleUpgradeWithInterval('lifetime')}
+                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold rounded-lg"
+                        disabled={loading}
+                    >
+                        {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Lifetime' : 'Get Lifetime'}
+                    </button>
+                </div>
+            </div>
 
             <p className="text-center text-xs text-text-muted mt-4">
                 Secure payment processed by Stripe

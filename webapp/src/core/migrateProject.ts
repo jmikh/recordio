@@ -26,6 +26,17 @@ export function migrateProject(raw: any): any {
         }
     }
 
+    // Backfill displaySettings if missing (pre-displaySettings projects)
+    if (raw.timeline && !raw.timeline.displaySettings) {
+        raw.timeline.displaySettings = {
+            showZoom: true,
+            showSpotlight: true,
+            showCaptions: false,
+            showCameraMove: false,
+            collapsed: false,
+        };
+    }
+
     // Stamp current version
     raw.schemaVersion = CURRENT_SCHEMA_VERSION;
     return raw;

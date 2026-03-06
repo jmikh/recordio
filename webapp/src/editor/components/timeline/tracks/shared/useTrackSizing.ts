@@ -58,7 +58,9 @@ export interface TrackSizingResult {
 }
 
 export function useTrackSizing(): TrackSizingResult {
-    const displaySettings = useProjectStore(s => s.project.timeline.displaySettings);
+    const displaySettings = useProjectStore(s => s.project.timeline.displaySettings) ?? {
+        showZoom: true, showSpotlight: true, showCaptions: false, showCameraMove: false, collapsed: false,
+    };
     const hoveredTrack = useUIStore(s => s.hoveredTrack);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
 
