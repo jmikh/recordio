@@ -13,6 +13,7 @@ export interface Subscription {
     currentPeriodEnd: Date | null;
     cancelAtPeriodEnd: boolean;
     stripeCustomerId: string | null;
+    billingInterval: 'monthly' | 'yearly' | 'lifetime' | null;
 }
 
 export interface UserState {
@@ -55,7 +56,8 @@ export const useUserStore = create<UserState>()(
                 planId: null,
                 currentPeriodEnd: null,
                 cancelAtPeriodEnd: false,
-                stripeCustomerId: null
+                stripeCustomerId: null,
+                billingInterval: null
             },
             isPro: false,
 
@@ -98,7 +100,8 @@ export const useUserStore = create<UserState>()(
                         planId: null,
                         currentPeriodEnd: null,
                         cancelAtPeriodEnd: false,
-                        stripeCustomerId: null
+                        stripeCustomerId: null,
+                        billingInterval: null
                     },
                     isPro: false,
                 });

@@ -1,0 +1,154 @@
+/**
+ * @fileoverview Codec resolution utilities for video export.
+ *
+ * Probes browser-level WebCodecs support and selects the best available
+ * video and audio codecs.  Falls back gracefully:
+ *   Video: H.264 High Profile → Baseline → VP9 software
+ *   Audio: AAC → Opus
+ */
+
+export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
+export type ExportFps = 30 | 60;
+
+export interface VideoCodecResult {
+    config: VideoEncoderConfig;
+    muxerCodec: 'avc' | 'hevc' | 'vp9' | 'av1';
+    fallback: boolean;
+    tried: string[];
+}
+
+export interface AudioCodecResult {
+    encoderCodec: string;
+    muxerCodec: 'aac' | 'opus';
+    fallback: boolean;
+}
+
+// ============================================================================
+// Video Codec Resolution
+// ============================================================================
+
+/**
+ * Probe browser video codec support.
+ * Tries H.264 profiles in order (best for playback compatibility),
+ * then falls back to VP9 software encoding (always available in Chromium).
+ */
+export async function resolveVideoCodec(
+    quality: ExportQuality,
+    width: number,
+    height: number,
+    fps: ExportFps
+): Promise<VideoCodecResult> {
+    const bitrate = getBitrate(quality, fps);
+    const tried: string[] = [];
+
+    // H.264 candidates ordered by preference (best quality first)
+    const h264Candidates = getH264Candidates(quality);
+    for (const codec of h264Candidates) {
+        tried.push(codec);
+        try {
+            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: fps };
+            const result = await VideoEncoder.isConfigSupported(config);
+            if (result.supported) {
+                return { config, muxerCodec: 'avc', fallback: false, tried };
+            }
+        } catch {
+            // isConfigSupported can throw on some browsers
+        }
+    }
+
+    // VP9 fallback — software encoding, always available in Chromium
+    const vp9Codec = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
+    tried.push(vp9Codec);
+    try {
+        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, framerate: fps };
+        const result = await VideoEncoder.isConfigSupported(config);
+        if (result.supported) {
+            console.warn('[Export] H.264 not supported — falling back to VP9');
+            return { config, muxerCodec: 'vp9', fallback: true, tried };
+        }
+    } catch {
+        // isConfigSupported can throw on some browsers
+    }
+
+    throw new Error(
+        `[Export] No supported video codec found. Tried: ${tried.join(', ')} @ ${width}×${height}`
+    );
+}
+
+/**
+ * Return H.264 codec strings to try, ordered by preference.
+ * Higher quality exports try High Profile first; lower quality uses Baseline.
+ */
+function getH264Candidates(q: ExportQuality): string[] {
+    switch (q) {
+        case '4K':
+        case '2K':
+            // High Profile Level 5.1, then Baseline as last resort
+            return ['avc1.640033', 'avc1.42001f'];
+        case '1080p':
+            // High Profile Level 4.2, then Baseline
+            return ['avc1.64002a', 'avc1.42001f'];
+        case '720p':
+        case '480p':
+        default:
+            return ['avc1.42001f'];
+    }
+}
+
+// ============================================================================
+// Audio Codec Resolution
+// ============================================================================
+
+/**
+ * Probe browser audio codec support.
+ * Prefer AAC (universal playback) → fall back to Opus (always available in Chromium,
+ * works around missing platform AAC on Linux / Brave).
+ */
+export async function resolveAudioCodec(): Promise<AudioCodecResult> {
+    const aacConfig = {
+        codec: 'mp4a.40.2',
+        numberOfChannels: 2,
+        sampleRate: 44100,
+        bitrate: 128000
+    };
+
+    try {
+        const aacResult = await AudioEncoder.isConfigSupported(aacConfig);
+        if (aacResult.supported) {
+            return { encoderCodec: 'mp4a.40.2', muxerCodec: 'aac', fallback: false };
+        }
+    } catch {
+        // isConfigSupported itself can throw on some browsers
+    }
+
+    console.warn('[Export] AAC not supported — falling back to Opus');
+    return { encoderCodec: 'opus', muxerCodec: 'opus', fallback: true };
+}
+
+// ============================================================================
+// Quality / Bitrate Helpers
+// ============================================================================
+
+export function getHeightForQuality(q: ExportQuality): number {
+    switch (q) {
+        case '480p': return 480;
+        case '720p': return 720;
+        case '1080p': return 1080;
+        case '2K': return 1440;
+        case '4K': return 2160;
+    }
+}
+
+export function getBitrate(q: ExportQuality, fps: ExportFps): number {
+    // Base bitrates at 30fps (bits per second)
+    let base: number;
+    switch (q) {
+        case '480p': base = 2_000_000; break; // 2 Mbps
+        case '720p': base = 5_000_000; break; // 5 Mbps
+        case '1080p': base = 8_000_000; break; // 8 Mbps
+        case '2K': base = 15_000_000; break; // 15 Mbps
+        case '4K': base = 25_000_000; break; // 25 Mbps
+    }
+    // Scale up 1.5x for 60fps to maintain per-frame quality
+    return fps === 60 ? Math.round(base * 1.5) : base;
+}

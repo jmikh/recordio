@@ -10,6 +10,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const PRICE_IDS: Record<string, string> = {
     monthly: Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
     yearly: Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
+    lifetime: Deno.env.get('STRIPE_PRICE_ID_LIFETIME') || '',
 };
 
 // Backward compat: fall back to single STRIPE_PRICE_ID if monthly/yearly not set
@@ -72,11 +73,13 @@ serve(async (req) => {
             );
         }
 
+        const isLifetime = interval === 'lifetime';
+
         const session = await stripe.checkout.sessions.create({
             customer_email: userEmail,
             client_reference_id: userId,
             line_items: [{ price: priceId, quantity: 1 }],
-            mode: 'subscription',
+            mode: isLifetime ? 'payment' : 'subscription',
             success_url: successUrl,
             cancel_url: cancelUrl,
             metadata: { userId, interval: interval || 'yearly' },
@@ -98,6 +101,7 @@ serve(async (req) => {
             hasPriceIds: {
                 monthly: !!Deno.env.get('STRIPE_PRICE_ID_MONTHLY'),
                 annual: !!Deno.env.get('STRIPE_PRICE_ID_YEARLY'),
+                lifetime: !!Deno.env.get('STRIPE_PRICE_ID_LIFETIME'),
                 fallback: !!Deno.env.get('STRIPE_PRICE_ID'),
             },
         };

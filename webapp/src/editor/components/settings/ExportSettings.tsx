@@ -7,7 +7,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
-import type { ExportQuality, ExportFps } from '../../export/ExportManager';
+import type { ExportQuality, ExportFps, ExportCodecInfo } from '../../export/ExportManager';
 import type { WatermarkPosition } from '../../../core/painters/watermarkPainter';
 import { trackExportCompleted, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
@@ -120,7 +120,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            await manager.exportProject(project, quality, fps, onProgress, options);
+            const { blob, codecs } = await manager.exportProject(project, quality, fps, onProgress, options);
             const exportDuration = (Date.now() - exportStart) / 1000;
 
             trackExportCompleted({
@@ -132,6 +132,11 @@ export function ExportSettings() {
                 is_pro: isPro,
                 export_duration_seconds: Math.round(exportDuration),
                 success: true,
+                video_codec: codecs.video.encoder,
+                video_codec_fallback: codecs.video.fallback,
+                video_codecs_tried: codecs.video.tried,
+                audio_codec: codecs.audio.encoder,
+                audio_codec_fallback: codecs.audio.fallback,
             });
             if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
         } catch (e: any) {
@@ -147,6 +152,11 @@ export function ExportSettings() {
                 export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
                 success: false,
                 error: e?.message || 'Unknown error',
+                video_codec: 'unknown',
+                video_codec_fallback: false,
+                video_codecs_tried: [],
+                audio_codec: 'unknown',
+                audio_codec_fallback: false,
             });
             if (e?.message) {
                 addToast({ type: 'error', title: 'Export Failed', message: e.message });
@@ -198,7 +208,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const blob = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
+            const { blob, codecs } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
@@ -240,6 +250,11 @@ export function ExportSettings() {
                 export_duration_seconds: Math.round(exportDuration),
                 upload_duration_seconds: Math.round(uploadDuration),
                 success: true,
+                video_codec: codecs.video.encoder,
+                video_codec_fallback: codecs.video.fallback,
+                video_codecs_tried: codecs.video.tried,
+                audio_codec: codecs.audio.encoder,
+                audio_codec_fallback: codecs.audio.fallback,
             });
 
             addToast({
@@ -262,6 +277,11 @@ export function ExportSettings() {
                 export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
                 success: false,
                 error: e?.message || 'Unknown error',
+                video_codec: 'unknown',
+                video_codec_fallback: false,
+                video_codecs_tried: [],
+                audio_codec: 'unknown',
+                audio_codec_fallback: false,
             });
             addToast({
                 type: 'error',

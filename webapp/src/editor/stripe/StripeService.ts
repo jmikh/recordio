@@ -4,7 +4,7 @@ export class StripeService {
     /**
      * Create a Stripe Checkout session and redirect to checkout
      */
-    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly'): Promise<{ error?: Error }> {
+    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' | 'lifetime' = 'yearly'): Promise<{ error?: Error }> {
         if (!supabase) {
             return { error: new Error('Supabase not configured') };
         }

@@ -184,14 +184,15 @@ serve(async (req) => {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const userId = session.metadata?.userId || session.client_reference_id;
     const customerId = session.customer as string;
-    const subscriptionId = session.subscription as string;
+    const subscriptionId = session.subscription as string | null;
+    const isLifetime = session.metadata?.interval === 'lifetime';
 
     if (!userId) {
         console.error('[Webhook] No userId in checkout session');
         return;
     }
 
-    console.log('[Webhook] Checkout completed for user:', userId);
+    console.log('[Webhook] Checkout completed for user:', userId, isLifetime ? '(lifetime)' : '');
 
     // Read old status before upserting
     const { data: oldSub } = await supabase
@@ -211,6 +212,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             stripe_subscription_id: subscriptionId,
             status: 'active',
             cancel_at_period_end: false,
+            billing_interval: isLifetime ? 'lifetime' : null,
+            // Lifetime has no period end
+            ...(isLifetime ? { current_period_end: null } : {}),
             updated_at: new Date().toISOString(),
         }, {
             onConflict: 'user_id'
@@ -226,18 +230,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // --- Mixpanel Tracking ---
     const email = await getUserEmail(userId);
 
-    // Retrieve Stripe subscription for billing details
-    let billingInterval: string | null = null;
+    let billingInterval: string | null = isLifetime ? 'lifetime' : null;
     let priceAmount = 0;
     let currency = 'usd';
-    try {
-        const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-        const priceItem = stripeSub.items?.data?.[0]?.price;
-        billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-        priceAmount = priceItem?.unit_amount ?? 0;
-        currency = priceItem?.currency ?? 'usd';
-    } catch (err) {
-        console.error('[Webhook] Error fetching Stripe subscription details:', err);
+
+    if (subscriptionId && !isLifetime) {
+        // Retrieve Stripe subscription for billing details (recurring plans only)
+        try {
+            const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceItem = stripeSub.items?.data?.[0]?.price;
+            billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+            priceAmount = priceItem?.unit_amount ?? 0;
+            currency = priceItem?.currency ?? 'usd';
+        } catch (err) {
+            console.error('[Webhook] Error fetching Stripe subscription details:', err);
+        }
+    } else if (isLifetime) {
+        // For lifetime, get amount from session
+        priceAmount = session.amount_total ?? 0;
+        currency = session.currency ?? 'usd';
     }
 
     await mpPeopleSet(userId, {
@@ -326,7 +337,9 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     let billingInterval: string | null = null;
     try {
         const priceItem = subscription.items?.data?.[0]?.price;
-        billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+        billingInterval = priceItem?.recurring
+            ? (priceItem.recurring.interval === 'year' ? 'yearly' : 'monthly')
+            : 'lifetime';
     } catch { /* ignore */ }
 
     // Update profile
@@ -425,7 +438,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
         let billingInterval: string | null = null;
         try {
             const priceItem = subscription.items?.data?.[0]?.price;
-            billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+            billingInterval = priceItem?.recurring
+                ? (priceItem.recurring.interval === 'year' ? 'yearly' : 'monthly')
+                : 'lifetime';
         } catch { /* ignore */ }
 
         await mpPeopleSet(existingSub.user_id, {

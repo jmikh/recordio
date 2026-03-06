@@ -17,7 +17,7 @@ interface UpgradeModalProps {
     autoCheckout?: boolean;
 }
 
-type BillingInterval = 'monthly' | 'yearly';
+type BillingInterval = 'monthly' | 'yearly' | 'lifetime';
 
 export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality, initialInterval, autoCheckout }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             // Use maybeSingle() instead of single() to avoid 406 errors when subscription doesn't exist yet
             const { data, error } = await supabase
                 .from('subscriptions')
-                .select('status, plan_id, current_period_end, cancel_at_period_end, stripe_customer_id')
+                .select('status, plan_id, current_period_end, cancel_at_period_end, stripe_customer_id, billing_interval')
                 .eq('user_id', userId)
                 .maybeSingle();
 
@@ -63,7 +63,8 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                     planId: data.plan_id || '',
                     currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : new Date(),
                     cancelAtPeriodEnd: data.cancel_at_period_end || false,
-                    stripeCustomerId: data.stripe_customer_id || null
+                    stripeCustomerId: data.stripe_customer_id || null,
+                    billingInterval: data.billing_interval || null
                 });
 
                 // Auto-close after showing success message
@@ -138,8 +139,11 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
     const monthlyPrice = 15;
     const yearlyPrice = 48;
+    const lifetimePrice = 89;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
+    const isLifetime = billingInterval === 'lifetime';
+    const isLifetimeSubscriber = isPro && subscription.billingInterval === 'lifetime';
 
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
@@ -169,7 +173,12 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
 
                 {/* Subscription Info */}
-                {subscription.currentPeriodEnd && (
+                {isLifetimeSubscriber ? (
+                    <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
+                        <p className="text-xs text-text-muted">Plan</p>
+                        <p className="text-sm text-text-highlighted font-medium mt-0.5">Lifetime access — no renewal needed</p>
+                    </div>
+                ) : subscription.currentPeriodEnd && (
                     <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
                         <p className="text-xs text-text-muted">
                             {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
@@ -246,16 +255,18 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             {/* Price Display */}
             <div className="text-center mb-2">
                 <span className="text-5xl font-bold text-primary">
-                    ${billingInterval === 'monthly' ? monthlyPrice : yearlyMonthlyEquivalent}
+                    ${isLifetime ? lifetimePrice : billingInterval === 'monthly' ? monthlyPrice : yearlyMonthlyEquivalent}
                 </span>
             </div>
             <p className="text-sm text-text-muted text-center mb-1">
-                per month
+                {isLifetime ? 'one-time' : 'per month'}
             </p>
             <p className="text-xs text-text-muted text-center mb-5">
-                {billingInterval === 'yearly'
-                    ? `Billed at $${yearlyPrice} annually`
-                    : 'Billed monthly'
+                {isLifetime
+                    ? 'Pay once, yours forever'
+                    : billingInterval === 'yearly'
+                        ? `Billed at $${yearlyPrice} annually`
+                        : 'Billed monthly'
                 }
             </p>
 
@@ -263,7 +274,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
                 <button
                     onClick={() => setBillingInterval('monthly')}
-                    className={`py-1.5 px-5 text-sm font-medium rounded-full transition-all ${billingInterval === 'monthly'
+                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${billingInterval === 'monthly'
                         ? 'bg-primary text-text-on-primary shadow-sm'
                         : 'text-text-muted hover:text-text-main'
                         }`}
@@ -272,12 +283,21 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </button>
                 <button
                     onClick={() => setBillingInterval('yearly')}
-                    className={`py-1.5 px-5 text-sm font-medium rounded-full transition-all ${billingInterval === 'yearly'
+                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${billingInterval === 'yearly'
                         ? 'bg-primary text-text-on-primary shadow-sm'
                         : 'text-text-muted hover:text-text-main'
                         }`}
                 >
                     Annual -{savingsPercent}%
+                </button>
+                <button
+                    onClick={() => setBillingInterval('lifetime')}
+                    className={`py-1.5 px-4 text-sm font-medium rounded-full transition-all ${isLifetime
+                        ? 'bg-primary text-text-on-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Lifetime
                 </button>
             </div>
 

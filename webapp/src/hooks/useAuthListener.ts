@@ -64,7 +64,8 @@ export function useAuthListener() {
                                 planId: data.plan_id,
                                 currentPeriodEnd: new Date(data.current_period_end),
                                 cancelAtPeriodEnd: data.cancel_at_period_end,
-                                stripeCustomerId: data.stripe_customer_id
+                                stripeCustomerId: data.stripe_customer_id,
+                                billingInterval: data.billing_interval || null
                             });
                         }
                     } catch {

@@ -207,6 +207,13 @@ export interface ExportCompletedParams {
     // Outcome
     success: boolean;
     error?: string;
+
+    // Codec resolution
+    video_codec: string;
+    video_codec_fallback: boolean;
+    video_codecs_tried: string[];
+    audio_codec: string;
+    audio_codec_fallback: boolean;
 }
 
 /**
@@ -217,7 +224,7 @@ import type { Project } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 
 export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
-    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_seconds' | 'upload_duration_seconds' | 'success' | 'error'
+    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_seconds' | 'upload_duration_seconds' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback'
 > {
     const { settings, timeline, userEvents, screenSource } = project;
     const timeMapper = new TimeMapper(timeline.outputWindows);
@@ -324,7 +331,7 @@ export function trackUpgradeModalDismissed() {
     trackEvent('upgrade_modal_dismissed');
 }
 
-export function trackGetProClicked(billingInterval: 'monthly' | 'yearly') {
+export function trackGetProClicked(billingInterval: 'monthly' | 'yearly' | 'lifetime') {
     trackEvent('get_pro_clicked', { billing_interval: billingInterval });
 }
 

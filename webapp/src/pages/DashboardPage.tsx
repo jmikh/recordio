@@ -39,7 +39,7 @@ export function DashboardPage() {
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     useAuthListener();
 
-    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | undefined>();
+    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | 'lifetime' | undefined>();
 
     useEffect(() => {
         // Check for error message in URL
@@ -51,7 +51,7 @@ export function DashboardPage() {
 
         // Check for checkout intent from marketing site (e.g. ?checkout=yearly)
         const checkout = params.get('checkout');
-        if (checkout === 'monthly' || checkout === 'yearly') {
+        if (checkout === 'monthly' || checkout === 'yearly' || checkout === 'lifetime') {
             setCheckoutInterval(checkout);
             setIsUpgradeModalOpen(true);
         }

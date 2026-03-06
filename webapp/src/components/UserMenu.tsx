@@ -107,12 +107,15 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                 ) : (
                                     <span className="bg-text-disabled text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">Free</span>
                                 )}
+                                {subscription.billingInterval === 'lifetime' && isPro && (
+                                    <span className="text-[11px] text-text-muted">Lifetime</span>
+                                )}
                                 {isTrialing && subscription.currentPeriodEnd && (
                                     <span className="text-[11px] text-text-muted">
                                         Trial ends {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 )}
-                                {isPro && !isTrialing && subscription.currentPeriodEnd && (
+                                {isPro && !isTrialing && subscription.billingInterval !== 'lifetime' && subscription.currentPeriodEnd && (
                                     <span className="text-[11px] text-text-muted">
                                         Expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
