@@ -63,6 +63,10 @@ export interface DragState {
     capturedElement: Element;
     /** The pointer ID that was captured */
     pointerId: number;
+    /** Aspect ratio (width/height) of the rect when the drag started, used for shift-lock */
+    initialAspectRatio: number;
+    /** Whether shift was held when the drag started */
+    shiftHeld: boolean;
 }
 
 // Re-export for convenience

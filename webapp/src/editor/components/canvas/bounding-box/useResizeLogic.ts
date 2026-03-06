@@ -78,18 +78,20 @@ export function useResizeLogic({
         const newRect = { ...initialRect };
 
         // Apply bounds constraints and calculate new rect based on corner type
+        // Use absolute edge positions (maxX/maxY/minX/minY) for correct clamping
+        // when constraint bounds have non-zero origin.
         switch (type) {
             case 'se': {
-                const maxAvailableW = maxW - initialRect.x;
-                const maxAvailableH_asW = (maxH - initialRect.y) * aspectRatio;
+                const maxAvailableW = maxX - initialRect.x;
+                const maxAvailableH_asW = (maxY - initialRect.y) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
                 newRect.width = proposedWidth;
                 newRect.height = proposedWidth / aspectRatio;
                 break;
             }
             case 'sw': {
-                const maxAvailableW = right;
-                const maxAvailableH_asW = (maxH - initialRect.y) * aspectRatio;
+                const maxAvailableW = right - minX;
+                const maxAvailableH_asW = (maxY - initialRect.y) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
                 newRect.width = proposedWidth;
                 newRect.height = proposedWidth / aspectRatio;
@@ -97,8 +99,8 @@ export function useResizeLogic({
                 break;
             }
             case 'ne': {
-                const maxAvailableW = maxW - initialRect.x;
-                const maxAvailableH_asW = bottom * aspectRatio;
+                const maxAvailableW = maxX - initialRect.x;
+                const maxAvailableH_asW = (bottom - minY) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
                 newRect.width = proposedWidth;
                 newRect.height = proposedWidth / aspectRatio;
@@ -106,8 +108,8 @@ export function useResizeLogic({
                 break;
             }
             case 'nw': {
-                const maxAvailableW = right;
-                const maxAvailableH_asW = bottom * aspectRatio;
+                const maxAvailableW = right - minX;
+                const maxAvailableH_asW = (bottom - minY) * aspectRatio;
                 proposedWidth = Math.min(proposedWidth, maxAvailableW, maxAvailableH_asW);
                 newRect.width = proposedWidth;
                 newRect.height = proposedWidth / aspectRatio;
@@ -118,7 +120,7 @@ export function useResizeLogic({
         }
 
         return newRect;
-    }, [minSize, maxSize, maxW, maxH]);
+    }, [minSize, maxSize, minX, minY, maxX, maxY]);
 
     /**
      * Calculate new rect after free-form resize (no aspect ratio lock)
@@ -197,19 +199,47 @@ export function useResizeLogic({
     }, [minSize, maxSize, minX, minY, maxX, maxY]);
 
     /**
-     * Main resize function - dispatches to appropriate handler
+     * Upgrade an edge interaction to the nearest corner for aspect-ratio-locked resize.
+     * Picks the corner based on which quadrant the delta points toward.
+     */
+    const edgeToCorner = useCallback((
+        type: InteractionType,
+        deltaX: number,
+        deltaY: number,
+    ): InteractionType => {
+        switch (type) {
+            case 'n': return deltaX >= 0 ? 'ne' : 'nw';
+            case 's': return deltaX >= 0 ? 'se' : 'sw';
+            case 'e': return deltaY >= 0 ? 'se' : 'ne';
+            case 'w': return deltaY >= 0 ? 'sw' : 'nw';
+            default: return type;
+        }
+    }, []);
+
+    /**
+     * Main resize function - dispatches to appropriate handler.
+     * @param shiftAspectRatio - When shift is held, the initial aspect ratio to lock to.
+     *                           Only used when fixedAspectRatio is null.
      */
     const calculateResize = useCallback((
         type: InteractionType,
         initialRect: Rect,
         deltaX: number,
         deltaY: number,
+        shiftAspectRatio?: number | null,
     ): Rect => {
         if (fixedAspectRatio) {
             return resizeWithAspectLock(type, initialRect, deltaX, deltaY, fixedAspectRatio);
         }
+        if (shiftAspectRatio) {
+            // Upgrade edge drags to corner drags so aspect lock works
+            const effectiveType = getResizeDirection(type).isEdge
+                ? edgeToCorner(type, deltaX, deltaY)
+                : type;
+            return resizeWithAspectLock(effectiveType, initialRect, deltaX, deltaY, shiftAspectRatio);
+        }
         return resizeFreeForm(type, initialRect, deltaX, deltaY);
-    }, [fixedAspectRatio, resizeWithAspectLock, resizeFreeForm]);
+    }, [fixedAspectRatio, resizeWithAspectLock, resizeFreeForm, edgeToCorner]);
 
     return {
         calculateResize,

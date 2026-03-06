@@ -180,7 +180,8 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         if (type === 'move') {
             newRect = calculateMove(initialRect, deltaX, deltaY);
         } else {
-            newRect = calculateResize(type, initialRect, deltaX, deltaY);
+            const shiftAspectRatio = dragRef.current.shiftHeld ? dragRef.current.initialAspectRatio : null;
+            newRect = calculateResize(type, initialRect, deltaX, deltaY, shiftAspectRatio);
         }
 
 
@@ -224,13 +225,16 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         lockInteraction();
         onDragStart?.();
 
+        const snapRect = { ...currentRectRef.current };
         dragRef.current = {
             type,
             startX: e.clientX,
             startY: e.clientY,
-            initialRect: { ...currentRectRef.current },
+            initialRect: snapRect,
             capturedElement: e.currentTarget as Element,
             pointerId: e.pointerId,
+            initialAspectRatio: snapRect.width / snapRect.height,
+            shiftHeld: e.shiftKey,
         };
         setIsDragging(true);
     }, [lockInteraction, onDragStart]);
