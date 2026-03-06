@@ -203,6 +203,32 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     const previousPlanType = derivePlanType(oldSub?.status ?? null);
 
+    // For recurring plans, fetch authoritative data from Stripe BEFORE the upsert
+    // so we write the correct current_period_end, status, and billing_interval.
+    // Without this, the stale trial current_period_end from the auth trigger persists.
+    let billingInterval: string | null = isLifetime ? 'lifetime' : null;
+    let priceAmount = 0;
+    let currency = 'usd';
+    let stripeStatus: string = 'active';
+    let stripePeriodEnd: string | null = null;
+
+    if (subscriptionId && !isLifetime) {
+        try {
+            const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceItem = stripeSub.items?.data?.[0]?.price;
+            billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+            priceAmount = priceItem?.unit_amount ?? 0;
+            currency = priceItem?.currency ?? 'usd';
+            stripeStatus = stripeSub.status;
+            stripePeriodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+        } catch (err) {
+            console.error('[Webhook] Error fetching Stripe subscription details:', err);
+        }
+    } else if (isLifetime) {
+        priceAmount = session.amount_total ?? 0;
+        currency = session.currency ?? 'usd';
+    }
+
     // Create or update subscription record
     const { error } = await supabase
         .from('subscriptions')
@@ -210,11 +236,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             user_id: userId,
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
-            status: 'active',
+            status: stripeStatus,
             cancel_at_period_end: false,
-            billing_interval: isLifetime ? 'lifetime' : null,
-            // Lifetime has no period end
-            ...(isLifetime ? { current_period_end: null } : {}),
+            billing_interval: billingInterval,
+            current_period_end: isLifetime ? null : stripePeriodEnd,
             updated_at: new Date().toISOString(),
         }, {
             onConflict: 'user_id'
@@ -230,34 +255,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // --- Mixpanel Tracking ---
     const email = await getUserEmail(userId);
 
-    let billingInterval: string | null = isLifetime ? 'lifetime' : null;
-    let priceAmount = 0;
-    let currency = 'usd';
-
-    if (subscriptionId && !isLifetime) {
-        // Retrieve Stripe subscription for billing details (recurring plans only)
-        try {
-            const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-            const priceItem = stripeSub.items?.data?.[0]?.price;
-            billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-            priceAmount = priceItem?.unit_amount ?? 0;
-            currency = priceItem?.currency ?? 'usd';
-        } catch (err) {
-            console.error('[Webhook] Error fetching Stripe subscription details:', err);
-        }
-    } else if (isLifetime) {
-        // For lifetime, get amount from session
-        priceAmount = session.amount_total ?? 0;
-        currency = session.currency ?? 'usd';
-    }
-
     await mpPeopleSet(userId, {
         ...(email ? { $email: email } : {}),
         current_plan_type: 'pro',
         billing_interval: billingInterval,
-        subscription_status: 'active',
+        subscription_status: stripeStatus,
         cancel_at_period_end: false,
-        current_period_end: null,
+        current_period_end: stripePeriodEnd,
     });
 
     // Set first_pro_date only once (preserved across churn/reactivation)
