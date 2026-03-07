@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAquKQJOvQ8iiYC6QrQwHA+RDY0LRoleYHnItVKFq+98MMgsdJMDh9RkkkFJM4138DpeK3c1RATk/505J69MUrhDWzo+Drd9QzfP04dupeVWlfOiOtkslIEFPqt1x7Nm9sLNABG156F1Hj+KnpZlFsGi1E1wOAQxynzFRGc8xkk5GPugFZbOmjA9H3BkZQzZA/ztlMpfHlCtYJ+678MrxJ6fJsXrjcKdG/Qdz+QiXHcbbaXrvWrZpKWoxGTrZzFHvkeLNlwO4+tzEXkdRWp5jZIIj9Vofn9qme66DR5y3u9r5ngg4PpnTrbpBZMqR2p1ZXG6GP1XbJ3dLpwt55TMIOGQIDAQAB",
     "name": "Recordio - Smart Screen Recorder",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Create professional screen recordings with automatic zoom, spotlight, captions and more.",
     "permissions": [
         "tabCapture",
