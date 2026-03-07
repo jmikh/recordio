@@ -158,9 +158,13 @@ export function ExportSettings() {
                 audio_codec: 'unknown',
                 audio_codec_fallback: false,
             });
-            if (e?.message) {
-                addToast({ type: 'error', title: 'Export Failed', message: e.message });
-            }
+            addToast({
+                type: 'error',
+                title: 'Export Failed',
+                message: 'Something went wrong. Please keep this tab active during export and try again. If the issue persists, reach out — we\'ll address it within 24 hours.',
+                duration: 0,
+                action: { label: 'Contact Support', href: 'mailto:support@recordio.cc' },
+            });
         } finally {
             setExportState({ isExporting: false });
             (window as any).__activeExportManager = null;
@@ -286,7 +290,9 @@ export function ExportSettings() {
             addToast({
                 type: 'error',
                 title: 'Publish Failed',
-                message: e?.message || 'Something went wrong. Please try again.',
+                message: 'Something went wrong. Please keep this tab active during export and try again. If the issue persists, reach out — we\'ll address it within 24 hours.',
+                duration: 0,
+                action: { label: 'Contact Support', href: 'mailto:support@recordio.cc' },
             });
         } finally {
             setIsPublishing(false);

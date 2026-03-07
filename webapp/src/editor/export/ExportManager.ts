@@ -32,6 +32,12 @@ export interface ExportResult {
     codecs: ExportCodecInfo;
 }
 
+/** Maximum number of full export retries on codec reclaim errors. */
+const MAX_EXPORT_RETRIES = 2;
+
+/** Maximum time (ms) to wait for backpressure to drain before treating it as stuck. */
+const BACKPRESSURE_TIMEOUT_MS = 15_000;
+
 export class ExportManager {
     private abortController: AbortController | null = null;
 
@@ -45,6 +51,65 @@ export class ExportManager {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
+        let lastError: Error | null = null;
+
+        for (let attempt = 0; attempt <= MAX_EXPORT_RETRIES; attempt++) {
+            if (signal.aborted) throw new Error("Export cancelled");
+
+            if (attempt > 0) {
+                console.warn(`[Export] Retrying export (attempt ${attempt + 1}/${MAX_EXPORT_RETRIES + 1})`);
+                Sentry.addBreadcrumb({
+                    category: 'codec',
+                    message: `Export retry attempt ${attempt + 1} after codec error`,
+                    level: 'warning',
+                    data: { previousError: lastError?.message },
+                });
+                // Reset progress for retry
+                onProgress({ progress: 0, timeRemainingSeconds: null });
+            }
+
+            try {
+                const result = await this.runExport(project, quality, fps, onProgress, signal, options);
+                return result;
+            } catch (e) {
+                if (signal.aborted) throw new Error('Export cancelled');
+
+                const error = e instanceof Error ? e : new Error(String(e));
+
+                if (isCodecReclaimError(error) && attempt < MAX_EXPORT_RETRIES) {
+                    console.warn('[Export] Codec reclaimed — scheduling retry:', error.message);
+                    Sentry.withScope((scope) => {
+                        scope.setTag('codec.reclaim', 'true');
+                        scope.setTag('export.retry_attempt', String(attempt + 1));
+                        scope.setLevel('warning');
+                        Sentry.captureMessage(`Codec reclaimed during export — retrying (attempt ${attempt + 1})`);
+                    });
+                    lastError = error;
+                    // Small delay before retry to let browser reclaim settle
+                    await new Promise(r => setTimeout(r, 500));
+                    continue;
+                }
+
+                // Not a codec reclaim error or max retries exceeded — rethrow
+                throw e;
+            }
+        }
+
+        // Should not reach here, but safety net
+        throw lastError ?? new Error('Export failed after all retries');
+    }
+
+    /**
+     * Core export logic — isolated so the outer method can retry it.
+     */
+    private async runExport(
+        project: Project,
+        quality: import('./codecResolver').ExportQuality,
+        fps: import('./codecResolver').ExportFps,
+        onProgress: (state: ExportProgress) => void,
+        signal: AbortSignal,
+        options?: { watermarkPosition?: WatermarkPosition; skipDownload?: boolean }
+    ): Promise<ExportResult> {
         const targetHeight = getHeightForQuality(quality);
         const aspectRatio = project.settings.outputSize.width / project.settings.outputSize.height;
         const targetWidth = Math.round(targetHeight * aspectRatio);
@@ -78,7 +143,7 @@ export class ExportManager {
         const videoEncoder = new VideoEncoder({
             output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
             error: (e) => {
-                console.error("VideoEncoder error:", e);
+                console.error("VideoEncoder error:", e.name, e.message);
                 videoEncoderError = e;
             }
         });
@@ -248,8 +313,9 @@ export class ExportManager {
                 if ((videoEncoder.state as string) === 'closed') {
                     encoderFrame.close();
                     Object.values(currentFrameRefs).forEach(f => f.close());
-                    throw videoEncoderError
-                    ?? new Error(`VideoEncoder closed unexpectedly after ${framesProcessed}/${totalFrames} frames`);
+                    const err = videoEncoderError
+                        ?? new Error(`VideoEncoder closed unexpectedly after ${framesProcessed}/${totalFrames} frames`);
+                    throw err;
                 }
                 videoEncoder.encode(encoderFrame, { keyFrame: i % (fps * 2) === 0 });
                 encoderFrame.close();
@@ -259,7 +325,14 @@ export class ExportManager {
 
                 // Backpressure: wait for the encoder queue to drain before submitting more.
                 // This prevents GPU memory exhaustion at high resolutions (2K/4K).
+                // Includes a timeout to prevent infinite hangs if the encoder stalls.
+                const bpStart = performance.now();
                 while ((videoEncoder.state as string) !== 'closed' && videoEncoder.encodeQueueSize > 5) {
+                    if (performance.now() - bpStart > BACKPRESSURE_TIMEOUT_MS) {
+                        console.error(`[Export] Backpressure timeout after ${BACKPRESSURE_TIMEOUT_MS}ms (queueSize=${videoEncoder.encodeQueueSize})`);
+                        throw videoEncoderError
+                        ?? new Error(`VideoEncoder backpressure stalled (queueSize=${videoEncoder.encodeQueueSize}) after ${framesProcessed}/${totalFrames} frames`);
+                    }
                     await new Promise(r => setTimeout(r, 1));
                 }
                 // Periodic yield for UI responsiveness (progress bar, cancel button)
@@ -337,7 +410,6 @@ export class ExportManager {
             throw e;
         } finally {
             Object.values(frameExtractors).forEach(ext => ext.dispose());
-            this.abortController = null;
         }
     }
 
@@ -362,4 +434,22 @@ export class ExportManager {
         const timeMapper = new TimeMapper(project.timeline.outputWindows);
         return timeMapper.outputDuration;
     }
+}
+
+/**
+ * Detect whether an error is a codec reclaim / quota exceeded error.
+ * These occur when Chrome reclaims codec resources due to inactivity
+ * (e.g., background tab, memory pressure).
+ */
+function isCodecReclaimError(error: Error): boolean {
+    const msg = error.message.toLowerCase();
+    return (
+        error.name === 'QuotaExceededError' ||
+        msg.includes('codec reclaimed') ||
+        msg.includes('quotaexceedederror') ||
+        // Also catch our own timeout errors — likely caused by a reclaimed codec
+        msg.includes('backpressure stalled') ||
+        msg.includes('decoder closed') ||
+        msg.includes('max rebuilds exceeded')
+    );
 }

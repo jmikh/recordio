@@ -19,11 +19,18 @@
  *   multiple export frames (at 30 fps) from the same decoded frame.
  */
 
+import * as Sentry from '@sentry/react';
 import { demuxWebm } from './webmDemuxer';
 import type { DemuxedVideoPacket } from './webmDemuxer';
 
 /** How far ahead (ms) to feed packets beyond the requested time. */
 const FEED_AHEAD_MS = 200;
+
+/** Maximum time (ms) to wait for decoder drain before treating it as stuck. */
+const DRAIN_TIMEOUT_MS = 10_000;
+
+/** Maximum number of automatic decoder rebuilds per export. */
+const MAX_REBUILDS = 2;
 
 
 /**
@@ -40,6 +47,8 @@ export class FrameExtractor {
     private codedHeight = 0;
     private description: Uint8Array | undefined;
     private flushed = false;
+    private codecString = '';
+    private rebuildCount = 0;
 
     /** Video dimensions — available after {@link initialize}. */
     width = 0;
@@ -65,13 +74,12 @@ export class FrameExtractor {
         this.height = track.height;
 
         // Map Matroska codec IDs to WebCodecs codec strings
-        let codecString: string;
         switch (track.codec) {
             case 'V_VP9':
-                codecString = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
+                this.codecString = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
                 break;
             case 'V_VP8':
-                codecString = 'vp8';
+                this.codecString = 'vp8';
                 break;
             default:
                 throw new Error(`[FrameExtractor] Unsupported codec: ${track.codec}`);
@@ -81,17 +89,26 @@ export class FrameExtractor {
             this.description = track.codecPrivate;
         }
 
+        this.createDecoder();
+    }
+
+    /**
+     * Create and configure a fresh VideoDecoder instance.
+     * Shared by initialize() and rebuildDecoder().
+     */
+    private createDecoder(): void {
         this.decoder = new VideoDecoder({
             output: (frame: VideoFrame) => {
                 this.decodedFrames.push(frame);
             },
             error: (e: DOMException) => {
-                console.error('[FrameExtractor] Decoder error:', e);
+                console.error('[FrameExtractor] Decoder error:', e.name, e.message);
+                // Don't throw — let getFrameAtTime detect the closed state and trigger recovery
             }
         });
 
         const config: VideoDecoderConfig = {
-            codec: codecString,
+            codec: this.codecString,
             codedWidth: this.codedWidth,
             codedHeight: this.codedHeight,
         };
@@ -99,6 +116,45 @@ export class FrameExtractor {
             config.description = this.description;
         }
         this.decoder.configure(config);
+    }
+
+    /**
+     * Rebuild the decoder after it was reclaimed or errored.
+     * Rewinds to the latest keyframe at or before the target time.
+     */
+    private rebuildDecoder(targetTimeMs: number): void {
+        this.rebuildCount++;
+        console.warn(`[FrameExtractor] Rebuilding decoder (attempt ${this.rebuildCount}/${MAX_REBUILDS}) at ${targetTimeMs.toFixed(0)}ms`);
+
+        Sentry.addBreadcrumb({
+            category: 'codec',
+            message: `Decoder rebuild #${this.rebuildCount} at ${targetTimeMs.toFixed(0)}ms`,
+            level: 'warning',
+            data: { targetTimeMs, nextPacketIndex: this.nextPacketIndex },
+        });
+
+        // Close old decoder if still around
+        if (this.decoder && this.decoder.state !== 'closed') {
+            try { this.decoder.close(); } catch { /* already closed */ }
+        }
+
+        // Close any stale frames
+        for (const frame of this.decodedFrames) {
+            try { frame.close(); } catch { /* already closed */ }
+        }
+        this.decodedFrames = [];
+
+        // Find the latest keyframe at or before the target time
+        let keyframeIndex = 0;
+        for (let i = 0; i < this.packets.length; i++) {
+            if (this.packets[i].isKeyframe && this.packets[i].timestampMs <= targetTimeMs) {
+                keyframeIndex = i;
+            }
+        }
+        this.nextPacketIndex = keyframeIndex;
+        this.flushed = false;
+
+        this.createDecoder();
     }
 
     /**
@@ -111,11 +167,16 @@ export class FrameExtractor {
      * @param timeSec  Target time in seconds (source-time).
      */
     async getFrameAtTime(timeSec: number): Promise<VideoFrame> {
-        if (!this.decoder || this.decoder.state === 'closed') {
-            throw new Error('[FrameExtractor] Not initialized or decoder closed');
+        const timeMs = timeSec * 1000;
+
+        // Detect reclaimed/errored decoder and attempt recovery
+        if (!this.decoder || (this.decoder.state as string) === 'closed') {
+            if (this.rebuildCount >= MAX_REBUILDS) {
+                throw new Error('[FrameExtractor] Decoder closed — max rebuilds exceeded');
+            }
+            this.rebuildDecoder(timeMs);
         }
 
-        const timeMs = timeSec * 1000;
         const targetMicros = timeMs * 1000;
 
         // 1. Evict stale frames whose successor is also at or before the target.
@@ -129,10 +190,20 @@ export class FrameExtractor {
         //    timestamps — not buffer size — to decide when to stop.
         let fed = 0;
         while (this.nextPacketIndex < this.packets.length) {
+            // Re-check decoder state — it can close mid-feed from a reclaim
+            if ((this.decoder!.state as string) === 'closed') {
+                if (this.rebuildCount >= MAX_REBUILDS) {
+                    throw new Error('[FrameExtractor] Decoder closed during feed — max rebuilds exceeded');
+                }
+                this.rebuildDecoder(timeMs);
+                fed = 0; // Reset — we'll re-feed from the keyframe
+                continue;
+            }
+
             const packet = this.packets[this.nextPacketIndex];
             if (packet.timestampMs > timeMs + FEED_AHEAD_MS && fed > 0) break;
 
-            this.decoder.decode(new EncodedVideoChunk({
+            this.decoder!.decode(new EncodedVideoChunk({
                 type: packet.isKeyframe ? 'key' : 'delta',
                 timestamp: packet.timestampMs * 1000, // ms → µs
                 data: packet.data
@@ -142,8 +213,6 @@ export class FrameExtractor {
         }
 
         // 3. Wait for all fed chunks to be decoded (deterministic sync).
-        //    Uses the 'dequeue' event to await the decoder draining its queue,
-        //    instead of timer-based polling which is performance-dependent.
         if (fed > 0) {
             await this.awaitDecoderDrain();
         }
@@ -152,7 +221,9 @@ export class FrameExtractor {
         //    any remaining frames from the decoder pipeline.
         if (this.nextPacketIndex >= this.packets.length && !this.flushed) {
             this.flushed = true;
-            await this.decoder.flush();
+            if ((this.decoder!.state as string) !== 'closed') {
+                await this.decoder!.flush();
+            }
         }
 
         // 5. After sync, all fed frames are guaranteed to be in decodedFrames.
@@ -189,14 +260,39 @@ export class FrameExtractor {
      *
      * After the queue drains, we also wait for the output callback to fire
      * (it runs asynchronously after the internal dequeue), with a safety timeout.
+     *
+     * Includes a global timeout to prevent infinite hangs when the decoder
+     * is reclaimed or stalled.
      */
     private async awaitDecoderDrain(): Promise<void> {
-        if (!this.decoder || this.decoder.state === 'closed') return;
+        if (!this.decoder || (this.decoder.state as string) === 'closed') return;
+
+        const drainStart = performance.now();
+
         while (this.decoder.decodeQueueSize > 0) {
+            // Global timeout — decoder may be stalled/reclaimed
+            if (performance.now() - drainStart > DRAIN_TIMEOUT_MS) {
+                console.error(`[FrameExtractor] Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`);
+                Sentry.addBreadcrumb({
+                    category: 'codec',
+                    message: `Decoder drain timeout (queueSize=${this.decoder.decodeQueueSize})`,
+                    level: 'error',
+                });
+                return; // Let getFrameAtTime handle the fallout
+            }
+
+            // Check if decoder closed while waiting
+            if ((this.decoder.state as string) === 'closed') return;
+
             await new Promise<void>(resolve => {
-                this.decoder!.addEventListener('dequeue', () => resolve(), { once: true });
+                const timeout = setTimeout(() => resolve(), 2000); // Safety timeout per-event
+                this.decoder!.addEventListener('dequeue', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                }, { once: true });
             });
         }
+
         // The output callback fires asynchronously after dequeue — yield until
         // at least one frame appears, with a safety timeout to prevent infinite hangs.
         const prevCount = this.decodedFrames.length;
@@ -214,7 +310,7 @@ export class FrameExtractor {
         }
         this.decodedFrames = [];
 
-        if (this.decoder && this.decoder.state !== 'closed') {
+        if (this.decoder && (this.decoder.state as string) !== 'closed') {
             try { this.decoder.close(); } catch { /* already closed */ }
         }
         this.decoder = null;
