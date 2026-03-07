@@ -50,10 +50,22 @@ export const Header = () => {
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const updateSettings = useProjectStore(s => s.updateSettings);
+    const resetZooms = useProjectStore(s => s.resetZooms);
+    const resetSpotlights = useProjectStore(s => s.resetSpotlights);
     const currentPreset = findPreset(outputSize);
 
     const handleAspectRatioChange = (preset: AspectRatioPreset) => {
         updateSettings({ outputSize: { width: preset.width, height: preset.height } });
+        resetZooms();
+        resetSpotlights();
+
+        const store = useProjectStore.getState().project.timeline;
+        const hasZooms = store.zoomSegments.length > 0;
+        const hasSpotlights = store.spotlightSegments.length > 0;
+        if (hasZooms || hasSpotlights) {
+            const parts = [hasZooms && 'zooms', hasSpotlights && 'spotlights'].filter(Boolean);
+            addToast({ type: 'info', title: 'Recalculated', message: `Auto ${parts.join(' & ')} updated for new aspect ratio` });
+        }
     };
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
