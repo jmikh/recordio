@@ -30,7 +30,7 @@ const FEED_AHEAD_MS = 200;
 const DRAIN_TIMEOUT_MS = 10_000;
 
 /** Maximum number of automatic decoder rebuilds per export. */
-const MAX_REBUILDS = 3;
+const MAX_REBUILDS = 4;
 
 
 /**
@@ -279,8 +279,9 @@ export class FrameExtractor {
 
         const drainStart = performance.now();
 
+        // Poll decodeQueueSize instead of relying on the 'dequeue' event,
+        // which doesn't fire reliably in all browsers (e.g. Brave).
         while (this.decoder.decodeQueueSize > 0) {
-            // Global timeout — decoder may be stalled/reclaimed
             if (performance.now() - drainStart > DRAIN_TIMEOUT_MS) {
                 console.error(`[FrameExtractor] Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`);
                 Sentry.addBreadcrumb({
@@ -291,23 +292,16 @@ export class FrameExtractor {
                 throw new Error(`Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms`);
             }
 
-            // Check if decoder closed while waiting
             if ((this.decoder.state as string) === 'closed') return;
 
-            await new Promise<void>(resolve => {
-                const timeout = setTimeout(() => resolve(), 2000); // Safety timeout per-event
-                this.decoder!.addEventListener('dequeue', () => {
-                    clearTimeout(timeout);
-                    resolve();
-                }, { once: true });
-            });
+            await new Promise(r => setTimeout(r, 5));
         }
 
-        // The output callback fires asynchronously after dequeue — yield until
-        // at least one frame appears, with a safety timeout to prevent infinite hangs.
+        // The output callback fires asynchronously after the queue empties —
+        // yield briefly so decoded frames appear in the buffer.
         const prevCount = this.decodedFrames.length;
         let waited = 0;
-        while (this.decodedFrames.length === prevCount && waited < 2000) {
+        while (this.decodedFrames.length === prevCount && waited < 500) {
             await new Promise(r => setTimeout(r, 1));
             waited++;
         }
