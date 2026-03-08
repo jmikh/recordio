@@ -51,6 +51,7 @@ export interface HandoffState {
     screenVideo: Blob | null;
     cameraVideo: Blob | null;
     micAudio: Blob | null;
+    extensionDistinctId: string | null;
 }
 
 // ============================================
@@ -141,6 +142,7 @@ export function useExtensionBridge() {
         screenVideo: null,
         cameraVideo: null,
         micAudio: null,
+        extensionDistinctId: null,
     });
 
     // Refs for chunk accumulation - use Map with index as key to handle out-of-order arrival
@@ -177,6 +179,7 @@ export function useExtensionBridge() {
             screenVideo: null,
             cameraVideo: null,
             micAudio: null,
+            extensionDistinctId: null,
         });
 
         try {
@@ -274,6 +277,7 @@ export function useExtensionBridge() {
                 screenVideo,
                 cameraVideo,
                 micAudio,
+                extensionDistinctId: response.extensionDistinctId || null,
             }));
 
         } catch (error) {

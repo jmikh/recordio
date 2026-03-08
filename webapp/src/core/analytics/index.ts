@@ -88,6 +88,16 @@ export function resetUser() {
     mixpanel.reset();
 }
 
+/**
+ * Link the webapp's anonymous Mixpanel profile with the extension's anonymous ID.
+ * Called during handoff so extension recording events merge into the same profile.
+ * If the user later authenticates, identifyUser() will further merge into the Supabase ID.
+ */
+export function identifyExtensionUser(extensionDistinctId: string) {
+    if (IS_LOCAL) return;
+    mixpanel.identify(extensionDistinctId);
+}
+
 // ============================================================================
 // Event Tracking (dual: GA4 + Mixpanel)
 // ============================================================================

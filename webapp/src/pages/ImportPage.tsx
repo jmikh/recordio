@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
 import { captureImportError } from '../utils/sentry';
-import { trackProjectCreated } from '../core/analytics';
+import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { LogoLink } from '@shared/components';
 
@@ -80,6 +80,11 @@ export function ImportPage() {
 
         if (state.status === 'success' && state.recording && state.screenVideo) {
             setStatus('storing');
+
+            // Link Mixpanel profiles: extension anonymous ID → webapp
+            if (state.extensionDistinctId) {
+                identifyExtensionUser(state.extensionDistinctId);
+            }
 
             importFromRawRecording(
                 state.recording,

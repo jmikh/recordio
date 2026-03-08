@@ -67,6 +67,7 @@ export interface HandoffMetadataResponse {
     cameraVideoType?: string;     // MIME type (optional)
     micAudioSize?: number;        // bytes (optional)
     micAudioType?: string;        // MIME type (optional)
+    extensionDistinctId?: string; // Mixpanel anonymous ID for identity linking
 }
 
 /** Extension → Website: Error response */

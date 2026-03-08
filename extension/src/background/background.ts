@@ -10,6 +10,7 @@
 
 import { type Size } from '@shared/types';
 import { initSentry, captureException } from '../utils/sentry';
+import { trackRecordingStarted, trackRecordingFinished, trackRecordingErrored, getDistinctId } from '../utils/mixpanel';
 
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
@@ -268,6 +269,8 @@ async function handleStartSession(message: any, sendResponse: Function) {
         } else {
             console.error("Error starting recording:", err);
             captureException(err instanceof Error ? err : new Error(String(err)));
+            const { mode = 'tab', hasAudio = false, hasCamera = false } = message.payload || {};
+            trackRecordingErrored({ mode, error: err.message || 'Unknown error', hasAudio, hasCamera });
         }
         sendResponse({ success: false, error: err.message });
     }
@@ -375,6 +378,8 @@ async function startTabModeSession(payload: any, sessionId: string) {
     startBadgeTimer();
 
     chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
+
+    trackRecordingStarted({ mode: 'tab', hasAudio: hasAudio !== false, hasCamera: hasCamera === true });
 }
 
 async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'screen') {
@@ -482,6 +487,8 @@ async function startControllerModeSession(payload: any, sessionId: string, mode:
         // Start badge timer to show recording duration on extension icon
         startBadgeTimer();
 
+        trackRecordingStarted({ mode, hasAudio: hasAudio !== false, hasCamera: hasCamera === true });
+
     } catch (error) {
         if (openedControllerTabId) {
             closeControllerTab(openedControllerTabId);
@@ -534,6 +541,17 @@ async function handleStopSession(sendResponse: Function) {
     stopBadgeTimer();
 
     await ensureState(); // Ensure state is loaded
+
+    // Track recording_finished before we clear state
+    if (currentState?.isRecording && currentState.startTime) {
+        const durationSeconds = Math.round((Date.now() - currentState.startTime) / 1000);
+        trackRecordingFinished({
+            mode: currentState.mode || 'tab',
+            durationSeconds,
+            hasAudio: currentState.hasAudio,
+            hasCamera: currentState.hasCamera,
+        });
+    }
 
     const finalSessionId = currentState?.currentSessionId;
     // Capture the controller ID from state before we wipe the state
@@ -783,6 +801,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
 
 
         // Send metadata response (small, under 64MB limit)
+        const extensionDistinctId = await getDistinctId();
         const response: HandoffMetadataResponse = {
             success: true,
             recording,
@@ -792,6 +811,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             cameraVideoType: cameraBlob?.type,
             micAudioSize: micBlob?.size,
             micAudioType: micBlob?.type,
+            extensionDistinctId,
         };
         sendResponse(response);
 
