@@ -75,6 +75,11 @@ export const ProgressModal = ({
                         <span ref={spanRef}>{Math.round(progress * 100)}%</span>
                         <span>{statusText}</span>
                     </div>
+
+                    <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-main">
+                        <span className="text-base flex-shrink-0">⚡</span>
+                        <span>Do not switch tab during export for best performance</span>
+                    </div>
                 </div>
 
                 <div className="flex justify-end pt-2">
