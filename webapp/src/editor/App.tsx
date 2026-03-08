@@ -379,15 +379,21 @@ function Editor() {
 
             <ProgressModal
                 isOpen={isExporting}
-                title={exportPhase === 'uploading' ? 'Publishing Video' : 'Exporting Project'}
+                title={
+                    exportPhase === 'uploading' ? 'Publishing Video'
+                        : exportPhase === 'preparing' ? 'Preparing Export'
+                            : 'Exporting Project'
+                }
                 projectName={project.name}
                 progress={exportProgress}
                 statusText={
                     exportPhase === 'uploading'
                         ? `Uploading... ${Math.round(exportProgress * 100)}%`
-                        : timeRemainingSeconds !== null
-                            ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
-                            : 'Estimating time...'
+                        : exportPhase === 'preparing'
+                            ? 'Analyzing video...'
+                            : timeRemainingSeconds !== null
+                                ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
+                                : 'Estimating time...'
                 }
                 onCancel={() => {
                     const manager = (window as any).__activeExportManager;

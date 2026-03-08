@@ -121,7 +121,7 @@ export function ExportSettings() {
         try {
             (window as any).__activeExportManager = manager;
             const { blob, codecs } = await manager.exportProject(project, quality, fps, onProgress, options);
-            const exportDuration = (Date.now() - exportStart) / 1000;
+            const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
                 ...extractProjectProperties(project),
@@ -130,7 +130,7 @@ export function ExportSettings() {
                 export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
-                export_duration_seconds: Math.round(exportDuration),
+                export_duration_ms: exportDuration,
                 success: true,
                 video_codec: codecs.video.encoder,
                 video_codec_fallback: codecs.video.fallback,
@@ -149,7 +149,7 @@ export function ExportSettings() {
                 export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
-                export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
+                export_duration_ms: Date.now() - exportStart,
                 success: false,
                 error: e?.message || 'Unknown error',
                 video_codec: 'unknown',
@@ -216,7 +216,7 @@ export function ExportSettings() {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
-            const exportDuration = (Date.now() - exportStart) / 1000;
+            const exportDuration = Date.now() - exportStart;
 
             // Upload to Cloudflare Stream
             setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'uploading' });
@@ -224,7 +224,7 @@ export function ExportSettings() {
             const result = await ShareService.shareVideo(blob, project.id, project.name, {
                 onUploadProgress: (fraction) => setExportState({ progress: fraction }),
             });
-            const uploadDuration = (Date.now() - uploadStart) / 1000;
+            const uploadDuration = Date.now() - uploadStart;
 
             // Try to copy URL to clipboard (non-blocking)
             let linkCopied = false;
@@ -251,8 +251,8 @@ export function ExportSettings() {
                 export_type: 'publish',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
-                export_duration_seconds: Math.round(exportDuration),
-                upload_duration_seconds: Math.round(uploadDuration),
+                export_duration_ms: exportDuration,
+                upload_duration_ms: uploadDuration,
                 success: true,
                 video_codec: codecs.video.encoder,
                 video_codec_fallback: codecs.video.fallback,
@@ -278,7 +278,7 @@ export function ExportSettings() {
                 export_type: 'publish',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
-                export_duration_seconds: Math.round((Date.now() - exportStart) / 1000),
+                export_duration_ms: Date.now() - exportStart,
                 success: false,
                 error: e?.message || 'Unknown error',
                 video_codec: 'unknown',

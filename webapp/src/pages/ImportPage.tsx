@@ -119,7 +119,7 @@ export function ImportPage() {
                             events.hoveredCards.length;
 
                         trackProjectCreated({
-                            duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
+                            duration_ms: Math.round(recording.screenSource.durationMs),
                             microphone_on: !!recording.microphoneSource,
                             camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
@@ -169,7 +169,7 @@ export function ImportPage() {
                         }
 
                         trackProjectCreated({
-                            duration_seconds: Math.round(recording.screenSource.durationMs / 1000),
+                            duration_ms: Math.round(recording.screenSource.durationMs),
                             microphone_on: !!recording.microphoneSource,
                             camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
@@ -226,7 +226,7 @@ export function ImportPage() {
                 }
 
                 trackProjectCreated({
-                    duration_seconds: recording ? Math.round(recording.screenSource.durationMs / 1000) : 0,
+                    duration_ms: recording ? Math.round(recording.screenSource.durationMs) : 0,
                     microphone_on: !!recording?.microphoneSource,
                     camera_on: !!state.cameraVideo,
                     has_system_audio: recording?.screenSource.hasAudio ?? false,

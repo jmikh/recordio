@@ -90,7 +90,7 @@ export function trackRecordingStarted(props: {
 
 export function trackRecordingFinished(props: {
     mode: string;
-    durationSeconds: number;
+    duration_ms: number;
     hasAudio: boolean;
     hasCamera: boolean;
 }) {

@@ -158,13 +158,13 @@ export interface ExportCompletedParams {
     export_type: ExportType;
     is_authenticated: boolean;
     is_pro: boolean;
-    export_duration_seconds: number;
-    upload_duration_seconds?: number;
+    export_duration_ms: number;
+    upload_duration_ms?: number;
 
     // Recording context
     recording_type: 'tab' | 'window' | 'screen';
-    input_duration: number;
-    output_duration: number;
+    input_duration_ms: number;
+    output_duration_ms: number;
     first_url: string | null;
 
     // Event counts
@@ -234,7 +234,7 @@ import type { Project } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 
 export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
-    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_seconds' | 'upload_duration_seconds' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback'
+    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback'
 > {
     const { settings, timeline, userEvents, screenSource } = project;
     const timeMapper = new TimeMapper(timeline.outputWindows);
@@ -272,8 +272,8 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
     return {
         // Recording context
         recording_type: screenSource.recordingType,
-        input_duration: Math.round(timeline.durationMs / 1000),
-        output_duration: Math.round(timeMapper.outputDuration / 1000),
+        input_duration_ms: Math.round(timeline.durationMs),
+        output_duration_ms: Math.round(timeMapper.outputDuration),
         first_url,
 
         // Event counts
@@ -371,7 +371,7 @@ function incrementProjectCount(): number {
 }
 
 export interface ProjectCreatedParams {
-    duration_seconds: number;
+    duration_ms: number;
     microphone_on: boolean;
     camera_on: boolean;
     has_system_audio: boolean;

@@ -19,7 +19,7 @@ export type { ExportQuality, ExportFps } from './codecResolver';
 export interface ExportProgress {
     progress: number;
     timeRemainingSeconds: number | null;
-    phase?: 'exporting' | 'uploading';
+    phase?: 'preparing' | 'exporting' | 'uploading';
 }
 
 export interface ExportCodecInfo {
@@ -212,6 +212,9 @@ export class ExportManager {
                 }
             }
 
+            // Signal preparing phase — WASM compilation + full demux happen here
+            onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'preparing' });
+
             // Initialize frame extractors for screen and camera sources
             for (const source of sources) {
                 if (source.runtimeUrl) {
@@ -242,6 +245,7 @@ export class ExportManager {
             encodeAudioBuffer(renderedAudioBuffer, audioEncoder);
 
             // --- Frame Loop ---
+            onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
             const frameInterval = 1000 / fps;
             totalFrames = Math.ceil(totalDurationMs / frameInterval);
 

@@ -83,7 +83,7 @@ export function useAudioAnalysis(sourceId: string, url: string): AudioAnalysisRe
                 audioContext.close();
 
             } catch (err: any) {
-                console.error("Audio analysis failed", err);
+                console.info("Audio analysis: no audio track found or decode failed", err);
                 const errorResult = { peaks: [], duration: 0, isLoading: false, error: err.message };
                 // Don't cache errors? Or maybe do to prevent retry loops.
                 if (active) setResult(errorResult);

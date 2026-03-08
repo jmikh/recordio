@@ -1,11 +1,9 @@
 /**
  * @fileoverview WebCodecs-based frame extractor for video export.
  *
- * Replaces per-frame `<video>` element seeking with sequential VideoDecoder
- * decoding for significantly faster export. Uses a custom WebM demuxer
- * ({@link demuxWebm}) to extract encoded chunks from MediaRecorder output,
- * then feeds them through the WebCodecs VideoDecoder for hardware-accelerated
- * sequential decoding.
+ * Uses the `web-demuxer` library (FFmpeg libavformat via WASM) for reliable
+ * demuxing with correct keyframe detection, then feeds EncodedVideoChunks
+ * through the WebCodecs VideoDecoder for hardware-accelerated sequential decoding.
  *
  * Design constraints:
  * - Feed loop decides when to stop based on **packet timestamps** (not buffer
@@ -20,8 +18,8 @@
  */
 
 import * as Sentry from '@sentry/react';
-import { demuxWebm } from './webmDemuxer';
-import type { DemuxedVideoPacket } from './webmDemuxer';
+import { WebDemuxer } from 'web-demuxer';
+import type { WebAVPacket } from 'web-demuxer';
 
 /** How far ahead (ms) to feed packets beyond the requested time. */
 const FEED_AHEAD_MS = 200;
@@ -34,20 +32,21 @@ const MAX_REBUILDS = 4;
 
 
 /**
- * Extracts decoded {@link VideoFrame}s from a WebM video source using WebCodecs.
+ * Extracts decoded {@link VideoFrame}s from a video source using WebCodecs.
  * Optimised for sequential (monotonically increasing) time access during export.
+ *
+ * Uses `web-demuxer` (FFmpeg libavformat via WASM) for reliable demuxing
+ * and keyframe detection, eliminating the custom EBML parser errors.
  */
 export class FrameExtractor {
     private url: string;
-    private packets: DemuxedVideoPacket[] = [];
+    private demuxer: WebDemuxer | null = null;
+    private packets: WebAVPacket[] = [];
     private decoder: VideoDecoder | null = null;
+    private decoderConfig: VideoDecoderConfig | null = null;
     private decodedFrames: VideoFrame[] = [];
     private nextPacketIndex = 0;
-    private codedWidth = 0;
-    private codedHeight = 0;
-    private description: Uint8Array | undefined;
     private flushed = false;
-    private codecString = '';
     private rebuildCount = 0;
 
     /** Video dimensions — available after {@link initialize}. */
@@ -59,35 +58,61 @@ export class FrameExtractor {
     }
 
     /**
-     * Fetch the video, demux it into encoded packets, and configure the
-     * hardware VideoDecoder.
+     * Fetch the video, demux it into encoded packets using web-demuxer
+     * (FFmpeg WASM), and configure the hardware VideoDecoder.
      */
     async initialize(): Promise<void> {
+        this.demuxer = new WebDemuxer({
+            wasmFilePath: new URL('/web-demuxer.wasm', window.location.origin).href,
+        });
+
+        // Fetch the video on the main thread and pass as a File object.
+        // web-demuxer's internal worker (blob: origin) can't fetch blob: URLs
+        // created by the main page, so we must resolve to a File first.
         const response = await fetch(this.url);
-        const arrayBuffer = await response.arrayBuffer();
-        const { track, packets } = demuxWebm(arrayBuffer);
+        const blob = await response.blob();
+        const file = new File([blob], 'source.webm', { type: blob.type || 'video/webm' });
+        await this.demuxer.load(file);
 
-        this.packets = packets;
-        this.codedWidth = track.width;
-        this.codedHeight = track.height;
-        this.width = track.width;
-        this.height = track.height;
+        // Get video stream info for dimensions
+        const streamInfo = await this.demuxer.getMediaStream('video');
+        this.width = streamInfo.width;
+        this.height = streamInfo.height;
 
-        // Map Matroska codec IDs to WebCodecs codec strings
-        switch (track.codec) {
-            case 'V_VP9':
-                this.codecString = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
-                break;
-            case 'V_VP8':
-                this.codecString = 'vp8';
-                break;
-            default:
-                throw new Error(`[FrameExtractor] Unsupported codec: ${track.codec}`);
+        // Get decoder config directly from web-demuxer (includes codec string, description, etc.)
+        this.decoderConfig = await this.demuxer.getDecoderConfig('video');
+
+        // Read all video packets into memory for sequential access.
+        // Using readMediaPacket('video') gives us raw WebAVPacket objects with FFmpeg's
+        // reliable keyframe detection — no more custom EBML parsing bugs.
+        this.packets = [];
+        const videoPacketStream = this.demuxer.readMediaPacket('video');
+        const videoReader = videoPacketStream.getReader();
+
+        while (true) {
+            const { done, value } = await videoReader.read();
+            if (done) break;
+            this.packets.push(value);
         }
 
-        if (track.codecPrivate) {
-            this.description = track.codecPrivate;
+        if (this.packets.length === 0) {
+            console.error('[FrameExtractor] No video packets found in source');
+            throw new Error('[FrameExtractor] No video packets found in source');
         }
+
+        // web-demuxer returns timestamps in seconds, but EncodedVideoChunk/VideoFrame
+        // use microseconds. Normalize once here so all downstream logic is consistent.
+        for (const pkt of this.packets) {
+            pkt.timestamp = Math.round(pkt.timestamp * 1_000_000);
+            pkt.duration = Math.round(pkt.duration * 1_000_000);
+        }
+
+        const first = this.packets[0];
+        const last = this.packets[this.packets.length - 1];
+        const keyframes = this.packets.filter(p => p.keyframe === 1).length;
+        console.log(`[FrameExtractor] Loaded ${this.packets.length} packets (${keyframes} keyframes), ` +
+            `first.ts=${first.timestamp}µs last.ts=${last.timestamp}µs first.dur=${first.duration}µs ` +
+            `dimensions=${this.width}x${this.height}`);
 
         this.createDecoder();
     }
@@ -97,6 +122,10 @@ export class FrameExtractor {
      * Shared by initialize() and rebuildDecoder().
      */
     private createDecoder(): void {
+        if (!this.decoderConfig) {
+            throw new Error('[FrameExtractor] Cannot create decoder — no config available');
+        }
+
         this.decoder = new VideoDecoder({
             output: (frame: VideoFrame) => {
                 this.decodedFrames.push(frame);
@@ -107,15 +136,7 @@ export class FrameExtractor {
             }
         });
 
-        const config: VideoDecoderConfig = {
-            codec: this.codecString,
-            codedWidth: this.codedWidth,
-            codedHeight: this.codedHeight,
-        };
-        if (this.description) {
-            config.description = this.description;
-        }
-        this.decoder.configure(config);
+        this.decoder.configure(this.decoderConfig);
     }
 
     /**
@@ -144,10 +165,12 @@ export class FrameExtractor {
         }
         this.decodedFrames = [];
 
-        // Find the latest keyframe at or before the target time
+        // Find the latest keyframe at or before the target time.
+        // FFmpeg's keyframe flag is reliable — this is the core improvement.
+        const targetTimeMicros = targetTimeMs * 1000;
         let keyframeIndex = 0;
         for (let i = 0; i < this.packets.length; i++) {
-            if (this.packets[i].isKeyframe && this.packets[i].timestampMs <= targetTimeMs) {
+            if (this.packets[i].keyframe === 1 && this.packets[i].timestamp <= targetTimeMicros) {
                 keyframeIndex = i;
             }
         }
@@ -155,6 +178,19 @@ export class FrameExtractor {
         this.flushed = false;
 
         this.createDecoder();
+    }
+
+    /**
+     * Convert a WebAVPacket to an EncodedVideoChunk for the VideoDecoder.
+     * Uses FFmpeg's keyframe flag directly — no guessing or heuristics.
+     */
+    private packetToChunk(packet: WebAVPacket): EncodedVideoChunk {
+        return new EncodedVideoChunk({
+            type: packet.keyframe === 1 ? 'key' : 'delta',
+            timestamp: packet.timestamp,
+            duration: packet.duration,
+            data: packet.data,
+        });
     }
 
     /**
@@ -188,6 +224,7 @@ export class FrameExtractor {
         // 2. Feed encoded chunks up to targetTime + margin.
         //    The output callback fires asynchronously, so we use packet
         //    timestamps — not buffer size — to decide when to stop.
+        const feedAheadMicros = (timeMs + FEED_AHEAD_MS) * 1000;
         let fed = 0;
         while (this.nextPacketIndex < this.packets.length) {
             // Re-check decoder state — it can close mid-feed from a reclaim
@@ -201,13 +238,9 @@ export class FrameExtractor {
             }
 
             const packet = this.packets[this.nextPacketIndex];
-            if (packet.timestampMs > timeMs + FEED_AHEAD_MS && fed > 0) break;
+            if (packet.timestamp > feedAheadMicros && fed > 0) break;
 
-            this.decoder!.decode(new EncodedVideoChunk({
-                type: packet.isKeyframe ? 'key' : 'delta',
-                timestamp: packet.timestampMs * 1000, // ms → µs
-                data: packet.data
-            }));
+            this.decoder!.decode(this.packetToChunk(packet));
             this.nextPacketIndex++;
             fed++;
         }
@@ -265,8 +298,7 @@ export class FrameExtractor {
 
     /**
      * Wait for the decoder to process all queued chunks.
-     * Uses the 'dequeue' event which fires each time a chunk finishes decoding,
-     * providing deterministic synchronization without timer-based polling.
+     * Uses polling on decodeQueueSize for maximum cross-browser compatibility.
      *
      * After the queue drains, we also wait for the output callback to fire
      * (it runs asynchronously after the internal dequeue), with a safety timeout.
@@ -311,7 +343,6 @@ export class FrameExtractor {
                     tags: { component: 'FrameExtractor' },
                     extra: {
                         queueSize: this.decoder.decodeQueueSize,
-                        codecString: this.codecString,
                         rebuildCount: this.rebuildCount,
                         userAgent: navigator.userAgent,
                     },
@@ -346,5 +377,10 @@ export class FrameExtractor {
         }
         this.decoder = null;
         this.packets = [];
+
+        if (this.demuxer) {
+            try { this.demuxer.destroy(); } catch { /* already destroyed */ }
+            this.demuxer = null;
+        }
     }
 }

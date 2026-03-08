@@ -544,10 +544,10 @@ async function handleStopSession(sendResponse: Function) {
 
     // Track recording_finished before we clear state
     if (currentState?.isRecording && currentState.startTime) {
-        const durationSeconds = Math.round((Date.now() - currentState.startTime) / 1000);
+        const duration_ms = Date.now() - currentState.startTime;
         trackRecordingFinished({
             mode: currentState.mode || 'tab',
-            durationSeconds,
+            duration_ms,
             hasAudio: currentState.hasAudio,
             hasCamera: currentState.hasCamera,
         });
