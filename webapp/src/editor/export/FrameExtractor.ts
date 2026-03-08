@@ -128,6 +128,13 @@ export class FrameExtractor {
             data: dataCopy,
         };
         this.consumedChunks.push(cached);
+
+        // Diagnostic: log first few chunks to verify timestamp units
+        if (this.consumedChunks.length <= 3) {
+            console.log(`[FrameExtractor] Chunk #${this.consumedChunks.length}: ` +
+                `type=${cached.type}, ts=${cached.timestamp}, dur=${cached.duration}, bytes=${cached.data.byteLength}`);
+        }
+
         return cached;
     }
 

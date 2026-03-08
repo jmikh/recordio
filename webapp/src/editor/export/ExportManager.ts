@@ -274,13 +274,15 @@ export class ExportManager {
 
                 const sourceTimeMs = timeMapper.mapOutputToSourceTime(currentTimeMs);
 
-                // Decode frames at the target source time using WebCodecs
+                // --- TIMING: Frame extraction ---
+                const t0 = performance.now();
                 const currentFrameRefs: Record<string, VideoFrame> = {};
                 await Promise.all(Object.entries(frameExtractors).map(async ([id, ext]) => {
                     currentFrameRefs[id] = await ext.getFrameAtTime(sourceTimeMs / 1000);
                 }));
+                const t1 = performance.now();
 
-                // Render Frame
+                // --- TIMING: Canvas rendering ---
                 ctx.clearRect(0, 0, width, height);
 
                 drawBackground(
@@ -307,7 +309,9 @@ export class ExportManager {
                 if (shouldShowWatermark && imageElements.watermark) {
                     drawWatermark(ctx, imageElements.watermark, width, height, options?.watermarkPosition);
                 }
+                const t2 = performance.now();
 
+                // --- TIMING: Video encoding ---
                 const durationMicros = 1000000 / fps;
                 const encoderFrame = new VideoFrame(offscreenCanvas, {
                     timestamp: timestampMicros,
@@ -326,10 +330,9 @@ export class ExportManager {
 
                 // Close decoded source frames — they've been drawn to the canvas
                 Object.values(currentFrameRefs).forEach(f => f.close());
+                const t3 = performance.now();
 
                 // Backpressure: wait for the encoder queue to drain before submitting more.
-                // This prevents GPU memory exhaustion at high resolutions (2K/4K).
-                // Includes a timeout to prevent infinite hangs if the encoder stalls.
                 const bpStart = performance.now();
                 while ((videoEncoder.state as string) !== 'closed' && videoEncoder.encodeQueueSize > 5) {
                     if (performance.now() - bpStart > BACKPRESSURE_TIMEOUT_MS) {
@@ -339,6 +342,18 @@ export class ExportManager {
                     }
                     await new Promise(r => setTimeout(r, 1));
                 }
+                const bpMs = performance.now() - bpStart;
+
+                // DIAGNOSTIC: Per-frame timing breakdown (every 30 frames)
+                if (framesProcessed % 30 === 0) {
+                    const frameTotal = performance.now() - t0;
+                    console.log(`[Export] Frame ${framesProcessed}/${totalFrames}: ` +
+                        `${frameTotal.toFixed(0)}ms total | ` +
+                        `extract=${(t1 - t0).toFixed(0)}ms, render=${(t2 - t1).toFixed(0)}ms, ` +
+                        `encode=${(t3 - t2).toFixed(0)}ms, backpressure=${bpMs.toFixed(0)}ms, ` +
+                        `queueSize=${videoEncoder.encodeQueueSize}`);
+                }
+
                 // Periodic yield for UI responsiveness (progress bar, cancel button)
                 if (framesProcessed % 30 === 0) {
                     await new Promise(r => setTimeout(r, 0));
