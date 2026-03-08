@@ -30,7 +30,7 @@ const FEED_AHEAD_MS = 200;
 const DRAIN_TIMEOUT_MS = 10_000;
 
 /** Maximum number of automatic decoder rebuilds per export. */
-const MAX_REBUILDS = 2;
+const MAX_REBUILDS = 3;
 
 
 /**
@@ -214,7 +214,17 @@ export class FrameExtractor {
 
         // 3. Wait for all fed chunks to be decoded (deterministic sync).
         if (fed > 0) {
-            await this.awaitDecoderDrain();
+            try {
+                await this.awaitDecoderDrain();
+            } catch {
+                // Drain timed out — decoder is stalled. Attempt rebuild.
+                if (this.rebuildCount >= MAX_REBUILDS) {
+                    throw new Error('[FrameExtractor] Decoder drain stalled — max rebuilds exceeded');
+                }
+                this.rebuildDecoder(timeMs);
+                // Re-feed from the keyframe after rebuild
+                return this.getFrameAtTime(timeSec);
+            }
         }
 
         // 4. One-time flush after all packets have been consumed to drain
@@ -278,7 +288,7 @@ export class FrameExtractor {
                     message: `Decoder drain timeout (queueSize=${this.decoder.decodeQueueSize})`,
                     level: 'error',
                 });
-                return; // Let getFrameAtTime handle the fallout
+                throw new Error(`Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms`);
             }
 
             // Check if decoder closed while waiting
