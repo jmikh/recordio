@@ -278,18 +278,45 @@ export class FrameExtractor {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
 
         const drainStart = performance.now();
+        let lastQueueSize = this.decoder.decodeQueueSize;
+        let lastChangeTime = drainStart;
+        let stallWarned = false;
 
         // Poll decodeQueueSize instead of relying on the 'dequeue' event,
         // which doesn't fire reliably in all browsers (e.g. Brave).
         while (this.decoder.decodeQueueSize > 0) {
-            if (performance.now() - drainStart > DRAIN_TIMEOUT_MS) {
-                console.error(`[FrameExtractor] Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`);
+            const now = performance.now();
+
+            // Track queue progress — detect stalls early
+            if (this.decoder.decodeQueueSize !== lastQueueSize) {
+                lastQueueSize = this.decoder.decodeQueueSize;
+                lastChangeTime = now;
+                stallWarned = false;
+            } else if (now - lastChangeTime > 2000 && !stallWarned) {
+                stallWarned = true;
+                console.warn(`[FrameExtractor] Decoder queue stuck at ${this.decoder.decodeQueueSize} for 2s`);
                 Sentry.addBreadcrumb({
                     category: 'codec',
-                    message: `Decoder drain timeout (queueSize=${this.decoder.decodeQueueSize})`,
-                    level: 'error',
+                    message: `Decoder queue stalled (queueSize=${this.decoder.decodeQueueSize}, elapsed=${Math.round(now - drainStart)}ms)`,
+                    level: 'warning',
+                    data: { queueSize: this.decoder.decodeQueueSize, elapsedMs: Math.round(now - drainStart) },
                 });
-                throw new Error(`Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms`);
+            }
+
+            if (now - drainStart > DRAIN_TIMEOUT_MS) {
+                const errorMsg = `Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`;
+                console.error(`[FrameExtractor] ${errorMsg}`);
+                Sentry.captureMessage(errorMsg, {
+                    level: 'error',
+                    tags: { component: 'FrameExtractor' },
+                    extra: {
+                        queueSize: this.decoder.decodeQueueSize,
+                        codecString: this.codecString,
+                        rebuildCount: this.rebuildCount,
+                        userAgent: navigator.userAgent,
+                    },
+                });
+                throw new Error(errorMsg);
             }
 
             if ((this.decoder.state as string) === 'closed') return;
