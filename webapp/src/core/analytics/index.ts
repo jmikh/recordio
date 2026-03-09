@@ -401,6 +401,10 @@ export function trackProjectOpened() {
     trackEvent('project_opened');
 }
 
+export function trackEditorLoaded() {
+    trackEvent('editor_loaded');
+}
+
 export function trackExtensionInstalled() {
     trackEvent('extension_installed', {});
 }

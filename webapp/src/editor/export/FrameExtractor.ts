@@ -335,8 +335,15 @@ export class FrameExtractor {
             await new Promise(r => setTimeout(r, 1));
         }
 
-        // Single yield for the output callback to fire after queue empties.
-        await new Promise(r => setTimeout(r, 0));
+        // Wait for output callback to deliver decoded frames.
+        // A single yield is insufficient on slower machines — poll until
+        // at least one new frame appears or a timeout is reached.
+        const prevCount = this.decodedFrames.length;
+        let postDrainWait = 0;
+        while (this.decodedFrames.length === prevCount && postDrainWait < 500) {
+            await new Promise(r => setTimeout(r, 1));
+            postDrainWait++;
+        }
     }
 
     dispose(): void {

@@ -20,6 +20,7 @@ import { useToast } from './components/Toast';
 import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from './stores/useUserStore';
 import { ShareService } from './services/ShareService';
+import { trackEditorLoaded } from '../core/analytics';
 
 /** Fetch a remote image once and return it as a data URL to avoid repeated network requests. */
 async function cacheAvatarUrl(url: string): Promise<string | null> {
@@ -182,6 +183,7 @@ function Editor() {
                 const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
                 loadProject(loadedProject);
                 setIsLoading(false);
+                trackEditorLoaded();
 
                 // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
                 if (useUserStore.getState().isAuthenticated) {

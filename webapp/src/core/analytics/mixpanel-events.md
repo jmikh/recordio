@@ -28,6 +28,7 @@
 | `extension_installed` | Extension freshly installed (fired from welcome page) | — |
 | `extension_uninstalled` | Extension removed (fired from farewell page) | — |
 | `project_opened` | Project opened from dashboard | — |
+| `editor_loaded` | Editor page loaded / reloaded with a project | — |
 | `review_modal_shown` | Review modal qualified to show | — |
 | `review_modal_dismissed` | Review modal closed without action | — |
 | `review_modal_review_clicked` | "Leave a Review" button clicked | — |
