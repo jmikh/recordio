@@ -5,8 +5,6 @@
  * Mixpanel is initialized here via the npm SDK.
  * All events are dual-tracked to both platforms.
  * 
- * Mixpanel is disabled in local dev mode (import.meta.env.DEV).
- * 
  * ⚠️  When adding or modifying events/properties, update ./mixpanel-events.md
  */
 
@@ -20,21 +18,13 @@ declare global {
 }
 
 // ============================================================================
-// Local Mode Gate — Mixpanel is disabled in dev
-// ============================================================================
-
-const IS_LOCAL = import.meta.env.DEV;
-
-// ============================================================================
 // Mixpanel Initialization
 // ============================================================================
 
-if (!IS_LOCAL) {
-    mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
-        autocapture: false,
-        record_sessions_percent: 0,
-    });
-}
+mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+    autocapture: false,
+    record_sessions_percent: 0,
+});
 
 // ============================================================================
 // Anonymous Local User ID (GA4 only — Mixpanel uses identify/reset)
@@ -61,7 +51,6 @@ function getOrCreateLocalUserId(): string {
  * Merges any anonymous events into the identified profile.
  */
 export function identifyUser(userId: string, email: string) {
-    if (IS_LOCAL) return;
     mixpanel.identify(userId);
     mixpanel.people.set({ $email: email });
     // Set signup_date only once (won't overwrite on subsequent sessions)
@@ -74,7 +63,6 @@ export function identifyUser(userId: string, email: string) {
  * get their plan type set on first load (not just via webhook).
  */
 export function updatePlanType(status: string | null) {
-    if (IS_LOCAL) return;
     const planType = status === 'active' ? 'pro' : status === 'trialing' ? 'pro_trial' : 'basic';
     mixpanel.people.set({ current_plan_type: planType });
 }
@@ -84,7 +72,6 @@ export function updatePlanType(status: string | null) {
  * Called from useUserStore.clearUser on sign-out.
  */
 export function resetUser() {
-    if (IS_LOCAL) return;
     mixpanel.reset();
 }
 
@@ -94,7 +81,6 @@ export function resetUser() {
  * If the user later authenticates, identifyUser() will further merge into the Supabase ID.
  */
 export function identifyExtensionUser(extensionDistinctId: string) {
-    if (IS_LOCAL) return;
     mixpanel.identify(extensionDistinctId);
 }
 
@@ -138,11 +124,9 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
         });
     }
 
-    // Mixpanel (disabled in local dev)
-    if (!IS_LOCAL) {
-        mixpanel.track(eventName, allParams);
-        mixpanel.people.set({ last_active_date: new Date().toISOString() });
-    }
+    // Mixpanel
+    mixpanel.track(eventName, allParams);
+    mixpanel.people.set({ last_active_date: new Date().toISOString() });
 }
 
 // ============================================================================
