@@ -21,10 +21,20 @@ declare global {
 // Mixpanel Initialization
 // ============================================================================
 
-mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
-    autocapture: false,
-    record_sessions_percent: 0,
-});
+let mixpanelReady = false;
+
+try {
+    mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+        autocapture: false,
+        record_sessions_percent: 0,
+        loaded: () => {
+            mixpanelReady = true;
+            console.log('[Analytics] Mixpanel initialized successfully');
+        },
+    });
+} catch (e) {
+    console.error('[Analytics] Mixpanel init failed:', e);
+}
 
 // ============================================================================
 // Anonymous Local User ID (GA4 only — Mixpanel uses identify/reset)
@@ -125,8 +135,15 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
     }
 
     // Mixpanel
-    mixpanel.track(eventName, allParams);
-    mixpanel.people.set({ last_active_date: new Date().toISOString() });
+    try {
+        if (!mixpanelReady) {
+            console.warn(`[Analytics] Mixpanel not ready, dropping event: ${eventName}`);
+        }
+        mixpanel.track(eventName, allParams);
+        mixpanel.people.set({ last_active_date: new Date().toISOString() });
+    } catch (e) {
+        console.error(`[Analytics] Mixpanel track failed for ${eventName}:`, e);
+    }
 }
 
 // ============================================================================
