@@ -31,6 +31,12 @@ const DRAIN_TIMEOUT_MS = 10_000;
 /** Maximum number of automatic decoder rebuilds per export. */
 const MAX_REBUILDS = 4;
 
+/** Timeout (ms) for the hardware decode probe during initialization. */
+const HW_PROBE_TIMEOUT_MS = 2_000;
+
+/** localStorage key — persisted when hardware decode fails and software is required. */
+const SW_DECODE_KEY = 'recordio:prefer-software-decode';
+
 /** Cached chunk — lightweight copy of EncodedVideoChunk for replay/rebuild. */
 interface CachedChunk {
     type: 'key' | 'delta';
@@ -47,6 +53,7 @@ export class FrameExtractor {
     private decodedFrames: VideoFrame[] = [];
     private rebuildCount = 0;
     private flushed = false;
+    private forceSoftware = false;
 
     // All chunks pre-read at init
     private chunks: CachedChunk[] = [];
@@ -58,6 +65,11 @@ export class FrameExtractor {
 
     constructor(url: string) {
         this.url = url;
+    }
+
+    /** Whether this extractor is using software (CPU) decode. */
+    get isSoftwareDecode(): boolean {
+        return this.forceSoftware;
     }
 
     /**
@@ -140,7 +152,73 @@ export class FrameExtractor {
             `first.ts=${first.timestamp}µs last.ts=${last.timestamp}µs, ` +
             `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}`);
 
+        // Check if software decode was previously required
+        if (localStorage.getItem(SW_DECODE_KEY) === 'true') {
+            console.log('[FrameExtractor] Using software decode (persisted from previous failure)');
+            this.forceSoftware = true;
+        } else {
+            // Probe hardware decoder — decode a single keyframe with 2s timeout
+            await this.probeHardwareDecode();
+        }
+
         this.createDecoder();
+        console.log(`[FrameExtractor] Decoder ready (${this.forceSoftware ? 'software' : 'hardware'})`);
+        Sentry.addBreadcrumb({
+            category: 'codec',
+            message: `Decoder mode: ${this.forceSoftware ? 'software' : 'hardware'}`,
+            level: 'info',
+        });
+    }
+
+    /**
+     * Quick probe: create a hardware decoder, feed one keyframe, and check
+     * if the output callback fires within HW_PROBE_TIMEOUT_MS.
+     * If it doesn't, flip to software decode and persist in localStorage.
+     */
+    private async probeHardwareDecode(): Promise<void> {
+        if (!this.decoderConfig || this.chunks.length === 0) return;
+
+        const firstKeyframe = this.chunks.find(c => c.type === 'key');
+        if (!firstKeyframe) return;
+
+        let gotFrame = false;
+        const probe = new VideoDecoder({
+            output: (frame: VideoFrame) => {
+                gotFrame = true;
+                frame.close();
+            },
+            error: () => { /* probe errors handled by timeout */ },
+        });
+
+        try {
+            probe.configure(this.decoderConfig);
+            probe.decode(this.chunkToEncoded(firstKeyframe));
+
+            const start = performance.now();
+            while (!gotFrame && performance.now() - start < HW_PROBE_TIMEOUT_MS) {
+                await new Promise(r => setTimeout(r, 10));
+            }
+
+            if (!gotFrame) {
+                console.warn('[FrameExtractor] Hardware decode probe failed — switching to software decode');
+                Sentry.addBreadcrumb({
+                    category: 'codec',
+                    message: 'Hardware decode probe failed, falling back to software',
+                    level: 'warning',
+                    data: { probeTimeoutMs: HW_PROBE_TIMEOUT_MS, codec: this.decoderConfig.codec },
+                });
+                this.forceSoftware = true;
+                localStorage.setItem(SW_DECODE_KEY, 'true');
+            } else {
+                console.log(`[FrameExtractor] Hardware decode probe OK (${(performance.now() - start).toFixed(0)}ms)`);
+            }
+        } catch (e) {
+            console.warn('[FrameExtractor] Hardware decode probe threw — switching to software decode', e);
+            this.forceSoftware = true;
+            localStorage.setItem(SW_DECODE_KEY, 'true');
+        } finally {
+            try { if (probe.state !== 'closed') probe.close(); } catch { /* OK */ }
+        }
     }
 
     private createDecoder(): void {
@@ -157,7 +235,11 @@ export class FrameExtractor {
             }
         });
 
-        this.decoder.configure(this.decoderConfig);
+        const config = { ...this.decoderConfig };
+        if (this.forceSoftware) {
+            config.hardwareAcceleration = 'prefer-software';
+        }
+        this.decoder.configure(config);
     }
 
     private chunkToEncoded(chunk: CachedChunk): EncodedVideoChunk {
@@ -183,13 +265,21 @@ export class FrameExtractor {
 
     private rebuildDecoder(targetTimeMs: number): void {
         this.rebuildCount++;
-        console.warn(`[FrameExtractor] Rebuilding decoder (attempt ${this.rebuildCount}/${MAX_REBUILDS}) at ${targetTimeMs.toFixed(0)}ms`);
+
+        // On first rebuild, switch to software decode — hardware is unreliable
+        if (!this.forceSoftware) {
+            this.forceSoftware = true;
+            localStorage.setItem(SW_DECODE_KEY, 'true');
+            console.warn(`[FrameExtractor] Switching to software decode after hardware failure`);
+        }
+
+        console.warn(`[FrameExtractor] Rebuilding decoder (attempt ${this.rebuildCount}/${MAX_REBUILDS}) at ${targetTimeMs.toFixed(0)}ms [software=${this.forceSoftware}]`);
 
         Sentry.addBreadcrumb({
             category: 'codec',
             message: `Decoder rebuild #${this.rebuildCount} at ${targetTimeMs.toFixed(0)}ms`,
             level: 'warning',
-            data: { targetTimeMs, totalChunks: this.chunks.length },
+            data: { targetTimeMs, totalChunks: this.chunks.length, forceSoftware: this.forceSoftware },
         });
 
         if (this.decoder && this.decoder.state !== 'closed') {

@@ -226,6 +226,7 @@ export interface ExportCompletedParams {
     video_codecs_tried: string[];
     audio_codec: string;
     audio_codec_fallback: boolean;
+    video_decode_mode: 'hardware' | 'software';
 }
 
 /**
@@ -236,7 +237,7 @@ import type { Project } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 
 export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
-    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback'
+    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode'
 > {
     const { settings, timeline, userEvents, screenSource } = project;
     const timeMapper = new TimeMapper(timeline.outputWindows);

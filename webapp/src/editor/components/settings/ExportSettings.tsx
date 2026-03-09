@@ -120,7 +120,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs } = await manager.exportProject(project, quality, fps, onProgress, options);
+            const { blob, codecs, videoDecodeMode } = await manager.exportProject(project, quality, fps, onProgress, options);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
@@ -137,6 +137,7 @@ export function ExportSettings() {
                 video_codecs_tried: codecs.video.tried,
                 audio_codec: codecs.audio.encoder,
                 audio_codec_fallback: codecs.audio.fallback,
+                video_decode_mode: videoDecodeMode,
             });
             if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
         } catch (e: any) {
@@ -157,6 +158,7 @@ export function ExportSettings() {
                 video_codecs_tried: [],
                 audio_codec: 'unknown',
                 audio_codec_fallback: false,
+                video_decode_mode: 'hardware',
             });
             addToast({
                 type: 'error',
@@ -212,7 +214,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
+            const { blob, codecs, videoDecodeMode } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
@@ -259,6 +261,7 @@ export function ExportSettings() {
                 video_codecs_tried: codecs.video.tried,
                 audio_codec: codecs.audio.encoder,
                 audio_codec_fallback: codecs.audio.fallback,
+                video_decode_mode: videoDecodeMode,
             });
 
             addToast({
@@ -286,6 +289,7 @@ export function ExportSettings() {
                 video_codecs_tried: [],
                 audio_codec: 'unknown',
                 audio_codec_fallback: false,
+                video_decode_mode: 'hardware',
             });
             addToast({
                 type: 'error',

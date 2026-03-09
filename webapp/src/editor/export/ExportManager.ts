@@ -30,6 +30,7 @@ export interface ExportCodecInfo {
 export interface ExportResult {
     blob: Blob;
     codecs: ExportCodecInfo;
+    videoDecodeMode: 'hardware' | 'software';
 }
 
 /** Maximum number of full export retries on codec reclaim errors. */
@@ -404,6 +405,8 @@ export class ExportManager {
                 });
             }
 
+            const usedSoftwareDecode = Object.values(frameExtractors).some(ext => ext.isSoftwareDecode);
+
             return {
                 blob,
                 codecs: {
@@ -419,6 +422,7 @@ export class ExportManager {
                         fallback: audioCodec.fallback,
                     },
                 },
+                videoDecodeMode: usedSoftwareDecode ? 'software' : 'hardware',
             };
 
         } catch (e) {
