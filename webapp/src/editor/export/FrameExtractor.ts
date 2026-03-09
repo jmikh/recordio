@@ -369,12 +369,11 @@ export class FrameExtractor {
             await new Promise(r => setTimeout(r, 1));
         }
 
-        // Wait for output callback to deliver decoded frames.
-        // A single yield is insufficient on slower machines — poll until
-        // at least one new frame appears or a timeout is reached.
-        const prevCount = this.decodedFrames.length;
+        // Wait for output callback to deliver decoded frames if they haven't
+        // arrived yet. Uses frameCountBefore (captured at top of drain) to
+        // correctly detect frames that arrived during the drain loop itself.
         let postDrainWait = 0;
-        while (this.decodedFrames.length === prevCount && postDrainWait < 500) {
+        while (this.decodedFrames.length === frameCountBefore && postDrainWait < 500) {
             await new Promise(r => setTimeout(r, 1));
             postDrainWait++;
         }
