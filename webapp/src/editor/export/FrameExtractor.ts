@@ -128,6 +128,9 @@ export class FrameExtractor {
                 initMs: Math.round(performance.now() - initStart),
             },
         });
+        console.log(`[FrameExtractor] Pre-read ${this.chunks.length} chunks (${keyframes} keyframes) in ${(performance.now() - readStart).toFixed(0)}ms, ` +
+            `first.ts=${first.timestamp}µs last.ts=${last.timestamp}µs, ` +
+            `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}`);
 
         this.createDecoder();
     }
