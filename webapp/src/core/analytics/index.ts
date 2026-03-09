@@ -123,6 +123,7 @@ function getGlobalProperties(): Record<string, any> {
 }
 
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
+    console.log(`[Analytics] trackEvent called: ${eventName}`);
     const globalProps = getGlobalProperties();
     const allParams = { ...globalProps, ...params };
 
@@ -403,6 +404,7 @@ export function trackProjectOpened() {
 }
 
 export function trackEditorLoaded() {
+    console.log('[Analytics] trackEditorLoaded called');
     trackEvent('editor_loaded');
 }
 
