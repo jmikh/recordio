@@ -115,9 +115,19 @@ export class FrameExtractor {
         const keyframes = this.chunks.filter(c => c.type === 'key').length;
         const first = this.chunks[0];
         const last = this.chunks[this.chunks.length - 1];
-        console.log(`[FrameExtractor] Pre-read ${this.chunks.length} chunks (${keyframes} keyframes) in ${(performance.now() - readStart).toFixed(0)}ms, ` +
-            `first.ts=${first.timestamp}µs last.ts=${last.timestamp}µs, ` +
-            `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}`);
+        Sentry.addBreadcrumb({
+            category: 'codec',
+            message: `Pre-read ${this.chunks.length} chunks (${keyframes} keyframes), ${this.width}x${this.height}`,
+            level: 'info',
+            data: {
+                chunks: this.chunks.length,
+                keyframes,
+                firstTs: first.timestamp,
+                lastTs: last.timestamp,
+                readMs: Math.round(performance.now() - readStart),
+                initMs: Math.round(performance.now() - initStart),
+            },
+        });
 
         this.createDecoder();
     }
@@ -233,7 +243,7 @@ export class FrameExtractor {
         // 3. Wait for decoder drain
         if (fed > 0) {
             try {
-                await this.awaitDecoderDrain();
+                await this.awaitDecoderDrain(fed);
             } catch {
                 if (this.rebuildCount >= MAX_REBUILDS) {
                     throw new Error('[FrameExtractor] Decoder drain stalled — max rebuilds exceeded');
@@ -280,18 +290,36 @@ export class FrameExtractor {
 
     /**
      * Wait for the decoder to process all queued chunks.
-     * After the queue empties, yields once for the output callback to fire.
+     *
+     * Handles a Brave/Linux quirk where `decodeQueueSize` may stay stuck at 1
+     * even after the frame has been decoded and delivered via the output callback.
+     * We track new frames appearing in `decodedFrames` as an alternative signal
+     * that the decoder has finished processing.
+     *
+     * @param fedCount Number of chunks fed in this call (used to detect when
+     *                 enough output frames have appeared).
      */
-    private async awaitDecoderDrain(): Promise<void> {
+    private async awaitDecoderDrain(fedCount: number): Promise<void> {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
 
         const drainStart = performance.now();
+        const frameCountBefore = this.decodedFrames.length;
         let lastQueueSize = this.decoder.decodeQueueSize;
         let lastChangeTime = drainStart;
         let stallWarned = false;
 
         while (this.decoder.decodeQueueSize > 0) {
             const now = performance.now();
+
+            // If we've received at least as many new frames as we fed,
+            // the decoder has done its job — break even if queueSize is stuck.
+            const newFrames = this.decodedFrames.length - frameCountBefore;
+            if (newFrames >= fedCount) {
+                if (this.decoder.decodeQueueSize > 0) {
+                    console.warn(`[FrameExtractor] Drain: queueSize stuck at ${this.decoder.decodeQueueSize} but ${newFrames} frames received — proceeding`);
+                }
+                break;
+            }
 
             if (this.decoder.decodeQueueSize !== lastQueueSize) {
                 lastQueueSize = this.decoder.decodeQueueSize;
@@ -309,6 +337,7 @@ export class FrameExtractor {
             }
 
             if (now - drainStart > DRAIN_TIMEOUT_MS) {
+                const framesReceived = this.decodedFrames.length - frameCountBefore;
                 const errorMsg = `Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`;
                 console.error(`[FrameExtractor] ${errorMsg}`);
                 Sentry.captureMessage(errorMsg, {
@@ -319,6 +348,8 @@ export class FrameExtractor {
                         decoderState: this.decoder.state,
                         rebuildCount: this.rebuildCount,
                         decodedFrameBuffer: this.decodedFrames.length,
+                        framesReceivedDuringDrain: framesReceived,
+                        fedCount,
                         totalChunks: this.chunks.length,
                         nextChunkIndex: this.nextChunkIndex,
                         sourceWidth: this.width,
