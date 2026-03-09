@@ -33,6 +33,7 @@ export interface ExportResult {
     blob: Blob;
     codecs: ExportCodecInfo;
     videoDecodeMode: 'hardware' | 'software';
+    videoDecodeFallback: boolean;
 }
 
 /** Maximum number of full export retries on codec reclaim errors. */
@@ -236,10 +237,12 @@ export class ExportManager {
             }
 
             // If any extractor fell back to software decode AND user had GPU selected, notify the UI
+            let decodeFallbackTriggered = false;
             const decodeFallbackOccurred = Object.values(frameExtractors).some(ext => ext.isSoftwareDecode);
             if (decodeFallbackOccurred) {
                 const userChoseGpu = useUIStore.getState().videoDecodePreference === 'gpu';
                 if (userChoseGpu) {
+                    decodeFallbackTriggered = true;
                     useUIStore.getState().setVideoDecodePreference('cpu');
                     onProgress({ progress: 1, timeRemainingSeconds: null, phase: 'preparing', decodeFallback: true });
                 }
@@ -435,6 +438,7 @@ export class ExportManager {
                     },
                 },
                 videoDecodeMode: usedSoftwareDecode ? 'software' : 'hardware',
+                videoDecodeFallback: decodeFallbackTriggered,
             };
 
         } catch (e) {

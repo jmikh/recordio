@@ -120,7 +120,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode } = await manager.exportProject(project, quality, fps, onProgress, options);
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(project, quality, fps, onProgress, options);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
@@ -138,6 +138,7 @@ export function ExportSettings() {
                 audio_codec: codecs.audio.encoder,
                 audio_codec_fallback: codecs.audio.fallback,
                 video_decode_mode: videoDecodeMode,
+                video_decode_fallback: videoDecodeFallback,
             });
             if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
         } catch (e: any) {
@@ -159,6 +160,7 @@ export function ExportSettings() {
                 audio_codec: 'unknown',
                 audio_codec_fallback: false,
                 video_decode_mode: 'hardware',
+                video_decode_fallback: false,
             });
             addToast({
                 type: 'error',
@@ -214,7 +216,7 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
@@ -262,6 +264,7 @@ export function ExportSettings() {
                 audio_codec: codecs.audio.encoder,
                 audio_codec_fallback: codecs.audio.fallback,
                 video_decode_mode: videoDecodeMode,
+                video_decode_fallback: videoDecodeFallback,
             });
 
             addToast({
@@ -290,6 +293,7 @@ export function ExportSettings() {
                 audio_codec: 'unknown',
                 audio_codec_fallback: false,
                 video_decode_mode: 'hardware',
+                video_decode_fallback: false,
             });
             addToast({
                 type: 'error',
@@ -468,19 +472,19 @@ export function ExportSettings() {
             >
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-text-muted">Video Decoding</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-text-muted shrink-0">Video Decoding</span>
+                            <MultiToggle
+                                options={[
+                                    { value: 'cpu', label: 'CPU' },
+                                    { value: 'gpu', label: 'GPU' },
+                                ]}
+                                value={useUIStore((s) => s.videoDecodePreference)}
+                                onChange={(val) => useUIStore.getState().setVideoDecodePreference(val as 'gpu' | 'cpu')}
+                            />
                         </div>
-                        <MultiToggle
-                            options={[
-                                { value: 'gpu', label: 'GPU' },
-                                { value: 'cpu', label: 'CPU' },
-                            ]}
-                            value={useUIStore((s) => s.videoDecodePreference)}
-                            onChange={(val) => useUIStore.getState().setVideoDecodePreference(val as 'gpu' | 'cpu')}
-                        />
                         <p className="text-[11px] text-text-disabled leading-snug">
-                            GPU is faster on most machines. Switch to CPU if exports fail or stall on older hardware.
+                            Controls how video frames are decoded during export — this has no effect on the final video quality. CPU works best for most machines. GPU may speed things up on high-end hardware, but some browser and OS combinations don't support it reliably. When in doubt, leave it on CPU.
                         </p>
                     </div>
                 </div>
