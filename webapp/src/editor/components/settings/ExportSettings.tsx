@@ -484,7 +484,7 @@ export function ExportSettings() {
                             />
                         </div>
                         <p className="text-[11px] text-text-disabled leading-snug">
-                            Controls how video frames are decoded during export — this has no effect on the final video quality. CPU works best for most machines. GPU may speed things up on high-end hardware, but some browser and OS combinations don't support it reliably. When in doubt, leave it on CPU.
+                            Controls how video frames are decoded during export — <span className="font-semibold text-text-muted">this has no effect on the final video quality.</span> CPU works best for most machines. GPU may speed things up on high-end hardware, but some browser and OS combinations don't support it reliably. When in doubt, leave it on CPU.
                         </p>
                     </div>
                 </div>
