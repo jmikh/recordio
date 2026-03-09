@@ -25,6 +25,7 @@ let mixpanelReady = false;
 
 try {
     mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+        api_host: '/mp',
         autocapture: false,
         record_sessions_percent: 0,
         loaded: () => {

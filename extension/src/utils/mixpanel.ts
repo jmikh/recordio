@@ -6,7 +6,7 @@
  */
 
 const MIXPANEL_TOKEN = '773bc18d036f7f77ec70ec94e7eec508';
-const MIXPANEL_API_URL = 'https://api-js.mixpanel.com/track';
+const MIXPANEL_API_URL = 'https://app.recordio.cc/mp/track';
 const DISTINCT_ID_KEY = 'mixpanel_distinct_id';
 
 const IS_PRODUCTION = import.meta.env.MODE === 'production';
