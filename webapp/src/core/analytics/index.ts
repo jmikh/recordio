@@ -31,10 +31,27 @@ try {
         loaded: () => {
             mixpanelReady = true;
             console.log('[Analytics] Mixpanel initialized successfully');
+            detectBrowser().then(browser => mixpanel.register({ browser }));
         },
     });
 } catch (e) {
     console.error('[Analytics] Mixpanel init failed:', e);
+}
+
+/** Detect actual browser — Chromium forks all report as Chrome in UA */
+async function detectBrowser(): Promise<string> {
+    const ua = navigator.userAgent;
+    try {
+        if (await (navigator as any).brave?.isBrave?.()) return 'Brave';
+    } catch { /* not Brave */ }
+    if (ua.includes('Edg/')) return 'Edge';
+    if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+    if (ua.includes('Vivaldi')) return 'Vivaldi';
+    if (ua.includes('SamsungBrowser')) return 'Samsung Internet';
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
+    if (ua.includes('Chrome')) return 'Chrome';
+    return 'Unknown';
 }
 
 // ============================================================================
