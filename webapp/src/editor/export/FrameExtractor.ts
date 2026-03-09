@@ -64,8 +64,10 @@ export class FrameExtractor {
      * Load the video, pre-read ALL chunks, and configure the decoder.
      * Pre-reading amortizes the WASM worker postMessage overhead into
      * one batch rather than paying ~80ms per chunk during the frame loop.
+     *
+     * @param onProgress Optional callback reporting pre-read progress (0–1).
      */
-    async initialize(): Promise<void> {
+    async initialize(onProgress?: (progress: number) => void): Promise<void> {
         const initStart = performance.now();
 
         this.demuxer = new WebDemuxer({
@@ -82,6 +84,7 @@ export class FrameExtractor {
         const streamInfo = await this.demuxer.getMediaStream('video');
         this.width = streamInfo.width;
         this.height = streamInfo.height;
+        const videoDurationUs = (streamInfo.duration ?? 0) * 1_000_000; // seconds → µs
 
         this.decoderConfig = await this.demuxer.getDecoderConfig('video');
 
@@ -105,6 +108,11 @@ export class FrameExtractor {
                 duration: value.duration ?? 0,
                 data: dataCopy,
             });
+
+            // Report pre-read progress every 50 chunks
+            if (onProgress && videoDurationUs > 0 && this.chunks.length % 50 === 0) {
+                onProgress(Math.min(0.99, value.timestamp / videoDurationUs));
+            }
         }
 
         if (this.chunks.length === 0) {

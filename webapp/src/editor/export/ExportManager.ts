@@ -216,11 +216,19 @@ export class ExportManager {
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'preparing' });
 
             // Initialize frame extractors for screen and camera sources
+            const sourceCount = sources.filter(s => s.runtimeUrl).length;
+            let sourceIndex = 0;
             for (const source of sources) {
                 if (source.runtimeUrl) {
                     const extractor = new FrameExtractor(source.runtimeUrl);
-                    await extractor.initialize();
+                    const si = sourceIndex;
+                    await extractor.initialize((chunkProgress) => {
+                        // Each source gets an equal share of the preparing progress bar
+                        const overallProgress = (si + chunkProgress) / sourceCount;
+                        onProgress({ progress: overallProgress, timeRemainingSeconds: null, phase: 'preparing' });
+                    });
                     frameExtractors[source.id] = extractor;
+                    sourceIndex++;
                 }
             }
 
