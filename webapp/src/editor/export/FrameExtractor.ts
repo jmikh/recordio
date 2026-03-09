@@ -316,7 +316,14 @@ export class FrameExtractor {
                     tags: { component: 'FrameExtractor' },
                     extra: {
                         queueSize: this.decoder.decodeQueueSize,
+                        decoderState: this.decoder.state,
                         rebuildCount: this.rebuildCount,
+                        decodedFrameBuffer: this.decodedFrames.length,
+                        totalChunks: this.chunks.length,
+                        nextChunkIndex: this.nextChunkIndex,
+                        sourceWidth: this.width,
+                        sourceHeight: this.height,
+                        documentVisible: document.visibilityState,
                         userAgent: navigator.userAgent,
                     },
                 });
