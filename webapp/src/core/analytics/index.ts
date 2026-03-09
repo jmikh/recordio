@@ -31,7 +31,7 @@ try {
         loaded: () => {
             mixpanelReady = true;
             console.log('[Analytics] Mixpanel initialized successfully');
-            detectBrowser().then(browser => mixpanel.register({ browser }));
+            detectBrowser().then(browser => mixpanel.register({ real_browser: browser }));
         },
     });
 } catch (e) {
