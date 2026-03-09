@@ -459,6 +459,33 @@ export function ExportSettings() {
                 </div>
             </CollapsibleCard>
 
+            {/* Advanced Export Settings */}
+            <CollapsibleCard
+                title="Advanced"
+                icon={<TbSettings2 size={16} />}
+                isExpanded={useUIStore((s) => s.showCollapsibleAdvancedExport)}
+                onExpandChange={(open: boolean) => useUIStore.getState().setCollapsibleVisibility('showCollapsibleAdvancedExport', open)}
+            >
+                <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-muted">Video Decoding</span>
+                        </div>
+                        <MultiToggle
+                            options={[
+                                { value: 'gpu', label: 'GPU' },
+                                { value: 'cpu', label: 'CPU' },
+                            ]}
+                            value={useUIStore((s) => s.videoDecodePreference)}
+                            onChange={(val) => useUIStore.getState().setVideoDecodePreference(val as 'gpu' | 'cpu')}
+                        />
+                        <p className="text-[11px] text-text-disabled leading-snug">
+                            GPU is faster on most machines. Switch to CPU if exports fail or stall on older hardware.
+                        </p>
+                    </div>
+                </div>
+            </CollapsibleCard>
+
             {/* Modals */}
             <AuthModal
                 isOpen={isAuthModalOpen}

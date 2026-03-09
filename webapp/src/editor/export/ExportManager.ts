@@ -11,6 +11,7 @@ import { FrameExtractor } from './FrameExtractor';
 import { resolveVideoCodec, resolveAudioCodec, getHeightForQuality } from './codecResolver';
 import { renderAudioBuffer, encodeAudioBuffer } from './audioProcessor';
 import type { Project, SourceMetadata } from '../../types';
+import { useUIStore } from '../stores/useUIStore';
 import watermarkPng from '../../assets/watermark.png';
 
 // Re-export types that consumers depend on
@@ -20,6 +21,7 @@ export interface ExportProgress {
     progress: number;
     timeRemainingSeconds: number | null;
     phase?: 'preparing' | 'exporting' | 'uploading';
+    decodeFallback?: boolean;
 }
 
 export interface ExportCodecInfo {
@@ -230,6 +232,16 @@ export class ExportManager {
                     });
                     frameExtractors[source.id] = extractor;
                     sourceIndex++;
+                }
+            }
+
+            // If any extractor fell back to software decode AND user had GPU selected, notify the UI
+            const decodeFallbackOccurred = Object.values(frameExtractors).some(ext => ext.isSoftwareDecode);
+            if (decodeFallbackOccurred) {
+                const userChoseGpu = useUIStore.getState().videoDecodePreference === 'gpu';
+                if (userChoseGpu) {
+                    useUIStore.getState().setVideoDecodePreference('cpu');
+                    onProgress({ progress: 1, timeRemainingSeconds: null, phase: 'preparing', decodeFallback: true });
                 }
             }
 

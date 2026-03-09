@@ -8,6 +8,7 @@ interface ProgressModalProps {
     progress: number;
     statusText: string;
     onCancel: () => void;
+    decodeFallback?: boolean;
 }
 
 export const ProgressModal = ({
@@ -16,7 +17,8 @@ export const ProgressModal = ({
     projectName,
     progress,
     statusText,
-    onCancel
+    onCancel,
+    decodeFallback = false
 }: ProgressModalProps) => {
     const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
 
@@ -52,6 +54,12 @@ export const ProgressModal = ({
                         <span className="text-base flex-shrink-0">⚡</span>
                         <span>Do not switch tab during export for best performance</span>
                     </div>
+                    {decodeFallback && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-muted">
+                            <span className="text-base flex-shrink-0">⚙️</span>
+                            <span>GPU decoding unavailable — using CPU instead. Export may be slower.</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end pt-2">

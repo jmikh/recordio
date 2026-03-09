@@ -58,6 +58,7 @@ function Editor() {
     const exportProgress = useProjectStore(s => s.exportState.progress);
     const timeRemainingSeconds = useProjectStore(s => s.exportState.timeRemainingSeconds);
     const exportPhase = useProjectStore(s => s.exportState.phase);
+    const decodeFallback = useProjectStore(s => s.exportState.decodeFallback);
 
 
     // Initialization State
@@ -397,6 +398,7 @@ function Editor() {
                                 ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
                                 : 'Estimating time...'
                 }
+                decodeFallback={!!decodeFallback}
                 onCancel={() => {
                     const manager = (window as any).__activeExportManager;
                     if (manager) {

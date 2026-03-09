@@ -4,6 +4,8 @@ import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { useProjectStore } from './useProjectStore';
 import type { DisplaySettings } from '../../types/timeline';
 
+const SW_DECODE_KEY = 'recordio:prefer-software-decode';
+
 export const CanvasMode = {
     Preview: 'preview',
     CropEdit: 'cropEdit',
@@ -106,8 +108,14 @@ export interface UIState {
     // -- Audio Settings
     showCollapsibleAudioToggles: boolean;
     showCollapsibleMusic: boolean;
+    // -- Export Advanced
+    showCollapsibleAdvancedExport: boolean;
 
     setCollapsibleVisibility: (key: string, value: boolean) => void;
+
+    // Export decode preference (GPU = hardware, CPU = software)
+    videoDecodePreference: 'gpu' | 'cpu';
+    setVideoDecodePreference: (pref: 'gpu' | 'cpu') => void;
 
     // Track Visibility & Collapse (delegates to ProjectStore timeline.displaySettings)
     setTrackShow: (key: keyof DisplaySettings, visible: boolean) => void;
@@ -335,8 +343,21 @@ export const useUIStore = create<UIState>((set, get) => ({
     // -- Audio Settings
     showCollapsibleAudioToggles: true, // Default expanded
     showCollapsibleMusic: true, // Default expanded
+    // -- Export Advanced
+    showCollapsibleAdvancedExport: false,
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
+
+    // Export decode preference — synced to localStorage
+    videoDecodePreference: localStorage.getItem(SW_DECODE_KEY) === 'true' ? 'cpu' : 'gpu',
+    setVideoDecodePreference: (pref) => {
+        if (pref === 'cpu') {
+            localStorage.setItem(SW_DECODE_KEY, 'true');
+        } else {
+            localStorage.removeItem(SW_DECODE_KEY);
+        }
+        set({ videoDecodePreference: pref });
+    },
 
     // Track Visibility & Collapse (delegates to ProjectStore timeline.displaySettings)
     setTrackShow: (key, visible) => {
