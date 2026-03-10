@@ -220,7 +220,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             priceAmount = priceItem?.unit_amount ?? 0;
             currency = priceItem?.currency ?? 'usd';
             stripeStatus = stripeSub.status;
-            stripePeriodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+            // Post 2025-03-31.basil: current_period_end moved to items.data[]
+            const rawEnd = stripeSub.items?.data?.[0]?.current_period_end ?? stripeSub.current_period_end;
+            stripePeriodEnd = typeof rawEnd === 'number'
+                ? new Date(rawEnd * 1000).toISOString()
+                : new Date(rawEnd).toISOString();
         } catch (err) {
             console.error('[Webhook] Error fetching Stripe subscription details:', err);
         }
@@ -313,7 +317,15 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     const oldPeriodEnd = existingSub.current_period_end;
 
     const newStatus = subscription.status;
-    const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    // Post 2025-03-31.basil: current_period_end moved to items.data[]
+    const rawPeriodEnd = subscription.items?.data?.[0]?.current_period_end ?? subscription.current_period_end;
+    const currentPeriodEnd = typeof rawPeriodEnd === 'number'
+        ? new Date(rawPeriodEnd * 1000)
+        : new Date(rawPeriodEnd);
+    if (isNaN(currentPeriodEnd.getTime())) {
+        console.error('[Webhook] Invalid current_period_end value:', rawPeriodEnd, 'type:', typeof rawPeriodEnd);
+        throw new Error(`Invalid current_period_end: ${rawPeriodEnd}`);
+    }
     const cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
     console.log('[Webhook] Updating subscription:', { status: newStatus, customerId });

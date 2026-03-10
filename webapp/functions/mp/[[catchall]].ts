@@ -3,7 +3,8 @@
  *
  * Routes /mp/* → https://api.mixpanel.com/*
  * Bypasses ad blockers by keeping analytics calls same-origin.
- * Forwards client IP via X-Forwarded-For for geolocation accuracy.
+ * Injects client IP directly into event payloads for geolocation accuracy
+ * (X-Forwarded-For is unreliable through Cloudflare's outbound fetch).
  */
 
 interface CFContext {
@@ -14,34 +15,45 @@ interface CFContext {
 export const onRequest = async (context: CFContext) => {
     const { request, params } = context;
     const path = (params.catchall || []).join('/');
-    const targetUrl = `https://api.mixpanel.com/${path}`;
 
-    // Build forwarded headers, preserving originals
-    const headers = new Headers(request.headers);
-    headers.set('Host', 'api.mixpanel.com');
+    const url = new URL(request.url);
+    const targetUrl = new URL(`https://api.mixpanel.com/${path}`);
+    // Preserve query params (verbose, ip, _ etc.)
+    targetUrl.search = url.search;
 
-    // Forward client IP for Mixpanel geolocation
     const clientIp = request.headers.get('CF-Connecting-IP');
-    if (clientIp) {
-        headers.set('X-Forwarded-For', clientIp);
+
+    // For POST /track requests, inject client IP into event payload
+    let body: BodyInit | undefined;
+    if (request.method === 'POST' && path.startsWith('track') && clientIp) {
+        try {
+            const json = await request.json();
+            const events = Array.isArray(json) ? json : [json];
+            for (const event of events) {
+                if (event.properties) {
+                    event.properties.ip = clientIp;
+                }
+            }
+            body = JSON.stringify(Array.isArray(json) ? events : events[0]);
+        } catch {
+            // If JSON parsing fails, forward body as-is
+            body = request.body ?? undefined;
+        }
+    } else if (request.method !== 'GET' && request.method !== 'HEAD') {
+        body = request.body ?? undefined;
     }
 
-    // Remove Cloudflare-specific headers that Mixpanel doesn't need
-    headers.delete('CF-Connecting-IP');
-    headers.delete('CF-IPCountry');
-    headers.delete('CF-RAY');
-    headers.delete('CF-Visitor');
-
-    const proxyRequest = new Request(targetUrl, {
-        method: request.method,
-        headers,
-        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
-    });
+    const headers = new Headers();
+    headers.set('Content-Type', request.headers.get('Content-Type') || 'application/json');
+    headers.set('Accept', request.headers.get('Accept') || 'text/plain');
 
     try {
-        const response = await fetch(proxyRequest);
+        const response = await fetch(targetUrl.toString(), {
+            method: request.method,
+            headers,
+            body,
+        });
 
-        // Forward response with CORS headers
         const responseHeaders = new Headers(response.headers);
         responseHeaders.set('Access-Control-Allow-Origin', '*');
         responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
