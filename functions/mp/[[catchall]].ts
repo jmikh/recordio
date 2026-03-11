@@ -43,14 +43,14 @@ export const onRequest = async (context: CFContext) => {
     const targetUrl = new URL(`https://api.mixpanel.com/${path}`);
     // Preserve query params (verbose, ip, _ etc.)
     targetUrl.search = url.search;
-    // Don't let Mixpanel use the proxy IP for geo — we inject geo explicitly
-    targetUrl.searchParams.set('ip', '0');
+    // Enable IP-based geo — Mixpanel will use $ip property if present,
+    // falling back to request IP only if $ip is not set.
+    targetUrl.searchParams.set('ip', '1');
 
     const clientIp = request.headers.get('CF-Connecting-IP');
-    const cf = request.cf;
 
-    // For POST /track requests, inject Cloudflare geo properties directly.
-    // request.cf contains geolocation resolved from the real client IP.
+    // For POST /track requests, inject $ip so Mixpanel geolocates
+    // using the real client IP instead of the Cloudflare edge IP.
     // Clone request first — consuming the body is irreversible.
     let body: BodyInit | undefined;
     let contentType = request.headers.get('Content-Type') || 'application/json';
@@ -62,13 +62,8 @@ export const onRequest = async (context: CFContext) => {
             const json = JSON.parse(text);
             const events = Array.isArray(json) ? json : [json];
             for (const event of events) {
-                if (event.properties) {
-                    // Inject real client IP
-                    if (clientIp) event.properties.$ip = clientIp;
-                    // Inject Cloudflare-resolved geo (more accurate than IP geo)
-                    if (cf?.city) event.properties.$city = cf.city;
-                    if (cf?.region) event.properties.$region = cf.region;
-                    if (cf?.country) event.properties.mp_country_code = cf.country;
+                if (event.properties && clientIp) {
+                    event.properties.$ip = clientIp;
                 }
             }
             body = JSON.stringify(Array.isArray(json) ? events : events[0]);
