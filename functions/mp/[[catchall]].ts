@@ -16,6 +16,19 @@ export const onRequest = async (context: CFContext) => {
     const { request, params } = context;
     const path = (params.catchall || []).join('/');
 
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Max-Age': '86400',
+            },
+        });
+    }
+
     const url = new URL(request.url);
     const targetUrl = new URL(`https://api.mixpanel.com/${path}`);
     // Preserve query params (verbose, ip, _ etc.)
@@ -23,11 +36,17 @@ export const onRequest = async (context: CFContext) => {
 
     const clientIp = request.headers.get('CF-Connecting-IP');
 
-    // For POST /track requests, inject client IP into event payload
+    // For POST /track requests, inject client IP into event payload.
+    // Clone request first — request.json() consumes the body stream,
+    // so we need the clone's body as fallback if JSON parsing fails.
     let body: BodyInit | undefined;
+    let contentType = request.headers.get('Content-Type') || 'application/json';
+
     if (request.method === 'POST' && path.startsWith('track') && clientIp) {
+        const cloned = request.clone();
         try {
-            const json = await request.json();
+            const text = await request.text();
+            const json = JSON.parse(text);
             const events = Array.isArray(json) ? json : [json];
             for (const event of events) {
                 if (event.properties) {
@@ -35,16 +54,18 @@ export const onRequest = async (context: CFContext) => {
                 }
             }
             body = JSON.stringify(Array.isArray(json) ? events : events[0]);
+            contentType = 'application/json';
         } catch {
-            // If JSON parsing fails, forward body as-is
-            body = request.body ?? undefined;
+            // JSON parsing failed (e.g. sendBeacon text/plain, form-encoded, etc.)
+            // Forward the cloned body as-is
+            body = cloned.body ?? undefined;
         }
     } else if (request.method !== 'GET' && request.method !== 'HEAD') {
         body = request.body ?? undefined;
     }
 
     const headers = new Headers();
-    headers.set('Content-Type', request.headers.get('Content-Type') || 'application/json');
+    headers.set('Content-Type', contentType);
     headers.set('Accept', request.headers.get('Accept') || 'text/plain');
 
     try {
