@@ -55,6 +55,8 @@ export const onRequest = async (context: CFContext) => {
             }
             body = JSON.stringify(Array.isArray(json) ? events : events[0]);
             contentType = 'application/json';
+            // Tell Mixpanel to use the injected properties.ip for geolocation
+            targetUrl.searchParams.set('ip', '1');
         } catch {
             // JSON parsing failed (e.g. sendBeacon text/plain, form-encoded, etc.)
             // Forward the cloned body as-is
