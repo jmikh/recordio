@@ -8,7 +8,17 @@
  */
 
 interface CFContext {
-    request: Request;
+    request: Request & {
+        cf?: {
+            city?: string;
+            region?: string;
+            regionCode?: string;
+            country?: string;
+            latitude?: string;
+            longitude?: string;
+            timezone?: string;
+        };
+    };
     params: { catchall: string[] };
 }
 
@@ -33,16 +43,19 @@ export const onRequest = async (context: CFContext) => {
     const targetUrl = new URL(`https://api.mixpanel.com/${path}`);
     // Preserve query params (verbose, ip, _ etc.)
     targetUrl.search = url.search;
+    // Don't let Mixpanel use the proxy IP for geo — we inject geo explicitly
+    targetUrl.searchParams.set('ip', '0');
 
     const clientIp = request.headers.get('CF-Connecting-IP');
+    const cf = request.cf;
 
-    // For POST /track requests, inject client IP into event payload.
-    // Clone request first — request.json() consumes the body stream,
-    // so we need the clone's body as fallback if JSON parsing fails.
+    // For POST /track requests, inject Cloudflare geo properties directly.
+    // request.cf contains geolocation resolved from the real client IP.
+    // Clone request first — consuming the body is irreversible.
     let body: BodyInit | undefined;
     let contentType = request.headers.get('Content-Type') || 'application/json';
 
-    if (request.method === 'POST' && path.startsWith('track') && clientIp) {
+    if (request.method === 'POST' && path.startsWith('track')) {
         const cloned = request.clone();
         try {
             const text = await request.text();
@@ -50,16 +63,18 @@ export const onRequest = async (context: CFContext) => {
             const events = Array.isArray(json) ? json : [json];
             for (const event of events) {
                 if (event.properties) {
-                    event.properties.ip = clientIp;
+                    // Inject real client IP
+                    if (clientIp) event.properties.$ip = clientIp;
+                    // Inject Cloudflare-resolved geo (more accurate than IP geo)
+                    if (cf?.city) event.properties.$city = cf.city;
+                    if (cf?.region) event.properties.$region = cf.region;
+                    if (cf?.country) event.properties.mp_country_code = cf.country;
                 }
             }
             body = JSON.stringify(Array.isArray(json) ? events : events[0]);
             contentType = 'application/json';
-            // Tell Mixpanel to use the injected properties.ip for geolocation
-            targetUrl.searchParams.set('ip', '1');
         } catch {
-            // JSON parsing failed (e.g. sendBeacon text/plain, form-encoded, etc.)
-            // Forward the cloned body as-is
+            // JSON parsing failed — forward the cloned body as-is
             body = cloned.body ?? undefined;
         }
     } else if (request.method !== 'GET' && request.method !== 'HEAD') {
