@@ -6,7 +6,10 @@ import { WatchPage } from './pages/WatchPage';
 import { WelcomePage } from './pages/WelcomePage';
 import { UninstallPage } from './pages/UninstallPage';
 import { ToastProvider } from './editor/components/Toast';
+import { initMacBridge } from './bridge/macBridge';
 
+// Initialize Mac native bridge (no-op if not inside WKWebView)
+initMacBridge();
 export function App() {
     const [path, setPath] = useState(window.location.pathname);
 

@@ -11,6 +11,7 @@ import { FrameExtractor } from './FrameExtractor';
 import { resolveVideoCodec, resolveAudioCodec, getHeightForQuality } from './codecResolver';
 import { renderAudioBuffer, encodeAudioBuffer } from './audioProcessor';
 import type { Project, SourceMetadata } from '../../types';
+import { downloadViaNative } from '../../bridge/macBridge';
 import { useUIStore } from '../stores/useUIStore';
 import watermarkPng from '../../assets/watermark.png';
 
@@ -465,7 +466,12 @@ export class ExportManager {
         }
     }
 
-    private downloadBlob(blob: Blob, filename: string) {
+    private async downloadBlob(blob: Blob, filename: string) {
+        // In Mac app: use native save dialog via Swift bridge
+        const sentToNative = await downloadViaNative(blob, filename);
+        if (sentToNative) return;
+
+        // Browser fallback: standard anchor download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

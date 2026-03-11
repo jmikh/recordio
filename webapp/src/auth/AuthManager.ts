@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js';
+import { isRecordioMacApp } from '../bridge/macBridge';
 
 // These will be set via environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -71,12 +72,17 @@ export class AuthManager {
         }
 
         try {
-
+            // In the Mac app, redirect OAuth through the browser → recordio:// URL scheme
+            // so the native app receives the callback and injects the session.
+            // In the browser, redirect back to the current page.
+            const redirectTo = isRecordioMacApp()
+                ? 'recordio://auth-callback'
+                : window.location.href;
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
-                    redirectTo: window.location.href,
+                    redirectTo,
                 },
             });
 

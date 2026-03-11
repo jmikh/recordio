@@ -54,6 +54,7 @@ export class FrameExtractor {
     private rebuildCount = 0;
     private flushed = false;
     private forceSoftware = false;
+    private safariFlushMode = false;
 
     // All chunks pre-read at init
     private chunks: CachedChunk[] = [];
@@ -90,7 +91,14 @@ export class FrameExtractor {
         // can't fetch blob: URLs from the main page.
         const response = await fetch(this.url);
         const blob = await response.blob();
-        const file = new File([blob], 'source.webm', { type: blob.type || 'video/webm' });
+
+        // Detect container format from MIME type — web-demuxer uses the file
+        // extension for format detection (FFmpeg libavformat), so .webm vs .mp4 matters.
+        const mimeType = blob.type || 'video/webm';
+        const isMP4 = mimeType.includes('mp4') || mimeType.includes('quicktime');
+        const fileName = isMP4 ? 'source.mp4' : 'source.webm';
+        console.log(`[FrameExtractor] Blob: ${(blob.size / 1024 / 1024).toFixed(1)}MB, type="${blob.type}", using fileName="${fileName}"`);
+        const file = new File([blob], fileName, { type: mimeType });
         await this.demuxer.load(file);
 
         const streamInfo = await this.demuxer.getMediaStream('video');
@@ -99,6 +107,14 @@ export class FrameExtractor {
         const videoDurationUs = (streamInfo.duration ?? 0) * 1_000_000; // seconds → µs
 
         this.decoderConfig = await this.demuxer.getDecoderConfig('video');
+        console.log(`[FrameExtractor] Decoder config:`, JSON.stringify({
+            codec: this.decoderConfig?.codec,
+            codedWidth: this.decoderConfig?.codedWidth,
+            codedHeight: this.decoderConfig?.codedHeight,
+            hardwareAcceleration: this.decoderConfig?.hardwareAcceleration,
+            hasDescription: !!this.decoderConfig?.description,
+            descriptionLength: this.decoderConfig?.description ? (this.decoderConfig.description as ArrayBuffer).byteLength : 0,
+        }));
 
         // Pre-read all chunks. read('video') returns EncodedVideoChunks with
         // correct µs timestamps from FFmpeg.
@@ -161,7 +177,7 @@ export class FrameExtractor {
             await this.probeHardwareDecode();
         }
 
-        this.createDecoder();
+        await this.createDecoder();
         console.log(`[FrameExtractor] Decoder ready (${this.forceSoftware ? 'software' : 'hardware'})`);
         Sentry.addBreadcrumb({
             category: 'codec',
@@ -221,9 +237,35 @@ export class FrameExtractor {
         }
     }
 
-    private createDecoder(): void {
+    private async createDecoder(): Promise<void> {
         if (!this.decoderConfig) {
             throw new Error('[FrameExtractor] Cannot create decoder — no config available');
+        }
+
+        // Check if the config is actually supported by this browser/env
+        const config = { ...this.decoderConfig };
+        if (this.forceSoftware) {
+            config.hardwareAcceleration = 'prefer-software';
+        }
+
+        try {
+            const support = await VideoDecoder.isConfigSupported(config);
+            console.log(`[FrameExtractor] isConfigSupported:`, JSON.stringify({
+                supported: support.supported,
+                codec: config.codec,
+                codedWidth: config.codedWidth,
+                codedHeight: config.codedHeight,
+                hardwareAcceleration: config.hardwareAcceleration,
+            }));
+            if (!support.supported) {
+                console.error('[FrameExtractor] Decoder config NOT supported! Trying without description...');
+                // Try without description as a fallback
+                delete config.description;
+                const support2 = await VideoDecoder.isConfigSupported(config);
+                console.log(`[FrameExtractor] isConfigSupported (no description):`, support2.supported);
+            }
+        } catch (e) {
+            console.error('[FrameExtractor] isConfigSupported threw:', e);
         }
 
         this.decoder = new VideoDecoder({
@@ -231,14 +273,11 @@ export class FrameExtractor {
                 this.decodedFrames.push(frame);
             },
             error: (e: DOMException) => {
-                console.error('[FrameExtractor] Decoder error:', e.name, e.message);
+                console.error('[FrameExtractor] Decoder error:', e.name, e.message, e);
+                console.error('[FrameExtractor] Decoder state at error:', this.decoder?.state, 'decodedFrames:', this.decodedFrames.length, 'nextChunkIndex:', this.nextChunkIndex);
             }
         });
 
-        const config = { ...this.decoderConfig };
-        if (this.forceSoftware) {
-            config.hardwareAcceleration = 'prefer-software';
-        }
         this.decoder.configure(config);
     }
 
@@ -263,7 +302,7 @@ export class FrameExtractor {
         }
     }
 
-    private rebuildDecoder(targetTimeMs: number): void {
+    private async rebuildDecoder(targetTimeMs: number): Promise<void> {
         this.rebuildCount++;
 
         // On first rebuild, switch to software decode — hardware is unreliable
@@ -301,17 +340,18 @@ export class FrameExtractor {
         this.nextChunkIndex = keyframeIndex;
         this.flushed = false;
 
-        this.createDecoder();
+        await this.createDecoder();
     }
 
     async getFrameAtTime(timeSec: number): Promise<VideoFrame> {
         const timeMs = timeSec * 1000;
 
         if (!this.decoder || (this.decoder.state as string) === 'closed') {
+            console.warn(`[FrameExtractor] getFrameAtTime(${timeMs}ms): decoder is ${this.decoder?.state ?? 'null'}, rebuilding...`);
             if (this.rebuildCount >= MAX_REBUILDS) {
                 throw new Error('[FrameExtractor] Decoder closed — max rebuilds exceeded');
             }
-            this.rebuildDecoder(timeMs);
+            await this.rebuildDecoder(timeMs);
         }
 
         const targetMicros = timeMs * 1000;
@@ -319,38 +359,72 @@ export class FrameExtractor {
         // 1. Evict stale frames BEFORE feeding new ones
         this.evictStaleFrames(targetMicros);
 
-        // 2. Feed chunks up to target + margin (from pre-read array — instant)
-        const feedAheadMicros = (timeMs + FEED_AHEAD_MS) * 1000;
+        // In Safari flush mode, check if the buffer already has frames covering the target.
+        // If so, skip feeding entirely — just pick from the buffer.
+        const bufferCoversTarget = this.safariFlushMode && this.decodedFrames.length > 0 &&
+            this.decodedFrames.some(f => f.timestamp <= targetMicros);
+
         let fed = 0;
 
-        while (this.nextChunkIndex < this.chunks.length) {
-            if ((this.decoder!.state as string) === 'closed') {
-                if (this.rebuildCount >= MAX_REBUILDS) {
-                    throw new Error('[FrameExtractor] Decoder closed during feed — max rebuilds exceeded');
+        if (!bufferCoversTarget) {
+            // 2. Feed chunks up to target + margin
+            const feedAheadMicros = (timeMs + FEED_AHEAD_MS) * 1000;
+
+            // In Safari flush mode, if we need new frames, the decoder was reset by
+            // the previous flush. We must start from a keyframe.
+            if (this.safariFlushMode && this.nextChunkIndex < this.chunks.length &&
+                this.chunks[this.nextChunkIndex].type !== 'key') {
+                // Find keyframe at or before target
+                let keyframeIdx = 0;
+                for (let i = 0; i < this.chunks.length; i++) {
+                    if (this.chunks[i].type === 'key' && this.chunks[i].timestamp <= targetMicros) {
+                        keyframeIdx = i;
+                    }
                 }
-                this.rebuildDecoder(timeMs);
-                fed = 0;
-                continue;
+                this.nextChunkIndex = keyframeIdx;
             }
 
-            const chunk = this.chunks[this.nextChunkIndex];
-            if (chunk.timestamp > feedAheadMicros && fed > 0) break;
-
-            this.decoder!.decode(this.chunkToEncoded(chunk));
-            this.nextChunkIndex++;
-            fed++;
-        }
-
-        // 3. Wait for decoder drain
-        if (fed > 0) {
-            try {
-                await this.awaitDecoderDrain(fed);
-            } catch {
-                if (this.rebuildCount >= MAX_REBUILDS) {
-                    throw new Error('[FrameExtractor] Decoder drain stalled — max rebuilds exceeded');
+            while (this.nextChunkIndex < this.chunks.length) {
+                if ((this.decoder!.state as string) === 'closed') {
+                    console.warn(`[FrameExtractor] Decoder closed during feed at chunk ${this.nextChunkIndex}`);
+                    if (this.rebuildCount >= MAX_REBUILDS) {
+                        throw new Error('[FrameExtractor] Decoder closed during feed — max rebuilds exceeded');
+                    }
+                    await this.rebuildDecoder(timeMs);
+                    fed = 0;
+                    continue;
                 }
-                this.rebuildDecoder(timeMs);
-                return this.getFrameAtTime(timeSec);
+
+                const chunk = this.chunks[this.nextChunkIndex];
+                if (chunk.timestamp > feedAheadMicros && fed > 0) break;
+
+                this.decoder!.decode(this.chunkToEncoded(chunk));
+                this.nextChunkIndex++;
+                fed++;
+            }
+
+            // 3. Wait for decoder drain
+            if (fed > 0) {
+                try {
+                    await this.awaitDecoderDrain(fed);
+                } catch {
+                    if (this.rebuildCount >= MAX_REBUILDS) {
+                        throw new Error('[FrameExtractor] Decoder drain stalled — max rebuilds exceeded');
+                    }
+                    await this.rebuildDecoder(timeMs);
+                    return this.getFrameAtTime(timeSec);
+                }
+            }
+
+            // 3b. Safari/WKWebView: frames only appear after flush().
+            if ((this.decodedFrames.length === 0 && fed > 0) || this.safariFlushMode) {
+                if (fed > 0 && this.decoder && (this.decoder.state as string) !== 'closed') {
+                    await this.decoder.flush();
+                    if (!this.safariFlushMode) {
+                        console.log(`[FrameExtractor] Safari flush mode activated`);
+                        this.safariFlushMode = true;
+                    }
+                }
             }
         }
 
@@ -368,6 +442,19 @@ export class FrameExtractor {
 
         // 6. Pick best frame (latest whose timestamp ≤ target)
         if (this.decodedFrames.length === 0) {
+            console.error(`[FrameExtractor] FAILURE: No decoded frames at ${timeMs}ms. Debug state:`, {
+                totalChunks: this.chunks.length,
+                nextChunkIndex: this.nextChunkIndex,
+                fed,
+                decoderState: this.decoder?.state,
+                decodeQueueSize: this.decoder?.decodeQueueSize,
+                rebuildCount: this.rebuildCount,
+                forceSoftware: this.forceSoftware,
+                firstChunkTs: this.chunks[0]?.timestamp,
+                firstChunkType: this.chunks[0]?.type,
+                width: this.width,
+                height: this.height,
+            });
             throw new Error(
                 `[FrameExtractor] No decoded frames available at ${timeMs.toFixed(0)} ms`
             );
