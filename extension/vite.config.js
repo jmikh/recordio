@@ -38,7 +38,8 @@ export default defineConfig(function (_a) {
         build: __assign({ outDir: resolve(__dirname, 'dist'), minify: mode === 'development' ? false : 'esbuild', sourcemap: mode === 'development', rollupOptions: {
                 input: {
                     offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
-                    controller: resolve(__dirname, 'src/controller/controller.html')
+                    controller: resolve(__dirname, 'src/controller/controller.html'),
+                    cameraFloat: resolve(__dirname, 'src/camera-float/camera-float.html'),
                 },
                 output: {},
             } }, (mode === 'production' && {

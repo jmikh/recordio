@@ -4,6 +4,7 @@ import { MultiToggle, Toggle, Dropdown, Notice } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
 import { BiMicrophone } from 'react-icons/bi';
 import { PiWebcamBold } from 'react-icons/pi';
+import { MdOutlineOpenInNew } from 'react-icons/md';
 
 interface RecordingConfigProps {
     recordingMode: 'tab' | 'window' | 'screen';
@@ -122,6 +123,30 @@ export function RecordingConfig({
                             onChange={setSelectedVideoId}
                         />
                         <CameraPreview stream={videoStream} />
+                        {videoStream && (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        console.log('[popup] Float Camera clicked, deviceId:', selectedVideoId, 'mode:', recordingMode);
+                                        chrome.runtime.sendMessage({
+                                            type: MSG_TYPES.OPEN_CAMERA_FLOAT,
+                                            payload: {
+                                                deviceId: selectedVideoId,
+                                                mode: recordingMode,
+                                            }
+                                        }, (response) => {
+                                            console.log('[popup] Float Camera response:', response, chrome.runtime.lastError);
+                                        });
+                                    }}
+                                    className="interactive-base flex items-center justify-center gap-2 w-full mt-2 py-1.5 text-xs"
+                                    title="Open camera in a floating always-on-top window"
+                                >
+                                    <MdOutlineOpenInNew size={14} />
+                                    Float Camera
+                                </button>
+                                <p className="subtext mt-1" style={{ textAlign: 'center' }}>Allows you to see yourself during recording.</p>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

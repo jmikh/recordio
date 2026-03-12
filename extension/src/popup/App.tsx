@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { captureException } from '../utils/sentry';
 import { MSG_TYPES, STORAGE_KEYS } from '../shared/messageTypes';
 import { RecordingConfig } from './components/RecordingConfig';
@@ -14,6 +14,7 @@ type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number>(0);
   const [recordingMode, setRecordingMode] = useState<'tab' | 'window' | 'screen'>('tab');
 
@@ -42,6 +43,11 @@ function App() {
   // Synced media state (from recording session storage)
   const [recordingHasAudio, setRecordingHasAudio] = useState(false);
   const [recordingHasCamera, setRecordingHasCamera] = useState(false);
+
+  // Keep ref in sync for beforeunload handler
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
 
   // Update recording duration every second
   useEffect(() => {
@@ -117,8 +123,17 @@ function App() {
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
     });
 
+    // 5. Close camera float when popup closes without an active recording
+    const handleBeforeUnload = () => {
+      if (!isRecordingRef.current) {
+        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       chrome.storage.onChanged.removeListener(storageListener);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       // Clean up streams on unmount
       stopStream(audioStream);
       stopStream(videoStream);
@@ -203,6 +218,8 @@ function App() {
       stopStream(videoStream);
       setVideoStream(null);
       setVideoPermission('unknown');
+      // Close float window when camera is toggled off
+      chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
     }
   };
 

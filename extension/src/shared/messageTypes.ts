@@ -52,6 +52,10 @@ export const MSG_TYPES = {
     SHOW_TAB_SWITCH_TOAST: 'SHOW_TAB_SWITCH_TOAST',       // Background -> Content (wrong tab)
     SWITCH_TO_RECORDING_TAB: 'SWITCH_TO_RECORDING_TAB',   // Content -> Background (take me back)
 
+    // Camera Float (PiP)
+    OPEN_CAMERA_FLOAT: 'OPEN_CAMERA_FLOAT',               // Popup -> Background (open float window)
+    CLOSE_CAMERA_FLOAT: 'CLOSE_CAMERA_FLOAT',             // Background -> Camera Float (close)
+
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];
@@ -74,6 +78,7 @@ export interface RecordingState {
     originalTabId: number | null;
     hasAudio: boolean;
     hasCamera: boolean;
+    cameraFloatWindowId: number | null;
 }
 
 // --- Payloads ---

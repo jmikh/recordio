@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/icons/icon128.png" />
+    <title>Recordio Camera</title>
+</head>
+
+<body class="bg-surface-body camera-float-body">
+    <div class="camera-float-video-container" id="videoContainer">
+        <video id="cameraVideo" autoplay muted playsinline></video>
+    </div>
+    <p class="subtext camera-float-note" id="cameraNote"></p>
+
+    <div class="camera-float-bottom">
+        <button class="interactive-primary flex items-center justify-center gap-2 camera-float-btn-pin" id="btnPin">
+            <svg class="camera-float-pip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/><rect x="14" y="14" width="7" height="5" rx="1"/></svg>
+            Keep on Top
+        </button>
+        <span class="camera-float-status" id="status"></span>
+    </div>
+    <script type="module" src="./camera-float.ts"></script>
+</body>
+
+</html>

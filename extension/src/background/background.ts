@@ -37,7 +37,8 @@ const DEFAULT_STATE: RecordingState = {
     mode: null,
     originalTabId: null,
     hasAudio: false,
-    hasCamera: false
+    hasCamera: false,
+    cameraFloatWindowId: null,
 };
 
 let currentState: RecordingState | null = null;
@@ -245,7 +246,45 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // Helper removed, using direct calls.
 
 
-// --- Message Handlers ---
+// --- Camera Float ---
+
+async function openCameraFloat(deviceId: string, mode: string): Promise<number | null> {
+    // If already open, just focus it
+    if (currentState?.cameraFloatWindowId) {
+        try {
+            await chrome.windows.update(currentState.cameraFloatWindowId, { focused: true });
+            return currentState.cameraFloatWindowId;
+        } catch {
+            // Window was closed externally, proceed to create new one
+        }
+    }
+
+    const url = chrome.runtime.getURL(
+        `src/camera-float/camera-float.html?deviceId=${encodeURIComponent(deviceId)}&mode=${encodeURIComponent(mode)}`
+    );
+    const win = await chrome.windows.create({
+        url,
+        type: 'popup',
+        width: 400,
+        height: 340,
+        top: 60,
+        left: (self as any).screen?.availWidth ? (self as any).screen.availWidth - 440 : 100,
+        focused: true,
+    });
+    const windowId = win?.id ?? null;
+    await saveState({ cameraFloatWindowId: windowId });
+    return windowId;
+}
+
+async function closeCameraFloat() {
+    if (currentState?.cameraFloatWindowId) {
+        const id = currentState.cameraFloatWindowId;
+        await saveState({ cameraFloatWindowId: null });
+        // Send close message so the float page can clean up the stream
+        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
+        chrome.windows.remove(id).catch(() => {});
+    }
+}
 
 // --- Message Handlers ---
 
@@ -557,6 +596,9 @@ async function handleStopSession(sendResponse: Function) {
     // Capture the controller ID from state before we wipe the state
     const controllerTabIdToClose = currentState?.controllerTabId;
 
+    // Close camera float window if open
+    await closeCameraFloat();
+
     const stopEventsMsg: BaseMessage = {
         type: MSG_TYPES.STOP_RECORDING_EVENTS,
         payload: { sessionId: finalSessionId }
@@ -654,6 +696,15 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     }
 });
 
+// --- Camera Float Window Removal ---
+// If the float window (chrome.windows popup) is manually closed, clear state (recording continues)
+chrome.windows.onRemoved.addListener(async (windowId) => {
+    await ensureState();
+    if (currentState?.cameraFloatWindowId === windowId) {
+        await saveState({ cameraFloatWindowId: null });
+    }
+});
+
 // --- Tab Switch Detection (Tab Recording) ---
 // When recording a specific tab, detect if user switches to a different tab
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
@@ -699,6 +750,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     chrome.tabs.update(currentState.recordedTabId, { active: true });
                 }
                 break;
+
+            case MSG_TYPES.OPEN_CAMERA_FLOAT: {
+                const { deviceId: floatDeviceId, mode: floatMode } = message.payload || {};
+                if (!floatDeviceId) {
+                    console.error('[background] OPEN_CAMERA_FLOAT missing deviceId');
+                    sendResponse({ success: false, error: 'Missing deviceId' });
+                    break;
+                }
+                openCameraFloat(floatDeviceId, floatMode || 'tab').then(windowId => {
+                    sendResponse({ success: true, windowId });
+                }).catch(err => {
+                    console.error('[background] Failed to open camera float:', err);
+                    sendResponse({ success: false, error: err.message });
+                });
+                break;
+            }
         }
     })();
     return true; // We always return true because of the async wrapper
