@@ -19,7 +19,7 @@ export function isRecordioMacApp(): boolean {
 }
 
 /** Send a message to the Swift native bridge */
-function sendToNative(type: string, payload?: Record<string, any>) {
+export function sendToNative(type: string, payload?: Record<string, any>) {
     if ((window as any).webkit?.messageHandlers?.recordioNative) {
         (window as any).webkit.messageHandlers.recordioNative.postMessage({
             type,

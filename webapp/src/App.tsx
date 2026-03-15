@@ -5,6 +5,7 @@ import { ImportPage } from './pages/ImportPage';
 import { WatchPage } from './pages/WatchPage';
 import { WelcomePage } from './pages/WelcomePage';
 import { UninstallPage } from './pages/UninstallPage';
+import { MacHandoffPage } from './pages/MacHandoffPage';
 import { ToastProvider } from './editor/components/Toast';
 import { initMacBridge } from './bridge/macBridge';
 
@@ -39,6 +40,10 @@ export function App() {
 
         if (path.startsWith('/watch/')) {
             return <WatchPage />;
+        }
+
+        if (path === '/mac-handoff' || path.startsWith('/mac-handoff')) {
+            return <MacHandoffPage />;
         }
 
         // Default to dashboard

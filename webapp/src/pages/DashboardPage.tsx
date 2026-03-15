@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
@@ -19,6 +19,7 @@ import { useToast } from '../editor/components/Toast';
 import { useAuthListener } from '../hooks/useAuthListener';
 import * as Sentry from '@sentry/react';
 import { trackProjectOpened } from '../core/analytics';
+import { importProjectFromZip } from '../storage/projectTransfer';
 
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -38,6 +39,25 @@ export function DashboardPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     useAuthListener();
+    const importInputRef = useRef<HTMLInputElement>(null);
+    const [isImporting, setIsImporting] = useState(false);
+
+    const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsImporting(true);
+        try {
+            const projectId = await importProjectFromZip(file);
+            addToast({ type: 'success', title: 'Project Imported', message: 'Opening project...' });
+            window.location.href = `/editor?projectId=${projectId}`;
+        } catch (err: any) {
+            console.error('Import failed:', err);
+            addToast({ type: 'error', title: 'Import Failed', message: err?.message || 'Invalid archive' });
+        } finally {
+            setIsImporting(false);
+            if (importInputRef.current) importInputRef.current.value = '';
+        }
+    };
 
     const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | 'lifetime' | undefined>();
 
@@ -260,6 +280,24 @@ export function DashboardPage() {
                         <span className="text-xs text-text-muted">
                             · stored on this device{storageUsed != null ? ` · ${formatBytes(storageUsed)}` : ''}
                         </span>
+                        {import.meta.env.DEV && (
+                            <>
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".zip"
+                                    className="hidden"
+                                    onChange={handleImportProject}
+                                />
+                                <button
+                                    onClick={() => importInputRef.current?.click()}
+                                    disabled={isImporting}
+                                    className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
+                                >
+                                    {isImporting ? 'Importing...' : '📦 Import Project'}
+                                </button>
+                            </>
+                        )}
                         {projects.length > 1 && (
                             <button
                                 onClick={() => setShowDeleteAllModal(true)}
