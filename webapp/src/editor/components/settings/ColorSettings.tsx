@@ -211,7 +211,7 @@ export const ColorSettings = ({
             {/* Hex Input */}
             <div className="space-y-1">
                 <div className="text-[10px] text-text-main font-semibold">Hex Color</div>
-                <div className={`flex bg-surface border rounded px-2 py-1.5 items-center gap-2 ${isValidHex(`#${hexInput}`) ? 'border-border' : 'border-red-400'}`}>
+                <div className={`flex bg-surface border rounded px-2 py-1.5 items-center gap-2 ${isValidHex(`#${hexInput}`) ? 'border-border' : 'border-destructive'}`}>
                     <span className="text-text-main mr-2 select-none">#</span>
                     <input
                         type="text"
@@ -230,7 +230,7 @@ export const ColorSettings = ({
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
                 </div>
                 {!isValidHex(`#${hexInput}`) && (
-                    <div className="text-[10px] text-red-400">Invalid hex color</div>
+                    <div className="text-[10px] text-destructive">Invalid hex color</div>
                 )}
             </div>
 

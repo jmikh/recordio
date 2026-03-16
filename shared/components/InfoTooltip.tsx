@@ -86,7 +86,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
             {isHovered &&
                 createPortal(
                     <div
-                        className={`fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float overflow-hidden text-xs text-text-main ${(videoSrc || imageSrc)
+                        className={`fixed z-[999999] bg-surface-raised border border-border rounded-md shadow-float overflow-hidden text-xs text-text-main ${(videoSrc || imageSrc)
                             ? `${dims.px} ${dims.py} flex flex-col items-center`
                             : 'max-w-[280px]'
                             }`}

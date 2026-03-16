@@ -65,7 +65,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, className }) =
                 createPortal(
                     <div
                         ref={clampToViewport}
-                        className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float text-xs text-text-main max-w-[280px] px-3 py-2 pointer-events-none"
+                        className="fixed z-[999999] bg-surface-raised border border-border rounded-md shadow-float text-xs text-text-main max-w-[280px] px-3 py-2 pointer-events-none"
                         style={{
                             left: position.left,
                             top: position.top,

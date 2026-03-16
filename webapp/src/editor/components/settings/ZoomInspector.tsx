@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, Button, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { ZoomSegment } from '../../../types';
 import { TbZoomIn } from 'react-icons/tb';
@@ -156,19 +156,19 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
-                    </button>
-                    <button onClick={handleDeleteAll} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    </Button>
+                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Auto Generate */}
                 {hasTrackableContent && (
-                    <button onClick={() => { resetZooms(); selectZoom(null); }} className="interactive-primary flex items-center justify-center gap-2 text-xs">
+                    <Button variant="primary" size="sm" onClick={() => { resetZooms(); selectZoom(null); }}>
                         <span>Auto Generate Zooms</span>
-                    </button>
+                    </Button>
                 )}
             </div>
         </CollapsibleCard>

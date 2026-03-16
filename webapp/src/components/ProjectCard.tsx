@@ -1,14 +1,38 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { TbLink, TbPencil } from 'react-icons/tb';
 import type { Project } from '../types';
-import { XButton } from '@shared/components';
-import { Tooltip } from '@shared/components/Tooltip';
+import { CardCheckbox } from './CardCheckbox';
+
+function timeAgo(date: Date | string): string {
+    const now = Date.now();
+    const then = new Date(date).getTime();
+    const seconds = Math.floor((now - then) / 1000);
+
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+    const weeks = Math.floor(days / 7);
+    if (weeks < 5) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+    const years = Math.floor(days / 365);
+    return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+}
 
 interface ProjectCardProps {
     project: Project;
     isActive?: boolean;
     variant?: 'sidebar' | 'grid';
     onOpen: (project: Project) => void;
-    onDelete?: (project: Project) => Promise<void>;
+    selectMode?: boolean;
+    selected?: boolean;
+    onSelect?: () => void;
+    isShared?: boolean;
+    onRename?: (newName: string) => void;
 }
 
 export const ProjectCard = ({
@@ -16,46 +40,74 @@ export const ProjectCard = ({
     isActive = false,
     variant = 'sidebar',
     onOpen,
-    onDelete
+    selectMode = false,
+    selected = false,
+    onSelect,
+    isShared = false,
+    onRename
 }: ProjectCardProps) => {
-    const [isDeleting, setIsDeleting] = useState(false);
-
     const isGrid = variant === 'grid';
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(project.name);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    const handleClick = () => {
+        if (isEditing) return;
+        if (selectMode && onSelect) {
+            onSelect();
+        } else {
+            onOpen(project);
+        }
+    };
+
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditName(project.name);
+        setIsEditing(true);
+    };
+
+    const commitRename = () => {
+        const trimmed = editName.trim();
+        setIsEditing(false);
+        if (trimmed && trimmed !== project.name) {
+            onRename?.(trimmed);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            commitRename();
+        } else if (e.key === 'Escape') {
+            setIsEditing(false);
+            setEditName(project.name);
+        }
+    };
 
     return (
         <div
-            onClick={() => !isDeleting && onOpen(project)}
+            id="project-card"
+            onClick={handleClick}
             className={`
-                group relative flex bg-state-inactive flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
+                group relative flex bg-surface-raised flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-[4/3] gap-3' : 'p-3'}
-                ${isActive
-                    ? 'border-border-primary scale-[1.02]'
-                    : 'border-border hover:border-border-hover hover:bg-state-hover hover:scale-[1.01] hover:shadow-lg'
+                ${selectMode && selected
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : isActive
+                        ? 'border-border-primary scale-[1.02]'
+                        : 'border-border hover:border-border-hover  hover:scale-[1.01] hover:shadow-lg'
                 }
             `}
         >
-            {/* Delete Confirmation Overlay */}
-            {onDelete && isDeleting && (
-                <div
-                    className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <p className="text-sm text-text-highlighted mb-1">Deleting is final</p>
-                    <div className="flex space-x-3">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setIsDeleting(false); }}
-                            className="px-3 py-1.5 text-xs text-text-main hover:text-text-highlighted bg-surface-raised hover:bg-surface-overlay rounded-md transition-colors border border-border"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onDelete(project); }}
-                            className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-md shadow-sm transition-colors"
-                        >
-                            Confirm
-                        </button>
-                    </div>
-                </div>
+            {onSelect && (
+                <CardCheckbox selectMode={selectMode} selected={selected} onSelect={onSelect} />
             )}
 
             {/* Thumbnail */}
@@ -95,26 +147,41 @@ export const ProjectCard = ({
             {/* Info */}
             <div className="w-full min-w-0 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-normal truncate pr-2 text-text-highlighted text-sm">
-                        {project.name}
-                    </h3>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-text-muted">{new Date(project.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                    {isEditing ? (
+                        <input
+                            ref={inputRef}
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={handleKeyDown}
+                            onClick={e => e.stopPropagation()}
+                            className="font-normal text-sm text-text-highlighted bg-transparent border-b border-primary outline-none w-full mr-2"
+                        />
+                    ) : (
+                        <div className="flex items-center gap-1 min-w-0 mr-2">
+                            <h3 className="font-normal truncate text-text-highlighted text-sm">
+                                {project.name}
+                            </h3>
+                            {!selectMode && onRename && (
+                                <button
+                                    onClick={handleEditClick}
+                                    className="opacity-0 group-hover:opacity-100 transition-all duration-150 text-text-muted hover:text-text-main hover:scale-125 shrink-0 cursor-pointer"
+                                    title="Rename"
+                                >
+                                    <TbPencil size={13} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {isShared && (
+                            <TbLink size={13} className="text-primary" title="Published" />
+                        )}
+                        <span className="text-xs text-text-muted">{timeAgo(project.createdAt)}</span>
                         {isActive && <span className="chosen-dot"></span>}
                     </div>
                 </div>
             </div>
-
-            {/* Actions (Hover) */}
-            {onDelete && !isDeleting && (
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 z-10">
-                    <Tooltip text="Delete project">
-                        <XButton
-                            onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                        />
-                    </Tooltip>
-                </div>
-            )}
         </div>
     );
 };

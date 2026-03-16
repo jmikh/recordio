@@ -335,7 +335,7 @@ function Editor() {
             <Header />
 
             {showDebugBar && (
-                <div className="bg-surface-overlay border-b border-border flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
+                <div className="bg-surface-raised border-b border-border flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
                     {/* Bottom Row: Debug Tools */}
                     <DebugBar />
                 </div>
@@ -346,12 +346,12 @@ function Editor() {
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <div
                         id="video-player-container"
-                        className="flex-1 flex overflow-hidden relative items-center justify-center bg-surface"
+                        className="flex-1 flex overflow-hidden relative items-center justify-center"
                     >
                         <div
                             id="canvas-sizing-container"
                             ref={setContainerElement}
-                            className="relative flex items-center bg-surface justify-center shadow-2xl"
+                            className="relative flex items-center bg-surface-body justify-center shadow-2xl"
                             style={{
                                 width: '100%',
                                 height: '100%',
@@ -363,7 +363,6 @@ function Editor() {
                             {hasActiveProject && (
                                 <div
                                     id="canvas-rendered-wrapper"
-                                    className="bg-surface"
                                     style={{ position: 'relative', ...renderedStyle }}
                                 >
                                     <CanvasContainer />

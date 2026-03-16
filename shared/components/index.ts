@@ -1,4 +1,5 @@
 // Shared UI Components - Barrel Export
+export { Button } from './Button';
 export { Checkbox } from './Checkbox';
 export { CollapsibleCard } from './CollapsibleCard';
 export type { PreviewItem } from './CollapsibleCard';
@@ -10,9 +11,11 @@ export { LogoLink } from './LogoLink';
 export { Modal } from './Modal';
 export { MultiToggle } from './MultiToggle';
 export { Notice } from './Notice';
+export { ProBadge } from './ProBadge';
 export { ProgressModal } from './ProgressModal';
 export { RangeSlider } from './RangeSlider';
 export { Scrollbar } from './Scrollbar';
 export { Slider } from './Slider';
+export { ThemeToggle } from './ThemeToggle';
 export { Toggle } from './Toggle';
 export { XButton } from './XButton';

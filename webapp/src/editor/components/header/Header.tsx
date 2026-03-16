@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { FaUndo, FaRedo } from 'react-icons/fa';
-import { MdDarkMode, MdLightMode } from 'react-icons/md';
+
 import { BiSupport } from 'react-icons/bi';
 import { TbLink, TbFolder } from 'react-icons/tb';
 
@@ -12,8 +12,8 @@ import { SupportModal } from '../../../components/SupportModal';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
-import { useThemeStore } from '../../../stores/useThemeStore';
-import { LogoLink, Dropdown, type DropdownOption } from '@shared/components';
+
+import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
 import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { useToast } from '../Toast';
@@ -43,7 +43,7 @@ export const Header = () => {
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const { isAuthenticated, hasProAccess } = useUserStore();
-    const { theme, setTheme } = useThemeStore();
+
     const { addToast } = useToast();
 
     const project = useProjectData();
@@ -100,33 +100,33 @@ export const Header = () => {
     };
 
     return (
-        <div id="editor-header" className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none" style={{ boxShadow: 'var(--shadow-panel)' }}>
+        <div id="editor-header" className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
                     <LogoLink className="mr-2" imgClassName="h-7" />
                     {hasProAccess() && (
-                        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase -ml-3">Pro</span>
+                        <ProBadge className="-ml-3" />
                     )}
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
-                        <button
+                        <Button
+                            variant="icon"
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                            className="interactive-icon"
                         >
                             <FaUndo size={14} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="icon"
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                            className="interactive-icon"
                         >
                             <FaRedo size={14} />
-                        </button>
+                        </Button>
                         {false && <span className="text-[10px] text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>}
@@ -136,13 +136,15 @@ export const Header = () => {
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 
-                            {<button
+                            {<Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => useUIStore.getState().toggleDebugBar()}
                                 title="Toggle Debug Bar"
-                                className="interactive-ghost px-2 py-1 h-auto text-[10px]"
+                                className="px-2 py-1 h-auto"
                             >
                                 Debug
-                            </button>}
+                            </Button>}
                         </>
                     )}
                 </div>
@@ -176,26 +178,20 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <button onClick={() => window.location.href = '/'} title="Dashboard" className="interactive-icon">
+                        <Button variant="icon" onClick={() => window.location.href = '/'} title="Dashboard">
                             <TbFolder size={18} />
-                        </button>
-                        <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-icon">
+                        </Button>
+                        <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
                             <BiSupport size={18} />
-                        </button>
-                        <button
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                            className="interactive-icon"
-                        >
-                            {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                        </button>
+                        </Button>
+                        <ThemeToggle />
                     </div>
                     {isAuthenticated ? (
                         <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                     ) : (
-                        <button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features" className="interactive-ghost flex items-center justify-center gap-2">
+                        <Button variant="ghost" onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
                             Sign In
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -249,7 +245,7 @@ function ShareLinkButton({ onClick, snapshotDate }: { onClick: () => void; snaps
 
             {isHovered && createPortal(
                 <div
-                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 pointer-events-none flex flex-col items-center gap-1"
+                    className="fixed z-[999999] bg-surface-raised border border-border rounded-md px-3 py-2 pointer-events-none flex flex-col items-center gap-1"
                     style={{
                         left: position.left,
                         top: position.top,

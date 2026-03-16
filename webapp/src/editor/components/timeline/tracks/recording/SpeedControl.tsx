@@ -48,7 +48,7 @@ export const SpeedControl: React.FC<SpeedControlProps> = ({
     return createPortal(
         <div
             ref={popoverRef}
-            className="fixed z-[9999] bg-surface-overlay border border-border rounded shadow-xl p-1 flex flex-col min-w-[120px]"
+            className="fixed z-[9999] bg-surface-raised border border-border rounded shadow-xl p-1 flex flex-col min-w-[120px]"
             style={{
                 bottom: `${window.innerHeight - rect.top + 8}px`,
                 left: `${rect.left}px`,

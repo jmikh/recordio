@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
-import { Slider } from '@shared/components';
+import { Slider, Button } from '@shared/components';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
@@ -93,7 +93,7 @@ export const TimelineToolbar: React.FC = () => {
 
 
     return (
-        <div className="h-10 flex items-center px-4 p-4 bg-surface  border-b border-border-selected shrink-0 justify-between">
+        <div className="h-10 flex items-center px-4 p-4 bg-surface-raised rounded-xl border border-border shrink-0 justify-between m-1">
             <div className="flex items-center gap-3">
                 <button
                     onClick={onTogglePlay}
@@ -116,19 +116,21 @@ export const TimelineToolbar: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={handleFit}
-                    className="interactive-ghost flex items-center justify-center gap-2 px-2 py-0.5 text-[10px]"
+                    className="px-2 py-0.5"
                     title="Fit timeline to screen"
                 >
                     Fit
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="icon"
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                    className="interactive-icon"
                 >
                     <MdRemove size={14} />
-                </button>
+                </Button>
                 <div className="w-24">
                     <Slider
                         value={pixelsPerSec}
@@ -139,12 +141,12 @@ export const TimelineToolbar: React.FC = () => {
                         onPointerUp={batcher.endInteraction}
                     />
                 </div>
-                <button
+                <Button
+                    variant="icon"
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                    className="interactive-icon"
                 >
                     <MdAdd size={14} />
-                </button>
+                </Button>
             </div>
         </div>
     );

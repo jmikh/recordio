@@ -78,11 +78,10 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     return (
         <div
             className={`
-                bg-surface rounded-lg
+                bg-surface rounded-lg border border-border
                 overflow-hidden
                 ${className}
             `}
-            style={{ boxShadow: 'var(--shadow-card)' }}
         >
             {/* Header - Always visible */}
             <button

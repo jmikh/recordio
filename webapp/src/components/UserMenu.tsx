@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
+import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
 import { StripeService } from '../editor/stripe/StripeService';
@@ -103,9 +104,9 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                             <span className="text-xs text-text-muted">Status</span>
                             <div className="flex items-center justify-between">
                                 {isPro ? (
-                                    <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">Pro</span>
+                                    <ProBadge />
                                 ) : (
-                                    <span className="bg-text-disabled text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">Free</span>
+                                    <ProBadge variant="free" />
                                 )}
                                 {subscription.billingInterval === 'lifetime' && isPro && (
                                     <span className="text-[11px] text-text-muted">Lifetime</span>
@@ -149,7 +150,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
 
                         <button
                             onClick={handleSignOut}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:text-red-400 hover:bg-red-900/10 rounded-md transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors text-left"
                         >
                             <FaSignOutAlt size={14} />
                             Sign Out

@@ -120,7 +120,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const popoverContent = (
         <div
             ref={menuRef}
-            className="bg-surface-overlay border border-border rounded-lg shadow-float py-3 px-4"
+            className="bg-surface-raised border border-border rounded-lg shadow-float py-3 px-4"
             style={menuStyle}
         >
             {/* Header */}

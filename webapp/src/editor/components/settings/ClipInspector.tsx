@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useToast } from '../Toast';
-import { Slider, Tooltip, CollapsibleCard, Checkbox } from '@shared/components';
+import { Slider, Tooltip, CollapsibleCard, Checkbox, Button } from '@shared/components';
 import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import type { OutputWindow } from '../../../types';
@@ -163,35 +163,37 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
                 <div className="flex flex-col gap-2 pt-2 border-t border-border">
                     {isLastWindow ? (
                         <Tooltip text="Cannot delete the only remaining clip">
-                            <button disabled className="interactive-base flex items-center justify-center gap-2 text-xs w-full opacity-50">
-                                <span>Delete Clip</span>
-                            </button>
+                            <Button disabled size="sm" fullWidth className="opacity-50">
+                            <span>Delete Clip</span>
+                        </Button>
                         </Tooltip>
                     ) : (
-                        <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 text-xs w-full text-danger hover:text-danger">
+                        <Button onClick={handleDelete} size="sm" fullWidth className="text-danger hover:text-danger">
                             <span>Delete Clip</span>
-                        </button>
+                        </Button>
                     )}
 
                     {/* Reset */}
                     <Tooltip text="Resets the timeline to one full clip">
-                        <button onClick={handleReset} disabled={isAlreadyReset} className={`interactive-base flex items-center justify-center gap-2 text-xs w-full ${isAlreadyReset ? 'opacity-50' : ''}`}>
+                        <Button onClick={handleReset} disabled={isAlreadyReset} size="sm" fullWidth className={isAlreadyReset ? 'opacity-50' : ''}>
                             <span>Reset</span>
-                        </button>
+                        </Button>
                     </Tooltip>
                 </div>
 
                 {/* AutoCut */}
                 {showAutoCut && (
                     <Tooltip text="Remove silent and inactive segments from the entire recording">
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            fullWidth
                             onClick={handleAutoCut}
                             disabled={isAnalyzing}
-                            className="interactive-primary flex items-center justify-center gap-2 text-xs w-full"
                         >
                             <HiSparkles size={14} />
                             <span>AutoCut</span>
-                        </button>
+                        </Button>
                     </Tooltip>
                 )}
             </div>

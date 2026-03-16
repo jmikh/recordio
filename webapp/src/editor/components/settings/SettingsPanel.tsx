@@ -203,10 +203,10 @@ export const SettingsPanel = () => {
             </nav>
 
             {/* Content Area */}
-            <div id="settings-content" className="w-72 flex flex-row relative h-full bg-surface-raised">
+            <div id="settings-content" className="w-72 flex flex-row relative h-full bg-surface-body">
                 <div
                     ref={setScrollContainer}
-                    className="p-4 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
+                    className="p-2 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"
                 >
                     {hasSelection ? (
                         <>
@@ -245,7 +245,7 @@ export const SettingsPanel = () => {
             {/* Disabled tab tooltip - rendered via portal */}
             {hoveredDisabledTab && createPortal(
                 <div
-                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float px-3 py-2 text-xs text-text-main whitespace-nowrap"
+                    className="fixed z-[999999] bg-surface-raised border border-border rounded-md shadow-float px-3 py-2 text-xs text-text-main whitespace-nowrap"
                     style={{
                         left: tooltipPosition.left,
                         top: tooltipPosition.top,

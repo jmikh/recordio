@@ -435,7 +435,7 @@ export const BackgroundSettings = () => {
                 {showColorPopover && createPortal(
                     <div
                         ref={popoverRef}
-                        className="fixed z-[9999] bg-surface-overlay border border-border rounded-lg shadow-lg"
+                        className="fixed z-[9999] bg-surface-raised border border-border rounded-lg shadow-lg"
                         style={{ top: popoverPos.top, left: popoverPos.left }}
                     >
                         <ColorSettings

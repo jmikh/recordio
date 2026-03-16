@@ -150,7 +150,7 @@ export const CaptionBlock: React.FC<CaptionBlockProps> = ({
             {/* Tooltip — portal-rendered to escape stacking contexts */}
             {isHovered && !isSelected && text && createPortal(
                 <div
-                    className="fixed z-[999999] bg-surface-overlay border border-border rounded-md shadow-float text-xs text-text-main max-w-[280px] px-3 py-2 pointer-events-none"
+                    className="fixed z-[999999] bg-surface-raised border border-border rounded-md shadow-float text-xs text-text-main max-w-[280px] px-3 py-2 pointer-events-none"
                     style={{
                         left: tooltipPos.left,
                         top: tooltipPos.top,

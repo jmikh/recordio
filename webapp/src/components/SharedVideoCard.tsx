@@ -3,18 +3,19 @@ import { TbEye, TbLink, TbExternalLink } from 'react-icons/tb';
 import type { SharedVideo, VideoAnalytics } from '../editor/services/ShareService';
 import { ShareService } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
-import { XButton } from '@shared/components/XButton';
 import { Tooltip } from '@shared/components/Tooltip';
+import { CardCheckbox } from './CardCheckbox';
 
 interface SharedVideoCardProps {
     video: SharedVideo;
     localProjectExists: boolean;
     analytics?: VideoAnalytics;
-    onUnshare: (video: SharedVideo) => void;
+    selectMode?: boolean;
+    selected?: boolean;
+    onSelect?: () => void;
 }
 
-export const SharedVideoCard = ({ video, localProjectExists, analytics, onUnshare }: SharedVideoCardProps) => {
-    const [isUnsharing, setIsUnsharing] = useState(false);
+export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMode = false, selected = false, onSelect }: SharedVideoCardProps) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const { addToast } = useToast();
 
@@ -44,40 +45,27 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, onUnshar
         setIsPlaying(true);
     };
 
-    return (
-        <div className="group relative flex flex-col rounded-xl transition-all border overflow-hidden p-4 gap-3 bg-state-inactive border-border hover:border-border-hover hover:bg-state-hover hover:scale-[1.01] hover:shadow-lg">
-            {/* Delist X button — top right */}
-            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Tooltip text="Delist video">
-                    <XButton
-                        onClick={(e) => { e.stopPropagation(); setIsUnsharing(true); }}
-                    />
-                </Tooltip>
-            </div>
+    const handleClick = () => {
+        if (selectMode && onSelect) {
+            onSelect();
+        }
+    };
 
-            {/* Delist Confirmation Overlay */}
-            {isUnsharing && (
-                <div
-                    className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <p className="text-sm text-text-highlighted mb-1">Remove shared link?</p>
-                    <p className="text-xs text-text-muted mb-3">This will permanently delete the shared video</p>
-                    <div className="flex space-x-3">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setIsUnsharing(false); }}
-                            className="px-3 py-1.5 text-xs text-text-main hover:text-text-highlighted bg-surface-raised hover:bg-surface-overlay rounded-md transition-colors border border-border"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onUnshare(video); }}
-                            className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-md shadow-sm transition-colors"
-                        >
-                            Delist
-                        </button>
-                    </div>
-                </div>
+    return (
+        <div
+            id="published-video-card"
+            onClick={handleClick}
+            className={`
+                group relative flex flex-col rounded-xl transition-all border overflow-hidden p-4 gap-3 bg-surface-raised
+                ${selectMode && selected
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-border hover:border-border-hover hover:scale-[1.01] hover:shadow-lg'
+                }
+                ${selectMode ? 'cursor-pointer' : ''}
+            `}
+        >
+            {onSelect && (
+                <CardCheckbox selectMode={selectMode} selected={selected} onSelect={onSelect} />
             )}
 
             {/* Video Preview */}
@@ -136,43 +124,41 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, onUnshar
             </div>
 
             {/* Action buttons */}
-            {!isUnsharing && (
-                <div className="flex flex-col gap-2 pt-1 border-t border-border">
-                    <div className="flex items-center gap-1">
-                        {localProjectExists ? (
-                            <button
-                                onClick={openProject}
-                                title="Open project in editor"
-                                className="px-2 py-1 text-xs text-text-main hover:text-primary transition-colors rounded"
-                            >
-                                Open Project
-                            </button>
-                        ) : (
-                            <span className="px-2 py-1 text-xs text-text-muted">
-                                Project not found
-                            </span>
-                        )}
-                        <div className="flex-1" />
-                        <Tooltip text="Copy share link">
-                            <button
-                                onClick={copyLink}
-                                className="interactive-icon"
-                            >
-                                <TbLink size={14} />
-                            </button>
-                        </Tooltip>
-                        <Tooltip text="Open watch page">
-                            <button
-                                onClick={openWatchPage}
-                                className="interactive-icon"
-                            >
-                                <TbExternalLink size={14} />
-                            </button>
-                        </Tooltip>
+            <div className="flex flex-col gap-2 pt-1 border-t border-border">
+                <div className="flex items-center gap-1">
+                    {localProjectExists ? (
+                        <button
+                            onClick={openProject}
+                            title="Open project in editor"
+                            className="px-2 py-1 text-xs text-text-main hover:text-primary transition-colors rounded"
+                        >
+                            Open In Editor
+                        </button>
+                    ) : (
+                        <span className="px-2 py-1 text-xs text-text-muted">
+                            Project not found
+                        </span>
+                    )}
+                    <div className="flex-1" />
+                    <Tooltip text="Copy share link">
+                        <button
+                            onClick={copyLink}
+                            className="interactive-icon"
+                        >
+                            <TbLink size={14} />
+                        </button>
+                    </Tooltip>
+                    <Tooltip text="Open watch page">
+                        <button
+                            onClick={openWatchPage}
+                            className="interactive-icon"
+                        >
+                            <TbExternalLink size={14} />
+                        </button>
+                    </Tooltip>
 
-                    </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 };

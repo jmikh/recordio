@@ -18,7 +18,7 @@ export const LinkToggle: React.FC<LinkToggleProps> = ({ linked, onToggle }) => {
                 e.stopPropagation();
                 onToggle(!linked);
             }}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded shadow-md border transition-colors bg-surface-overlay/90 border-border/50 hover:bg-surface-overlay"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded shadow-md border transition-colors bg-surface-raised/90 border-border/50 hover:bg-surface-raised"
             title={linked ? 'Unlink corners (edit independently)' : 'Link corners (edit together)'}
             style={{ pointerEvents: 'auto' }}
         >

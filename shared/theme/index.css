@@ -14,8 +14,6 @@
    --color-surface-body: var(--surface-body);
    --color-surface: var(--surface-default);
    --color-surface-raised: var(--surface-raised);
-   --color-surface-overlay: var(--surface-overlay);
-   --color-surface-inset: var(--surface-inset);
 
    /* ─────────────────────────────────────────────────────────
      Interactive State Overlays
@@ -78,11 +76,6 @@
    --color-text-on-secondary: var(--text-on-secondary);
 
    /* ─────────────────────────────────────────────────────────
-     Focus Ring
-     ───────────────────────────────────────────────────────── */
-   --color-ring: var(--ring-color);
-
-   /* ─────────────────────────────────────────────────────────
      Shadows - Centralized for Tailwind utilities
      Use: shadow-sm, shadow-button, shadow-card, shadow-panel, shadow-segment, shadow-float
      ───────────────────────────────────────────────────────── */
@@ -139,11 +132,6 @@
    --tertiary-muted: oklch(0.55 0.12 var(--hue-tertiary));
    --tertiary-highlighted: oklch(0.72 0.20 var(--hue-tertiary));
 
-   /* Focus Ring */
-   --ring-color: oklch(0.65 0.22 var(--hue-secondary));
-   --ring-width: 2px;
-   --ring-offset: 2px;
-
    /* Semantic States */
    --destructive: oklch(0.65 0.25 25);
    --success: oklch(0.70 0.18 155);
@@ -163,12 +151,10 @@
       LIGHT THEME TOKENS (Default)
       ============================================================ */
 
-   /* Surfaces - Creamy off-white */
-   --surface-body: oklch(0.93 0.015 75);
-   --surface-default: oklch(0.96 0.012 75);
-   --surface-raised: oklch(0.98 0.008 75);
-   --surface-overlay: oklch(97.364% 0.01569 73.569);
-   --surface-inset: oklch(0.96 0.012 75);
+   /* Surfaces - Subtle primary-tinted off-white */
+   --surface-body: oklch(97% 0.005 var(--hue-secondary));
+   --surface-default: oklch(99% 0.005 var(--hue-secondary));
+   --surface-raised: oklch(100% 0.005 var(--hue-secondary));
 
    /* Interactive State Overlays - Black transparency */
    --state-inactive: oklch(0 0 0 / 3%);
@@ -177,8 +163,8 @@
    --state-disabled: oklch(0 0 0 / 2%);
 
    /* Borders - Black transparency */
-   --border-default: oklch(0 0 0 / 6%);
-   --border-hover: oklch(0 0 0 / 12%);
+   --border-default: oklch(86% 0 270);
+   --border-hover: oklch(81% 0 270);
    --border-selected: oklch(0 0 0 / 18%);
 
    /* Text Colors - Dark */
@@ -195,12 +181,10 @@
    DARK THEME TOKENS (Overrides light theme tokens)
    ============================================================ */
 .dark {
-   /* Surfaces - Deep grays */
-   --surface-body: oklch(0.10 0.01 270);
-   --surface-default: oklch(0.17 0.012 270);
-   --surface-raised: oklch(0.25 0.014 270);
-   --surface-overlay: oklch(0.30 0.016 270);
-   --surface-inset: oklch(0.17 0.012 270);
+   /* Surfaces - Subtle primary-tinted deep grays */
+   --surface-body: oklch(0.10 0.02 var(--hue-primary));
+   --surface-default: oklch(0.18 0.02 var(--hue-primary));
+   --surface-raised: oklch(0.25 0.02 var(--hue-primary));
 
    /* Interactive State Overlays - Original values */
    --state-disabled: oklch(1 0 0 / 1%);
@@ -209,9 +193,9 @@
    --state-active: oklch(1 0 0 / 12%);
 
    /* Borders - Original values */
-   --border-default: oklch(1 0 0 / 6%);
-   --border-hover: oklch(1 0 0 / 12%);
-   --border-selected: oklch(1 0 0 / 18%);
+   --border-default: oklch(30% 0 271.152);
+   --border-hover: oklch(40% 0 0);
+   --border-selected: oklch(50% 0 0);
 
    /* Text Colors - Original values */
    --text-highlighted: oklch(0.98 0 0);
@@ -243,27 +227,14 @@ body,
    ============================================================ */
 @layer components {
 
-   /* Standard Panel */
-   .panel-base {
-      @apply bg-surface border border-border rounded-md text-text-highlighted;
-      box-shadow: var(--shadow-panel);
-   }
-
-   /* Interactive Item */
-   .item-interactive {
-      @apply hover:bg-state-hover transition-colors cursor-pointer;
-   }
-
    /* Interactive Base - for buttons, dropdowns, and other clickable controls */
    .interactive-base {
-      @apply h-9 px-3 bg-state-inactive border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-state-inactive disabled:hover:text-text-main;
-      box-shadow: var(--shadow-button);
+      @apply h-9 px-3 border border-border rounded-[var(--radius-interactive)] text-sm text-text-main hover:border-border-hover hover:bg-state-hover hover:text-text-highlighted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-state-inactive disabled:hover:text-text-main;
    }
 
    /* Interactive Primary - primary-colored variant */
    .interactive-primary {
-      @apply h-9 px-3 bg-primary border border-border rounded-[var(--radius-interactive)] text-sm text-text-on-primary font-medium hover:bg-primary-highlighted transition-colors cursor-pointer disabled:cursor-default disabled:opacity-70 disabled:hover:bg-primary;
-      box-shadow: var(--shadow-button);
+      @apply h-9 px-3 bg-primary border border-border rounded-[var(--radius-interactive)] text-sm text-text-on-primary font-medium hover:border-border-hover hover:bg-primary-highlighted transition-colors cursor-pointer disabled:cursor-default disabled:opacity-70 disabled:hover:bg-primary;
    }
 
    /* Interactive Ghost - borderless, backgroundless variant for subtle toolbar actions */
@@ -287,6 +258,12 @@ body,
       transform: none;
    }
 
+   /* Interactive Destructive - for dangerous/irreversible actions */
+   .interactive-destructive {
+      @apply h-9 px-3 bg-destructive border border-destructive rounded-[var(--radius-interactive)] text-sm text-white font-medium hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default;
+      box-shadow: var(--shadow-button);
+   }
+
    /* Interactive Selected State - secondary border with glow */
    .interactive-selected {
       @apply border-secondary;
@@ -299,36 +276,10 @@ body,
       box-shadow: 0 0 5px var(--primary);
    }
 
-   /* Primary Button */
-   .btn-primary {
-      @apply bg-primary text-primary-fg px-4 py-2 rounded-md font-medium transition-colors;
-   }
-
-   .btn-primary:hover {
-      @apply bg-primary-highlighted;
-   }
-
-   .btn-primary:disabled {
-      @apply bg-primary-disabled text-text-disabled;
-   }
-
-   /* Focus Ring Utility */
+   /* Focus Ring Utility (shadcn-style: 1px, tight to border) */
    .focus-ring:focus-visible {
-      outline: 2px solid transparent;
-      /* High contrast fallback */
-      outline-offset: var(--ring-offset);
-      box-shadow:
-         0 0 0 var(--ring-offset) var(--surface-body),
-         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
-   }
-
-   /* Active Ring Utility - always visible when applied */
-   .ring-active {
-      outline: 2px solid transparent;
-      outline-offset: var(--ring-offset);
-      box-shadow:
-         0 0 0 var(--ring-offset) var(--surface-body),
-         0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-color);
+      outline: none;
+      box-shadow: 0 0 0 2px var(--state-active);
    }
 
    /* Hide Scrollbar */
@@ -393,28 +344,6 @@ body,
 /* ============================================================
    Animations (Retained)
    ============================================================ */
-@keyframes flashing-glow {
-   0% {
-      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
-      border-color: oklch(from var(--primary) l c h / 80%);
-   }
-
-   50% {
-      box-shadow: inset 0 0 20px oklch(from var(--primary) l c h / 90%);
-      border-color: var(--primary);
-   }
-
-   100% {
-      box-shadow: inset 0 0 5px oklch(from var(--primary) l c h / 50%);
-      border-color: oklch(from var(--primary) l c h / 80%);
-   }
-}
-
-.bounding-box-glow {
-   animation: flashing-glow 1.5s infinite ease-in-out;
-   border: 2px solid var(--primary);
-}
-
 /* Canvas Editor Glow - Secondary color border for edit modes */
 .canvas-editor-glow {
    box-shadow: 0 0 0 2px var(--secondary),

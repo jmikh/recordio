@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, CollapsibleCard, MultiToggle, Toggle, InfoTooltip, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, CollapsibleCard, MultiToggle, Toggle, InfoTooltip, Button, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { CameraMoveSegment } from '../../../types';
 import { PiWebcamBold } from 'react-icons/pi';
@@ -122,13 +122,15 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
                         />
 
                         {/* Fill Screen */}
-                        <button
+                        <Button
                             onClick={handleFillScreen}
-                            className="interactive-base flex items-center justify-center gap-1.5 w-full text-xs text-text-muted hover:text-text"
+                            size="sm"
+                            fullWidth
+                            className="text-text-muted hover:text-text"
                         >
                             <RxEnterFullScreen size={14} />
                             <span>Fill Screen</span>
-                        </button>
+                        </Button>
                     </>
                 )}
 
@@ -164,12 +166,12 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
-                    </button>
-                    <button onClick={handleDeleteAll} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    </Button>
+                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
-                    </button>
+                    </Button>
                 </div>
             </div>
         </CollapsibleCard >

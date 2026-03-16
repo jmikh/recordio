@@ -161,10 +161,19 @@ export function drawScreen(
 
             const renderBorderWidth = borderWidth;
 
+            // Outset rect so the border stroke sits entirely OUTSIDE the content
+            const halfBW = renderBorderWidth / 2;
+            const borderOutsetRect: Rect = {
+                x: contentRect.x - halfBW,
+                y: contentRect.y - halfBW,
+                width: contentRect.width + renderBorderWidth,
+                height: contentRect.height + renderBorderWidth
+            };
+
             // --- PASS 1: GLOW ---
             if (hasGlow) {
                 ctx.save();
-                defineScreenPath(ctx, contentRect, borderRadius);
+                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
                 ctx.shadowColor = borderColor;
                 ctx.shadowBlur = glowBlur;
                 ctx.fillStyle = borderColor;
@@ -181,7 +190,7 @@ export function drawScreen(
             // --- PASS 2: SHADOW ---
             if (hasShadow) {
                 ctx.save();
-                defineScreenPath(ctx, contentRect, borderRadius);
+                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
                 ctx.shadowColor = SHADOW_COLOR;
                 ctx.shadowBlur = shadowBlur;
                 ctx.shadowOffsetY = shadowOffsetY;
@@ -226,7 +235,7 @@ export function drawScreen(
             // --- PASS 4: BORDER ---
             if (renderBorderWidth > 0) {
                 ctx.save();
-                defineScreenPath(ctx, contentRect, borderRadius);
+                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
                 ctx.lineWidth = renderBorderWidth;
                 ctx.strokeStyle = borderColor;
                 ctx.stroke();

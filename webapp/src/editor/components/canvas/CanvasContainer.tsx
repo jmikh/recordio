@@ -367,7 +367,7 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.CameraMoveEdit;
 
     return (
-        <div id="canvas-container" className={`relative w-full h-full bg-surface flex items-center justify-center p-2`}>
+        <div id="canvas-container" className={`relative w-full h-full flex items-center justify-center p-2`}>
 
             {/* ASPECT RATIO WRAPPER */}
             <div
@@ -378,7 +378,7 @@ export const CanvasContainer = () => {
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     maxHeight: '100%',
                     maxWidth: '100%',
-                    boxShadow: !isEditorMode ? '0 0 0 2px var(--primary)' : undefined
+                    boxShadow: !isEditorMode ? '0 0 0 1px var(--text-disabled)' : undefined
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}

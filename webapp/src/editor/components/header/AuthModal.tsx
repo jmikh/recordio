@@ -54,7 +54,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <div className="space-y-4">
                 {/* Error Message */}
                 {error && (
-                    <div className="bg-red-900/20 border border-red-500/50 text-red-400 px-3 py-2 rounded-sm text-xs">
+                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs">
                         {error}
                     </div>
                 )}
@@ -64,10 +64,10 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 font-medium rounded-sm border border-gray-300 transition-colors disabled:opacity-50 group"
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50 group"
                 >
                     {loading ? (
-                        <div className="h-4 w-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin"></div>
+                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
                     ) : (
                         <FcGoogle className="group-hover:scale-110 transition-transform" size={20} />
                     )}

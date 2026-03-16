@@ -23,7 +23,7 @@
     padding: 14px 16px;
     min-width: 320px;
     max-width: 420px;
-    background: var(--surface-overlay);
+    background: var(--surface-raised);
     border: 1px solid var(--border-default);
     border-radius: 12px;
     box-shadow: 0 8px 32px oklch(0% 0 0 / 0.3);

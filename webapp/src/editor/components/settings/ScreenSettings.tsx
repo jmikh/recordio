@@ -38,12 +38,8 @@ export const ScreenSettings = () => {
     // Build preview items for collapsed Size state
     const sizePreviewItems: PreviewItem[] = [];
     const paddingPercent = Math.round((screenConfig.padding || 0) * 100);
-    if (paddingPercent > 0) {
-        sizePreviewItems.push({ type: 'text', content: `${paddingPercent}%` });
-    }
-    if (screenConfig.crop) {
-        sizePreviewItems.push({ type: 'text', content: 'Cropped' });
-    }
+    sizePreviewItems.push({ type: 'text', content: `${paddingPercent}%` });
+    sizePreviewItems.push({ type: 'text', content: screenConfig.crop ? 'Cropped' : 'Full' });
 
     // Build preview items for collapsed frame state
     const framePreviewItems: PreviewItem[] = [];
@@ -152,10 +148,13 @@ export const ScreenSettings = () => {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleFrame', v)}
             >
                 <div className="space-y-4">
-                    <Toggle
-                        label="Device Frame"
-                        value={screenConfig.mode === 'device'}
-                        onChange={(val) => handleModeChange(val ? 'device' : 'border')}
+                    <MultiToggle
+                        options={[
+                            { value: 'device', label: 'Device' },
+                            { value: 'border', label: 'Border' }
+                        ]}
+                        value={screenConfig.mode}
+                        onChange={(val) => handleModeChange(val as 'device' | 'border')}
                     />
 
                     {/* Device Selection - Always mounted to keep images loaded */}
@@ -170,7 +169,7 @@ export const ScreenSettings = () => {
                                             screen: { ...screenConfig, deviceFrameId: frame.id }
                                         })}
                                         className={`flex flex-col gap-1 cursor-pointer rounded-md transition-all ${isSelected
-                                            ? 'bg-state-active'
+                                            ? ''
                                             : 'opacity-70 hover:opacity-90'
                                             }`}
                                         title={frame.name}

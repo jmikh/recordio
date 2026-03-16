@@ -52,7 +52,7 @@ export const MultiToggle = <T extends string>({
             ref={containerRef}
             className={`
                 relative flex items-center justify-center select-none
-                bg-state-hover rounded-full p-1 h-9
+                border border-border rounded-full p-1 h-9
                 ${className}
             `}
         >
@@ -65,7 +65,7 @@ export const MultiToggle = <T extends string>({
                     top: 3,
                     bottom: 3,
                 }}
-                className="absolute bg-primary rounded-full z-0 shadow-[var(--shadow-button)]"
+                className="absolute bg-primary/30 rounded-full z-0"
             />
 
             {/* Options */}
@@ -83,7 +83,7 @@ export const MultiToggle = <T extends string>({
                             text-center
                             transition-colors duration-200
                             ${isSelected
-                                ? 'text-text-on-primary'
+                                ? 'text-text-main'
                                 : 'text-text-disabled hover:text-text-muted'
                             }
                         `}

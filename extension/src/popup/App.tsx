@@ -7,6 +7,7 @@ import { RecordingStatus } from './components/RecordingStatus';
 import { MdArrowBack, MdBlurOn } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
 import { LogoLink } from '@shared/components/LogoLink';
+import { Button } from '@shared/components/Button';
 import permissionGuide from '../assets/permission-guide.jpg';
 import { getEditorOrigin } from '@shared/types/bridge';
 
@@ -344,8 +345,8 @@ function App() {
   if (hasPermissionError) {
     return (
       <div className="w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col p-4 relative">
-        <button
-          className="interactive-base flex items-center justify-center gap-2 absolute top-2 right-2 p-1.5"
+        <Button
+          className="absolute top-2 right-2 p-1.5"
           onClick={() => {
             setIsAudioEnabled(false);
             setIsVideoEnabled(false);
@@ -355,7 +356,7 @@ function App() {
           title="Back to menu"
         >
           <MdArrowBack size={16} />
-        </button>
+        </Button>
         <h2 className="text-xl font-bold mb-4 text-destructive">Permission Denied</h2>
         <p className="text-sm text-text-main mb-4">
           Please allow access to your microphone and camera to use them in Recordio.
@@ -365,12 +366,13 @@ function App() {
           <img src={permissionGuide} alt="Permission Guide" className="w-full h-auto" />
         </div>
 
-        <button
+        <Button
           onClick={openOptions}
-          className="interactive-base flex items-center justify-center gap-2 w-full py-2 text-sm"
+          fullWidth
+          className="py-2 text-sm"
         >
           Open Settings
-        </button>
+        </Button>
 
         <p className="text-xs text-text-muted mt-4 text-center">
           If the error persists, make sure Chrome has access to your microphone and camera in the OS settings.
@@ -385,21 +387,21 @@ function App() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <LogoLink />
         <div className="flex items-center gap-1">
-          <button
+          <Button
             onClick={openEditor}
-            className="interactive-base flex items-center justify-center gap-2 p-1.5"
+            className="p-1.5"
             title="Projects"
           >
             <TbFolder size={16} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleBlurMode}
-            className="interactive-base flex items-center justify-center gap-2 p-1.5"
+            className="p-1.5"
             title={canInjectContentScript === false ? "Blur doesn't work on Chrome-owned pages" : "Blur Items"}
             disabled={canInjectContentScript === false}
           >
             <MdBlurOn size={16} />
-          </button>
+          </Button>
 
         </div>
       </div>

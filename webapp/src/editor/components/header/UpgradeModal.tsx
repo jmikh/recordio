@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaCheck, FaCog } from 'react-icons/fa';
 import { BiCrown } from 'react-icons/bi';
-import { XButton, Modal } from '@shared/components';
+import { XButton, Modal, Button } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { MAX_SHARED_VIDEOS } from '../../services/ShareService';
 import { useUserStore } from '../../stores/useUserStore';
@@ -191,14 +191,16 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
                 {/* Manage Subscription */}
                 {subscription.stripeCustomerId && (
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={handleManageSubscription}
                         disabled={loading}
-                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
+                        fullWidth
+                        className="py-3 text-base font-semibold rounded-lg"
                     >
                         <FaCog size={14} />
                         {loading ? 'Loading...' : 'Manage Subscription'}
-                    </button>
+                    </Button>
                 )}
 
                 <button
@@ -244,9 +246,9 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
             {/* Success Message */}
             {success && (
-                <div className="mb-6 bg-green-900/20 border border-green-500/50 rounded-sm p-4 text-center">
-                    <FaCheck className="text-green-500 mx-auto mb-2" size={32} />
-                    <p className="text-lg font-semibold text-green-400 mb-1">
+                <div className="mb-6 bg-success/10 border border-success/30 rounded-sm p-4 text-center">
+                    <FaCheck className="text-success mx-auto mb-2" size={32} />
+                    <p className="text-lg font-semibold text-success mb-1">
                         🎉 Welcome to Pro!
                     </p>
                     <p className="text-sm text-text-muted">
@@ -269,7 +271,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
             {/* Error Message */}
             {error && (
-                <div className="mb-4 bg-red-900/20 border border-red-500/50 text-red-400 px-3 py-2 rounded-sm text-xs">
+                <div className="mb-4 bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs">
                     {error}
                 </div>
             )}
@@ -342,13 +344,15 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                     </ul>
 
                     {/* Get Pro Button */}
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={() => handleUpgradeWithInterval(billingInterval === 'monthly' ? 'monthly' : 'yearly')}
-                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold rounded-lg"
+                        fullWidth
+                        className="py-3 text-sm font-semibold rounded-lg"
                         disabled={loading}
                     >
                         {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
-                    </button>
+                    </Button>
                 </div>
 
                 {/* ── Lifetime Card ── */}
@@ -394,13 +398,15 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                     </ul>
 
                     {/* Get Lifetime Button */}
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={() => handleUpgradeWithInterval('lifetime')}
-                        className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold rounded-lg"
+                        fullWidth
+                        className="py-3 text-sm font-semibold rounded-lg"
                         disabled={loading}
                     >
                         {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Lifetime' : 'Get Lifetime'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 

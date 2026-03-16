@@ -32,7 +32,7 @@ style.textContent = `
         min-height: 0;
         border-radius: 8px;
         overflow: hidden;
-        background: var(--surface-inset);
+        background: var(--surface-raised);
     }
 
     .camera-float-video-container video {

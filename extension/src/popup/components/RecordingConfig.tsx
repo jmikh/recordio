@@ -1,6 +1,6 @@
 import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
-import { MultiToggle, Toggle, Dropdown, Notice } from '@shared/components';
+import { MultiToggle, Toggle, Dropdown, Notice, Button } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
 import { BiMicrophone } from 'react-icons/bi';
 import { PiWebcamBold } from 'react-icons/pi';
@@ -125,7 +125,7 @@ export function RecordingConfig({
                         <CameraPreview stream={videoStream} />
                         {videoStream && (
                             <>
-                                <button
+                                <Button
                                     onClick={() => {
                                         console.log('[popup] Float Camera clicked, deviceId:', selectedVideoId, 'mode:', recordingMode);
                                         chrome.runtime.sendMessage({
@@ -138,12 +138,14 @@ export function RecordingConfig({
                                             console.log('[popup] Float Camera response:', response, chrome.runtime.lastError);
                                         });
                                     }}
-                                    className="interactive-base flex items-center justify-center gap-2 w-full mt-2 py-1.5 text-xs"
+                                    size="sm"
+                                    fullWidth
+                                    className="mt-2 py-1.5"
                                     title="Open camera in a floating always-on-top window"
                                 >
                                     <MdOutlineOpenInNew size={14} />
                                     Float Camera
-                                </button>
+                                </Button>
                                 <p className="subtext mt-1" style={{ textAlign: 'center' }}>Allows you to see yourself during recording.</p>
                             </>
                         )}
@@ -157,13 +159,15 @@ export function RecordingConfig({
                 </Notice>
             )}
 
-            <button
+            <Button
+                variant="primary"
                 onClick={startRecording}
                 disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
-                className="interactive-primary flex items-center justify-center gap-2 mt-2 w-full"
+                fullWidth
+                className="mt-2"
             >
                 Start Recording
-            </button>
+            </Button>
         </div>
     );
 }

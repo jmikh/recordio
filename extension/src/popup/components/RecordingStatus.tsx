@@ -1,6 +1,7 @@
 
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
+import { Button } from '@shared/components';
 
 interface RecordingStatusProps {
     recordingDuration: number;
@@ -45,12 +46,14 @@ export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, ha
             </div>
 
             {/* Finish Recording Button */}
-            <button
+            <Button
+                variant="primary"
                 onClick={stopRecording}
-                className="interactive-primary flex items-center justify-center gap-2 w-full py-2.5"
+                fullWidth
+                className="py-2.5"
             >
                 Finish Recording
-            </button>
+            </Button>
         </div>
     );
 }

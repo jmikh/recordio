@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ColorSettings } from './ColorSettings';
+import { Button } from '@shared/components';
 
 
 
@@ -71,10 +72,11 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
         <div className="flex items-center gap-3">
             <span className="text-sm text-text-muted w-[80px] shrink-0">{title}</span>
             <div className="flex-1 min-w-0">
-                <button
+                <Button
                     ref={buttonRef}
                     onClick={toggleColorPopover}
-                    className="interactive-base flex items-center justify-center gap-2 w-full justify-start gap-3 px-2"
+                    fullWidth
+                    className="justify-start gap-3 px-2"
                 >
                     <div
                         className="w-5 h-5 rounded-full border border-text-muted shrink-0"
@@ -86,13 +88,13 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                     <span className="text-xs font-mono text-text-muted uppercase">
                         {color}
                     </span>
-                </button>
+                </Button>
             </div>
 
             {showColorPopover && createPortal(
                 <div
                     ref={popoverRef}
-                    className="fixed z-[9999] bg-surface-overlay rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                    className="fixed z-[9999] bg-surface-raised rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
                     style={{
                         top: popoverPos.top,
                         left: popoverPos.left,

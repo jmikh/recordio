@@ -281,7 +281,7 @@ export function ImportPage() {
             <LogoLink />
 
             <div className="mt-8 text-center max-w-md">
-                <div className={`text-lg ${isError ? 'text-red-400' : 'text-text-main'}`}>
+                <div className={`text-lg ${isError ? 'text-destructive' : 'text-text-main'}`}>
                     {getStatusMessage()}
                 </div>
 

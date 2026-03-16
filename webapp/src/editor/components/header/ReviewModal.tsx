@@ -1,4 +1,4 @@
-import { Modal } from '@shared/components';
+import { Modal, Button } from '@shared/components';
 import { trackReviewModalShown, trackReviewModalDismissed, trackReviewModalReviewClicked } from '../../../core/analytics';
 
 const REVIEW_TOAST_KEY = 'recordio-review-toast-shown';
@@ -44,12 +44,14 @@ export function ReviewModal({ isOpen, onClose }: ReviewModalProps) {
             </p>
 
             {/* CTA */}
-            <button
+            <Button
+                variant="primary"
                 onClick={handleReview}
-                className="interactive-primary flex items-center justify-center gap-2 w-full py-3 text-base font-semibold rounded-lg"
+                fullWidth
+                className="py-3 text-base font-semibold rounded-lg"
             >
                 ⭐ Leave a Review
-            </button>
+            </Button>
 
             {/* Dismiss */}
             <button

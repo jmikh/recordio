@@ -349,7 +349,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
     // Export decode preference — synced to localStorage
-    videoDecodePreference: localStorage.getItem(SW_DECODE_KEY) === 'false' ? 'gpu' : 'cpu',
+    videoDecodePreference: localStorage.getItem(SW_DECODE_KEY) === 'true' ? 'cpu' : 'gpu',
     setVideoDecodePreference: (pref) => {
         if (pref === 'cpu') {
             localStorage.setItem(SW_DECODE_KEY, 'true');

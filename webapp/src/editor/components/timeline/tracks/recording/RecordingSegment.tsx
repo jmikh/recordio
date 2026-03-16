@@ -193,9 +193,9 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                     : (dragState.constraints.maxEnd - currentWin.endMs);
 
                 const isPendingMerge = dragState.pendingMerge;
-                const bubbleBg = isPendingMerge ? 'bg-tertiary' : 'bg-secondary';
-                const bubbleBorderColor = isPendingMerge ? 'border-tertiary-muted' : 'border-border';
-                const notchColor = isPendingMerge ? 'before:border-b-tertiary-muted after:border-b-tertiary' : 'before:border-b-border after:border-b-secondary';
+                const bubbleBg = 'bg-secondary';
+                const bubbleBorderColor = 'border-border';
+                const notchColor = 'before:border-b-border after:border-b-secondary';
 
                 return createPortal(
                     <div
@@ -206,8 +206,8 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                             transform: 'translate(-50%, 8px)'
                         }}
                     >
-                        <div className={`relative rounded-lg ${bubbleBg} text-text-on-secondary text-[10px] font-mono px-1.5 py-0.5 rounded shadow-xl border ${bubbleBorderColor} whitespace-nowrap transition-colors before:content-[''] before:absolute before:top-0 before:left-1/2 before:-translate-x-1/2 before:-translate-y-full before:border-[8px] before:border-transparent ${notchColor} before:z-10 after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:-translate-y-[calc(100%-1px)] after:border-[8px] after:border-transparent after:z-20`}>
-                            {isPendingMerge ? 'Merge' : `${(remainingGapMs / 1000).toFixed(2)}s`}
+                        <div className={`relative rounded-lg ${bubbleBg} text-text-on-secondary text-[10px] font-sans px-1.5 py-0.5 rounded shadow-xl border ${bubbleBorderColor} whitespace-nowrap transition-colors before:content-[''] before:absolute before:top-0 before:left-1/2 before:-translate-x-1/2 before:-translate-y-full before:border-[8px] before:border-transparent ${notchColor} before:z-10 after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:-translate-y-[calc(100%-1px)] after:border-[8px] after:border-transparent after:z-20`}>
+                            {isPendingMerge ? 'Merge' : `${(remainingGapMs / 1000).toFixed(1)}s`}
                         </div>
                     </div>,
                     document.body

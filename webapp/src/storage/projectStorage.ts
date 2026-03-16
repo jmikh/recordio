@@ -407,6 +407,33 @@ export class ProjectStorage {
         });
     }
 
+    /**
+     * Renames a project without full hydration.
+     * Reads raw, updates name + updatedAt, writes back.
+     */
+    static async renameProject(projectId: ID, newName: string): Promise<void> {
+        const db = await this.getDB();
+        const project = await new Promise<Project | undefined>((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.get(projectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+        if (!project) throw new Error(`Project ${projectId} not found`);
+
+        project.name = newName;
+        project.updatedAt = new Date();
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readwrite');
+            const store = tx.objectStore('projects');
+            const req = store.put(project);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
     // ===========================================
     // CUSTOM BACKGROUNDS LIBRARY (Global)
     // ===========================================

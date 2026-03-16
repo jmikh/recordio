@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, type DropdownOption } from '@shared/components';
+import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, Button, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '../../../core/easing';
 import type { SpotlightSegment } from '../../../types';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
@@ -235,24 +235,26 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <button onClick={handleDelete} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
-                    </button>
-                    <button onClick={handleDeleteAll} className="interactive-base flex items-center justify-center gap-2 flex-1 text-xs text-danger hover:text-danger">
+                    </Button>
+                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Auto Generate */}
                 {hasTrackableContent && (
                     <Tooltip text={!hasHoveredCards ? 'Could not automatically detect areas in the recording suitable for spotlighting.' : ''}>
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            fullWidth
                             onClick={() => { resetSpotlights(); selectSpotlight(null); }}
-                            className="interactive-primary flex items-center justify-center gap-2 text-xs w-full"
                             disabled={!hasHoveredCards}
                         >
                             <span>Auto Generate Spotlights</span>
-                        </button>
+                        </Button>
                     </Tooltip>
                 )}
             </div>

@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../storage/projectStorage';
 import type { Project } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { SharedVideoCard } from '../components/SharedVideoCard';
-import { LogoLink, XButton, Modal } from '@shared/components';
+import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
+import { Dropdown } from '@shared/components/Dropdown';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { BiSupport } from 'react-icons/bi';
-import { MdDarkMode, MdLightMode } from 'react-icons/md';
+
 import { useUserStore } from '../editor/stores/useUserStore';
-import { useThemeStore } from '../stores/useThemeStore';
+
 import { SupportModal } from '../components/SupportModal';
 import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
@@ -21,6 +22,15 @@ import * as Sentry from '@sentry/react';
 import { trackProjectOpened } from '../core/analytics';
 import { importProjectFromZip } from '../storage/projectTransfer';
 
+type TabId = 'projects' | 'published';
+type SortOrder = 'newest' | 'oldest' | 'name';
+
+const SORT_OPTIONS = [
+    { value: 'newest' as SortOrder, label: 'Newest first' },
+    { value: 'oldest' as SortOrder, label: 'Oldest first' },
+    { value: 'name' as SortOrder, label: 'Name A–Z' },
+];
+
 export function DashboardPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [sharedVideos, setSharedVideos] = useState<SharedVideo[]>([]);
@@ -28,19 +38,25 @@ export function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { userId, hasProAccess } = useUserStore();
-    const { theme, setTheme } = useThemeStore();
+
     const isAuthenticated = !!userId;
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
     const [storageUsed, setStorageUsed] = useState<number | null>(null);
-    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     useAuthListener();
     const importInputRef = useRef<HTMLInputElement>(null);
     const [isImporting, setIsImporting] = useState(false);
+
+    // Tab, sort, and select state
+    const [activeTab, setActiveTab] = useState<TabId>('projects');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const selectMode = selectedIds.size > 0;
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -124,34 +140,77 @@ export function DashboardPage() {
         }
     };
 
+    // Sort projects
+    const sortedProjects = useMemo(() => {
+        const sorted = [...projects];
+        switch (sortOrder) {
+            case 'newest':
+                sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                break;
+            case 'oldest':
+                sorted.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+                break;
+            case 'name':
+                sorted.sort((a, b) => a.name.localeCompare(b.name));
+                break;
+        }
+        return sorted;
+    }, [projects, sortOrder]);
+
+    // Derive set of project IDs that have shared links (no extra API calls)
+    const sharedProjectIds = useMemo(() => {
+        return new Set(sharedVideos.map(v => v.project_id));
+    }, [sharedVideos]);
+
     const handleOpen = (projectId: string) => {
         trackProjectOpened();
         window.location.href = `/editor?projectId=${projectId}`;
     };
 
-    const handleDelete = async (projectId: string) => {
+    const handleRename = useCallback(async (projectId: string, newName: string) => {
         try {
-            await ProjectStorage.deleteProject(projectId);
-            setProjects(prev => prev.filter(p => p.id !== projectId));
+            await ProjectStorage.renameProject(projectId, newName);
+            setProjects(prev => prev.map(p =>
+                p.id === projectId ? { ...p, name: newName, updatedAt: new Date() } : p
+            ));
         } catch (error) {
-            console.error('Failed to delete project:', error);
+            console.error('Failed to rename project:', error);
         }
-    };
+    }, []);
 
-    const handleDeleteAll = async () => {
-        setIsDeleting(true);
+    // Bulk delete
+    const handleBulkDelete = async () => {
+        setIsBulkDeleting(true);
+        const count = selectedIds.size;
         try {
-            for (const project of projects) {
-                await ProjectStorage.deleteProject(project.id);
+            for (const id of selectedIds) {
+                await ProjectStorage.deleteProject(id);
             }
-            setProjects([]);
-            setShowDeleteAllModal(false);
-            addToast({ type: 'success', title: 'All Projects Deleted', message: `${projects.length} project${projects.length !== 1 ? 's' : ''} deleted` });
+            setProjects(prev => prev.filter(p => !selectedIds.has(p.id)));
+            setSelectedIds(new Set());
+            setShowBulkDeleteModal(false);
+            addToast({ type: 'success', title: 'Projects Deleted', message: `${count} project${count !== 1 ? 's' : ''} deleted` });
         } catch (error) {
             console.error('Failed to delete projects:', error);
         } finally {
-            setIsDeleting(false);
+            setIsBulkDeleting(false);
         }
+    };
+
+    const toggleSelect = (projectId: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(projectId)) {
+                next.delete(projectId);
+            } else {
+                next.add(projectId);
+            }
+            return next;
+        });
+    };
+
+    const exitSelectMode = () => {
+        setSelectedIds(new Set());
     };
 
     const formatBytes = (bytes: number): string => {
@@ -177,6 +236,29 @@ export function DashboardPage() {
         }
     };
 
+    const handleBulkDelist = async () => {
+        const videosToRemove = sharedVideos.filter(v => selectedIds.has(v.id));
+        const count = videosToRemove.length;
+        setIsBulkDeleting(true);
+        try {
+            for (const video of videosToRemove) {
+                await handleUnshare(video);
+            }
+            setSelectedIds(new Set());
+            addToast({ type: 'success', title: 'Videos Delisted', message: `${count} video${count !== 1 ? 's' : ''} delisted` });
+        } catch (error) {
+            console.error('Failed to delist videos:', error);
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
+
+    const handleTabChange = (tab: TabId) => {
+        setActiveTab(tab);
+        // Exit select mode when switching tabs
+        exitSelectMode();
+    };
+
     return (
         <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
@@ -184,7 +266,7 @@ export function DashboardPage() {
                 <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center">
                     <LogoLink />
                     {hasProAccess() && (
-                        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase ml-1">Pro</span>
+                        <ProBadge className="ml-1" />
                     )}
                     <div className="flex-1" />
                     <div className="flex items-center gap-3">
@@ -192,20 +274,14 @@ export function DashboardPage() {
                             <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-icon">
                                 <BiSupport size={18} />
                             </button>
-                            <button
-                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                                className="interactive-icon"
-                            >
-                                {theme === 'dark' ? <MdLightMode size={18} /> : <MdDarkMode size={18} />}
-                            </button>
+                            <ThemeToggle />
                         </div>
                         {isAuthenticated ? (
                             <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
                         ) : (
-                            <button onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features" className="interactive-ghost flex items-center justify-center gap-2">
+                            <Button variant="ghost" onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
                                 Sign In
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -214,26 +290,112 @@ export function DashboardPage() {
             <div style={{ maxWidth: 1400 }} className="mx-auto">
                 {/* Error Message */}
                 {errorMessage && (
-                    <div className="mt-4 w-fit mx-auto bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-3">
+                    <div className="mt-4 w-fit mx-auto bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg flex items-center gap-3">
                         <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span>{errorMessage}</span>
-                        <button
+                        <XButton
                             onClick={() => setErrorMessage(null)}
-                            className="ml-auto text-red-400 hover:text-red-300"
-                        >
-                            ✕
-                        </button>
+                            title="Dismiss"
+                        />
                     </div>
                 )}
 
-                {/* Published Videos Section */}
-                <section className="p-6 pb-2">
-                    <div className="flex items-center gap-3 mb-4">
-                        <h2 className="text-lg font-medium text-text-highlighted">Published Videos</h2>
+                {/* Tab Bar */}
+                <div className="px-6 pt-5 flex items-center gap-6 border-b border-border">
+                    <TabButton
+                        active={activeTab === 'projects'}
+                        count={projects.length}
+                        onClick={() => handleTabChange('projects')}
+                    >
+                        Projects
+                    </TabButton>
+                    <TabButton
+                        active={activeTab === 'published'}
+                        count={sharedVideos.length}
+                        onClick={() => handleTabChange('published')}
+                    >
+                        Published
+                    </TabButton>
+                </div>
+
+                {/* Projects Tab */}
+                {activeTab === 'projects' && (
+                    <main className="p-6">
+                        {/* Toolbar */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="text-xs text-text-muted">
+                                {storageUsed != null ? `${formatBytes(storageUsed)} stored on this device` : 'Stored on this device'}
+                            </span>
+                            {import.meta.env.DEV && (
+                                <>
+                                    <input
+                                        ref={importInputRef}
+                                        type="file"
+                                        accept=".zip"
+                                        className="hidden"
+                                        onChange={handleImportProject}
+                                    />
+                                    <button
+                                        onClick={() => importInputRef.current?.click()}
+                                        disabled={isImporting}
+                                        className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
+                                    >
+                                        {isImporting ? 'Importing...' : '📦 Import Project'}
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex-1" />
+                            {projects.length > 1 && (
+                                <Dropdown
+                                    options={SORT_OPTIONS}
+                                    value={sortOrder}
+                                    onChange={setSortOrder}
+                                    fullWidth={false}
+                                    buttonClassName="h-8 text-xs"
+                                />
+                            )}
+                        </div>
+
+                        <p className="text-sm text-text-muted mb-4">
+                            Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
+                        </p>
+
+                        {loading ? (
+                            <div className="flex items-center justify-center h-64">
+                                <div className="text-text-muted">Loading projects...</div>
+                            </div>
+                        ) : projects.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64 text-center max-w-md mx-auto">
+                                <div className="text-text-muted text-sm">
+                                    Projects are stored locally in your browser. If you recorded on a different browser or device, open Recordio there to find your projects.
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {sortedProjects.map(project => (
+                                    <ProjectCard
+                                        key={project.id}
+                                        project={project}
+                                        onOpen={() => handleOpen(project.id)}
+                                        selectMode={selectMode}
+                                        selected={selectedIds.has(project.id)}
+                                        onSelect={() => toggleSelect(project.id)}
+                                        isShared={sharedProjectIds.has(project.id)}
+                                        onRename={(newName) => handleRename(project.id, newName)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </main>
+                )}
+
+                {/* Published Tab */}
+                {activeTab === 'published' && (
+                    <section className="p-6">
                         {isAuthenticated && sharedVideos.length > 0 && (
-                            <>
+                            <div className="flex items-center gap-3 mb-4">
                                 <span className="text-xs text-text-muted">
                                     {sharedVideos.length} of {MAX_SHARED_VIDEOS}
                                 </span>
@@ -243,97 +405,89 @@ export function DashboardPage() {
                                         style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
                                     />
                                 </div>
-                            </>
-                        )}
-                        {isAuthenticated && sharedVideos.length >= MAX_SHARED_VIDEOS && (
-                            <span className="text-xs text-text-muted">
-                                Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
-                            </span>
-                        )}
-                    </div>
-                    {!isAuthenticated ? (
-                        <p className="text-sm text-text-muted">Log in to see published videos</p>
-                    ) : sharedVideos.length === 0 ? (
-                        <p className="text-sm text-text-muted">You have no published videos</p>
-                    ) : (() => {
-                        const localProjectIds = new Set(projects.map(p => p.id));
-                        return (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {sharedVideos.map(video => (
-                                    <SharedVideoCard
-                                        key={video.id}
-                                        video={video}
-                                        localProjectExists={localProjectIds.has(video.project_id)}
-                                        analytics={analytics[video.cf_video_uid]}
-                                        onUnshare={handleUnshare}
-                                    />
-                                ))}
+                                {sharedVideos.length >= MAX_SHARED_VIDEOS && (
+                                    <span className="text-xs text-text-muted">
+                                        Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
+                                    </span>
+                                )}
                             </div>
-                        );
-                    })()}
-                </section>
-
-                {/* Projects Section */}
-                <main className="p-6">
-                    <div className="flex items-baseline gap-2 mb-4">
-                        <h2 className="text-lg font-medium text-text-highlighted">Projects</h2>
-                        <span className="text-xs text-text-muted">
-                            · stored on this device{storageUsed != null ? ` · ${formatBytes(storageUsed)}` : ''}
-                        </span>
-                        {import.meta.env.DEV && (
-                            <>
-                                <input
-                                    ref={importInputRef}
-                                    type="file"
-                                    accept=".zip"
-                                    className="hidden"
-                                    onChange={handleImportProject}
-                                />
-                                <button
-                                    onClick={() => importInputRef.current?.click()}
-                                    disabled={isImporting}
-                                    className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
-                                >
-                                    {isImporting ? 'Importing...' : '📦 Import Project'}
-                                </button>
-                            </>
                         )}
-                        {projects.length > 1 && (
-                            <button
-                                onClick={() => setShowDeleteAllModal(true)}
-                                className="ml-auto text-xs text-text-muted hover:text-destructive transition-colors"
-                            >
-                                Delete All
-                            </button>
-                        )}
-                    </div>
-                    <p className="text-sm text-text-muted mb-4">
-                        Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
-                    </p>
-                    {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="text-text-muted">Loading projects...</div>
-                        </div>
-                    ) : projects.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-center max-w-md mx-auto">
-                            <div className="text-text-muted text-sm">
-                                Projects are stored locally in your browser. If you recorded on a different browser or device, open Recordio there to find your projects.
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {projects.map(project => (
-                                <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    onOpen={() => handleOpen(project.id)}
-                                    onDelete={() => handleDelete(project.id)}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </main>
+                        {!isAuthenticated ? (
+                            <p className="text-sm text-text-muted">Log in to see published videos</p>
+                        ) : sharedVideos.length === 0 ? (
+                            <p className="text-sm text-text-muted">You have no published videos</p>
+                        ) : (() => {
+                            const localProjectIds = new Set(projects.map(p => p.id));
+                            return (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {sharedVideos.map(video => (
+                                        <SharedVideoCard
+                                            key={video.id}
+                                            video={video}
+                                            localProjectExists={localProjectIds.has(video.project_id)}
+                                            analytics={analytics[video.cf_video_uid]}
+                                            selectMode={selectMode}
+                                            selected={selectedIds.has(video.id)}
+                                            onSelect={() => toggleSelect(video.id)}
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                    </section>
+                )}
             </div>
+
+            {/* Floating Action Bar — Select Mode */}
+            {selectMode && createPortal(
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[var(--z-index-overlay)] animate-in slide-in-from-bottom-4 fade-in duration-200">
+                    <div className="flex items-center gap-3 bg-surface-raised border border-border rounded-xl px-5 py-3 shadow-float">
+                        <span className="text-sm text-text-highlighted font-medium">
+                            {selectedIds.size} selected
+                        </span>
+                        <div className="w-px h-5 bg-border" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const allIds = activeTab === 'projects'
+                                    ? projects.map(p => p.id)
+                                    : sharedVideos.map(v => v.id);
+                                if (selectedIds.size === allIds.length) {
+                                    setSelectedIds(new Set());
+                                } else {
+                                    setSelectedIds(new Set(allIds));
+                                }
+                            }}
+                        >
+                            {selectedIds.size === (activeTab === 'projects' ? projects.length : sharedVideos.length)
+                                ? 'Deselect All' : 'Select All'}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                                if (activeTab === 'projects') {
+                                    setShowBulkDeleteModal(true);
+                                } else {
+                                    handleBulkDelist();
+                                }
+                            }}
+                            disabled={isBulkDeleting}
+                        >
+                            {activeTab === 'projects' ? 'Delete' : 'Delist'}
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={exitSelectMode}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
             <AuthModal
                 isOpen={isAuthModalOpen}
@@ -354,37 +508,36 @@ export function DashboardPage() {
                 autoCheckout={!!checkoutInterval && isAuthenticated}
             />
 
-            {/* Delete All Confirmation Modal */}
-            {showDeleteAllModal && createPortal(
+            {/* Bulk Delete Confirmation Modal */}
+            {showBulkDeleteModal && createPortal(
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
                     <div className="bg-surface-raised rounded-lg p-6 w-full max-w-[400px] border border-border">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-text-highlighted">Delete All Projects</h2>
+                            <h2 className="text-lg font-semibold text-text-highlighted">Delete Projects</h2>
                             <XButton
-                                onClick={() => setShowDeleteAllModal(false)}
+                                onClick={() => setShowBulkDeleteModal(false)}
                                 title="Close"
                             />
                         </div>
 
                         <p className="text-sm text-text-main mb-6">
-                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{projects.length}</span> project{projects.length !== 1 ? 's' : ''}? This action cannot be undone.
+                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{selectedIds.size}</span> project{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
                         </p>
 
                         <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setShowDeleteAllModal(false)}
-                                disabled={isDeleting}
-                                className="interactive-base flex items-center justify-center gap-2"
+                            <Button
+                                onClick={() => setShowBulkDeleteModal(false)}
+                                disabled={isBulkDeleting}
                             >
                                 Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteAll}
-                                disabled={isDeleting}
-                                className="px-3 py-1.5 text-xs text-white bg-destructive hover:bg-destructive/90 rounded-sm shadow-sm transition-colors disabled:opacity-50"
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleBulkDelete}
+                                disabled={isBulkDeleting}
                             >
-                                {isDeleting ? 'Deleting...' : 'Delete All'}
-                            </button>
+                                {isBulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size}`}
+                            </Button>
                         </div>
                     </div>
                 </div>,
@@ -398,13 +551,50 @@ export function DashboardPage() {
                 <p className="text-sm text-text-main mb-6">
                     Your subscription is now active. Enjoy unlimited exports, publishing, and all Pro features.
                 </p>
-                <button
+                <Button
+                    variant="primary"
+                    fullWidth
                     onClick={() => setShowSubscriptionSuccess(false)}
-                    className="interactive-primary w-full"
                 >
                     Get Started
-                </button>
+                </Button>
             </Modal>
         </div>
+    );
+}
+
+/** Tab button with active underline and count badge */
+function TabButton({ active, count, onClick, children }: {
+    active: boolean;
+    count: number;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className={`
+                pb-3 text-sm font-medium transition-colors relative cursor-pointer
+                ${active
+                    ? 'text-text-highlighted'
+                    : 'text-text-muted hover:text-text-main'
+                }
+            `}
+        >
+            <span>{children}</span>
+            <span className={`
+                ml-1.5 text-xs px-1.5 py-0.5 rounded-full
+                ${active
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-state-inactive text-text-muted'
+                }
+            `}>
+                {count}
+            </span>
+            {/* Active underline */}
+            {active && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+            )}
+        </button>
     );
 }

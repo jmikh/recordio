@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as Sentry from '@sentry/react';
-import { BiCrown } from 'react-icons/bi';
+
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload } from 'react-icons/tb';
-import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip } from '@shared/components';
+import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -331,11 +331,7 @@ export function ExportSettings() {
         )
     );
 
-    const proBadge = (
-        <span className="bg-primary text-text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none uppercase">
-            Pro
-        </span>
-    );
+    const proBadge = <ProBadge />;
 
     const busy = isExporting || isPublishing;
 
@@ -415,14 +411,15 @@ export function ExportSettings() {
 
                     {/* Download Button */}
                     <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
-                        <button
+                        <Button
                             onClick={handleDownload}
-                            className="interactive-base flex items-center justify-center gap-2 w-full text-sm font-medium"
+                            fullWidth
+                            className="text-sm font-medium"
                             disabled={busy || needsProFeature}
                         >
                             <TbDownload size={16} />
                             Download
-                        </button>
+                        </Button>
                     </Tooltip>
 
                     {/* Publish / Republish Button (Primary) */}
@@ -438,14 +435,16 @@ export function ExportSettings() {
                         return (
                             <div className="flex flex-col items-center gap-1.5">
                                 <Tooltip text={tooltipText} className="w-full">
-                                    <button
+                                    <Button
+                                        variant="primary"
                                         onClick={proAccess ? handlePublish : () => setIsUpgradeModalOpen(true)}
-                                        className={`interactive-primary flex items-center justify-center gap-2 w-full text-sm font-medium ${publishDisabled ? 'pointer-events-none' : ''}`}
+                                        fullWidth
+                                        className={`text-sm font-medium ${publishDisabled ? 'pointer-events-none' : ''}`}
                                         disabled={publishDisabled}
                                     >
                                         <TbLink size={16} />
                                         {isPublishing ? 'Publishing...' : existingShare ? 'Republish' : 'Publish'}
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                                 {proAccess && !existingShare && (
                                     <span className="subtext">{publishedCount} of {MAX_SHARED_VIDEOS} published</span>

@@ -92,7 +92,7 @@ export function Dropdown<T>({
     const dropdownMenu = (
         <div
             ref={menuRef}
-            className="bg-surface-overlay border border-border rounded-lg shadow-float max-h-[200px] overflow-y-auto py-1 px-1 scrollbar-thin"
+            className="bg-surface-raised border border-border rounded-lg shadow-float max-h-[280px] overflow-y-auto py-1 px-1 scrollbar-thin"
             style={menuStyle}
         >
             {options.map((option, index) => {
