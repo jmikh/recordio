@@ -719,6 +719,20 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     }).catch(() => { /* tab may not have content script */ });
 });
 
+// --- Popup Lifecycle Detection (Port-based) ---
+// When the popup connects a port, we track it. On disconnect (popup closed),
+// close the camera float if no recording is active.
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'popup') return;
+
+    port.onDisconnect.addListener(async () => {
+        await ensureState();
+        if (!currentState?.isRecording) {
+            closeCameraFloat();
+        }
+    });
+});
+
 // --- Main Listener ---
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

@@ -126,17 +126,12 @@ function App() {
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
     });
 
-    // 5. Close camera float when popup closes without an active recording
-    const handleBeforeUnload = () => {
-      if (!isRecordingRef.current) {
-        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => { });
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    // 5. Connect a port so background detects popup close reliably
+    const port = chrome.runtime.connect({ name: 'popup' });
 
     return () => {
       chrome.storage.onChanged.removeListener(storageListener);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      port.disconnect();
       // Clean up streams on unmount
       stopStream(audioStream);
       stopStream(videoStream);
