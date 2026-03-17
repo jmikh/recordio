@@ -3,7 +3,7 @@ import { ShareService, type SharedVideo } from '../editor/services/ShareService'
 import { LogoLink } from '@shared/components/LogoLink';
 import { Button } from '@shared/components/Button';
 import { ThemeToggle } from '@shared/components';
-import { TbLink } from 'react-icons/tb';
+import { TbCopy } from 'react-icons/tb';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
 
@@ -278,7 +278,7 @@ export function WatchPage() {
                                 )}
                             </div>
                             <Button size="sm" fullWidth onClick={copyLink} className="mt-4">
-                                <TbLink size={15} />
+                                <TbCopy size={15} />
                                 {linkCopied ? 'Copied!' : 'Copy link'}
                             </Button>
                         </div>

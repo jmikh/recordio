@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Sentry from '@sentry/react';
 
-import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload } from 'react-icons/tb';
+import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
 import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -409,20 +409,7 @@ export function ExportSettings() {
                         </div>
                     )}
 
-                    {/* Download Button */}
-                    <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
-                        <Button
-                            onClick={handleDownload}
-                            fullWidth
-                            className="text-sm font-medium"
-                            disabled={busy || needsProFeature}
-                        >
-                            <TbDownload size={16} />
-                            Download
-                        </Button>
-                    </Tooltip>
-
-                    {/* Publish / Republish Button (Primary) */}
+                    {/* Publish / Republish Button */}
                     {(() => {
                         const quotaFull = proAccess && publishedCount >= MAX_SHARED_VIDEOS && !existingShare;
                         const publishDisabled = busy || !proAccess || quotaFull;
@@ -436,22 +423,52 @@ export function ExportSettings() {
                             <div className="flex flex-col items-center gap-1.5">
                                 <Tooltip text={tooltipText} className="w-full">
                                     <Button
-                                        variant="primary"
                                         onClick={proAccess ? handlePublish : () => setIsUpgradeModalOpen(true)}
                                         fullWidth
                                         className={`text-sm font-medium ${publishDisabled ? 'pointer-events-none' : ''}`}
                                         disabled={publishDisabled}
                                     >
                                         <TbLink size={16} />
-                                        {isPublishing ? 'Publishing...' : existingShare ? 'Republish' : 'Publish'}
+                                        {isPublishing ? 'Sharing...' : existingShare ? 'Reshare' : 'Share'}
                                     </Button>
                                 </Tooltip>
                                 {proAccess && !existingShare && (
                                     <span className="subtext">{publishedCount} of {MAX_SHARED_VIDEOS} published</span>
                                 )}
+                                {existingShare && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={async () => {
+                                            try {
+                                                await navigator.clipboard.writeText(ShareService.getShareUrl(existingShare.id));
+                                                addToast({ type: 'success', title: 'Link copied to clipboard' });
+                                            } catch {
+                                                addToast({ type: 'error', title: 'Failed to copy link' });
+                                            }
+                                        }}
+                                    >
+                                        <TbCopy size={14} />
+                                        Copy Link
+                                    </Button>
+                                )}
                             </div>
                         );
                     })()}
+
+                    {/* Download Button (Primary) */}
+                    <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
+                        <Button
+                            variant="primary"
+                            onClick={handleDownload}
+                            fullWidth
+                            className="text-sm font-medium"
+                            disabled={busy || needsProFeature}
+                        >
+                            <TbDownload size={16} />
+                            Download
+                        </Button>
+                    </Tooltip>
 
                     {/* Inline status badge */}
                     {statusBadge && (

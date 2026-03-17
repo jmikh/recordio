@@ -438,6 +438,20 @@ export function DashboardPage() {
                                             selectMode={selectMode}
                                             selected={selectedIds.has(video.id)}
                                             onSelect={() => toggleSelect(video.id)}
+                                            onRename={async (newName) => {
+                                                setSharedVideos(prev => prev.map(v =>
+                                                    v.id === video.id ? { ...v, project_name: newName } : v
+                                                ));
+                                                try {
+                                                    await ShareService.updateSharedVideoMeta(video.id, { project_name: newName });
+                                                } catch (err) {
+                                                    console.error('Failed to rename shared video:', err);
+                                                    setSharedVideos(prev => prev.map(v =>
+                                                        v.id === video.id ? { ...v, project_name: video.project_name } : v
+                                                    ));
+                                                    addToast({ type: 'error', title: 'Rename Failed' });
+                                                }
+                                            }}
                                         />
                                     ))}
                                 </div>

@@ -36,11 +36,31 @@ export const useToast = () => {
     return context;
 };
 
+// Inject keyframes once
+const STYLE_ID = 'toast-keyframes';
+const ensureKeyframes = () => {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+        @keyframes toast-slide-in {
+            from { opacity: 0; transform: translateY(-100%); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toast-spin {
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+};
+
 // Toast Item Component
 const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, onRemove }) => {
     const timerRef = useRef<number | null>(null);
     const [isExiting, setIsExiting] = useState(false);
     const dismissReasonRef = useRef<ToastDismissReason>('expired');
+
+    useEffect(ensureKeyframes, []);
 
     const startExit = useCallback((reason: ToastDismissReason) => {
         dismissReasonRef.current = reason;
@@ -67,13 +87,18 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
         };
     }, [toast.type, toast.duration, startExit]);
 
-
-
-
     // Status icon to the left of the title
     const getStatusIcon = () => {
         if (toast.type === 'progress') {
-            return <div className="toast-spinner" />;
+            return (
+                <div
+                    className="w-5 h-5 shrink-0 rounded-full border-2 border-border"
+                    style={{
+                        borderTopColor: 'var(--primary)',
+                        animation: 'toast-spin 0.8s linear infinite',
+                    }}
+                />
+            );
         }
         if (toast.type === 'success') {
             return <FaCheck className="shrink-0 w-5 h-5 text-success" />;
@@ -94,21 +119,36 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
     };
 
     return (
-        <div className={`toast toast-${toast.type} ${isExiting ? 'toast-exiting' : ''}`}>
+        <div
+            className="flex items-center gap-3 min-w-80 max-w-[420px] bg-surface-raised border border-border-selected rounded-xl shadow-float pointer-events-auto"
+            style={{
+                padding: '14px 16px',
+                animation: isExiting ? undefined : 'toast-slide-in 0.3s ease-out',
+                opacity: isExiting ? 0 : undefined,
+                transform: isExiting ? 'translateY(-100%)' : undefined,
+                transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
+            }}
+        >
             {getStatusIcon()}
-            <div className="toast-content">
-                <div className="toast-title">{toast.title}</div>
-                {toast.message && <div className="toast-message">{toast.message}</div>}
+            <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-text-main leading-snug">{toast.title}</div>
+                {toast.message && <div className="text-[13px] text-text-muted mt-0.5 leading-snug">{toast.message}</div>}
                 {toast.action && (
-                    <button className="toast-action" onClick={handleActionClick}>
+                    <button
+                        className="mt-1.5 text-[13px] font-semibold text-primary bg-transparent border-none p-0 cursor-pointer hover:underline transition-colors"
+                        onClick={handleActionClick}
+                    >
                         {toast.action.label}
                     </button>
                 )}
                 {toast.type === 'progress' && toast.progress !== undefined && (
-                    <div className="toast-progress-container">
+                    <div className="mt-2.5 h-1 bg-surface rounded-sm overflow-hidden">
                         <div
-                            className="toast-progress-bar"
-                            style={{ width: `${Math.round(toast.progress * 100)}%` }}
+                            className="h-full rounded-sm transition-[width] duration-200 ease-out"
+                            style={{
+                                width: `${Math.round(toast.progress * 100)}%`,
+                                background: 'linear-gradient(90deg, var(--primary), var(--secondary))',
+                            }}
                         />
                     </div>
                 )}
@@ -123,7 +163,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: string) => void
     if (toasts.length === 0) return null;
 
     return createPortal(
-        <div className="toast-container">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[10000] flex flex-col gap-3 pointer-events-none">
             {toasts.map(toast => (
                 <ToastItem
                     key={toast.id}

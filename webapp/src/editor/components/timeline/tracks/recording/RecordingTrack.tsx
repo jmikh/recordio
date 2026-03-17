@@ -46,8 +46,10 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
         return new TimePixelMapper(timeMapper, pixelsPerSec);
     }, [timeline.outputWindows, pixelsPerSec]);
 
-    // Prepare Audio Analysis for Microphone and Camera
-    const screenAudio = useAudioAnalysis(microphoneSource?.id || '', microphoneSource?.runtimeUrl || '');
+    // Prepare Audio Analysis: prefer microphone, fallback to video audio if screen has audio
+    const audioSourceId = microphoneSource?.id || (screenSource.hasAudio ? screenSource.id : '');
+    const audioSourceUrl = microphoneSource?.runtimeUrl || (screenSource.hasAudio ? screenSource.runtimeUrl : '') || '';
+    const screenAudio = useAudioAnalysis(audioSourceId, audioSourceUrl);
     const cameraAudio = useAudioAnalysis(cameraSource?.id || '', cameraSource?.runtimeUrl || '');
 
     const { dragState, handleDragStart } = useWindowDrag(timeline, coords);

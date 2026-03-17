@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { TbEye, TbLink, TbExternalLink } from 'react-icons/tb';
+import { useState, useRef, useEffect } from 'react';
+import { TbEye, TbCopy, TbExternalLink, TbInfoCircle } from 'react-icons/tb';
 import type { SharedVideo, VideoAnalytics } from '../editor/services/ShareService';
+import { timeAgo } from '../utils/timeAgo';
 import { ShareService } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
 import { Tooltip } from '@shared/components/Tooltip';
@@ -13,11 +14,46 @@ interface SharedVideoCardProps {
     selectMode?: boolean;
     selected?: boolean;
     onSelect?: () => void;
+    onRename?: (newName: string) => void;
 }
 
-export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMode = false, selected = false, onSelect }: SharedVideoCardProps) => {
+export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMode = false, selected = false, onSelect, onRename }: SharedVideoCardProps) => {
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(video.project_name);
+    const inputRef = useRef<HTMLInputElement>(null);
     const { addToast } = useToast();
+
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditName(video.project_name);
+        setIsEditing(true);
+    };
+
+    const commitRename = () => {
+        const trimmed = editName.trim();
+        setIsEditing(false);
+        if (trimmed && trimmed !== video.project_name) {
+            onRename?.(trimmed);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            commitRename();
+        } else if (e.key === 'Escape') {
+            setIsEditing(false);
+            setEditName(video.project_name);
+        }
+    };
 
     const shareUrl = ShareService.getShareUrl(video.id);
     const thumbnailUrl = ShareService.getThumbnailUrl(video.cf_video_uid);
@@ -110,53 +146,62 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMo
             {/* Title + quick stats */}
             <div className="w-full min-w-0">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-normal truncate text-text-highlighted text-sm">{video.project_name}</h3>
-                    <span className="text-xs text-text-muted shrink-0 ml-2">{new Date(video.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                </div>
-                <div className="flex items-center text-xs text-text-muted mt-1 gap-3">
-                    {analytics && analytics.views > 0 && (
-                        <span className="flex items-center gap-1">
-                            <TbEye size={12} />
-                            {analytics.views}
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex flex-col gap-2 pt-1 border-t border-border">
-                <div className="flex items-center gap-1">
-                    {localProjectExists ? (
-                        <button
-                            onClick={openProject}
-                            title="Open project in editor"
-                            className="px-2 py-1 text-xs text-text-main hover:text-primary transition-colors rounded"
-                        >
-                            Open In Editor
-                        </button>
+                    {isEditing ? (
+                        <input
+                            ref={inputRef}
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={handleKeyDown}
+                            onClick={e => e.stopPropagation()}
+                            className="font-normal text-sm text-text-highlighted bg-transparent border-b border-primary outline-none w-full mr-2"
+                        />
                     ) : (
-                        <span className="px-2 py-1 text-xs text-text-muted">
-                            Project not found
-                        </span>
+                        <h3
+                            className={`font-normal truncate text-text-highlighted text-sm ${!selectMode && onRename ? 'cursor-text hover:text-primary transition-colors' : ''}`}
+                            onClick={!selectMode && onRename ? handleEditClick : undefined}
+                        >
+                            {video.project_name}
+                        </h3>
                     )}
+                    <span className="text-xs text-text-muted shrink-0 ml-2">{timeAgo(video.updated_at)}</span>
+                </div>
+                <div className="flex items-center mt-1 gap-1">
+                    <div className="flex items-center gap-2 text-xs text-text-muted">
+                        {analytics && analytics.views > 0 && (
+                            <span className="flex items-center gap-1">
+                                <TbEye size={12} />
+                                {analytics.views}
+                            </span>
+                        )}
+                        {localProjectExists ? (
+                            <button
+                                onClick={openProject}
+                                title="Open project in editor"
+                                className="text-xs text-text-muted hover:text-primary transition-colors cursor-pointer"
+                            >
+                                Open In Editor
+                            </button>
+                        ) : (
+                            <span className="flex items-center gap-1 text-xs text-text-disabled">
+                                No Project
+                                <Tooltip text="The project was deleted from your computer or this video was recorded on a different device.">
+                                    <TbInfoCircle size={13} className="text-text-disabled cursor-help" />
+                                </Tooltip>
+                            </span>
+                        )}
+                    </div>
                     <div className="flex-1" />
                     <Tooltip text="Copy share link">
-                        <button
-                            onClick={copyLink}
-                            className="interactive-icon"
-                        >
-                            <TbLink size={14} />
+                        <button onClick={copyLink} className="interactive-icon">
+                            <TbCopy size={14} />
                         </button>
                     </Tooltip>
                     <Tooltip text="Open watch page">
-                        <button
-                            onClick={openWatchPage}
-                            className="interactive-icon"
-                        >
+                        <button onClick={openWatchPage} className="interactive-icon">
                             <TbExternalLink size={14} />
                         </button>
                     </Tooltip>
-
                 </div>
             </div>
         </div>

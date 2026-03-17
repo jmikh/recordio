@@ -134,7 +134,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         yPx: 1080 - 325,
         shape: 'circle',
         borderRadiusPx: 0,
-        borderWidthPx: 1,
+        borderWidthPx: 0,
         borderColor: 'white',
         hasShadow: true,
         hasGlow: false,
