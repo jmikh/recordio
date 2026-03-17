@@ -74,6 +74,7 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
     let current: Element | null = element;
     let farthestMatch: Element | null = null;
     let farthestMatchRadius: [number, number, number, number] = [0, 0, 0, 0];
+    let farthestMatchSignals: string[] = [];
 
     // Track bubbled radius from same-size children
     let bubbledRadius: [number, number, number, number] = [0, 0, 0, 0];
@@ -174,9 +175,8 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
 
         // Additional visual signals
         const hasBackgroundImage = style.backgroundImage && style.backgroundImage !== 'none';
-        const hasOutline = style.outlineWidth && parseFloat(style.outlineWidth) > 0 && style.outlineStyle !== 'none';
 
-        let hasVisualSignal = hasBoxShadow || hasDropShadow || hasBorder || hasModalBackdrop || hasOpaqueBackground || hasBackgroundImage || hasOutline;
+        let hasVisualSignal = hasBoxShadow || hasDropShadow || hasBorder || hasModalBackdrop || hasOpaqueBackground || hasBackgroundImage;
 
         // Shadow DOM visual signal peek: web components often style internally
         // around <slot>, so the host has no visual signals from getComputedStyle.
@@ -233,6 +233,16 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
         // Skip non-interactive wrappers (e.g., transparent modal containers)
         const isInteractive = style.pointerEvents !== 'none';
 
+        // Collect matched visual signals for debug
+        const visualSignals: string[] = [];
+        if (hasBoxShadow) visualSignals.push('shadow');
+        if (hasDropShadow) visualSignals.push('dropShadow');
+        if (hasBorder) visualSignals.push('border');
+        if (hasModalBackdrop) visualSignals.push('backdrop');
+        if (hasOpaqueBackground) visualSignals.push('opaqueBg');
+        if (hasBackgroundImage) visualSignals.push('bgImage');
+
+
         if (debug) {
             const tag = current.tagName.toLowerCase();
             const cls = typeof (current as HTMLElement).className === 'string' ? (current as HTMLElement).className.split(' ')[0] : '';
@@ -245,6 +255,9 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
             if (!isVisibleInViewport) reasons.push('offscreen');
             if (!isInteractive) reasons.push('noPointer');
             const pass = meetsMinSize && meetsMaxSize && hasVisualSignal && isVisibleInViewport && isInteractive;
+
+            // Visual signals for passing elements
+            if (pass && visualSignals.length) reasons.push(visualSignals.join(', '));
 
             // Radius diagnostics
             const radiusInfo: string[] = [];
@@ -272,6 +285,7 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
         if (meetsMinSize && meetsMaxSize && hasVisualSignal && isVisibleInViewport && isInteractive) {
             farthestMatch = current;
             farthestMatchRadius = bubbledRadius;
+            farthestMatchSignals = visualSignals;
         }
 
         // Track visual signal for overflow boundary check on next iteration
@@ -349,7 +363,8 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
         if (farthestMatch) {
             const tag = farthestMatch.tagName.toLowerCase();
             const cls = typeof (farthestMatch as HTMLElement).className === 'string' ? (farthestMatch as HTMLElement).className.split(' ')[0] : '';
-            console.log(`[HoveredCard]   → Result: <${tag}${cls ? '.' + cls : ''}> radius=[${farthestMatchRadius.join(',')}]`);
+            const signalsStr = farthestMatchSignals.length ? ` matched=[${farthestMatchSignals.join(', ')}]` : '';
+            console.log(`[HoveredCard]   → Result: <${tag}${cls ? '.' + cls : ''}> radius=[${farthestMatchRadius.join(',')}]${signalsStr}`);
         } else {
             console.log(`[HoveredCard]   → No match`);
         }
