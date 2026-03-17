@@ -282,6 +282,7 @@ export const CanvasContainer = () => {
                     } else {
                         PlaybackRenderer.render(resources, {
                             project,
+                            userEvents: useProjectStore.getState().userEvents,
                             currentTimeMs: effectiveTimeMs,
                             timeMapper: timeMapperRef.current,
                             overrideCameraSettings: previewCameraSettingsRef.current || undefined,

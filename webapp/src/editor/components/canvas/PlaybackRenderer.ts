@@ -15,6 +15,7 @@ import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings, getResolved
 import type { TimeMapper } from '../../../core/mappers/timeMapper';
 import { type FocusArea } from '../../../types';
 import type { Project, Rect, CameraSettings } from '../../../types';
+import type { UserEvents } from '@shared/types';
 
 /** A video source that can be drawn with ctx.drawImage — either a DOM video element or a decoded WebCodecs frame */
 export type VideoSource = HTMLVideoElement | VideoFrame;
@@ -32,6 +33,7 @@ export class PlaybackRenderer {
         resources: RenderResources,
         state: {
             project: Project,
+            userEvents: UserEvents,
             currentTimeMs: number,
             timeMapper: TimeMapper,
             overrideCameraSettings?: CameraSettings,
@@ -40,8 +42,7 @@ export class PlaybackRenderer {
         }
     ) {
         const { ctx, videoRefs } = resources;
-        const { project, currentTimeMs } = state;
-        const { userEvents } = project;
+        const { project, currentTimeMs, userEvents } = state;
         const outputSize = project.settings.outputSize;
 
         const { timeline } = project;
@@ -80,7 +81,8 @@ export class PlaybackRenderer {
                 effectiveViewport,
                 resources.deviceFrameImg,
                 currentTimeMs,
-                state.timeMapper
+                state.timeMapper,
+                userEvents?.urlChanges
             );
             viewMapper = result.viewMapper;
 

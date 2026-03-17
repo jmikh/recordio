@@ -120,7 +120,9 @@ export function ExportSettings() {
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(project, quality, fps, onProgress, options);
+            // Re-attach userEvents (stored separately from project for undo/redo perf)
+            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress, options);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
@@ -218,7 +220,9 @@ export function ExportSettings() {
         let exportDuration = 0;
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
+            // Re-attach userEvents (stored separately from project for undo/redo perf)
+            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });

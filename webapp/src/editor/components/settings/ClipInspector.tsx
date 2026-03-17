@@ -18,7 +18,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     const { batchAction } = useHistoryBatcher();
 
     // AutoCut sources
-    const userEvents = useProjectStore(s => s.project.userEvents);
+    const userEvents = useProjectStore(s => s.userEvents);
     const screenSource = useProjectStore(s => s.project.screenSource);
     const cameraSource = useProjectStore(s => s.project.cameraSource);
     const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);

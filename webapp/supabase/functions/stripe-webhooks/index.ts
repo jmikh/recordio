@@ -272,22 +272,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     // Track subscription created
     await mpTrack(userId, 'subscription_created', {
-        billing_interval: billingInterval,
+        plan_type: billingInterval,
         price: priceAmount,
         currency,
     });
 
-    // Track plan type change
-    if (previousPlanType !== 'pro') {
-        await mpTrack(userId, 'plan_type_changed', {
-            previous_plan_type: previousPlanType,
-            new_plan_type: 'pro',
-        });
-    }
-
     // Track revenue
     if (priceAmount > 0) {
-        await mpTrackCharge(userId, priceAmount / 100, { billing_interval: billingInterval });
+        await mpTrackCharge(userId, priceAmount / 100, { plan_type: billingInterval });
     }
 }
 
@@ -373,20 +365,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
     await mpPeopleSet(userId, profileUpdate);
 
-    // Plan type changed?
-    if (oldPlanType !== newPlanType) {
-        await mpTrack(userId, 'plan_type_changed', {
-            previous_plan_type: oldPlanType,
-            new_plan_type: newPlanType,
-        });
-    }
-
     // Cancel scheduled? (cancel_at_period_end flipped to true)
     if (cancelAtPeriodEnd && !oldCancelAtPeriodEnd) {
         const remainingMs = currentPeriodEnd.getTime() - Date.now();
         const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
         await mpTrack(userId, 'subscription_cancel_scheduled', {
-            billing_interval: billingInterval,
+            plan_type: billingInterval,
             remaining_days: remainingDays,
             cancel_at: currentPeriodEnd.toISOString(),
         });
@@ -395,7 +379,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     // Reactivated? (cancel_at_period_end flipped to false)
     if (!cancelAtPeriodEnd && oldCancelAtPeriodEnd) {
         await mpTrack(userId, 'subscription_reactivated', {
-            billing_interval: billingInterval,
+            plan_type: billingInterval,
         });
     }
 
@@ -409,8 +393,13 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
             renewalAmount = (priceItem?.unit_amount ?? 0) / 100;
         } catch { /* ignore */ }
 
+        await mpTrack(userId, 'subscription_renewed', {
+            plan_type: billingInterval,
+            price: renewalAmount,
+        });
+
         if (renewalAmount > 0) {
-            await mpTrackCharge(userId, renewalAmount, { billing_interval: billingInterval });
+            await mpTrackCharge(userId, renewalAmount, { plan_type: billingInterval });
         }
     }
 }
@@ -467,10 +456,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
         });
 
         if (previousPlanType !== 'basic') {
-            await mpTrack(existingSub.user_id, 'plan_type_changed', {
-                previous_plan_type: previousPlanType,
-                new_plan_type: 'basic',
-                billing_interval: billingInterval,
+            await mpTrack(existingSub.user_id, 'subscription_canceled', {
+                plan_type: billingInterval,
             });
         }
     }

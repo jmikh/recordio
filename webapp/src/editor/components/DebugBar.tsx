@@ -41,8 +41,8 @@ export const DebugBar = () => {
             <button
                 className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
                 onClick={() => {
-                    const p = useProjectStore.getState().project;
-                    const areas = getAllFocusAreas(p.userEvents, p.screenSource.size, p.screenSource.durationMs);
+                    const s = useProjectStore.getState();
+                    const areas = getAllFocusAreas(s.userEvents, s.project.screenSource.size, s.project.screenSource.durationMs);
                     console.log('Focus Areas:', areas);
                 }}
                 title="Log computed focus areas"

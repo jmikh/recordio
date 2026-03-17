@@ -126,7 +126,7 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
             const spotlightSegments = calculateAutoSpotlights(
                 viewMapper,
                 timeMapper,
-                project.userEvents.hoveredCards || [],
+                state.userEvents.hoveredCards || [],
                 project.timeline.zoomSegments,
                 project.settings.zoom,
                 project.settings.spotlight

@@ -100,7 +100,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
         set(state => {
             const project = state.project;
             const sourceSize = project.screenSource.size;
-            const hasUserEvents = project.userEvents.mousePositions.length > 0;
+            const hasUserEvents = state.userEvents.mousePositions.length > 0;
 
             if (!project.screenSource.trackableContentRect) {
                 return state;
@@ -120,7 +120,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                 deviceFrame
             );
             const timeMapper = getTimeMapper(project.timeline.outputWindows);
-            const focusAreas = getAllFocusAreas(project.userEvents, sourceSize, project.screenSource.durationMs);
+            const focusAreas = getAllFocusAreas(state.userEvents, sourceSize, project.screenSource.durationMs);
             const zoomSegments = calculateAutoZooms(
                 project.settings.zoom,
                 viewMapper,

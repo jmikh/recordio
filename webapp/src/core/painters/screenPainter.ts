@@ -37,6 +37,7 @@ export function drawScreen(
     deviceFrameImg: HTMLImageElement | null, // Cached device frame image
     currentOutputTimeMs?: number, // Current playback time (output) for URL lookup
     timeMapper?: TimeMapper, // For converting output time → source time
+    urlChanges?: UrlChangeEvent[], // URL change events (passed explicitly; project.userEvents separated from project at runtime)
 ): { viewMapper: ViewMapper } {
     const screenConfig = project.settings.screen || {
         mode: 'device',
@@ -116,7 +117,6 @@ export function drawScreen(
 
             // Draw custom toolbar (if active), then video
             if (hasCustomToolbar) {
-                const urlChanges = project.userEvents?.urlChanges as UrlChangeEvent[] | undefined;
                 const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
                     ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
                     : undefined;
@@ -212,7 +212,6 @@ export function drawScreen(
 
             // Draw custom toolbar in the top portion
             if (hasCustomToolbar) {
-                const urlChanges = project.userEvents?.urlChanges as UrlChangeEvent[] | undefined;
                 const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
                     ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
                     : undefined;

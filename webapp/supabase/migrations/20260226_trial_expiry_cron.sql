@@ -29,22 +29,6 @@ begin
         set status = 'expired', updated_at = now()
         where user_id = r.user_id;
 
-        -- Fire Mixpanel plan_type_changed event
-        perform net.http_post(
-            url := 'https://api.mixpanel.com/track',
-            body := jsonb_build_array(jsonb_build_object(
-                'event', 'plan_type_changed',
-                'properties', jsonb_build_object(
-                    'token', mp_token,
-                    'distinct_id', r.user_id,
-                    'time', extract(epoch from now())::bigint * 1000,
-                    'previous_plan_type', 'pro_trial',
-                    'new_plan_type', 'basic'
-                )
-            )),
-            headers := '{"Content-Type": "application/json", "Accept": "text/plain"}'::jsonb
-        );
-
         -- Update Mixpanel profile
         perform net.http_post(
             url := 'https://api.mixpanel.com/engage#profile-set',
@@ -65,9 +49,9 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- 4. Schedule the cron job to run every hour
+-- 4. Schedule the cron job to run daily at midnight UTC
 select cron.schedule(
     'expire-free-trials',
-    '0 * * * *',
+    '0 0 * * *',
     $$select public.expire_trials()$$
 );

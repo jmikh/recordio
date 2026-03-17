@@ -326,6 +326,7 @@ export class ExportManager {
                     deviceFrameImg: imageElements.device
                 }, {
                     project: renderProject,
+                    userEvents: renderProject.userEvents,
                     currentTimeMs: currentTimeMs,
                     timeMapper: timeMapper
                 });

@@ -28,7 +28,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     const allSpotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
     const spotlightSettings = useProjectStore(s => s.project.settings.spotlight);
     const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
-    const hasHoveredCards = useProjectStore(s => (s.project.userEvents.hoveredCards || []).length > 0);
+    const hasHoveredCards = useProjectStore(s => (s.userEvents.hoveredCards || []).length > 0);
 
     // Per-setting "apply to all" checkboxes — reset on each mount
     const [applyDimToAll, setApplyDimToAll] = useState(false);

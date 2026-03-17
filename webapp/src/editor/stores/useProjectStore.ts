@@ -1,7 +1,7 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID } from '../../types';
+import type { Project, ID, UserEvents } from '../../types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
@@ -14,6 +14,8 @@ import { createCameraMoveSlice, type CameraMoveSlice } from './slices/cameraMove
 
 export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice {
     project: Project;
+    /** Recording events — loaded once, never mutated, excluded from undo/redo history. */
+    userEvents: UserEvents;
     isSaving: boolean;
 
 
@@ -51,6 +53,7 @@ export const useProjectStore = create<ProjectState>()(
             (set, get, store) => ({
                 // Initialize with a default empty project
                 project: ProjectImpl.create('Untitled Project'),
+                userEvents: { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] },
                 isSaving: false,
                 mutedSources: {},
 
@@ -74,8 +77,10 @@ export const useProjectStore = create<ProjectState>()(
                 })),
 
                 loadProject: async (project) => {
-                    // Project now contains embedded sources and events - no separate loading needed
-                    set({ project });
+                    // Separate userEvents from the project so undo/redo history
+                    // doesn't snapshot the (potentially massive) event arrays.
+                    const { userEvents, ...projectWithoutEvents } = project;
+                    set({ project: projectWithoutEvents as Project, userEvents });
 
                     // Clear History so we can't undo into valid empty state or previous project
                     useProjectStore.temporal.getState().clear();
@@ -182,7 +187,11 @@ useProjectStore.subscribe(
         // Debounce save (e.g., 2 seconds)
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            ProjectStorage.saveProject(project).catch(console.error);
+            // Re-attach userEvents before persisting — the runtime store keeps
+            // them separate, but the IndexedDB record needs the full project.
+            const userEvents = useProjectStore.getState().userEvents;
+            const fullProject = { ...project, userEvents };
+            ProjectStorage.saveProject(fullProject).catch(console.error);
         }, 2000);
     }
 );
@@ -192,7 +201,7 @@ useProjectStore.subscribe(
 export const useProjectData = () => useProjectStore(s => s.project);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
 export const useTimeline = () => useProjectStore(s => s.project.timeline);
-export const useUserEvents = () => useProjectStore(s => s.project.userEvents);
+export const useUserEvents = () => useProjectStore(s => s.userEvents);
 export const useProjectHistory = <T,>(
     selector: (state: TemporalState<{ project: Project }>) => T
 ) => useStore(useProjectStore.temporal, selector);
