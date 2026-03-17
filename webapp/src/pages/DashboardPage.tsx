@@ -36,7 +36,7 @@ export function DashboardPage() {
     const [sharedVideos, setSharedVideos] = useState<SharedVideo[]>([]);
     const [analytics, setAnalytics] = useState<Record<string, VideoAnalytics>>({});
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
     const { userId, hasProAccess } = useUserStore();
 
     const isAuthenticated = !!userId;
@@ -82,7 +82,7 @@ export function DashboardPage() {
         const params = new URLSearchParams(window.location.search);
         const error = params.get('error');
         if (error) {
-            setErrorMessage(error);
+            addToast({ type: 'error', title: error });
         }
 
         // Check for checkout intent from marketing site (e.g. ?checkout=yearly)
@@ -156,6 +156,23 @@ export function DashboardPage() {
         }
         return sorted;
     }, [projects, sortOrder]);
+
+    // Sort shared videos
+    const sortedSharedVideos = useMemo(() => {
+        const sorted = [...sharedVideos];
+        switch (sortOrder) {
+            case 'newest':
+                sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                break;
+            case 'oldest':
+                sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                break;
+            case 'name':
+                sorted.sort((a, b) => a.project_name.localeCompare(b.project_name));
+                break;
+        }
+        return sorted;
+    }, [sharedVideos, sortOrder]);
 
     // Derive set of project IDs that have shared links (no extra API calls)
     const sharedProjectIds = useMemo(() => {
@@ -262,7 +279,7 @@ export function DashboardPage() {
     return (
         <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
-            <header className="border-b border-border">
+            <header className="border-b border-border bg-surface">
                 <div style={{ maxWidth: 1400 }} className="mx-auto px-6 py-4 flex items-center">
                     <LogoLink />
                     {hasProAccess() && (
@@ -288,22 +305,10 @@ export function DashboardPage() {
             </header>
 
             <div style={{ maxWidth: 1400 }} className="mx-auto">
-                {/* Error Message */}
-                {errorMessage && (
-                    <div className="mt-4 w-fit mx-auto bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg flex items-center gap-3">
-                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>{errorMessage}</span>
-                        <XButton
-                            onClick={() => setErrorMessage(null)}
-                            title="Dismiss"
-                        />
-                    </div>
-                )}
+
 
                 {/* Tab Bar */}
-                <div className="px-6 pt-5 flex items-center gap-6 border-b border-border">
+                <div className="mx-6 mt-4 px-6 flex items-center gap-6 border border-border rounded-xl bg-surface">
                     <TabButton
                         active={activeTab === 'projects'}
                         count={projects.length}
@@ -318,6 +323,34 @@ export function DashboardPage() {
                     >
                         Published
                     </TabButton>
+                    <div className="flex-1" />
+                    {activeTab === 'projects' && projects.length > 0 && storageUsed != null && (
+                        <span className="text-xs text-text-muted">
+                            <span className="text-text-main">{formatBytes(storageUsed)}</span> local storage used
+                        </span>
+                    )}
+                    {activeTab === 'published' && isAuthenticated && sharedVideos.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-text-muted">
+                                {sharedVideos.length} of {MAX_SHARED_VIDEOS}
+                            </span>
+                            <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary rounded-full transition-all duration-300"
+                                    style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <div className={`my-2 ${((activeTab === 'projects' && projects.length > 1) || (activeTab === 'published' && sharedVideos.length > 1)) ? 'visible' : 'invisible'}`}>
+                        <Dropdown
+                            options={SORT_OPTIONS}
+                            value={sortOrder}
+                            onChange={setSortOrder}
+                            fullWidth={false}
+                            buttonClassName="h-8 text-xs"
+                        />
+                    </div>
                 </div>
 
                 {/* Projects Tab */}
@@ -325,9 +358,6 @@ export function DashboardPage() {
                     <main className="p-6">
                         {/* Toolbar */}
                         <div className="flex items-center gap-3 mb-4">
-                            <span className="text-xs text-text-muted">
-                                {storageUsed != null ? `${formatBytes(storageUsed)} stored on this device` : 'Stored on this device'}
-                            </span>
                             {import.meta.env.DEV && (
                                 <>
                                     <input
@@ -346,31 +376,18 @@ export function DashboardPage() {
                                     </button>
                                 </>
                             )}
-                            <div className="flex-1" />
-                            {projects.length > 1 && (
-                                <Dropdown
-                                    options={SORT_OPTIONS}
-                                    value={sortOrder}
-                                    onChange={setSortOrder}
-                                    fullWidth={false}
-                                    buttonClassName="h-8 text-xs"
-                                />
-                            )}
-                        </div>
 
-                        <p className="text-sm text-text-muted mb-4">
-                            Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
-                        </p>
+                        </div>
 
                         {loading ? (
                             <div className="flex items-center justify-center h-64">
                                 <div className="text-text-muted">Loading projects...</div>
                             </div>
                         ) : projects.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 text-center max-w-md mx-auto">
-                                <div className="text-text-muted text-sm">
-                                    Projects are stored locally in your browser. If you recorded on a different browser or device, open Recordio there to find your projects.
-                                </div>
+                            <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                <p className="text-sm text-text-muted">
+                                    Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
+                                </p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -394,33 +411,25 @@ export function DashboardPage() {
                 {/* Published Tab */}
                 {activeTab === 'published' && (
                     <section className="p-6">
-                        {isAuthenticated && sharedVideos.length > 0 && (
+                        {isAuthenticated && sharedVideos.length > 0 && sharedVideos.length >= MAX_SHARED_VIDEOS && (
                             <div className="flex items-center gap-3 mb-4">
                                 <span className="text-xs text-text-muted">
-                                    {sharedVideos.length} of {MAX_SHARED_VIDEOS}
+                                    Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
                                 </span>
-                                <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-primary rounded-full transition-all duration-300"
-                                        style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
-                                    />
-                                </div>
-                                {sharedVideos.length >= MAX_SHARED_VIDEOS && (
-                                    <span className="text-xs text-text-muted">
-                                        Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
-                                    </span>
-                                )}
                             </div>
                         )}
                         {!isAuthenticated ? (
-                            <p className="text-sm text-text-muted">Log in to see published videos</p>
+                            <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                <p className="text-sm text-text-muted">Sign in to see your published videos</p>
+                                <Button size="sm" onClick={() => setIsAuthModalOpen(true)}>Sign in</Button>
+                            </div>
                         ) : sharedVideos.length === 0 ? (
                             <p className="text-sm text-text-muted">You have no published videos</p>
                         ) : (() => {
                             const localProjectIds = new Set(projects.map(p => p.id));
                             return (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {sharedVideos.map(video => (
+                                    {sortedSharedVideos.map(video => (
                                         <SharedVideoCard
                                             key={video.id}
                                             video={video}
@@ -574,7 +583,7 @@ function TabButton({ active, count, onClick, children }: {
         <button
             onClick={onClick}
             className={`
-                pb-3 text-sm font-medium transition-colors relative cursor-pointer
+                py-3 text-sm font-medium transition-colors relative cursor-pointer self-stretch flex items-center
                 ${active
                     ? 'text-text-highlighted'
                     : 'text-text-muted hover:text-text-main'
@@ -591,9 +600,9 @@ function TabButton({ active, count, onClick, children }: {
             `}>
                 {count}
             </span>
-            {/* Active underline */}
+            {/* Active underline — sits on the border */}
             {active && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
             )}
         </button>
     );

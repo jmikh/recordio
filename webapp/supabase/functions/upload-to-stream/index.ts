@@ -143,6 +143,9 @@ serve(async (req) => {
         // 6. Upsert shared_videos record
         const oldVideoUid = existingShare?.cf_video_uid;
 
+        // Extract creator name from user metadata (Google OAuth provides full_name)
+        const creatorName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'A Recordio user';
+
         if (existingShare) {
             // Re-share: update existing record
             const { error: updateError } = await supabase
@@ -150,6 +153,7 @@ serve(async (req) => {
                 .update({
                     cf_video_uid: newVideoUid,
                     project_name: projectName,
+                    creator_name: creatorName,
                     version: (existingShare.version || 1) + 1,
                     updated_at: new Date().toISOString(),
                 })
@@ -186,6 +190,7 @@ serve(async (req) => {
                     user_id: user.id,
                     project_id: projectId,
                     project_name: projectName,
+                    creator_name: creatorName,
                     cf_video_uid: newVideoUid,
                 })
                 .select('id')

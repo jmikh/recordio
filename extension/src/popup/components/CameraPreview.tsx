@@ -16,7 +16,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({ stream }) => {
     if (!stream) return null;
 
     return (
-        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 shadow-inner mt-2">
+        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-border shadow-inner">
             <video
                 ref={videoRef}
                 autoPlay

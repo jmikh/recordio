@@ -5,9 +5,11 @@ import { RecordingConfig } from './components/RecordingConfig';
 import { RecordingStatus } from './components/RecordingStatus';
 
 import { MdArrowBack, MdBlurOn } from 'react-icons/md';
-import { TbFolder } from 'react-icons/tb';
-import { LogoLink } from '@shared/components/LogoLink';
+import { AiOutlineHome } from 'react-icons/ai';
+import logoDark from '@shared/assets/fulllogo-dark.png';
+import logoLight from '@shared/assets/fulllogo-light.png';
 import { Button } from '@shared/components/Button';
+import { Tooltip } from '@shared/components/Tooltip';
 import permissionGuide from '../assets/permission-guide.jpg';
 import { getEditorOrigin } from '@shared/types/bridge';
 
@@ -127,7 +129,7 @@ function App() {
     // 5. Close camera float when popup closes without an active recording
     const handleBeforeUnload = () => {
       if (!isRecordingRef.current) {
-        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
+        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => { });
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -220,7 +222,7 @@ function App() {
       setVideoStream(null);
       setVideoPermission('unknown');
       // Close float window when camera is toggled off
-      chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
+      chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => { });
     }
   };
 
@@ -382,32 +384,36 @@ function App() {
   }
 
   return (
-    <div className="relative w-[320px] bg-surface text-text-highlighted font-sans overflow-hidden flex flex-col">
+    <div className="relative w-[320px] bg-surface-raised text-text-highlighted font-sans overflow-hidden flex flex-col">
       {/* Fixed Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <LogoLink />
+      <div className="flex items-center justify-between px-3 py-1 border-b border-border bg-surface">
+        <span className="opacity-90">
+          <img src={logoLight} alt="Recordio" className="logo-for-light h-5" />
+          <img src={logoDark} alt="Recordio" className="logo-for-dark h-5" />
+        </span>
         <div className="flex items-center gap-1">
-          <Button
-            onClick={openEditor}
-            className="p-1.5"
-            title="Projects"
-          >
-            <TbFolder size={16} />
-          </Button>
-          <Button
-            onClick={handleBlurMode}
-            className="p-1.5"
-            title={canInjectContentScript === false ? "Blur doesn't work on Chrome-owned pages" : "Blur Items"}
-            disabled={canInjectContentScript === false}
-          >
-            <MdBlurOn size={16} />
-          </Button>
-
+          <Tooltip text="Home" position="bottom-start">
+            <Button
+              variant="icon"
+              onClick={openEditor}
+            >
+              <AiOutlineHome size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip text={canInjectContentScript === false ? "Blur doesn't work on Chrome-owned pages" : "Blur Items"} position="bottom-start">
+            <Button
+              variant="icon"
+              onClick={handleBlurMode}
+              disabled={canInjectContentScript === false}
+            >
+              <MdBlurOn size={16} />
+            </Button>
+          </Tooltip>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="p-4 flex flex-col">
+      <div className="p-2 flex flex-col">
         {!isRecording ? (
           <RecordingConfig
             recordingMode={recordingMode}

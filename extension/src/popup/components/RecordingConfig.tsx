@@ -1,6 +1,6 @@
 import { AudioVisualizerWrapper } from './AudioVisualizerWrapper';
 import { CameraPreview } from './CameraPreview';
-import { MultiToggle, Toggle, Dropdown, Notice, Button } from '@shared/components';
+import { MultiToggle, Toggle, Dropdown, Notice, Button, Tooltip } from '@shared/components';
 import { MSG_TYPES } from '../../shared/messageTypes';
 import { BiMicrophone } from 'react-icons/bi';
 import { PiWebcamBold } from 'react-icons/pi';
@@ -122,33 +122,30 @@ export function RecordingConfig({
                             value={selectedVideoId}
                             onChange={setSelectedVideoId}
                         />
-                        <CameraPreview stream={videoStream} />
-                        {videoStream && (
-                            <>
-                                <Button
-                                    onClick={() => {
-                                        console.log('[popup] Float Camera clicked, deviceId:', selectedVideoId, 'mode:', recordingMode);
-                                        chrome.runtime.sendMessage({
-                                            type: MSG_TYPES.OPEN_CAMERA_FLOAT,
-                                            payload: {
-                                                deviceId: selectedVideoId,
-                                                mode: recordingMode,
-                                            }
-                                        }, (response) => {
-                                            console.log('[popup] Float Camera response:', response, chrome.runtime.lastError);
-                                        });
-                                    }}
-                                    size="sm"
-                                    fullWidth
-                                    className="mt-2 py-1.5"
-                                    title="Open camera in a floating always-on-top window"
-                                >
-                                    <MdOutlineOpenInNew size={14} />
-                                    Float Camera
-                                </Button>
-                                <p className="subtext mt-1" style={{ textAlign: 'center' }}>Allows you to see yourself during recording.</p>
-                            </>
-                        )}
+                        <div className="relative mt-2">
+                            <CameraPreview stream={videoStream} />
+                            {videoStream && (
+                                <Tooltip text="Float camera on screen" position="bottom-start" className="absolute top-2 right-2">
+                                    <button
+                                        onClick={() => {
+                                            console.log('[popup] Float Camera clicked, deviceId:', selectedVideoId, 'mode:', recordingMode);
+                                            chrome.runtime.sendMessage({
+                                                type: MSG_TYPES.OPEN_CAMERA_FLOAT,
+                                                payload: {
+                                                    deviceId: selectedVideoId,
+                                                    mode: recordingMode,
+                                                }
+                                            }, (response) => {
+                                                console.log('[popup] Float Camera response:', response, chrome.runtime.lastError);
+                                            });
+                                        }}
+                                        className="size-7 flex items-center justify-center rounded-full bg-surface-raised/80 text-text-highlighted hover:bg-surface-raised hover:scale-110 transition-all cursor-pointer"
+                                    >
+                                        <MdOutlineOpenInNew size={14} />
+                                    </button>
+                                </Tooltip>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
@@ -164,7 +161,6 @@ export function RecordingConfig({
                 onClick={startRecording}
                 disabled={hasPermissionError || (recordingMode === 'tab' && canInjectContentScript === false)}
                 fullWidth
-                className="mt-2"
             >
                 Start Recording
             </Button>

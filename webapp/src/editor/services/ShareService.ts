@@ -20,6 +20,7 @@ export interface SharedVideo {
     description: string;
     cf_video_uid: string;
     version: number;
+    creator_name?: string;
     created_at: string;
     updated_at: string;
 }

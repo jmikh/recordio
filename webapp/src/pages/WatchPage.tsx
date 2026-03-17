@@ -1,78 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { ShareService, type SharedVideo } from '../editor/services/ShareService';
 import { LogoLink } from '@shared/components/LogoLink';
-import { TbEyeCheck, TbClock, TbChartBar } from 'react-icons/tb';
+import { Button } from '@shared/components/Button';
+import { ThemeToggle } from '@shared/components';
+import { TbLink } from 'react-icons/tb';
+import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
-/** Format seconds into m:ss */
-function formatDuration(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
-interface DailyData {
-    date: string;
-    views: number;
-    minutesViewed: number;
-}
 
-interface DetailedAnalytics {
-    views: number;
-    minutesViewed: number;
-    durationSeconds: number;
-    daily?: DailyData[];
-}
-
-/** Simple SVG bar chart for daily views */
-function ViewsChart({ daily }: { daily: DailyData[] }) {
-    if (daily.length === 0) return null;
-
-    const maxViews = Math.max(...daily.map(d => d.views), 1);
-    const barWidth = Math.max(4, Math.floor(400 / daily.length) - 2);
-    const chartHeight = 100;
-
-    return (
-        <div className="w-full overflow-x-auto">
-            <svg
-                width={daily.length * (barWidth + 2)}
-                height={chartHeight + 20}
-                className="text-primary"
-            >
-                {daily.map((d, i) => {
-                    const barHeight = (d.views / maxViews) * chartHeight;
-                    const x = i * (barWidth + 2);
-                    const y = chartHeight - barHeight;
-                    return (
-                        <g key={d.date}>
-                            <rect
-                                x={x}
-                                y={y}
-                                width={barWidth}
-                                height={barHeight}
-                                fill="currentColor"
-                                opacity={0.7}
-                                rx={2}
-                            >
-                                <title>{`${d.date}: ${d.views} views, ${d.minutesViewed.toFixed(1)} min`}</title>
-                            </rect>
-                            {/* Show date label for first, last, and middle */}
-                            {(i === 0 || i === daily.length - 1 || i === Math.floor(daily.length / 2)) && (
-                                <text
-                                    x={x + barWidth / 2}
-                                    y={chartHeight + 14}
-                                    fontSize={9}
-                                    fill="var(--color-text-muted)"
-                                    textAnchor="middle"
-                                >
-                                    {new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </text>
-                            )}
-                        </g>
-                    );
-                })}
-            </svg>
-        </div>
-    );
+/** Get initials from a name string */
+function getInitials(name: string): string {
+    return name
+        .split(' ')
+        .map(w => w[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 }
 
 /** Branded watch page for shared Recordio videos */
@@ -80,11 +24,11 @@ export function WatchPage() {
     const [sharedVideo, setSharedVideo] = useState<SharedVideo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [linkCopied, setLinkCopied] = useState(false);
 
     // Auth state
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
-    const [analytics, setAnalytics] = useState<DetailedAnalytics | null>(null);
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingDesc, setEditingDesc] = useState(false);
     const [titleValue, setTitleValue] = useState('');
@@ -117,10 +61,6 @@ export function WatchPage() {
                         setIsAuthenticated(true);
                         if (userId === video.user_id) {
                             setIsOwner(true);
-                            // Fetch detailed analytics
-                            ShareService.getDetailedVideoAnalytics(video.cf_video_uid).then(data => {
-                                if (data) setAnalytics(data);
-                            });
                         }
                     }
                 });
@@ -152,6 +92,13 @@ export function WatchPage() {
         }
         setEditingDesc(false);
         setSaving(false);
+    };
+
+    const copyLink = () => {
+        if (!shareId) return;
+        navigator.clipboard.writeText(ShareService.getShareUrl(shareId));
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
     };
 
     if (loading) {
@@ -186,48 +133,86 @@ export function WatchPage() {
     }
 
     // Cloudflare Stream embed URL
-    const cfEmbedUrl = `https://customer-${getCfCustomerSubdomain()}.cloudflarestream.com/${sharedVideo.cf_video_uid}/iframe?primaryColor=%236366f1`;
+    const cfEmbedUrl = `https://customer-${getCfCustomerSubdomain()}.cloudflarestream.com/${sharedVideo.cf_video_uid}/iframe`;
+    const creatorName = sharedVideo.creator_name || 'A Recordio user';
+    const sharedDate = new Date(sharedVideo.created_at);
 
     return (
-        <div className="min-h-screen bg-surface flex flex-col">
+        <div className="min-h-screen bg-surface-body flex flex-col">
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <header className="border-b border-border bg-surface">
+                <div style={{ maxWidth: 1400 }} className="mx-auto flex items-center justify-between px-6 py-4">
                 <LogoLink
                     href={isAuthenticated ? '/' : 'https://recordio.cc'}
                     {...(!isAuthenticated ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 />
-                <span className="text-xs text-text-muted">Shared Video</span>
+                <div className="flex items-center gap-2">
+                    <ThemeToggle />
+                    {!isAuthenticated && (
+                        <Button
+                            size="sm"
+                            onClick={() => { window.location.href = '/'; }}
+                        >
+                            Sign in
+                        </Button>
+                    )}
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => { window.open(CHROME_EXTENSION_URL, '_blank'); }}
+                    >
+                        Record for free →
+                    </Button>
+                </div>
+                </div>
             </header>
 
-            {/* Video player + info */}
-            <main className="flex-1 flex flex-col items-center p-6">
-                <div className="w-full max-w-4xl">
-                    {/* Player */}
-                    <div className="relative w-full" style={{ paddingTop: '56.25%' /* 16:9 */ }}>
-                        <iframe
-                            src={cfEmbedUrl}
-                            className="absolute inset-0 w-full h-full rounded-xl border border-border"
-                            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
-                            allowFullScreen
-                        />
-                    </div>
+            {/* Main content — two columns */}
+            <main className="flex-1 p-6">
+                <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
+                    {/* Left column — Video + actions */}
+                    <div className="flex-1 min-w-0 border border-border rounded-xl bg-surface p-5">
+                        {/* Creator attribution */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
+                                {getInitials(creatorName)}
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-text-highlighted">
+                                    {creatorName} shared a recording
+                                </p>
+                                <p className="text-xs text-text-muted">
+                                    {sharedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {' · '}
+                                    {sharedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                </p>
+                            </div>
+                        </div>
 
-                    {/* Title + description */}
-                    <div className="mt-4">
-                        {/* Title */}
-                        {isOwner && editingTitle ? (
-                            <input
-                                ref={titleRef}
-                                value={titleValue}
-                                onChange={e => setTitleValue(e.target.value)}
-                                onBlur={saveTitle}
-                                onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
-                                className="w-full bg-transparent text-lg font-medium text-text-main border-b border-primary outline-none py-1"
-                                autoFocus
-                                disabled={saving}
+                        {/* Player */}
+                        <div className="relative w-full" style={{ paddingTop: '56.25%' /* 16:9 */ }}>
+                            <iframe
+                                src={cfEmbedUrl}
+                                className="absolute inset-0 w-full h-full rounded-xl border border-border"
+                                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+                                allowFullScreen
                             />
-                        ) : (
-                            <div className="flex items-center justify-between">
+                        </div>
+
+                        {/* Title */}
+                        <div className="mt-4">
+                            {isOwner && editingTitle ? (
+                                <input
+                                    ref={titleRef}
+                                    value={titleValue}
+                                    onChange={e => setTitleValue(e.target.value)}
+                                    onBlur={saveTitle}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+                                    className="w-full bg-transparent text-lg font-medium text-text-main border-b border-primary outline-none py-1"
+                                    autoFocus
+                                    disabled={saving}
+                                />
+                            ) : (
                                 <h1
                                     className={`text-lg font-medium text-text-main ${isOwner ? 'cursor-text hover:text-primary transition-colors' : ''}`}
                                     onClick={isOwner ? () => { setEditingTitle(true); setTimeout(() => titleRef.current?.select(), 0); } : undefined}
@@ -235,105 +220,87 @@ export function WatchPage() {
                                 >
                                     {sharedVideo.project_name}
                                 </h1>
-                                <span className="text-xs text-text-muted shrink-0 ml-4">
-                                    Shared via <a href="https://recordio.cc" className="text-primary hover:underline">Recordio</a>
-                                </span>
-                            </div>
-                        )}
+                            )}
+                        </div>
+
+
 
                         {/* Description */}
-                        {isOwner && editingDesc ? (
-                            <textarea
-                                ref={descRef}
-                                value={descValue}
-                                onChange={e => setDescValue(e.target.value)}
-                                onBlur={saveDescription}
-                                onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false); }}
-                                className="w-full bg-transparent text-sm text-text-main border border-border rounded-lg p-2 mt-2 outline-none focus:border-primary resize-y min-h-[60px]"
-                                placeholder="Add a description..."
-                                autoFocus
-                                disabled={saving}
-                                rows={3}
-                            />
-                        ) : (
-                            <div
-                                className={`mt-2 ${isOwner ? 'cursor-text' : ''}`}
-                                onClick={isOwner ? () => { setEditingDesc(true); setTimeout(() => descRef.current?.focus(), 0); } : undefined}
-                                title={isOwner ? 'Click to edit description' : undefined}
-                            >
-                                {sharedVideo.description ? (
-                                    <p className="text-sm text-text-main whitespace-pre-wrap">{sharedVideo.description}</p>
-                                ) : isOwner ? (
-                                    <p className="text-sm text-text-muted italic hover:text-text-main transition-colors">
-                                        Click to add a description...
-                                    </p>
-                                ) : null}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Owner-only analytics panel */}
-                    {isOwner && (
-                        <div className="mt-8 border border-border rounded-xl p-5 bg-state-inactive">
-                            {/* "Only visible to you" banner */}
-                            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                                <TbEyeCheck size={14} className="text-primary" />
-                                <span className="text-xs text-text-muted">Only visible to you · analytics may be delayed up to a few hours</span>
-                            </div>
-
-                            {analytics ? (
-                                <>
-                                    {/* Stats row */}
-                                    <div className="flex gap-6 mb-5">
-                                        <div className="flex flex-col">
-                                            <span className="text-2xl font-semibold text-text-highlighted">{analytics.views}</span>
-                                            <span className="text-xs text-text-muted">Total views</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-2xl font-semibold text-text-highlighted">{analytics.minutesViewed.toFixed(1)}</span>
-                                            <span className="text-xs text-text-muted">Minutes watched</span>
-                                        </div>
-                                        {analytics.durationSeconds > 0 && (
-                                            <div className="flex flex-col">
-                                                <span className="text-2xl font-semibold text-text-highlighted">
-                                                    {analytics.views > 0
-                                                        ? formatDuration((analytics.minutesViewed * 60) / analytics.views)
-                                                        : '—'
-                                                    }
-                                                </span>
-                                                <span className="text-xs text-text-muted">
-                                                    Avg watch time{analytics.durationSeconds > 0 ? ` / ${formatDuration(analytics.durationSeconds)}` : ''}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Daily views chart */}
-                                    {analytics.daily && analytics.daily.length > 0 && (
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <TbChartBar size={14} className="text-text-muted" />
-                                                <span className="text-xs font-medium text-text-main">Daily views (last 30 days)</span>
-                                            </div>
-                                            <ViewsChart daily={analytics.daily} />
-                                        </div>
-                                    )}
-
-                                    {analytics.views === 0 && (
-                                        <p className="text-sm text-text-muted text-center py-4">
-                                            No views yet. Share the link to start tracking!
-                                        </p>
-                                    )}
-                                </>
+                        <div className="mt-4">
+                            {isOwner && editingDesc ? (
+                                <textarea
+                                    ref={descRef}
+                                    value={descValue}
+                                    onChange={e => setDescValue(e.target.value)}
+                                    onBlur={saveDescription}
+                                    onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false); }}
+                                    className="w-full bg-transparent text-sm text-text-main border border-border rounded-lg p-2 outline-none focus:border-primary resize-y min-h-[60px]"
+                                    placeholder="Add a description..."
+                                    autoFocus
+                                    disabled={saving}
+                                    rows={3}
+                                />
                             ) : (
-                                <div className="flex items-center justify-center py-6 text-text-muted">
-                                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
-                                    <span className="text-sm">Loading analytics...</span>
+                                <div
+                                    className={`${isOwner ? 'cursor-text' : ''}`}
+                                    onClick={isOwner ? () => { setEditingDesc(true); setTimeout(() => descRef.current?.focus(), 0); } : undefined}
+                                    title={isOwner ? 'Click to edit description' : undefined}
+                                >
+                                    {sharedVideo.description ? (
+                                        <p className="text-sm text-text-muted whitespace-pre-wrap">{sharedVideo.description}</p>
+                                    ) : isOwner ? (
+                                        <p className="text-sm text-text-muted italic hover:text-text-main transition-colors">
+                                            Click to add a description...
+                                        </p>
+                                    ) : null}
                                 </div>
                             )}
                         </div>
-                    )}
+                    </div>
+
+                    {/* Right column — Sidebar */}
+                    <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
+                        {/* Details card */}
+                        <div className="border border-border rounded-xl p-5 bg-surface">
+                            <h2 className="text-[11px] font-semibold tracking-wider text-text-muted uppercase mb-4">Details</h2>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-text-muted">Shared</span>
+                                    <span className="text-text-highlighted">
+                                        {sharedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                </div>
+                                {sharedVideo.version > 1 && (
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-text-muted">Version</span>
+                                        <span className="text-text-highlighted">v{sharedVideo.version}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <Button size="sm" fullWidth onClick={copyLink} className="mt-4">
+                                <TbLink size={15} />
+                                {linkCopied ? 'Copied!' : 'Copy link'}
+                            </Button>
+                        </div>
+
+                        {/* Recordio ad card */}
+                        <div className="border border-primary/30 rounded-xl p-5 bg-primary/5">
+                            <h3 className="text-sm font-semibold text-text-highlighted mb-1">Record your screen free</h3>
+                            <p className="text-xs text-text-muted mb-3">
+                                Create beautiful demo videos with <span className="text-primary font-medium">auto zooms</span> from screen recordings in seconds.
+                            </p>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => { window.open(CHROME_EXTENSION_URL, '_blank'); }}
+                            >
+                                Try Recordio →
+                            </Button>
+                        </div>
+                    </div>
                 </div>
+
+
             </main>
         </div>
     );
