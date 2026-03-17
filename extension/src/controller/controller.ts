@@ -69,11 +69,10 @@ async function handlePrepare(message: BaseMessage) {
     const sessionId = message.payload.sessionId;
     const msgMode = message.payload.mode || 'window';
 
-    // Determine viewport size from this window
-    const dpr = window.devicePixelRatio || 1;
+    // Determine viewport size from this window (CSS pixels)
     const viewportSize = {
-        width: Math.round(window.innerWidth * dpr),
-        height: Math.round(window.innerHeight * dpr)
+        width: window.innerWidth,
+        height: window.innerHeight
     };
 
     // Merge viewport into config

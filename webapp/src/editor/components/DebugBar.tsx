@@ -1,6 +1,7 @@
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 import { exportProjectToZip } from '../../storage/projectTransfer';
+import { getAllFocusAreas } from '../../core/zoom';
 
 export const DebugBar = () => {
     const project = useProjectData();
@@ -16,6 +17,18 @@ export const DebugBar = () => {
                 title={`Project ID: ${project.id}`}
             >
                 Log Project
+            </button>
+
+            <button
+                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
+                onClick={() => {
+                    const p = useProjectStore.getState().project;
+                    const areas = getAllFocusAreas(p.userEvents, p.screenSource.size, p.screenSource.durationMs);
+                    console.log('Focus Areas:', areas);
+                }}
+                title="Log computed focus areas"
+            >
+                Log Focus Areas
             </button>
 
             {/* Separator */}

@@ -99,8 +99,8 @@ export function rectContainsPoint(rect: Rect, point: Point): boolean {
 export function clampRectToBounds(rect: Rect, bounds: Size): Rect {
     const x = Math.max(0, rect.x);
     const y = Math.max(0, rect.y);
-    const width = Math.min(rect.width, bounds.width - x);
-    const height = Math.min(rect.height, bounds.height - y);
+    const width = Math.max(0, Math.min(rect.width, bounds.width - x));
+    const height = Math.max(0, Math.min(rect.height, bounds.height - y));
 
     return { x, y, width, height };
 }

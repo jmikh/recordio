@@ -279,7 +279,7 @@ body,
    /* Focus Ring Utility (shadcn-style: 1px, tight to border) */
    .focus-ring:focus-visible {
       outline: none;
-      box-shadow: 0 0 0 2px var(--state-active);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 50%, transparent);
    }
 
    /* Hide Scrollbar */

@@ -88,7 +88,7 @@ export interface RecordingConfig {
     hasCamera: boolean;
     audioDeviceId?: string; // Microphone
     videoDeviceId?: string; // Camera
-    tabViewportSize?: Size; // Target dimensions (for window mode calibration)
+    tabViewportSize?: Size; // CSS pixel dimensions of the recorded viewport
     streamId?: string; // Required for tab recording
     sourceId?: string; // For desktop capture (window/desktop mode)
     sourceName?: string; // Human readable name (e.g. Tab Title)

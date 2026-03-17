@@ -11,7 +11,7 @@
 
 import type { Rect } from '@shared/types';
 import { findElementGroup, cornerRadiusToString, type ElementGroupResult } from './elementGroupUtils';
-import { dprScaleRect, dprScaleRadius } from './dprUtils';
+
 
 export interface HoveredCardEvent {
     type: 'hoveredCard';
@@ -353,13 +353,13 @@ export class HoveredCardDetector {
                     type: 'hoveredCard',
                     startTime: this.sessionStartTime,
                     endTime: Date.now(),
-                    targetRect: dprScaleRect({
+                    targetRect: {
                         x: this.currentCardRect.left,
                         y: this.currentCardRect.top,
                         width: this.currentCardRect.width,
                         height: this.currentCardRect.height,
-                    }),
-                    cornerRadius: dprScaleRadius(this.currentCard.effectiveRadius),
+                    },
+                    cornerRadius: this.currentCard.effectiveRadius,
                 };
 
                 this.onEvent(event);

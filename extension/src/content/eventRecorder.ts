@@ -16,7 +16,7 @@ import { EventType, type BaseEvent, type Rect } from '@shared/types';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { HoveredCardDetector, type HoveredCardEvent } from './hoveredCardDetector';
 import { findElementGroup, cornerRadiusToString } from './elementGroupUtils';
-import { dprScalePoint, dprScaleRect } from './dprUtils';
+
 
 // Debug flag - controlled by DEBUG_OVERLAY build flag
 declare const __DEBUG_OVERLAY__: boolean;
@@ -171,12 +171,11 @@ export class EventRecorder {
     private handleMouseMove = (e: MouseEvent) => {
         if (!this.isActive()) return;
         const now = this.getRelativeTime();
-        const scaled = dprScalePoint({ x: e.clientX, y: e.clientY });
 
         this.lastMousePos = {
             type: EventType.MOUSEPOS,
             timestamp: now,
-            mousePos: scaled
+            mousePos: { x: e.clientX, y: e.clientY }
         };
 
         this.sendMessage(EventType.MOUSEPOS, this.lastMousePos);
@@ -193,44 +192,35 @@ export class EventRecorder {
         this.flushPendingTypingSession();
         this.flushPendingScrollSession();
 
-        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
         // Use composedPath to get actual target element (handles shadow DOM)
         const target = (e.composedPath()[0] || e.target) as Element;
         const rect = target.getBoundingClientRect();
-        const targetRect = dprScaleRect({
-            x: rect.left,
-            y: rect.top,
-            width: rect.width,
-            height: rect.height
-        });
 
         this.sendMessage(EventType.CLICK, {
-            mousePos: scaledPos,
+            mousePos: { x: e.clientX, y: e.clientY },
             timestamp: now,
-            targetRect
+            targetRect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
         });
     }
 
     private handlePointerDown = (e: PointerEvent) => {
         if (!this.isActive()) return;
 
-        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
         // Store drag start position and time
-        this.dragStartPos = { ...scaledPos, timestamp: now };
+        this.dragStartPos = { x: e.clientX, y: e.clientY, timestamp: now };
     }
 
     private handlePointerUp = (e: PointerEvent) => {
         if (!this.dragStartPos) return;
 
-        const scaledPos = dprScalePoint({ x: e.clientX, y: e.clientY });
         const now = this.getRelativeTime();
 
-        const dx = scaledPos.x - this.dragStartPos.x;
-        const dy = scaledPos.y - this.dragStartPos.y;
+        const dx = e.clientX - this.dragStartPos.x;
+        const dy = e.clientY - this.dragStartPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         // Only emit drag if moved beyond threshold (clicks are handled by click event)
@@ -331,15 +321,21 @@ export class EventRecorder {
         } else {
             targetRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
         }
-        const scaledTargetRect = dprScaleRect(targetRect);
 
+        // Ignore scrolls on elements the mouse isn't over (e.g. programmatic scrolls, animations)
+        const mp = this.lastMousePos?.mousePos;
+        if (mp) {
+            const inBounds = mp.x >= targetRect.x && mp.x <= targetRect.x + targetRect.width &&
+                mp.y >= targetRect.y && mp.y <= targetRect.y + targetRect.height;
+            if (!inBounds) return;
+        }
         // Check if scroll target changed - flush old session and start new one
         if (this.currentScrollSession) {
             const current = this.currentScrollSession.targetRect;
-            const targetChanged = current.x !== scaledTargetRect.x ||
-                current.y !== scaledTargetRect.y ||
-                current.width !== scaledTargetRect.width ||
-                current.height !== scaledTargetRect.height;
+            const targetChanged = current.x !== targetRect.x ||
+                current.y !== targetRect.y ||
+                current.width !== targetRect.width ||
+                current.height !== targetRect.height;
             if (targetChanged) {
                 this.flushPendingScrollSession();
             }
@@ -349,7 +345,7 @@ export class EventRecorder {
         if (!this.currentScrollSession) {
             this.currentScrollSession = {
                 startTime: now,
-                targetRect: scaledTargetRect,
+                targetRect,
                 lastScrollTime: now
             };
         } else {
@@ -406,15 +402,15 @@ export class EventRecorder {
         // Compute target rect
         let targetRect: Rect;
         if (useViewportRect) {
-            targetRect = dprScaleRect({
+            targetRect = {
                 x: 0,
                 y: 0,
                 width: window.innerWidth,
                 height: window.innerHeight
-            });
+            };
         } else {
             const finalRect = rectElement.getBoundingClientRect();
-            targetRect = dprScaleRect({ x: finalRect.left, y: finalRect.top, width: finalRect.width, height: finalRect.height });
+            targetRect = { x: finalRect.left, y: finalRect.top, width: finalRect.width, height: finalRect.height };
         }
 
         // Set up focusout handler on this specific element

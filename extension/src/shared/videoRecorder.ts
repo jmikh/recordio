@@ -113,10 +113,13 @@ export class VideoRecorder {
 
 
                 // Store trackable content rect for later use (events + screenSource metadata)
+                // Detection offsets are in video pixels; convert to CSS pixels to match tabViewportSize.
+                // The ratio scaling in saveRecordingData() will then uniformly scale everything to video dimensions.
                 if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
+                    const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
                     this.viewportRect = {
-                        x: this.detectionResult.xOffset,
-                        y: this.detectionResult.yOffset,
+                        x: Math.round(this.detectionResult.xOffset / dpr),
+                        y: Math.round(this.detectionResult.yOffset / dpr),
                         width: this.config.tabViewportSize.width,
                         height: this.config.tabViewportSize.height
                     };
@@ -374,6 +377,10 @@ export class VideoRecorder {
             const streamId = config.streamId;
             if (!streamId) throw new Error("Stream ID is required for tab recording mode.");
 
+            // Request device-pixel resolution for highest quality.
+            // Events are in CSS pixels; saveRecordingData() scales them to match actual video dimensions.
+            const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+
             // @ts-ignore
             return await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -386,8 +393,8 @@ export class VideoRecorder {
                     mandatory: {
                         chromeMediaSource: 'tab',
                         chromeMediaSourceId: streamId,
-                        maxWidth: config.tabViewportSize?.width,
-                        maxHeight: config.tabViewportSize?.height,
+                        maxWidth: Math.round((config.tabViewportSize?.width ?? 1920) * dpr),
+                        maxHeight: Math.round((config.tabViewportSize?.height ?? 1080) * dpr),
                         maxFrameRate: 60
                     }
                 }
@@ -434,16 +441,41 @@ export class VideoRecorder {
 
         // 2. Create Screen Source Metadata (embedded in project, not saved separately)
         // For tab recordings, trackableContentRect is the full frame (x=0, y=0)
-        const trackableContentRect = this.viewportRect
+        let trackableContentRect = this.viewportRect
             ?? (this.mode === 'tab' && this.config.tabViewportSize
                 ? { x: 0, y: 0, ...this.config.tabViewportSize }
                 : undefined);
+
+        const screenSize = this.screenDimensions || { width: 1920, height: 1080 };
+
+        // Scale events from CSS pixels to match actual video dimensions.
+        // Events are captured in CSS pixels. Chrome may capture the video at CSS or
+        // device pixel resolution. We use the ratio of actual video size to CSS viewport
+        // to align event coordinates with the video coordinate space.
+        // We use width-based uniform scale since height can differ due to title bar offsets
+        // in window mode (screenSize includes title bar, but trackableContentRect doesn't).
+        if (trackableContentRect && events) {
+            const cssWidth = trackableContentRect.width;
+            if (cssWidth > 0) {
+                const scale = screenSize.width / cssWidth;
+                // Only scale if there's a meaningful difference
+                if (Math.abs(scale - 1) > 0.01) {
+                    this.scaleAllEvents(events, scale, scale);
+                    trackableContentRect = {
+                        x: Math.round(trackableContentRect.x * scale),
+                        y: Math.round(trackableContentRect.y * scale),
+                        width: Math.round(trackableContentRect.width * scale),
+                        height: Math.round(trackableContentRect.height * scale),
+                    };
+                }
+            }
+        }
 
         const screenSource: ScreenMetadata = {
             id: `src-${projectId}-screen`,
             storageUrl: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
-            size: this.screenDimensions || { width: 1920, height: 1080 },
+            size: screenSize,
             frameRate: screenFrameRate,
             recordingType: this.mode,
             trackableContentRect,
@@ -588,6 +620,33 @@ export class VideoRecorder {
 
         if (e.mousePos) offsetPoint(e.mousePos);
         if (e.targetRect) offsetRect(e.targetRect);
+    }
+
+    /**
+     * Scales all event coordinates to match actual video dimensions.
+     * Used to align CSS-pixel events with whatever resolution Chrome captured.
+     */
+    private scaleAllEvents(events: UserEvents, scaleX: number, scaleY: number) {
+        const scaleEvent = (e: any) => {
+            if (e.mousePos) {
+                e.mousePos.x *= scaleX;
+                e.mousePos.y *= scaleY;
+            }
+            if (e.targetRect) {
+                e.targetRect.x *= scaleX;
+                e.targetRect.y *= scaleY;
+                e.targetRect.width *= scaleX;
+                e.targetRect.height *= scaleY;
+            }
+        };
+
+        for (const arr of Object.values(events)) {
+            if (Array.isArray(arr)) {
+                for (const e of arr) {
+                    scaleEvent(e);
+                }
+            }
+        }
     }
 
     /**

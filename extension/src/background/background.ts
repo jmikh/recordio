@@ -347,8 +347,8 @@ async function startTabModeSession(payload: any, sessionId: string) {
         hasCamera: hasCamera === true,
         streamId: streamId,
         tabViewportSize: {
-            width: Math.round(initialDimensions.width * (initialDimensions.dpr || 1)),
-            height: Math.round(initialDimensions.height * (initialDimensions.dpr || 1))
+            width: initialDimensions.width,
+            height: initialDimensions.height
         },
 
 
@@ -378,7 +378,7 @@ async function startTabModeSession(payload: any, sessionId: string) {
     const countdownResult = await waitForCountdown(tabId, sessionId);
     if (countdownResult.status === 'canceled') return; // Silent early return
 
-    // Update config with real dimensions
+    // Update config with real dimensions (CSS pixels)
     config.tabViewportSize = countdownResult.dimensions;
 
     // 6. Send START to Offscreen (VideoRecorder)
@@ -553,12 +553,12 @@ async function waitForCountdown(tabId: number | undefined, sessionId: string): P
             if (msg.type === MSG_TYPES.COUNTDOWN_DONE) {
                 chrome.runtime.onMessage.removeListener(listener);
                 clearTimeout(timeout);
-                const { width, height, dpr } = msg.payload;
+                const { width, height } = msg.payload;
                 resolve({
                     status: 'done',
                     dimensions: {
-                        width: Math.round(width * (dpr || 1)),
-                        height: Math.round(height * (dpr || 1))
+                        width: Math.round(width),
+                        height: Math.round(height)
                     }
                 });
             } else if (msg.type === MSG_TYPES.COUNTDOWN_CANCELED) {
