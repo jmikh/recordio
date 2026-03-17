@@ -61,13 +61,6 @@ function buildWelcomeEmailHtml(unsubscribeUrl: string): string {
             I read every single reply. Seriously.
         </p>
 
-        <!-- CTA -->
-        <div style="text-align: center; margin-bottom: 32px; padding: 16px; background-color: #f8f5ff; border-radius: 8px;">
-            <p style="margin: 0; font-size: 16px; font-weight: 600; color: #856FDC;">
-                ↩ Just hit reply to this email
-            </p>
-        </div>
-
         <!-- Sign-off with photo -->
         <div style="border-top: 1px solid #f0f0f0; padding-top: 20px; display: flex; align-items: center;">
             <img
@@ -78,7 +71,7 @@ function buildWelcomeEmailHtml(unsubscribeUrl: string): string {
                 style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; margin-right: 12px;"
             />
             <div>
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #111111;">John</p>
+                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #111111;">John Mikhail</p>
                 <p style="margin: 0; font-size: 13px; color: #888888;">Founder, Recordio</p>
             </div>
         </div>

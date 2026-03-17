@@ -53,7 +53,6 @@ begin
                 '$distinct_id', r.user_id,
                 '$set', jsonb_build_object(
                     'current_plan_type', 'basic',
-                    'subscription_status', 'expired',
                     'last_active_plan_type', 'pro_trial',
                     'last_active_plan_end_date', to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
                 )

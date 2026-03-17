@@ -9,7 +9,7 @@ import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality, ExportFps, ExportCodecInfo } from '../../export/ExportManager';
 import type { WatermarkPosition } from '../../../core/painters/watermarkPainter';
-import { trackExportCompleted, extractProjectProperties } from '../../../core/analytics';
+import { trackExportCompleted, trackVideoPublished, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../services/ShareService';
 
@@ -127,7 +127,6 @@ export function ExportSettings() {
                 ...extractProjectProperties(project),
                 quality,
                 fps,
-                export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
                 export_duration_ms: exportDuration,
@@ -148,7 +147,6 @@ export function ExportSettings() {
                 ...extractProjectProperties(project),
                 quality,
                 fps,
-                export_type: 'download',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
                 export_duration_ms: Date.now() - exportStart,
@@ -214,13 +212,38 @@ export function ExportSettings() {
         const onProgress = (state: any) => setExportState(state);
 
         const exportStart = Date.now();
+        let exportCodecs: ExportCodecInfo | null = null;
+        let exportDecodeMode: 'hardware' | 'software' = 'hardware';
+        let exportDecodeFallback = false;
+        let exportDuration = 0;
         try {
             (window as any).__activeExportManager = manager;
             const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(project, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
-            const exportDuration = Date.now() - exportStart;
+            exportDuration = Date.now() - exportStart;
+            exportCodecs = codecs;
+            exportDecodeMode = videoDecodeMode;
+            exportDecodeFallback = videoDecodeFallback;
+
+            // Fire export_completed immediately after render
+            trackExportCompleted({
+                ...extractProjectProperties(project),
+                quality: selectedQuality,
+                fps: selectedFps,
+                is_authenticated: isAuthenticated,
+                is_pro: isPro,
+                export_duration_ms: exportDuration,
+                success: true,
+                video_codec: codecs.video.encoder,
+                video_codec_fallback: codecs.video.fallback,
+                video_codecs_tried: codecs.video.tried,
+                audio_codec: codecs.audio.encoder,
+                audio_codec_fallback: codecs.audio.fallback,
+                video_decode_mode: videoDecodeMode,
+                video_decode_fallback: videoDecodeFallback,
+            });
 
             // Upload to Cloudflare Stream
             setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'uploading' });
@@ -248,11 +271,10 @@ export function ExportSettings() {
             // Notify Header
             window.dispatchEvent(new Event('share-updated'));
 
-            trackExportCompleted({
+            trackVideoPublished({
                 ...extractProjectProperties(project),
                 quality: selectedQuality,
                 fps: selectedFps,
-                export_type: 'publish',
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
                 export_duration_ms: exportDuration,
@@ -277,24 +299,47 @@ export function ExportSettings() {
             if (e?.message === 'Export cancelled') return;
             console.error('[Publish] Failed:', e);
             Sentry.captureException(e, { extra: { projectId: project.id, phase: 'publish' } });
-            trackExportCompleted({
-                ...extractProjectProperties(project),
-                quality: selectedQuality,
-                fps: selectedFps,
-                export_type: 'publish',
-                is_authenticated: isAuthenticated,
-                is_pro: isPro,
-                export_duration_ms: Date.now() - exportStart,
-                success: false,
-                error: e?.message || 'Unknown error',
-                video_codec: 'unknown',
-                video_codec_fallback: false,
-                video_codecs_tried: [],
-                audio_codec: 'unknown',
-                audio_codec_fallback: false,
-                video_decode_mode: 'hardware',
-                video_decode_fallback: false,
-            });
+
+            if (exportCodecs) {
+                // Export succeeded but upload failed — fire video_published with failure
+                trackVideoPublished({
+                    ...extractProjectProperties(project),
+                    quality: selectedQuality,
+                    fps: selectedFps,
+                    is_authenticated: isAuthenticated,
+                    is_pro: isPro,
+                    export_duration_ms: exportDuration,
+                    upload_duration_ms: Date.now() - exportStart - exportDuration,
+                    success: false,
+                    error: e?.message || 'Unknown error',
+                    video_codec: exportCodecs.video.encoder,
+                    video_codec_fallback: exportCodecs.video.fallback,
+                    video_codecs_tried: exportCodecs.video.tried,
+                    audio_codec: exportCodecs.audio.encoder,
+                    audio_codec_fallback: exportCodecs.audio.fallback,
+                    video_decode_mode: exportDecodeMode,
+                    video_decode_fallback: exportDecodeFallback,
+                });
+            } else {
+                // Export itself failed
+                trackExportCompleted({
+                    ...extractProjectProperties(project),
+                    quality: selectedQuality,
+                    fps: selectedFps,
+                    is_authenticated: isAuthenticated,
+                    is_pro: isPro,
+                    export_duration_ms: Date.now() - exportStart,
+                    success: false,
+                    error: e?.message || 'Unknown error',
+                    video_codec: 'unknown',
+                    video_codec_fallback: false,
+                    video_codecs_tried: [],
+                    audio_codec: 'unknown',
+                    audio_codec_fallback: false,
+                    video_decode_mode: 'hardware',
+                    video_decode_fallback: false,
+                });
+            }
             addToast({
                 type: 'error',
                 title: 'Publish Failed',

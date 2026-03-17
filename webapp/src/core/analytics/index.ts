@@ -169,17 +169,13 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
 // Public API - Specific Event Tracking Functions
 // ============================================================================
 
-export type ExportType = 'download' | 'publish';
-
 export interface ExportCompletedParams {
     // Export context
     quality: '480p' | '720p' | '1080p' | '2K' | '4K';
     fps: 30 | 60;
-    export_type: ExportType;
     is_authenticated: boolean;
     is_pro: boolean;
     export_duration_ms: number;
-    upload_duration_ms?: number;
 
     // Recording context
     recording_type: 'tab' | 'window' | 'screen';
@@ -349,6 +345,14 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
 
 export function trackExportCompleted(params: ExportCompletedParams) {
     trackEvent('export_completed', params);
+}
+
+export type VideoPublishedParams = ExportCompletedParams & {
+    upload_duration_ms: number;
+};
+
+export function trackVideoPublished(params: VideoPublishedParams) {
+    trackEvent('video_published', params);
 }
 
 // ============================================================================

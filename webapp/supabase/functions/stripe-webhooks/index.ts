@@ -263,7 +263,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         ...(email ? { $email: email } : {}),
         current_plan_type: 'pro',
         billing_interval: billingInterval,
-        subscription_status: stripeStatus,
         cancel_at_period_end: false,
         current_period_end: stripePeriodEnd,
     });
@@ -361,7 +360,6 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     // Update profile
     const profileUpdate: Record<string, any> = {
         current_plan_type: newPlanType,
-        subscription_status: newStatus,
         cancel_at_period_end: cancelAtPeriodEnd,
         billing_interval: billingInterval,
         current_period_end: currentPeriodEnd.toISOString(),
@@ -461,7 +459,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
         await mpPeopleSet(existingSub.user_id, {
             current_plan_type: 'basic',
-            subscription_status: 'canceled',
             cancel_at_period_end: false,
             billing_interval: null,
             current_period_end: null,
