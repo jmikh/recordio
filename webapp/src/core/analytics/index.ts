@@ -254,7 +254,8 @@ import { TimeMapper } from '../mappers/timeMapper';
 export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
     'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
 > {
-    const { settings, timeline, userEvents, screenSource } = project;
+    const { settings, timeline, screenSource } = project;
+    const userEvents = project.userEvents ?? { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] };
     const timeMapper = new TimeMapper(timeline.outputWindows);
 
     // Derive background image choice

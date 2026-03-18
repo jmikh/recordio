@@ -117,16 +117,16 @@ export function ExportSettings() {
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
 
+        // Re-attach userEvents (stored separately from project for undo/redo perf)
+        const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
         const exportStart = Date.now();
         try {
             (window as any).__activeExportManager = manager;
-            // Re-attach userEvents (stored separately from project for undo/redo perf)
-            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
             const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress, options);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
-                ...extractProjectProperties(project),
+                ...extractProjectProperties(fullProject),
                 quality,
                 fps,
                 is_authenticated: isAuthenticated,
@@ -146,7 +146,7 @@ export function ExportSettings() {
             if (e?.message === 'Export cancelled') return;
             console.error(e);
             trackExportCompleted({
-                ...extractProjectProperties(project),
+                ...extractProjectProperties(fullProject),
                 quality,
                 fps,
                 is_authenticated: isAuthenticated,
@@ -213,6 +213,8 @@ export function ExportSettings() {
         const manager = new ExportManager();
         const onProgress = (state: any) => setExportState(state);
 
+        // Re-attach userEvents (stored separately from project for undo/redo perf)
+        const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
         const exportStart = Date.now();
         let exportCodecs: ExportCodecInfo | null = null;
         let exportDecodeMode: 'hardware' | 'software' = 'hardware';
@@ -220,8 +222,6 @@ export function ExportSettings() {
         let exportDuration = 0;
         try {
             (window as any).__activeExportManager = manager;
-            // Re-attach userEvents (stored separately from project for undo/redo perf)
-            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
             const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, selectedQuality, selectedFps, onProgress, {
                 watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
@@ -233,7 +233,7 @@ export function ExportSettings() {
 
             // Fire export_completed immediately after render
             trackExportCompleted({
-                ...extractProjectProperties(project),
+                ...extractProjectProperties(fullProject),
                 quality: selectedQuality,
                 fps: selectedFps,
                 is_authenticated: isAuthenticated,
@@ -276,7 +276,7 @@ export function ExportSettings() {
             window.dispatchEvent(new Event('share-updated'));
 
             trackVideoPublished({
-                ...extractProjectProperties(project),
+                ...extractProjectProperties(fullProject),
                 quality: selectedQuality,
                 fps: selectedFps,
                 is_authenticated: isAuthenticated,
@@ -307,7 +307,7 @@ export function ExportSettings() {
             if (exportCodecs) {
                 // Export succeeded but upload failed — fire video_published with failure
                 trackVideoPublished({
-                    ...extractProjectProperties(project),
+                    ...extractProjectProperties(fullProject),
                     quality: selectedQuality,
                     fps: selectedFps,
                     is_authenticated: isAuthenticated,
@@ -327,7 +327,7 @@ export function ExportSettings() {
             } else {
                 // Export itself failed
                 trackExportCompleted({
-                    ...extractProjectProperties(project),
+                    ...extractProjectProperties(fullProject),
                     quality: selectedQuality,
                     fps: selectedFps,
                     is_authenticated: isAuthenticated,

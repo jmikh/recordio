@@ -78,7 +78,17 @@ export const useProjectStore = create<ProjectState>()(
 
                 loadProject: async (project) => {
                     // Separate userEvents from the project so undo/redo history
-                    // doesn't snapshot the (potentially massive) event arrays.
+                    // (via zundo's `partialize`) doesn't snapshot the potentially
+                    // massive event arrays on every mutation. Events are immutable
+                    // after recording, so they don't need undo/redo tracking.
+                    //
+                    // After this call:
+                    //   s.project        → project WITHOUT userEvents
+                    //   s.userEvents     → the extracted events
+                    //
+                    // Consumers must read events from s.userEvents (or useUserEvents()),
+                    // NOT from s.project.userEvents (which will be undefined).
+                    // Auto-save re-attaches events before writing to IndexedDB.
                     const { userEvents, ...projectWithoutEvents } = project;
                     set({ project: projectWithoutEvents as Project, userEvents });
 
@@ -180,6 +190,10 @@ export const useProjectStore = create<ProjectState>()(
 );
 
 // --- Auto-Save Subscription ---
+// Re-attaches userEvents (stripped on load — see loadProject) before writing
+// the full Project record back to IndexedDB. This is the inverse of the
+// split performed in loadProject, ensuring the persisted record always
+// contains the complete userEvents.
 let saveTimeout: any = null;
 useProjectStore.subscribe(
     (state) => state.project,
@@ -187,8 +201,6 @@ useProjectStore.subscribe(
         // Debounce save (e.g., 2 seconds)
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            // Re-attach userEvents before persisting — the runtime store keeps
-            // them separate, but the IndexedDB record needs the full project.
             const userEvents = useProjectStore.getState().userEvents;
             const fullProject = { ...project, userEvents };
             ProjectStorage.saveProject(fullProject).catch(console.error);

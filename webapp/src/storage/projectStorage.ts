@@ -105,6 +105,11 @@ export class ProjectStorage {
     /**
      * Saves the project to the 'projects' store.
      * Excludes transient runtimeUrl fields - only storageUrl is persisted.
+     *
+     * ⚠️  The runtime project store strips `userEvents` from the project for
+     * undo/redo performance (see `useProjectStore.loadProject`). Callers must
+     * re-attach `userEvents` before calling this method, e.g.:
+     *   `{ ...project, userEvents: store.userEvents }`
      */
     static async saveProject(project: Project): Promise<void> {
         const db = await this.getDB();

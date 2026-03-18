@@ -12,6 +12,21 @@ import type { Timeline } from './timeline';
 /**
  * The Root Entity of the Video Editor.
  * Contains all sources, the timeline, and global settings.
+ *
+ * ## userEvents Separation (Runtime vs Persistence)
+ *
+ * In IndexedDB, `userEvents` is stored as part of the full Project record.
+ * However, at runtime the project store (`useProjectStore`) strips `userEvents`
+ * out of `project` on load and holds them in a separate top-level `userEvents`
+ * field. This prevents the (potentially massive) event arrays from being
+ * snapshot on every undo/redo operation.
+ *
+ * **Implications:**
+ * - `useProjectData()` / `s.project` does NOT contain `userEvents` at runtime.
+ * - Access events via `useProjectStore(s => s.userEvents)` or `useUserEvents()`.
+ * - When passing a full project to functions that need events (e.g. export,
+ *   analytics), reconstruct it: `{ ...project, userEvents: store.userEvents }`.
+ * - Auto-save re-attaches `userEvents` before writing to IndexedDB.
  */
 export interface Project {
     id: ID;
@@ -30,7 +45,13 @@ export interface Project {
     cameraSource?: CameraMetadata;
     /** Microphone audio source metadata (optional, standalone track) */
     microphoneSource?: MicrophoneMetadata;
-    /** User interaction events from the recording */
+    /**
+     * User interaction events captured during recording.
+     *
+     * ⚠️  At runtime this field is EMPTY on `useProjectData()` — the store
+     * strips it on load for undo/redo performance. Read events from
+     * `useProjectStore(s => s.userEvents)` instead. See class-level JSDoc.
+     */
     userEvents: UserEvents;
 
     /* Unified Settings */
