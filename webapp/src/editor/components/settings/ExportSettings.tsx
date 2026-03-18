@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { timeAgo } from '../../../utils/timeAgo';
 import * as Sentry from '@sentry/react';
 
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
@@ -9,7 +10,7 @@ import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality, ExportFps, ExportCodecInfo } from '../../export/ExportManager';
 import type { WatermarkPosition } from '../../../core/painters/watermarkPainter';
-import { trackExportCompleted, trackVideoPublished, extractProjectProperties } from '../../../core/analytics';
+import { trackExportStarted, trackExportCompleted, trackVideoPublished, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../services/ShareService';
 
@@ -120,6 +121,16 @@ export function ExportSettings() {
         // Re-attach userEvents (stored separately from project for undo/redo perf)
         const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
         const exportStart = Date.now();
+
+        trackExportStarted({
+            ...extractProjectProperties(fullProject),
+            quality,
+            fps,
+            is_authenticated: isAuthenticated,
+            is_pro: isPro,
+            export_type: 'download',
+        });
+
         try {
             (window as any).__activeExportManager = manager;
             const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress, options);
@@ -216,6 +227,16 @@ export function ExportSettings() {
         // Re-attach userEvents (stored separately from project for undo/redo perf)
         const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
         const exportStart = Date.now();
+
+        trackExportStarted({
+            ...extractProjectProperties(fullProject),
+            quality: selectedQuality,
+            fps: selectedFps,
+            is_authenticated: isAuthenticated,
+            is_pro: isPro,
+            export_type: 'publish',
+        });
+
         let exportCodecs: ExportCodecInfo | null = null;
         let exportDecodeMode: 'hardware' | 'software' = 'hardware';
         let exportDecodeFallback = false;
@@ -485,21 +506,24 @@ export function ExportSettings() {
                                     <span className="subtext">{publishedCount} of {MAX_SHARED_VIDEOS} published</span>
                                 )}
                                 {existingShare && (
-                                    <Button
-                                        fullWidth
-                                        className="text-sm font-medium"
-                                        onClick={async () => {
-                                            try {
-                                                await navigator.clipboard.writeText(ShareService.getShareUrl(existingShare.id));
-                                                addToast({ type: 'success', title: 'Link copied to clipboard' });
-                                            } catch {
-                                                addToast({ type: 'error', title: 'Failed to copy link' });
-                                            }
-                                        }}
-                                    >
-                                        <TbCopy size={16} />
-                                        Copy Link
-                                    </Button>
+                                    <>
+                                        <Button
+                                            fullWidth
+                                            className="text-sm font-medium"
+                                            onClick={async () => {
+                                                try {
+                                                    await navigator.clipboard.writeText(ShareService.getShareUrl(existingShare.id));
+                                                    addToast({ type: 'success', title: 'Link copied to clipboard' });
+                                                } catch {
+                                                    addToast({ type: 'error', title: 'Failed to copy link' });
+                                                }
+                                            }}
+                                        >
+                                            <TbCopy size={16} />
+                                            Copy Link
+                                        </Button>
+                                        <span className="subtext">Published {timeAgo(existingShare.updated_at)}</span>
+                                    </>
                                 )}
                             </div>
                         );

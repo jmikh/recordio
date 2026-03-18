@@ -11,6 +11,7 @@ export function initSentry() {
 
     Sentry.init({
         dsn: SENTRY_DSN,
+        tunnel: '/sentry',
         environment: IS_PRODUCTION ? "production" : "development",
         release: `recordio-webapp@${import.meta.env.VITE_APP_VERSION ?? "dev"}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,

@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect } from 'react';
 import { useProjectStore, useProjectData, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 
 import { BiSupport } from 'react-icons/bi';
-import { TbLink, TbFolder } from 'react-icons/tb';
+import { TbFolder } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -15,22 +14,7 @@ import { useUserStore } from '../../stores/useUserStore';
 
 import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
-import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { useToast } from '../Toast';
-
-/** Format a date as a relative time string, e.g. "2 hours ago" */
-function timeAgo(dateStr: string): string {
-    const ms = Date.now() - new Date(dateStr).getTime();
-    const seconds = Math.floor(ms / 1000);
-    if (seconds < 60) return 'just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'yesterday';
-    return `${days}d ago`;
-}
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
     value: preset,
@@ -72,32 +56,7 @@ export const Header = () => {
     const pastStates = useProjectHistory(state => state.pastStates);
     const futureStates = useProjectHistory(state => state.futureStates);
 
-    // Share link state
-    const [existingShare, setExistingShare] = useState<SharedVideo | null>(null);
 
-    useEffect(() => {
-        if (isAuthenticated && project?.id) {
-            ShareService.getShareForProject(project.id).then(setExistingShare);
-        }
-    }, [isAuthenticated, project?.id]);
-
-    // Listen for share updates from ExportSettings via a custom event
-    useEffect(() => {
-        const handler = () => {
-            if (project?.id) {
-                ShareService.getShareForProject(project.id).then(setExistingShare);
-            }
-        };
-        window.addEventListener('share-updated', handler);
-        return () => window.removeEventListener('share-updated', handler);
-    }, [project?.id]);
-
-    const copyShareLink = () => {
-        if (!existingShare) return;
-        const url = ShareService.getShareUrl(existingShare.id);
-        navigator.clipboard.writeText(url);
-        addToast({ type: 'success', title: 'Link Copied', message: url });
-    };
 
     return (
         <div id="editor-header" className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
@@ -168,12 +127,6 @@ export const Header = () => {
                         buttonClassName="px-2 text-xs"
                         hideSuffixInTrigger
                     />
-                    {existingShare && (
-                        <ShareLinkButton
-                            onClick={copyShareLink}
-                            snapshotDate={existingShare.updated_at}
-                        />
-                    )}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -211,52 +164,3 @@ export const Header = () => {
     );
 };
 
-/** Small link icon with a two-line hover tooltip */
-function ShareLinkButton({ onClick, snapshotDate }: { onClick: () => void; snapshotDate: string }) {
-    const [isHovered, setIsHovered] = useState(false);
-    const [position, setPosition] = useState({ left: 0, top: 0 });
-    const ref = useRef<HTMLButtonElement>(null);
-
-    const updatePosition = useCallback(() => {
-        if (ref.current) {
-            const rect = ref.current.getBoundingClientRect();
-            setPosition({
-                left: rect.left + rect.width / 2,
-                top: rect.bottom + 8,
-            });
-        }
-    }, []);
-
-    useEffect(() => {
-        if (isHovered) updatePosition();
-    }, [isHovered, updatePosition]);
-
-    return (
-        <>
-            <button
-                ref={ref}
-                onClick={onClick}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                className="interactive-icon"
-            >
-                <TbLink size={16} />
-            </button>
-
-            {isHovered && createPortal(
-                <div
-                    className="fixed z-[999999] bg-surface-raised border border-border rounded-md px-3 py-2 pointer-events-none flex flex-col items-center gap-1"
-                    style={{
-                        left: position.left,
-                        top: position.top,
-                        transform: 'translateX(-50%)',
-                    }}
-                >
-                    <span className="text-xs text-text-highlighted font-medium">Copy Link</span>
-                    <span className="subtext">snapshot from {timeAgo(snapshotDate)}</span>
-                </div>,
-                document.body
-            )}
-        </>
-    );
-}

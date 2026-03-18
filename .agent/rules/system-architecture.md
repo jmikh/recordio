@@ -36,3 +36,15 @@ The extension records video + user events locally, then hands off to the webapp 
 - **Edge functions handle their own auth** — no middleware JWT verification at the Cloudflare/Supabase gateway level.
 - **Supabase DB Webhooks** trigger edge functions (e.g., `send-welcome-email` fires on `auth.users` INSERT).
 - **Email unsubscribe** uses signed JWTs with 1-year expiry via the `unsubscribe` edge function.
+
+## userEvents Separation (Critical)
+
+`userEvents` (mouse clicks, keyboard events, drags, URL changes, etc.) are stored as part of the `Project` record in IndexedDB, but are **stripped out of `project` at runtime** by `useProjectStore.loadProject()` and held in a separate top-level store field `s.userEvents`.
+
+**Why:** The undo/redo system (zundo) snapshots `s.project` on every mutation. userEvents are large and immutable — including them would bloat history.
+
+**Rules:**
+- **NEVER read `project.userEvents`** from store state — it will be `undefined`.
+- **Read events from** `useProjectStore(s => s.userEvents)` or the `useUserEvents()` selector.
+- **When passing a full project** to functions that need events (export, analytics), reconstruct: `{ ...project, userEvents: useProjectStore.getState().userEvents }`.
+- **Auto-save** re-attaches `userEvents` before writing to IndexedDB (see subscription in `useProjectStore.ts`).

@@ -344,6 +344,20 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
     };
 }
 
+export type ExportStartedParams = Omit<ExportCompletedParams,
+    'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
+> & {
+    export_type: 'download' | 'publish';
+};
+
+/**
+ * Fires at the start of an export so we have telemetry even if the export
+ * crashes midway and never reaches export_completed.
+ */
+export function trackExportStarted(params: ExportStartedParams) {
+    trackEvent('export_started', params);
+}
+
 export function trackExportCompleted(params: ExportCompletedParams) {
     trackEvent('export_completed', params);
 }
