@@ -486,8 +486,8 @@ export function ExportSettings() {
                                 )}
                                 {existingShare && (
                                     <Button
-                                        variant="ghost"
-                                        size="sm"
+                                        fullWidth
+                                        className="text-sm font-medium"
                                         onClick={async () => {
                                             try {
                                                 await navigator.clipboard.writeText(ShareService.getShareUrl(existingShare.id));
@@ -497,7 +497,7 @@ export function ExportSettings() {
                                             }
                                         }}
                                     >
-                                        <TbCopy size={14} />
+                                        <TbCopy size={16} />
                                         Copy Link
                                     </Button>
                                 )}
