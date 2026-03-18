@@ -36,6 +36,7 @@ The extension records video + user events locally, then hands off to the webapp 
 - **Edge functions handle their own auth** — no middleware JWT verification at the Cloudflare/Supabase gateway level.
 - **Supabase DB Webhooks** trigger edge functions (e.g., `send-welcome-email` fires on `auth.users` INSERT).
 - **Email unsubscribe** uses signed JWTs with 1-year expiry via the `unsubscribe` edge function.
+- **localStorage keys** are documented in [localstorage-keys.md](file:///Users/johnmikhail/Projects/recordio-all/recordio/webapp/src/localstorage-keys.md). Only the webapp uses localStorage.
 
 ## userEvents Separation (Critical)
 
