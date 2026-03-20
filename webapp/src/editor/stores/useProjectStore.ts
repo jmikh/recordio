@@ -97,6 +97,16 @@ export const useProjectStore = create<ProjectState>()(
                     if (!projectWithoutEvents.timeline.overlaySegments) {
                         projectWithoutEvents.timeline.overlaySegments = [];
                     }
+                    if (!projectWithoutEvents.settings.overlay) {
+                        projectWithoutEvents.settings.overlay = {
+                            enabled: true,
+                            defaultDurationMs: 3000,
+                            blurDefaults: { blurRadiusPx: 20 },
+                            textDefaults: { color: '#ffffff', backgroundColor: '#00000080', fontSizePx: 0 },
+                            arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4 },
+                            borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
+                        };
+                    }
 
                     set({ project: projectWithoutEvents as Project, userEvents });
 
