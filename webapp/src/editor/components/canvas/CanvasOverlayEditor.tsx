@@ -45,7 +45,7 @@ export const renderOverlayEditor = (
 
     // Draw non-editing overlay items (the editing item is rendered via HTML)
     const overlaySegments = project.timeline.overlaySegments || [];
-    drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, editingItemId);
+    drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport, editingItemId);
 };
 
 // ------------------------------------------------------------------

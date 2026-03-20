@@ -96,7 +96,8 @@ export function paintMouseClicks(
     outputSize: Size
 ) {
     const renderer = EFFECT_RENDERERS[settings.effectType];
-    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const zoomScale = outputSize.width / viewport.width;
+    const scale = (outputSize.height / REF_OUTPUT_HEIGHT) * zoomScale;
 
     for (const click of events) {
         const mappedTime = timeMapper.mapSourceToOutputTime(click.timestamp);

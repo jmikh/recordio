@@ -8,7 +8,7 @@
  * All coordinates are in OUTPUT pixels.
  */
 
-import type { Size } from '../../types';
+import type { Size, Rect } from '../../types';
 import type { OverlaySegment, OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../types/overlay';
 
 // Reference constants — scaled proportionally to output height (matching camera painter pattern)
@@ -30,6 +30,7 @@ export const TEXT_REF_RADIUS = 6;
  * @param overlaySegments - All overlay segments in the project
  * @param currentTimeMs - Current output time in ms
  * @param outputSize - Output canvas size
+ * @param viewport - Current zoom viewport in output coordinates
  * @param editingItemId - Item currently being edited (skip to avoid double-render)
  */
 export function drawOverlays(
@@ -37,9 +38,20 @@ export function drawOverlays(
     overlaySegments: OverlaySegment[],
     currentTimeMs: number,
     outputSize: Size,
+    viewport: Rect,
     editingItemId?: string | null
 ): void {
     const effectScale = outputSize.height / REF_OUTPUT_HEIGHT;
+
+    // Apply viewport transform: overlay coordinates are in output space,
+    // so we scale + translate to project them through the zoom viewport.
+    // When not zoomed, viewport === outputSize → scale=1, translate=0 (no-op).
+    const scaleX = outputSize.width / viewport.width;
+    const scaleY = outputSize.height / viewport.height;
+
+    ctx.save();
+    ctx.scale(scaleX, scaleY);
+    ctx.translate(-viewport.x, -viewport.y);
 
     // Find active segments at this time
     for (const segment of overlaySegments) {
@@ -52,14 +64,16 @@ export function drawOverlays(
             // bounding box handles, not the visual itself.
             if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
 
-            drawOverlayItem(ctx, item, outputSize, effectScale);
+            drawOverlayItem(ctx, item, outputSize, effectScale, viewport);
         }
     }
+
+    ctx.restore();
 }
 
-function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outputSize: Size, effectScale: number): void {
+function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outputSize: Size, effectScale: number, viewport: Rect): void {
     switch (item.type) {
-        case 'blur': return drawBlur(ctx, item, outputSize);
+        case 'blur': return drawBlur(ctx, item, outputSize, viewport);
         case 'text': return drawText(ctx, item, outputSize);
         case 'arrow': return drawArrow(ctx, item, effectScale);
         case 'border': return drawBorder(ctx, item, effectScale);
@@ -70,33 +84,52 @@ function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outpu
 // BLUR
 // ============================================================================
 
-function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, _outputSize: Size): void {
+function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, outputSize: Size, viewport: Rect): void {
     const { rectPx, blurRadiusPx, borderRadiusPx } = item;
+
+    // Work entirely in canvas pixel space to avoid CTM/filter ambiguity.
+    // The parent transform is scale(sx,sy) + translate(-vp.x,-vp.y).
+    // We reset the transform and manually project all coordinates.
+    const scaleX = outputSize.width / viewport.width;
+    const scaleY = outputSize.height / viewport.height;
+
+    // Project the overlay rect from output space to canvas pixel space
+    const canvasX = (rectPx.x - viewport.x) * scaleX;
+    const canvasY = (rectPx.y - viewport.y) * scaleY;
+    const canvasW = rectPx.width * scaleX;
+    const canvasH = rectPx.height * scaleY;
+
+    // Scale blur radius by zoom so blur stays equally effective at all zoom levels.
+    // When zoomed in 2×, content pixels double, so blur kernel must double too.
+    const scaledBlur = blurRadiusPx * scaleX;
 
     ctx.save();
 
-    // Create clipping path with border radius (restricts visible output)
+    // Reset transform — we'll work in raw canvas pixel coordinates
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Create clipping path in canvas pixel space
     ctx.beginPath();
     if (ctx.roundRect) {
-        ctx.roundRect(rectPx.x, rectPx.y, rectPx.width, rectPx.height, borderRadiusPx);
+        const scaledRadius = borderRadiusPx.map(r => r * scaleX) as [number, number, number, number];
+        ctx.roundRect(canvasX, canvasY, canvasW, canvasH, scaledRadius);
     } else {
-        ctx.rect(rectPx.x, rectPx.y, rectPx.width, rectPx.height);
+        ctx.rect(canvasX, canvasY, canvasW, canvasH);
     }
     ctx.clip();
 
-    // Apply blur filter
-    ctx.filter = `blur(${blurRadiusPx}px)`;
+    // Apply blur filter (now unambiguously in canvas pixel space)
+    ctx.filter = `blur(${scaledBlur}px)`;
 
     // Expand source area by blur radius so the kernel has real pixel data at the edges.
-    // Without this, the blur fades out at the edges (sampling transparent pixels).
-    const expand = blurRadiusPx * 2;
-    const sx = Math.max(0, rectPx.x - expand);
-    const sy = Math.max(0, rectPx.y - expand);
-    const sw = rectPx.width + expand * 2;
-    const sh = rectPx.height + expand * 2;
+    const expand = scaledBlur * 2;
+    const srcX = Math.max(0, canvasX - expand);
+    const srcY = Math.max(0, canvasY - expand);
+    const srcW = canvasW + expand * 2;
+    const srcH = canvasH + expand * 2;
 
-    const canvas = ctx.canvas;
-    ctx.drawImage(canvas, sx, sy, sw, sh, sx, sy, sw, sh);
+    // 1:1 copy with blur — source and dest are the same canvas pixel coordinates
+    ctx.drawImage(ctx.canvas, srcX, srcY, srcW, srcH, srcX, srcY, srcW, srcH);
 
     ctx.filter = 'none';
     ctx.restore();

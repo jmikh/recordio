@@ -60,7 +60,8 @@ export function drawDragEffects(
 
     const { drags, mousePositions } = userEvents;
     const [r, g, b, a] = hexToRgba(settings.color);
-    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const zoomScale = outputSize.width / viewport.width;
+    const scale = (outputSize.height / REF_OUTPUT_HEIGHT) * zoomScale;
     const radius = REF_DRAG_RADIUS * settings.size * scale;
 
     for (const drag of drags) {

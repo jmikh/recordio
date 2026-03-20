@@ -191,7 +191,7 @@ export class PlaybackRenderer {
         if (project.settings.overlay?.enabled ?? true) {
             const overlaySegments = timeline.overlaySegments || [];
             if (overlaySegments.length > 0) {
-                drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize);
+                drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
             }
         }
 
