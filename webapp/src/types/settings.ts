@@ -251,6 +251,22 @@ export interface CameraMoveSettings {
 }
 
 // ==========================================
+// OVERLAY
+// ==========================================
+
+export interface OverlaySettings {
+    /** Whether overlay effects are rendered. When false, overlays are disabled. */
+    enabled: boolean;
+    /** Default overlay block duration in ms when adding a new block */
+    defaultDurationMs: number;
+    /** Per-type defaults — used when creating new items and updated by apply-to-all */
+    blurDefaults?: { blurRadiusPx: number };
+    textDefaults?: { color: string; backgroundColor: string; fontSizePx: number };
+    arrowDefaults?: { color: string; strokeWidthPx: number; headScale: number };
+    borderDefaults?: { color: string; borderWidthPx: number };
+}
+
+// ==========================================
 // PROJECT SETTINGS (aggregated)
 // ==========================================
 
@@ -281,6 +297,9 @@ export interface ProjectSettings {
 
     // Camera Layout (dynamic position/size blocks)
     cameraMove?: CameraMoveSettings;
+
+    // Overlay annotations
+    overlay?: OverlaySettings;
 
     // Captions
     captions: CaptionSettings;

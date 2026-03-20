@@ -47,6 +47,12 @@ function buildTrackConfigs(): TrackConfig[] {
             getEnabled: (s) => s.project.settings.cameraMove?.enabled ?? true,
             toggle: () => useProjectStore.getState().toggleCameraMoveEnabled(),
         },
+        {
+            showKey: 'showOverlay',
+            label: 'Overlay',
+            getEnabled: (s) => s.project.settings.overlay?.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleOverlayEnabled(),
+        },
     ];
 }
 
@@ -70,6 +76,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
     const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
     const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
+    const overlayEnabled = useProjectStore(s => s.project.settings.overlay?.enabled ?? true);
 
     const trackConfigs = useMemo(() => buildTrackConfigs(), []);
 
@@ -83,6 +90,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         showSpotlight: spotlightEnabled,
         showCaptions: captionsEnabled,
         showCameraMove: cameraMoveEnabled,
+        showOverlay: overlayEnabled,
     };
 
     // Calculate menu position when opening

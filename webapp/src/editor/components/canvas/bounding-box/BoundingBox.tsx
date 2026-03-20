@@ -35,6 +35,8 @@ export interface BoundingBoxProps {
     constraintBounds?: Rect;
     /** Fixed aspect ratio (width/height) - if null, free-form resizing is allowed */
     fixedAspectRatio?: number | null;
+    /** Custom border color for the bounding box outline */
+    borderColor?: string;
     /** Callback when drag starts */
     onDragStart?: () => void;
     /** Callback when rect changes during drag */
@@ -53,6 +55,8 @@ export interface BoundingBoxProps {
     cornersLinked?: boolean;
     /** Hide the link/unlink toggle */
     hideLinkToggle?: boolean;
+    /** Hide the rounded border preview on the bounding box outline */
+    hideCornerPreview?: boolean;
     /** Callback when corner radii change during drag */
     onCornerRadiiChange?: (radii: CornerRadii) => void;
     /** Callback when corner radii editing is committed */
@@ -72,6 +76,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     maxBounds,
     constraintBounds,
     fixedAspectRatio = null,
+    borderColor,
     onDragStart,
     onChange,
     onCommit,
@@ -81,6 +86,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     cornerRadii,
     cornersLinked: controlledLinked,
     hideLinkToggle = false,
+    hideCornerPreview = false,
     onCornerRadiiChange,
     onCornerRadiiCommit,
     onCornersLinkedChange,
@@ -312,6 +318,8 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const activeRect = dragRef.current ? currentRectRef.current : rect;
     const displayRect = displayMapper.outputToDisplay(activeRect);
 
+    const resolvedColor = borderColor ?? PRIMARY_COLOR;
+
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
         left: displayRect.x,
@@ -319,17 +327,17 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         width: displayRect.width,
         height: displayRect.height,
         cursor: 'move',
-        boxSizing: 'border-box',
-        borderRadius: borderRadiusCss,
+        borderRadius: hideCornerPreview ? '0' : borderRadiusCss,
         pointerEvents: 'auto',
         zIndex: Z_INDEX_BOUNDING_BOX,
-        border: `${BOX_BORDER_WIDTH}px solid ${PRIMARY_COLOR}`,
+        outline: `${BOX_BORDER_WIDTH}px solid ${resolvedColor}`,
+        outlineOffset: 0,
     };
 
     const straightLineStyle: React.CSSProperties = {
         position: 'absolute',
         inset: -1,
-        border: `${OVERLAY_BORDER_WIDTH}px solid ${PRIMARY_COLOR}`,
+        border: `${OVERLAY_BORDER_WIDTH}px solid ${resolvedColor}`,
         borderRadius: 0,
         pointerEvents: 'none',
     };
@@ -386,10 +394,10 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             )}
 
             {/* Corner Resize Handles */}
-            <Handle type="nw" cursor="nw-resize" onPointerDown={handlePointerDown} />
-            <Handle type="ne" cursor="ne-resize" onPointerDown={handlePointerDown} />
-            <Handle type="sw" cursor="sw-resize" onPointerDown={handlePointerDown} />
-            <Handle type="se" cursor="se-resize" onPointerDown={handlePointerDown} />
+            <Handle type="nw" cursor="nw-resize" color={borderColor} onPointerDown={handlePointerDown} />
+            <Handle type="ne" cursor="ne-resize" color={borderColor} onPointerDown={handlePointerDown} />
+            <Handle type="sw" cursor="sw-resize" color={borderColor} onPointerDown={handlePointerDown} />
+            <Handle type="se" cursor="se-resize" color={borderColor} onPointerDown={handlePointerDown} />
 
             {/* Edge Resize Handles (only when aspect ratio not locked) */}
             {!fixedAspectRatio && (

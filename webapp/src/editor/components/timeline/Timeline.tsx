@@ -10,6 +10,8 @@ import { SpotlightHeaderCell } from './tracks/spotlight/SpotlightHeaderCell';
 import { LayoutHeaderCell } from './tracks/cameraMove/LayoutHeaderCell';
 import { CaptionTrack } from './tracks/caption/CaptionTrack';
 import { CameraMoveTrack } from './tracks/cameraMove/CameraMoveTrack';
+import { OverlayTrack } from './tracks/overlay/OverlayTrack';
+import { OverlayHeaderCell } from './tracks/overlay/OverlayHeaderCell';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
@@ -165,6 +167,9 @@ export function Timeline() {
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
+    const selectedOverlayBlockId = useUIStore(s => s.selectedOverlayBlockId);
+    const selectOverlayBlock = useUIStore(s => s.selectOverlayBlock);
+    const deleteOverlayBlock = useProjectStore(s => s.deleteOverlayBlock);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -186,6 +191,10 @@ export function Timeline() {
                     e.preventDefault();
                     deleteCameraMove(selectedCameraMoveId);
                     selectCameraMove(null);
+                } else if (selectedOverlayBlockId) {
+                    e.preventDefault();
+                    deleteOverlayBlock(selectedOverlayBlockId);
+                    selectOverlayBlock(null);
                 }
             }
 
@@ -203,7 +212,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlayBlockId, deleteOverlayBlock, selectOverlayBlock, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -290,6 +299,13 @@ export function Timeline() {
                         {displaySettings.showCameraMove && hasCameraSource && (
                             <div className="shrink-0" style={{ height: trackSizing.cameraMove.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('cameraMove')}>
                                 <LayoutHeaderCell height={trackSizing.cameraMove.height} isCollapsed={trackSizing.cameraMove.isCollapsed} />
+                            </div>
+                        )}
+
+                        {/* Header: Overlay */}
+                        {displaySettings.showOverlay && (
+                            <div className="shrink-0" style={{ height: trackSizing.overlay.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('overlay')}>
+                                <OverlayHeaderCell height={trackSizing.overlay.height} isCollapsed={trackSizing.overlay.isCollapsed} />
                             </div>
                         )}
                     </div>
@@ -386,6 +402,13 @@ export function Timeline() {
                                     {displaySettings.showCameraMove && hasCameraSource && (
                                         <TimelineTrackRow height={trackSizing.cameraMove.height} onMouseEnter={() => setHoveredTrack('cameraMove')}>
                                             <CameraMoveTrack height={trackSizing.cameraMove.height} isCollapsed={trackSizing.cameraMove.isCollapsed} />
+                                        </TimelineTrackRow>
+                                    )}
+
+                                    {/* Overlay Track */}
+                                    {displaySettings.showOverlay && (
+                                        <TimelineTrackRow height={trackSizing.overlay.height} onMouseEnter={() => setHoveredTrack('overlay')}>
+                                            <OverlayTrack height={trackSizing.overlay.height} isCollapsed={trackSizing.overlay.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 

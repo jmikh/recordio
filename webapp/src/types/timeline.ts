@@ -7,6 +7,9 @@
 import type { ID, TimeMs, Rect } from '@shared/types';
 import type { EasingStyle } from './settings';
 
+// Re-export overlay types (defined in their own file for complexity management)
+export type { OverlayItemType, BaseOverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem, OverlayItem, OverlayBlock } from './overlay';
+
 // ==========================================
 // BASE SEGMENT INTERFACE
 // ==========================================
@@ -159,6 +162,7 @@ export interface DisplaySettings {
     showSpotlight: boolean;
     showCaptions: boolean;
     showCameraMove: boolean;
+    showOverlay: boolean;
     /** Whether hover-to-expand collapse is active */
     collapsed: boolean;
 }
@@ -191,6 +195,8 @@ export interface Timeline {
     captionSegments: CaptionSegment[];
     /** Camera layout overrides for dynamic camera position/size changes */
     cameraMoveSegments: CameraMoveSegment[];
+    /** Overlay annotation blocks (non-overlapping, source-time anchored) */
+    overlayBlocks: import('./overlay').OverlayBlock[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
     /** Timeline display settings (track visibility, collapse state) */

@@ -1,4 +1,5 @@
 import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraMoveSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
+import type { OverlayBlock } from '../types/overlay';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
@@ -12,6 +13,7 @@ const DEFAULT_DISPLAY_SETTINGS = {
     showSpotlight: true,
     showCaptions: false,
     showCameraMove: false,
+    showOverlay: true,
     collapsed: false,
 };
 
@@ -152,6 +154,15 @@ const createDefaultSettings = (): ProjectSettings => ({
         easing: 'ease-in-out'
     },
 
+    overlay: {
+        enabled: true,
+        defaultDurationMs: 3000,
+        blurDefaults: { blurRadiusPx: 20 },
+        textDefaults: { color: '#ffffff', backgroundColor: '#00000080', fontSizePx: 0 },
+        arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4, headScale: 1.0 },
+        borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
+    },
+
     autoCutApplied: false,
 });
 
@@ -164,6 +175,7 @@ const createDefaultTimeline = (): Timeline => ({
     zoomSegments: [],
     spotlightSegments: [],
     cameraMoveSegments: [],
+    overlayBlocks: [],
     outputWindows: [],
     focusAreas: [],
     captionSegments: [],
@@ -273,6 +285,7 @@ export class ProjectImpl {
             focusAreas: focusAreas,
             captionSegments: [],
             cameraMoveSegments: [],
+            overlayBlocks: [],
             displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
         };
 
@@ -395,6 +408,9 @@ export class ProjectImpl {
                 ),
                 cameraMoveSegments: (project.timeline.cameraMoveSegments || []).map((cl: CameraMoveSegment) =>
                     ProjectImpl.scalePixelValues(cl, scale) as CameraMoveSegment
+                ),
+                overlayBlocks: (project.timeline.overlayBlocks || []).map((ob: OverlayBlock) =>
+                    ProjectImpl.scalePixelValues(ob, scale) as OverlayBlock
                 ),
             }
         };

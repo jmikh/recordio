@@ -16,6 +16,7 @@ import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
+import { OverlayInspector } from './OverlayInspector';
 import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
 import { PiWebcamBold } from 'react-icons/pi';
 import { FaChevronRight } from 'react-icons/fa';
@@ -128,7 +129,8 @@ export const SettingsPanel = () => {
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
-    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraMoveId);
+    const selectedOverlayBlockId = useUIStore(s => s.selectedOverlayBlockId);
+    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraMoveId || selectedOverlayBlockId);
 
     const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
     const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
@@ -139,6 +141,9 @@ export const SettingsPanel = () => {
     const selectedSpotlight = selectedSpotlightId ? spotlightSegments.find(s => s.id === selectedSpotlightId) : null;
     const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
     const selectedCameraMove = selectedCameraMoveId ? (cameraMoveSegments || []).find(s => s.id === selectedCameraMoveId) : null;
+
+    const overlayBlocks = useProjectStore(s => s.project.timeline.overlayBlocks);
+    const selectedOverlayBlock = selectedOverlayBlockId ? (overlayBlocks || []).find(b => b.id === selectedOverlayBlockId) : null;
 
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
@@ -214,6 +219,7 @@ export const SettingsPanel = () => {
                             {selectedSpotlight && <SpotlightInspector segment={selectedSpotlight} />}
                             {selectedWindow && <ClipInspector window={selectedWindow} />}
                             {selectedCameraMove && <CameraMoveInspector segment={selectedCameraMove} />}
+                            {selectedOverlayBlock && <OverlayInspector block={selectedOverlayBlock} />}
                         </>
                     ) : (
                         <>

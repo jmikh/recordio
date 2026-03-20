@@ -17,6 +17,7 @@ import {
 export interface HandleProps {
     type: InteractionType;
     cursor: string;
+    color?: string;
     onPointerDown: (e: React.PointerEvent, type: InteractionType) => void;
 }
 
@@ -34,10 +35,12 @@ const HIT_AREA = CORNER_HANDLE_LENGTH + 4;
 export const Handle: React.FC<HandleProps> = ({
     type,
     cursor,
+    color,
     onPointerDown
 }) => {
     const isNorth = type.includes('n');
     const isWest = type.includes('w');
+    const handleColor = color ?? CORNER_HANDLE_COLOR;
 
     // Hit area container positioned at the corner
     const containerStyle: React.CSSProperties = {
@@ -55,7 +58,7 @@ export const Handle: React.FC<HandleProps> = ({
         position: 'absolute',
         width: CORNER_HANDLE_LENGTH,
         height: CORNER_HANDLE_THICKNESS,
-        backgroundColor: CORNER_HANDLE_COLOR,
+        backgroundColor: handleColor,
         ...(isNorth ? { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
         ...(isWest ? { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
     };
@@ -65,7 +68,7 @@ export const Handle: React.FC<HandleProps> = ({
         position: 'absolute',
         width: CORNER_HANDLE_THICKNESS,
         height: CORNER_HANDLE_LENGTH,
-        backgroundColor: CORNER_HANDLE_COLOR,
+        backgroundColor: handleColor,
         ...(isNorth ? { top: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { bottom: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
         ...(isWest ? { left: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 } : { right: HIT_AREA / 2 - CORNER_HANDLE_THICKNESS / 2 }),
     };

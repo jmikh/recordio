@@ -10,9 +10,10 @@ import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActi
 import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSlice';
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 import { createCameraMoveSlice, type CameraMoveSlice } from './slices/cameraMoveSlice';
+import { createOverlaySlice, type OverlaySlice } from './slices/overlaySlice';
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, OverlaySlice {
     project: Project;
     /** Recording events — loaded once, never mutated, excluded from undo/redo history. */
     userEvents: UserEvents;
@@ -68,6 +69,7 @@ export const useProjectStore = create<ProjectState>()(
                 ...createSpotlightSlice(set, get, store),
                 ...createTranscriptionSlice(set, get, store),
                 ...createCameraMoveSlice(set, get, store),
+                ...createOverlaySlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {

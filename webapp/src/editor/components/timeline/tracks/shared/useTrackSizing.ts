@@ -20,7 +20,7 @@ export const TRACK_HEIGHT = 32;
 /** Collapsed track height (~40% of full) */
 export const COLLAPSED_HEIGHT = 13;
 
-type EffectTrack = 'zoom' | 'spotlight' | 'captions' | 'cameraMove';
+type EffectTrack = 'zoom' | 'spotlight' | 'captions' | 'cameraMove' | 'overlay';
 
 /** Track ordering for effect tracks (recording is handled separately) */
 const EFFECT_TRACK_ORDER: EffectTrack[] = [
@@ -28,6 +28,7 @@ const EFFECT_TRACK_ORDER: EffectTrack[] = [
     'spotlight',
     'captions',
     'cameraMove',
+    'overlay',
 ];
 
 /** Maps effect track keys to their DisplaySettings show_ field */
@@ -36,6 +37,7 @@ const SHOW_KEY: Record<EffectTrack, keyof DisplaySettings> = {
     spotlight: 'showSpotlight',
     captions: 'showCaptions',
     cameraMove: 'showCameraMove',
+    overlay: 'showOverlay',
 };
 
 /** Gap between track rows */
@@ -59,7 +61,7 @@ export interface TrackSizingResult {
 
 export function useTrackSizing(): TrackSizingResult {
     const displaySettings = useProjectStore(s => s.project.timeline.displaySettings) ?? {
-        showZoom: true, showSpotlight: true, showCaptions: false, showCameraMove: false, collapsed: false,
+        showZoom: true, showSpotlight: true, showCaptions: false, showCameraMove: false, showOverlay: true, collapsed: false,
     };
     const hoveredTrack = useUIStore(s => s.hoveredTrack);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
