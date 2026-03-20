@@ -18,7 +18,7 @@ import {
     holdShapeBase,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
-import type { OverlayBlock as OverlayBlockType } from '../../../../../types/overlay';
+import type { OverlaySegment } from '../../../../../types/overlay';
 
 interface OverlayTrackProps {
     height: number;
@@ -33,9 +33,9 @@ export const OverlayTrack: React.FC<OverlayTrackProps> = ({ height, isCollapsed 
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const timeline = useProjectTimeline();
 
-    const selectedId = useUIStore(s => s.selectedOverlayBlockId);
+    const selectedId = useUIStore(s => s.selectedOverlaySegmentId);
     const setSelected = (id: string | null) => {
-        useUIStore.getState().selectOverlayBlock(id);
+        useUIStore.getState().selectOverlaySegment(id);
     };
 
     const overlayEnabled = useProjectStore(s => s.project.settings.overlay?.enabled ?? true);
@@ -44,23 +44,23 @@ export const OverlayTrack: React.FC<OverlayTrackProps> = ({ height, isCollapsed 
     const coords = useMemo(() => new TimePixelMapper(timeMapper, pixelsPerSec), [timeMapper, pixelsPerSec]);
     const outputDuration = useMemo(() => timeMapper.getOutputDuration(), [timeMapper]);
 
-    const blocks = useMemo(() =>
-        (timeline.overlayBlocks || []).filter((b: OverlayBlockType) => b.visible),
-        [timeline.overlayBlocks]);
+    const segments = useMemo(() =>
+        (timeline.overlaySegments || []).filter((b: OverlaySegment) => b.visible),
+        [timeline.overlaySegments]);
 
-    const updateOverlayBlock = useProjectStore(s => s.updateOverlayBlock);
-    const deleteOverlayBlock = useProjectStore(s => s.deleteOverlayBlock);
+    const updateOverlaySegment = useProjectStore(s => s.updateOverlaySegment);
+    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
 
-    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<OverlayBlockType>({
-        segments: blocks,
+    const { dragState, handleDragStart, wasDraggingRef, wasSelectedBeforeMousedownRef } = useTimelineSegmentDrag<OverlaySegment>({
+        segments,
         outputDuration,
         coords,
         timeMapper,
         onSelect: setSelected,
         onUpdate: (id, sourceStart, sourceEnd) =>
-            updateOverlayBlock(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
-        onDelete: deleteOverlayBlock,
-        getAllSegments: () => timeline.overlayBlocks ?? [],
+            updateOverlaySegment(id, { sourceStartTimeMs: sourceStart, sourceEndTimeMs: sourceEnd }),
+        onDelete: deleteOverlaySegment,
+        getAllSegments: () => timeline.overlaySegments ?? [],
     });
 
     const { hoverInfo, handleMouseMove, handleMouseLeave, handleClick } = useOverlayHover(
@@ -69,7 +69,7 @@ export const OverlayTrack: React.FC<OverlayTrackProps> = ({ height, isCollapsed 
         selectedId,
         setSelected,
         outputDuration,
-        blocks,
+        segments,
         timeMapper
     );
 
@@ -87,7 +87,7 @@ export const OverlayTrack: React.FC<OverlayTrackProps> = ({ height, isCollapsed 
                 {!overlayEnabled && <DisabledTrackOverlay height={height} />}
 
                 {/* Overlay blocks */}
-                {blocks.map((b: OverlayBlockType) => {
+                {segments.map((b: OverlaySegment) => {
                     const startX = coords.msToX(b.outputStartTimeMs);
                     const endX = coords.msToX(b.outputEndTimeMs);
                     const blockWidth = Math.max(endX - startX, 2);

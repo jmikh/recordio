@@ -262,7 +262,7 @@ export interface OverlaySettings {
     /** Per-type defaults — used when creating new items and updated by apply-to-all */
     blurDefaults?: { blurRadiusPx: number };
     textDefaults?: { color: string; backgroundColor: string; fontSizePx: number };
-    arrowDefaults?: { color: string; strokeWidthPx: number; headScale: number };
+    arrowDefaults?: { color: string; strokeWidthPx: number };
     borderDefaults?: { color: string; borderWidthPx: number };
 }
 

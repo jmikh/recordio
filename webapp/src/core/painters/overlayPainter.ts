@@ -9,45 +9,60 @@
  */
 
 import type { Size } from '../../types';
-import type { OverlayBlock, OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../types/overlay';
+import type { OverlaySegment, OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../types/overlay';
+
+// Reference constants — scaled proportionally to output height (matching camera painter pattern)
+const REF_OUTPUT_HEIGHT = 1080;
+const REF_SHADOW_BLUR = 20;
+const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
+const REF_SHADOW_OFFSET_Y = 10;
+const REF_GLOW_BLUR = 25;
+const HEAD_SCALE = 1.0;
+
+// Text overlay painter constants (not stored per-item — derived from output size)
+export const TEXT_REF_HEIGHT = 1080;
+export const TEXT_REF_PADDING = 8;
+export const TEXT_REF_RADIUS = 6;
 
 /**
  * Draws all overlay items for the given time.
  * @param ctx - Canvas 2D context
- * @param overlayBlocks - All overlay blocks in the project
+ * @param overlaySegments - All overlay segments in the project
  * @param currentTimeMs - Current output time in ms
  * @param outputSize - Output canvas size
  * @param editingItemId - Item currently being edited (skip to avoid double-render)
  */
 export function drawOverlays(
     ctx: CanvasRenderingContext2D,
-    overlayBlocks: OverlayBlock[],
+    overlaySegments: OverlaySegment[],
     currentTimeMs: number,
     outputSize: Size,
     editingItemId?: string | null
 ): void {
-    // Find active blocks at this time
-    for (const block of overlayBlocks) {
-        if (!block.visible) continue;
-        if (currentTimeMs < block.outputStartTimeMs || currentTimeMs > block.outputEndTimeMs) continue;
+    const effectScale = outputSize.height / REF_OUTPUT_HEIGHT;
 
-        for (const item of block.items) {
+    // Find active segments at this time
+    for (const segment of overlaySegments) {
+        if (!segment.visible) continue;
+        if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) continue;
+
+        for (const item of segment.items) {
             // Only skip text when being edited (rendered via HTML for inline editing).
             // Blur, arrow, and border always paint — the HTML overlay only shows
             // bounding box handles, not the visual itself.
             if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
 
-            drawOverlayItem(ctx, item, outputSize);
+            drawOverlayItem(ctx, item, outputSize, effectScale);
         }
     }
 }
 
-function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outputSize: Size): void {
+function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outputSize: Size, effectScale: number): void {
     switch (item.type) {
         case 'blur': return drawBlur(ctx, item, outputSize);
-        case 'text': return drawText(ctx, item);
-        case 'arrow': return drawArrow(ctx, item);
-        case 'border': return drawBorder(ctx, item);
+        case 'text': return drawText(ctx, item, outputSize);
+        case 'arrow': return drawArrow(ctx, item, effectScale);
+        case 'border': return drawBorder(ctx, item, effectScale);
     }
 }
 
@@ -91,60 +106,43 @@ function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, _outputS
 // TEXT
 // ============================================================================
 
-function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem): void {
+function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSize: Size): void {
     const { topLeft, widthPx, text, fontSizePx, fontFamily, fontWeight, color } = item;
 
     ctx.save();
 
-    const font = `${fontWeight} ${fontSizePx}px ${fontFamily}, sans-serif`;
-    ctx.font = font;
+    // Painter-derived constants (not stored per-item)
+    const scale = outputSize.height / TEXT_REF_HEIGHT;
+    const pad = Math.round(TEXT_REF_PADDING * scale);
+    const bgRadius = Math.round(TEXT_REF_RADIUS * scale);
+
+    // Font
+    const fontString = `${fontWeight} ${fontSizePx}px ${fontFamily}, sans-serif`;
+    ctx.font = fontString;
     ctx.textBaseline = 'top';
 
-    // Match HTML line-height: 1.2
-    const LINE_HEIGHT = 1.2;
-    const halfLeading = fontSizePx * (LINE_HEIGHT - 1) / 2;
-    const lineHeightPx = fontSizePx * LINE_HEIGHT;
-
-    // Word-wrap text within widthPx
-    const lines = wrapLines(ctx, text, widthPx);
-    const totalHeight = lines.length * lineHeightPx;
+    // Line wrapping
+    const lineHeightPx = fontSizePx * 1.2;
+    const lines = wrapLines(ctx, text || '', widthPx);
 
     // Background
     if (item.backgroundColor) {
-        const pad = item.backgroundPaddingPx ?? 8;
-        const radius = item.backgroundRadiusPx ?? 0;
-
+        const bgH = lines.length * lineHeightPx + pad * 2;
         ctx.fillStyle = item.backgroundColor;
         ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, totalHeight + pad * 2, radius);
+        if (ctx.roundRect && bgRadius > 0) {
+            ctx.roundRect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH, bgRadius);
         } else {
-            ctx.rect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, totalHeight + pad * 2);
+            ctx.rect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH);
         }
         ctx.fill();
     }
 
-    // Shadow
-    if (item.shadow) {
-        ctx.shadowColor = item.shadow.color;
-        ctx.shadowBlur = item.shadow.blurPx;
-        ctx.shadowOffsetX = item.shadow.offsetXPx;
-        ctx.shadowOffsetY = item.shadow.offsetYPx;
-    }
-
-    // Draw each line
-    for (let i = 0; i < lines.length; i++) {
-        const lineY = topLeft.y + halfLeading + i * lineHeightPx;
-
-        if (item.strokeColor && item.strokeWidthPx > 0) {
-            ctx.strokeStyle = item.strokeColor;
-            ctx.lineWidth = item.strokeWidthPx;
-            ctx.strokeText(lines[i], topLeft.x, lineY);
-        }
-
-        ctx.fillStyle = color;
-        ctx.fillText(lines[i], topLeft.x, lineY);
-    }
+    // Fill text
+    ctx.fillStyle = color;
+    lines.forEach((line, i) => {
+        ctx.fillText(line, topLeft.x, topLeft.y + i * lineHeightPx);
+    });
 
     ctx.restore();
 }
@@ -192,20 +190,20 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 // ARROW
 // ============================================================================
 
-function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem): void {
-    const { tail, head, strokeWidthPx, color, headScale } = item;
+function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem, effectScale: number): void {
+    const { tail, head, strokeWidthPx, color } = item;
 
     ctx.save();
 
-    // Shadow
-    if (item.shadow) {
-        ctx.shadowColor = item.shadow.color;
-        ctx.shadowBlur = item.shadow.blurPx;
-        ctx.shadowOffsetX = item.shadow.offsetXPx;
-        ctx.shadowOffsetY = item.shadow.offsetYPx;
-    } else if (item.glow && item.glow.blurPx > 0) {
-        ctx.shadowColor = item.glow.color;
-        ctx.shadowBlur = item.glow.blurPx;
+    // Shadow / Glow (derived from effect enum, matching camera painter pattern)
+    if (item.effect === 'shadow') {
+        ctx.shadowColor = SHADOW_COLOR;
+        ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
+    } else if (item.effect === 'glow') {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
     }
 
     ctx.strokeStyle = color;
@@ -219,8 +217,8 @@ function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem): void 
     const dy = head.y - tail.y;
     const angle = Math.atan2(dy, dx);
 
-    // Arrowhead size
-    const headSize = strokeWidthPx * 4 * headScale;
+    // Arrowhead size (fixed scale, no longer stored per-item)
+    const headSize = strokeWidthPx * 4 * HEAD_SCALE;
 
     // Draw shaft
     ctx.beginPath();
@@ -249,20 +247,20 @@ function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem): void 
 // BORDER
 // ============================================================================
 
-function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem): void {
+function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem, effectScale: number): void {
     const { rectPx, borderWidthPx, color, borderRadiusPx } = item;
 
     ctx.save();
 
-    // Shadow / Glow
-    if (item.shadow) {
-        ctx.shadowColor = item.shadow.color;
-        ctx.shadowBlur = item.shadow.blurPx;
-        ctx.shadowOffsetX = item.shadow.offsetXPx;
-        ctx.shadowOffsetY = item.shadow.offsetYPx;
-    } else if (item.glow && item.glow.blurPx > 0) {
-        ctx.shadowColor = item.glow.color;
-        ctx.shadowBlur = item.glow.blurPx;
+    // Shadow / Glow (derived from effect enum, matching camera painter pattern)
+    if (item.effect === 'shadow') {
+        ctx.shadowColor = SHADOW_COLOR;
+        ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
+    } else if (item.effect === 'glow') {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
     }
 
     // Fill

@@ -5,9 +5,10 @@ import { useOverlayEditorStore } from '../canvas/useOverlayEditorStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { CollapsibleCard, Button, Slider, MultiToggle, Checkbox, Tooltip, type DropdownOption } from '@shared/components';
 import { ColorButton } from './ColorButton';
-import { MdLayers, MdBlurOn, MdOutlineTextFields, MdBorderOuter, MdSettings } from 'react-icons/md';
+import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
+import { LuLayers3 } from 'react-icons/lu';
 import { RiArrowRightUpFill } from 'react-icons/ri';
-import type { OverlayBlock, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../../types/overlay';
+import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../../types/overlay';
 import type { OverlaySettings } from '../../../types/settings';
 import type { Size } from '../../../types';
 
@@ -32,13 +33,10 @@ const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
 // Hardcoded fallbacks for projects without saved defaults
 const BLUR_FALLBACK = { blurRadiusPx: 20 };
 const TEXT_FALLBACK = { color: '#ffffff', backgroundColor: '#00000080', fontSizePx: 0 };
-const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4, headScale: 1.0 };
+const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4 };
 const BORDER_FALLBACK = { color: '#7B61FF', borderWidthPx: 4 };
 
-// Reference constants for text overlays (designed for 1080px height, following captionPainter)
-const TEXT_REF_HEIGHT = 1080;
-const TEXT_REF_PADDING = 8;
-const TEXT_REF_RADIUS = 6;
+
 
 const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySettings: OverlaySettings): OverlayItem => {
     const id = crypto.randomUUID();
@@ -56,19 +54,15 @@ const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySetti
                 borderRadiusPx: [0, 0, 0, 0],
             };
         }
-        case 'text': {
+         case 'text': {
             const d = overlaySettings.textDefaults ?? TEXT_FALLBACK;
             const fontSize = d.fontSizePx > 0 ? d.fontSizePx : Math.round(Math.min(W, H) * 0.05);
-            const scale = H / TEXT_REF_HEIGHT;
             return {
                 id, type: 'text', text: 'Text',
                 topLeft: { x: Math.round(W * 0.3), y: Math.round(H * 0.45) },
                 widthPx: Math.round(W * 0.4),
                 fontSizePx: fontSize, fontFamily: 'Inter', fontWeight: 400,
                 color: d.color, backgroundColor: d.backgroundColor,
-                backgroundPaddingPx: Math.round(TEXT_REF_PADDING * scale),
-                backgroundRadiusPx: Math.round(TEXT_REF_RADIUS * scale),
-                strokeWidthPx: 0,
             };
         }
         case 'arrow': {
@@ -77,7 +71,8 @@ const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySetti
                 id, type: 'arrow',
                 tail: { x: Math.round(W * 0.3), y: Math.round(H * 0.6) },
                 head: { x: Math.round(W * 0.6), y: Math.round(H * 0.4) },
-                color: d.color, strokeWidthPx: d.strokeWidthPx, headScale: d.headScale,
+                color: d.color, strokeWidthPx: d.strokeWidthPx,
+                effect: 'none',
             };
         }
         case 'border': {
@@ -88,6 +83,7 @@ const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySetti
                 id, type: 'border',
                 rectPx: { x: Math.round((W - bw) / 2), y: Math.round((H - bh) / 2), width: bw, height: bh },
                 color: d.color, borderWidthPx: d.borderWidthPx, borderRadiusPx: [8, 8, 8, 8],
+                effect: 'none',
             };
         }
     }
@@ -110,14 +106,14 @@ function getNumberedLabels(items: OverlayItem[]): Map<string, string> {
 // MAIN INSPECTOR
 // ============================================================================
 
-export const OverlayInspector: React.FC<{ block: OverlayBlock }> = ({ block }) => {
-    const deleteOverlayBlock = useProjectStore(s => s.deleteOverlayBlock);
-    const clearOverlayBlocks = useProjectStore(s => s.clearOverlayBlocks);
+export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block }) => {
+    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
+    const clearOverlaySegments = useProjectStore(s => s.clearOverlaySegments);
     const addOverlayItem = useProjectStore(s => s.addOverlayItem);
     const deleteOverlayItem = useProjectStore(s => s.deleteOverlayItem);
     const updateOverlayItem = useProjectStore(s => s.updateOverlayItem);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const selectOverlayBlock = useUIStore(s => s.selectOverlayBlock);
+    const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
     const selectOverlayItem = useUIStore(s => s.selectOverlayItem);
     const selectedItemId = useUIStore(s => s.selectedOverlayItemId);
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
@@ -130,14 +126,14 @@ export const OverlayInspector: React.FC<{ block: OverlayBlock }> = ({ block }) =
     const hoveredItemId = useOverlayEditorStore(s => s.hoveredItemId);
 
     const handleDelete = useCallback(() => {
-        deleteOverlayBlock(block.id);
-        selectOverlayBlock(null);
-    }, [block.id, deleteOverlayBlock, selectOverlayBlock]);
+        deleteOverlaySegment(block.id);
+        selectOverlaySegment(null);
+    }, [block.id, deleteOverlaySegment, selectOverlaySegment]);
 
     const handleDeleteAll = useCallback(() => {
-        clearOverlayBlocks();
-        selectOverlayBlock(null);
-    }, [clearOverlayBlocks, selectOverlayBlock]);
+        clearOverlaySegments();
+        selectOverlaySegment(null);
+    }, [clearOverlaySegments, selectOverlaySegment]);
 
     const handleAddItem = useCallback((type: OverlayItemType) => {
         const item = createDefaultItem(type, outputSize, overlaySettings);
@@ -159,7 +155,7 @@ export const OverlayInspector: React.FC<{ block: OverlayBlock }> = ({ block }) =
     return (
         <div className="flex flex-col gap-2">
             {/* Items List */}
-            <CollapsibleCard title="Items" icon={<MdLayers size={16} />} notCollapsible>
+            <CollapsibleCard title="Overlays" icon={<LuLayers3 size={16} />} notCollapsible>
                 <div className="flex flex-col gap-2">
                     {block.items.length === 0 ? (
                         <p className="subtext">No items yet. Add an overlay type below.</p>
@@ -214,7 +210,7 @@ export const OverlayInspector: React.FC<{ block: OverlayBlock }> = ({ block }) =
             {selectedItem && (
                 <CollapsibleCard
                     title={numberedLabels.get(selectedItem.id) ?? 'Settings'}
-                    icon={<MdSettings size={16} />}
+                    icon={OVERLAY_TYPE_ICONS[selectedItem.type]}
                     notCollapsible
                 >
                     <OverlayItemSettings
@@ -249,7 +245,7 @@ export const OverlayInspector: React.FC<{ block: OverlayBlock }> = ({ block }) =
 // ============================================================================
 
 interface OverlayItemSettingsProps {
-    block: OverlayBlock;
+    block: OverlaySegment;
     item: OverlayItem;
     overlaySettings: OverlaySettings;
     updateItem: (updates: Partial<OverlayItem>) => void;
@@ -391,7 +387,6 @@ const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
         }
         case 'arrow': {
             const arrow = item as ArrowOverlayItem;
-            const hasShadow = !!arrow.shadow;
             return (
                 <div className="flex flex-col gap-4">
                     <p className="subtext">Check the box to apply to all arrow overlays.</p>
@@ -413,15 +408,9 @@ const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
                             { value: 'none', label: 'None' },
                             { value: 'glow', label: 'Glow' },
                         ]}
-                        value={hasShadow ? 'shadow' : arrow.glow ? 'glow' : 'none'}
+                    value={arrow.effect}
                         onChange={(val) => {
-                            if (val === 'shadow') {
-                                updateItem({ shadow: { color: '#00000066', blurPx: 8, offsetXPx: 2, offsetYPx: 2 }, glow: undefined } as any);
-                            } else if (val === 'glow') {
-                                updateItem({ glow: { color: arrow.color, blurPx: 12 }, shadow: undefined } as any);
-                            } else {
-                                updateItem({ shadow: undefined, glow: undefined } as any);
-                            }
+                            updateItem({ effect: val } as any);
                         }}
                     />
                 </div>
@@ -458,15 +447,9 @@ const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
                             { value: 'none', label: 'None' },
                             { value: 'glow', label: 'Glow' },
                         ]}
-                        value={border.shadow ? 'shadow' : border.glow ? 'glow' : 'none'}
+                        value={border.effect}
                         onChange={(val) => {
-                            if (val === 'shadow') {
-                                updateItem({ shadow: { color: '#00000066', blurPx: 8, offsetXPx: 2, offsetYPx: 2 }, glow: undefined } as any);
-                            } else if (val === 'glow') {
-                                updateItem({ glow: { color: border.color, blurPx: 12 }, shadow: undefined } as any);
-                            } else {
-                                updateItem({ shadow: undefined, glow: undefined } as any);
-                            }
+                            updateItem({ effect: val } as any);
                         }}
                     />
                 </div>

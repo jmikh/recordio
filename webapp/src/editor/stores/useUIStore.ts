@@ -34,7 +34,7 @@ export interface UIState {
     selectedWindowId: ID | null;
     selectedCaptionId: ID | null;
     selectedCameraMoveId: ID | null;
-    selectedOverlayBlockId: ID | null;
+    selectedOverlaySegmentId: ID | null;
     selectedOverlayItemId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
@@ -46,7 +46,7 @@ export interface UIState {
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
     selectCameraMove: (id: ID | null) => void;
-    selectOverlayBlock: (blockId: ID | null) => void;
+    selectOverlaySegment: (blockId: ID | null) => void;
     selectOverlayItem: (itemId: ID | null) => void;
     deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
@@ -144,7 +144,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedWindowId: null,
     selectedCaptionId: null,
     selectedCameraMoveId: null,
-    selectedOverlayBlockId: null,
+    selectedOverlaySegmentId: null,
     selectedOverlayItemId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
@@ -155,7 +155,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedOverlayBlockId: null, selectedOverlayItemId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null, selectedOverlayItemId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => {
@@ -164,7 +164,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectCameraMove(null);
-            get().selectOverlayBlock(null);
+            get().selectOverlaySegment(null);
         }
         set({
             selectedWindowId,
@@ -178,7 +178,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlayBlock(null);
+            get().selectOverlaySegment(null);
         }
         set((state) => {
             if (selectedZoomId) {
@@ -198,7 +198,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlayBlock(null);
+            get().selectOverlaySegment(null);
         }
         set((state) => {
             if (selectedSpotlightId) {
@@ -218,7 +218,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlayBlock(null);
+            get().selectOverlaySegment(null);
         }
         set((state) => {
             if (selectedCaptionId) {
@@ -253,7 +253,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectWindow(null);
-            get().selectOverlayBlock(null);
+            get().selectOverlaySegment(null);
         }
         set((state) => {
             if (selectedCameraMoveId) {
@@ -273,12 +273,12 @@ export const useUIStore = create<UIState>((set, get) => ({
         get().selectWindow(null);
         get().selectCaption(null);
         get().selectCameraMove(null);
-        get().selectOverlayBlock(null);
+        get().selectOverlaySegment(null);
         set({ canvasMode: CanvasMode.Preview });
     },
 
-    selectOverlayBlock: (selectedOverlayBlockId) => {
-        if (selectedOverlayBlockId) {
+    selectOverlaySegment: (selectedOverlaySegmentId) => {
+        if (selectedOverlaySegmentId) {
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectCaption(null);
@@ -286,16 +286,16 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCameraMove(null);
         }
         set((state) => {
-            if (selectedOverlayBlockId) {
+            if (selectedOverlaySegmentId) {
                 return {
-                    selectedOverlayBlockId,
+                    selectedOverlaySegmentId,
                     selectedOverlayItemId: null,
                     canvasMode: CanvasMode.OverlayEdit,
                     isPlaying: false,
                 };
             }
             return {
-                selectedOverlayBlockId: null,
+                selectedOverlaySegmentId: null,
                 selectedOverlayItemId: null,
                 canvasMode: CanvasMode.Preview,
             };
@@ -331,7 +331,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedOverlayBlockId: null, selectedOverlayItemId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null, selectedOverlayItemId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -439,7 +439,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedWindowId: null,
             selectedCaptionId: null,
             selectedCameraMoveId: null,
-            selectedOverlayBlockId: null,
+            selectedOverlaySegmentId: null,
             selectedOverlayItemId: null,
             selectedSettingsPanel: SettingsPanel.Screen,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,

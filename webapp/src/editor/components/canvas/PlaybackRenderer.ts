@@ -5,6 +5,7 @@ import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawCamera } from '../../../core/painters/cameraPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
 import { drawCaptions } from '../../../core/painters/captionPainter';
+import { drawOverlays } from '../../../core/painters/overlayPainter';
 import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 
 
@@ -183,6 +184,14 @@ export class PlaybackRenderer {
                         }
                     }
                 }
+            }
+        }
+
+        // Render Overlay annotations (after camera, before captions)
+        if (project.settings.overlay?.enabled ?? true) {
+            const overlaySegments = timeline.overlaySegments || [];
+            if (overlaySegments.length > 0) {
+                drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize);
             }
         }
 

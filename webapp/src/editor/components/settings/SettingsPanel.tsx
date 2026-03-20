@@ -129,8 +129,8 @@ export const SettingsPanel = () => {
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
-    const selectedOverlayBlockId = useUIStore(s => s.selectedOverlayBlockId);
-    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraMoveId || selectedOverlayBlockId);
+    const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
+    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraMoveId || selectedOverlaySegmentId);
 
     const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
     const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
@@ -142,8 +142,8 @@ export const SettingsPanel = () => {
     const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
     const selectedCameraMove = selectedCameraMoveId ? (cameraMoveSegments || []).find(s => s.id === selectedCameraMoveId) : null;
 
-    const overlayBlocks = useProjectStore(s => s.project.timeline.overlayBlocks);
-    const selectedOverlayBlock = selectedOverlayBlockId ? (overlayBlocks || []).find(b => b.id === selectedOverlayBlockId) : null;
+    const overlaySegments = useProjectStore(s => s.project.timeline.overlaySegments);
+    const selectedOverlaySegment = selectedOverlaySegmentId ? (overlaySegments || []).find(b => b.id === selectedOverlaySegmentId) : null;
 
     return (
         <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
@@ -219,7 +219,7 @@ export const SettingsPanel = () => {
                             {selectedSpotlight && <SpotlightInspector segment={selectedSpotlight} />}
                             {selectedWindow && <ClipInspector window={selectedWindow} />}
                             {selectedCameraMove && <CameraMoveInspector segment={selectedCameraMove} />}
-                            {selectedOverlayBlock && <OverlayInspector block={selectedOverlayBlock} />}
+                            {selectedOverlaySegment && <OverlayInspector block={selectedOverlaySegment} />}
                         </>
                     ) : (
                         <>

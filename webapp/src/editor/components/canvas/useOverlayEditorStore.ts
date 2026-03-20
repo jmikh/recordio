@@ -2,7 +2,7 @@
  * Overlay Editor UI Store
  *
  * Local interaction state for the canvas overlay editor.
- * Selection state (selectedOverlayBlockId/selectedOverlayItemId) lives in
+ * Selection state (selectedOverlaySegmentId/selectedOverlayItemId) lives in
  * useUIStore since it's cross-cutting (timeline, inspector, canvas).
  * This store manages the canvas editor's own interaction state machine.
  */

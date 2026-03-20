@@ -17,7 +17,10 @@ import type { TimeSegment } from './timeline';
 /** Types of visual overlays */
 export type OverlayItemType = 'blur' | 'text' | 'arrow' | 'border';
 
-/** Base overlay item within a block */
+/** Visual effect applied to overlay items (shadow/glow are painter-derived from REF constants) */
+export type OverlayEffect = 'none' | 'shadow' | 'glow';
+
+/** Base overlay item within a segment */
 export interface BaseOverlayItem {
     id: ID;
     type: OverlayItemType;
@@ -53,21 +56,6 @@ export interface TextOverlayItem extends BaseOverlayItem {
     color: string;
     /** Optional background color (hex with alpha, e.g. '#000000cc') */
     backgroundColor?: string;
-    /** Background padding in output pixels */
-    backgroundPaddingPx: number;
-    /** Background corner radius in output pixels */
-    backgroundRadiusPx: number;
-    /** Optional text stroke/outline color */
-    strokeColor?: string;
-    /** Stroke width in output pixels */
-    strokeWidthPx: number;
-    /** Optional drop shadow */
-    shadow?: {
-        color: string;
-        blurPx: number;
-        offsetXPx: number;
-        offsetYPx: number;
-    };
 }
 
 /** Arrow annotation */
@@ -81,20 +69,8 @@ export interface ArrowOverlayItem extends BaseOverlayItem {
     strokeWidthPx: number;
     /** Arrow color (hex) */
     color: string;
-    /** Arrowhead size multiplier (1.0 = default) */
-    headScale: number;
-    /** Optional drop shadow */
-    shadow?: {
-        color: string;
-        blurPx: number;
-        offsetXPx: number;
-        offsetYPx: number;
-    };
-    /** Optional glow */
-    glow?: {
-        color: string;
-        blurPx: number;
-    };
+    /** Visual effect: shadow, glow, or none (params derived by painter) */
+    effect: OverlayEffect;
 }
 
 /** Border/outline overlay — draws a rectangular outline */
@@ -110,29 +86,19 @@ export interface BorderOverlayItem extends BaseOverlayItem {
     borderRadiusPx: [number, number, number, number];
     /** Fill style: translucent fill color */
     fillColor?: string;
-    /** Optional glow */
-    glow?: {
-        color: string;
-        blurPx: number;
-    };
-    /** Optional drop shadow */
-    shadow?: {
-        color: string;
-        blurPx: number;
-        offsetXPx: number;
-        offsetYPx: number;
-    };
+    /** Visual effect: shadow, glow, or none (params derived by painter) */
+    effect: OverlayEffect;
 }
 
 /** Union of all overlay item types */
 export type OverlayItem = BlurOverlayItem | TextOverlayItem | ArrowOverlayItem | BorderOverlayItem;
 
 /**
- * An overlay block is a time segment containing one or more visual overlays.
- * Non-overlapping with other overlay blocks (Option 2).
+ * An overlay segment is a time segment containing one or more visual overlays.
+ * Non-overlapping with other overlay segments.
  * Source-time anchored for trim/speed stability.
  */
-export interface OverlayBlock extends TimeSegment {
-    /** The overlay items in this block */
+export interface OverlaySegment extends TimeSegment {
+    /** The overlay items in this segment */
     items: OverlayItem[];
 }

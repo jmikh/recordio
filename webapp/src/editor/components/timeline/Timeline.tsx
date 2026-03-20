@@ -167,9 +167,9 @@ export function Timeline() {
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
-    const selectedOverlayBlockId = useUIStore(s => s.selectedOverlayBlockId);
-    const selectOverlayBlock = useUIStore(s => s.selectOverlayBlock);
-    const deleteOverlayBlock = useProjectStore(s => s.deleteOverlayBlock);
+    const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
+    const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
+    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -191,10 +191,10 @@ export function Timeline() {
                     e.preventDefault();
                     deleteCameraMove(selectedCameraMoveId);
                     selectCameraMove(null);
-                } else if (selectedOverlayBlockId) {
+                } else if (selectedOverlaySegmentId) {
                     e.preventDefault();
-                    deleteOverlayBlock(selectedOverlayBlockId);
-                    selectOverlayBlock(null);
+                    deleteOverlaySegment(selectedOverlaySegmentId);
+                    selectOverlaySegment(null);
                 }
             }
 
@@ -212,7 +212,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlayBlockId, deleteOverlayBlock, selectOverlayBlock, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {

@@ -8,9 +8,9 @@ import { useOverlayEditorStore } from './useOverlayEditorStore';
 
 import type { RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawOverlays } from '../../../core/painters/overlayPainter';
+import { drawOverlays, TEXT_REF_HEIGHT, TEXT_REF_PADDING, TEXT_REF_RADIUS } from '../../../core/painters/overlayPainter';
 import type { Project, Size } from '../../../types';
-import type { OverlayItem, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '../../../types/overlay';
+import type { OverlayItem, OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '../../../types/overlay';
 import { BoundingBox } from './bounding-box';
 
 // ------------------------------------------------------------------
@@ -44,8 +44,8 @@ export const renderOverlayEditor = (
     }
 
     // Draw non-editing overlay items (the editing item is rendered via HTML)
-    const overlayBlocks = project.timeline.overlayBlocks || [];
-    drawOverlays(ctx, overlayBlocks, currentTimeMs, outputSize, editingItemId);
+    const overlaySegments = project.timeline.overlaySegments || [];
+    drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, editingItemId);
 };
 
 // ------------------------------------------------------------------
@@ -57,7 +57,7 @@ export const OverlayEditor: React.FC = () => {
     const displayMapper = useDisplayMapper();
     const project = useProjectStore(s => s.project);
     const outputSize = project.settings.outputSize;
-    const selectedBlockId = useUIStore(s => s.selectedOverlayBlockId);
+    const selectedBlockId = useUIStore(s => s.selectedOverlaySegmentId);
     const selectedItemId = useUIStore(s => s.selectedOverlayItemId);
     const updateOverlayItem = useProjectStore(s => s.updateOverlayItem);
     const selectOverlayItem = useUIStore(s => s.selectOverlayItem);
@@ -73,8 +73,8 @@ export const OverlayEditor: React.FC = () => {
 
     // Find the selected block and item
     const block = useMemo(() =>
-        (project.timeline.overlayBlocks || []).find(b => b.id === selectedBlockId),
-        [project.timeline.overlayBlocks, selectedBlockId]
+        (project.timeline.overlaySegments || []).find((b: OverlaySegment) => b.id === selectedBlockId),
+        [project.timeline.overlaySegments, selectedBlockId]
     );
 
     const selectedItem = useMemo(() =>
@@ -85,7 +85,7 @@ export const OverlayEditor: React.FC = () => {
     if (!block || !displayMapper) return null;
 
     return (
-        <div className="absolute inset-0 z-10 pointer-events-none">
+        <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
             {/* Contrasting outline for bounding box visibility on any background */}
             <style>{`
                 .overlay-editor-contrast #bounding-box {
@@ -386,6 +386,7 @@ const InlineTextEditor: React.FC<{
     batchAction: (fn: () => void) => void;
 }> = ({ item, blockId, updateOverlayItem, startInteraction, endInteraction, batchAction }) => {
     const displayMapper = useDisplayMapper();
+    const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const textRef = React.useRef<HTMLDivElement>(null);
     const dragRef = React.useRef<{ startX: number; startY: number; startPos: { x: number; y: number } } | null>(null);
 
@@ -395,9 +396,9 @@ const InlineTextEditor: React.FC<{
     const exitEditMode = useOverlayEditorStore(s => s.exitEditMode);
     const isEditing = interactionMode === 'editing';
 
-    // Compute display positions matching canvas painter exactly:
-    // Canvas draws bg at (topLeft.x - pad, topLeft.y - pad) with width (widthPx + 2*pad)
-    const pad = item.backgroundPaddingPx ?? 0;
+    // Painter-derived constants (not stored per-item)
+    const outputScale = outputSize.height / TEXT_REF_HEIGHT;
+    const pad = Math.round(TEXT_REF_PADDING * outputScale);
     const bgDisplayRect = displayMapper.outputToDisplay({
         x: item.topLeft.x - pad,
         y: item.topLeft.y - pad,
@@ -409,25 +410,7 @@ const InlineTextEditor: React.FC<{
     const scale = displayMapper.outputToDisplayLength(1);
     const displayFontSize = item.fontSizePx * scale;
     const displayPadding = pad * scale;
-    const displayBgRadius = (item.backgroundRadiusPx ?? 0) * scale;
-    const displayStrokeWidth = (item.strokeWidthPx ?? 0) * scale;
-
-    // Build text shadow for stroke effect (CSS approximation of canvas strokeText)
-    const textShadows: string[] = [];
-    if (item.strokeColor && item.strokeWidthPx > 0) {
-        const sw = displayStrokeWidth;
-        const offsets = [
-            [sw, 0], [-sw, 0], [0, sw], [0, -sw],
-            [sw, sw], [-sw, sw], [sw, -sw], [-sw, -sw],
-        ];
-        for (const [ox, oy] of offsets) {
-            textShadows.push(`${ox}px ${oy}px 0 ${item.strokeColor}`);
-        }
-    }
-    if (item.shadow) {
-        const s = item.shadow;
-        textShadows.push(`${s.offsetXPx * scale}px ${s.offsetYPx * scale}px ${s.blurPx * scale}px ${s.color}`);
-    }
+    const displayBgRadius = Math.round(TEXT_REF_RADIUS * outputScale) * scale;
 
     // Focus and select text when entering edit mode
     useEffect(() => {
@@ -535,7 +518,7 @@ const InlineTextEditor: React.FC<{
         padding: displayPadding > 0 ? `${displayPadding}px` : undefined,
         backgroundColor: item.backgroundColor || undefined,
         borderRadius: displayBgRadius > 0 ? `${displayBgRadius}px` : undefined,
-        textShadow: textShadows.length > 0 ? textShadows.join(', ') : undefined,
+
     };
 
     // Drag left/right edges to resize width
@@ -691,7 +674,9 @@ const OverlayHoverTarget: React.FC<{
         }
         case 'text': {
             const textItem = item as TextOverlayItem;
-            const pad = textItem.backgroundPaddingPx ?? 0;
+            const outputSize = useProjectStore.getState().project.settings.outputSize;
+            const textScale = outputSize.height / TEXT_REF_HEIGHT;
+            const pad = Math.round(TEXT_REF_PADDING * textScale);
             const scale = displayMapper.outputToDisplayLength(1);
             const displayFontSize = textItem.fontSizePx * scale;
             const displayPadding = pad * scale;
@@ -703,18 +688,35 @@ const OverlayHoverTarget: React.FC<{
             let lineCount = 1;
             if (tmpCtx) {
                 tmpCtx.font = `${textItem.fontWeight} ${textItem.fontSizePx}px ${textItem.fontFamily}, sans-serif`;
+                const maxW = textItem.widthPx;
                 const words = (textItem.text || '').split(' ');
                 let currentLine = '';
-                lineCount = 1;
+                lineCount = 0;
                 for (const word of words) {
                     const test = currentLine ? `${currentLine} ${word}` : word;
-                    if (tmpCtx.measureText(test).width > textItem.widthPx && currentLine) {
+                    if (tmpCtx.measureText(test).width > maxW && currentLine) {
                         lineCount++;
                         currentLine = word;
                     } else {
                         currentLine = test;
                     }
+                    // Character-level breaking for words wider than maxW
+                    if (tmpCtx.measureText(currentLine).width > maxW) {
+                        let remaining = currentLine;
+                        currentLine = '';
+                        for (const char of remaining) {
+                            const charTest = currentLine + char;
+                            if (tmpCtx.measureText(charTest).width > maxW && currentLine) {
+                                lineCount++;
+                                currentLine = char;
+                            } else {
+                                currentLine = charTest;
+                            }
+                        }
+                    }
                 }
+                if (currentLine) lineCount++;
+                if (lineCount === 0) lineCount = 1;
             }
             const totalOutputHeight = lineCount * lineHeightPx + pad * 2;
 

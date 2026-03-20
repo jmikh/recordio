@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
-import type { OverlayBlock } from '../../../../../types/overlay';
+import type { OverlaySegment } from '../../../../../types/overlay';
 import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
@@ -21,11 +21,11 @@ export function useOverlayHover(
     selectedId: string | null,
     setSelected: (id: string | null) => void,
     outputDuration: number,
-    blocks: OverlayBlock[],
+    segments: OverlaySegment[],
     timeMapper: TimeMapper
 ) {
-    const addOverlayBlock = useProjectStore(s => s.addOverlayBlock);
-    const deleteOverlayBlock = useProjectStore(s => s.deleteOverlayBlock);
+    const addOverlaySegment = useProjectStore(s => s.addOverlaySegment);
+    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
     const [hoverInfo, setHoverInfo] = useState<OverlayHoverInfo | null>(null);
     const hoverInfoSetAtRef = useRef<number>(0);
 
@@ -48,7 +48,7 @@ export function useOverlayHover(
             return;
         }
 
-        const isInside = blocks.some(b =>
+        const isInside = segments.some(b =>
             mouseTimeMs >= b.outputStartTimeMs && mouseTimeMs <= b.outputEndTimeMs
         );
         if (isInside) {
@@ -58,7 +58,7 @@ export function useOverlayHover(
 
         const range = getValidBlockRange(
             mouseTimeMs,
-            blocks,
+            segments,
             outputDuration,
             K_MIN_TIMELINE_BLOCK_MS,
             K_DEFAULT_TIMELINE_BLOCK_MS
@@ -90,7 +90,7 @@ export function useOverlayHover(
         e.stopPropagation();
         if (dragState) return;
 
-        const currentSelectedId = useUIStore.getState().selectedOverlayBlockId;
+        const currentSelectedId = useUIStore.getState().selectedOverlaySegmentId;
         if (currentSelectedId) {
             setSelected(null);
             setHoverInfo(null);
@@ -102,7 +102,7 @@ export function useOverlayHover(
         const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
         const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
 
-        const newBlock: OverlayBlock = {
+        const newSegment: OverlaySegment = {
             id: crypto.randomUUID(),
             sourceStartTimeMs: sourceStart,
             sourceEndTimeMs: sourceEnd,
@@ -112,16 +112,16 @@ export function useOverlayHover(
             items: [],
         };
 
-        // Delete overlapping blocks (shouldn't happen with non-overlap, but be safe)
-        const allBlocks = useProjectStore.getState().project.timeline.overlayBlocks || [];
-        for (const existing of allBlocks) {
-            if (doSourceRangesOverlap(newBlock, existing)) {
-                deleteOverlayBlock(existing.id);
+        // Delete overlapping segments (shouldn't happen with non-overlap, but be safe)
+        const allSegments = useProjectStore.getState().project.timeline.overlaySegments || [];
+        for (const existing of allSegments) {
+            if (doSourceRangesOverlap(newSegment, existing)) {
+                deleteOverlaySegment(existing.id);
             }
         }
 
-        addOverlayBlock(newBlock);
-        setSelected(newBlock.id);
+        addOverlaySegment(newSegment);
+        setSelected(newSegment.id);
         setHoverInfo(null);
     };
 

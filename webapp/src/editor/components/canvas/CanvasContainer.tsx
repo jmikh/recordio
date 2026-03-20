@@ -26,7 +26,7 @@ export const CanvasContainer = () => {
     const activeZoomId = useUIStore(s => s.selectedZoomId);
     const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const activeCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
-    const activeOverlayBlockId = useUIStore(s => s.selectedOverlayBlockId);
+    const activeOverlayBlockId = useUIStore(s => s.selectedOverlaySegmentId);
     const activeOverlayItemId = useUIStore(s => s.selectedOverlayItemId);
 
     // Background music sync with playback
@@ -147,7 +147,7 @@ export const CanvasContainer = () => {
 
             const uiState = useUIStore.getState();
             const { project } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedOverlayBlockId: activeOverlayBlockId, selectedOverlayItemId: activeOverlayItemId } = uiState;
+            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedOverlaySegmentId: activeOverlayBlockId, selectedOverlayItemId: activeOverlayItemId } = uiState;
 
             // Build sources from project
             const sources: Record<string, SourceMetadata> = {};

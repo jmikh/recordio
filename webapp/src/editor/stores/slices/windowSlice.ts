@@ -29,8 +29,8 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
     // Captions: always recompute output times
     const nextCaptionSegments = recomputeOutputTimes(project.timeline.captionSegments || [], timeMapper);
 
-    // Overlays: recompute output times for overlay blocks
-    const nextOverlayBlocks = recomputeOutputTimes(project.timeline.overlayBlocks || [], timeMapper);
+    // Overlays: recompute output times for overlay segments
+    const nextOverlaySegments = recomputeOutputTimes(project.timeline.overlaySegments || [], timeMapper);
 
     return {
         ...project,
@@ -40,7 +40,7 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
             zoomSegments: nextZoomSegments,
             spotlightSegments: nextSpotlightSegments,
             captionSegments: nextCaptionSegments,
-            overlayBlocks: nextOverlayBlocks,
+            overlaySegments: nextOverlaySegments,
         },
         updatedAt: new Date()
     };
