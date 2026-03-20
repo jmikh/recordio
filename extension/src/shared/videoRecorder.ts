@@ -638,6 +638,9 @@ export class VideoRecorder {
                 e.targetRect.width *= scaleX;
                 e.targetRect.height *= scaleY;
             }
+            if (e.cornerRadius && Array.isArray(e.cornerRadius)) {
+                e.cornerRadius = e.cornerRadius.map((r: number) => r * scaleX);
+            }
         };
 
         for (const arr of Object.values(events)) {
