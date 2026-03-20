@@ -224,6 +224,10 @@ export interface ExportCompletedParams {
     spotlight_count: number;
     camera_move_count: number;
     caption_count: number;
+    text_overlay_count: number;
+    blur_overlay_count: number;
+    outline_overlay_count: number;
+    arrow_overlay_count: number;
     captions_generated: boolean;
     captions_visible: boolean;
     auto_cut_used: boolean;
@@ -336,6 +340,10 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
         spotlight_count: timeline.spotlightSegments.length,
         camera_move_count: timeline.cameraMoveSegments.length,
         caption_count: timeline.captionSegments.length,
+        text_overlay_count: (timeline.overlaySegments ?? []).flatMap(s => s.items).filter(i => i.type === 'text').length,
+        blur_overlay_count: (timeline.overlaySegments ?? []).flatMap(s => s.items).filter(i => i.type === 'blur').length,
+        outline_overlay_count: (timeline.overlaySegments ?? []).flatMap(s => s.items).filter(i => i.type === 'border').length,
+        arrow_overlay_count: (timeline.overlaySegments ?? []).flatMap(s => s.items).filter(i => i.type === 'arrow').length,
         captions_generated: !!settings.captions.generatedAt,
         captions_visible: settings.captions.enabled ?? true,
         auto_cut_used: settings.autoCutApplied ?? false,
