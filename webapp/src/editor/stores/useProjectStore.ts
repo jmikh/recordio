@@ -92,6 +92,12 @@ export const useProjectStore = create<ProjectState>()(
                     // NOT from s.project.userEvents (which will be undefined).
                     // Auto-save re-attaches events before writing to IndexedDB.
                     const { userEvents, ...projectWithoutEvents } = project;
+
+                    // Backfill fields added after initial schema for older projects
+                    if (!projectWithoutEvents.timeline.overlaySegments) {
+                        projectWithoutEvents.timeline.overlaySegments = [];
+                    }
+
                     set({ project: projectWithoutEvents as Project, userEvents });
 
                     // Clear History so we can't undo into valid empty state or previous project
