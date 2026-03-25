@@ -152,7 +152,7 @@ export function ExportSettings() {
                 video_decode_mode: videoDecodeMode,
                 video_decode_fallback: videoDecodeFallback,
             });
-            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
+            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 5000);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error(e);
@@ -319,7 +319,7 @@ export function ExportSettings() {
                 title: result.isUpdate ? 'Video Republished' : 'Video Published!',
                 message: linkCopied ? 'Link copied to clipboard' : 'Published successfully',
             });
-            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 1000);
+            if (shouldShowReviewModal()) setTimeout(() => setIsReviewModalOpen(true), 5000);
         } catch (e: any) {
             if (e?.message === 'Export cancelled') return;
             console.error('[Publish] Failed:', e);

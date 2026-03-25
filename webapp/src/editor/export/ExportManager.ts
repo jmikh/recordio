@@ -266,6 +266,8 @@ export class ExportManager {
             const renderedAudioBuffer = await renderAudioBuffer({
                 project: renderProject,
                 totalDurationSec,
+                userEvents: renderProject.userEvents,
+                timeMapper,
             });
             encodeAudioBuffer(renderedAudioBuffer, audioEncoder);
 

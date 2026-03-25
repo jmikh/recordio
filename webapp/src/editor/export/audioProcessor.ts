@@ -1,27 +1,34 @@
 /**
  * @fileoverview Audio rendering pipeline for video export.
  *
- * Handles mixing screen audio, microphone audio, and background music
- * into a single rendered AudioBuffer using OfflineAudioContext, then
- * encodes it into chunks via WebCodecs AudioEncoder.
+ * Handles mixing screen audio, microphone audio, background music,
+ * and click/drag sound effects into a single rendered AudioBuffer
+ * using OfflineAudioContext, then encodes it into chunks via WebCodecs
+ * AudioEncoder.
  */
 
 import type { Project, ScreenMetadata } from '../../types';
+import type { UserEvents } from '@shared/types';
+import type { TimeMapper } from '../../core/mappers/timeMapper';
+import { getClickSoundBuffer, getDragSoundBuffers } from '../../core/audio/clickSoundPlayer';
 
 interface AudioRenderOptions {
     project: Project;
     totalDurationSec: number;
+    userEvents?: UserEvents;
+    timeMapper?: TimeMapper;
     sampleRate?: number;
 }
 
 /**
- * Render all audio tracks (screen, mic, music) into a single AudioBuffer.
+ * Render all audio tracks (screen, mic, music, click/drag effects) into a
+ * single AudioBuffer.
  *
  * Uses OfflineAudioContext for sample-accurate mixing with per-source
  * volume control and speed-aware windowed playback.
  */
 export async function renderAudioBuffer(options: AudioRenderOptions): Promise<AudioBuffer> {
-    const { project, totalDurationSec, sampleRate = 44100 } = options;
+    const { project, totalDurationSec, userEvents, timeMapper, sampleRate = 44100 } = options;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDurationSec), sampleRate);
 
     const audioSettings = project.settings.audio;
@@ -119,7 +126,85 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
         }
     }
 
+    // --- Click & Drag Sound Effects ---
+    const mouseSettings = project.settings.mouse;
+    if (mouseSettings?.soundEnabled && userEvents && timeMapper) {
+        try {
+            const volume = mouseSettings.soundVolume ?? 0.5;
+
+            // Schedule click sounds
+            const clickBuffer = await getClickSoundBuffer();
+            if (clickBuffer) {
+                // Re-decode the buffer into the offline context's sample rate
+                const clickOfflineBuffer = resampleBuffer(offlineCtx, clickBuffer);
+                for (const click of userEvents.mouseClicks) {
+                    const outputTimeMs = timeMapper.mapSourceToOutputTime(click.timestamp);
+                    if (outputTimeMs < 0) continue; // Event is in a cut segment
+                    const outputTimeSec = outputTimeMs / 1000;
+                    if (outputTimeSec >= totalDurationSec) continue;
+
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = clickOfflineBuffer;
+                    const gainNode = offlineCtx.createGain();
+                    gainNode.gain.value = volume;
+                    source.connect(gainNode);
+                    gainNode.connect(offlineCtx.destination);
+                    source.start(outputTimeSec);
+                }
+            }
+
+            // Schedule drag sounds (mouse_down at start, mouse_up at end)
+            const dragBuffers = await getDragSoundBuffers();
+            if (dragBuffers.down && dragBuffers.up) {
+                const downOfflineBuffer = resampleBuffer(offlineCtx, dragBuffers.down);
+                const upOfflineBuffer = resampleBuffer(offlineCtx, dragBuffers.up);
+                for (const drag of userEvents.drags) {
+                    const mappedRange = timeMapper.mapSourceRangeToOutputRange(drag.timestamp, drag.endTime);
+                    if (!mappedRange) continue; // Drag is entirely in a cut segment
+
+                    const startSec = mappedRange.start / 1000;
+                    const endSec = mappedRange.end / 1000;
+
+                    if (startSec < totalDurationSec) {
+                        const downSource = offlineCtx.createBufferSource();
+                        downSource.buffer = downOfflineBuffer;
+                        const downGain = offlineCtx.createGain();
+                        downGain.gain.value = volume;
+                        downSource.connect(downGain);
+                        downGain.connect(offlineCtx.destination);
+                        downSource.start(startSec);
+                    }
+
+                    if (endSec < totalDurationSec) {
+                        const upSource = offlineCtx.createBufferSource();
+                        upSource.buffer = upOfflineBuffer;
+                        const upGain = offlineCtx.createGain();
+                        upGain.gain.value = volume;
+                        upSource.connect(upGain);
+                        upGain.connect(offlineCtx.destination);
+                        upSource.start(endSec);
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('[Export] Failed to mix click/drag sounds:', error);
+        }
+    }
+
     return offlineCtx.startRendering();
+}
+
+/**
+ * Copy an AudioBuffer into the target OfflineAudioContext so it can be
+ * scheduled on that context's timeline. The OfflineAudioContext may use a
+ * different sample rate than the source buffer's original context.
+ */
+function resampleBuffer(ctx: OfflineAudioContext, source: AudioBuffer): AudioBuffer {
+    const buf = ctx.createBuffer(source.numberOfChannels, source.length, source.sampleRate);
+    for (let c = 0; c < source.numberOfChannels; c++) {
+        buf.copyToChannel(source.getChannelData(c), c);
+    }
+    return buf;
 }
 
 /**
