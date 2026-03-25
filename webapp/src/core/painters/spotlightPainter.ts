@@ -64,8 +64,9 @@ export function drawSpotlight(
 
     // Snapshot the spotlight region BEFORE dimming using GPU-side drawImage
     // (avoids expensive getImageData GPU→CPU readback)
+    // Always snapshot when visible so we can restore content over the dim
     let hasSnapshot = false;
-    if (sourceCanvas && scale > 1.0 && scaledRect) {
+    if (sourceCanvas) {
         const sx = Math.max(0, Math.round(originalRect.x));
         const sy = Math.max(0, Math.round(originalRect.y));
         const sw = Math.min(Math.round(originalRect.width), (sourceCanvas.width || 0) - sx);
@@ -84,43 +85,21 @@ export function drawSpotlight(
         }
     }
 
-    // Draw dim overlay with cut-out for spotlight
+    // Step 1: Dim the ENTIRE canvas (no cut-outs, no seams)
     ctx.save();
     ctx.fillStyle = dimColor;
-
-    // Top rectangle (full width, from top to spotlight top)
-    if (originalRect.y > 0) {
-        ctx.fillRect(0, 0, outputSize.width, originalRect.y);
-    }
-
-    // Bottom rectangle (full width, from spotlight bottom to canvas bottom)
-    const bottomY = originalRect.y + originalRect.height;
-    if (bottomY < outputSize.height) {
-        ctx.fillRect(0, bottomY, outputSize.width, outputSize.height - bottomY);
-    }
-
-    // Left rectangle (from spotlight top to bottom, left edge to spotlight left)
-    if (originalRect.x > 0) {
-        ctx.fillRect(0, originalRect.y, originalRect.x, originalRect.height);
-    }
-
-    // Right rectangle (from spotlight top to bottom, spotlight right to canvas right)
-    const rightX = originalRect.x + originalRect.width;
-    if (rightX < outputSize.width) {
-        ctx.fillRect(rightX, originalRect.y, outputSize.width - rightX, originalRect.height);
-    }
-
-    // Fill corner areas for rounded corners (if any corner has radius)
-    const hasRoundedCorners = radiusPx.some((r: number) => r > 0);
-    if (hasRoundedCorners) {
-        drawCornerFillsMultiRadius(ctx, originalRect, radiusPx, dimColor);
-    }
-
+    ctx.fillRect(0, 0, outputSize.width, outputSize.height);
     ctx.restore();
 
-    // Draw scaled spotlight content from the cached snapshot canvas
-    if (hasSnapshot && _snapshotCanvas && scale > 1.0 && scaledRect) {
-        drawScaledCanvasContent(ctx, _snapshotCanvas, originalRect, scaledRect, scale, radiusPx);
+    // Step 2: Draw spotlight content back on top of the dimmed canvas
+    if (hasSnapshot && _snapshotCanvas) {
+        if (scale > 1.0 && scaledRect) {
+            // Enlarged: draw scaled content
+            drawScaledCanvasContent(ctx, _snapshotCanvas, originalRect, scaledRect, scale, radiusPx);
+        } else {
+            // No scaling: restore original content in the spotlight region
+            drawRestoredContent(ctx, _snapshotCanvas, originalRect, radiusPx);
+        }
     }
 }
 
@@ -176,6 +155,38 @@ function drawScaledCanvasContent(
 }
 
 /**
+ * Restores the spotlight content at 1:1 scale over the dimmed canvas.
+ * Clips to rounded corners so the dim overlay is visible outside the spotlight.
+ */
+function drawRestoredContent(
+    ctx: CanvasRenderingContext2D,
+    snapshotCanvas: OffscreenCanvas,
+    originalRect: Rect,
+    radiusPx: [number, number, number, number]
+): void {
+    ctx.save();
+
+    // Clip to the spotlight shape (with rounded corners)
+    ctx.beginPath();
+    const hasRoundedCorners = radiusPx.some(r => r > 0);
+    if (hasRoundedCorners) {
+        if (ctx.roundRect) {
+            ctx.roundRect(originalRect.x, originalRect.y, originalRect.width, originalRect.height, radiusPx);
+        } else {
+            drawRoundedRectPathMultiRadius(ctx, originalRect.x, originalRect.y, originalRect.width, originalRect.height, radiusPx);
+        }
+    } else {
+        ctx.rect(originalRect.x, originalRect.y, originalRect.width, originalRect.height);
+    }
+    ctx.clip();
+
+    // Draw the snapshot back at the original position
+    ctx.drawImage(snapshotCanvas, Math.round(originalRect.x), Math.round(originalRect.y));
+
+    ctx.restore();
+}
+
+/**
  * Fallback for drawing rounded rectangle path with 4 independent corner radii.
  * Uses arcTo for true circular arcs matching CSS border-radius.
  * Radii order: [topLeft, topRight, bottomRight, bottomLeft]
@@ -210,83 +221,4 @@ function drawRoundedRectPathMultiRadius(
     ctx.arcTo(x, y, x + tl, y, tl);
 
     ctx.closePath();
-}
-
-/**
- * Fills the corner areas that appear when the spotlight has rounded corners.
- * Supports 4 independent corner radii [topLeft, topRight, bottomRight, bottomLeft].
- */
-function drawCornerFillsMultiRadius(
-    ctx: CanvasRenderingContext2D,
-    rect: { x: number; y: number; width: number; height: number },
-    radii: [number, number, number, number],
-    fillColor: string
-): void {
-    ctx.fillStyle = fillColor;
-
-    const maxRadius = Math.min(rect.width / 2, rect.height / 2);
-    const [tl, tr, br, bl] = radii.map(r => Math.min(r, maxRadius)) as [number, number, number, number];
-
-    // Top-left corner
-    if (tl > 0) {
-        fillCornerWithRadius(ctx, rect.x, rect.y, tl, 'top-left');
-    }
-    // Top-right corner
-    if (tr > 0) {
-        fillCornerWithRadius(ctx, rect.x + rect.width - tr, rect.y, tr, 'top-right');
-    }
-    // Bottom-left corner
-    if (bl > 0) {
-        fillCornerWithRadius(ctx, rect.x, rect.y + rect.height - bl, bl, 'bottom-left');
-    }
-    // Bottom-right corner
-    if (br > 0) {
-        fillCornerWithRadius(ctx, rect.x + rect.width - br, rect.y + rect.height - br, br, 'bottom-right');
-    }
-}
-
-/**
- * Fills a single corner region (the area between the sharp corner and the arc).
- */
-function fillCornerWithRadius(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    radius: number,
-    corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-): void {
-    ctx.beginPath();
-
-    switch (corner) {
-        case 'top-left':
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + radius, y);
-            ctx.arc(x + radius, y + radius, radius, -Math.PI / 2, Math.PI, true);
-            ctx.lineTo(x, y);
-            break;
-
-        case 'top-right':
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x, y);
-            ctx.arc(x, y + radius, radius, -Math.PI / 2, 0, false);
-            ctx.lineTo(x + radius, y);
-            break;
-
-        case 'bottom-left':
-            ctx.moveTo(x, y + radius);
-            ctx.lineTo(x, y);
-            ctx.arc(x + radius, y, radius, Math.PI, Math.PI / 2, true);
-            ctx.lineTo(x, y + radius);
-            break;
-
-        case 'bottom-right':
-            ctx.moveTo(x + radius, y + radius);
-            ctx.lineTo(x + radius, y);
-            ctx.arc(x, y, radius, 0, Math.PI / 2, false);
-            ctx.lineTo(x + radius, y + radius);
-            break;
-    }
-
-    ctx.closePath();
-    ctx.fill();
 }
