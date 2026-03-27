@@ -3,7 +3,7 @@ import { useProjectStore, useProjectData, useProjectHistory } from '../../stores
 import { useUIStore } from '../../stores/useUIStore';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 
-import { BiSupport } from 'react-icons/bi';
+import { MdOutlineBugReport } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
@@ -134,8 +134,8 @@ export const Header = () => {
                         <Button variant="icon" onClick={() => window.location.href = '/'} title="Dashboard">
                             <TbFolder size={18} />
                         </Button>
-                        <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Contact Support">
-                            <BiSupport size={18} />
+                        <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Report a Bug">
+                            <MdOutlineBugReport size={18} />
                         </Button>
                         <ThemeToggle />
                     </div>

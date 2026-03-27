@@ -7,7 +7,7 @@ import { SharedVideoCard } from '../components/SharedVideoCard';
 import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
-import { BiSupport } from 'react-icons/bi';
+import { MdOutlineBugReport } from 'react-icons/md';
 
 import { useUserStore } from '../editor/stores/useUserStore';
 
@@ -288,9 +288,9 @@ export function DashboardPage() {
                     <div className="flex-1" />
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
-                            <button onClick={() => setIsSupportModalOpen(true)} title="Contact Support" className="interactive-icon">
-                                <BiSupport size={18} />
-                            </button>
+                            <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Report a Bug">
+                                <MdOutlineBugReport size={18} />
+                            </Button>
                             <ThemeToggle />
                         </div>
                         {isAuthenticated ? (

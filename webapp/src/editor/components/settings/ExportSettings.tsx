@@ -178,7 +178,7 @@ export function ExportSettings() {
                 title: 'Export Failed',
                 message: 'Something went wrong. Please keep this tab active during export and try again. If the issue persists, reach out — we\'ll address it within 24 hours.',
                 duration: 0,
-                action: { label: 'Contact Support', href: 'mailto:support@recordio.cc' },
+                action: { label: 'Report a Bug', href: 'mailto:support@recordio.cc' },
             });
         } finally {
             setExportState({ isExporting: false });
@@ -370,7 +370,7 @@ export function ExportSettings() {
                 title: 'Publish Failed',
                 message: 'Something went wrong. Please keep this tab active during export and try again. If the issue persists, reach out — we\'ll address it within 24 hours.',
                 duration: 0,
-                action: { label: 'Contact Support', href: 'mailto:support@recordio.cc' },
+                action: { label: 'Report a Bug', href: 'mailto:support@recordio.cc' },
             });
         } finally {
             setIsPublishing(false);

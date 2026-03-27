@@ -100,9 +100,14 @@ export const OverlayEditor: React.FC = () => {
                     <OverlayHoverTarget
                         key={item.id}
                         item={item}
+                        blockId={block.id}
                         isHovered={hoveredItemId === item.id}
                         onHover={(hovered) => setHoveredItem(hovered ? item.id : null)}
-                        onClick={() => selectOverlayItem(item.id)}
+                        selectItem={() => selectOverlayItem(item.id)}
+                        updateOverlayItem={updateOverlayItem}
+                        startInteraction={startInteraction}
+                        endInteraction={endInteraction}
+                        batchAction={batchAction}
                     />
                 ))
             }
@@ -629,30 +634,66 @@ const InlineTextEditor: React.FC<{
 };
 
 // ------------------------------------------------------------------
-// Hover target — transparent hit area for non-selected items
-// Shows primary border + pointer cursor on hover
+// Hover target — for non-selected items
+// Shows full BoundingBox on hover for blur/border, enabling immediate drag.
+// For arrow/text, onPointerDown selects + starts drag in one gesture.
 // ------------------------------------------------------------------
 
 const OverlayHoverTarget: React.FC<{
     item: OverlayItem;
+    blockId: string;
     isHovered: boolean;
     onHover: (hovered: boolean) => void;
-    onClick: () => void;
-}> = ({ item, isHovered, onHover, onClick }) => {
+    selectItem: () => void;
+    updateOverlayItem: (blockId: string, itemId: string, updates: Partial<OverlayItem>) => void;
+    startInteraction: () => void;
+    endInteraction: () => void;
+    batchAction: (fn: () => void) => void;
+}> = ({ item, blockId, isHovered, onHover, selectItem, updateOverlayItem, startInteraction, endInteraction, batchAction }) => {
     const displayMapper = useDisplayMapper();
+    const outputSize = useProjectStore(s => s.project.settings.outputSize);
 
-    const handleClick = React.useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        onClick();
-    }, [onClick]);
-
-    const hoverBorder = isHovered ? '2px solid var(--color-primary)' : '2px solid transparent';
+    const hoverBorder = isHovered ? '2px solid var(--color-secondary)' : '2px solid transparent';
 
     switch (item.type) {
         case 'blur':
         case 'border': {
             const rectItem = item as BlurOverlayItem | BorderOverlayItem;
             const display = displayMapper.outputToDisplay(rectItem.rectPx);
+
+            // onPointerDown: select + start move drag immediately
+            const handleRectPointerDown = (e: React.PointerEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectItem();
+                startInteraction();
+
+                const el = e.currentTarget as HTMLElement;
+                el.setPointerCapture(e.pointerId);
+                const outputScale = displayMapper.displayToOutputLength(1);
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startRect = { ...rectItem.rectPx };
+
+                const onMove = (me: PointerEvent) => {
+                    const dx = (me.clientX - startX) * outputScale;
+                    const dy = (me.clientY - startY) * outputScale;
+                    batchAction(() => {
+                        updateOverlayItem(blockId, item.id, {
+                            rectPx: { ...startRect, x: startRect.x + dx, y: startRect.y + dy },
+                        } as Partial<OverlayItem>);
+                    });
+                };
+                const onUp = () => {
+                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    endInteraction();
+                };
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+            };
+
             return (
                 <div
                     style={{
@@ -668,20 +709,18 @@ const OverlayHoverTarget: React.FC<{
                     }}
                     onMouseEnter={() => onHover(true)}
                     onMouseLeave={() => onHover(false)}
-                    onClick={handleClick}
+                    onPointerDown={handleRectPointerDown}
                 />
             );
         }
         case 'text': {
             const textItem = item as TextOverlayItem;
-            const outputSize = useProjectStore.getState().project.settings.outputSize;
             const textScale = outputSize.height / TEXT_REF_HEIGHT;
             const pad = Math.round(TEXT_REF_PADDING * textScale);
             const scale = displayMapper.outputToDisplayLength(1);
             const displayFontSize = textItem.fontSizePx * scale;
             const displayPadding = pad * scale;
 
-            // Estimate line count by measuring text with a temp canvas (matching painter's wrapLines)
             const lineHeightPx = textItem.fontSizePx * 1.2;
             const canvasEl = document.createElement('canvas');
             const tmpCtx = canvasEl.getContext('2d');
@@ -700,7 +739,6 @@ const OverlayHoverTarget: React.FC<{
                     } else {
                         currentLine = test;
                     }
-                    // Character-level breaking for words wider than maxW
                     if (tmpCtx.measureText(currentLine).width > maxW) {
                         let remaining = currentLine;
                         currentLine = '';
@@ -726,6 +764,40 @@ const OverlayHoverTarget: React.FC<{
                 width: textItem.widthPx + pad * 2,
                 height: totalOutputHeight,
             });
+
+            // onPointerDown: select + start move drag immediately
+            const handleTextPointerDown = (e: React.PointerEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectItem();
+                startInteraction();
+
+                const el = e.currentTarget as HTMLElement;
+                el.setPointerCapture(e.pointerId);
+                const outputScale = displayMapper.displayToOutputLength(1);
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startPos = { ...textItem.topLeft };
+
+                const onMove = (me: PointerEvent) => {
+                    const dx = (me.clientX - startX) * outputScale;
+                    const dy = (me.clientY - startY) * outputScale;
+                    batchAction(() => {
+                        updateOverlayItem(blockId, item.id, {
+                            topLeft: { x: startPos.x + dx, y: startPos.y + dy },
+                        } as Partial<OverlayItem>);
+                    });
+                };
+                const onUp = () => {
+                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    endInteraction();
+                };
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+            };
+
             return (
                 <div
                     style={{
@@ -751,7 +823,7 @@ const OverlayHoverTarget: React.FC<{
                     }}
                     onMouseEnter={() => onHover(true)}
                     onMouseLeave={() => onHover(false)}
-                    onClick={handleClick}
+                    onPointerDown={handleTextPointerDown}
                 >
                     {textItem.text}
                 </div>
@@ -761,6 +833,47 @@ const OverlayHoverTarget: React.FC<{
             const arrowItem = item as ArrowOverlayItem;
             const tail = displayMapper.outputToDisplay({ ...arrowItem.tail, width: 0, height: 0 });
             const head = displayMapper.outputToDisplay({ ...arrowItem.head, width: 0, height: 0 });
+
+            // onPointerDown: select + start line drag immediately
+            const handleArrowPointerDown = (e: React.PointerEvent<SVGLineElement>) => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectItem();
+                startInteraction();
+
+                const el = e.currentTarget as unknown as Element;
+                el.setPointerCapture(e.pointerId);
+                const scale = displayMapper.displayToOutputLength(1);
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startTail = { ...arrowItem.tail };
+                const startHead = { ...arrowItem.head };
+
+                const clamp = (p: { x: number; y: number }) => ({
+                    x: Math.max(0, Math.min(p.x, outputSize.width)),
+                    y: Math.max(0, Math.min(p.y, outputSize.height)),
+                });
+
+                const onMove = (me: PointerEvent) => {
+                    const dx = (me.clientX - startX) * scale;
+                    const dy = (me.clientY - startY) * scale;
+                    batchAction(() => {
+                        updateOverlayItem(blockId, item.id, {
+                            tail: clamp({ x: startTail.x + dx, y: startTail.y + dy }),
+                            head: clamp({ x: startHead.x + dx, y: startHead.y + dy }),
+                        } as Partial<OverlayItem>);
+                    });
+                };
+                const onUp = () => {
+                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    endInteraction();
+                };
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+            };
+
             return (
                 <svg
                     style={{
@@ -781,14 +894,14 @@ const OverlayHoverTarget: React.FC<{
                         style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                         onMouseEnter={() => onHover(true)}
                         onMouseLeave={() => onHover(false)}
-                        onClick={handleClick}
+                        onPointerDown={handleArrowPointerDown}
                     />
                     {/* Visible hover line */}
                     {isHovered && (
                         <line
                             x1={tail.x} y1={tail.y}
                             x2={head.x} y2={head.y}
-                            stroke="var(--color-primary)"
+                            stroke="var(--color-secondary)"
                             strokeWidth={2}
                             style={{ pointerEvents: 'none' }}
                         />

@@ -14,6 +14,7 @@ import { getZoomBoundsForRange } from '../../../core/zoom/zoomBounds';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
+import { drawOverlays } from '../../../core/painters/overlayPainter';
 import type { Project } from '../../../types';
 
 // ------------------------------------------------------------------
@@ -53,6 +54,12 @@ export const renderSpotlightEditor = (
 
     // Note: Camera is intentionally not rendered in spotlight edit mode
     // to avoid visual clutter while editing the spotlight region
+
+    // Render Overlay annotations (if any are active at this time)
+    const overlaySegments = project.timeline.overlaySegments || [];
+    if (overlaySegments.length > 0) {
+        drawOverlays(ctx, overlaySegments, state.currentTimeMs, outputSize, effectiveViewport);
+    }
 };
 
 // ------------------------------------------------------------------

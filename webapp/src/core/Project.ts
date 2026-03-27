@@ -342,6 +342,13 @@ export class ProjectImpl {
             return obj;
         }
 
+        // Handle Point objects ({x, y} without width/height) — overlay output coordinates.
+        // Fields like tail, head, topLeft are in output pixels but don't use the Px suffix.
+        const POINT_FIELDS_TO_SCALE = ['tail', 'head', 'topLeft'];
+        if (obj.hasOwnProperty('x') && obj.hasOwnProperty('y') && !obj.hasOwnProperty('width') && POINT_FIELDS_TO_SCALE.includes(parentKey)) {
+            return { x: obj.x * scale, y: obj.y * scale };
+        }
+
         // Not an object — return as-is
         if (typeof obj !== 'object') return obj;
 

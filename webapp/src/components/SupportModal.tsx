@@ -1,5 +1,5 @@
 import { Modal, XButton } from '@shared/components';
-import { BiSupport } from 'react-icons/bi';
+import { MdOutlineBugReport } from 'react-icons/md';
 
 interface SupportModalProps {
     isOpen: boolean;
@@ -12,8 +12,8 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <BiSupport size={20} className="text-text-highlighted" />
-                        <h2 className="text-lg font-semibold text-text-highlighted">Contact Support</h2>
+                        <MdOutlineBugReport size={20} className="text-text-highlighted" />
+                        <h2 className="text-lg font-semibold text-text-highlighted">Report a Bug</h2>
                     </div>
                     <XButton onClick={onClose} />
                 </div>

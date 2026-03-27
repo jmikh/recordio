@@ -9,6 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
+import { drawOverlays } from '../../../core/painters/overlayPainter';
 import type { Project } from '../../../types';
 
 // Maximum zoom bounding box size as a fraction of the output
@@ -49,7 +50,11 @@ export const renderZoomEditor = (
         }
     }
 
-
+    // Render Overlay annotations (if any are active at this time)
+    const overlaySegments = project.timeline.overlaySegments || [];
+    if (overlaySegments.length > 0) {
+        drawOverlays(ctx, overlaySegments, state.currentTimeMs, outputSize, effectiveViewport);
+    }
 };
 
 // ------------------------------------------------------------------

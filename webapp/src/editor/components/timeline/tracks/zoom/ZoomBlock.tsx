@@ -96,13 +96,13 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
 
     return (
         <div
-            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} group z-10 hover:z-[15] ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
             data-part="block-container"
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
-                zIndex: isSelected ? 20 : 10,
+                zIndex: isSelected ? 20 : undefined,
                 opacity: disabled ? 0.7 : 1,
                 cursor: disabled ? 'default' : undefined,
             }}
