@@ -136,7 +136,15 @@ export class PlaybackRenderer {
         }
 
 
-        // Render Camera Layer (after spotlight, so camera always appears on top)
+        // Render Overlay annotations (before camera, so camera always appears on top)
+        if (project.settings.overlay?.enabled ?? true) {
+            const overlaySegments = timeline.overlaySegments || [];
+            if (overlaySegments.length > 0) {
+                drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
+            }
+        }
+
+        // Render Camera Layer (after overlays, so camera always appears on top)
         if (cameraSource) {
             const video = videoRefs[cameraSource.id];
             if (video) {
@@ -184,14 +192,6 @@ export class PlaybackRenderer {
                         }
                     }
                 }
-            }
-        }
-
-        // Render Overlay annotations (after camera, before captions)
-        if (project.settings.overlay?.enabled ?? true) {
-            const overlaySegments = timeline.overlaySegments || [];
-            if (overlaySegments.length > 0) {
-                drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
             }
         }
 

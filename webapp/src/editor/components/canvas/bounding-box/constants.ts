@@ -28,7 +28,7 @@ export const OVERLAY_BORDER_WIDTH = 1;
 // ------------------------------------------------------------------
 
 /** Minimum inset from corner for radius handles (in output pixels) */
-export const RADIUS_HANDLE_MIN_INSET = 12;
+export const RADIUS_HANDLE_MIN_INSET = 22;
 
 // ------------------------------------------------------------------
 // COLORS

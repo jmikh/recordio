@@ -16,6 +16,7 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
 import { RecordingTrack } from './tracks/recording/RecordingTrack';
+import { RecordingHeaderCell } from './tracks/recording/RecordingHeaderCell';
 
 import { TimelineHeaderCell } from './tracks/shared/TimelineHeaderCell';
 import { TimelineTrackRow } from './tracks/shared/TimelineTrackRow';
@@ -168,11 +169,8 @@ export function Timeline() {
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
     const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
-    const selectedOverlayItemId = useUIStore(s => s.selectedOverlayItemId);
     const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
-    const selectOverlayItem = useUIStore(s => s.selectOverlayItem);
     const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
-    const deleteOverlayItem = useProjectStore(s => s.deleteOverlayItem);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -196,14 +194,8 @@ export function Timeline() {
                     selectCameraMove(null);
                 } else if (selectedOverlaySegmentId) {
                     e.preventDefault();
-                    if (selectedOverlayItemId) {
-                        // Delete just the selected item, not the whole segment
-                        deleteOverlayItem(selectedOverlaySegmentId, selectedOverlayItemId);
-                        selectOverlayItem(null);
-                    } else {
-                        deleteOverlaySegment(selectedOverlaySegmentId);
-                        selectOverlaySegment(null);
-                    }
+                    deleteOverlaySegment(selectedOverlaySegmentId);
+                    selectOverlaySegment(null);
                 }
             }
 
@@ -221,7 +213,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, selectedOverlayItemId, deleteOverlaySegment, deleteOverlayItem, selectOverlaySegment, selectOverlayItem, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -277,10 +269,7 @@ export function Timeline() {
                     <div className="flex flex-col" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
                         {/* Header: Recording (always visible) */}
                         <div className="shrink-0" style={{ height: recordingHeight, transition: TRANSITION_STYLE }}>
-                            <TimelineHeaderCell
-                                title="Recording"
-                                height={recordingHeight}
-                            />
+                            <RecordingHeaderCell height={recordingHeight} />
                         </div>
 
                         {/* Header: Zoom */}

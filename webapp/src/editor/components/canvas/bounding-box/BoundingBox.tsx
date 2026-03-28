@@ -12,7 +12,6 @@ import {
     OVERLAY_BORDER_WIDTH,
     Z_INDEX_BOUNDING_BOX,
     Z_INDEX_RADIUS_HANDLE,
-    PRIMARY_COLOR,
 } from './constants';
 
 // Re-export types for backwards compatibility
@@ -35,8 +34,7 @@ export interface BoundingBoxProps {
     constraintBounds?: Rect;
     /** Fixed aspect ratio (width/height) - if null, free-form resizing is allowed */
     fixedAspectRatio?: number | null;
-    /** Custom border color for the bounding box outline */
-    borderColor?: string;
+
     /** Callback when drag starts */
     onDragStart?: () => void;
     /** Callback when rect changes during drag */
@@ -76,7 +74,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     maxBounds,
     constraintBounds,
     fixedAspectRatio = null,
-    borderColor,
     onDragStart,
     onChange,
     onCommit,
@@ -318,7 +315,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const activeRect = dragRef.current ? currentRectRef.current : rect;
     const displayRect = displayMapper.outputToDisplay(activeRect);
 
-    const resolvedColor = borderColor ?? PRIMARY_COLOR;
+    const resolvedColor = 'var(--color-secondary)';
 
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
@@ -394,10 +391,10 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
             )}
 
             {/* Corner Resize Handles */}
-            <Handle type="nw" cursor="nw-resize" color={borderColor} onPointerDown={handlePointerDown} />
-            <Handle type="ne" cursor="ne-resize" color={borderColor} onPointerDown={handlePointerDown} />
-            <Handle type="sw" cursor="sw-resize" color={borderColor} onPointerDown={handlePointerDown} />
-            <Handle type="se" cursor="se-resize" color={borderColor} onPointerDown={handlePointerDown} />
+            <Handle type="nw" cursor="nw-resize" onPointerDown={handlePointerDown} />
+            <Handle type="ne" cursor="ne-resize" onPointerDown={handlePointerDown} />
+            <Handle type="sw" cursor="sw-resize" onPointerDown={handlePointerDown} />
+            <Handle type="se" cursor="se-resize" onPointerDown={handlePointerDown} />
 
             {/* Edge Resize Handles (only when aspect ratio not locked) */}
             {!fixedAspectRatio && (

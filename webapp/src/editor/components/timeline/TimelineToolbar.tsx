@@ -1,11 +1,13 @@
-import React from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-
+import React, { useMemo } from 'react';
+import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-
 import { useTimeMapper } from '../../hooks/useTimeMapper';
+import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
+import { FaScissors } from 'react-icons/fa6';
 import { Slider, Button } from '@shared/components';
+import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
@@ -20,6 +22,11 @@ export const TimelineToolbar: React.FC = () => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
     const timelineContainerRef = useUIStore(s => s.timelineContainerRef);
+    const canvasMode = useUIStore(s => s.canvasMode);
+    const currentTimeMs = useUIStore(s => s.currentTimeMs);
+    const setScissorsHovered = useUIStore(s => s.setScissorsHovered);
+    const splitWindow = useProjectStore(s => s.splitWindow);
+    const timeline = useProjectTimeline();
 
     // Derive totalDurationMs internally
     const timeMapper = useTimeMapper();
@@ -27,8 +34,6 @@ export const TimelineToolbar: React.FC = () => {
 
     // History Batcher
     const batcher = useHistoryBatcher();
-
-    // Handlers
 
     const handleScaleChange = (newScale: number) => {
         setPixelsPerSec(newScale);
@@ -43,6 +48,32 @@ export const TimelineToolbar: React.FC = () => {
             const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
             setPixelsPerSec(clampedPps);
         }
+    };
+
+    // Check if current time is at least MIN_WINDOW_DURATION_MS from both window boundaries (in output time)
+    const canSplit = useMemo(() => {
+        if (canvasMode !== CanvasMode.Preview || isPlaying) return false;
+        const timeMapper = getTimeMapper(timeline.outputWindows);
+        const result = timeMapper.getWindowAtOutputTime(currentTimeMs);
+        if (!result) return false;
+        const { window: win, outputStartMs } = result;
+        const speed = win.speed || 1.0;
+        const windowOutputDuration = (win.endMs - win.startMs) / speed;
+        const windowOutputEndMs = outputStartMs + windowOutputDuration;
+        const distanceFromStart = currentTimeMs - outputStartMs;
+        const distanceFromEnd = windowOutputEndMs - currentTimeMs;
+        return distanceFromStart >= MIN_WINDOW_DURATION_MS && distanceFromEnd >= MIN_WINDOW_DURATION_MS;
+    }, [currentTimeMs, timeline.outputWindows, canvasMode, isPlaying]);
+
+    const handleSplit = () => {
+        const timeMapper = getTimeMapper(timeline.outputWindows);
+        const result = timeMapper.getWindowAtOutputTime(currentTimeMs);
+        if (!result) return;
+        const { window: win, outputStartMs } = result;
+        const outputOffset = currentTimeMs - outputStartMs;
+        const speed = win.speed || 1.0;
+        const sourceOffset = outputOffset * speed;
+        splitWindow(win.id, win.startMs + sourceOffset);
     };
 
     const onTogglePlay = () => {
@@ -93,7 +124,28 @@ export const TimelineToolbar: React.FC = () => {
 
 
     return (
-        <div className="h-10 flex items-center px-4 p-4 bg-surface-raised rounded-xl border border-border shrink-0 justify-between m-1">
+        <div className="h-10 flex items-center px-4 bg-surface-raised rounded-xl border border-border shrink-0 m-1">
+            {/* Left: Scissors cut button */}
+            <div className="flex-1 flex items-center">
+                <div className="relative group/scissors">
+                    <Button
+                        variant="icon"
+                        disabled={!canSplit}
+                        onClick={canSplit ? handleSplit : undefined}
+                        onMouseEnter={() => setScissorsHovered(true)}
+                        onMouseLeave={() => setScissorsHovered(false)}
+                        className={!canSplit ? 'opacity-40 cursor-not-allowed' : ''}
+                    >
+                        <FaScissors size={13} />
+                    </Button>
+                    {/* Tooltip — top-right of button */}
+                    <div className="absolute bottom-full left-full -translate-x-1 mb-1 px-2 py-1 rounded bg-surface-raised text-text-muted text-[10px] whitespace-nowrap shadow-float border border-border z-[var(--z-index-tooltip)] pointer-events-none opacity-0 group-hover/scissors:opacity-100 transition-opacity duration-100">
+                        {canSplit ? 'Cut at playhead' : `Cannot cut — segment <${(MIN_WINDOW_DURATION_MS / 1000).toFixed(1)}s`}
+                    </div>
+                </div>
+            </div>
+
+            {/* Center: play button + time */}
             <div className="flex items-center gap-3">
                 <button
                     onClick={onTogglePlay}
@@ -115,7 +167,8 @@ export const TimelineToolbar: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Right: zoom controls */}
+            <div className="flex-1 flex items-center justify-end gap-2">
                 <Button
                     variant="ghost"
                     size="sm"

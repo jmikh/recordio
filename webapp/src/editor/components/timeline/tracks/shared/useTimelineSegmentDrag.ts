@@ -40,6 +40,8 @@ export interface UseTimelineSegmentDragConfig<T extends TimeSegment> {
     onUpdate: (id: string, sourceStart: number, sourceEnd: number) => void;
     onDelete: (id: string) => void;
     getAllSegments: () => T[];
+    /** When true, segments can overlap — skip neighbor clamping and collision deletion */
+    allowOverlap?: boolean;
 }
 
 export function useTimelineSegmentDrag<T extends TimeSegment>({
@@ -51,6 +53,7 @@ export function useTimelineSegmentDrag<T extends TimeSegment>({
     onUpdate,
     onDelete,
     getAllSegments,
+    allowOverlap,
 }: UseTimelineSegmentDragConfig<T>) {
     const setCurrentTime = useUIStore(s => s.setCurrentTime);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -58,6 +61,8 @@ export function useTimelineSegmentDrag<T extends TimeSegment>({
     const [dragState, setDragState] = useState<TimelineSegmentDragState | null>(null);
     const wasDraggingRef = useRef(false);
     const wasSelectedBeforeMousedownRef = useRef(false);
+    const allowOverlapRef = useRef(allowOverlap ?? false);
+    allowOverlapRef.current = allowOverlap ?? false;
 
     const handleDragStart = (
         e: React.MouseEvent,
@@ -100,33 +105,51 @@ export function useTimelineSegmentDrag<T extends TimeSegment>({
         const deltaX = e.clientX - dragState.startX;
         const deltaTimeMs = coords.xToMs(deltaX);
 
-        const { prevEnd, nextStart } = getBlockBounds(
-            dragState.segmentId,
-            segments,
-            outputDuration
-        );
-
         let newStart = dragState.initialStartTimeMs;
         let newEnd = dragState.initialEndTimeMs;
         const currentDuration = newEnd - newStart;
         const { minDuration } = dragState;
 
-        if (dragState.type === 'move') {
-            newStart = dragState.initialStartTimeMs + deltaTimeMs;
-            newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+        if (allowOverlapRef.current) {
+            // Free movement — only clamp to [0, outputDuration]
+            if (dragState.type === 'move') {
+                newStart = dragState.initialStartTimeMs + deltaTimeMs;
+                newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+                if (newStart < 0) { newStart = 0; newEnd = currentDuration; }
+                if (newEnd > outputDuration) { newEnd = outputDuration; newStart = newEnd - currentDuration; }
+            } else if (dragState.type === 'resize-start') {
+                newStart = dragState.initialStartTimeMs + deltaTimeMs;
+                newStart = Math.max(newStart, 0);
+                newStart = Math.min(newStart, newEnd - minDuration);
+            } else if (dragState.type === 'resize-end') {
+                newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+                newEnd = Math.min(newEnd, outputDuration);
+                newEnd = Math.max(newEnd, newStart + minDuration);
+            }
+        } else {
+            const { prevEnd, nextStart } = getBlockBounds(
+                dragState.segmentId,
+                segments,
+                outputDuration
+            );
 
-            if (newStart < prevEnd) { newStart = prevEnd; newEnd = newStart + currentDuration; }
-            if (newEnd > nextStart) { newEnd = nextStart; newStart = newEnd - currentDuration; }
-            if (newStart < 0) { newStart = 0; newEnd = currentDuration; }
-            if (newEnd > outputDuration) { newEnd = outputDuration; newStart = newEnd - currentDuration; }
-        } else if (dragState.type === 'resize-start') {
-            newStart = dragState.initialStartTimeMs + deltaTimeMs;
-            newStart = Math.max(newStart, prevEnd);
-            newStart = Math.min(newStart, newEnd - minDuration);
-        } else if (dragState.type === 'resize-end') {
-            newEnd = dragState.initialEndTimeMs + deltaTimeMs;
-            newEnd = Math.min(newEnd, nextStart, outputDuration);
-            newEnd = Math.max(newEnd, newStart + minDuration);
+            if (dragState.type === 'move') {
+                newStart = dragState.initialStartTimeMs + deltaTimeMs;
+                newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+
+                if (newStart < prevEnd) { newStart = prevEnd; newEnd = newStart + currentDuration; }
+                if (newEnd > nextStart) { newEnd = nextStart; newStart = newEnd - currentDuration; }
+                if (newStart < 0) { newStart = 0; newEnd = currentDuration; }
+                if (newEnd > outputDuration) { newEnd = outputDuration; newStart = newEnd - currentDuration; }
+            } else if (dragState.type === 'resize-start') {
+                newStart = dragState.initialStartTimeMs + deltaTimeMs;
+                newStart = Math.max(newStart, prevEnd);
+                newStart = Math.min(newStart, newEnd - minDuration);
+            } else if (dragState.type === 'resize-end') {
+                newEnd = dragState.initialEndTimeMs + deltaTimeMs;
+                newEnd = Math.min(newEnd, nextStart, outputDuration);
+                newEnd = Math.max(newEnd, newStart + minDuration);
+            }
         }
 
         wasDraggingRef.current = true;
@@ -146,7 +169,7 @@ export function useTimelineSegmentDrag<T extends TimeSegment>({
     const handleGlobalMouseUp = useCallback(() => {
         if (!dragState) return;
 
-        if (wasDraggingRef.current) {
+        if (wasDraggingRef.current && !allowOverlapRef.current) {
             const all = getAllSegments();
             const moved = all.find(s => s.id === dragState.segmentId);
             if (moved) {

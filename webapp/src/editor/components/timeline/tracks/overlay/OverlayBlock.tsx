@@ -1,5 +1,8 @@
 import React from 'react';
 import { LuLayers3 } from 'react-icons/lu';
+import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
+import { RiArrowRightUpFill } from 'react-icons/ri';
+import type { OverlayItemType } from '../../../../../types/overlay';
 import {
     holdSegment,
     blockContainer,
@@ -11,13 +14,25 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 
+const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
+    blur: <MdBlurOn size={BLOCK_ICON_SIZE} />,
+    text: <MdOutlineTextFields size={BLOCK_ICON_SIZE} />,
+    arrow: <RiArrowRightUpFill size={BLOCK_ICON_SIZE} />,
+    border: <MdBorderOuter size={BLOCK_ICON_SIZE} />,
+};
+
 interface OverlayBlockProps {
     left: number;
     width: number;
     isSelected: boolean;
     isDragging: boolean;
     trackHeight: number;
-    itemCount: number;
+    /** Type of the single overlay item */
+    itemType: OverlayItemType;
+    /** Number of other segments overlapping with this one */
+    overlapCount: number;
+    /** Z-index for stacking (shorter blocks get higher z) */
+    zIndex: number;
     onMouseDown: (e: React.MouseEvent) => void;
     onClick: (e: React.MouseEvent) => void;
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
@@ -27,8 +42,8 @@ interface OverlayBlockProps {
 }
 
 /**
- * A single overlay block on the timeline — simple rounded rectangle
- * containing one or more overlay items. No transition zones.
+ * A single overlay block on the timeline — contains exactly one overlay item.
+ * Shows type-specific icon and overlap indicator when overlapping with other blocks.
  */
 export const OverlayBlock: React.FC<OverlayBlockProps> = ({
     left,
@@ -36,7 +51,9 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
     isSelected,
     isDragging,
     trackHeight,
-    itemCount,
+    itemType,
+    overlapCount,
+    zIndex,
     onMouseDown,
     onClick,
     onResizeStartMouseDown,
@@ -55,14 +72,14 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
-                zIndex: isSelected ? 20 : 10,
+                zIndex,
                 opacity: disabled ? 0.7 : 1,
                 cursor: disabled ? 'default' : undefined,
             }}
             onMouseDown={disabled ? undefined : onMouseDown}
             onClick={disabled ? undefined : onClick}
         >
-            {/* Single hold segment (no transitions) */}
+            {/* Single hold segment */}
             <div
                 className={`${holdSegment.base} ${holdColorClass} flex items-center justify-center overflow-hidden`}
                 style={{
@@ -76,9 +93,14 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
             >
                 {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (
                     <div className="flex items-center gap-0.5">
-                        <LuLayers3 className={blockIconClass} size={BLOCK_ICON_SIZE} />
-                        {itemCount > 1 && (
-                            <span className={`${blockIconClass} text-[9px] font-medium`}>{itemCount}</span>
+                        <span className={blockIconClass}>
+                            {OVERLAY_TYPE_ICONS[itemType]}
+                        </span>
+                        {/* Overlap indicator */}
+                        {overlapCount > 0 && width >= MIN_ICON_WIDTH_PX + 16 && (
+                            <span className={`${blockIconClass} text-[8px] font-bold opacity-60`}>
+                                +{overlapCount}
+                            </span>
                         )}
                     </div>
                 )}

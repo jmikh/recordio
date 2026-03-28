@@ -97,6 +97,12 @@ export const useProjectStore = create<ProjectState>()(
                     if (!projectWithoutEvents.timeline.overlaySegments) {
                         projectWithoutEvents.timeline.overlaySegments = [];
                     }
+                    // Migration: clear old overlay segments that used items[] arrays
+                    // (pre-single-item model). Check for any segment that has 'items' instead of 'item'.
+                    projectWithoutEvents.timeline.overlaySegments =
+                        projectWithoutEvents.timeline.overlaySegments.filter(
+                            (s: any) => s.item && !s.items
+                        );
                     if (!projectWithoutEvents.settings.overlay) {
                         projectWithoutEvents.settings.overlay = {
                             enabled: true,

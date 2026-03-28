@@ -141,31 +141,10 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     }, [initialSourceRect, viewMapper]);
 
     // Convert output rect back to source rect for saving
+    // Uses viewMapper.outputToEventRect — the exact inverse of eventToOutputRect
     const outputToSourceRect = (outputRect: Rect): Rect => {
-        if (!viewMapper || !screenContentBounds) return outputRect;
-
-        // Calculate the inverse mapping: output -> source
-        const screenSource = project.screenSource;
-        if (!screenSource.id) return outputRect;
-
-        const effectiveInputSize = project.settings.screen.crop
-            ? { width: project.settings.screen.crop.width, height: project.settings.screen.crop.height }
-            : screenSource.size;
-        const offsetX = project.settings.screen.crop?.x || 0;
-        const offsetY = project.settings.screen.crop?.y || 0;
-
-        // Map output rect to source coordinates
-        const nx = (outputRect.x - screenContentBounds.x) / screenContentBounds.width;
-        const ny = (outputRect.y - screenContentBounds.y) / screenContentBounds.height;
-        const nw = outputRect.width / screenContentBounds.width;
-        const nh = outputRect.height / screenContentBounds.height;
-
-        return {
-            x: nx * effectiveInputSize.width + offsetX,
-            y: ny * effectiveInputSize.height + offsetY,
-            width: nw * effectiveInputSize.width,
-            height: nh * effectiveInputSize.height
-        };
+        if (!viewMapper) return outputRect;
+        return viewMapper.outputToEventRect(outputRect);
     };
 
     // Actions

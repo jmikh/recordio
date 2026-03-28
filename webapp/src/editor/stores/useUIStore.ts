@@ -35,7 +35,6 @@ export interface UIState {
     selectedCaptionId: ID | null;
     selectedCameraMoveId: ID | null;
     selectedOverlaySegmentId: ID | null;
-    selectedOverlayItemId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
@@ -47,7 +46,6 @@ export interface UIState {
     selectCaption: (id: ID | null) => void;
     selectCameraMove: (id: ID | null) => void;
     selectOverlaySegment: (blockId: ID | null) => void;
-    selectOverlayItem: (itemId: ID | null) => void;
     deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
@@ -130,6 +128,10 @@ export interface UIState {
     hoveredTrack: string | null;
     setHoveredTrack: (track: string | null) => void;
 
+    // Scissors Hover (show floating scissors on recording track)
+    isScissorsHovered: boolean;
+    setScissorsHovered: (hovered: boolean) => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -145,7 +147,6 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedCaptionId: null,
     selectedCameraMoveId: null,
     selectedOverlaySegmentId: null,
-    selectedOverlayItemId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
@@ -155,7 +156,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null, selectedOverlayItemId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => {
@@ -289,22 +290,18 @@ export const useUIStore = create<UIState>((set, get) => ({
             if (selectedOverlaySegmentId) {
                 return {
                     selectedOverlaySegmentId,
-                    selectedOverlayItemId: null,
                     canvasMode: CanvasMode.OverlayEdit,
                     isPlaying: false,
                 };
             }
             return {
                 selectedOverlaySegmentId: null,
-                selectedOverlayItemId: null,
                 canvasMode: CanvasMode.Preview,
             };
         });
     },
 
-    selectOverlayItem: (selectedOverlayItemId) => {
-        set({ selectedOverlayItemId });
-    },
+
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
     setSettingsPanelActiveTab: (settingsPanelActiveTab) => set({ settingsPanelActiveTab }),
@@ -331,7 +328,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null, selectedOverlayItemId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -430,6 +427,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     hoveredTrack: null,
     setHoveredTrack: (hoveredTrack) => set({ hoveredTrack }),
 
+    // Scissors Hover
+    isScissorsHovered: false,
+    setScissorsHovered: (isScissorsHovered) => set({ isScissorsHovered }),
+
     reset: () => {
         get().selectCaption(null);
         set({
@@ -440,7 +441,6 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedCaptionId: null,
             selectedCameraMoveId: null,
             selectedOverlaySegmentId: null,
-            selectedOverlayItemId: null,
             selectedSettingsPanel: SettingsPanel.Screen,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,
             timelineContainerRef: null,
@@ -470,6 +470,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             showCollapsibleMusic: true,
 
             hoveredTrack: null,
+            isScissorsHovered: false,
         });
     }
 }));

@@ -50,7 +50,7 @@ export const renderOverlayEditor = (
 
 // ------------------------------------------------------------------
 // COMPONENT: Interactive HTML Overlay
-// Shows bounding boxes / manipulation handles for the selected item.
+// Shows bounding box / manipulation handles for the selected segment's single item.
 // ------------------------------------------------------------------
 
 export const OverlayEditor: React.FC = () => {
@@ -58,31 +58,31 @@ export const OverlayEditor: React.FC = () => {
     const project = useProjectStore(s => s.project);
     const outputSize = project.settings.outputSize;
     const selectedBlockId = useUIStore(s => s.selectedOverlaySegmentId);
-    const selectedItemId = useUIStore(s => s.selectedOverlayItemId);
-    const updateOverlayItem = useProjectStore(s => s.updateOverlayItem);
-    const selectOverlayItem = useUIStore(s => s.selectOverlayItem);
+    const updateOverlayItemData = useProjectStore(s => s.updateOverlayItemData);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
     const resetEditorStore = useOverlayEditorStore(s => s.reset);
-    const hoveredItemId = useOverlayEditorStore(s => s.hoveredItemId);
-    const setHoveredItem = useOverlayEditorStore(s => s.setHoveredItem);
 
-    // Reset editor store when selected item changes
+    // Reset editor store when selected block changes
     useEffect(() => {
         resetEditorStore();
-    }, [selectedItemId, resetEditorStore]);
+    }, [selectedBlockId, resetEditorStore]);
 
-    // Find the selected block and item
+    // Find the selected block
     const block = useMemo(() =>
         (project.timeline.overlaySegments || []).find((b: OverlaySegment) => b.id === selectedBlockId),
         [project.timeline.overlaySegments, selectedBlockId]
     );
 
-    const selectedItem = useMemo(() =>
-        block?.items.find(i => i.id === selectedItemId) ?? null,
-        [block, selectedItemId]
-    );
-
     if (!block || !displayMapper) return null;
+
+    const item = block.item;
+    const blockId = block.id;
+
+    // Wrapper for updateOverlayItemData that matches the old (blockId, itemId, updates) signature
+    // used by sub-components — simplified since there's only one item per segment
+    const updateItem = (updates: Partial<OverlayItem>) => {
+        updateOverlayItemData(blockId, updates);
+    };
 
     return (
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
@@ -93,39 +93,18 @@ export const OverlayEditor: React.FC = () => {
                 }
             `}</style>
 
-            {/* Hover targets for non-selected items */}
-            {block.items
-                .filter(i => i.id !== selectedItemId)
-                .map(item => (
-                    <OverlayHoverTarget
-                        key={item.id}
-                        item={item}
-                        blockId={block.id}
-                        isHovered={hoveredItemId === item.id}
-                        onHover={(hovered) => setHoveredItem(hovered ? item.id : null)}
-                        selectItem={() => selectOverlayItem(item.id)}
-                        updateOverlayItem={updateOverlayItem}
-                        startInteraction={startInteraction}
-                        endInteraction={endInteraction}
-                        batchAction={batchAction}
-                    />
-                ))
-            }
-
             {/* Selected overlay item — interactive bounding box */}
-            {selectedItem && (
-                <div className="overlay-editor-contrast">
-                    <OverlayItemEditor
-                        item={selectedItem}
-                        blockId={block.id}
-                        outputSize={outputSize}
-                        updateOverlayItem={updateOverlayItem}
-                        startInteraction={startInteraction}
-                        endInteraction={endInteraction}
-                        batchAction={batchAction}
-                    />
-                </div>
-            )}
+            <div className="overlay-editor-contrast">
+                <OverlayItemEditor
+                    item={item}
+                    blockId={blockId}
+                    outputSize={outputSize}
+                    updateItem={updateItem}
+                    startInteraction={startInteraction}
+                    endInteraction={endInteraction}
+                    batchAction={batchAction}
+                />
+            </div>
         </div>
     );
 };
@@ -138,26 +117,26 @@ interface OverlayItemEditorProps {
     item: OverlayItem;
     blockId: string;
     outputSize: Size;
-    updateOverlayItem: (blockId: string, itemId: string, updates: Partial<OverlayItem>) => void;
+    updateItem: (updates: Partial<OverlayItem>) => void;
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;
 }
 
 const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
-    item, blockId, outputSize, updateOverlayItem, startInteraction, endInteraction, batchAction
+    item, blockId, outputSize, updateItem, startInteraction, endInteraction, batchAction
 }) => {
     const handleRectChange = (rect: Rect) => {
         batchAction(() => {
             if (item.type === 'blur' || item.type === 'border') {
-                updateOverlayItem(blockId, item.id, { rectPx: rect } as Partial<OverlayItem>);
+                updateItem({ rectPx: rect } as Partial<OverlayItem>);
             }
         });
     };
 
     const handleRectCommit = (rect: Rect) => {
         if (item.type === 'blur' || item.type === 'border') {
-            updateOverlayItem(blockId, item.id, { rectPx: rect } as Partial<OverlayItem>);
+            updateItem({ rectPx: rect } as Partial<OverlayItem>);
         }
         endInteraction();
     };
@@ -171,7 +150,6 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                 <BoundingBox
                     rect={rectItem.rectPx}
                     minSize={minDim * 0.04}
-                    borderColor="var(--color-secondary)"
                     hideCornerPreview={item.type === 'border'}
                     hideLinkToggle={item.type === 'blur'}
                     onChange={handleRectChange}
@@ -181,13 +159,13 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                     cornerRadii={rectItem.borderRadiusPx}
                     onCornerRadiiChange={(radii) => {
                         batchAction(() => {
-                            updateOverlayItem(blockId, item.id, {
+                            updateItem({
                                 borderRadiusPx: radii,
                             } as Partial<OverlayItem>);
                         });
                     }}
                     onCornerRadiiCommit={(radii) => {
-                        updateOverlayItem(blockId, item.id, {
+                        updateItem({
                             borderRadiusPx: radii,
                         } as Partial<OverlayItem>);
                         endInteraction();
@@ -200,7 +178,7 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                 <InlineTextEditor
                     item={item as TextOverlayItem}
                     blockId={blockId}
-                    updateOverlayItem={updateOverlayItem}
+                    updateItem={updateItem}
                     startInteraction={startInteraction}
                     endInteraction={endInteraction}
                     batchAction={batchAction}
@@ -212,7 +190,7 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                 <ArrowPointHandles
                     item={item as ArrowOverlayItem}
                     blockId={blockId}
-                    updateOverlayItem={updateOverlayItem}
+                    updateItem={updateItem}
                     startInteraction={startInteraction}
                     endInteraction={endInteraction}
                     batchAction={batchAction}
@@ -233,11 +211,11 @@ const HANDLE_SIZE = 12;
 const ArrowPointHandles: React.FC<{
     item: ArrowOverlayItem;
     blockId: string;
-    updateOverlayItem: (blockId: string, itemId: string, updates: Partial<OverlayItem>) => void;
+    updateItem: (updates: Partial<OverlayItem>) => void;
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;
-}> = ({ item, blockId, updateOverlayItem, startInteraction, endInteraction, batchAction }) => {
+}> = ({ item, blockId, updateItem, startInteraction, endInteraction, batchAction }) => {
     const displayMapper = useDisplayMapper();
     const outputSize = displayMapper.outputSize;
 
@@ -266,7 +244,7 @@ const ArrowPointHandles: React.FC<{
             const dy = (me.clientY - startY) * scale;
             const newPoint = clamp({ x: startPoint.x + dx, y: startPoint.y + dy });
             batchAction(() => {
-                updateOverlayItem(blockId, item.id, { [endpoint]: newPoint } as Partial<OverlayItem>);
+                updateItem({ [endpoint]: newPoint } as Partial<OverlayItem>);
             });
         };
 
@@ -279,7 +257,7 @@ const ArrowPointHandles: React.FC<{
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, blockId, displayMapper, updateOverlayItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
 
     // Drag entire arrow (both tail and head move together)
     const handleLineDrag = React.useCallback((e: React.PointerEvent) => {
@@ -301,7 +279,7 @@ const ArrowPointHandles: React.FC<{
             const newTail = clamp({ x: startTail.x + dx, y: startTail.y + dy });
             const newHead = clamp({ x: startHead.x + dx, y: startHead.y + dy });
             batchAction(() => {
-                updateOverlayItem(blockId, item.id, {
+                updateItem({
                     tail: newTail,
                     head: newHead,
                 } as Partial<OverlayItem>);
@@ -317,7 +295,7 @@ const ArrowPointHandles: React.FC<{
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, blockId, displayMapper, updateOverlayItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
 
     const tailDisplay = displayMapper.outputToDisplay({ ...item.tail, width: 0, height: 0 });
     const headDisplay = displayMapper.outputToDisplay({ ...item.head, width: 0, height: 0 });
@@ -385,11 +363,11 @@ const ArrowPointHandles: React.FC<{
 const InlineTextEditor: React.FC<{
     item: TextOverlayItem;
     blockId: string;
-    updateOverlayItem: (blockId: string, itemId: string, updates: Partial<OverlayItem>) => void;
+    updateItem: (updates: Partial<OverlayItem>) => void;
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;
-}> = ({ item, blockId, updateOverlayItem, startInteraction, endInteraction, batchAction }) => {
+}> = ({ item, blockId, updateItem, startInteraction, endInteraction, batchAction }) => {
     const displayMapper = useDisplayMapper();
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const textRef = React.useRef<HTMLDivElement>(null);
@@ -455,7 +433,7 @@ const InlineTextEditor: React.FC<{
                 y: dragRef.current.startPos.y + dy,
             };
             batchAction(() => {
-                updateOverlayItem(blockId, item.id, { topLeft: newPos } as Partial<OverlayItem>);
+                updateItem({ topLeft: newPos } as Partial<OverlayItem>);
             });
         };
 
@@ -469,7 +447,7 @@ const InlineTextEditor: React.FC<{
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [isEditing, item, blockId, displayMapper, updateOverlayItem, startInteraction, endInteraction, batchAction]);
+    }, [isEditing, item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
 
     // Double-click to enter edit mode
     const handleDoubleClick = React.useCallback((e: React.MouseEvent) => {
@@ -485,11 +463,11 @@ const InlineTextEditor: React.FC<{
         if (el) {
             const newText = el.textContent || '';
             if (newText !== item.text) {
-                updateOverlayItem(blockId, item.id, { text: newText } as Partial<OverlayItem>);
+                updateItem({ text: newText } as Partial<OverlayItem>);
             }
         }
         exitEditMode();
-    }, [item, blockId, updateOverlayItem, exitEditMode]);
+    }, [item, updateItem, exitEditMode]);
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -547,14 +525,14 @@ const InlineTextEditor: React.FC<{
             if (side === 'right') {
                 const newWidth = Math.max(20, startWidth + dxOutput);
                 batchAction(() => {
-                    updateOverlayItem(blockId, item.id, { widthPx: newWidth } as Partial<OverlayItem>);
+                    updateItem({ widthPx: newWidth } as Partial<OverlayItem>);
                 });
             } else {
                 // Left edge: move topLeft.x and shrink width to keep right edge fixed
                 const newWidth = Math.max(20, startWidth - dxOutput);
                 const newLeft = startLeft + (startWidth - newWidth);
                 batchAction(() => {
-                    updateOverlayItem(blockId, item.id, {
+                    updateItem({
                         topLeft: { x: newLeft, y: item.topLeft.y },
                         widthPx: newWidth,
                     } as Partial<OverlayItem>);
@@ -571,7 +549,7 @@ const InlineTextEditor: React.FC<{
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, blockId, displayMapper, updateOverlayItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
 
     const HANDLE_W = 5;
     const HANDLE_H = 19;
@@ -631,285 +609,4 @@ const InlineTextEditor: React.FC<{
             />
         </div>
     );
-};
-
-// ------------------------------------------------------------------
-// Hover target — for non-selected items
-// Shows full BoundingBox on hover for blur/border, enabling immediate drag.
-// For arrow/text, onPointerDown selects + starts drag in one gesture.
-// ------------------------------------------------------------------
-
-const OverlayHoverTarget: React.FC<{
-    item: OverlayItem;
-    blockId: string;
-    isHovered: boolean;
-    onHover: (hovered: boolean) => void;
-    selectItem: () => void;
-    updateOverlayItem: (blockId: string, itemId: string, updates: Partial<OverlayItem>) => void;
-    startInteraction: () => void;
-    endInteraction: () => void;
-    batchAction: (fn: () => void) => void;
-}> = ({ item, blockId, isHovered, onHover, selectItem, updateOverlayItem, startInteraction, endInteraction, batchAction }) => {
-    const displayMapper = useDisplayMapper();
-    const outputSize = useProjectStore(s => s.project.settings.outputSize);
-
-    const hoverBorder = isHovered ? '2px solid var(--color-secondary)' : '2px solid transparent';
-
-    switch (item.type) {
-        case 'blur':
-        case 'border': {
-            const rectItem = item as BlurOverlayItem | BorderOverlayItem;
-            const display = displayMapper.outputToDisplay(rectItem.rectPx);
-
-            // onPointerDown: select + start move drag immediately
-            const handleRectPointerDown = (e: React.PointerEvent) => {
-                e.stopPropagation();
-                e.preventDefault();
-                selectItem();
-                startInteraction();
-
-                const el = e.currentTarget as HTMLElement;
-                el.setPointerCapture(e.pointerId);
-                const outputScale = displayMapper.displayToOutputLength(1);
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const startRect = { ...rectItem.rectPx };
-
-                const onMove = (me: PointerEvent) => {
-                    const dx = (me.clientX - startX) * outputScale;
-                    const dy = (me.clientY - startY) * outputScale;
-                    batchAction(() => {
-                        updateOverlayItem(blockId, item.id, {
-                            rectPx: { ...startRect, x: startRect.x + dx, y: startRect.y + dy },
-                        } as Partial<OverlayItem>);
-                    });
-                };
-                const onUp = () => {
-                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
-                    window.removeEventListener('pointermove', onMove);
-                    window.removeEventListener('pointerup', onUp);
-                    endInteraction();
-                };
-                window.addEventListener('pointermove', onMove);
-                window.addEventListener('pointerup', onUp);
-            };
-
-            return (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: display.x,
-                        top: display.y,
-                        width: display.width,
-                        height: display.height,
-                        pointerEvents: 'auto',
-                        cursor: 'pointer',
-                        border: hoverBorder,
-                        borderRadius: 2,
-                    }}
-                    onMouseEnter={() => onHover(true)}
-                    onMouseLeave={() => onHover(false)}
-                    onPointerDown={handleRectPointerDown}
-                />
-            );
-        }
-        case 'text': {
-            const textItem = item as TextOverlayItem;
-            const textScale = outputSize.height / TEXT_REF_HEIGHT;
-            const pad = Math.round(TEXT_REF_PADDING * textScale);
-            const scale = displayMapper.outputToDisplayLength(1);
-            const displayFontSize = textItem.fontSizePx * scale;
-            const displayPadding = pad * scale;
-
-            const lineHeightPx = textItem.fontSizePx * 1.2;
-            const canvasEl = document.createElement('canvas');
-            const tmpCtx = canvasEl.getContext('2d');
-            let lineCount = 1;
-            if (tmpCtx) {
-                tmpCtx.font = `${textItem.fontWeight} ${textItem.fontSizePx}px ${textItem.fontFamily}, sans-serif`;
-                const maxW = textItem.widthPx;
-                const words = (textItem.text || '').split(' ');
-                let currentLine = '';
-                lineCount = 0;
-                for (const word of words) {
-                    const test = currentLine ? `${currentLine} ${word}` : word;
-                    if (tmpCtx.measureText(test).width > maxW && currentLine) {
-                        lineCount++;
-                        currentLine = word;
-                    } else {
-                        currentLine = test;
-                    }
-                    if (tmpCtx.measureText(currentLine).width > maxW) {
-                        let remaining = currentLine;
-                        currentLine = '';
-                        for (const char of remaining) {
-                            const charTest = currentLine + char;
-                            if (tmpCtx.measureText(charTest).width > maxW && currentLine) {
-                                lineCount++;
-                                currentLine = char;
-                            } else {
-                                currentLine = charTest;
-                            }
-                        }
-                    }
-                }
-                if (currentLine) lineCount++;
-                if (lineCount === 0) lineCount = 1;
-            }
-            const totalOutputHeight = lineCount * lineHeightPx + pad * 2;
-
-            const bgDisplay = displayMapper.outputToDisplay({
-                x: textItem.topLeft.x - pad,
-                y: textItem.topLeft.y - pad,
-                width: textItem.widthPx + pad * 2,
-                height: totalOutputHeight,
-            });
-
-            // onPointerDown: select + start move drag immediately
-            const handleTextPointerDown = (e: React.PointerEvent) => {
-                e.stopPropagation();
-                e.preventDefault();
-                selectItem();
-                startInteraction();
-
-                const el = e.currentTarget as HTMLElement;
-                el.setPointerCapture(e.pointerId);
-                const outputScale = displayMapper.displayToOutputLength(1);
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const startPos = { ...textItem.topLeft };
-
-                const onMove = (me: PointerEvent) => {
-                    const dx = (me.clientX - startX) * outputScale;
-                    const dy = (me.clientY - startY) * outputScale;
-                    batchAction(() => {
-                        updateOverlayItem(blockId, item.id, {
-                            topLeft: { x: startPos.x + dx, y: startPos.y + dy },
-                        } as Partial<OverlayItem>);
-                    });
-                };
-                const onUp = () => {
-                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
-                    window.removeEventListener('pointermove', onMove);
-                    window.removeEventListener('pointerup', onUp);
-                    endInteraction();
-                };
-                window.addEventListener('pointermove', onMove);
-                window.addEventListener('pointerup', onUp);
-            };
-
-            return (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: bgDisplay.x,
-                        top: bgDisplay.y,
-                        width: bgDisplay.width,
-                        height: bgDisplay.height,
-                        boxSizing: 'border-box',
-                        padding: displayPadding > 0 ? `${displayPadding}px` : undefined,
-                        pointerEvents: 'auto',
-                        cursor: 'pointer',
-                        border: hoverBorder,
-                        borderRadius: 2,
-                        fontFamily: `${textItem.fontFamily}, sans-serif`,
-                        fontSize: `${displayFontSize}px`,
-                        fontWeight: textItem.fontWeight,
-                        lineHeight: 1.2,
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        color: 'transparent',
-                        overflow: 'hidden',
-                    }}
-                    onMouseEnter={() => onHover(true)}
-                    onMouseLeave={() => onHover(false)}
-                    onPointerDown={handleTextPointerDown}
-                >
-                    {textItem.text}
-                </div>
-            );
-        }
-        case 'arrow': {
-            const arrowItem = item as ArrowOverlayItem;
-            const tail = displayMapper.outputToDisplay({ ...arrowItem.tail, width: 0, height: 0 });
-            const head = displayMapper.outputToDisplay({ ...arrowItem.head, width: 0, height: 0 });
-
-            // onPointerDown: select + start line drag immediately
-            const handleArrowPointerDown = (e: React.PointerEvent<SVGLineElement>) => {
-                e.stopPropagation();
-                e.preventDefault();
-                selectItem();
-                startInteraction();
-
-                const el = e.currentTarget as unknown as Element;
-                el.setPointerCapture(e.pointerId);
-                const scale = displayMapper.displayToOutputLength(1);
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const startTail = { ...arrowItem.tail };
-                const startHead = { ...arrowItem.head };
-
-                const clamp = (p: { x: number; y: number }) => ({
-                    x: Math.max(0, Math.min(p.x, outputSize.width)),
-                    y: Math.max(0, Math.min(p.y, outputSize.height)),
-                });
-
-                const onMove = (me: PointerEvent) => {
-                    const dx = (me.clientX - startX) * scale;
-                    const dy = (me.clientY - startY) * scale;
-                    batchAction(() => {
-                        updateOverlayItem(blockId, item.id, {
-                            tail: clamp({ x: startTail.x + dx, y: startTail.y + dy }),
-                            head: clamp({ x: startHead.x + dx, y: startHead.y + dy }),
-                        } as Partial<OverlayItem>);
-                    });
-                };
-                const onUp = () => {
-                    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
-                    window.removeEventListener('pointermove', onMove);
-                    window.removeEventListener('pointerup', onUp);
-                    endInteraction();
-                };
-                window.addEventListener('pointermove', onMove);
-                window.addEventListener('pointerup', onUp);
-            };
-
-            return (
-                <svg
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        pointerEvents: 'none',
-                        zIndex: 10,
-                    }}
-                >
-                    {/* Thick transparent hit area */}
-                    <line
-                        x1={tail.x} y1={tail.y}
-                        x2={head.x} y2={head.y}
-                        stroke="transparent"
-                        strokeWidth={12}
-                        style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                        onMouseEnter={() => onHover(true)}
-                        onMouseLeave={() => onHover(false)}
-                        onPointerDown={handleArrowPointerDown}
-                    />
-                    {/* Visible hover line */}
-                    {isHovered && (
-                        <line
-                            x1={tail.x} y1={tail.y}
-                            x2={head.x} y2={head.y}
-                            stroke="var(--color-secondary)"
-                            strokeWidth={2}
-                            style={{ pointerEvents: 'none' }}
-                        />
-                    )}
-                </svg>
-            );
-        }
-        default:
-            return null;
-    }
 };

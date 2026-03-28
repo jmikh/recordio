@@ -146,7 +146,8 @@ export const SettingsPanel = () => {
     const selectedOverlaySegment = selectedOverlaySegmentId ? (overlaySegments || []).find(b => b.id === selectedOverlaySegmentId) : null;
 
     return (
-        <div id="settings-panel" className="flex h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
+        <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
+            <div className="flex flex-1 min-h-0">
             {/* Sidebar Navigation */}
             <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 pl-0 pr-3 border-r border-border">
                 {/* Sliding accent bar — hidden when inspector is active */}
@@ -239,6 +240,7 @@ export const SettingsPanel = () => {
                     orientation="vertical"
                     dependency={activeTab}
                 />
+            </div>
             </div>
 
             {/* Preload Device Frames */}

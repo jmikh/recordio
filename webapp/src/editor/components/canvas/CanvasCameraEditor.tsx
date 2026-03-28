@@ -3,7 +3,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CameraSettings, Rect, Project } from '../../../types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
-import { DimmedOverlay } from '../../../components/DimmedOverlay';
+
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from './PlaybackRenderer';
@@ -100,8 +100,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     const hasShadow = useProjectStore(s => s.project.settings.camera?.hasShadow);
     const hasGlow = useProjectStore(s => s.project.settings.camera?.hasGlow);
 
-    // Get spotlight dimOpacity for the dimmed overlay
-    const dimOpacity = useProjectStore(s => s.project.settings.spotlight.dimOpacity);
+
 
     // Batcher for consistent history behavior
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
@@ -199,17 +198,9 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         return [r, r, r, r];
     })();
 
-    // For circle shape, use half the size as radius for DimmedOverlay
-    const dimmedOverlayRadii: CornerRadii = (() => {
-        if (currentShape === 'circle') {
-            // Circle is always square (widthPx === heightPx), use half as radius
-            const circleRadius = currentSettings.widthPx / 2;
-            return [circleRadius, circleRadius, circleRadius, circleRadius];
-        }
-        return cornerRadii;
-    })();
 
-    // Adapter: convert Px-suffixed CameraSettings to Rect for BoundingBox/DimmedOverlay
+
+    // Adapter: convert Px-suffixed CameraSettings to Rect for BoundingBox
     const cameraRect: Rect = {
         x: currentSettings.xPx,
         y: currentSettings.yPx,
@@ -273,11 +264,6 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             ref={containerRef}
             className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] pointer-events-none"
         >
-            <DimmedOverlay
-                holeRect={cameraRect}
-                cornerRadii={dimmedOverlayRadii}
-                opacity={dimOpacity}
-            />
 
             <div className="absolute inset-0 pointer-events-none">
                 <BoundingBox

@@ -1,15 +1,13 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef } from 'react';
 import type { Timeline as TimelineType } from '../../../../../types';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useAudioAnalysis } from '../../../../hooks/useAudioAnalysis';
-import { useUIStore, CanvasMode } from '../../../../stores/useUIStore';
+import { useUIStore } from '../../../../stores/useUIStore';
 import { getTimeMapper } from '../../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
-
-import { RecordingSegment } from './RecordingSegment';
-import { MIN_WINDOW_DURATION_MS } from './constants';
 import { FaScissors } from 'react-icons/fa6';
+import { RecordingSegment } from './RecordingSegment';
 
 
 interface RecordingTrackProps {
@@ -54,52 +52,10 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
 
     const { dragState, handleDragStart } = useWindowDrag(timeline, coords);
 
-    // Scissors button state
-    const canvasMode = useUIStore(s => s.canvasMode);
-    const isPlaying = useUIStore(s => s.isPlaying);
+    // Floating scissors preview (driven by toolbar scissors button hover)
+    const isScissorsHovered = useUIStore(s => s.isScissorsHovered);
     const currentTimeMs = useUIStore(s => s.currentTimeMs);
-    const splitWindow = useProjectStore(s => s.splitWindow);
-
-    // Check if current time is at least MIN_WINDOW_DURATION_MS from both window boundaries (in output time)
-    const canShowScissors = useMemo(() => {
-        const timeMapper = getTimeMapper(timeline.outputWindows);
-        const result = timeMapper.getWindowAtOutputTime(currentTimeMs);
-        if (!result) return false;
-
-        const { window: win, outputStartMs } = result;
-        const speed = win.speed || 1.0;
-        const windowOutputDuration = (win.endMs - win.startMs) / speed;
-        const windowOutputEndMs = outputStartMs + windowOutputDuration;
-
-        // Calculate distances in output time
-        const distanceFromStart = currentTimeMs - outputStartMs;
-        const distanceFromEnd = windowOutputEndMs - currentTimeMs;
-
-        return distanceFromStart >= MIN_WINDOW_DURATION_MS && distanceFromEnd >= MIN_WINDOW_DURATION_MS;
-    }, [currentTimeMs, timeline.outputWindows]);
-
-    const showScissors = canvasMode === CanvasMode.Preview && !isPlaying && canShowScissors;
-
-    // Playhead X position for scissors button
     const playheadX = (currentTimeMs / 1000) * pixelsPerSec;
-
-    // Split handler
-    const handleScissorsClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        const timeMapper = getTimeMapper(timeline.outputWindows);
-        const result = timeMapper.getWindowAtOutputTime(currentTimeMs);
-        if (!result) return;
-
-        const { window: win, outputStartMs } = result;
-        const outputOffset = currentTimeMs - outputStartMs;
-        const speed = win.speed || 1.0;
-        const sourceOffset = outputOffset * speed;
-        const splitTime = win.startMs + sourceOffset;
-
-        splitWindow(win.id, splitTime);
-    };
 
     // Calculate layout
     let currentX = 0;
@@ -145,19 +101,13 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                     );
                 })}
             </div>
-
-            {/* Scissors Split Button */}
-            <button
-                onClick={handleScissorsClick}
-                onMouseDown={(e) => e.stopPropagation()}
-                onMouseEnter={(e) => e.stopPropagation()}
-                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-text-on-primary border border-transparent hover:bg-black/80 hover:scale-110 cursor-pointer transition-[opacity,background-color,border-color,color,scale] duration-150 z-[var(--z-index-tooltip)] ${showScissors ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            {/* Floating scissors preview — shown when toolbar scissors button is hovered */}
+            <div
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-text-on-primary border border-transparent pointer-events-none transition-[opacity] duration-150 z-[var(--z-index-tooltip)] ${isScissorsHovered ? 'opacity-100' : 'opacity-0'}`}
                 style={{ left: `${playheadX}px` }}
-                title="Split at playhead"
             >
                 <FaScissors size={12} />
-            </button>
-
+            </div>
 
         </div >
     );

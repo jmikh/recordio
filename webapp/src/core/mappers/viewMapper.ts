@@ -323,6 +323,32 @@ export class ViewMapper {
     }
 
     /**
+     * Inverse of `eventToOutputRect`: maps an Output Space rectangle back
+     * to viewport-relative event coordinates.
+     */
+    outputToEventRect(outputRect: Rect): Rect {
+        // Reverse the contentRect mapping: output → normalized (0..1)
+        const nx = (outputRect.x - this.contentRect.x) / this.contentRect.width;
+        const ny = (outputRect.y - this.contentRect.y) / this.contentRect.height;
+        const nw = outputRect.width / this.contentRect.width;
+        const nh = outputRect.height / this.contentRect.height;
+
+        // Reverse normalize: normalized → source (with crop offset)
+        const sourceX = nx * this.effectiveSize.width + this.cropOffset.x;
+        const sourceY = ny * this.effectiveSize.height + this.cropOffset.y;
+        const sourceW = nw * this.effectiveSize.width;
+        const sourceH = nh * this.effectiveSize.height;
+
+        // Reverse event offset: source → event
+        return {
+            x: sourceX - this.eventOffset.x,
+            y: sourceY - this.eventOffset.y,
+            width: sourceW,
+            height: sourceH,
+        };
+    }
+
+    /**
      * Projects an event rectangle (viewport-relative) through the viewport to Output coordinates.
      */
     projectEventToOutput(rect: Rect, viewport: Rect): Rect {

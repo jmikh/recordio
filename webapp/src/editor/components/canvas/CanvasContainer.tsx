@@ -13,6 +13,7 @@ import { renderCropEditor, CropEditor } from './CanvasCropEditor';
 import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEditor';
 import { OverlayEditor, renderOverlayEditor } from './CanvasOverlayEditor';
+import { OverlayHoverLayer } from './OverlayHoverLayer';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
@@ -27,7 +28,6 @@ export const CanvasContainer = () => {
     const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const activeCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const activeOverlayBlockId = useUIStore(s => s.selectedOverlaySegmentId);
-    const activeOverlayItemId = useUIStore(s => s.selectedOverlayItemId);
 
     // Background music sync with playback
     useBackgroundMusic();
@@ -147,7 +147,7 @@ export const CanvasContainer = () => {
 
             const uiState = useUIStore.getState();
             const { project } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedOverlaySegmentId: activeOverlayBlockId, selectedOverlayItemId: activeOverlayItemId } = uiState;
+            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedOverlaySegmentId: activeOverlayBlockId } = uiState;
 
             // Build sources from project
             const sources: Record<string, SourceMetadata> = {};
@@ -283,10 +283,12 @@ export const CanvasContainer = () => {
                             overrideCameraSettings: previewCameraSettingsRef.current
                         });
                     } else if (canvasMode === CanvasMode.OverlayEdit && activeOverlayBlockId) {
+                        // Find the selected segment's item id for editingItemId
+                        const overlayBlock = project.timeline.overlaySegments?.find((b: any) => b.id === activeOverlayBlockId);
                         renderOverlayEditor(resources, {
                             project,
                             currentTimeMs: effectiveTimeMs,
-                            editingItemId: activeOverlayItemId,
+                            editingItemId: overlayBlock?.item?.id ?? null,
                         });
                     } else {
                         PlaybackRenderer.render(resources, {
@@ -477,6 +479,9 @@ export const CanvasContainer = () => {
                     ref={canvasRef}
                     className="block w-full h-full object-contain"
                 />
+
+                {/* Overlay hover targets (always-on background layer) */}
+                <OverlayHoverLayer />
 
                 {/* CROP OVERLAY (Highest Priority) */}
                 {canvasMode === CanvasMode.CropEdit && (

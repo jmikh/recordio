@@ -195,7 +195,7 @@ export interface Timeline {
     captionSegments: CaptionSegment[];
     /** Camera layout overrides for dynamic camera position/size changes */
     cameraMoveSegments: CameraMoveSegment[];
-    /** Overlay annotation segments (non-overlapping, source-time anchored) */
+    /** Overlay annotation segments (may overlap, single-item each, source-time anchored) */
     overlaySegments: import('./overlay').OverlaySegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];

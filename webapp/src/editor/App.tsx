@@ -343,37 +343,35 @@ function Editor() {
 
             <div id="editor-body" className="flex-1 flex overflow-hidden">
                 <SettingsPanel />
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div
+                    id="video-player-container"
+                    className="flex-1 flex overflow-hidden relative items-center justify-center"
+                >
                     <div
-                        id="video-player-container"
-                        className="flex-1 flex overflow-hidden relative items-center justify-center"
+                        id="canvas-sizing-container"
+                        ref={setContainerElement}
+                        className="relative flex items-center bg-surface-body justify-center shadow-2xl"
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            overflow: 'hidden'
+                        }}
                     >
-                        <div
-                            id="canvas-sizing-container"
-                            ref={setContainerElement}
-                            className="relative flex items-center bg-surface-body justify-center shadow-2xl"
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                overflow: 'hidden'
-                            }}
-                        >
 
 
-                            {hasActiveProject && (
-                                <div
-                                    id="canvas-rendered-wrapper"
-                                    style={{ position: 'relative', ...renderedStyle }}
-                                >
-                                    <CanvasContainer />
-                                </div>
-                            )}
-                            {isLoading && <div className="text-text-main">Loading Project...</div>}
-                        </div>
+                        {hasActiveProject && (
+                            <div
+                                id="canvas-rendered-wrapper"
+                                style={{ position: 'relative', ...renderedStyle }}
+                            >
+                                <CanvasContainer />
+                            </div>
+                        )}
+                        {isLoading && <div className="text-text-main">Loading Project...</div>}
                     </div>
-                    <TimelineToolbar />
                 </div>
             </div>
+            <TimelineToolbar />
 
             <div id="timeline-container" className="border-t border-border shrink-0 z-[var(--z-index-navbar)] bg-surface">
                 <Timeline />

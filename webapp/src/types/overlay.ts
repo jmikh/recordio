@@ -94,11 +94,11 @@ export interface BorderOverlayItem extends BaseOverlayItem {
 export type OverlayItem = BlurOverlayItem | TextOverlayItem | ArrowOverlayItem | BorderOverlayItem;
 
 /**
- * An overlay segment is a time segment containing one or more visual overlays.
- * Non-overlapping with other overlay segments.
+ * An overlay segment is a time segment containing a single visual overlay.
+ * Segments may overlap in time — shorter segments render on top.
  * Source-time anchored for trim/speed stability.
  */
 export interface OverlaySegment extends TimeSegment {
-    /** The overlay items in this segment */
-    items: OverlayItem[];
+    /** The single overlay item in this segment */
+    item: OverlayItem;
 }

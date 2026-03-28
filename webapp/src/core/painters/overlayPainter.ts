@@ -53,19 +53,26 @@ export function drawOverlays(
     ctx.scale(scaleX, scaleY);
     ctx.translate(-viewport.x, -viewport.y);
 
-    // Find active segments at this time
-    for (const segment of overlaySegments) {
-        if (!segment.visible) continue;
-        if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) continue;
+    // Find active segments at this time, sorted by duration descending
+    // so shorter overlays paint on top
+    const activeSegments = overlaySegments
+        .filter(segment => {
+            if (!segment.visible) return false;
+            if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            const durA = a.outputEndTimeMs - a.outputStartTimeMs;
+            const durB = b.outputEndTimeMs - b.outputStartTimeMs;
+            return durB - durA; // longest first (painted first = behind)
+        });
 
-        for (const item of segment.items) {
-            // Only skip text when being edited (rendered via HTML for inline editing).
-            // Blur, arrow, and border always paint — the HTML overlay only shows
-            // bounding box handles, not the visual itself.
-            if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
+    for (const segment of activeSegments) {
+        const item = segment.item;
+        // Only skip text when being edited (rendered via HTML for inline editing).
+        if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
 
-            drawOverlayItem(ctx, item, outputSize, effectScale, viewport);
-        }
+        drawOverlayItem(ctx, item, outputSize, effectScale, viewport);
     }
 
     ctx.restore();
