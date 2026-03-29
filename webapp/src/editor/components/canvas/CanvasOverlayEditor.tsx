@@ -492,6 +492,7 @@ const InlineTextEditor: React.FC<{
         fontWeight: item.fontWeight,
         color: item.color,
         lineHeight: 1.2,
+        textAlign: 'center',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
         width: `${displayWidth}px`,

@@ -49,9 +49,14 @@ export const CanvasHoverLayer: React.FC = () => {
     // ── Shared: zoom viewport ────────────────────────────────
     const zoomEnabled = project.settings.zoom?.enabled ?? true;
     const viewport = useMemo(() => {
+        // If an overlay is selected, the entire canvas renders without zoom
+        if (canvasMode === CanvasMode.OverlayEdit) {
+            return { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+        }
+        
         const zoomSegments = zoomEnabled ? (project.timeline.zoomSegments || []) : [];
         return getViewportStateAtTime(zoomSegments, currentTimeMs, outputSize, project.settings.zoom);
-    }, [zoomEnabled, project.timeline.zoomSegments, currentTimeMs, outputSize, project.settings.zoom]);
+    }, [canvasMode, zoomEnabled, project.timeline.zoomSegments, currentTimeMs, outputSize, project.settings.zoom]);
 
     /**
      * Transform an output-space rect through the zoom viewport to display coords.

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
+import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 
 interface CaptionsHeaderCellProps {
@@ -18,6 +19,7 @@ export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height, 
     return (
         <TimelineHeaderCell
             title="Captions"
+            icon={<FaRegClosedCaptioning size={16} />}
             height={height}
             disabled={!captionsEnabled}
             isCollapsed={isCollapsed}

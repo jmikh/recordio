@@ -1,7 +1,9 @@
 import React from 'react';
-import { RiResetLeftFill } from 'react-icons/ri';
+import { FaUndoAlt } from 'react-icons/fa';
+import { BiVideoRecording } from 'react-icons/bi';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 import { useProjectStore } from '../../../../stores/useProjectStore';
+import { Button } from '@shared/components';
 
 interface RecordingHeaderCellProps {
     height: number;
@@ -21,19 +23,21 @@ export const RecordingHeaderCell: React.FC<RecordingHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Recording"
+            icon={<BiVideoRecording size={16} />}
             height={height}
             infoElement={
                 needsReset ? (
-                    <button
-                        onClick={(e) => {
+                    <Button
+                        variant="icon"
+                        onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             resetWindows();
                         }}
-                        className="p-1 rounded hover:bg-white/10 transition-colors text-text-disabled hover:text-text-muted"
+                        className="!text-text-disabled hover:!text-text-muted"
                         title="Reset to single window at 1× speed"
                     >
-                        <RiResetLeftFill size={13} />
-                    </button>
+                        <FaUndoAlt size={12} />
+                    </Button>
                 ) : null
             }
         />

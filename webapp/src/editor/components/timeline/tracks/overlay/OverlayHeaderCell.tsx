@@ -1,5 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
+import { LuLayers3 } from 'react-icons/lu';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 
 interface OverlayHeaderCellProps {
@@ -14,6 +15,7 @@ export const OverlayHeaderCell: React.FC<OverlayHeaderCellProps> = ({ height, is
     return (
         <TimelineHeaderCell
             title="Overlay"
+            icon={<LuLayers3 size={16} />}
             height={height}
             disabled={!overlayEnabled}
             isCollapsed={isCollapsed}

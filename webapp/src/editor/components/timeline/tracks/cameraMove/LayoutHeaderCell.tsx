@@ -1,4 +1,5 @@
 import React from 'react';
+import { PiWebcamBold } from 'react-icons/pi';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 import { CameraMoveTooltip } from '../../../shared/MediaTooltips';
@@ -14,7 +15,8 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
 
     return (
         <TimelineHeaderCell
-            title="Camera"
+            title="Layout"
+            icon={<PiWebcamBold size={16} />}
             height={height}
             disabled={!cameraMoveEnabled}
             isCollapsed={isCollapsed}
@@ -28,7 +30,7 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
                             className={`truncate select-none ${!cameraMoveEnabled ? 'text-text-muted' : 'text-text-main'}`}
                             style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
                         >
-                            Camera
+                            Layout
                         </span>
                     }
                 />

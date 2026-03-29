@@ -159,7 +159,8 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSi
     // Font
     const fontString = `${fontWeight} ${fontSizePx}px ${fontFamily}, sans-serif`;
     ctx.font = fontString;
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
 
     // Line wrapping
     const lineHeightPx = fontSizePx * 1.2;
@@ -180,8 +181,9 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSi
 
     // Fill text
     ctx.fillStyle = color;
+    const centerX = topLeft.x + widthPx / 2;
     lines.forEach((line, i) => {
-        ctx.fillText(line, topLeft.x, topLeft.y + i * lineHeightPx);
+        ctx.fillText(line, centerX, topLeft.y + i * lineHeightPx + lineHeightPx / 2);
     });
 
     ctx.restore();

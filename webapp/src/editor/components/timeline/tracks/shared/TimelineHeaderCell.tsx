@@ -1,8 +1,10 @@
 import React from 'react';
 import { MdVolumeUp, MdVolumeOff } from 'react-icons/md';
-import { IoEye, IoEyeOff } from 'react-icons/io5';
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
+import { Button } from '@shared/components';
 
 interface TimelineHeaderCellProps {
+    icon?: React.ReactNode;
     title: string;
     height: number;
     hasAudio?: boolean;
@@ -26,6 +28,7 @@ interface TimelineHeaderCellProps {
  * Provides consistent height, styling, and layout for all track headers.
  */
 export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
+    icon,
     title,
     height,
     hasAudio,
@@ -40,46 +43,55 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
 }) => {
     return (
         <div
-            className="flex items-center justify-between px-3 bg-surface-raised rounded-sm overflow-hidden mx-1"
+            className="flex items-center justify-between pl-3 pr-1 bg-surface-raised rounded-sm overflow-hidden mx-1"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
             {!isCollapsed && (
                 <>
-                    {titleElement ?? (
-                        <span
-                            className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
-                            style={{ fontSize: 14 }}
-                            title={title}
-                        >
-                            {title}
-                        </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {icon && (
+                            <span className={`flex-shrink-0 ${disabled ? 'text-text-muted' : 'text-text-main'}`}>
+                                {icon}
+                            </span>
+                        )}
+                        {titleElement ?? (
+                            <span
+                                className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
+                                style={{ fontSize: 14 }}
+                                title={title}
+                            >
+                                {title}
+                            </span>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-1">
                         {infoElement}
                         {hasAudio && onToggleMute && (
-                            <button
+                            <Button
+                                variant="icon"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onToggleMute();
                                 }}
-                                className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
+                                className={isMuted ? '!text-destructive' : ''}
                                 title={isMuted ? "Unmute" : "Mute"}
                             >
                                 {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
-                            </button>
+                            </Button>
                         )}
                         {onToggleApply !== undefined && (
-                            <button
+                            <Button
+                                variant="icon"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onToggleApply();
                                 }}
-                                className={`p-1 rounded hover:bg-white/10 transition-colors ${applyEnabled ? 'text-text-muted hover:text-text-highlighted' : 'text-text-disabled hover:text-text-muted'}`}
+                                className={!applyEnabled ? '!text-text-disabled hover:!text-text-muted' : '!text-text-muted hover:!text-text-highlighted'}
                                 title={applyEnabled ? 'Disable effect' : 'Enable effect'}
                             >
-                                {applyEnabled ? <IoEye size={13} /> : <IoEyeOff size={13} />}
-                            </button>
+                                {applyEnabled ? <AiOutlineEye size={14} /> : <AiOutlineEyeInvisible size={14} />}
+                            </Button>
                         )}
                     </div>
                 </>

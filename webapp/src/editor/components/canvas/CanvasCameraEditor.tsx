@@ -9,6 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { type RenderResources } from './PlaybackRenderer';
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { drawCamera } from '../../../core/painters/cameraPainter';
+import { drawOverlays } from '../../../core/painters/overlayPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 
 // ------------------------------------------------------------------
@@ -49,6 +50,14 @@ export const renderCameraEditor = (
                 effectiveViewport,
                 resources.deviceFrameImg
             );
+        }
+    }
+
+    // Render Overlays
+    if (project.settings.overlay?.enabled ?? true) {
+        const overlaySegments = project.timeline.overlaySegments || [];
+        if (overlaySegments.length > 0) {
+            drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
         }
     }
 

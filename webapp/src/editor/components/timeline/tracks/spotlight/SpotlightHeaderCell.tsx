@@ -1,4 +1,5 @@
 import React from 'react';
+import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 import { SpotlightTooltip } from '../../../shared/MediaTooltips';
@@ -15,6 +16,7 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Spotlight"
+            icon={<RiLightbulbFlashLine size={16} />}
             height={height}
             disabled={!spotlightEnabled}
             isCollapsed={isCollapsed}
