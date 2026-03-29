@@ -142,7 +142,7 @@ export const FaceAnchorModal: React.FC<{
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[800px]">
             <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-semibold border-b border-border pb-2">Adjust Face Anchor</h2>
+                <h2 className="text-lg font-semibold border-b border-border pb-2">Center Face</h2>
                 <p className="text-sm text-text-muted">
                     Drag the circle to center your face. We use this anchor to keep your face centered when you adjust size or crop zoom.
                 </p>

@@ -146,7 +146,7 @@ export const CameraSettings = () => {
                                 className="interactive-base flex items-center justify-center gap-2 w-full"
                             >
                                 <RiFocus3Line />
-                                Face Anchor
+                                Center Face
                             </button>
                         </div>
                         
