@@ -55,13 +55,15 @@ export function useOverlayHover(
             return;
         }
 
-        // Center a default-duration block on the cursor, clamped to [0, outputDuration].
-        const halfDuration = K_DEFAULT_TIMELINE_BLOCK_MS / 2;
-        let start = mouseTimeMs - halfDuration;
-        let end = mouseTimeMs + halfDuration;
+        // Start slightly before the cursor and extend right to match Spotlight/Zoom
+        const CURSOR_OVERLAP_MS = 100;
+        let start = Math.max(0, mouseTimeMs - CURSOR_OVERLAP_MS);
+        let end = start + K_DEFAULT_TIMELINE_BLOCK_MS;
 
-        if (start < 0) { start = 0; end = Math.min(K_DEFAULT_TIMELINE_BLOCK_MS, outputDuration); }
-        if (end > outputDuration) { end = outputDuration; start = Math.max(0, end - K_DEFAULT_TIMELINE_BLOCK_MS); }
+        if (end > outputDuration) {
+            end = outputDuration;
+            start = Math.max(0, end - K_DEFAULT_TIMELINE_BLOCK_MS);
+        }
 
         // Enforce minimum duration
         if (end - start < K_MIN_TIMELINE_BLOCK_MS) {

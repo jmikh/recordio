@@ -39,6 +39,7 @@ export const CanvasHoverLayer: React.FC = () => {
     const setCanvasMode    = useUIStore(s => s.setCanvasMode);
     const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
     const selectedOverlayId = useUIStore(s => s.selectedOverlaySegmentId);
+    const setSettingsPanelActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
 
     // Clear lingering hover state if camera or segment disappears while hovered
     // (e.g. during timeline scrub or playback)
@@ -138,8 +139,9 @@ export const CanvasHoverLayer: React.FC = () => {
             selectCameraMove(active.id);
         } else {
             setCanvasMode(CanvasMode.CameraEdit);
+            setSettingsPanelActiveTab('camera');
         }
-    }, [cameraMoveEnabled, project.timeline.cameraMoveSegments, currentTimeMs, selectCameraMove, setCanvasMode]);
+    }, [cameraMoveEnabled, project.timeline.cameraMoveSegments, currentTimeMs, selectCameraMove, setCanvasMode, setSettingsPanelActiveTab]);
 
     // ── Overlay hover targets ────────────────────────────────
     const overlayEnabled = project.settings.overlay?.enabled ?? true;

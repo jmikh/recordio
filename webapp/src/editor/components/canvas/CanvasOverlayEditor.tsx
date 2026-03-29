@@ -24,6 +24,7 @@ export const renderOverlayEditor = (
         project: Project,
         currentTimeMs: number,
         editingItemId: string | null,
+        overrideOverlayItem?: OverlayItem | null,
     }
 ) => {
     const { ctx, videoRefs } = resources;
@@ -43,8 +44,14 @@ export const renderOverlayEditor = (
         }
     }
 
-    // Draw non-editing overlay items (the editing item is rendered via HTML)
-    const overlaySegments = project.timeline.overlaySegments || [];
+    let overlaySegments = project.timeline.overlaySegments || [];
+    if (state.overrideOverlayItem && state.editingItemId) {
+        overlaySegments = overlaySegments.map(seg => 
+            (seg.item.id === state.editingItemId && state.overrideOverlayItem) 
+                ? { ...seg, item: state.overrideOverlayItem } 
+                : seg
+        );
+    }
     drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport, editingItemId);
 };
 
@@ -53,7 +60,7 @@ export const renderOverlayEditor = (
 // Shows bounding box / manipulation handles for the selected segment's single item.
 // ------------------------------------------------------------------
 
-export const OverlayEditor: React.FC = () => {
+export const OverlayEditor: React.FC<{ previewItemRef: React.MutableRefObject<OverlayItem | null> }> = ({ previewItemRef }) => {
     const displayMapper = useDisplayMapper();
     const project = useProjectStore(s => s.project);
     const outputSize = project.settings.outputSize;
@@ -103,6 +110,7 @@ export const OverlayEditor: React.FC = () => {
                     startInteraction={startInteraction}
                     endInteraction={endInteraction}
                     batchAction={batchAction}
+                    previewItemRef={previewItemRef}
                 />
             </div>
         </div>
@@ -121,24 +129,70 @@ interface OverlayItemEditorProps {
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;
+    previewItemRef: React.MutableRefObject<OverlayItem | null>;
 }
 
 const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
-    item, blockId, outputSize, updateItem, startInteraction, endInteraction, batchAction
+    item: storeItem, blockId, outputSize, updateItem, startInteraction, endInteraction, batchAction, previewItemRef
 }) => {
-    const handleRectChange = (rect: Rect) => {
-        batchAction(() => {
-            if (item.type === 'blur' || item.type === 'border') {
-                updateItem({ rectPx: rect } as Partial<OverlayItem>);
-            }
+    // We hold a local replica of the item to avoid modifying the global store at 60fps.
+    // This allows smooth dragging without triggering a full project re-render.
+    const [localItem, setLocalItem] = React.useState<OverlayItem>(storeItem);
+    const isDraggingRef = React.useRef(false);
+
+    // Sync with the store when not dragging (e.g., from undo/redo or right-panel edits)
+    useEffect(() => {
+        if (!isDraggingRef.current) {
+            setLocalItem(storeItem);
+            previewItemRef.current = null;
+        }
+    }, [storeItem, previewItemRef]);
+
+    const applyLocalUpdate = React.useCallback((updates: Partial<OverlayItem>) => {
+        setLocalItem(prev => {
+            const next = { ...prev, ...updates } as OverlayItem;
+            previewItemRef.current = next;
+            return next;
         });
+    }, [previewItemRef]);
+
+    const commitUpdate = React.useCallback((updates: Partial<OverlayItem>) => {
+        applyLocalUpdate(updates);
+        batchAction(() => {
+            updateItem(updates);
+        });
+        endInteraction();
+        isDraggingRef.current = false;
+        previewItemRef.current = null;
+    }, [applyLocalUpdate, batchAction, updateItem, endInteraction, previewItemRef]);
+
+    const handleStartDrag = React.useCallback(() => {
+        isDraggingRef.current = true;
+        startInteraction();
+    }, [startInteraction]);
+
+    const cancelInteraction = React.useCallback(() => {
+        endInteraction();
+        isDraggingRef.current = false;
+        previewItemRef.current = null;
+    }, [endInteraction, previewItemRef]);
+
+    useEffect(() => {
+        return () => { previewItemRef.current = null; };
+    }, [previewItemRef]);
+
+    const item = localItem; // Render UI using local interactive item
+
+    const handleRectChange = (rect: Rect) => {
+        if (item.type === 'blur' || item.type === 'border') {
+            applyLocalUpdate({ rectPx: rect } as Partial<OverlayItem>);
+        }
     };
 
     const handleRectCommit = (rect: Rect) => {
         if (item.type === 'blur' || item.type === 'border') {
-            updateItem({ rectPx: rect } as Partial<OverlayItem>);
+            commitUpdate({ rectPx: rect } as Partial<OverlayItem>);
         }
-        endInteraction();
     };
 
     switch (item.type) {
@@ -154,21 +208,18 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                     hideLinkToggle={item.type === 'blur'}
                     onChange={handleRectChange}
                     onCommit={handleRectCommit}
-                    onDragStart={startInteraction}
+                    onDragStart={handleStartDrag}
                     allowCornerEditing
                     cornerRadii={rectItem.borderRadiusPx}
                     onCornerRadiiChange={(radii) => {
-                        batchAction(() => {
-                            updateItem({
-                                borderRadiusPx: radii,
-                            } as Partial<OverlayItem>);
-                        });
-                    }}
-                    onCornerRadiiCommit={(radii) => {
-                        updateItem({
+                        applyLocalUpdate({
                             borderRadiusPx: radii,
                         } as Partial<OverlayItem>);
-                        endInteraction();
+                    }}
+                    onCornerRadiiCommit={(radii) => {
+                        commitUpdate({
+                            borderRadiusPx: radii,
+                        } as Partial<OverlayItem>);
                     }}
                 />
             );
@@ -177,10 +228,11 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
             return (
                 <InlineTextEditor
                     item={item as TextOverlayItem}
-                    blockId={blockId}
                     updateItem={updateItem}
-                    startInteraction={startInteraction}
-                    endInteraction={endInteraction}
+                    applyLocalUpdate={applyLocalUpdate}
+                    commitUpdate={commitUpdate}
+                    startInteraction={handleStartDrag}
+                    cancelInteraction={cancelInteraction}
                     batchAction={batchAction}
                 />
             );
@@ -189,11 +241,10 @@ const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
             return (
                 <ArrowPointHandles
                     item={item as ArrowOverlayItem}
-                    blockId={blockId}
-                    updateItem={updateItem}
-                    startInteraction={startInteraction}
-                    endInteraction={endInteraction}
-                    batchAction={batchAction}
+                    applyLocalUpdate={applyLocalUpdate}
+                    commitUpdate={commitUpdate}
+                    startInteraction={handleStartDrag}
+                    cancelInteraction={cancelInteraction}
                 />
             );
         }
@@ -210,12 +261,11 @@ const HANDLE_SIZE = 12;
 
 const ArrowPointHandles: React.FC<{
     item: ArrowOverlayItem;
-    blockId: string;
-    updateItem: (updates: Partial<OverlayItem>) => void;
+    applyLocalUpdate: (updates: Partial<OverlayItem>) => void;
+    commitUpdate: (updates: Partial<OverlayItem>) => void;
     startInteraction: () => void;
-    endInteraction: () => void;
-    batchAction: (fn: () => void) => void;
-}> = ({ item, blockId, updateItem, startInteraction, endInteraction, batchAction }) => {
+    cancelInteraction: () => void;
+}> = ({ item, applyLocalUpdate, commitUpdate, startInteraction, cancelInteraction }) => {
     const displayMapper = useDisplayMapper();
     const outputSize = displayMapper.outputSize;
 
@@ -238,26 +288,31 @@ const ArrowPointHandles: React.FC<{
         const startX = e.clientX;
         const startY = e.clientY;
         const startPoint = endpoint === 'tail' ? { ...item.tail } : { ...item.head };
+        
+        let lastUpdate: Partial<OverlayItem> | null = null;
 
         const onMove = (me: PointerEvent) => {
             const dx = (me.clientX - startX) * scale;
             const dy = (me.clientY - startY) * scale;
             const newPoint = clamp({ x: startPoint.x + dx, y: startPoint.y + dy });
-            batchAction(() => {
-                updateItem({ [endpoint]: newPoint } as Partial<OverlayItem>);
-            });
+            lastUpdate = { [endpoint]: newPoint } as Partial<OverlayItem>;
+            applyLocalUpdate(lastUpdate);
         };
 
         const onUp = () => {
             try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
-            endInteraction();
+            if (lastUpdate) {
+                commitUpdate(lastUpdate);
+            } else {
+                cancelInteraction(); // user just clicked
+            }
         };
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, startInteraction, applyLocalUpdate, commitUpdate, cancelInteraction]);
 
     // Drag entire arrow (both tail and head move together)
     const handleLineDrag = React.useCallback((e: React.PointerEvent) => {
@@ -273,29 +328,34 @@ const ArrowPointHandles: React.FC<{
         const startTail = { ...item.tail };
         const startHead = { ...item.head };
 
+        let lastUpdate: Partial<OverlayItem> | null = null;
+
         const onMove = (me: PointerEvent) => {
             const dx = (me.clientX - startX) * scale;
             const dy = (me.clientY - startY) * scale;
             const newTail = clamp({ x: startTail.x + dx, y: startTail.y + dy });
             const newHead = clamp({ x: startHead.x + dx, y: startHead.y + dy });
-            batchAction(() => {
-                updateItem({
-                    tail: newTail,
-                    head: newHead,
-                } as Partial<OverlayItem>);
-            });
+            lastUpdate = {
+                tail: newTail,
+                head: newHead,
+            } as Partial<OverlayItem>;
+            applyLocalUpdate(lastUpdate);
         };
 
         const onUp = () => {
             try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
-            endInteraction();
+            if (lastUpdate) {
+                commitUpdate(lastUpdate);
+            } else {
+                cancelInteraction();
+            }
         };
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, startInteraction, applyLocalUpdate, commitUpdate, cancelInteraction]);
 
     const tailDisplay = displayMapper.outputToDisplay({ ...item.tail, width: 0, height: 0 });
     const headDisplay = displayMapper.outputToDisplay({ ...item.head, width: 0, height: 0 });
@@ -362,12 +422,13 @@ const ArrowPointHandles: React.FC<{
 
 const InlineTextEditor: React.FC<{
     item: TextOverlayItem;
-    blockId: string;
     updateItem: (updates: Partial<OverlayItem>) => void;
+    applyLocalUpdate: (updates: Partial<OverlayItem>) => void;
+    commitUpdate: (updates: Partial<OverlayItem>) => void;
     startInteraction: () => void;
-    endInteraction: () => void;
+    cancelInteraction: () => void;
     batchAction: (fn: () => void) => void;
-}> = ({ item, blockId, updateItem, startInteraction, endInteraction, batchAction }) => {
+}> = ({ item, updateItem, applyLocalUpdate, commitUpdate, startInteraction, cancelInteraction, batchAction }) => {
     const displayMapper = useDisplayMapper();
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const textRef = React.useRef<HTMLDivElement>(null);
@@ -424,6 +485,8 @@ const InlineTextEditor: React.FC<{
             startPos: { ...item.topLeft },
         };
 
+        let lastUpdate: Partial<OverlayItem> | null = null;
+
         const onMove = (me: PointerEvent) => {
             if (!dragRef.current) return;
             const dx = (me.clientX - dragRef.current.startX) * outputScale;
@@ -432,9 +495,8 @@ const InlineTextEditor: React.FC<{
                 x: dragRef.current.startPos.x + dx,
                 y: dragRef.current.startPos.y + dy,
             };
-            batchAction(() => {
-                updateItem({ topLeft: newPos } as Partial<OverlayItem>);
-            });
+            lastUpdate = { topLeft: newPos } as Partial<OverlayItem>;
+            applyLocalUpdate(lastUpdate);
         };
 
         const onUp = () => {
@@ -442,12 +504,17 @@ const InlineTextEditor: React.FC<{
             dragRef.current = null;
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
-            endInteraction();
+            
+            if (lastUpdate) {
+                commitUpdate(lastUpdate);
+            } else {
+                cancelInteraction();
+            }
         };
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [isEditing, item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
+    }, [isEditing, item, displayMapper, startInteraction, applyLocalUpdate, commitUpdate, cancelInteraction]);
 
     // Double-click to enter edit mode
     const handleDoubleClick = React.useCallback((e: React.MouseEvent) => {
@@ -463,11 +530,13 @@ const InlineTextEditor: React.FC<{
         if (el) {
             const newText = el.textContent || '';
             if (newText !== item.text) {
-                updateItem({ text: newText } as Partial<OverlayItem>);
+                batchAction(() => {
+                    updateItem({ text: newText } as Partial<OverlayItem>);
+                });
             }
         }
         exitEditMode();
-    }, [item, updateItem, exitEditMode]);
+    }, [item, updateItem, batchAction, exitEditMode]);
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -521,23 +590,23 @@ const InlineTextEditor: React.FC<{
         const startWidth = item.widthPx;
         const startLeft = item.topLeft.x;
 
+        let lastUpdate: Partial<OverlayItem> | null = null;
+
         const onMove = (me: PointerEvent) => {
             const dxOutput = (me.clientX - startX) * outputScale;
             if (side === 'right') {
                 const newWidth = Math.max(20, startWidth + dxOutput);
-                batchAction(() => {
-                    updateItem({ widthPx: newWidth } as Partial<OverlayItem>);
-                });
+                lastUpdate = { widthPx: newWidth } as Partial<OverlayItem>;
+                applyLocalUpdate(lastUpdate);
             } else {
                 // Left edge: move topLeft.x and shrink width to keep right edge fixed
                 const newWidth = Math.max(20, startWidth - dxOutput);
                 const newLeft = startLeft + (startWidth - newWidth);
-                batchAction(() => {
-                    updateItem({
-                        topLeft: { x: newLeft, y: item.topLeft.y },
-                        widthPx: newWidth,
-                    } as Partial<OverlayItem>);
-                });
+                lastUpdate = {
+                    topLeft: { x: newLeft, y: item.topLeft.y },
+                    widthPx: newWidth,
+                } as Partial<OverlayItem>;
+                applyLocalUpdate(lastUpdate);
             }
         };
 
@@ -545,12 +614,17 @@ const InlineTextEditor: React.FC<{
             try { el.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
-            endInteraction();
+            
+            if (lastUpdate) {
+                commitUpdate(lastUpdate);
+            } else {
+                cancelInteraction();
+            }
         };
 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [item, displayMapper, updateItem, startInteraction, endInteraction, batchAction]);
+    }, [item, displayMapper, startInteraction, applyLocalUpdate, commitUpdate, cancelInteraction]);
 
     const HANDLE_W = 5;
     const HANDLE_H = 19;

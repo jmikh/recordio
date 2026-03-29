@@ -157,15 +157,9 @@ export const TimelineToolbar: React.FC = () => {
 
         const outputDuration = timeMapper.getOutputDuration();
         const defaultDuration = 3000;
-        const halfDuration = defaultDuration / 2;
+        let outputStart = currentTimeMs;
+        let outputEnd = currentTimeMs + defaultDuration;
 
-        let outputStart = currentTimeMs - halfDuration;
-        let outputEnd = currentTimeMs + halfDuration;
-
-        if (outputStart < 0) { 
-            outputStart = 0; 
-            outputEnd = Math.min(defaultDuration, outputDuration); 
-        }
         if (outputEnd > outputDuration) { 
             outputEnd = outputDuration; 
             outputStart = Math.max(0, outputEnd - defaultDuration); 

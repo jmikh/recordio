@@ -20,6 +20,7 @@ import { getDeviceFrame } from '../../../core/deviceFrames';
 import watermarkPng from '../../../assets/watermark.png';
 
 import type { CameraSettings, Rect, SourceMetadata } from '../../../types';
+import type { OverlayItem } from '../../../types/overlay';
 
 export const CanvasContainer = () => {
     const project = useProjectData();
@@ -72,6 +73,7 @@ export const CanvasContainer = () => {
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
     const previewZoomRectRef = useRef<Rect | null>(null);
     const previewSpotlightRectRef = useRef<Rect | null>(null);
+    const previewOverlayItemRef = useRef<OverlayItem | null>(null);
     const aspectWrapperRef = useRef<HTMLDivElement | null>(null);
 
     // Update canvas container size in UI store for DisplayMapper
@@ -289,6 +291,7 @@ export const CanvasContainer = () => {
                             project,
                             currentTimeMs: effectiveTimeMs,
                             editingItemId: overlayBlock?.item?.id ?? null,
+                            overrideOverlayItem: previewOverlayItemRef.current,
                         });
                     } else {
                         PlaybackRenderer.render(resources, {
@@ -514,7 +517,7 @@ export const CanvasContainer = () => {
 
                 {/* OVERLAY EDITOR */}
                 {canvasMode === CanvasMode.OverlayEdit && activeOverlayBlockId && (
-                    <OverlayEditor />
+                    <OverlayEditor previewItemRef={previewOverlayItemRef} />
                 )}
             </div>
         </div>

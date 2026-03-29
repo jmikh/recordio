@@ -31,7 +31,7 @@ const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
 
 // Hardcoded fallbacks for projects without saved defaults
 const BLUR_FALLBACK = { blurRadiusPx: 20 };
-const TEXT_FALLBACK = { color: '#ffffff', backgroundColor: '#00000080', fontSizePx: 0 };
+const TEXT_FALLBACK = { color: '#454545', backgroundColor: '#ffdb57', fontSizePx: 0 };
 const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4 };
 const BORDER_FALLBACK = { color: '#7B61FF', borderWidthPx: 4 };
 
@@ -53,11 +53,11 @@ export const createDefaultItem = (type: OverlayItemType, outputSize: Size, overl
         }
          case 'text': {
             const d = overlaySettings.textDefaults ?? TEXT_FALLBACK;
-            const fontSize = d.fontSizePx > 0 ? d.fontSizePx : Math.round(Math.min(W, H) * 0.05);
+            const fontSize = d.fontSizePx > 0 ? d.fontSizePx : Math.round(Math.min(W, H) * 0.025);
             return {
                 id, type: 'text', text: 'Text',
                 topLeft: { x: Math.round(W * 0.3), y: Math.round(H * 0.45) },
-                widthPx: Math.round(W * 0.4),
+                widthPx: Math.round(W * 0.2),
                 fontSizePx: fontSize, fontFamily: 'Inter', fontWeight: 400,
                 color: d.color, backgroundColor: d.backgroundColor,
             };

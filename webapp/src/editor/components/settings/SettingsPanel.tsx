@@ -16,7 +16,7 @@ import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
-import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick, TbDownload } from 'react-icons/tb';
+import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick } from 'react-icons/tb';
 import { PiWebcamBold } from 'react-icons/pi';
 import { FaChevronRight } from 'react-icons/fa';
 
@@ -209,7 +209,6 @@ export const SettingsPanel = () => {
                         onClick={() => useUIStore.getState().setExportModalOpen(true)}
                         className="text-sm shadow-sm"
                     >
-                        <TbDownload size={16} />
                         Export
                     </Button>
                 </div>
