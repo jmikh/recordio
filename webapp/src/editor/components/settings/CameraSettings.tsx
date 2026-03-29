@@ -1,21 +1,19 @@
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
-import { FaCheck, FaRegCircle, FaRegSquare } from 'react-icons/fa';
-import { FaArrowsUpDownLeftRight } from "react-icons/fa6";
+import { FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { MdAspectRatio } from 'react-icons/md';
-import { RiPaletteLine } from 'react-icons/ri';
+import { RiPaletteLine, RiFocus3Line } from 'react-icons/ri';
 import { TbShape, TbBorderOuter } from 'react-icons/tb';
+import { FaceAnchorModal } from './FaceAnchorModal';
+import { useState } from 'react';
 
 export const CameraSettings = () => {
     const project = useProjectStore(s => s.project);
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const setCanvasMode = useUIStore(s => s.setCanvasMode);
-    const canvasMode = useUIStore(s => s.canvasMode);
-    const isEditingCamera = canvasMode === CanvasMode.CameraEdit;
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Collapsible visibility state
@@ -23,6 +21,8 @@ export const CameraSettings = () => {
     const showCollapsibleShape = useUIStore(s => s.showCollapsibleShape);
     const showCollapsibleBorder = useUIStore(s => s.showCollapsibleBorder);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
+
+    const [isFaceAnchorOpen, setIsFaceAnchorOpen] = useState(false);
 
     const cameraConfig = project.settings.camera;
     const cameraSource = project.cameraSource;
@@ -139,17 +139,30 @@ export const CameraSettings = () => {
                             onChange={(val) => handleShapeChange(val as any)}
                         />
 
-                        {/* Adjust Button */}
+                        {/* Face Tracking Button */}
                         <div className="flex flex-col gap-1">
                             <button
-                                onClick={() => setCanvasMode(isEditingCamera ? CanvasMode.Preview : CanvasMode.CameraEdit)}
-                                className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCamera ? 'interactive-selected' : ''}`}
+                                onClick={() => setIsFaceAnchorOpen(true)}
+                                className="interactive-base flex items-center justify-center gap-2 w-full"
                             >
-                                {isEditingCamera ? <FaCheck /> : <FaArrowsUpDownLeftRight />}
-                                {isEditingCamera ? 'Done' : 'Adjust'}
+                                <RiFocus3Line />
+                                Face Anchor
                             </button>
-                            <span className="text-xs text-text-disabled text-center">Size, Position, Corner Radius</span>
                         </div>
+                        
+                        {/* Crop Zoom - zooms within the camera video feed */}
+                        <Slider
+                            label="Crop Zoom"
+                            min={1}
+                            max={3}
+                            value={cropZoom}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, cropZoom: val } }))}
+                            showTooltip
+                            units="x"
+                            decimals={1}
+                        />
                     </div>
                 </CollapsibleCard>
 
@@ -171,20 +184,6 @@ export const CameraSettings = () => {
                             label="Mirror"
                             value={mirrored}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, mirrored: val } })}
-                        />
-
-                        {/* Crop Zoom - zooms within the camera video feed */}
-                        <Slider
-                            label="Crop Zoom"
-                            min={1}
-                            max={3}
-                            value={cropZoom}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, cropZoom: val } }))}
-                            showTooltip
-                            units="x"
-                            decimals={1}
                         />
 
                         {/* Auto Shrink */}
@@ -298,6 +297,11 @@ export const CameraSettings = () => {
                     </div>
                 </CollapsibleCard>
             </div>
+
+            <FaceAnchorModal 
+                isOpen={isFaceAnchorOpen} 
+                onClose={() => setIsFaceAnchorOpen(false)} 
+            />
         </div>
     );
 };

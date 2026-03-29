@@ -78,6 +78,20 @@ export function drawCamera(
         sh = zoomedH;
     }
 
+    // Apply Face Anchor Centering if defined
+    if (settings.faceCenter) {
+        // faceCenter is normalized [0, 1] relative to inputSize
+        const fcX = settings.faceCenter.x * inputSize.width;
+        const fcY = settings.faceCenter.y * inputSize.height;
+
+        sx = fcX - (sw / 2);
+        sy = fcY - (sh / 2);
+
+        // Clamp to ensure we don't draw outside source video bounds and show empty pixels
+        sx = Math.max(0, Math.min(sx, inputSize.width - sw));
+        sy = Math.max(0, Math.min(sy, inputSize.height - sh));
+    }
+
     // Scale effect properties relative to output height
     const effectScale = outputSize ? outputSize.height / REF_OUTPUT_HEIGHT : 1;
 

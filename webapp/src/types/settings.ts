@@ -47,6 +47,9 @@ export interface CameraSettings extends StyleSettings {
     /** Zoom/crop within the camera video feed (1x = no crop, 3x = 3x zoom) */
     cropZoom: number;
 
+    /** Face Tracking anchoring: Normalized (0-1) coordinates from original video center */
+    faceCenter?: { x: number, y: number };
+
     /** Enable auto-shrink when screen is zoomed in */
     autoShrink: boolean;
 
