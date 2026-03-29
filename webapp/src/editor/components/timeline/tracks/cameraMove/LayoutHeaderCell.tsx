@@ -10,6 +10,7 @@ interface LayoutHeaderCellProps {
 
 export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCollapsed }) => {
     const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
+    const toggleCameraMoveEnabled = useProjectStore(s => s.toggleCameraMoveEnabled);
 
     return (
         <TimelineHeaderCell
@@ -17,6 +18,8 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
             height={height}
             disabled={!cameraMoveEnabled}
             isCollapsed={isCollapsed}
+            applyEnabled={cameraMoveEnabled}
+            onToggleApply={toggleCameraMoveEnabled}
             titleElement={
                 <CameraMoveTooltip
                     placement="top-right"

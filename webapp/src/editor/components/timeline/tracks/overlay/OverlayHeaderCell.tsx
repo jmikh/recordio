@@ -9,6 +9,7 @@ interface OverlayHeaderCellProps {
 
 export const OverlayHeaderCell: React.FC<OverlayHeaderCellProps> = ({ height, isCollapsed }) => {
     const overlayEnabled = useProjectStore(s => s.project.settings.overlay?.enabled ?? true);
+    const toggleOverlayEnabled = useProjectStore(s => s.toggleOverlayEnabled);
 
     return (
         <TimelineHeaderCell
@@ -16,6 +17,8 @@ export const OverlayHeaderCell: React.FC<OverlayHeaderCellProps> = ({ height, is
             height={height}
             disabled={!overlayEnabled}
             isCollapsed={isCollapsed}
+            applyEnabled={overlayEnabled}
+            onToggleApply={toggleOverlayEnabled}
         />
     );
 };

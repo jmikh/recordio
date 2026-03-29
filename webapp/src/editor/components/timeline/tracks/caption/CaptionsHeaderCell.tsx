@@ -9,6 +9,11 @@ interface CaptionsHeaderCellProps {
 
 export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height, isCollapsed }) => {
     const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
+    const toggleCaptionsEnabled = () => {
+        const state = useProjectStore.getState();
+        const captions = state.project.settings.captions;
+        state.updateSettings({ captions: { ...captions, enabled: !(captions.enabled ?? true) } });
+    };
 
     return (
         <TimelineHeaderCell
@@ -16,6 +21,8 @@ export const CaptionsHeaderCell: React.FC<CaptionsHeaderCellProps> = ({ height, 
             height={height}
             disabled={!captionsEnabled}
             isCollapsed={isCollapsed}
+            applyEnabled={captionsEnabled}
+            onToggleApply={toggleCaptionsEnabled}
         />
     );
 };

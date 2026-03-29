@@ -13,7 +13,7 @@ import { renderCropEditor, CropEditor } from './CanvasCropEditor';
 import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEditor';
 import { OverlayEditor, renderOverlayEditor } from './CanvasOverlayEditor';
-import { OverlayHoverLayer } from './OverlayHoverLayer';
+import { CanvasHoverLayer } from './CanvasHoverLayer';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
 import { drawWatermark } from '../../../core/painters/watermarkPainter';
 import { getDeviceFrame } from '../../../core/deviceFrames';
@@ -480,8 +480,8 @@ export const CanvasContainer = () => {
                     className="block w-full h-full object-contain"
                 />
 
-                {/* Overlay hover targets (always-on background layer) */}
-                <OverlayHoverLayer />
+                {/* Canvas hover targets (camera first, then overlays) */}
+                <CanvasHoverLayer />
 
                 {/* CROP OVERLAY (Highest Priority) */}
                 {canvasMode === CanvasMode.CropEdit && (

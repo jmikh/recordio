@@ -10,6 +10,7 @@ interface SpotlightHeaderCellProps {
 
 export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height, isCollapsed }) => {
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
+    const toggleSpotlightEnabled = useProjectStore(s => s.toggleSpotlightEnabled);
 
     return (
         <TimelineHeaderCell
@@ -17,6 +18,8 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
             height={height}
             disabled={!spotlightEnabled}
             isCollapsed={isCollapsed}
+            applyEnabled={spotlightEnabled}
+            onToggleApply={toggleSpotlightEnabled}
             titleElement={
                 <SpotlightTooltip
                     placement="top-right"

@@ -1,5 +1,6 @@
 import React from 'react';
 import { MdVolumeUp, MdVolumeOff } from 'react-icons/md';
+import { IoEye, IoEyeOff } from 'react-icons/io5';
 
 interface TimelineHeaderCellProps {
     title: string;
@@ -15,6 +16,9 @@ interface TimelineHeaderCellProps {
     disabled?: boolean;
     /** When true, shows a compact "…" placeholder instead of full header content */
     isCollapsed?: boolean;
+    /** When provided, renders an eye icon button to toggle the apply state */
+    applyEnabled?: boolean;
+    onToggleApply?: () => void;
 }
 
 /**
@@ -31,38 +35,54 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
     titleElement,
     disabled,
     isCollapsed = false,
+    applyEnabled,
+    onToggleApply,
 }) => {
     return (
         <div
             className="flex items-center justify-between px-3 bg-surface-raised rounded-sm overflow-hidden mx-1"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
-            {titleElement ?? (
-                <span
-                    className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
-                    style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
-                    title={title}
-                >
-                    {title}
-                </span>
-            )}
-
             {!isCollapsed && (
-                <div className="flex items-center gap-1">
-                    {infoElement}
-                    {hasAudio && onToggleMute && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleMute();
-                            }}
-                            className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
-                            title={isMuted ? "Unmute" : "Mute"}
+                <>
+                    {titleElement ?? (
+                        <span
+                            className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
+                            style={{ fontSize: 14 }}
+                            title={title}
                         >
-                            {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
-                        </button>
+                            {title}
+                        </span>
                     )}
-                </div>
+
+                    <div className="flex items-center gap-1">
+                        {infoElement}
+                        {hasAudio && onToggleMute && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleMute();
+                                }}
+                                className={`p-1 rounded hover:bg-white/10 transition-colors ${isMuted ? 'text-destructive' : 'text-text-main hover:text-text-highlighted'}`}
+                                title={isMuted ? "Unmute" : "Mute"}
+                            >
+                                {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
+                            </button>
+                        )}
+                        {onToggleApply !== undefined && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleApply();
+                                }}
+                                className={`p-1 rounded hover:bg-white/10 transition-colors ${applyEnabled ? 'text-text-muted hover:text-text-highlighted' : 'text-text-disabled hover:text-text-muted'}`}
+                                title={applyEnabled ? 'Disable effect' : 'Enable effect'}
+                            >
+                                {applyEnabled ? <IoEye size={13} /> : <IoEyeOff size={13} />}
+                            </button>
+                        )}
+                    </div>
+                </>
             )}
         </div>
     );

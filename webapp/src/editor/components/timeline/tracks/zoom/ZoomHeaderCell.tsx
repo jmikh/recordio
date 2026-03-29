@@ -9,6 +9,7 @@ interface ZoomHeaderCellProps {
 
 export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollapsed }) => {
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
+    const toggleZoomEnabled = useProjectStore(s => s.toggleZoomEnabled);
 
     return (
         <TimelineHeaderCell
@@ -16,6 +17,8 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollap
             height={height}
             disabled={!zoomEnabled}
             isCollapsed={isCollapsed}
+            applyEnabled={zoomEnabled}
+            onToggleApply={toggleZoomEnabled}
         />
     );
 };

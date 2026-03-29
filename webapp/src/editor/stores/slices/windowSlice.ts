@@ -10,6 +10,7 @@ export interface WindowSlice {
     splitWindow: (windowId: ID, splitTimeMs: number) => void;
     mergeWindows: (keepId: ID, removeId: ID) => void;
     setOutputWindows: (windows: OutputWindow[]) => void;
+    resetWindows: () => void;
 }
 
 const getWindowDuration = (w: OutputWindow) => {
@@ -148,6 +149,24 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             const sortedWindows = [...windows].sort((a, b) => a.startMs - b.startMs);
             return { project: applyNewWindows(state.project, sortedWindows) };
         });
-    }
+    },
+
+    resetWindows: () => {
+        set((state) => {
+            const currentWindows = state.project.timeline.outputWindows;
+            if (currentWindows.length === 0) return state;
+
+            const sourceDurationMs = state.project.timeline.durationMs;
+
+            const resetWindow: OutputWindow = {
+                id: currentWindows[0].id,
+                startMs: 0,
+                endMs: sourceDurationMs,
+                speed: 1.0,
+            };
+
+            return { project: applyNewWindows(state.project, [resetWindow]) };
+        });
+    },
 
 });

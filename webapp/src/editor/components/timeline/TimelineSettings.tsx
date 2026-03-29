@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdOutlineSettingsInputComponent } from 'react-icons/md';
+import { MdKeyboardArrowUp } from 'react-icons/md';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { Checkbox, Toggle } from '@shared/components';
@@ -10,9 +10,7 @@ interface TrackConfig {
     showKey: keyof DisplaySettings;
     label: string;
     requiresCamera?: boolean;
-    /** Selector to read the enabled state from ProjectStore */
     getEnabled: (s: any) => boolean;
-    /** Action to toggle enabled state */
     toggle: () => void;
 }
 
@@ -71,7 +69,6 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const toggleTracksCollapsed = useUIStore(s => s.toggleTracksCollapsed);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
 
-    // Read enabled states from ProjectStore
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
     const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
@@ -92,6 +89,9 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         showCameraMove: cameraMoveEnabled,
         showOverlay: overlayEnabled,
     };
+
+    const visibleCount = tracks.filter(t => displaySettings[t.showKey] as boolean).length;
+    const totalCount = tracks.length;
 
     // Calculate menu position when opening
     useEffect(() => {
@@ -132,14 +132,10 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
             style={menuStyle}
         >
             {/* Header */}
-            <div className="text-sm font-medium text-text-highlighted mb-2">Timeline Settings</div>
+            <div className="text-sm font-medium text-text-highlighted mb-2">Timeline Tracks</div>
 
             {/* Column headers */}
-            <div className="flex items-center gap-2 mb-1">
-                <span className="flex-1"></span>
-                <span className="w-10 text-center text-xs text-text-disabled">Show</span>
-                <span className="w-10 text-center text-xs text-text-disabled">Apply</span>
-            </div>
+
 
             {/* Track rows */}
             <div className="flex flex-col">
@@ -148,10 +144,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
                     const isEnabled = enabledMap[showKey] ?? true;
 
                     return (
-                        <div
-                            key={showKey}
-                            className="flex items-center gap-2 py-1.5"
-                        >
+                        <div key={showKey} className="flex items-center gap-2 py-1.5">
                             <span className={`flex-1 text-sm ${isEnabled ? 'text-text-muted' : 'text-text-disabled'}`}>
                                 {label}
                             </span>
@@ -161,22 +154,11 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
                                     onChange={() => setTrackShow(showKey, !isVisible)}
                                 />
                             </div>
-                            <div className="w-10 flex justify-center">
-                                <Checkbox
-                                    checked={isEnabled}
-                                    onChange={() => toggle()}
-                                />
-                            </div>
                         </div>
                     );
                 })}
             </div>
 
-            {/* Helper text */}
-            <div className="mt-2 flex flex-col gap-0.5 subtext">
-                <span><span className="font-medium">Show</span> — display track in timeline</span>
-                <span><span className="font-medium">Apply</span> — apply effects during playback</span>
-            </div>
 
             {/* Divider */}
             <div className="border-t border-border my-2.5" />
@@ -194,10 +176,36 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         <div ref={triggerRef} className="relative w-full" style={{ height }}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-highlighted hover:scale-115 transition-all cursor-pointer select-none"
+                className="flex items-center justify-between w-full h-full px-3 text-text-muted hover:text-text-highlighted hover:bg-white/5 transition-all cursor-pointer select-none group"
                 title="Track settings"
             >
-                <MdOutlineSettingsInputComponent size={18} />
+                {/* Track dots — filled = visible, empty = hidden */}
+                <div className="flex items-center gap-[3px]">
+                    {tracks.map(t => {
+                        const isVisible = displaySettings[t.showKey] as boolean;
+                        return (
+                            <div
+                                key={t.showKey}
+                                className={`w-[5px] h-[5px] rounded-full transition-colors ${
+                                    isVisible
+                                        ? 'bg-text-muted group-hover:bg-text-highlighted'
+                                        : 'bg-border'
+                                }`}
+                            />
+                        );
+                    })}
+                </div>
+
+                {/* Count + animated chevron */}
+                <div className="flex items-center gap-0.5">
+                    <span className="text-[10px] tabular-nums leading-none">
+                        {visibleCount}/{totalCount}
+                    </span>
+                    <MdKeyboardArrowUp
+                        size={12}
+                        className={`transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
+                    />
+                </div>
             </button>
 
             {/* Portal-rendered popover */}

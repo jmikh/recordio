@@ -31,7 +31,7 @@ import { useUIStore } from '../../stores/useUIStore';
 
 
 // Constants
-const HEADER_WIDTH = 120;
+const HEADER_WIDTH = 152;
 const RULER_HEIGHT = 26; // 24px canvas + 2px borders (border-t + border-b on ruler wrapper)
 const SCROLLBAR_GUTTER = 8; // Space below tracks so horizontal scrollbar doesn't overlap bottom track
 const TRANSITION_STYLE = 'height 150ms ease';
