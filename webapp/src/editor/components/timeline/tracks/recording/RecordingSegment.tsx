@@ -91,8 +91,13 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
 
     return (
         <div
-            className={`absolute [--block-bg:var(--primary)] group`}
-            style={{ left: `${left}px`, width: `${width}px`, height: trackContentHeight }}
+            className={`absolute z-10 hover:z-[15] [--block-bg:var(--primary)] ${!isSelected ? 'hover:[--block-bg:var(--primary-highlighted)]' : ''} group`}
+            style={{ 
+                left: `${left}px`, 
+                width: `${width}px`, 
+                height: trackContentHeight,
+                zIndex: isSelected ? 20 : undefined
+            }}
             onMouseDown={() => {
                 // Just handle selection (no deselect on re-click)
                 // Let event bubble up to Timeline for CTI movement
@@ -152,7 +157,10 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                     top: -1,
                     bottom: -1,
                 }}
-                onMouseDown={(e) => handleDragStart(e, seg.id, 'left')}
+                onMouseDown={(e) => {
+                    selectWindow(seg.id);
+                    handleDragStart(e, seg.id, 'left');
+                }}
             >
                 <div
                     className={`${dragHandleIndicator.base} ${dragHandleIndicator.leftClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}
@@ -169,7 +177,10 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                     top: -1,
                     bottom: -1,
                 }}
-                onMouseDown={(e) => handleDragStart(e, seg.id, 'right')}
+                onMouseDown={(e) => {
+                    selectWindow(seg.id);
+                    handleDragStart(e, seg.id, 'right');
+                }}
             >
                 <div
                     className={`${dragHandleIndicator.base} ${dragHandleIndicator.rightClass} ${isSelected ? dragHandleIndicator.selectedClass : dragHandleIndicator.defaultClass}`}

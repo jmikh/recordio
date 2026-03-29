@@ -2,7 +2,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Slider, MultiToggle, Toggle, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { Button, Slider, MultiToggle, Toggle, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
 import { FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { MdAspectRatio } from 'react-icons/md';
@@ -141,13 +141,13 @@ export const CameraSettings = () => {
 
                         {/* Face Tracking Button */}
                         <div className="flex flex-col gap-1">
-                            <button
+                            <Button
                                 onClick={() => setIsFaceAnchorOpen(true)}
-                                className="interactive-base flex items-center justify-center gap-2 w-full"
+                                fullWidth
                             >
                                 <RiFocus3Line />
                                 Center Face
-                            </button>
+                            </Button>
                         </div>
                         
                         {/* Crop Zoom - zooms within the camera video feed */}

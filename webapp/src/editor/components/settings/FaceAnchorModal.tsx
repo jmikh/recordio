@@ -142,7 +142,7 @@ export const FaceAnchorModal: React.FC<{
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[800px]">
             <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-semibold border-b border-border pb-2">Center Face</h2>
+                <h2 className="text-lg font-semibold text-text-main border-b border-border pb-2">Center Face</h2>
                 <p className="text-sm text-text-muted">
                     Drag the circle to center your face. We use this anchor to keep your face centered when you adjust size or crop zoom.
                 </p>
@@ -167,7 +167,7 @@ export const FaceAnchorModal: React.FC<{
 
                     {/* Draggable Face Circle Tracker */}
                     <div 
-                        className="absolute rounded-full border-2 border-primary shadow-lg"
+                        className="absolute rounded-full border-2 border-primary bg-primary/20 shadow-lg"
                         style={{
                             left: `${localCenter.x * 100}%`,
                             top: `${localCenter.y * 100}%`,
@@ -175,7 +175,6 @@ export const FaceAnchorModal: React.FC<{
                             // to make it a perfect circle visually, we need aspect-ratio 1:1, and height auto
                             aspectRatio: '1',
                             transform: 'translate(-50%, -50%)',
-                            backgroundColor: 'rgba(123, 97, 255, 0.2)',
                             backdropFilter: 'brightness(1.1)',
                             cursor: isDragging ? 'grabbing' : 'grab'
                         }}
@@ -187,8 +186,8 @@ export const FaceAnchorModal: React.FC<{
                 </div>
 
                 <div className="flex justify-end gap-2 mt-2">
-                    <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                    <Button variant="primary" onClick={handleSave}>Save Anchor</Button>
+                    <Button onClick={onClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleSave}>Save</Button>
                 </div>
             </div>
         </Modal>
