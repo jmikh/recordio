@@ -6,11 +6,15 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { FaScissors } from 'react-icons/fa6';
+import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
+import { RiArrowRightUpFill } from 'react-icons/ri';
 import { Slider, Button, Tooltip, AiAudioIcon } from '@shared/components';
 import { useToast } from '../Toast';
 import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
+import { createDefaultItem } from '../settings/OverlayInspector';
+import type { OverlayItemType, OverlaySegment } from '../../../types/overlay';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
@@ -146,6 +150,44 @@ export const TimelineToolbar: React.FC = () => {
         splitWindow(win.id, win.startMs + sourceOffset);
     };
 
+    const handleAddOverlay = useCallback((type: OverlayItemType) => {
+        const outputSize = useProjectStore.getState().project.settings.outputSize;
+        const overlaySettings = useProjectStore.getState().project.settings.overlay as any;
+        const item = createDefaultItem(type, outputSize, overlaySettings);
+
+        const outputDuration = timeMapper.getOutputDuration();
+        const defaultDuration = 3000;
+        const halfDuration = defaultDuration / 2;
+
+        let outputStart = currentTimeMs - halfDuration;
+        let outputEnd = currentTimeMs + halfDuration;
+
+        if (outputStart < 0) { 
+            outputStart = 0; 
+            outputEnd = Math.min(defaultDuration, outputDuration); 
+        }
+        if (outputEnd > outputDuration) { 
+            outputEnd = outputDuration; 
+            outputStart = Math.max(0, outputEnd - defaultDuration); 
+        }
+
+        const sourceStart = timeMapper.mapOutputToSourceTime(outputStart);
+        const sourceEnd = timeMapper.mapOutputToSourceTime(outputEnd);
+
+        const newSegment: OverlaySegment = {
+            id: crypto.randomUUID(),
+            sourceStartTimeMs: sourceStart,
+            sourceEndTimeMs: sourceEnd,
+            outputStartTimeMs: outputStart,
+            outputEndTimeMs: outputEnd,
+            visible: true,
+            item,
+        };
+
+        useProjectStore.getState().addOverlaySegment(newSegment);
+        useUIStore.getState().selectOverlaySegment(newSegment.id);
+    }, [currentTimeMs, timeMapper]);
+
     const onTogglePlay = () => {
         if (!isPlaying && useUIStore.getState().currentTimeMs >= timeMapper.outputDuration) {
             useUIStore.getState().setCurrentTime(0);
@@ -225,6 +267,29 @@ export const TimelineToolbar: React.FC = () => {
                         </Button>
                     </Tooltip>
                 )}
+
+                <div className="w-px h-5 bg-border mx-1" />
+
+                <Tooltip text="Add Blur" position="top-start">
+                    <Button variant="icon" onClick={() => handleAddOverlay('blur')}>
+                        <MdBlurOn size={16} />
+                    </Button>
+                </Tooltip>
+                <Tooltip text="Add Text" position="top-start">
+                    <Button variant="icon" onClick={() => handleAddOverlay('text')}>
+                        <MdOutlineTextFields size={16} />
+                    </Button>
+                </Tooltip>
+                <Tooltip text="Add Arrow" position="top-start">
+                    <Button variant="icon" onClick={() => handleAddOverlay('arrow')}>
+                        <RiArrowRightUpFill size={16} />
+                    </Button>
+                </Tooltip>
+                <Tooltip text="Add Outline" position="top-start">
+                    <Button variant="icon" onClick={() => handleAddOverlay('border')}>
+                        <MdBorderOuter size={16} />
+                    </Button>
+                </Tooltip>
             </div>
 
             {/* Center: play button + time */}

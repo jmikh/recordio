@@ -25,7 +25,7 @@ export const SettingsPanel = {
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio' | 'export';
+export type SettingsPanelTab = 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -56,6 +56,10 @@ export interface UIState {
     // Timeline State
     timelineContainerRef: React.RefObject<HTMLDivElement | null> | null;
     setTimelineContainerRef: (ref: React.RefObject<HTMLDivElement | null> | null) => void;
+
+    // Export Modal State
+    isExportModalOpen: boolean;
+    setExportModalOpen: (isOpen: boolean) => void;
     pixelsPerSec: number;
     setPixelsPerSec: (pps: number) => void;
 
@@ -149,7 +153,10 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedOverlaySegmentId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
+    isExportModalOpen: false,
     isResizingWindow: false,
+
+    setExportModalOpen: (isExportModalOpen) => set({ isExportModalOpen }),
 
     setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
 

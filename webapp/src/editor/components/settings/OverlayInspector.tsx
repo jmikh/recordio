@@ -35,7 +35,7 @@ const TEXT_FALLBACK = { color: '#ffffff', backgroundColor: '#00000080', fontSize
 const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4 };
 const BORDER_FALLBACK = { color: '#7B61FF', borderWidthPx: 4 };
 
-const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySettings: OverlaySettings): OverlayItem => {
+export const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySettings: OverlaySettings): OverlayItem => {
     const id = crypto.randomUUID();
     const { width: W, height: H } = outputSize;
 

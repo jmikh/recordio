@@ -6,9 +6,8 @@ import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
-import { ExportSettings } from './ExportSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
-import { Scrollbar } from '@shared/components';
+import { Scrollbar, Button } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
@@ -105,11 +104,6 @@ export const SettingsPanel = () => {
                 label: 'Audio',
                 icon: <TbMusic size={20} />,
             },
-            {
-                id: 'export' as const,
-                label: 'Export',
-                icon: <TbDownload size={20} />,
-            },
         ];
         return items;
     }, [hasCameraSource, hasMicrophone]);
@@ -149,7 +143,8 @@ export const SettingsPanel = () => {
         <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
             <div className="flex flex-1 min-h-0">
             {/* Sidebar Navigation */}
-            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col gap-0.5 py-6 pl-0 pr-3 border-r border-border">
+            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col py-6 pl-0 pr-3 border-r border-border">
+                <div className="flex flex-col gap-0.5 flex-1">
                 {/* Sliding accent bar — hidden when inspector is active */}
                 {!hasSelection && (
                     <div
@@ -206,6 +201,19 @@ export const SettingsPanel = () => {
                         </button>
                     );
                 })}
+
+                <div className="mt-2 mx-3">
+                    <Button
+                        variant="primary"
+                        fullWidth
+                        onClick={() => useUIStore.getState().setExportModalOpen(true)}
+                        className="text-sm shadow-sm"
+                    >
+                        <TbDownload size={16} />
+                        Export
+                    </Button>
+                </div>
+                </div>
             </nav>
 
             {/* Content Area */}
@@ -231,7 +239,6 @@ export const SettingsPanel = () => {
                             {activeTab === 'effects' && <EffectsSettings />}
                             {activeTab === 'captions' && <CaptionsSettings />}
                             {activeTab === 'audio' && <AudioSettingsPanel />}
-                            {activeTab === 'export' && <ExportSettings />}
                         </>
                     )}
                 </div>

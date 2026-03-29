@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const CF_API_TOKEN = Deno.env.get('CF_STREAM_API_TOKEN')!;
 const CF_ACCOUNT_ID = Deno.env.get('CF_STREAM_ACCOUNT_ID')!;
 
-const MAX_SHARED_VIDEOS = 5;
+const MAX_SHARED_VIDEOS = 10;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',

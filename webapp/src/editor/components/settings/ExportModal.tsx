@@ -3,7 +3,7 @@ import { timeAgo } from '../../../utils/timeAgo';
 import * as Sentry from '@sentry/react';
 
 import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
-import { CollapsibleCard, MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge } from '@shared/components';
+import { MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge, Modal, XButton } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -50,8 +50,10 @@ function formatTrialRemaining(endDate: Date | null): string {
     return `${days} days left`;
 }
 
-export function ExportSettings() {
+export function ExportModal() {
     const { addToast } = useToast();
+    const isOpen = useUIStore(s => s.isExportModalOpen);
+    const setExportModalOpen = useUIStore(s => s.setExportModalOpen);
 
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('720p');
     const [selectedFps, setSelectedFps] = useState<ExportFps>(30);
@@ -406,13 +408,17 @@ export function ExportSettings() {
     const busy = isExporting || isPublishing;
 
     return (
-        <div className="flex flex-col gap-3 text-sm text-text-main">
-            <CollapsibleCard
-                title="Export Settings"
-                icon={<TbSettings2 size={16} />}
-                notCollapsible
-            >
-                <div className="flex flex-col gap-4">
+        <Modal isOpen={isOpen} onClose={() => setExportModalOpen(false)} maxWidth="max-w-[480px]">
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-text-main flex items-center gap-2">
+                    <TbDownload size={20} />
+                    Export Project
+                </h2>
+                <XButton onClick={() => setExportModalOpen(false)} />
+            </div>
+
+            <div className="flex flex-col gap-6 text-sm text-text-main overflow-y-auto max-h-[70vh] custom-scrollbar pr-2">
+                <div className="flex flex-col gap-5">
                     {/* Quality Selection */}
                     <div className="flex items-center gap-3">
                         <span className="text-sm text-text-muted w-1/3 shrink-0">Quality</span>
@@ -550,16 +556,16 @@ export function ExportSettings() {
                         </div>
                     )}
                 </div>
-            </CollapsibleCard>
 
-            {/* Advanced Export Settings */}
-            <CollapsibleCard
-                title="Advanced"
-                icon={<TbSettings2 size={16} />}
-                isExpanded={useUIStore((s) => s.showCollapsibleAdvancedExport)}
-                onExpandChange={(open: boolean) => useUIStore.getState().setCollapsibleVisibility('showCollapsibleAdvancedExport', open)}
-            >
-                <div className="flex flex-col gap-3">
+                <div className="h-[1px] w-full bg-border opacity-50 my-1" />
+
+                {/* Advanced Settings */}
+                <div className="flex flex-col gap-4">
+                    <h3 className="font-medium text-text-highlighted flex items-center gap-2">
+                        <TbSettings2 size={16} />
+                        Advanced
+                    </h3>
+                    <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-text-muted shrink-0">Video Decoding</span>
@@ -576,8 +582,9 @@ export function ExportSettings() {
                             Controls how video frames are decoded during export — <span className="font-semibold text-text-muted">this has no effect on the final video quality.</span> CPU works best for most machines. GPU may speed things up on high-end hardware, but some browser and OS combinations don't support it reliably. When in doubt, leave it on CPU.
                         </p>
                     </div>
+                    </div>
                 </div>
-            </CollapsibleCard>
+            </div>
 
             {/* Modals */}
             <AuthModal
@@ -595,6 +602,6 @@ export function ExportSettings() {
                 isOpen={isReviewModalOpen}
                 onClose={() => setIsReviewModalOpen(false)}
             />
-        </div>
+        </Modal>
     );
 }

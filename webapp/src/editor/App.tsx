@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
+import { ExportModal } from './components/settings/ExportModal';
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
 import { TimelineToolbar } from './components/timeline/TimelineToolbar';
@@ -343,6 +344,7 @@ function Editor() {
 
             <div id="editor-body" className="flex-1 flex overflow-hidden">
                 <SettingsPanel />
+                <ExportModal />
                 <div
                     id="video-player-container"
                     className="flex-1 flex overflow-hidden relative items-center justify-center"
