@@ -3,11 +3,8 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useToast } from '../Toast';
 import { Slider, Tooltip, CollapsibleCard, Checkbox, Button } from '@shared/components';
-import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
-import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import type { OutputWindow } from '../../../types';
 import { PiVideoBold } from 'react-icons/pi';
-import { HiSparkles } from 'react-icons/hi2';
 
 export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
@@ -16,19 +13,6 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
     const screenDurationMs = useProjectStore(s => s.project.screenSource.durationMs);
     const { batchAction } = useHistoryBatcher();
-
-    // AutoCut sources
-    const userEvents = useProjectStore(s => s.userEvents);
-    const screenSource = useProjectStore(s => s.project.screenSource);
-    const cameraSource = useProjectStore(s => s.project.cameraSource);
-    const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);
-    const { addToast, updateToast, removeToast } = useToast();
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-    const micSource = useProjectStore(s => s.project.microphoneSource);
-    const hasMic = !!micSource?.runtimeUrl;
-    const hasUserEvents = userEvents.mousePositions.length > 0;
-    const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
 
     const isLastWindow = outputWindows.length <= 1;
     const isAlreadyReset = isLastWindow && outputWindows[0]?.startMs === 0 && outputWindows[0]?.endMs === screenDurationMs && (outputWindows[0]?.speed || 1) === 1;
@@ -75,59 +59,6 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
             removeOutputWindow(win.id);
         }
     }, [win.id, isLastWindow, removeOutputWindow]);
-
-    const handleAutoCut = useCallback(async () => {
-        if (isAnalyzing) return;
-        setIsAnalyzing(true);
-
-        const toastId = addToast({
-            type: 'progress',
-            title: 'Analyzing audio...',
-            message: 'Detecting speech segments'
-        });
-
-        try {
-            const audioUrl = micSource?.runtimeUrl || '';
-
-            const hasAudio = Boolean(audioUrl);
-            let speechSegments: { startMs: number; endMs: number }[] = [];
-
-            if (hasAudio) {
-                speechSegments = await getCachedSpeechSegments(audioUrl);
-                if (speechSegments.length === 0) {
-                    throw new Error('VAD detected no speech in audio. The audio may be silent or there may be an issue with the analysis.');
-                }
-            }
-
-            const { windows, totalRemovedMs } = analyzeForAutoCut(
-                speechSegments,
-                userEvents,
-                sourceDurationMs
-            );
-
-            if (windows.length > 0) {
-                setOutputWindows(windows);
-                useProjectStore.getState().updateSettings({ autoCutApplied: true });
-                const seconds = (totalRemovedMs / 1000).toFixed(1);
-                if (totalRemovedMs > 0) {
-                    updateToast(toastId, { type: 'success', title: `Trimmed ${seconds}s of silence` });
-                } else {
-                    updateToast(toastId, { type: 'info', title: 'No silence detected' });
-                }
-            } else {
-                removeToast(toastId);
-            }
-        } catch (error) {
-            console.error('AutoCut failed:', error);
-            updateToast(toastId, {
-                type: 'error',
-                title: 'AutoCut failed',
-                message: error instanceof Error ? error.message : 'Unknown error'
-            });
-        } finally {
-            setIsAnalyzing(false);
-        }
-    }, [isAnalyzing, micSource, cameraSource, screenSource, userEvents, sourceDurationMs, setOutputWindows, addToast, updateToast, removeToast]);
 
     return (
         <CollapsibleCard title="Clip" icon={<PiVideoBold size={16} />} notCollapsible>
@@ -180,22 +111,6 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
                         </Button>
                     </Tooltip>
                 </div>
-
-                {/* AutoCut */}
-                {showAutoCut && (
-                    <Tooltip text="Remove silent and inactive segments from the entire recording">
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            fullWidth
-                            onClick={handleAutoCut}
-                            disabled={isAnalyzing}
-                        >
-                            <HiSparkles size={14} />
-                            <span>AutoCut</span>
-                        </Button>
-                    </Tooltip>
-                )}
             </div>
         </CollapsibleCard>
     );

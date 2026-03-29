@@ -1,4 +1,5 @@
 // Shared UI Components - Barrel Export
+export { AiAudioIcon } from './AiAudioIcon';
 export { Button } from './Button';
 export { Checkbox } from './Checkbox';
 export { CollapsibleCard } from './CollapsibleCard';

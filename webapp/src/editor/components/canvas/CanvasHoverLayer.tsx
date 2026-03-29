@@ -9,7 +9,7 @@
  *
  * Accounts for the current zoom viewport when positioning targets.
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
@@ -39,6 +39,12 @@ export const CanvasHoverLayer: React.FC = () => {
     const setCanvasMode    = useUIStore(s => s.setCanvasMode);
     const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
     const selectedOverlayId = useUIStore(s => s.selectedOverlaySegmentId);
+
+    // Clear lingering hover state if camera or segment disappears while hovered
+    // (e.g. during timeline scrub or playback)
+    const cameraActiveRef = useRef<boolean>(false);
+    
+    // We will evaluate the effects lower down after we calculate visibility.
 
     // ── Shared: zoom viewport ────────────────────────────────
     const zoomEnabled = project.settings.zoom?.enabled ?? true;
@@ -84,6 +90,7 @@ export const CanvasHoverLayer: React.FC = () => {
         !isPlaying &&
         canvasMode !== CanvasMode.CameraEdit &&
         canvasMode !== CanvasMode.CameraMoveEdit &&
+        canvasMode !== CanvasMode.OverlayEdit &&
         !!cameraSource &&
         !!cameraSettings;
 
@@ -105,13 +112,13 @@ export const CanvasHoverLayer: React.FC = () => {
 
     const cameraDisplayRect = useMemo(() => {
         if (!resolvedCamera || resolvedCamera.opacity <= 0) return null;
-        return outputToViewportDisplay({
+        return displayMapper.outputToDisplay({
             x: resolvedCamera.xPx,
             y: resolvedCamera.yPx,
             width: resolvedCamera.widthPx,
             height: resolvedCamera.heightPx,
         });
-    }, [resolvedCamera, outputToViewportDisplay]);
+    }, [resolvedCamera, displayMapper]);
 
     const handleCameraClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -158,10 +165,39 @@ export const CanvasHoverLayer: React.FC = () => {
     const showCamera  = cameraActive && !!cameraDisplayRect;
     const showOverlays = overlaysActive && visibleSegments.length > 0;
 
+    // --- Cleanup lingering state ---
+    // If the camera goes out of view or is paused out, clear its hover state.
+    useEffect(() => {
+        if (!showCamera && hoveredCameraId) {
+            setHoveredCameraId(false);
+        }
+    }, [showCamera, hoveredCameraId]);
+
+    // If the hovered segment goes out of view, clear its hover state.
+    useEffect(() => {
+        if (hoveredSegmentId && !visibleSegments.find(s => s.id === hoveredSegmentId)) {
+            setHoveredSegmentId(null);
+        }
+    }, [visibleSegments, hoveredSegmentId]);
+
     if (!showCamera && !showOverlays) return null;
 
     return (
         <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden">
+
+            {/* ── Overlay targets (suppressed while camera is hovered) ── */}
+            {showOverlays && visibleSegments.map((segment: OverlaySegment) => (
+                <OverlayHoverTarget
+                    key={segment.id}
+                    segment={segment}
+                    isHovered={hoveredSegmentId === segment.id}
+                    suppressPointerEvents={hoveredCameraId}
+                    onHover={(hovered) => setHoveredSegmentId(hovered ? segment.id : null)}
+                    onClick={(e) => handleOverlayClick(e, segment.id)}
+                    outputToViewportDisplay={outputToViewportDisplay}
+                    pointToViewportDisplay={pointToViewportDisplay}
+                />
+            ))}
 
             {/* ── Camera target ── */}
             {showCamera && cameraDisplayRect && (
@@ -187,20 +223,6 @@ export const CanvasHoverLayer: React.FC = () => {
                     onClick={handleCameraClick}
                 />
             )}
-
-            {/* ── Overlay targets (suppressed while camera is hovered) ── */}
-            {showOverlays && visibleSegments.map((segment: OverlaySegment) => (
-                <OverlayHoverTarget
-                    key={segment.id}
-                    segment={segment}
-                    isHovered={hoveredSegmentId === segment.id}
-                    suppressPointerEvents={hoveredCameraId}
-                    onHover={(hovered) => setHoveredSegmentId(hovered ? segment.id : null)}
-                    onClick={(e) => handleOverlayClick(e, segment.id)}
-                    outputToViewportDisplay={outputToViewportDisplay}
-                    pointToViewportDisplay={pointToViewportDisplay}
-                />
-            ))}
         </div>
     );
 };

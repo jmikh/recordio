@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -6,7 +6,10 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
 import { FaScissors } from 'react-icons/fa6';
-import { Slider, Button } from '@shared/components';
+import { Slider, Button, Tooltip, AiAudioIcon } from '@shared/components';
+import { useToast } from '../Toast';
+import { analyzeForAutoCut } from '../../../core/autocut/autoCutAnalyzer';
+import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
 
 export const MIN_PIXELS_PER_SEC = 10;
@@ -34,6 +37,73 @@ export const TimelineToolbar: React.FC = () => {
 
     // History Batcher
     const batcher = useHistoryBatcher();
+
+    // AutoCut logic
+    const { addToast, updateToast, removeToast } = useToast();
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const userEvents = useProjectStore(s => s.userEvents);
+    const screenSource = useProjectStore(s => s.project.screenSource);
+    const cameraSource = useProjectStore(s => s.project.cameraSource);
+    const micSource = useProjectStore(s => s.project.microphoneSource);
+    const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);
+    const setOutputWindows = useProjectStore(s => s.setOutputWindows);
+
+    const hasMic = !!micSource?.runtimeUrl;
+    const hasUserEvents = userEvents.mousePositions.length > 0;
+    const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
+
+    const handleAutoCut = useCallback(async () => {
+        if (isAnalyzing) return;
+        setIsAnalyzing(true);
+
+        const toastId = addToast({
+            type: 'progress',
+            title: 'Analyzing audio...',
+            message: 'Detecting speech segments'
+        });
+
+        try {
+            const audioUrl = micSource?.runtimeUrl || '';
+
+            const hasAudio = Boolean(audioUrl);
+            let speechSegments: { startMs: number; endMs: number }[] = [];
+
+            if (hasAudio) {
+                speechSegments = await getCachedSpeechSegments(audioUrl);
+                if (speechSegments.length === 0) {
+                    throw new Error('VAD detected no speech in audio. The audio may be silent or there may be an issue with the analysis.');
+                }
+            }
+
+            const { windows, totalRemovedMs } = analyzeForAutoCut(
+                speechSegments,
+                userEvents,
+                sourceDurationMs
+            );
+
+            if (windows.length > 0) {
+                setOutputWindows(windows);
+                useProjectStore.getState().updateSettings({ autoCutApplied: true });
+                const seconds = (totalRemovedMs / 1000).toFixed(1);
+                if (totalRemovedMs > 0) {
+                    updateToast(toastId, { type: 'success', title: `Trimmed ${seconds}s of silence` });
+                } else {
+                    updateToast(toastId, { type: 'info', title: 'No silence detected' });
+                }
+            } else {
+                removeToast(toastId);
+            }
+        } catch (error) {
+            console.error('AutoCut failed:', error);
+            updateToast(toastId, {
+                type: 'error',
+                title: 'AutoCut failed',
+                message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        } finally {
+            setIsAnalyzing(false);
+        }
+    }, [isAnalyzing, micSource, cameraSource, screenSource, userEvents, sourceDurationMs, setOutputWindows, addToast, updateToast, removeToast]);
 
     const handleScaleChange = (newScale: number) => {
         setPixelsPerSec(newScale);
@@ -125,9 +195,12 @@ export const TimelineToolbar: React.FC = () => {
 
     return (
         <div className="h-10 flex items-center px-4 bg-surface-raised rounded-xl border border-border shrink-0 m-1">
-            {/* Left: Scissors cut button */}
-            <div className="flex-1 flex items-center">
-                <div className="relative group/scissors">
+            {/* Left: Scissors cut button & AutoCut */}
+            <div className="flex-1 flex items-center gap-2">
+                <Tooltip
+                    text={canSplit ? 'Cut at playhead' : `Cannot cut — segment <${(MIN_WINDOW_DURATION_MS / 1000).toFixed(1)}s`}
+                    position="top-start"
+                >
                     <Button
                         variant="icon"
                         disabled={!canSplit}
@@ -138,11 +211,20 @@ export const TimelineToolbar: React.FC = () => {
                     >
                         <FaScissors size={13} />
                     </Button>
-                    {/* Tooltip — top-right of button */}
-                    <div className="absolute bottom-full left-full -translate-x-1 mb-1 px-2 py-1 rounded bg-surface-raised text-text-muted text-[10px] whitespace-nowrap shadow-float border border-border z-[var(--z-index-tooltip)] pointer-events-none opacity-0 group-hover/scissors:opacity-100 transition-opacity duration-100">
-                        {canSplit ? 'Cut at playhead' : `Cannot cut — segment <${(MIN_WINDOW_DURATION_MS / 1000).toFixed(1)}s`}
-                    </div>
-                </div>
+                </Tooltip>
+
+                {showAutoCut && (
+                    <Tooltip text="Remove silent and inactive segments" position="top-start">
+                        <Button
+                            variant="icon"
+                            disabled={isAnalyzing}
+                            onClick={handleAutoCut}
+                            className={isAnalyzing ? 'animate-pulse' : ''}
+                        >
+                            <AiAudioIcon size={18} />
+                        </Button>
+                    </Tooltip>
+                )}
             </div>
 
             {/* Center: play button + time */}
