@@ -106,4 +106,15 @@ export interface RawRecording {
     cameraSource?: CameraMetadata;
     microphoneSource?: MicrophoneMetadata;
     userEvents: UserEvents;
+
+    /** Post-processing preferences set during recording setup */
+    recordingPreferences?: RecordingPreferences;
+}
+
+/** Preferences set in the controller during recording setup.
+ *  These are hints for the editor to auto-apply on import. */
+export interface RecordingPreferences {
+    applyAutoZoom?: boolean;
+    applySpotlight?: boolean;
+    simplifyToolbar?: boolean;
 }

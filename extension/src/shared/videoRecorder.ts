@@ -2,12 +2,12 @@
  * @fileoverview Video Recorder (MediaRecorder Wrapper)
  * 
  * Handles screen and camera capture using MediaRecorder API.
- * - Manages screen stream (tab capture or desktop capture)
+ * - Manages screen stream (desktop capture via window/screen mode)
  * - Optional camera stream (dual recording mode)
  * - Audio mixing (system audio + microphone)
  * - Saves RawRecording (lightweight handoff format) to storage
  * 
- * Used by both offscreen.ts (tab mode) and controller.ts (window/desktop mode).
+ * Used by controller.ts (the controller tab handles all recording).
  */
 
 import type { RecorderMode, RecordingConfig } from './messageTypes';
@@ -15,7 +15,7 @@ import { ProjectStorage } from '../storage/projectStorage';
 import { captureException } from '../utils/sentry';
 import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
-import type { RawRecording } from '@shared/types';
+import type { RawRecording, RecordingPreferences } from '@shared/types';
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
@@ -60,6 +60,9 @@ export class VideoRecorder {
     private detectionResult: WindowDetectionResult | null = null;
     private viewportRect: Rect | undefined;
 
+    // Recording Preferences (post-processing hints)
+    private recordingPreferences: RecordingPreferences | undefined;
+
     // Audio Detection (AnalyserNode-based)
     private audioAnalyser: AnalyserNode | null = null;
     private audioDetectionInterval: ReturnType<typeof setInterval> | null = null;
@@ -80,8 +83,30 @@ export class VideoRecorder {
     }
 
     /**
+     * Returns the screen stream after prepare() has been called.
+     * Used by the controller to display a live preview.
+     */
+    public getPreviewStream(): MediaStream | null {
+        return this.activeStreams[0] || null;
+    }
+
+    /**
+     * Sets post-processing preferences to include in the saved RawRecording.
+     */
+    public setRecordingPreferences(prefs: RecordingPreferences) {
+        this.recordingPreferences = prefs;
+    }
+
+    /**
+     * Returns the detection result after prepare() has been called.
+     */
+    public getDetectionResult(): WindowDetectionResult | null {
+        return this.detectionResult;
+    }
+
+    /**
      * Prepares the recording session by initializing streams.
-     * Use this to warm up the camera during countdown.
+     * Returns the window detection result for the controller to display.
      */
     public async prepare(config: RecordingConfig): Promise<WindowDetectionResult | null> {
         if (this.state !== 'idle') {
@@ -98,23 +123,18 @@ export class VideoRecorder {
 
         await this.initializeStreams(this.config);
 
-        // Detect Window if Window Mode (moved from start)
+        // Detect Window if Window Mode
         if (this.mode === 'window') {
             const screenStream = this.activeStreams[0];
             if (screenStream) {
-                // Detect if the recorded window is the controller window (current window)
-                // This is used to determine if we need to apply offsets to the recorded events
                 // Clone stream for detection to avoid interfering with the main recorder stream
                 const detectionStream = screenStream.clone();
                 this.detectionResult = await detectControllerWindow(detectionStream);
                 // Ensure we stop the cloned tracks after detection
                 detectionStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
 
-
-
                 // Store trackable content rect for later use (events + screenSource metadata)
                 // Detection offsets are in video pixels; convert to CSS pixels to match tabViewportSize.
-                // The ratio scaling in saveRecordingData() will then uniformly scale everything to video dimensions.
                 if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
                     const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
                     this.viewportRect = {
@@ -126,8 +146,6 @@ export class VideoRecorder {
                 }
             }
         }
-
-
 
         // Set up audio analyser to detect actual audio content
         this.setupAudioAnalyser();
@@ -148,9 +166,6 @@ export class VideoRecorder {
             this.config.sourceName = tabTitle;
         }
 
-
-
-
         if (!this.screenRecorder) {
             throw new Error("Screen Recorder failed to initialize.");
         }
@@ -166,16 +181,10 @@ export class VideoRecorder {
         this.startTime = Date.now();
         this.state = 'recording';
         this.startAudioDetection();
-
-
-
-        // Window detection is now done in prepare()
-
-        // Window detection is now done in prepare()
     }
 
     /**
-     * Finishes the recording session, saves the files, and creates the Project.
+     * Finishes the recording session, saves the files, and creates the RawRecording.
      */
     public async finish(sessionId?: string): Promise<{ durationMs: number }> {
         this.validateSession(sessionId);
@@ -238,10 +247,7 @@ export class VideoRecorder {
         await Promise.all(stopPromises);
         this.stopAudioDetection();
 
-
-
         // Save Data
-        // Use currentSessionId if not provided (should match due to validateSession)
         const effectiveId = sessionId || this.currentSessionId;
         if (!effectiveId) throw new Error("No session ID available to save");
 
@@ -259,10 +265,7 @@ export class VideoRecorder {
     public addEvent(event: any) {
         if (this.state !== 'recording') return;
 
-        // Viewport offset is stored as viewportRect on UserEvents (not per-event)
-
-        // Categorize on the fly
-        const e = event; // Incoming event payload
+        const e = event;
         switch (e.type) {
             case EventType.CLICK: this.events.mouseClicks.push(e); break;
             case EventType.MOUSEPOS: this.events.mousePositions.push(e); break;
@@ -273,7 +276,6 @@ export class VideoRecorder {
             case EventType.URLCHANGE: this.events.urlChanges.push(e); break;
             case EventType.HOVERED_CARD: this.events.hoveredCards.push(e); break;
             default:
-                // Unrecognized event type
                 console.warn('[VideoRecorder] Unrecognized event type:', e.type);
                 break;
         }
@@ -284,7 +286,6 @@ export class VideoRecorder {
      */
     public async cancel(sessionId: string): Promise<void> {
         this.validateSession(sessionId);
-
         this.releaseStreams();
     }
 
@@ -297,7 +298,6 @@ export class VideoRecorder {
         this.activeStreams.push(screenStream);
 
         // 2. Playback System Audio (Anti-Swallow)
-        // If system audio exists, route it to speakers
         if (screenStream.getAudioTracks().length > 0) {
             this.audioContext = new AudioContext();
             const sysSource = this.audioContext.createMediaStreamSource(screenStream);
@@ -337,9 +337,6 @@ export class VideoRecorder {
         }
 
         // 5. Setup Recorders
-        // Screen records video + system audio only (no mic mixing)
-        // Camera records video only (no mic muxing)
-        // Mic records as standalone audio-only track
         const mimeType = VideoRecorder.getSupportedMimeType();
 
         this.screenRecorder = new MediaRecorder(screenStream, { mimeType });
@@ -373,54 +370,26 @@ export class VideoRecorder {
     }
 
     private async getScreenStream(config: RecordingConfig): Promise<MediaStream> {
-        if (this.mode === 'tab') {
-            const streamId = config.streamId;
-            if (!streamId) throw new Error("Stream ID is required for tab recording mode.");
+        // Window/Screen (desktop) mode: use sourceId from chooseDesktopMedia
+        const sourceId = config.sourceId;
+        if (!sourceId) throw new Error("Source ID is required for recording.");
 
-            // Request device-pixel resolution for highest quality.
-            // Events are in CSS pixels; saveRecordingData() scales them to match actual video dimensions.
-            const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
-
-            // @ts-ignore
-            return await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    mandatory: {
-                        chromeMediaSource: 'tab',
-                        chromeMediaSourceId: streamId
-                    }
-                },
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'tab',
-                        chromeMediaSourceId: streamId,
-                        maxWidth: Math.round((config.tabViewportSize?.width ?? 1920) * dpr),
-                        maxHeight: Math.round((config.tabViewportSize?.height ?? 1080) * dpr),
-                        maxFrameRate: 60
-                    }
+        // @ts-ignore
+        return await navigator.mediaDevices.getUserMedia({
+            audio: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sourceId
                 }
-            } as any);
-        } else {
-            // Window/Screen (desktop) mode: use sourceId from chooseDesktopMedia
-            const sourceId = config.sourceId;
-            if (!sourceId) throw new Error("Source ID is required for window/screen recording mode.");
-
-            // @ts-ignore
-            return await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId
-                    }
-                },
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId,
-                        maxFrameRate: 60
-                    }
+            },
+            video: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sourceId,
+                    maxFrameRate: 60
                 }
-            } as any);
-        }
+            }
+        } as any);
     }
 
     // --- Storage ---    
@@ -439,26 +408,16 @@ export class VideoRecorder {
         const hasAudioTrack = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
         const screenHasAudio = hasAudioTrack && this.detectedScreenAudio;
 
-        // 2. Create Screen Source Metadata (embedded in project, not saved separately)
-        // For tab recordings, trackableContentRect is the full frame (x=0, y=0)
-        let trackableContentRect = this.viewportRect
-            ?? (this.mode === 'tab' && this.config.tabViewportSize
-                ? { x: 0, y: 0, ...this.config.tabViewportSize }
-                : undefined);
+        // 2. Create Screen Source Metadata
+        let trackableContentRect = this.viewportRect ?? undefined;
 
         const screenSize = this.screenDimensions || { width: 1920, height: 1080 };
 
         // Scale events from CSS pixels to match actual video dimensions.
-        // Events are captured in CSS pixels. Chrome may capture the video at CSS or
-        // device pixel resolution. We use the ratio of actual video size to CSS viewport
-        // to align event coordinates with the video coordinate space.
-        // We use width-based uniform scale since height can differ due to title bar offsets
-        // in window mode (screenSize includes title bar, but trackableContentRect doesn't).
         if (trackableContentRect && events) {
             const cssWidth = trackableContentRect.width;
             if (cssWidth > 0) {
                 const scale = screenSize.width / cssWidth;
-                // Only scale if there's a meaningful difference
                 if (Math.abs(scale - 1) > 0.01) {
                     this.scaleAllEvents(events, scale, scale);
                     trackableContentRect = {
@@ -517,7 +476,7 @@ export class VideoRecorder {
             };
         }
 
-        // 5. Create & Save RawRecording (lightweight handoff format)
+        // 5. Create & Save RawRecording
         const rawRecording: RawRecording = {
             id: projectId,
             name: this.config.sourceName || this.mode,
@@ -529,10 +488,9 @@ export class VideoRecorder {
                 mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [],
                 scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [],
             },
+            recordingPreferences: this.recordingPreferences,
         };
         await ProjectStorage.saveRawRecording(rawRecording);
-
-
     }
 
 
@@ -548,15 +506,11 @@ export class VideoRecorder {
             this.audioContext = null;
         }
         this.audioAnalyser = null;
-        this.state = 'idle'; // Reset state on release
+        this.state = 'idle';
     }
 
     // --- Audio Detection ---
 
-    /**
-     * Sets up an AnalyserNode on the screen stream's audio to detect
-     * whether actual audio content is present (not just a silent track).
-     */
     private setupAudioAnalyser() {
         const screenStream = this.activeStreams[0];
         if (!screenStream || screenStream.getAudioTracks().length === 0) return;
@@ -569,7 +523,6 @@ export class VideoRecorder {
             this.audioAnalyser = ctx.createAnalyser();
             this.audioAnalyser.fftSize = 2048;
             source.connect(this.audioAnalyser);
-            // Don't connect to destination — we only observe, no playback
         } catch (e) {
             console.warn('[VideoRecorder] Failed to set up audio analyser:', e);
         }
@@ -582,9 +535,8 @@ export class VideoRecorder {
         this.audioDetectionInterval = setInterval(() => {
             if (!this.audioAnalyser) return;
             this.audioAnalyser.getFloatTimeDomainData(dataArray);
-            // RMS (root mean square) — measures actual signal energy
             const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
-            if (rms > 0.001) { // ~-60dB threshold
+            if (rms > 0.001) {
                 this.detectedScreenAudio = true;
             }
         }, 500);
@@ -622,10 +574,6 @@ export class VideoRecorder {
         if (e.targetRect) offsetRect(e.targetRect);
     }
 
-    /**
-     * Scales all event coordinates to match actual video dimensions.
-     * Used to align CSS-pixel events with whatever resolution Chrome captured.
-     */
     private scaleAllEvents(events: UserEvents, scaleX: number, scaleY: number) {
         const scaleEvent = (e: any) => {
             if (e.mousePos) {
@@ -652,16 +600,13 @@ export class VideoRecorder {
         }
     }
 
-    /**
-     * static helper to detect supported mime type
-     */
     static getSupportedMimeType(): string {
         const types = [
-            'video/webm;codecs=vp9',           // High quality VP9
-            'video/webm;codecs=vp8',           // Fallback VP8
-            'video/webm',                       // Generic
-            'video/mp4;codecs=avc1,mp4a.40.2', // Standard MP4 (Moved to bottom)
-            'video/webm;codecs=h264'          // Standard WebM (H.264)
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm',
+            'video/mp4;codecs=avc1,mp4a.40.2',
+            'video/webm;codecs=h264'
         ];
 
         for (const type of types) {

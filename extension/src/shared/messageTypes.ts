@@ -2,15 +2,18 @@
  * @fileoverview Message Types and Interfaces
  * 
  * Defines all message type constants and interfaces for cross-context communication
- * between the popup, background service worker, content scripts, offscreen document,
- * and controller page.
+ * between the popup, background service worker, content scripts, and controller page.
  * 
- * Message flow: Popup → Background → (Offscreen|Controller) + Content
+ * Message flow:
+ *   Icon Click → Background → Opens Controller Tab
+ *   Controller Tab ↔ Content Scripts (direct via chrome.runtime messaging)
+ *   Controller Tab → Background (START_RECORDING / state updates)
+ *   Popup → Background (STOP_SESSION)
  */
 
 import type { BaseEvent, Size } from '@shared/types';
 
-export type RecorderMode = 'screen' | 'tab' | 'window';
+export type RecorderMode = 'screen' | 'window';
 
 export interface BaseMessage {
     type: string;
@@ -20,41 +23,28 @@ export interface BaseMessage {
 // --- Message Types ---
 
 export const MSG_TYPES = {
-    // Recording Control
-    // Session Control (Extension -> Background)
-    START_SESSION: 'START_SESSION',
+    // Session Control
     STOP_SESSION: 'STOP_SESSION',
 
-    // Recording Control (Background -> Offscreen)
-    PREPARE_RECORDING_VIDEO: 'PREPARE_RECORDING_VIDEO', // Background -> Offscreen (Warmup)
-    START_RECORDING_VIDEO: 'START_RECORDING_VIDEO',     // Background -> Offscreen
-    STOP_RECORDING_VIDEO: 'STOP_RECORDING_VIDEO',       // Background -> Offscreen
+    // Recording Control (Controller handles directly)
+    START_RECORDING_VIDEO: 'START_RECORDING_VIDEO',     // Controller internal
 
-    START_RECORDING_EVENTS: 'START_RECORDING_EVENTS',   // Background -> Content
-    STOP_RECORDING_EVENTS: 'STOP_RECORDING_EVENTS',     // Background -> Content
+    START_RECORDING_EVENTS: 'START_RECORDING_EVENTS',   // Controller → Content (broadcast)
+    STOP_RECORDING_EVENTS: 'STOP_RECORDING_EVENTS',     // Controller → Content (broadcast)
 
     // Content Script
-    CAPTURE_USER_EVENT: 'CAPTURE_USER_EVENT',           // Content -> Background (User interactions)
-    START_COUNTDOWN: 'START_COUNTDOWN',                 // Background -> Content (Start countdown/calibration)
-    COUNTDOWN_DONE: 'COUNTDOWN_DONE',                   // Content -> Background (Countdown done)
-    COUNTDOWN_CANCELED: 'COUNTDOWN_CANCELED',           // Content -> Background (User canceled countdown)
+    CAPTURE_USER_EVENT: 'CAPTURE_USER_EVENT',           // Content → Controller (User interactions)
 
-    // Coordination
-    PING_OFFSCREEN: 'PING_OFFSCREEN',
+    // State
     GET_RECORDING_STATE: 'GET_RECORDING_STATE',
-    GET_VIEWPORT_SIZE: 'GET_VIEWPORT_SIZE',
+
+    // Controller ↔ Background
+    CONTROLLER_STARTED_RECORDING: 'CONTROLLER_STARTED_RECORDING', // Controller → Background (recording began)
+    CONTROLLER_STOPPED_RECORDING: 'CONTROLLER_STOPPED_RECORDING', // Controller → Background (recording finished)
 
     // Blur Mode
     ENABLE_BLUR_MODE: 'ENABLE_BLUR_MODE',
     DISABLE_BLUR_MODE: 'DISABLE_BLUR_MODE',
-
-    // Tab Switch (Tab Recording)
-    SHOW_TAB_SWITCH_TOAST: 'SHOW_TAB_SWITCH_TOAST',       // Background -> Content (wrong tab)
-    SWITCH_TO_RECORDING_TAB: 'SWITCH_TO_RECORDING_TAB',   // Content -> Background (take me back)
-
-    // Camera Float (PiP)
-    OPEN_CAMERA_FLOAT: 'OPEN_CAMERA_FLOAT',               // Popup -> Background (open float window)
-    CLOSE_CAMERA_FLOAT: 'CLOSE_CAMERA_FLOAT',             // Background -> Camera Float (close)
 
 } as const;
 
@@ -70,7 +60,6 @@ export const STORAGE_KEYS = {
 
 export interface RecordingState {
     isRecording: boolean;
-    recordedTabId: number | null;
     controllerTabId: number | null;
     startTime: number;
     currentSessionId: string | null;
@@ -78,7 +67,6 @@ export interface RecordingState {
     originalTabId: number | null;
     hasAudio: boolean;
     hasCamera: boolean;
-    cameraFloatWindowId: number | null;
 }
 
 // --- Payloads ---
@@ -88,19 +76,12 @@ export interface RecordingConfig {
     hasCamera: boolean;
     audioDeviceId?: string; // Microphone
     videoDeviceId?: string; // Camera
-    tabViewportSize?: Size; // CSS pixel dimensions of the recorded viewport
-    streamId?: string; // Required for tab recording
+    tabViewportSize?: Size; // CSS pixel dimensions of the controller viewport (for detection scaling)
     sourceId?: string; // For desktop capture (window/desktop mode)
-    sourceName?: string; // Human readable name (e.g. Tab Title)
+    sourceName?: string; // Human readable name (e.g. window title)
 }
 
-export interface StartSessionPayload {
-    mode: RecorderMode;
-}
 
-export interface RecordingStartedPayload {
-    startTime: number;
-}
 
 export interface RecordingStoppedPayload {
     blobId: string;

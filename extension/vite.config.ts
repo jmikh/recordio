@@ -30,9 +30,8 @@ export default defineConfig(({ mode }) => ({
         sourcemap: mode === 'development',
         rollupOptions: {
             input: {
-                offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
-                controller: resolve(__dirname, 'src/controller/controller.html'),
-                cameraFloat: resolve(__dirname, 'src/camera-float/camera-float.html'),
+                popup: resolve(__dirname, 'src/popup/index.html'),
+                controller: resolve(__dirname, 'src/controller/index.html'),
             },
             output: {},
         },

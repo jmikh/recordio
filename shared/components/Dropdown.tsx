@@ -114,7 +114,7 @@ export function Dropdown<T>({
                         `}
                     >
                         {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                        <span className="flex-1">{option.label}</span>
+                        <span className="flex-1 truncate">{option.label}</span>
                         {option.suffix && <span className="flex-shrink-0">{option.suffix}</span>}
                     </button>
                 );
@@ -129,9 +129,9 @@ export function Dropdown<T>({
                 onClick={() => setIsOpen(!isOpen)}
                 className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''} ${buttonClassName}`}
             >
-                <div className="flex items-center gap-2">
-                    {label && <span className="text-text-muted">{label}</span>}
-                    <span>{displayLabel}</span>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {label && <span className="text-text-muted flex-shrink-0">{label}</span>}
+                    <span className="truncate">{displayLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                     {!hideSuffixInTrigger && currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}

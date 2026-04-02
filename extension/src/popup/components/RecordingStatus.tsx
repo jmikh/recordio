@@ -8,7 +8,7 @@ interface RecordingStatusProps {
     stopRecording: () => void;
     hasAudio: boolean;
     hasCamera: boolean;
-    recordingMode: 'tab' | 'window' | 'screen';
+    recordingMode: 'window' | 'screen';
 }
 
 export function RecordingStatus({ recordingDuration, stopRecording, hasAudio, hasCamera, recordingMode }: RecordingStatusProps) {

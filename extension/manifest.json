@@ -5,8 +5,6 @@
     "version": "1.0.8",
     "description": "Create professional screen recordings with automatic zoom, spotlight, captions and more.",
     "permissions": [
-        "tabCapture",
-        "offscreen",
         "storage",
         "activeTab",
         "scripting",
@@ -17,9 +15,7 @@
     "host_permissions": [
         "<all_urls>"
     ],
-    "action": {
-        "default_popup": "src/popup/index.html"
-    },
+    "action": {},
     "background": {
         "service_worker": "src/background/background.ts",
         "type": "module"

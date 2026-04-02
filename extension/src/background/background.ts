@@ -1,19 +1,20 @@
 /**
- * @fileoverview Background Service Worker
+ * @fileoverview Background Service Worker (Thin Router)
  * 
- * Orchestrates recording sessions for the Recordio extension.
- * - Routes messages between popup, content scripts, offscreen doc, and controller
- * - Manages session state (start/stop recording, mode selection)
- * - Handles tab capture (tab mode) and desktop capture picker (window/desktop mode)
- * - Persists state to chrome.storage.session for service worker restarts
+ * Minimal orchestrator for the Recordio extension:
+ * - Extension icon click → Opens/manages controller tab
+ * - Tracks recording state for popup display
+ * - Handles website handoff (external message port streaming)
+ * - Detects controller tab closure → auto-stop
+ * 
+ * The controller tab handles all recording logic directly.
  */
 
-import { type Size } from '@shared/types';
 import { initSentry, captureException } from '../utils/sentry';
 import { trackRecordingStarted, trackRecordingFinished, trackRecordingErrored, getDistinctId } from '../utils/mixpanel';
 
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
-import { MSG_TYPES, type BaseMessage, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
+import { MSG_TYPES, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 import {
     BRIDGE_MSG,
     buildImportUrl,
@@ -27,10 +28,8 @@ initSentry('background');
 
 // --- State Management ---
 
-// Default state if storage is empty
 const DEFAULT_STATE: RecordingState = {
     isRecording: false,
-    recordedTabId: null,
     controllerTabId: null,
     startTime: 0,
     currentSessionId: null,
@@ -38,11 +37,9 @@ const DEFAULT_STATE: RecordingState = {
     originalTabId: null,
     hasAudio: false,
     hasCamera: false,
-    cameraFloatWindowId: null,
 };
 
 let currentState: RecordingState | null = null;
-// Singleton promise to track initialization
 let stateReady: Promise<void> | null = null;
 
 async function doEnsureState() {
@@ -56,7 +53,6 @@ async function doEnsureState() {
     } catch (e) {
         console.error("Failed to restore state:", e);
         captureException(e instanceof Error ? e : new Error(String(e)));
-        // Fallback to defaults on error to allow extension to function
         currentState = { ...DEFAULT_STATE };
     }
 }
@@ -72,9 +68,7 @@ function ensureState() {
 ensureState();
 
 async function saveState(newState: Partial<RecordingState>) {
-    // Ensure we have a base state before merging (should be covered by ensureState usage)
     if (!currentState) currentState = { ...DEFAULT_STATE };
-
     currentState = { ...currentState, ...newState };
     await chrome.storage.session.set({ [STORAGE_KEYS.RECORDING_STATE]: currentState });
 }
@@ -83,10 +77,6 @@ async function saveState(newState: Partial<RecordingState>) {
 
 let badgeTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 
-/**
- * Formats elapsed time for badge display.
- * Uses M:SS format for under 10 minutes, MM:SS for 10+ minutes.
- */
 function formatRecordingTime(elapsedMs: number): string {
     const totalSeconds = Math.floor(elapsedMs / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -95,9 +85,6 @@ function formatRecordingTime(elapsedMs: number): string {
     return `${minutes}:${paddedSeconds}`;
 }
 
-/**
- * Updates the badge text with the current recording duration.
- */
 function updateBadge() {
     if (!currentState?.isRecording || !currentState.startTime) {
         return;
@@ -107,22 +94,13 @@ function updateBadge() {
     chrome.action.setBadgeText({ text });
 }
 
-/**
- * Starts the badge timer. Sets the badge background color to secondary (lime green)
- * and starts updating the badge text every second.
- */
 function startBadgeTimer() {
     chrome.action.setBadgeBackgroundColor({ color: SECONDARY_COLOR_HEX });
     chrome.action.setBadgeTextColor({ color: TEXT_ON_SECONDARY_HEX });
-
-    // Update immediately, then every second
     updateBadge();
     badgeTimerIntervalId = setInterval(updateBadge, 1000);
 }
 
-/**
- * Stops the badge timer and clears the badge.
- */
 function stopBadgeTimer() {
     if (badgeTimerIntervalId) {
         clearInterval(badgeTimerIntervalId);
@@ -131,51 +109,7 @@ function stopBadgeTimer() {
     chrome.action.setBadgeText({ text: '' });
 }
 
-// --- Offscreen Setup ---
-
-async function setupOffscreenDocument(path: string) {
-    const existingContexts = await chrome.runtime.getContexts({
-        contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
-    });
-
-    if (existingContexts.length > 0) {
-        try {
-            await chrome.offscreen.closeDocument();
-        } catch (e) {
-            // Closing existing offscreen doc failed — may already be gone
-        }
-    }
-
-    try {
-        await chrome.offscreen.createDocument({
-            url: path,
-            reasons: [chrome.offscreen.Reason.USER_MEDIA],
-            justification: 'Recording screen',
-        });
-    } catch (e: any) {
-        if (!e.message.includes('Only one offscreen document may be created')) {
-            throw e;
-        }
-    }
-}
-
-async function waitForOffscreen() {
-    for (let i = 0; i < 20; i++) { // Try for 2 seconds
-        try {
-            const response = await chrome.runtime.sendMessage({
-                type: MSG_TYPES.PING_OFFSCREEN,
-                payload: { sessionId: 'init' }
-            });
-            if (response === 'PONG') return;
-        } catch (e) {
-            // Context not ready
-        }
-        await new Promise(r => setTimeout(r, 100));
-    }
-    throw new Error("Offscreen document failed to initialize");
-}
-
-// --- Controller Tab Setup (Window/Desktop Mode) ---
+// --- Controller Tab Management ---
 
 async function closeControllerTab(tabId: number | null) {
     if (tabId) {
@@ -185,29 +119,12 @@ async function closeControllerTab(tabId: number | null) {
 
 async function openControllerTab(): Promise<number> {
     const tab = await chrome.tabs.create({
-        url: chrome.runtime.getURL('src/controller/controller.html'),
+        url: chrome.runtime.getURL('src/controller/index.html'),
         active: true,
         pinned: true
     });
 
     if (!tab || !tab.id) throw new Error("Failed to create controller tab");
-
-    // Wait for tab to fully load (chooseDesktopMedia requires a valid URL)
-    await new Promise<void>((resolve) => {
-        const listener = (tabId: number, info: any) => {
-            if (tabId === tab.id && info.status === 'complete') {
-                chrome.tabs.onUpdated.removeListener(listener);
-                resolve();
-            }
-        };
-        chrome.tabs.onUpdated.addListener(listener);
-        // Timeout fallback
-        setTimeout(() => {
-            chrome.tabs.onUpdated.removeListener(listener);
-            resolve();
-        }, 3000);
-    });
-
     return tab.id;
 }
 
@@ -221,7 +138,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         chrome.tabs.create({ url: getEditorOrigin() + '/welcome' });
     }
 
-    // Set farewell page for uninstall (always, so updates pick it up too)
+    // Set farewell page for uninstall
     chrome.runtime.setUninstallURL(getEditorOrigin() + '/uninstall');
 
     const tabs = await chrome.tabs.query({});
@@ -239,353 +156,46 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     }
 });
 
-// --- Event Helpers ---
+// --- Extension Icon Click Handler ---
+// When not recording: open controller tab (no popup)
+// When recording: popup is already set, Chrome shows it automatically
 
+chrome.action.onClicked.addListener(async (tab) => {
+    await ensureState();
 
-// --- Message Sending Helper ---
-// Helper removed, using direct calls.
-
-
-// --- Camera Float ---
-
-async function openCameraFloat(deviceId: string, mode: string): Promise<number | null> {
-    // If already open, just focus it
-    if (currentState?.cameraFloatWindowId) {
-        try {
-            await chrome.windows.update(currentState.cameraFloatWindowId, { focused: true });
-            return currentState.cameraFloatWindowId;
-        } catch {
-            // Window was closed externally, proceed to create new one
-        }
+    if (currentState?.isRecording) {
+        // This shouldn't fire when popup is set, but just in case
+        return;
     }
 
-    const url = chrome.runtime.getURL(
-        `src/camera-float/camera-float.html?deviceId=${encodeURIComponent(deviceId)}&mode=${encodeURIComponent(mode)}`
-    );
-    const win = await chrome.windows.create({
-        url,
-        type: 'popup',
-        width: 400,
-        height: 340,
-        top: 60,
-        left: (self as any).screen?.availWidth ? (self as any).screen.availWidth - 440 : 100,
-        focused: true,
+    // Close any existing controller tab
+    if (currentState?.controllerTabId) {
+        await closeControllerTab(currentState.controllerTabId);
+    }
+
+    // Remember the current tab as the original tab
+    const originalTabId = tab.id || null;
+
+    // Open fresh controller tab
+    const controllerTabId = await openControllerTab();
+
+    await saveState({
+        controllerTabId,
+        originalTabId,
     });
-    const windowId = win?.id ?? null;
-    await saveState({ cameraFloatWindowId: windowId });
-    return windowId;
-}
-
-async function closeCameraFloat() {
-    if (currentState?.cameraFloatWindowId) {
-        const id = currentState.cameraFloatWindowId;
-        await saveState({ cameraFloatWindowId: null });
-        // Send close message so the float page can clean up the stream
-        chrome.runtime.sendMessage({ type: MSG_TYPES.CLOSE_CAMERA_FLOAT }).catch(() => {});
-        chrome.windows.remove(id).catch(() => {});
-    }
-}
+});
 
 // --- Message Handlers ---
 
-async function handleStartSession(message: any, sendResponse: Function) {
-    try {
-        const { mode = 'tab' } = message.payload || {};
-        const sessionId = crypto.randomUUID();
-
-        if (mode === 'tab') {
-            await startTabModeSession(message.payload, sessionId);
-        } else {
-            // popup now sends tabId in payload as active tab when it was opened
-            await startControllerModeSession(message.payload, sessionId, mode);
-        }
-
-        sendResponse({ success: true });
-    } catch (err: any) {
-        // User cancellation is not an error, just a normal user action
-        if (err.message === "User cancelled desktop capture picker") {
-            // User cancelled — not an error
-        } else {
-            console.error("Error starting recording:", err);
-            captureException(err instanceof Error ? err : new Error(String(err)));
-            const { mode = 'tab', hasAudio = false, hasCamera = false } = message.payload || {};
-            trackRecordingErrored({ mode, error: err.message || 'Unknown error', hasAudio, hasCamera });
-        }
-        sendResponse({ success: false, error: err.message });
-    }
-}
-
-async function startTabModeSession(payload: any, sessionId: string) {
-    const { tabId, hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabTitle } = payload || {};
-
-    if (!tabId) throw new Error("Tab ID is required for tab recording");
-
-    // 1. Setup Offscreen
-    await setupOffscreenDocument('src/offscreen/offscreen.html');
-
-    // 2. Get Media Stream ID
-    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
-    if (!streamId) throw new Error("Failed to get stream ID");
-
-    // 3. Wait for Offscreen
-    await waitForOffscreen();
-
-    // 5. Generate Config
-    // Fetch REAL dimensions from content script now
-    // This ensures MediaStreams are initialized with correct constraints
-    if (!tabId) throw new Error("No tab ID");
-
-    // Simple await-based fetch. This will throw if content script is gone.
-    const initialDimensions: any = await chrome.tabs.sendMessage(tabId, { type: MSG_TYPES.GET_VIEWPORT_SIZE });
-
-    if (!initialDimensions) {
-        throw new Error("Failed to get viewport size: No response");
-    }
-
-    const config: RecordingConfig = {
-        hasAudio: hasAudio !== false,
-        hasCamera: hasCamera === true,
-        streamId: streamId,
-        tabViewportSize: {
-            width: initialDimensions.width,
-            height: initialDimensions.height
-        },
-
-
-        audioDeviceId: audioDeviceId,
-        videoDeviceId: videoDeviceId,
-        sourceName: tabTitle || 'Tab'
-    };
-
-    // 6. Send PREPARE to Offscreen (Warmup Streams)
-    // This starts the camera while we do the countdown
-    const prepareVideoMsg: BaseMessage = {
-        type: MSG_TYPES.PREPARE_RECORDING_VIDEO,
-        payload: { config, mode: 'tab', sessionId }
-    };
-    await chrome.runtime.sendMessage(prepareVideoMsg);
-
-    // 7. Start Countdown and get dimensions
-    if (tabId) {
-        const countdownMsg: BaseMessage = {
-            type: MSG_TYPES.START_COUNTDOWN,
-            payload: { sessionId }
-        };
-        chrome.tabs.sendMessage(tabId, countdownMsg);
-    }
-
-    // Wait for COUNTDOWN_DONE or COUNTDOWN_CANCELED from Content
-    const countdownResult = await waitForCountdown(tabId, sessionId);
-    if (countdownResult.status === 'canceled') return; // Silent early return
-
-    // Update config with real dimensions (CSS pixels)
-    config.tabViewportSize = countdownResult.dimensions;
-
-    // 6. Send START to Offscreen (VideoRecorder)
-    const startVideoMsg: BaseMessage = {
-        type: MSG_TYPES.START_RECORDING_VIDEO,
-        payload: { config, mode: 'tab', sessionId }
-    };
-    // ensures enough time the timer overlay to disappear
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await chrome.runtime.sendMessage(startVideoMsg);
-
-    // 7. Send START to Content (Start Event Capture)
-    const syncTimestamp = Date.now();
-    if (tabId) {
-        const startEventsMsg: BaseMessage = {
-            type: MSG_TYPES.START_RECORDING_EVENTS,
-            payload: { startTime: syncTimestamp, sessionId }
-        };
-        chrome.tabs.sendMessage(tabId, startEventsMsg);
-    }
-
-    // 8. Update State
-    await saveState({
-        isRecording: true,
-        recordedTabId: tabId,
-        controllerTabId: null,
-        startTime: syncTimestamp,
-        currentSessionId: sessionId,
-        mode: 'tab',
-        originalTabId: tabId,
-        hasAudio: hasAudio !== false,
-        hasCamera: hasCamera === true
-    });
-
-    // Start badge timer to show recording duration on extension icon
-    startBadgeTimer();
-
-    chrome.storage.local.set({ recordingSyncTimestamp: syncTimestamp });
-
-    trackRecordingStarted({ mode: 'tab', hasAudio: hasAudio !== false, hasCamera: hasCamera === true });
-}
-
-async function startControllerModeSession(payload: any, sessionId: string, mode: 'window' | 'screen') {
-    let openedControllerTabId: number | null = null;
-    const { hasAudio, hasCamera, audioDeviceId, videoDeviceId, tabId: originalTabId, tabTitle } = payload || {};
-
-    try {
-        // 1. Open Controller Tab first (needed as target for chooseDesktopMedia in service worker)
-        openedControllerTabId = await openControllerTab();
-
-        // Get the tab object for chooseDesktopMedia
-        const controllerTab = await chrome.tabs.get(openedControllerTabId);
-
-        // 2. Show desktop capture picker (needs target tab when called from service worker)
-        const sources = mode === 'window'
-            ? ['window' as const]
-            : ['screen' as const];
-
-        const sourceId = await new Promise<string>((resolve, reject) => {
-            chrome.desktopCapture.chooseDesktopMedia(sources, controllerTab, (streamId) => {
-                if (streamId) {
-                    resolve(streamId);
-                } else {
-                    reject(new Error("User cancelled desktop capture picker"));
-                }
-            });
-        });
-
-        // 4. Generate Config with sourceId
-        // Name will be updated after detection if it's a Chrome window
-        const config: RecordingConfig = {
-            hasAudio: hasAudio !== false,
-            hasCamera: hasCamera === true,
-            audioDeviceId: audioDeviceId,
-            videoDeviceId: videoDeviceId,
-            sourceId: sourceId,
-            sourceName: mode === 'window' ? 'Window' : 'Desktop'
-        };
-
-        // 5. Send PREPARE to Controller
-        const prepareVideoMsg: BaseMessage = {
-            type: MSG_TYPES.PREPARE_RECORDING_VIDEO,
-            payload: { config, mode, sessionId }
-        };
-        const prepareResponse = await chrome.tabs.sendMessage(openedControllerTabId, prepareVideoMsg);
-
-        // Update name to use tab title if recording a Chrome window (has trackable viewport)
-        if (prepareResponse?.detection?.isControllerWindow && tabTitle) {
-            config.sourceName = tabTitle;
-        }
-
-        // 6. Switch back to original tab if available (Before Start)
-        if (originalTabId) {
-            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
-
-        }
-
-        // 7. Send START to Controller
-        const startVideoMsg: BaseMessage = {
-            type: MSG_TYPES.START_RECORDING_VIDEO,
-            payload: { config, mode, sessionId, tabTitle }
-        };
-        // ensures enough time for the tab switch to take effect and 
-        // web cam to warm up
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const syncTimestamp = Date.now();
-        await chrome.tabs.sendMessage(openedControllerTabId, startVideoMsg);
-
-        let recordEvents = true;
-        // Check Window Detection (from PREPARE response)
-        if (prepareResponse && prepareResponse.detection && !prepareResponse.detection.isControllerWindow) {
-            recordEvents = false;
-        }
-
-        if (recordEvents) {
-            // 7. Broadcast START_RECORDING_EVENTS to all tabs
-            // syncTimestamp defined above
-            const startEventsMsg: BaseMessage = {
-                type: MSG_TYPES.START_RECORDING_EVENTS,
-                payload: { startTime: syncTimestamp, sessionId }
-            };
-
-            const tabs = await chrome.tabs.query({});
-            for (const tab of tabs) {
-                if (tab.id) {
-                    // Send and forget - some tabs might be restricted (chrome:// etc)
-                    chrome.tabs.sendMessage(tab.id, startEventsMsg).catch(() => { });
-                }
-            }
-        }
-
-        // 7. Update State
-        await saveState({
-            isRecording: true,
-            recordedTabId: null,
-            controllerTabId: openedControllerTabId,
-            startTime: syncTimestamp,
-            currentSessionId: sessionId,
-            mode: mode,
-            originalTabId: originalTabId || null,
-            hasAudio: hasAudio !== false,
-            hasCamera: hasCamera === true
-        });
-
-        // Start badge timer to show recording duration on extension icon
-        startBadgeTimer();
-
-        trackRecordingStarted({ mode, hasAudio: hasAudio !== false, hasCamera: hasCamera === true });
-
-    } catch (error) {
-        if (openedControllerTabId) {
-            closeControllerTab(openedControllerTabId);
-        }
-        if (originalTabId) {
-            chrome.tabs.update(originalTabId, { active: true }).catch(() => { });
-        }
-        throw error;
-    }
-}
-
-type CountdownResult =
-    | { status: 'done'; dimensions: Size }
-    | { status: 'canceled' };
-
-async function waitForCountdown(tabId: number | undefined, sessionId: string): Promise<CountdownResult> {
-    if (!tabId) throw new Error('No tab ID for countdown');
-
-    return new Promise<CountdownResult>((resolve, reject) => {
-        const listener = (msg: any) => {
-            if (msg.payload?.sessionId !== sessionId) return;
-
-            if (msg.type === MSG_TYPES.COUNTDOWN_DONE) {
-                chrome.runtime.onMessage.removeListener(listener);
-                clearTimeout(timeout);
-                const { width, height } = msg.payload;
-                resolve({
-                    status: 'done',
-                    dimensions: {
-                        width: Math.round(width),
-                        height: Math.round(height)
-                    }
-                });
-            } else if (msg.type === MSG_TYPES.COUNTDOWN_CANCELED) {
-                chrome.runtime.onMessage.removeListener(listener);
-                clearTimeout(timeout);
-                resolve({ status: 'canceled' });
-            }
-        };
-        chrome.runtime.onMessage.addListener(listener);
-        const timeout = setTimeout(() => {
-            chrome.runtime.onMessage.removeListener(listener);
-            reject(new Error('Timeout waiting for countdown'));
-        }, 10000);
-    });
-}
-
 async function handleStopSession(sendResponse: Function) {
-    // Stop badge timer first
     stopBadgeTimer();
+    await ensureState();
 
-    await ensureState(); // Ensure state is loaded
-
-    // Track recording_finished before we clear state
+    // Track recording_finished
     if (currentState?.isRecording && currentState.startTime) {
         const duration_ms = Date.now() - currentState.startTime;
         trackRecordingFinished({
-            mode: currentState.mode || 'tab',
+            mode: currentState.mode || 'window',
             duration_ms,
             hasAudio: currentState.hasAudio,
             hasCamera: currentState.hasCamera,
@@ -593,88 +203,61 @@ async function handleStopSession(sendResponse: Function) {
     }
 
     const finalSessionId = currentState?.currentSessionId;
-    // Capture the controller ID from state before we wipe the state
-    const controllerTabIdToClose = currentState?.controllerTabId;
 
-    // Close camera float window if open
-    await closeCameraFloat();
-
-    const stopEventsMsg: BaseMessage = {
+    // Broadcast stop to all content scripts
+    const stopEventsMsg = {
         type: MSG_TYPES.STOP_RECORDING_EVENTS,
         payload: { sessionId: finalSessionId }
     };
-
-    // broadcast to all tabs safer.
-    // This should happen first to flush any pending events. (though we might still need a wait)
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
         if (tab.id) {
-            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { /* ignore */ });
+            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { });
         }
     }
 
-    if (finalSessionId) {
-        try {
-            // Send STOP to the appropriate recorder (offscreen or controller)
-            const stopVideoMsg: BaseMessage = {
-                type: MSG_TYPES.STOP_RECORDING_VIDEO,
-                payload: { sessionId: finalSessionId }
-            };
-
-            let response;
-            if (currentState?.mode === 'tab') {
-                response = await chrome.runtime.sendMessage(stopVideoMsg);
-            } else if ((currentState?.mode === 'window' || currentState?.mode === 'screen') && controllerTabIdToClose) {
-                response = await chrome.tabs.sendMessage(controllerTabIdToClose, stopVideoMsg);
-            }
-
-
-
-
-
-            // Open website import page instead of extension editor
-            const importUrl = buildImportUrl(finalSessionId || '');
-            chrome.tabs.create({ url: importUrl });
-        } catch (e) {
-            console.error("Failed to stop video recording: ", e);
-            captureException(e instanceof Error ? e : new Error(String(e)));
-        }
-    }
-    // Cleanup regardless of success
-
-
-    await saveState({
-        isRecording: false,
-        recordedTabId: null,
-        controllerTabId: null,
-        currentSessionId: null,
-        mode: null,
-        originalTabId: null
-    });
-
-    // remove those after saving state so they don't accidentally trigger another stop session
-    // TODO: comment out to see logs upon exit
-    chrome.offscreen.closeDocument().catch(() => { });
-
-    // Close using the ID we captured earlier
-    if (controllerTabIdToClose) {
-        closeControllerTab(controllerTabIdToClose);
-    }
+    // NOTE: We do NOT send STOP_RECORDING_VIDEO to the controller tab.
+    // The controller listens for STOP_SESSION directly via chrome.runtime.onMessage
+    // and handles its own recorder.finish() + save. This avoids chrome.tabs.sendMessage
+    // which can cause Chrome to briefly activate the controller tab (visible in window recordings).
+    // 
+    // The controller will call CONTROLLER_STOPPED_RECORDING when it's done saving,
+    // which triggers handleRecordingFinished() to clean up state and open the import page.
 
     sendResponse({ success: true });
 }
 
-function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResponse: Function) {
-    // Ensure we send back the current state
-    if (!currentState) return sendResponse({ isRecording: false, startTime: 0 }); // Trigger fallback if ensureState failed
-
-    let isRecording = currentState.isRecording;
-    if (_sender.tab?.id && currentState.mode === 'tab') {
-        // Only report recording=true if we are recording THIS tab
-        isRecording = currentState.isRecording && _sender.tab.id === currentState.recordedTabId;
+/** Called after the controller has finished saving the recording */
+async function handleRecordingFinished(sessionId: string | null, controllerTabId: number | null) {
+    // Open website import page
+    if (sessionId) {
+        const importUrl = buildImportUrl(sessionId);
+        chrome.tabs.create({ url: importUrl });
     }
+
+    // Reset state
+    await saveState({
+        isRecording: false,
+        controllerTabId: null,
+        currentSessionId: null,
+        mode: null,
+        originalTabId: null,
+    });
+
+    // Clear popup so next icon click goes to onClicked handler
+    chrome.action.setPopup({ popup: '' });
+
+    // Close controller tab
+    if (controllerTabId) {
+        closeControllerTab(controllerTabId);
+    }
+}
+
+function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResponse: Function) {
+    if (!currentState) return sendResponse({ isRecording: false, startTime: 0 });
+
     sendResponse({
-        isRecording,
+        isRecording: currentState.isRecording,
         startTime: currentState.startTime,
         hasAudio: currentState.hasAudio,
         hasCamera: currentState.hasCamera,
@@ -683,54 +266,20 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
 }
 
 // --- Tab Removal Listener ---
-// Detect if the recorded tab or controller tab is closed
+// Detect if the controller tab is closed during recording
 chrome.tabs.onRemoved.addListener(async (tabId) => {
     await ensureState();
-    if (!currentState || !currentState.isRecording) return;
+    if (!currentState) return;
 
-    const isRecordedTab = currentState.mode === 'tab' && currentState.recordedTabId === tabId;
-    const isControllerTab = (currentState.mode === 'window' || currentState.mode === 'screen') && currentState.controllerTabId === tabId;
+    const isControllerTab = currentState.controllerTabId === tabId;
 
-    if (isRecordedTab || isControllerTab) {
-        handleStopSession(() => { }); // No response needed
+    if (isControllerTab && currentState.isRecording) {
+        // Controller closed while recording — auto-stop
+        handleStopSession(() => { });
+    } else if (isControllerTab && !currentState.isRecording) {
+        // Controller closed before recording started — just clear the ref
+        await saveState({ controllerTabId: null });
     }
-});
-
-// --- Camera Float Window Removal ---
-// If the float window (chrome.windows popup) is manually closed, clear state (recording continues)
-chrome.windows.onRemoved.addListener(async (windowId) => {
-    await ensureState();
-    if (currentState?.cameraFloatWindowId === windowId) {
-        await saveState({ cameraFloatWindowId: null });
-    }
-});
-
-// --- Tab Switch Detection (Tab Recording) ---
-// When recording a specific tab, detect if user switches to a different tab
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    await ensureState();
-    if (!currentState?.isRecording || currentState.mode !== 'tab') return;
-    if (activeInfo.tabId === currentState.recordedTabId) return;
-
-    // User switched away from the recorded tab — notify the new tab
-    chrome.tabs.sendMessage(activeInfo.tabId, {
-        type: MSG_TYPES.SHOW_TAB_SWITCH_TOAST,
-        payload: {}
-    }).catch(() => { /* tab may not have content script */ });
-});
-
-// --- Popup Lifecycle Detection (Port-based) ---
-// When the popup connects a port, we track it. On disconnect (popup closed),
-// close the camera float if no recording is active.
-chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'popup') return;
-
-    port.onDisconnect.addListener(async () => {
-        await ensureState();
-        if (!currentState?.isRecording) {
-            closeCameraFloat();
-        }
-    });
 });
 
 // --- Main Listener ---
@@ -738,51 +287,86 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     (async () => {
         await ensureState();
-        if (!currentState) return; // Should be set by ensureState
+        if (!currentState) return;
 
-
-        // 2. Command Routing
         switch (message.type) {
-            case MSG_TYPES.START_SESSION:
-                handleStartSession(message, sendResponse);
-                break; // Async response
-
             case MSG_TYPES.STOP_SESSION:
                 handleStopSession(sendResponse);
-                break; // Async response
+                break;
 
             case MSG_TYPES.GET_RECORDING_STATE:
                 handleGetRecordingState(_sender, sendResponse);
                 break;
 
-            case MSG_TYPES.PING_OFFSCREEN:
-                sendResponse("PONG");
-                break;
+            case MSG_TYPES.CONTROLLER_STARTED_RECORDING: {
+                // Controller tab tells us recording has begun
+                const { sessionId, mode, hasAudio, hasCamera, originalTabId } = message.payload || {};
+                const syncTimestamp = Date.now();
 
-            case MSG_TYPES.SWITCH_TO_RECORDING_TAB:
-                if (currentState?.recordedTabId) {
-                    chrome.tabs.update(currentState.recordedTabId, { active: true });
-                }
-                break;
-
-            case MSG_TYPES.OPEN_CAMERA_FLOAT: {
-                const { deviceId: floatDeviceId, mode: floatMode } = message.payload || {};
-                if (!floatDeviceId) {
-                    console.error('[background] OPEN_CAMERA_FLOAT missing deviceId');
-                    sendResponse({ success: false, error: 'Missing deviceId' });
-                    break;
-                }
-                openCameraFloat(floatDeviceId, floatMode || 'tab').then(windowId => {
-                    sendResponse({ success: true, windowId });
-                }).catch(err => {
-                    console.error('[background] Failed to open camera float:', err);
-                    sendResponse({ success: false, error: err.message });
+                await saveState({
+                    isRecording: true,
+                    controllerTabId: _sender.tab?.id || currentState.controllerTabId,
+                    startTime: syncTimestamp,
+                    currentSessionId: sessionId,
+                    mode: mode || 'window',
+                    originalTabId: originalTabId || currentState.originalTabId,
+                    hasAudio: hasAudio || false,
+                    hasCamera: hasCamera || false,
                 });
+
+                // Enable popup for stop-recording UI
+                chrome.action.setPopup({ popup: 'src/popup/index.html' });
+
+                // Start badge timer
+                startBadgeTimer();
+
+                trackRecordingStarted({
+                    mode: mode || 'window',
+                    hasAudio: hasAudio || false,
+                    hasCamera: hasCamera || false,
+                });
+
+                sendResponse({ success: true, startTime: syncTimestamp });
+                break;
+            }
+
+            case MSG_TYPES.CONTROLLER_STOPPED_RECORDING: {
+                // Controller has finished saving the recording data.
+                // Now clean up: open import page, reset state, close controller tab.
+                stopBadgeTimer();
+
+                if (currentState?.isRecording && currentState.startTime) {
+                    const duration_ms = Date.now() - currentState.startTime;
+                    trackRecordingFinished({
+                        mode: currentState.mode || 'window',
+                        duration_ms,
+                        hasAudio: currentState.hasAudio,
+                        hasCamera: currentState.hasCamera,
+                    });
+                }
+
+                // Broadcast stop to content scripts
+                const stopEventsMsg = {
+                    type: MSG_TYPES.STOP_RECORDING_EVENTS,
+                    payload: { sessionId: currentState?.currentSessionId }
+                };
+                const allTabs = await chrome.tabs.query({});
+                for (const tab of allTabs) {
+                    if (tab.id) {
+                        chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { });
+                    }
+                }
+
+                await handleRecordingFinished(
+                    currentState?.currentSessionId || null,
+                    currentState?.controllerTabId || null
+                );
+                sendResponse({ success: true });
                 break;
             }
         }
     })();
-    return true; // We always return true because of the async wrapper
+    return true; // Async response
 });
 
 // ============================================
@@ -810,8 +394,6 @@ const pendingHandoffs = new Map<string, {
 }>();
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-
-
     (async () => {
         switch (message.type) {
             case BRIDGE_MSG.HANDOFF_REQUEST:
@@ -828,18 +410,13 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
         }
     })();
 
-    return true; // Async response
+    return true;
 });
 
-/**
- * Handle HANDOFF_REQUEST: Return recording metadata (small payload).
- * The actual video data will be streamed via Port connection.
- */
 async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse: Function) {
     const { recordingId } = payload;
 
     try {
-        // Load RawRecording directly from storage
         const recording = await ProjectStorage.loadRawRecording(recordingId);
 
         if (!recording) {
@@ -854,7 +431,6 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             return;
         }
 
-        // Get the screen blob
         const screenBlobId = recording.screenSource.storageUrl.replace('recordio-blob://', '');
         const screenBlob = await ProjectStorage.getRecordingBlob(screenBlobId);
 
@@ -862,26 +438,20 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             throw new Error('Screen blob not found');
         }
 
-        // Get camera blob if exists
         let cameraBlob: Blob | undefined;
         if (recording.cameraSource?.storageUrl) {
             const cameraBlobId = recording.cameraSource.storageUrl.replace('recordio-blob://', '');
             cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
         }
 
-        // Get mic blob if exists
         let micBlob: Blob | undefined;
         if (recording.microphoneSource?.storageUrl) {
             const micBlobId = recording.microphoneSource.storageUrl.replace('recordio-blob://', '');
             micBlob = await ProjectStorage.getRecordingBlob(micBlobId);
         }
 
-        // Cache blobs for streaming phase
         pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob, micBlob });
 
-
-
-        // Send metadata response (small, under 64MB limit)
         const extensionDistinctId = await getDistinctId();
         const response: HandoffMetadataResponse = {
             success: true,
@@ -908,17 +478,11 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
     }
 }
 
-/**
- * Handle Port connections for streaming video chunks.
- * Website connects via chrome.runtime.connect(EXTENSION_ID, { name: 'recordio-handoff' })
- */
 chrome.runtime.onConnectExternal.addListener((port) => {
     if (port.name !== HANDOFF_PORT_NAME) {
         console.warn('[Background] Unknown port connection:', port.name);
         return;
     }
-
-
 
     port.onMessage.addListener(async (message) => {
         if (message.type === PORT_MSG.START_STREAM) {
@@ -926,14 +490,9 @@ chrome.runtime.onConnectExternal.addListener((port) => {
         }
     });
 
-    port.onDisconnect.addListener(() => {
-
-    });
+    port.onDisconnect.addListener(() => { });
 });
 
-/**
- * Stream video data in chunks via Port.
- */
 async function handleStartStream(port: chrome.runtime.Port, payload: StartStreamPayload) {
     const { recordingId } = payload;
 
@@ -949,26 +508,20 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
     const { screenBlob, cameraBlob, micBlob } = cached;
 
     try {
-        // Stream screen video chunks
         await streamBlobChunks(port, screenBlob, 'screen');
 
-        // Stream camera video chunks if present
         if (cameraBlob) {
             await streamBlobChunks(port, cameraBlob, 'camera');
         }
 
-        // Stream mic audio chunks if present
         if (micBlob) {
             await streamBlobChunks(port, micBlob, 'mic');
         }
 
-        // Signal completion
         port.postMessage({
             type: PORT_MSG.STREAM_COMPLETE,
             payload: { recordingId },
         });
-
-
 
     } catch (error) {
         console.error('[Background] Stream error:', error);
@@ -980,9 +533,6 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
     }
 }
 
-/**
- * Stream a blob in chunks via Port.
- */
 async function streamBlobChunks(
     port: chrome.runtime.Port,
     blob: Blob,
@@ -995,7 +545,6 @@ async function streamBlobChunks(
         const end = Math.min(start + CHUNK_SIZE, blob.size);
         const chunk = blob.slice(start, end);
 
-        // Convert chunk to ArrayBuffer, then to number array for structured clone
         const buffer = await chunk.arrayBuffer();
         const data = Array.from(new Uint8Array(buffer));
 
@@ -1010,26 +559,18 @@ async function streamBlobChunks(
             type: PORT_MSG.CHUNK,
             payload: chunkPayload,
         });
-
-
     }
 }
 
-/**
- * Handle HANDOFF_COMPLETE: Clean up extension storage.
- */
 async function handleHandoffComplete(payload: HandoffCompletePayload) {
     const { recordingId } = payload;
 
-    // Clear cache
     pendingHandoffs.delete(recordingId);
 
     try {
-        // Delete from extension storage after successful handoff
         await ProjectStorage.deleteRawRecording(recordingId);
     } catch (error) {
         console.error('[Background] Failed to delete recording:', error);
         captureException(error instanceof Error ? error : new Error(String(error)));
     }
 }
-
