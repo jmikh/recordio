@@ -176,7 +176,7 @@ export interface ExportCompletedParams {
     export_duration_ms: number;
 
     // Recording context
-    recording_type: 'tab' | 'window' | 'screen';
+    recording_current_window: boolean;
     input_duration_ms: number;
     output_duration_ms: number;
     first_url: string | null;
@@ -292,7 +292,7 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
 
     return {
         // Recording context
-        recording_type: screenSource.recordingType,
+        recording_current_window: !!screenSource.trackableContentRect,
         input_duration_ms: Math.round(timeline.durationMs),
         output_duration_ms: Math.round(timeMapper.outputDuration),
         first_url,
@@ -423,7 +423,7 @@ export interface ProjectCreatedParams {
     camera_on: boolean;
     has_system_audio: boolean;
     first_url: string | null;
-    recording_type: 'tab' | 'window' | 'screen';
+    recording_current_window: boolean;
     user_id: string | null;
     user_event_count: number;
     has_click_events: boolean;
@@ -450,10 +450,6 @@ export function trackProjectOpened() {
 
 export function trackEditorLoaded() {
     trackEvent('editor_loaded');
-}
-
-export function trackExtensionInstalled() {
-    trackEvent('extension_installed', {});
 }
 
 export function trackExtensionUninstalled() {

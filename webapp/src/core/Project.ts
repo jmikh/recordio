@@ -35,7 +35,6 @@ const createPlaceholderSource = (): ScreenMetadata => ({
     storageUrl: '',
     durationMs: 0,
     size: { width: 1920, height: 1080 },
-    recordingType: 'tab',
     hasAudio: false,
 });
 
@@ -99,12 +98,13 @@ const createDefaultSettings = (): ProjectSettings => ({
     },
 
     background: {
-        type: 'color',
+        type: 'preset',
         color: '#6078c4ff',
         gradientColors: ['#95a6f2ff', '#83689dff'],
         gradientDirection: 135,
         colorMode: 'gradient',
-        backgroundBlurPx: 0
+        backgroundBlurPx: 0,
+        imageUrl: '/assets/backgrounds/bg10.avif'
     },
 
     captions: {

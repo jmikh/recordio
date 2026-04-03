@@ -108,7 +108,7 @@ export const ScreenSettings = () => {
                     >
                         <div className="space-y-4">
                             <Toggle
-                                label="Custom Toolbar"
+                                label="Simplify Toolbar"
                                 value={toolbarEnabled}
                                 onChange={(val) => updateSettings({
                                     screen: { ...screenConfig, toolbar: { ...screenConfig.toolbar, enabled: val } }

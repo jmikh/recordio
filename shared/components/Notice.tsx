@@ -12,7 +12,7 @@ interface NoticeProps {
 export const Notice = ({ children, className = '' }: NoticeProps) => {
     return (
         <div
-            className={`font-normal flex items-start gap-3 text-sm text-disabled px-4 py-3 rounded-sm border border-border bg-state-inactive ${className}`}
+            className={`flex items-start gap-3 text-sm text-text-muted px-4 py-3 rounded-sm border border-border bg-state-inactive ${className}`}
         >
             {/* Exclamation Icon */}
             <div className="flex-shrink-0 mt-0.5">

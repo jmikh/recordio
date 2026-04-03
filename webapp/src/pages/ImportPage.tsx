@@ -124,7 +124,7 @@ export function ImportPage() {
                             camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
                             first_url: firstUrl,
-                            recording_type: recording.screenSource.recordingType,
+                            recording_current_window: !!recording.screenSource.trackableContentRect,
                             user_id: userId,
                             user_event_count: userEventCount,
                             has_click_events: events.mouseClicks.length > 0,
@@ -174,7 +174,7 @@ export function ImportPage() {
                             camera_on: !!state.cameraVideo,
                             has_system_audio: recording.screenSource.hasAudio,
                             first_url: firstUrl,
-                            recording_type: recording.screenSource.recordingType,
+                            recording_current_window: !!recording.screenSource.trackableContentRect,
                             user_id: userId,
                             user_event_count:
                                 events.mouseClicks.length + events.keyboardEvents.length +
@@ -231,7 +231,7 @@ export function ImportPage() {
                     camera_on: !!state.cameraVideo,
                     has_system_audio: recording?.screenSource.hasAudio ?? false,
                     first_url: firstUrl,
-                    recording_type: recording?.screenSource.recordingType ?? 'tab',
+                    recording_current_window: !!recording?.screenSource.trackableContentRect,
                     user_id: userId,
                     user_event_count: events
                         ? events.mouseClicks.length + events.keyboardEvents.length +

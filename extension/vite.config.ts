@@ -30,7 +30,6 @@ export default defineConfig(({ mode }) => ({
         sourcemap: mode === 'development',
         rollupOptions: {
             input: {
-                popup: resolve(__dirname, 'src/popup/index.html'),
                 controller: resolve(__dirname, 'src/controller/index.html'),
             },
             output: {},

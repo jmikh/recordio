@@ -16,7 +16,6 @@
 import { initSentry } from '../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
-import { BlurManager } from './blurManager';
 
 // Initialize Sentry for error tracking
 initSentry('content');
@@ -51,7 +50,6 @@ chrome.runtime.sendMessage({
 
 // --- State ---
 let eventRecorder: EventRecorder | null = null;
-const blurManager = new BlurManager();
 
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
@@ -62,14 +60,6 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
 
         case MSG_TYPES.STOP_RECORDING_EVENTS:
             handleStopRecording();
-            break;
-
-        case MSG_TYPES.ENABLE_BLUR_MODE:
-            blurManager.enable();
-            break;
-
-        case MSG_TYPES.DISABLE_BLUR_MODE:
-            blurManager.disable();
             break;
     }
 };
@@ -85,7 +75,6 @@ function handleStateResponse(response: any) {
 }
 
 function handleStartRecording(message: any) {
-    blurManager.disable(); // Ensure tool UI is gone before recording
     const startTime = message.payload?.startTime || Date.now();
     startRecording(startTime);
 }

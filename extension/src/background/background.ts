@@ -2,8 +2,7 @@
  * @fileoverview Background Service Worker (Thin Router)
  * 
  * Minimal orchestrator for the Recordio extension:
- * - Extension icon click → Opens/manages controller tab
- * - Tracks recording state for popup display
+ * - Extension icon click → Opens controller tab, or stops recording if active
  * - Handles website handoff (external message port streaming)
  * - Detects controller tab closure → auto-stop
  * 
@@ -33,7 +32,7 @@ const DEFAULT_STATE: RecordingState = {
     controllerTabId: null,
     startTime: 0,
     currentSessionId: null,
-    mode: null,
+    isCurrentWindow: false,
     originalTabId: null,
     hasAudio: false,
     hasCamera: false,
@@ -133,9 +132,11 @@ async function openControllerTab(): Promise<number> {
 import contentScriptPath from '../content/content.ts?script';
 
 chrome.runtime.onInstalled.addListener(async (details) => {
-    // Open welcome page on fresh install (not updates)
+    // Open controller on fresh install (not updates)
     if (details.reason === 'install') {
-        chrome.tabs.create({ url: getEditorOrigin() + '/welcome' });
+        const controllerTabId = await openControllerTab();
+        await ensureState();
+        await saveState({ controllerTabId });
     }
 
     // Set farewell page for uninstall
@@ -157,14 +158,19 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 // --- Extension Icon Click Handler ---
-// When not recording: open controller tab (no popup)
-// When recording: popup is already set, Chrome shows it automatically
+// When not recording: open controller tab
+// When recording: directly stop the recording (no popup)
 
 chrome.action.onClicked.addListener(async (tab) => {
     await ensureState();
 
     if (currentState?.isRecording) {
-        // This shouldn't fire when popup is set, but just in case
+        // Background-side cleanup (badge, analytics, content scripts)
+        handleStopSession(() => { });
+        // Broadcast STOP_SESSION so the controller tab receives it and stops the recorder.
+        // chrome.runtime.sendMessage delivers to all extension pages except the sender (background),
+        // so the controller's onMessage listener will pick this up and call stopRecording().
+        chrome.runtime.sendMessage({ type: MSG_TYPES.STOP_SESSION }).catch(() => { });
         return;
     }
 
@@ -195,7 +201,7 @@ async function handleStopSession(sendResponse: Function) {
     if (currentState?.isRecording && currentState.startTime) {
         const duration_ms = Date.now() - currentState.startTime;
         trackRecordingFinished({
-            mode: currentState.mode || 'window',
+            recording_current_window: currentState.isCurrentWindow,
             duration_ms,
             hasAudio: currentState.hasAudio,
             hasCamera: currentState.hasCamera,
@@ -240,12 +246,10 @@ async function handleRecordingFinished(sessionId: string | null, controllerTabId
         isRecording: false,
         controllerTabId: null,
         currentSessionId: null,
-        mode: null,
+        isCurrentWindow: false,
         originalTabId: null,
     });
 
-    // Clear popup so next icon click goes to onClicked handler
-    chrome.action.setPopup({ popup: '' });
 
     // Close controller tab
     if (controllerTabId) {
@@ -261,8 +265,41 @@ function handleGetRecordingState(_sender: chrome.runtime.MessageSender, sendResp
         startTime: currentState.startTime,
         hasAudio: currentState.hasAudio,
         hasCamera: currentState.hasCamera,
-        mode: currentState.mode
+        isCurrentWindow: currentState.isCurrentWindow,
+        originalTabId: currentState.originalTabId,
     });
+}
+
+/** Called when the controller tab is lost mid-recording (closed or navigated away).
+ *  This is a failed/aborted recording — just reset state, don't open import. */
+async function handleRecordingAborted(controllerTabId: number | null) {
+    stopBadgeTimer();
+
+    // Broadcast stop to content scripts
+    const stopEventsMsg = {
+        type: MSG_TYPES.STOP_RECORDING_EVENTS,
+        payload: { sessionId: currentState?.currentSessionId }
+    };
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+        if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { });
+        }
+    }
+
+    // Reset state only — no import page for aborted recordings
+    await saveState({
+        isRecording: false,
+        controllerTabId: null,
+        currentSessionId: null,
+        isCurrentWindow: false,
+        originalTabId: null,
+    });
+
+    // Close controller tab if it still exists
+    if (controllerTabId) {
+        closeControllerTab(controllerTabId);
+    }
 }
 
 // --- Tab Removal Listener ---
@@ -274,11 +311,32 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     const isControllerTab = currentState.controllerTabId === tabId;
 
     if (isControllerTab && currentState.isRecording) {
-        // Controller closed while recording — auto-stop
-        handleStopSession(() => { });
+        // Controller closed while recording — aborted, just clean up
+        await handleRecordingAborted(null); // tab is already gone
     } else if (isControllerTab && !currentState.isRecording) {
         // Controller closed before recording started — just clear the ref
         await saveState({ controllerTabId: null });
+    }
+});
+
+// --- Tab Navigation Listener ---
+// Detect if the controller tab navigates away (user types a URL, etc.)
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+    if (!changeInfo.url) return; // Only care about URL changes
+
+    await ensureState();
+    if (!currentState || currentState.controllerTabId !== tabId) return;
+
+    // Check if navigated away from the controller page
+    const controllerUrl = chrome.runtime.getURL('src/controller/index.html');
+    if (!changeInfo.url.startsWith(controllerUrl)) {
+        if (currentState.isRecording) {
+            // Navigated away during recording — aborted, just clean up
+            await handleRecordingAborted(tabId);
+        } else {
+            // Navigated away before recording — just clear the ref
+            await saveState({ controllerTabId: null });
+        }
     }
 });
 
@@ -300,7 +358,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
             case MSG_TYPES.CONTROLLER_STARTED_RECORDING: {
                 // Controller tab tells us recording has begun
-                const { sessionId, mode, hasAudio, hasCamera, originalTabId } = message.payload || {};
+                const { sessionId, isCurrentWindow, hasAudio, hasCamera, originalTabId } = message.payload || {};
                 const syncTimestamp = Date.now();
 
                 await saveState({
@@ -308,20 +366,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     controllerTabId: _sender.tab?.id || currentState.controllerTabId,
                     startTime: syncTimestamp,
                     currentSessionId: sessionId,
-                    mode: mode || 'window',
+                    isCurrentWindow: isCurrentWindow || false,
                     originalTabId: originalTabId || currentState.originalTabId,
                     hasAudio: hasAudio || false,
                     hasCamera: hasCamera || false,
                 });
 
-                // Enable popup for stop-recording UI
-                chrome.action.setPopup({ popup: 'src/popup/index.html' });
-
                 // Start badge timer
                 startBadgeTimer();
 
                 trackRecordingStarted({
-                    mode: mode || 'window',
+                    recording_current_window: isCurrentWindow || false,
                     hasAudio: hasAudio || false,
                     hasCamera: hasCamera || false,
                 });
@@ -332,30 +387,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
             case MSG_TYPES.CONTROLLER_STOPPED_RECORDING: {
                 // Controller has finished saving the recording data.
-                // Now clean up: open import page, reset state, close controller tab.
-                stopBadgeTimer();
-
-                if (currentState?.isRecording && currentState.startTime) {
-                    const duration_ms = Date.now() - currentState.startTime;
-                    trackRecordingFinished({
-                        mode: currentState.mode || 'window',
-                        duration_ms,
-                        hasAudio: currentState.hasAudio,
-                        hasCamera: currentState.hasCamera,
-                    });
-                }
-
-                // Broadcast stop to content scripts
-                const stopEventsMsg = {
-                    type: MSG_TYPES.STOP_RECORDING_EVENTS,
-                    payload: { sessionId: currentState?.currentSessionId }
-                };
-                const allTabs = await chrome.tabs.query({});
-                for (const tab of allTabs) {
-                    if (tab.id) {
-                        chrome.tabs.sendMessage(tab.id, stopEventsMsg).catch(() => { });
-                    }
-                }
+                // handleStopSession already handled badge, analytics, and content scripts.
+                // Just do final cleanup: open import page, reset state, close controller tab.
+                stopBadgeTimer(); // idempotent guard in case of edge cases
 
                 await handleRecordingFinished(
                     currentState?.currentSessionId || null,

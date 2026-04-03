@@ -58,7 +58,6 @@ interface BaseSourceMetadata {
  * Metadata for a screen recording source (tab, window, or screen capture).
  */
 export interface ScreenMetadata extends BaseSourceMetadata {
-    recordingType: 'tab' | 'window' | 'screen';
     /**
      * Trackable content area within the video frame (JavaScript-monitored region).
      * For window recordings: x,y = offset from video frame origin to content area origin.

@@ -10,7 +10,7 @@
  * Used by controller.ts (the controller tab handles all recording).
  */
 
-import type { RecorderMode, RecordingConfig } from './messageTypes';
+import type { RecordingConfig } from './messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
 import { captureException } from '../utils/sentry';
 import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
@@ -20,7 +20,6 @@ import type { RawRecording, RecordingPreferences } from '@shared/types';
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
 export class VideoRecorder {
-    private mode: RecorderMode;
     private state: RecorderState = 'idle';
     private currentSessionId: string;
     private config: RecordingConfig;
@@ -63,14 +62,10 @@ export class VideoRecorder {
     // Recording Preferences (post-processing hints)
     private recordingPreferences: RecordingPreferences | undefined;
 
-    // Audio Detection (AnalyserNode-based)
-    private audioAnalyser: AnalyserNode | null = null;
-    private audioDetectionInterval: ReturnType<typeof setInterval> | null = null;
-    private detectedScreenAudio = false;
 
-    constructor(sessionId: string, config: RecordingConfig, mode: RecorderMode) {
+
+    constructor(sessionId: string, config: RecordingConfig) {
         this.currentSessionId = sessionId;
-        this.mode = mode;
         this.config = config;
     }
 
@@ -123,10 +118,11 @@ export class VideoRecorder {
 
         await this.initializeStreams(this.config);
 
+        const screenStream = this.activeStreams[0];
+        const displaySurface = screenStream?.getVideoTracks()[0]?.getSettings()?.displaySurface;
+        
         // Detect Window if Window Mode
-        if (this.mode === 'window') {
-            const screenStream = this.activeStreams[0];
-            if (screenStream) {
+        if (displaySurface === 'window' && screenStream) {
                 // Clone stream for detection to avoid interfering with the main recorder stream
                 const detectionStream = screenStream.clone();
                 this.detectionResult = await detectControllerWindow(detectionStream);
@@ -145,10 +141,7 @@ export class VideoRecorder {
                     };
                 }
             }
-        }
 
-        // Set up audio analyser to detect actual audio content
-        this.setupAudioAnalyser();
 
         return this.detectionResult;
     }
@@ -161,8 +154,9 @@ export class VideoRecorder {
             throw new Error(`Cannot start recording: Recorder is in ${this.state} state. It must be in 'preparing' state.`);
         }
 
+        const displaySurface = this.activeStreams[0]?.getVideoTracks()[0]?.getSettings()?.displaySurface;
         // Update source name if we detected a Chrome window and have a tab title
-        if (this.mode === 'window' && this.detectionResult?.isControllerWindow && tabTitle) {
+        if (displaySurface === 'window' && this.detectionResult?.isControllerWindow && tabTitle) {
             this.config.sourceName = tabTitle;
         }
 
@@ -180,7 +174,6 @@ export class VideoRecorder {
 
         this.startTime = Date.now();
         this.state = 'recording';
-        this.startAudioDetection();
     }
 
     /**
@@ -189,18 +182,60 @@ export class VideoRecorder {
     public async finish(sessionId?: string): Promise<{ durationMs: number }> {
         this.validateSession(sessionId);
 
-        if (this.state !== 'recording') {
+        if (this.state !== 'recording' && this.state !== 'stopping') {
             console.warn(`[VideoRecorder] finish called but state is ${this.state}. Ignoring.`);
+            return { durationMs: 0 };
+        }
+
+        // Guard against double-finish (e.g., track ended + extension icon click race)
+        if (this.state === 'stopping') {
+            console.warn('[VideoRecorder] finish called while already stopping. Ignoring.');
             return { durationMs: 0 };
         }
 
         this.state = 'stopping';
 
-        // Stop Recorders
-        const stopPromises: Promise<void>[] = [];
-
+        // --- 1. Capture track metadata ---
+        // Try to get metadata from tracks. If tracks are already ended (Stop Sharing),
+        // getSettings() may return empty values, so we fall back to stored dimensions.
         let displaySurface: string | undefined;
         let screenFrameRate: number | undefined;
+        if (this.screenRecorder) {
+            const vt = this.screenRecorder.stream.getVideoTracks()[0];
+            if (vt) {
+                const set = vt.getSettings();
+                displaySurface = set?.displaySurface;
+                screenFrameRate = set?.frameRate;
+                if (set?.width && set?.height) {
+                    this.screenDimensions = { width: set.width, height: set.height };
+                }
+            }
+        }
+
+        let cameraFrameRate: number | undefined;
+        if (this.cameraRecorder) {
+            const vt = this.cameraRecorder.stream.getVideoTracks()[0];
+            if (vt) {
+                const settings = vt.getSettings();
+                cameraFrameRate = settings?.frameRate;
+                if (settings?.width && settings?.height) {
+                    this.cameraDimensions = { width: settings.width, height: settings.height };
+                }
+            }
+        }
+
+        // --- 2. Stop all live media tracks ---
+        for (const stream of this.activeStreams) {
+            for (const track of stream.getTracks()) {
+                if (track.readyState === 'live') {
+                    track.stop();
+                }
+            }
+        }
+
+        // --- 3. Stop MediaRecorders (skip if already inactive from Stop Sharing) ---
+        const stopPromises: Promise<void>[] = [];
+
         if (this.screenRecorder && this.screenRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
                 if (this.screenRecorder) {
@@ -208,17 +243,8 @@ export class VideoRecorder {
                     this.screenRecorder.stop();
                 } else resolve();
             }));
-            // Capture dims + frame rate
-            const vt = this.screenRecorder.stream.getVideoTracks()[0];
-            const set = vt?.getSettings();
-            displaySurface = set?.displaySurface;
-            screenFrameRate = set?.frameRate;
-            if (set && set.width && set.height) {
-                this.screenDimensions = { width: set.width, height: set.height };
-            }
         }
 
-        let cameraFrameRate: number | undefined;
         if (this.cameraRecorder && this.cameraRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
                 if (this.cameraRecorder) {
@@ -226,13 +252,6 @@ export class VideoRecorder {
                     this.cameraRecorder.stop();
                 } else resolve();
             }));
-            // Capture dims + frame rate
-            const vt = this.cameraRecorder.stream.getVideoTracks()[0];
-            const settings = vt?.getSettings();
-            cameraFrameRate = settings?.frameRate;
-            if (settings && settings.width && settings.height) {
-                this.cameraDimensions = { width: settings.width, height: settings.height };
-            }
         }
 
         if (this.micRecorder && this.micRecorder.state !== 'inactive') {
@@ -245,9 +264,8 @@ export class VideoRecorder {
         }
 
         await Promise.all(stopPromises);
-        this.stopAudioDetection();
 
-        // Save Data
+        // --- 4. Save Data ---
         const effectiveId = sessionId || this.currentSessionId;
         if (!effectiveId) throw new Error("No session ID available to save");
 
@@ -356,40 +374,47 @@ export class VideoRecorder {
             this.screenRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) this.screenData.push(e.data);
             };
+            this.screenRecorder.onerror = (e) => {
+                console.error('[VideoRecorder] screenRecorder.onerror fired:', e, 'state:', this.state);
+            };
+            // Note: onstop is set dynamically in finish(), but log unexpected stops here
+            const origOnStop = this.screenRecorder.onstop;
+            this.screenRecorder.onstop = (ev) => {
+                console.warn('[VideoRecorder] screenRecorder.onstop fired (outside finish). state:', this.state);
+                if (origOnStop) origOnStop.call(this.screenRecorder!, ev);
+            };
         }
         if (this.cameraRecorder) {
             this.cameraRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) this.cameraData.push(e.data);
+            };
+            this.cameraRecorder.onerror = (e) => {
+                console.error('[VideoRecorder] cameraRecorder.onerror fired:', e, 'state:', this.state);
             };
         }
         if (this.micRecorder) {
             this.micRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) this.micData.push(e.data);
             };
+            this.micRecorder.onerror = (e) => {
+                console.error('[VideoRecorder] micRecorder.onerror fired:', e, 'state:', this.state);
+            };
+        }
+
+        // Track 'ended' listeners — fires when Chrome's "Stop Sharing" is clicked
+        for (const stream of this.activeStreams) {
+            for (const track of stream.getTracks()) {
+                track.addEventListener('ended', () => {
+                    console.warn(`[VideoRecorder] Track ended: kind=${track.kind}, label="${track.label}", readyState=${track.readyState}, recorder state=${this.state}`);
+                });
+            }
         }
     }
 
     private async getScreenStream(config: RecordingConfig): Promise<MediaStream> {
-        // Window/Screen (desktop) mode: use sourceId from chooseDesktopMedia
-        const sourceId = config.sourceId;
-        if (!sourceId) throw new Error("Source ID is required for recording.");
-
-        // @ts-ignore
-        return await navigator.mediaDevices.getUserMedia({
-            audio: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: sourceId
-                }
-            },
-            video: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: sourceId,
-                    maxFrameRate: 60
-                }
-            }
-        } as any);
+        const stream = config.displayStream;
+        if (!stream) throw new Error("Display stream is required for recording.");
+        return stream;
     }
 
     // --- Storage ---    
@@ -404,9 +429,8 @@ export class VideoRecorder {
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
-        // Screen hasAudio: audio track exists AND actual audio content was detected
-        const hasAudioTrack = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
-        const screenHasAudio = hasAudioTrack && this.detectedScreenAudio;
+        // Screen hasAudio: directly map to whether an audio track exists in the display stream
+        const screenHasAudio = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
 
         // 2. Create Screen Source Metadata
         let trackableContentRect = this.viewportRect ?? undefined;
@@ -436,7 +460,6 @@ export class VideoRecorder {
             durationMs: duration,
             size: screenSize,
             frameRate: screenFrameRate,
-            recordingType: this.mode,
             trackableContentRect,
             hasAudio: screenHasAudio,
             createdAt: now,
@@ -479,7 +502,7 @@ export class VideoRecorder {
         // 5. Create & Save RawRecording
         const rawRecording: RawRecording = {
             id: projectId,
-            name: this.config.sourceName || this.mode,
+            name: this.config.sourceName || "Recording",
             timestamp: now,
             screenSource,
             cameraSource,
@@ -497,57 +520,16 @@ export class VideoRecorder {
     // --- Cleanup ---
 
     private releaseStreams() {
-        this.stopAudioDetection();
-        this.activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
-        this.activeStreams = [];
-
         if (this.audioContext) {
             this.audioContext.close();
             this.audioContext = null;
         }
-        this.audioAnalyser = null;
         this.state = 'idle';
     }
 
     // --- Audio Detection ---
 
-    private setupAudioAnalyser() {
-        const screenStream = this.activeStreams[0];
-        if (!screenStream || screenStream.getAudioTracks().length === 0) return;
 
-        try {
-            const ctx = this.audioContext || new AudioContext();
-            if (!this.audioContext) this.audioContext = ctx;
-
-            const source = ctx.createMediaStreamSource(screenStream);
-            this.audioAnalyser = ctx.createAnalyser();
-            this.audioAnalyser.fftSize = 2048;
-            source.connect(this.audioAnalyser);
-        } catch (e) {
-            console.warn('[VideoRecorder] Failed to set up audio analyser:', e);
-        }
-    }
-
-    private startAudioDetection() {
-        if (!this.audioAnalyser) return;
-
-        const dataArray = new Float32Array(this.audioAnalyser.fftSize);
-        this.audioDetectionInterval = setInterval(() => {
-            if (!this.audioAnalyser) return;
-            this.audioAnalyser.getFloatTimeDomainData(dataArray);
-            const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
-            if (rms > 0.001) {
-                this.detectedScreenAudio = true;
-            }
-        }, 500);
-    }
-
-    private stopAudioDetection() {
-        if (this.audioDetectionInterval) {
-            clearInterval(this.audioDetectionInterval);
-            this.audioDetectionInterval = null;
-        }
-    }
 
     private validateSession(sessionId?: string) {
         if (sessionId && sessionId !== this.currentSessionId) {

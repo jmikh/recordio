@@ -12,10 +12,10 @@ const IS_PRODUCTION = import.meta.env.MODE === "production";
 // Global scope instance for capturing errors
 let sentryScope: Scope | null = null;
 
-export function initSentry(context: "editor" | "popup" | "background" | "content" | "controller" | "offscreen") {
+export function initSentry(context: "editor" | "background" | "content" | "controller" | "welcome") {
     // Isolated contexts (extension pages) can safely use global integrations
     // Content scripts must filter them to avoid conflicts with websites that use Sentry
-    const isIsolatedContext = context === "editor" || context === "popup" || context === "controller" || context === "offscreen";
+    const isIsolatedContext = context === "editor" || context === "controller" || context === "welcome";
 
     const integrations = getDefaultIntegrations({}).filter(
         (defaultIntegration) => {
@@ -31,12 +31,12 @@ export function initSentry(context: "editor" | "popup" | "background" | "content
         },
     );
 
-    // Safely get extension version (offscreen documents have limited chrome API access)
+    // Safely get extension version
     let extensionVersion = 'unknown';
     try {
         extensionVersion = chrome.runtime.getManifest?.()?.version || 'unknown';
     } catch {
-        // Offscreen documents may not have access to getManifest
+        // Some contexts may not have access to getManifest
     }
 
     const client = new BrowserClient({

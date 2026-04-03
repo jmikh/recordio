@@ -37,7 +37,6 @@ export default defineConfig(function (_a) {
         base: './',
         build: __assign({ outDir: resolve(__dirname, 'dist'), minify: mode === 'development' ? false : 'esbuild', sourcemap: mode === 'development', rollupOptions: {
                 input: {
-                    popup: resolve(__dirname, 'src/popup/index.html'),
                     controller: resolve(__dirname, 'src/controller/index.html'),
                 },
                 output: {},

@@ -81,7 +81,7 @@ async function track(eventName: string, properties: Record<string, any> = {}) {
 // ============================================================================
 
 export function trackRecordingStarted(props: {
-    mode: string;
+    recording_current_window: boolean;
     hasAudio: boolean;
     hasCamera: boolean;
 }) {
@@ -89,7 +89,7 @@ export function trackRecordingStarted(props: {
 }
 
 export function trackRecordingFinished(props: {
-    mode: string;
+    recording_current_window: boolean;
     duration_ms: number;
     hasAudio: boolean;
     hasCamera: boolean;
@@ -104,4 +104,8 @@ export function trackRecordingErrored(props: {
     hasCamera: boolean;
 }) {
     track('recording_errored', props);
+}
+
+export function trackExtensionInstalled() {
+    track('extension_installed');
 }

@@ -59,12 +59,12 @@ export const Toggle: React.FC<ToggleProps> = ({
                 style={transitionStyle}
                 className={`
                     absolute
-                    w-4 h-4
+                    w-3 h-3
                     rounded-full
                     shadow-sm
                     transition-transform
                     group-hover:scale-110
-                    ${value ? 'left-[calc(100%-1.25rem)]' : 'left-1'}
+                    ${value ? 'left-[calc(100%-1rem)]' : 'left-1'}
                     ${value ? 'bg-text-on-primary' : 'bg-text-muted'}
                 `}
             />

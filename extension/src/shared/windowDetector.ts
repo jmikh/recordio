@@ -34,15 +34,27 @@ export async function detectControllerWindow(stream: MediaStream): Promise<Windo
     };
 
     return new Promise((resolve) => {
-        // Timeout Safety
+        // Timeout Safety — generous to handle slow stream initialization when switching sources
         const timeoutId = setTimeout(() => {
             console.warn("[VideoValidation] Stream Validation timed out. Returning invalid.");
             cleanup();
             resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
-        }, 1500);
+        }, 4000);
 
-        const extractFrame = () => {
+        const tryExtractFrame = (retriesLeft: number) => {
             try {
+                // Video dimensions may not be ready yet on newly-switched streams
+                if (video.videoWidth === 0 || video.videoHeight === 0) {
+                    if (retriesLeft > 0) {
+                        setTimeout(() => tryExtractFrame(retriesLeft - 1), 200);
+                        return;
+                    }
+                    // Give up after retries
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    return resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
+                }
+
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -51,7 +63,6 @@ export async function detectControllerWindow(stream: MediaStream): Promise<Windo
                 if (!ctx) {
                     clearTimeout(timeoutId);
                     cleanup();
-                    // Resolve invalid rather than reject
                     return resolve({ isControllerWindow: false, xOffset: 0, yOffset: 0 });
                 }
 
@@ -78,9 +89,9 @@ export async function detectControllerWindow(stream: MediaStream): Promise<Windo
         };
 
         video.onplaying = () => {
-            // Give it a small delay to ensure frame is painted
+            // Give it a small delay to ensure frame is painted, then try with retries
             requestAnimationFrame(() => {
-                extractFrame(); // or wait a bit more?
+                tryExtractFrame(5);
             });
         };
 
