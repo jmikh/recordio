@@ -24,7 +24,7 @@ import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
 import { MdFiberManualRecord, MdPictureInPicture } from 'react-icons/md';
-import { FiSquare, FiFolder } from 'react-icons/fi';
+import { FiSquare, FiFolder, FiX } from 'react-icons/fi';
 import { TbScreenShare, TbZoomIn } from 'react-icons/tb';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { CgToolbarTop, CgScreen } from 'react-icons/cg';
@@ -68,6 +68,7 @@ export function ControllerApp() {
     const [applySpotlight, setApplySpotlight] = useState(true);
     const [simplifyToolbar, setSimplifyToolbar] = useState(false);
     const [isEffectsExpanded, setIsEffectsExpanded] = useState(false);
+    const [hideTimerHint, setHideTimerHint] = useState(false);
 
     // --- Recording ---
     const recorderRef = useRef<VideoRecorder | null>(null);
@@ -121,6 +122,7 @@ export function ControllerApp() {
                 if (typeof prefs.applySpotlight === 'boolean') setApplySpotlight(prefs.applySpotlight);
                 if (typeof prefs.simplifyToolbar === 'boolean') setSimplifyToolbar(prefs.simplifyToolbar);
                 if (typeof prefs.isEffectsExpanded === 'boolean') setIsEffectsExpanded(prefs.isEffectsExpanded);
+                if (typeof prefs.hideTimerHint === 'boolean') setHideTimerHint(prefs.hideTimerHint);
             }
             setPrefsLoaded(true);
         });
@@ -139,9 +141,10 @@ export function ControllerApp() {
                 applySpotlight,
                 simplifyToolbar,
                 isEffectsExpanded,
+                hideTimerHint,
             }
         });
-    }, [isAudioEnabled, isVideoEnabled, selectedAudioId, selectedVideoId, applyAutoZoom, applySpotlight, simplifyToolbar, isEffectsExpanded, prefsLoaded]);
+    }, [isAudioEnabled, isVideoEnabled, selectedAudioId, selectedVideoId, applyAutoZoom, applySpotlight, simplifyToolbar, isEffectsExpanded, hideTimerHint, prefsLoaded]);
 
     // Populate devices on load
     useEffect(() => {
@@ -828,46 +831,51 @@ export function ControllerApp() {
                                         }
                                     >
                                         <div className="flex flex-col gap-2 pt-2">
-                                            {hasSource && !showPostProcessing && (
+                                            {hasSource && !showPostProcessing ? (
                                                 <Notice>
                                                     Detected you're sharing {previewStream?.getVideoTracks()[0]?.getSettings()?.displaySurface === 'monitor' ? 'your desktop' : 'an external window'}. Auto effects only work when recording this window.
                                                 </Notice>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 text-text-muted">
+                                                            <span className="text-sm">Auto Zoom</span>
+                                                            <InfoTooltip
+                                                                placement="top-right"
+                                                                description="Recordio doesn't just follow the cursor. It understands the layout of all elements you are interacting with, producing meaningful zooms."
+                                                                videoSrc="https://cdn.recordio.cc/demos/zoom.webm"
+                                                            />
+                                                        </div>
+                                                        <Toggle value={applyAutoZoom} onChange={setApplyAutoZoom} />
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 text-text-muted">
+                                                            <span className="text-sm">Auto Spotlight</span>
+                                                            <InfoTooltip
+                                                                placement="top-right"
+                                                                description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
+                                                                videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
+                                                            />
+                                                        </div>
+                                                        <Toggle value={applySpotlight} onChange={setApplySpotlight} />
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 text-text-muted">
+                                                            <span className="text-sm">Simplify Toolbar</span>
+                                                            <InfoTooltip
+                                                                placement="top-right"
+                                                                description="Replace messy browser toolbars with a clean, unified macOS-style window header in your final video."
+                                                                videoSrc="https://cdn.recordio.cc/demos/toolbar.webm"
+                                                            />
+                                                        </div>
+                                                        <Toggle value={simplifyToolbar} onChange={setSimplifyToolbar} />
+                                                    </div>
+                                                </>
                                             )}
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-text-muted">
-                                                    <span className="text-sm">Auto Zoom</span>
-                                                    <InfoTooltip
-                                                        placement="top-right"
-                                                        description="Recordio doesn't just follow the cursor. It understands the layout of all elements you are interacting with, producing meaningful zooms."
-                                                        videoSrc="https://cdn.recordio.cc/demos/zoom.webm"
-                                                    />
-                                                </div>
-                                                <Toggle value={applyAutoZoom} onChange={setApplyAutoZoom} />
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-text-muted">
-                                                    <span className="text-sm">Auto Spotlight</span>
-                                                    <InfoTooltip
-                                                        placement="top-right"
-                                                        description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
-                                                        videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
-                                                    />
-                                                </div>
-                                                <Toggle value={applySpotlight} onChange={setApplySpotlight} />
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-text-muted">
-                                                    <span className="text-sm">Simplify Toolbar</span>
-                                                    <InfoTooltip
-                                                        placement="top-right"
-                                                        description="Replace messy browser toolbars with a clean, unified macOS-style window header in your final video."
-                                                        videoSrc="https://cdn.recordio.cc/demos/toolbar.webm"
-                                                    />
-                                                </div>
-                                                <Toggle value={simplifyToolbar} onChange={setSimplifyToolbar} />
-                                            </div>
                                         </div>
-                                        <p className="text-xs text-text-disabled mt-3">These settings can be changed in the editor later.</p>
+                                        {(!hasSource || showPostProcessing) && (
+                                            <p className="text-xs text-text-disabled mt-3">These settings can be changed in the editor later.</p>
+                                        )}
                                     </CollapsibleCard>
 
                                     <div className="flex flex-col gap-2">
@@ -909,30 +917,40 @@ export function ControllerApp() {
                                         )}
 
                                         {/* Extension icon timer hint */}
-                                        <div className="flex items-center gap-3 mt-3 px-3 py-3 rounded-lg bg-surface-raised border border-border">
-                                            <img src={iconWithTimer} alt="Extension icon with timer" className="w-[72px] h-auto shrink-0" />
-                                            <p className="text-xs text-text-muted leading-relaxed relative">
-                                                While recording, the extension icon shows elapsed time. Click on it to finish recording.
-                                                {!isPinned && (
-                                                    <>
-                                                        {' '}Make sure to{' '}
-                                                        <span
-                                                            className="underline decoration-text-muted/50 underline-offset-2 cursor-pointer text-text-highlighted focus:outline-none"
-                                                            onMouseEnter={() => setIsHoveringPin(true)}
-                                                            onMouseLeave={() => setIsHoveringPin(false)}
-                                                        >
-                                                            Pin it
-                                                        </span>.
+                                        {!hideTimerHint && (
+                                            <div className="flex items-start gap-3 mt-3 px-3 py-3 rounded-lg bg-surface-raised border border-border">
+                                                <img src={iconWithTimer} alt="Extension icon with timer" className="w-[72px] h-auto shrink-0 mt-0.5" />
+                                                <div className="flex flex-col gap-1.5 flex-1">
+                                                    <p className="text-xs text-text-muted leading-relaxed">
+                                                        While recording, the extension icon shows elapsed time. Click on it to finish recording.
+                                                        {!isPinned && (
+                                                            <>
+                                                                {' '}Make sure to{' '}
+                                                                <span
+                                                                    className="underline decoration-text-muted/50 underline-offset-2 cursor-pointer text-text-highlighted focus:outline-none"
+                                                                    onMouseEnter={() => setIsHoveringPin(true)}
+                                                                    onMouseLeave={() => setIsHoveringPin(false)}
+                                                                >
+                                                                    Pin it
+                                                                </span>.
 
-                                                        {isHoveringPin && (
-                                                            <span className="absolute bottom-full right-0 mb-2 p-1.5 bg-surface border border-border shadow-float rounded-xl z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-                                                                <img src="/assets/welcome/pin.png" alt="Pin instructions" className="w-[280px] h-auto rounded-lg outline outline-1 outline-black/5 block" />
-                                                            </span>
+                                                                {isHoveringPin && (
+                                                                    <span className="absolute bottom-full right-0 mb-2 p-1.5 bg-surface border border-border shadow-float rounded-xl z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+                                                                        <img src="/assets/welcome/pin.png" alt="Pin instructions" className="w-[280px] h-auto rounded-lg outline outline-1 outline-black/5 block" />
+                                                                    </span>
+                                                                )}
+                                                            </>
                                                         )}
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
+                                                    </p>
+                                                    <button
+                                                        onClick={() => setHideTimerHint(true)}
+                                                        className="self-start text-[11px] font-medium text-text-disabled hover:text-text-main transition-colors"
+                                                    >
+                                                        Don't show again
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
