@@ -37,6 +37,7 @@ import iconWithTimer from '../assets/icon-with-timer.png';
 import '@shared/components/LogoLink.css';
 
 type ControllerPhase = 'setup' | 'recording';
+type ControllerTab = 'mic' | 'camera' | 'screen' | 'effects';
 
 export function ControllerApp() {
     // --- Phase ---
@@ -62,12 +63,14 @@ export function ControllerApp() {
     const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
     const [prefsLoaded, setPrefsLoaded] = useState(false);
     const [showPermissionModal, setShowPermissionModal] = useState(false);
+    const [audioLevel, setAudioLevel] = useState(0);
 
     // --- Post-Processing Preferences (only for Chrome window recordings) ---
     const [applyAutoZoom, setApplyAutoZoom] = useState(true);
     const [applySpotlight, setApplySpotlight] = useState(true);
     const [simplifyToolbar, setSimplifyToolbar] = useState(false);
     const [isEffectsExpanded, setIsEffectsExpanded] = useState(false);
+    const [activeTab, setActiveTab] = useState<ControllerTab>('screen');
     const [hideTimerHint, setHideTimerHint] = useState(false);
 
     // --- Recording ---
@@ -218,6 +221,56 @@ export function ControllerApp() {
             videoStream?.getTracks().forEach(t => t.stop());
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Audio level monitoring (single AudioContext, created in parent where user gesture is available)
+    useEffect(() => {
+        if (!isAudioEnabled || !audioStream) {
+            setAudioLevel(0);
+            return;
+        }
+
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        const source = ctx.createMediaStreamSource(audioStream);
+        source.connect(analyser);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        let smoothed = 0;
+        let rafId: number;
+
+        const tick = () => {
+            rafId = requestAnimationFrame(tick);
+            analyser.getByteTimeDomainData(dataArray);
+
+            let sumSquares = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const norm = (dataArray[i] / 128.0) - 1.0;
+                sumSquares += norm * norm;
+            }
+            const rms = Math.sqrt(sumSquares / bufferLength);
+            let target = rms * 4;
+            if (target > 1) target = 1;
+
+            smoothed += (target - smoothed) * 0.25;
+            setAudioLevel(smoothed);
+        };
+
+        tick();
+
+        return () => {
+            cancelAnimationFrame(rafId);
+            source.disconnect();
+            analyser.disconnect();
+            if (ctx.state !== 'closed') ctx.close().catch(() => { });
+        };
+    }, [isAudioEnabled, audioStream]);
+
 
     // --- Calibration Marker (for window detection) ---
     // Rendered as fixed-position divs in the DOM
@@ -650,13 +703,13 @@ export function ControllerApp() {
             ) : (
                 <div className="flex-1 w-full flex flex-col overflow-y-auto">
                     <div className="w-full flex-1 bg-[rgb(234,231,255)] border-b border-border">
-                        <main className="w-full max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 pb-20 flex flex-col items-center justify-start">
+                        <main className="w-full max-w-xl mx-auto p-4 sm:p-6 lg:p-8 pb-20 flex flex-col items-center justify-start">
                             <div className="animate-in fade-in duration-300 w-full">
 
                                 <div className="flex items-center justify-between w-full mb-6">
                                     <div className="flex items-center gap-3">
                                         <img src={logoSquare} alt="Record" className="w-6 h-6" />
-                                        <h1 className="text-xl font-semibold text-text-main">Start a new recording</h1>
+                                        <h1 className="text-xl font-semibold text-text-main">Start a Aew Recording</h1>
                                     </div>
                                     <Button variant="ghost" onClick={() => window.open(getEditorOrigin(), '_blank')}>
                                         <FiFolder size={16} />
@@ -664,145 +717,254 @@ export function ControllerApp() {
                                     </Button>
                                 </div>
 
-                                {/* Three equal boxes: Mic | Camera | Share Screen */}
-                                <div className="grid grid-cols-3 gap-4">
-                                    {/* ─── Microphone Box ─── */}
-                                    <div className="bg-surface-raised rounded-xl border border-border flex flex-col overflow-hidden">
-                                        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                                            <span className="text-sm font-medium text-text-main flex items-center gap-2">
-                                                <BiMicrophone size={16} />
+                                {/* Three accordion tabs: Mic | Camera | Share Screen */}
+                                <div className="flex flex-col gap-2">
+                                    {/* ─── Microphone Tab ─── */}
+                                    <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${activeTab === 'mic' ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
+                                        <button
+                                            className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
+                                            onClick={() => setActiveTab('mic')}
+                                        >
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'mic' ? 'text-primary' : 'text-text-main'}`}>
+                                                {isAudioEnabled ? <BiMicrophone size={16} /> : <BiMicrophoneOff size={16} />}
                                                 Microphone
                                             </span>
-                                            <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
-                                        </div>
-                                        <div className="flex flex-col items-center justify-center p-4 h-[240px]">
-                                            {isAudioEnabled ? (
-                                                <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                                    <div className="flex-1 flex items-center justify-center">
-                                                        <AudioVisualizer stream={audioStream} />
-                                                    </div>
-                                                    <div className="w-full relative z-20 mt-auto">
-                                                        <Dropdown
-                                                            options={audioDevices.map(d => ({
-                                                                value: d.deviceId,
-                                                                label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
-                                                            }))}
-                                                            value={selectedAudioId}
-                                                            onChange={setSelectedAudioId}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
-                                                    <BiMicrophoneOff size={36} />
-                                                    <span className="text-sm">Microphone off</span>
-                                                </div>
+                                            {activeTab !== 'mic' && isAudioEnabled && (
+                                                <AudioWaveformLine level={audioLevel} />
                                             )}
+                                            <div onClick={e => { if (isAudioEnabled) e.stopPropagation(); }}>
+                                                <Toggle value={isAudioEnabled} onChange={handleAudioToggle} />
+                                            </div>
+                                        </button>
+                                        <div
+                                            className="overflow-hidden transition-all duration-300 ease-in-out"
+                                            style={{ maxHeight: activeTab === 'mic' ? '300px' : '0px', opacity: activeTab === 'mic' ? 1 : 0 }}
+                                        >
+                                            <div className="px-4 pb-4 border-t border-border">
+                                                <div className="flex flex-col items-center justify-center h-[220px] pt-3">
+                                                    {isAudioEnabled ? (
+                                                        <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
+                                                            <div className="flex-1 flex items-center justify-center">
+                                                                <AudioVisualizer stream={audioStream} />
+                                                            </div>
+                                                            <div className="w-full relative z-20 mt-auto">
+                                                                <Dropdown
+                                                                    options={audioDevices.map(d => ({
+                                                                        value: d.deviceId,
+                                                                        label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
+                                                                    }))}
+                                                                    value={selectedAudioId}
+                                                                    onChange={setSelectedAudioId}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
+                                                            <BiMicrophoneOff size={36} />
+                                                            <span className="text-sm">Microphone off</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* ─── Camera Box ─── */}
-                                    <div className="bg-surface-raised rounded-xl border border-border flex flex-col overflow-hidden">
-                                        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                                            <span className="text-sm font-medium text-text-main flex items-center gap-2">
-                                                <PiWebcamBold size={16} />
+                                    {/* ─── Camera Tab ─── */}
+                                    <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${activeTab === 'camera' ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
+                                        <button
+                                            className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
+                                            onClick={() => setActiveTab('camera')}
+                                        >
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'camera' ? 'text-primary' : 'text-text-main'}`}>
+                                                {isVideoEnabled ? <PiWebcamBold size={16} /> : <PiWebcamSlashBold size={16} />}
                                                 Camera
                                             </span>
-                                            <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
-                                        </div>
-                                        <div className="flex flex-col items-center justify-center p-4 h-[240px] overflow-y-auto scrollbar-hide">
-                                            {isVideoEnabled ? (
-                                                <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                                    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-border flex justify-center">
-                                                        <video
-                                                            ref={cameraVideoRef}
-                                                            autoPlay
-                                                            muted
-                                                            playsInline
-                                                            className="w-full h-auto block transform -scale-x-100"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div className="flex items-center gap-1.5 text-sm text-text-muted">
-                                                            <MdPictureInPicture size={16} />
-                                                            <span>Float Camera</span>
-                                                            <InfoTooltip
-                                                                placement="top-right"
-                                                                description="Float the camera in a mini window so you can see yourself while recording. If recording your entire screen, keep it outside the recorded area."
-                                                            />
+                                            <div onClick={e => { if (isVideoEnabled) e.stopPropagation(); }}>
+                                                <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
+                                            </div>
+                                        </button>
+                                        <div
+                                            className="overflow-hidden transition-all duration-300 ease-in-out"
+                                            style={{ maxHeight: activeTab === 'camera' ? '360px' : '0px', opacity: activeTab === 'camera' ? 1 : 0 }}
+                                        >
+                                            <div className="px-4 pb-4 border-t border-border">
+                                                <div className="flex flex-col items-center justify-center h-[240px] pt-3 overflow-y-auto scrollbar-hide">
+                                                    {isVideoEnabled ? (
+                                                        <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
+                                                            <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-border flex justify-center">
+                                                                <video
+                                                                    ref={cameraVideoRef}
+                                                                    autoPlay
+                                                                    muted
+                                                                    playsInline
+                                                                    className="w-full h-auto block transform -scale-x-100"
+                                                                />
+                                                            </div>
+                                                            <div className="w-full relative z-10 mt-auto">
+                                                                <Dropdown
+                                                                    options={videoDevices.map(d => ({
+                                                                        value: d.deviceId,
+                                                                        label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
+                                                                    }))}
+                                                                    value={selectedVideoId}
+                                                                    onChange={setSelectedVideoId}
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <Toggle value={!!pipWindow} onChange={(v) => v ? openPiP() : pipWindow?.close()} />
-                                                    </div>
-                                                    <div className="w-full relative z-10 mt-auto">
-                                                        <Dropdown
-                                                            options={videoDevices.map(d => ({
-                                                                value: d.deviceId,
-                                                                label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
-                                                            }))}
-                                                            value={selectedVideoId}
-                                                            onChange={setSelectedVideoId}
-                                                        />
-                                                    </div>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
+                                                            <PiWebcamSlashBold size={36} />
+                                                            <span className="text-sm">Camera off</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
-                                                    <PiWebcamSlashBold size={36} />
-                                                    <span className="text-sm">Camera off</span>
-                                                </div>
-                                            )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* ─── Share Screen Box ─── */}
-                                    <div className="bg-surface-raised rounded-xl border border-border flex flex-col overflow-hidden">
-                                        <div className="flex items-center px-4 py-3 border-b border-border">
-                                            <span className="text-sm font-medium text-text-main flex items-center gap-2">
+                                    {/* ─── Share Screen Tab ─── */}
+                                    <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${activeTab === 'screen' ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
+                                        <button
+                                            className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
+                                            onClick={() => setActiveTab('screen')}
+                                        >
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'screen' ? 'text-primary' : 'text-text-main'}`}>
                                                 <CgScreen size={16} />
                                                 Share Screen
                                             </span>
-                                        </div>
-                                        <div className="flex flex-col p-4 h-[240px]">
-                                            {hasSource ? (
-                                                <div className="flex-1 flex flex-col items-center w-full min-h-0 animate-in fade-in duration-200">
-                                                    <div className="flex-1 w-full bg-black rounded-lg overflow-hidden border border-border flex items-center justify-center min-h-0">
-                                                        <video
-                                                            ref={previewVideoRef}
-                                                            autoPlay
-                                                            muted
-                                                            playsInline
-                                                            className="w-full h-full object-contain bg-black"
-                                                        />
+                                            {activeTab !== 'screen' && (
+                                                <span className="text-xs font-normal text-text-muted">
+                                                    {hasSource ? sharingLabel : 'Not sharing'}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <div
+                                            className="overflow-hidden transition-all duration-300 ease-in-out"
+                                            style={{ maxHeight: activeTab === 'screen' ? '360px' : '0px', opacity: activeTab === 'screen' ? 1 : 0 }}
+                                        >
+                                            <div className="px-4 pb-4 border-t border-border">
+                                                <div className="flex flex-col h-[260px] pt-3">
+                                                    {hasSource ? (
+                                                        <div className="flex-1 flex flex-col items-center w-full min-h-0 animate-in fade-in duration-200">
+                                                            <div className="flex-1 w-full bg-black rounded-lg overflow-hidden border border-border flex items-center justify-center min-h-0">
+                                                                <video
+                                                                    ref={previewVideoRef}
+                                                                    autoPlay
+                                                                    muted
+                                                                    playsInline
+                                                                    className="w-full h-full object-contain bg-black"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col flex-1 items-center justify-center pb-2 w-full min-h-0">
+                                                            <button
+                                                                className="relative flex items-center justify-center shrink-0 cursor-pointer hover:scale-105 transition-transform duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full"
+                                                                style={{ width: 80, height: 80 }}
+                                                                onClick={chooseSource}
+                                                                disabled={isChoosing}
+                                                                aria-label="Share screen"
+                                                            >
+                                                                {/* Emitting ripple rings */}
+                                                                <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationFillMode: 'backwards' }} />
+                                                                <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationDelay: '0.8s', animationFillMode: 'backwards' }} />
+                                                                <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationDelay: '1.6s', animationFillMode: 'backwards' }} />
+                                                                {/* Fixed center icon */}
+                                                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/25 z-10">
+                                                                    <CgScreen size={24} className="text-primary text-opacity-80" />
+                                                                </div>
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="w-full relative z-20 mt-auto pt-3 shrink-0">
+                                                        <Button
+                                                            onClick={chooseSource}
+                                                            disabled={isChoosing}
+                                                            className="w-full shadow-sm"
+                                                        >
+                                                            {isChoosing ? 'Waiting...' : hasSource ? 'Change screen' : 'Share screen'}
+                                                        </Button>
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                <div className="flex flex-col flex-1 items-center justify-center pb-2 w-full min-h-0">
-                                                    <button
-                                                        className="relative flex items-center justify-center shrink-0 cursor-pointer hover:scale-105 transition-transform duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full"
-                                                        style={{ width: 80, height: 80 }}
-                                                        onClick={chooseSource}
-                                                        disabled={isChoosing}
-                                                        aria-label="Share screen"
-                                                    >
-                                                        {/* Emitting ripple rings */}
-                                                        <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationFillMode: 'backwards' }} />
-                                                        <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationDelay: '0.8s', animationFillMode: 'backwards' }} />
-                                                        <div className="absolute inset-0 rounded-full border border-primary/40" style={{ opacity: 0, animation: 'ripple-out 2.4s ease-out infinite', animationDelay: '1.6s', animationFillMode: 'backwards' }} />
-                                                        {/* Fixed center icon */}
-                                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/25 z-10">
-                                                            <CgScreen size={24} className="text-primary text-opacity-80" />
-                                                        </div>
-                                                    </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* ─── Effects Settings Tab ─── */}
+                                    <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${activeTab === 'effects' ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
+                                        <button
+                                            className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
+                                            onClick={() => setActiveTab('effects')}
+                                        >
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'effects' ? 'text-primary' : 'text-text-main'}`}>
+                                                <IoSettingsOutline size={16} />
+                                                Effects Settings
+                                            </span>
+                                            {activeTab !== 'effects' && (
+                                                <div className="flex items-center gap-2">
+                                                    {hasSource && !showPostProcessing ? (
+                                                        <span className="text-xs font-normal text-text-disabled">Unavailable</span>
+                                                    ) : (
+                                                        <>
+                                                            <div className={`flex items-center gap-1 ${applyAutoZoom ? 'text-text-main' : 'text-text-disabled'}`}><TbZoomIn size={14} /><span className="text-xs font-medium">{applyAutoZoom ? 'On' : 'Off'}</span></div>
+                                                            <div className={`flex items-center gap-1 ${applySpotlight ? 'text-text-main' : 'text-text-disabled'}`}><RiLightbulbFlashLine size={14} /><span className="text-xs font-medium">{applySpotlight ? 'On' : 'Off'}</span></div>
+                                                            <div className={`flex items-center gap-1 ${simplifyToolbar ? 'text-text-main' : 'text-text-disabled'}`}><CgToolbarTop size={14} /><span className="text-xs font-medium">{simplifyToolbar ? 'On' : 'Off'}</span></div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
-
-                                            <div className="w-full relative z-20 mt-auto pt-3 shrink-0">
-                                                <Button
-                                                    onClick={chooseSource}
-                                                    disabled={isChoosing}
-                                                    className="w-full shadow-sm"
-                                                >
-                                                    {isChoosing ? 'Waiting...' : hasSource ? 'Change screen' : 'Share screen'}
-                                                </Button>
+                                        </button>
+                                        <div
+                                            className="overflow-hidden transition-all duration-300 ease-in-out"
+                                            style={{ maxHeight: activeTab === 'effects' ? '300px' : '0px', opacity: activeTab === 'effects' ? 1 : 0 }}
+                                        >
+                                            <div className="px-4 pb-4 border-t border-border">
+                                                <div className="flex flex-col gap-2 pt-3">
+                                                    {hasSource && !showPostProcessing ? (
+                                                        <p className="text-sm text-text-muted">
+                                                            Auto effects only work when recording this browser window.
+                                                        </p>
+                                                    ) : (
+                                                        <>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 text-text-muted">
+                                                                    <span className="text-sm">Auto Zoom</span>
+                                                                    <InfoTooltip
+                                                                        placement="top-right"
+                                                                        description="Recordio doesn't just follow the cursor. It understands the layout of all elements you are interacting with, producing meaningful zooms."
+                                                                        videoSrc="https://cdn.recordio.cc/demos/zoom.webm"
+                                                                    />
+                                                                </div>
+                                                                <Toggle value={applyAutoZoom} onChange={setApplyAutoZoom} />
+                                                            </div>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 text-text-muted">
+                                                                    <span className="text-sm">Auto Spotlight</span>
+                                                                    <InfoTooltip
+                                                                        placement="top-right"
+                                                                        description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
+                                                                        videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
+                                                                    />
+                                                                </div>
+                                                                <Toggle value={applySpotlight} onChange={setApplySpotlight} />
+                                                            </div>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 text-text-muted">
+                                                                    <span className="text-sm">Simplify Toolbar</span>
+                                                                    <InfoTooltip
+                                                                        placement="top-right"
+                                                                        description="Replace messy browser toolbars with a clean, unified macOS-style window header in your final video."
+                                                                        videoSrc="https://cdn.recordio.cc/demos/toolbar.webm"
+                                                                    />
+                                                                </div>
+                                                                <Toggle value={simplifyToolbar} onChange={setSimplifyToolbar} />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {(!hasSource || showPostProcessing) && (
+                                                    <p className="text-xs text-text-disabled mt-3">These settings can be changed in the editor later.</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -812,146 +974,92 @@ export function ControllerApp() {
                                     <p className="text-destructive text-sm animate-in fade-in text-center">{error}</p>
                                 )}
 
-                                {/* ─── Bottom Bar: Recording + Settings + Info ─── */}
-                                <div className="flex flex-col gap-4 mt-2 mx-auto w-1/2">
-                                    <CollapsibleCard
-                                        title="Effects Settings"
-                                        icon={<IoSettingsOutline size={18} />}
-                                        isExpanded={isEffectsExpanded}
-                                        onExpandChange={setIsEffectsExpanded}
-                                        className="w-full shadow-sm bg-surface-raised"
-                                        previewItems={
-                                            hasSource && !showPostProcessing
-                                                ? [{ type: 'custom', content: <span className="text-xs font-medium text-text-disabled">Unavailable</span> }]
-                                                : [
-                                                    { type: 'custom', content: <div className={`flex items-center gap-1 ${applyAutoZoom ? "text-text-main" : "text-text-disabled"}`}><TbZoomIn size={14} /><span className="text-xs font-medium">{applyAutoZoom ? "On" : "Off"}</span></div> },
-                                                    { type: 'custom', content: <div className={`flex items-center gap-1 ${applySpotlight ? "text-text-main" : "text-text-disabled"}`}><RiLightbulbFlashLine size={14} /><span className="text-xs font-medium">{applySpotlight ? "On" : "Off"}</span></div> },
-                                                    { type: 'custom', content: <div className={`flex items-center gap-1 ${simplifyToolbar ? "text-text-main" : "text-text-disabled"}`}><CgToolbarTop size={14} /><span className="text-xs font-medium">{simplifyToolbar ? "On" : "Off"}</span></div> },
-                                                ] as any
-                                        }
-                                    >
-                                        <div className="flex flex-col gap-2 pt-2">
-                                            {hasSource && !showPostProcessing ? (
-                                                <Notice>
-                                                    Detected you're sharing {previewStream?.getVideoTracks()[0]?.getSettings()?.displaySurface === 'monitor' ? 'your desktop' : 'an external window'}. Auto effects only work when recording this window.
-                                                </Notice>
-                                            ) : (
-                                                <>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 text-text-muted">
-                                                            <span className="text-sm">Auto Zoom</span>
-                                                            <InfoTooltip
-                                                                placement="top-right"
-                                                                description="Recordio doesn't just follow the cursor. It understands the layout of all elements you are interacting with, producing meaningful zooms."
-                                                                videoSrc="https://cdn.recordio.cc/demos/zoom.webm"
-                                                            />
-                                                        </div>
-                                                        <Toggle value={applyAutoZoom} onChange={setApplyAutoZoom} />
-                                                    </div>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 text-text-muted">
-                                                            <span className="text-sm">Auto Spotlight</span>
-                                                            <InfoTooltip
-                                                                placement="top-right"
-                                                                description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
-                                                                videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
-                                                            />
-                                                        </div>
-                                                        <Toggle value={applySpotlight} onChange={setApplySpotlight} />
-                                                    </div>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 text-text-muted">
-                                                            <span className="text-sm">Simplify Toolbar</span>
-                                                            <InfoTooltip
-                                                                placement="top-right"
-                                                                description="Replace messy browser toolbars with a clean, unified macOS-style window header in your final video."
-                                                                videoSrc="https://cdn.recordio.cc/demos/toolbar.webm"
-                                                            />
-                                                        </div>
-                                                        <Toggle value={simplifyToolbar} onChange={setSimplifyToolbar} />
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                        {(!hasSource || showPostProcessing) && (
-                                            <p className="text-xs text-text-disabled mt-3">These settings can be changed in the editor later.</p>
-                                        )}
-                                    </CollapsibleCard>
+                                {/* ─── Bottom Bar: Recording + Info ─── */}
+                                <div className="flex flex-col gap-2 mt-4">
 
-                                    <div className="flex flex-col gap-2">
-                                        {/* Start Recording */}
-                                        <Tooltip
-                                            text={!hasSource ? "Share screen to start recording" : ""}
-                                            position="top"
-                                            className="w-full flex"
+                                    {/* Float Camera */}
+                                    {isVideoEnabled && (
+                                        <Button
+                                            onClick={() => pipWindow ? pipWindow.close() : openPiP()}
+                                            className="w-full"
                                         >
-                                            <div className="w-full">
-                                                <Button
-                                                    variant="primary"
-                                                    onClick={startRecording}
-                                                    disabled={!hasSource}
-                                                    className="w-full text-base py-3"
-                                                    style={!hasSource ? { pointerEvents: 'none' } : undefined}
-                                                >
-                                                    <MdFiberManualRecord size={20} />
-                                                    Start Recording
-                                                </Button>
-                                            </div>
-                                        </Tooltip>
+                                            <MdPictureInPicture size={16} />
+                                            {pipWindow ? 'Close Float Camera' : 'Float Camera'}
+                                        </Button>
+                                    )}
 
-                                        {/* Selected Target Tab Return Notice */}
-                                        {hasSource && showPostProcessing && originalTab && (
-                                            <div className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 mt-2 px-2 text-xs text-text-disabled text-center">
-                                                <span>Will switch to </span>
-                                                <span
-                                                    className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded font-medium max-w-[180px] shadow-sm"
-                                                    style={{ backgroundColor: '#e8f0fe', color: '#1a73e8', border: '1px solid #d2e3fc' }}
-                                                >
-                                                    {originalTab.favIconUrl && (
-                                                        <img src={originalTab.favIconUrl} className="w-3.5 h-3.5 rounded-sm shrink-0" alt="" />
+                                    {/* Start Recording */}
+                                    <Tooltip
+                                        text={!hasSource ? "Share screen to start recording" : ""}
+                                        position="top"
+                                        className="w-full flex"
+                                    >
+                                        <div className="w-full">
+                                            <Button
+                                                variant="primary"
+                                                onClick={startRecording}
+                                                disabled={!hasSource}
+                                                className="w-full text-base py-3"
+                                                style={!hasSource ? { pointerEvents: 'none' } : undefined}
+                                            >
+                                                <MdFiberManualRecord size={20} />
+                                                Start Recording
+                                            </Button>
+                                        </div>
+                                    </Tooltip>
+
+                                    {/* Selected Target Tab Return Notice */}
+                                    {hasSource && showPostProcessing && originalTab && (
+                                        <div className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 mt-2 px-2 text-xs text-text-disabled text-center">
+                                            <span>Will switch to </span>
+                                            <span
+                                                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded font-medium max-w-[180px] shadow-sm"
+                                                style={{ backgroundColor: '#e8f0fe', color: '#1a73e8', border: '1px solid #d2e3fc' }}
+                                            >
+                                                {originalTab.favIconUrl && (
+                                                    <img src={originalTab.favIconUrl} className="w-3.5 h-3.5 rounded-sm shrink-0" alt="" />
+                                                )}
+                                                <span className="truncate">{originalTab.title}</span>
+                                            </span>
+                                            <span>tab on start.</span>
+                                        </div>
+                                    )}
+
+                                    {/* Extension icon timer hint */}
+                                    {!hideTimerHint && (
+                                        <div className="flex items-start gap-3 mt-3 px-3 py-3 rounded-lg bg-surface-raised border border-border">
+                                            <img src={iconWithTimer} alt="Extension icon with timer" className="w-[72px] h-auto shrink-0 mt-0.5" />
+                                            <div className="flex flex-col gap-1.5 flex-1">
+                                                <p className="text-xs text-text-muted leading-relaxed">
+                                                    While recording, the extension icon shows elapsed time. Click on it to finish recording.
+                                                    {!isPinned && (
+                                                        <>
+                                                            {' '}Make sure to{' '}
+                                                            <span
+                                                                className="underline decoration-text-muted/50 underline-offset-2 cursor-pointer text-text-highlighted focus:outline-none"
+                                                                onMouseEnter={() => setIsHoveringPin(true)}
+                                                                onMouseLeave={() => setIsHoveringPin(false)}
+                                                            >
+                                                                Pin it
+                                                            </span>.
+
+                                                            {isHoveringPin && (
+                                                                <span className="absolute bottom-full right-0 mb-2 p-1.5 bg-surface border border-border shadow-float rounded-xl z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+                                                                    <img src="/assets/welcome/pin.png" alt="Pin instructions" className="w-[280px] h-auto rounded-lg outline outline-1 outline-black/5 block" />
+                                                                </span>
+                                                            )}
+                                                        </>
                                                     )}
-                                                    <span className="truncate">{originalTab.title}</span>
-                                                </span>
-                                                <span>tab on start.</span>
+                                                </p>
+                                                <button
+                                                    onClick={() => setHideTimerHint(true)}
+                                                    className="self-start text-[11px] font-medium text-text-disabled hover:text-text-main transition-colors"
+                                                >
+                                                    Don't show again
+                                                </button>
                                             </div>
-                                        )}
-
-                                        {/* Extension icon timer hint */}
-                                        {!hideTimerHint && (
-                                            <div className="flex items-start gap-3 mt-3 px-3 py-3 rounded-lg bg-surface-raised border border-border">
-                                                <img src={iconWithTimer} alt="Extension icon with timer" className="w-[72px] h-auto shrink-0 mt-0.5" />
-                                                <div className="flex flex-col gap-1.5 flex-1">
-                                                    <p className="text-xs text-text-muted leading-relaxed">
-                                                        While recording, the extension icon shows elapsed time. Click on it to finish recording.
-                                                        {!isPinned && (
-                                                            <>
-                                                                {' '}Make sure to{' '}
-                                                                <span
-                                                                    className="underline decoration-text-muted/50 underline-offset-2 cursor-pointer text-text-highlighted focus:outline-none"
-                                                                    onMouseEnter={() => setIsHoveringPin(true)}
-                                                                    onMouseLeave={() => setIsHoveringPin(false)}
-                                                                >
-                                                                    Pin it
-                                                                </span>.
-
-                                                                {isHoveringPin && (
-                                                                    <span className="absolute bottom-full right-0 mb-2 p-1.5 bg-surface border border-border shadow-float rounded-xl z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-                                                                        <img src="/assets/welcome/pin.png" alt="Pin instructions" className="w-[280px] h-auto rounded-lg outline outline-1 outline-black/5 block" />
-                                                                    </span>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </p>
-                                                    <button
-                                                        onClick={() => setHideTimerHint(true)}
-                                                        className="self-start text-[11px] font-medium text-text-disabled hover:text-text-main transition-colors"
-                                                    >
-                                                        Don't show again
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
 
                             </div>
@@ -993,18 +1101,18 @@ export function ControllerApp() {
                     <div className="flex flex-row items-start gap-4 mt-2">
                         <div className="flex flex-col gap-2 w-[55%]">
                             <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Step 1</span>
-                            <img 
-                                src={viewPermissionsImage} 
-                                alt="View Permissions step 1" 
-                                className="w-full h-auto rounded-lg border border-border shadow-sm object-contain" 
+                            <img
+                                src={viewPermissionsImage}
+                                alt="View Permissions step 1"
+                                className="w-full h-auto rounded-lg border border-border shadow-sm object-contain"
                             />
                         </div>
                         <div className="flex flex-col gap-2 w-[45%]">
                             <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Step 2</span>
-                            <img 
-                                src={permissionsImage} 
-                                alt="Permissions step 2" 
-                                className="w-full h-auto rounded-lg border border-border shadow-sm object-contain" 
+                            <img
+                                src={permissionsImage}
+                                alt="Permissions step 2"
+                                className="w-full h-auto rounded-lg border border-border shadow-sm object-contain"
                             />
                         </div>
                     </div>
@@ -1024,6 +1132,24 @@ export function ControllerApp() {
 }
 
 // --- Sub-Components ---
+
+/** Compact inline audio level bar for the collapsed mic header.
+ *  Works like the circular visualizer but on a straight line:
+ *  a gray track with a primary→secondary gradient fill from left to right. */
+function AudioWaveformLine({ level }: { level: number }) {
+    return (
+        <div className="flex-1 h-[6px] rounded-full overflow-hidden bg-border mx-10">
+            <div
+                className="h-full rounded-full"
+                style={{
+                    width: `${level * 100}%`,
+                    background: 'linear-gradient(to right, var(--primary), var(--secondary))',
+                    transition: 'width 75ms linear',
+                }}
+            />
+        </div>
+    );
+}
 
 function CalibrationMarkers() {
     const markerStyle = "fixed w-[50px] h-[50px] z-[9999] flex items-center justify-center";
