@@ -128,6 +128,8 @@ export function ControllerApp() {
                 if (typeof prefs.hideTimerHint === 'boolean') setHideTimerHint(prefs.hideTimerHint);
             }
             setPrefsLoaded(true);
+            // Focus camera tab if camera is enabled by default
+            if (prefs?.isVideoEnabled) setActiveTab('camera');
         });
     }, []);
 
@@ -709,7 +711,7 @@ export function ControllerApp() {
                                 <div className="flex items-center justify-between w-full mb-6">
                                     <div className="flex items-center gap-3">
                                         <img src={logoSquare} alt="Record" className="w-6 h-6" />
-                                        <h1 className="text-xl font-semibold text-text-main">Start a Aew Recording</h1>
+                                        <h1 className="text-xl font-semibold text-text-main">Start a New Recording</h1>
                                     </div>
                                     <Button variant="ghost" onClick={() => window.open(getEditorOrigin(), '_blank')}>
                                         <FiFolder size={16} />
@@ -725,11 +727,11 @@ export function ControllerApp() {
                                             className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
                                             onClick={() => setActiveTab('mic')}
                                         >
-                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'mic' ? 'text-primary' : 'text-text-main'}`}>
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'mic' ? 'text-primary' : 'text-text-main'} w-[130px] justify-start`}>
                                                 {isAudioEnabled ? <BiMicrophone size={16} /> : <BiMicrophoneOff size={16} />}
                                                 Microphone
                                             </span>
-                                            {activeTab !== 'mic' && isAudioEnabled && (
+                                            {isAudioEnabled && (
                                                 <AudioWaveformLine level={audioLevel} />
                                             )}
                                             <div onClick={e => { if (isAudioEnabled) e.stopPropagation(); }}>
@@ -738,29 +740,22 @@ export function ControllerApp() {
                                         </button>
                                         <div
                                             className="overflow-hidden transition-all duration-300 ease-in-out"
-                                            style={{ maxHeight: activeTab === 'mic' ? '300px' : '0px', opacity: activeTab === 'mic' ? 1 : 0 }}
+                                            style={{ maxHeight: activeTab === 'mic' ? '100px' : '0px', opacity: activeTab === 'mic' ? 1 : 0 }}
                                         >
                                             <div className="px-4 pb-4 border-t border-border">
-                                                <div className="flex flex-col items-center justify-center h-[220px] pt-3">
+                                                <div className="pt-3">
                                                     {isAudioEnabled ? (
-                                                        <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                                            <div className="flex-1 flex items-center justify-center">
-                                                                <AudioVisualizer stream={audioStream} />
-                                                            </div>
-                                                            <div className="w-full relative z-20 mt-auto">
-                                                                <Dropdown
-                                                                    options={audioDevices.map(d => ({
-                                                                        value: d.deviceId,
-                                                                        label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
-                                                                    }))}
-                                                                    value={selectedAudioId}
-                                                                    onChange={setSelectedAudioId}
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        <Dropdown
+                                                            options={audioDevices.map(d => ({
+                                                                value: d.deviceId,
+                                                                label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
+                                                            }))}
+                                                            value={selectedAudioId}
+                                                            onChange={setSelectedAudioId}
+                                                        />
                                                     ) : (
-                                                        <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
-                                                            <BiMicrophoneOff size={36} />
+                                                        <div className="flex items-center justify-center gap-2 text-text-disabled py-2">
+                                                            <BiMicrophoneOff size={16} />
                                                             <span className="text-sm">Microphone off</span>
                                                         </div>
                                                     )}
@@ -775,23 +770,30 @@ export function ControllerApp() {
                                             className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
                                             onClick={() => setActiveTab('camera')}
                                         >
-                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'camera' ? 'text-primary' : 'text-text-main'}`}>
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'camera' ? 'text-primary' : 'text-text-main'} w-[130px] justify-start`}>
                                                 {isVideoEnabled ? <PiWebcamBold size={16} /> : <PiWebcamSlashBold size={16} />}
                                                 Camera
                                             </span>
+                                            {activeTab !== 'camera' && isVideoEnabled && (() => {
+                                                const device = videoDevices.find(d => d.deviceId === selectedVideoId);
+                                                const name = device?.label?.replace(/\s*\(.*?\)\s*/g, '').trim();
+                                                return name ? (
+                                                    <span className="text-xs font-normal text-text-muted truncate max-w-[120px]">{name}</span>
+                                                ) : null;
+                                            })()}
                                             <div onClick={e => { if (isVideoEnabled) e.stopPropagation(); }}>
                                                 <Toggle value={isVideoEnabled} onChange={handleVideoToggle} />
                                             </div>
                                         </button>
                                         <div
                                             className="overflow-hidden transition-all duration-300 ease-in-out"
-                                            style={{ maxHeight: activeTab === 'camera' ? '360px' : '0px', opacity: activeTab === 'camera' ? 1 : 0 }}
+                                            style={{ maxHeight: activeTab === 'camera' ? '440px' : '0px', opacity: activeTab === 'camera' ? 1 : 0 }}
                                         >
                                             <div className="px-4 pb-4 border-t border-border">
-                                                <div className="flex flex-col items-center justify-center h-[240px] pt-3 overflow-y-auto scrollbar-hide">
+                                                <div className="flex flex-col items-center justify-center h-[320px] pt-3 overflow-y-auto scrollbar-hide">
                                                     {isVideoEnabled ? (
                                                         <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                                            <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-border flex justify-center">
+                                                            <div className="relative w-full aspect-video bg-surface rounded-lg overflow-hidden border border-border flex justify-center">
                                                                 <video
                                                                     ref={cameraVideoRef}
                                                                     autoPlay
@@ -800,7 +802,7 @@ export function ControllerApp() {
                                                                     className="w-full h-auto block transform -scale-x-100"
                                                                 />
                                                             </div>
-                                                            <div className="w-full relative z-10 mt-auto">
+                                                            <div className="w-full relative z-10 mt-auto flex flex-col gap-2">
                                                                 <Dropdown
                                                                     options={videoDevices.map(d => ({
                                                                         value: d.deviceId,
@@ -809,6 +811,17 @@ export function ControllerApp() {
                                                                     value={selectedVideoId}
                                                                     onChange={setSelectedVideoId}
                                                                 />
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2 text-text-muted">
+                                                                        <MdPictureInPicture size={16} />
+                                                                        <span className="text-sm">Float Camera</span>
+                                                                        <InfoTooltip
+                                                                            placement="top-right"
+                                                                            description="Open the camera in a floating window so you can see yourself during recording."
+                                                                        />
+                                                                    </div>
+                                                                    <Toggle value={!!pipWindow} onChange={() => pipWindow ? pipWindow.close() : openPiP()} />
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -826,33 +839,39 @@ export function ControllerApp() {
                                     <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${activeTab === 'screen' ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
                                         <button
                                             className="flex items-center justify-between w-full px-4 py-3 cursor-pointer hover:bg-surface/50 transition-colors"
-                                            onClick={() => setActiveTab('screen')}
+                                            onClick={() => {
+                                                const wasCollapsed = activeTab !== 'screen';
+                                                setActiveTab('screen');
+                                                if (wasCollapsed && !hasSource) chooseSource();
+                                            }}
                                         >
-                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'screen' ? 'text-primary' : 'text-text-main'}`}>
+                                            <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'screen' ? 'text-primary' : 'text-text-main'} w-[130px] justify-start`}>
                                                 <CgScreen size={16} />
                                                 Share Screen
                                             </span>
                                             {activeTab !== 'screen' && (
-                                                <span className="text-xs font-normal text-text-muted">
+                                                <span className="text-xs font-normal text-text-muted truncate max-w-[150px]">
                                                     {hasSource ? sharingLabel : 'Not sharing'}
                                                 </span>
                                             )}
+                                            {/* Dummy element to balance flex layout (matches Toggle width) */}
+                                            <div className="w-11" />
                                         </button>
                                         <div
                                             className="overflow-hidden transition-all duration-300 ease-in-out"
-                                            style={{ maxHeight: activeTab === 'screen' ? '360px' : '0px', opacity: activeTab === 'screen' ? 1 : 0 }}
+                                            style={{ maxHeight: activeTab === 'screen' ? '440px' : '0px', opacity: activeTab === 'screen' ? 1 : 0 }}
                                         >
                                             <div className="px-4 pb-4 border-t border-border">
-                                                <div className="flex flex-col h-[260px] pt-3">
+                                                <div className="flex flex-col h-[340px] pt-3">
                                                     {hasSource ? (
                                                         <div className="flex-1 flex flex-col items-center w-full min-h-0 animate-in fade-in duration-200">
-                                                            <div className="flex-1 w-full bg-black rounded-lg overflow-hidden border border-border flex items-center justify-center min-h-0">
+                                                            <div className="flex-1 w-full bg-surface rounded-lg overflow-hidden border border-border flex items-center justify-center min-h-0">
                                                                 <video
                                                                     ref={previewVideoRef}
                                                                     autoPlay
                                                                     muted
                                                                     playsInline
-                                                                    className="w-full h-full object-contain bg-black"
+                                                                    className="w-full h-full object-contain bg-surface"
                                                                 />
                                                             </div>
                                                         </div>
@@ -977,16 +996,6 @@ export function ControllerApp() {
                                 {/* ─── Bottom Bar: Recording + Info ─── */}
                                 <div className="flex flex-col gap-2 mt-4">
 
-                                    {/* Float Camera */}
-                                    {isVideoEnabled && (
-                                        <Button
-                                            onClick={() => pipWindow ? pipWindow.close() : openPiP()}
-                                            className="w-full"
-                                        >
-                                            <MdPictureInPicture size={16} />
-                                            {pipWindow ? 'Close Float Camera' : 'Float Camera'}
-                                        </Button>
-                                    )}
 
                                     {/* Start Recording */}
                                     <Tooltip
