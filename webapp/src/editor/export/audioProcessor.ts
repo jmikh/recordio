@@ -11,6 +11,7 @@ import type { Project, ScreenMetadata } from '../../types';
 import type { UserEvents } from '@shared/types';
 import type { TimeMapper } from '../../core/mappers/timeMapper';
 import { getClickSoundBuffer, getDragSoundBuffers } from '../../core/audio/clickSoundPlayer';
+import { SoundTouch, SimpleFilter, WebAudioBufferSource } from 'soundtouchjs';
 
 interface AudioRenderOptions {
     project: Project;
@@ -62,27 +63,43 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
             const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
             let outputAccSec = 0;
-            project.timeline.outputWindows.forEach((window: any) => {
+            for (const window of project.timeline.outputWindows as any[]) {
                 const speed = window.speed || 1.0;
-                const sourceNode = offlineCtx.createBufferSource();
-                sourceNode.buffer = audioBuffer;
-                sourceNode.playbackRate.value = speed;
+                const offset = window.startMs / 1000;
+                const duration = (window.endMs - window.startMs) / 1000;
+                const startTime = outputAccSec;
+                const outputDuration = duration / speed;
+                outputAccSec += outputDuration;
 
-                // Apply per-source volume via GainNode
+                if (offset < 0 || offset >= audioBuffer.duration) continue;
+
+                // For 1x speed, schedule directly — no processing needed
+                if (Math.abs(speed - 1.0) < 0.001) {
+                    const sourceNode = offlineCtx.createBufferSource();
+                    sourceNode.buffer = audioBuffer;
+                    const gainNode = offlineCtx.createGain();
+                    gainNode.gain.setValueAtTime(audioSource.volume, 0);
+                    sourceNode.connect(gainNode);
+                    gainNode.connect(offlineCtx.destination);
+                    sourceNode.start(startTime, offset, duration);
+                    continue;
+                }
+
+                // Pitch-preserving time-stretch via SoundTouch
+                const stretchedBuffer = timeStretchWithSoundTouch(
+                    offlineCtx, audioBuffer, offset, duration, speed
+                );
+
+                if (!stretchedBuffer) continue;
+
+                const sourceNode = offlineCtx.createBufferSource();
+                sourceNode.buffer = stretchedBuffer;
                 const gainNode = offlineCtx.createGain();
                 gainNode.gain.setValueAtTime(audioSource.volume, 0);
                 sourceNode.connect(gainNode);
                 gainNode.connect(offlineCtx.destination);
-
-                const offset = window.startMs / 1000;
-                const duration = (window.endMs - window.startMs) / 1000;
-                const startTime = outputAccSec;
-                outputAccSec += duration / speed;
-
-                if (offset >= 0 && offset < audioBuffer.duration) {
-                    sourceNode.start(startTime, offset, duration);
-                }
-            });
+                sourceNode.start(startTime);
+            }
         } catch (error) {
             console.warn(`[Export] Failed to decode audio for source:`, error);
         }
@@ -192,6 +209,79 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
     }
 
     return offlineCtx.startRendering();
+}
+
+/**
+ * Pitch-preserving time-stretch using the SoundTouch library.
+ *
+ * SoundTouch is the same algorithm Chrome uses internally for
+ * HTMLMediaElement.preservesPitch. It uses WSOLA with optimized
+ * cross-correlation search and auto-tuning sequence/seek parameters.
+ *
+ * @param ctx - OfflineAudioContext for creating the output buffer
+ * @param audioBuffer - Source AudioBuffer containing the full audio
+ * @param offsetSec - Start position in the source (seconds)
+ * @param durationSec - Length of the source segment to process (seconds)
+ * @param speed - Playback speed (e.g. 2.0 = double speed)
+ * @returns Pitch-preserved AudioBuffer at the stretched duration, or null
+ */
+function timeStretchWithSoundTouch(
+    ctx: OfflineAudioContext,
+    audioBuffer: AudioBuffer,
+    offsetSec: number,
+    durationSec: number,
+    speed: number
+): AudioBuffer | null {
+    const sr = audioBuffer.sampleRate;
+    const channels = audioBuffer.numberOfChannels;
+    const srcStartFrame = Math.floor(offsetSec * sr);
+    const srcFrames = Math.min(
+        Math.ceil(durationSec * sr),
+        audioBuffer.length - srcStartFrame
+    );
+
+    if (srcFrames <= 0) return null;
+
+    // Create a segment buffer containing just the windowed portion
+    const segmentBuffer = ctx.createBuffer(channels, srcFrames, sr);
+    for (let c = 0; c < channels; c++) {
+        const fullChannel = audioBuffer.getChannelData(c);
+        const segChannel = segmentBuffer.getChannelData(c);
+        segChannel.set(fullChannel.subarray(srcStartFrame, srcStartFrame + srcFrames));
+    }
+
+    // Set up SoundTouch pipeline
+    const st = new SoundTouch();
+    st.tempo = speed; // Change tempo (speed) without changing pitch
+    st.rate = 1.0;    // No rate change (rate change WOULD affect pitch)
+
+    const source = new WebAudioBufferSource(segmentBuffer);
+    const filter = new SimpleFilter(source, st);
+
+    // Calculate expected output frames and allocate
+    const expectedOutputFrames = Math.ceil(srcFrames / speed);
+    // Extract slightly more to account for SoundTouch internal buffering
+    const maxOutputFrames = expectedOutputFrames + Math.ceil(sr * 0.1);
+
+    // Extract all processed samples (SoundTouch uses interleaved stereo: L R L R)
+    const interleavedOutput = new Float32Array(maxOutputFrames * 2);
+    const extractedFrames = filter.extract(interleavedOutput, maxOutputFrames);
+
+    if (extractedFrames <= 0) return null;
+
+    // Convert interleaved stereo back to planar AudioBuffer
+    const outputBuffer = ctx.createBuffer(channels, extractedFrames, sr);
+    const leftOut = outputBuffer.getChannelData(0);
+    const rightOut = channels > 1 ? outputBuffer.getChannelData(1) : null;
+
+    for (let i = 0; i < extractedFrames; i++) {
+        leftOut[i] = interleavedOutput[i * 2];
+        if (rightOut) {
+            rightOut[i] = interleavedOutput[i * 2 + 1];
+        }
+    }
+
+    return outputBuffer;
 }
 
 /**
