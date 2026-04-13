@@ -7,12 +7,11 @@ const corsHeaders = {
 };
 
 /**
- * Delete-from-Stream Edge Function (Soft Delete)
+ * Confirm-Upload Edge Function
  *
- * Instead of calling Cloudflare Stream API directly (which is slow),
- * this function moves the cf_video_uid to the deleted_videos queue
- * and returns immediately. The purge-deleted-videos cron handles
- * actual CF deletion asynchronously.
+ * Called by the client after a successful direct upload to Cloudflare Stream.
+ * Marks the shared_videos record as status='ready', making it visible on the
+ * watch page and dashboard.
  */
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -44,46 +43,29 @@ serve(async (req) => {
         }
 
         // 2. Parse request body
-        const { cf_video_uid } = await req.json();
-        if (!cf_video_uid || typeof cf_video_uid !== 'string') {
+        const { shareId } = await req.json();
+        if (!shareId) {
             return new Response(
-                JSON.stringify({ error: 'Missing cf_video_uid' }),
+                JSON.stringify({ error: 'Missing shareId' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // 3. Verify ownership — the video must belong to this user
-        const { data: share, error: lookupError } = await supabase
+        // 3. Update status to 'ready' (RLS ensures only the owner can update)
+        const { error: updateError } = await supabase
             .from('shared_videos')
-            .select('id, user_id')
-            .eq('cf_video_uid', cf_video_uid)
-            .maybeSingle();
+            .update({
+                status: 'ready',
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', shareId)
+            .eq('user_id', user.id)
+            .eq('status', 'uploading');   // Only transition from uploading → ready
 
-        if (lookupError) {
-            console.error('[delete-from-stream] DB lookup error:', lookupError);
-        }
-
-        if (!share || share.user_id !== user.id) {
+        if (updateError) {
+            console.error('[confirm-upload] DB update failed:', updateError);
             return new Response(
-                JSON.stringify({ error: 'Video not found or not owned by user' }),
-                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 4. Queue for async deletion (instant — no CF API call)
-        const adminSupabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        );
-
-        const { error: queueError } = await adminSupabase
-            .from('deleted_videos')
-            .insert({ cf_video_uid, source: 'user_delete' });
-
-        if (queueError) {
-            console.error('[delete-from-stream] Failed to queue deletion:', queueError);
-            return new Response(
-                JSON.stringify({ error: 'Failed to queue video for deletion' }),
+                JSON.stringify({ error: 'Failed to confirm upload' }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -94,7 +76,7 @@ serve(async (req) => {
         );
 
     } catch (err) {
-        console.error('[delete-from-stream] Unexpected error:', err);
+        console.error('[confirm-upload] Unexpected error:', err);
         return new Response(
             JSON.stringify({ error: 'Internal server error' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

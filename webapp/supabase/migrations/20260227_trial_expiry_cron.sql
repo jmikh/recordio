@@ -50,6 +50,10 @@ end;
 $$ language plpgsql security definer;
 
 -- 4. Schedule the cron job to run daily at midnight UTC
+-- Unschedule first if it already exists (idempotent)
+SELECT cron.unschedule('expire-free-trials')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'expire-free-trials');
+
 select cron.schedule(
     'expire-free-trials',
     '0 0 * * *',

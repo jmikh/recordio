@@ -126,7 +126,11 @@ export class ShareService {
     }
 
     /**
-     * Upload a video blob to Cloudflare Stream via the Edge Function.
+     * Upload a video blob to Cloudflare Stream via Direct Creator Upload.
+     * 3-step flow:
+     *   1. Request a one-time upload URL from the edge function
+     *   2. Upload the blob directly to Cloudflare
+     *   3. Confirm the upload with the edge function
      * Invalidates the cache on success.
      */
     static async shareVideo(
@@ -144,58 +148,109 @@ export class ShareService {
             throw new Error('Not authenticated');
         }
 
-        const formData = new FormData();
-        formData.append('video', blob, `${projectName}.mp4`);
-        formData.append('projectId', projectId);
-        formData.append('projectName', projectName);
-        if (options?.resetViews) {
-            formData.append('resetViews', 'true');
-        }
+        // Step 1: Get one-time upload URL from edge function (tiny JSON request)
+        const uploadData = await ShareService.requestUploadUrl(
+            session.access_token, projectId, projectName
+        );
 
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const url = `${supabaseUrl}/functions/v1/upload-to-stream`;
+        // Step 2: Upload directly to Cloudflare (XHR for progress tracking)
+        await ShareService.uploadDirectToCF(
+            uploadData.uploadURL, blob, options?.onUploadProgress
+        );
 
-        // Use XMLHttpRequest for upload progress tracking
-        const result = await new Promise<any>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', url);
-            xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
-
-            if (options?.onUploadProgress) {
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        options.onUploadProgress!(e.loaded / e.total);
-                    }
-                };
-            }
-
-            xhr.onload = () => {
-                let data: any;
-                try { data = JSON.parse(xhr.responseText); } catch { data = {}; }
-
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve(data);
-                } else if (data.error === 'quota_exceeded') {
-                    reject(new Error(data.message || `You've reached the limit of ${MAX_SHARED_VIDEOS} shared videos.`));
-                } else {
-                    reject(new Error(data.error || `Upload failed (${xhr.status})`));
-                }
-            };
-
-            xhr.onerror = () => reject(new Error('Network error during upload'));
-            xhr.send(formData);
-        });
+        // Step 3: Confirm upload completion (tiny JSON request)
+        await ShareService.confirmUpload(session.access_token, uploadData.shareId);
 
         // Invalidate cache so next reads are fresh
         ShareService.invalidateCache(projectId);
 
         return {
-            shareId: result.shareId,
-            shareUrl: `${SHARE_BASE_URL}/${result.shareId}`,
-            videoUid: result.videoUid,
-            version: result.version,
-            isUpdate: result.isUpdate,
+            shareId: uploadData.shareId,
+            shareUrl: `${SHARE_BASE_URL}/${uploadData.shareId}`,
+            videoUid: uploadData.uid,
+            version: uploadData.version,
+            isUpdate: uploadData.isUpdate,
         };
+    }
+
+    /** Step 1: Request a one-time upload URL from the edge function */
+    private static async requestUploadUrl(
+        accessToken: string, projectId: string, projectName: string
+    ): Promise<{ uploadURL: string; uid: string; shareId: string; version: number; isUpdate: boolean }> {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const url = `${supabaseUrl}/functions/v1/upload-to-stream`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ projectId, projectName }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (data.error === 'quota_exceeded') {
+                throw new Error(data.message || `You've reached the limit of ${MAX_SHARED_VIDEOS} shared videos.`);
+            }
+            throw new Error(data.error || `Failed to get upload URL (${response.status})`);
+        }
+
+        return data;
+    }
+
+    /** Step 2: Upload video blob directly to Cloudflare via the one-time URL */
+    private static async uploadDirectToCF(
+        uploadURL: string, blob: Blob, onUploadProgress?: (fraction: number) => void
+    ): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadURL);
+
+            if (onUploadProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        onUploadProgress(e.loaded / e.total);
+                    }
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    reject(new Error(`Direct upload failed (${xhr.status})`));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during direct upload'));
+
+            const formData = new FormData();
+            formData.append('file', blob, 'video.mp4');
+            xhr.send(formData);
+        });
+    }
+
+    /** Step 3: Confirm upload completion with the edge function */
+    private static async confirmUpload(accessToken: string, shareId: string): Promise<void> {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const url = `${supabaseUrl}/functions/v1/confirm-upload`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ shareId }),
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `Failed to confirm upload (${response.status})`);
+        }
     }
 
     /**
@@ -218,6 +273,7 @@ export class ShareService {
                 .from('shared_videos')
                 .select('*')
                 .eq('user_id', user.id)
+                .eq('status', 'ready')
                 .order('updated_at', { ascending: false });
 
             if (error) {
@@ -237,7 +293,8 @@ export class ShareService {
 
     /**
      * Delete a shared video (unshare).
-     * Deletes from Cloudflare Stream first, then removes the DB record.
+     * Queues CF video for async deletion via the edge function (instant),
+     * then removes the DB record.
      */
     static async deleteSharedVideo(shareId: string): Promise<void> {
         if (!supabase) throw new Error('Supabase not configured');
@@ -253,7 +310,7 @@ export class ShareService {
             throw new Error('Video not found');
         }
 
-        // 2. Delete from Cloudflare Stream first (to avoid orphaned videos)
+        // 2. Queue for async CF deletion (instant — no waiting for CF API)
         const session = await AuthManager.getSession();
         if (!session) throw new Error('Not authenticated');
 
@@ -269,14 +326,14 @@ export class ShareService {
 
         if (!cfResponse.ok) {
             const errorData = await cfResponse.json().catch(() => ({}));
-            console.error('[Share] CF deletion failed:', errorData);
-            Sentry.captureException(new Error('CF video deletion failed'), {
-                extra: { phase: 'cf_delete', shareId, cfVideoUid: share.cf_video_uid, status: cfResponse.status }
+            console.error('[Share] Deletion queue failed:', errorData);
+            Sentry.captureException(new Error('Video deletion queue failed'), {
+                extra: { phase: 'queue_delete', shareId, cfVideoUid: share.cf_video_uid, status: cfResponse.status }
             });
-            throw new Error('Failed to delete video from Cloudflare');
+            throw new Error('Failed to delete video');
         }
 
-        // 3. Delete the DB record (CF video is already gone)
+        // 3. Delete the DB record
         const { error } = await supabase
             .from('shared_videos')
             .delete()
@@ -420,6 +477,7 @@ export class ShareService {
             .from('shared_videos')
             .select('*')
             .eq('id', shareId)
+            .eq('status', 'ready')
             .maybeSingle();
 
         if (error) return null;

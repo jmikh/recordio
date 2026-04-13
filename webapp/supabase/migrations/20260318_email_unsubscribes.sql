@@ -11,6 +11,7 @@ create table if not exists public.email_unsubscribes (
 alter table public.email_unsubscribes enable row level security;
 
 -- Users can read and insert their own unsubscribe row
+drop policy if exists "Users can manage own unsubscribe" on public.email_unsubscribes;
 create policy "Users can manage own unsubscribe"
     on public.email_unsubscribes for all
     using (auth.uid() = user_id);
