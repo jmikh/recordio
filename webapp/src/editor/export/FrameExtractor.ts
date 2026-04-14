@@ -25,8 +25,13 @@ import { WebDemuxer } from 'web-demuxer';
 /** How far ahead (ms) to feed packets beyond the requested time. */
 const FEED_AHEAD_MS = 200;
 
-/** Maximum time (ms) to wait for decoder drain before treating it as stuck. */
-const DRAIN_TIMEOUT_MS = 3_000;
+/**
+ * Decoder drain timeout = max(DRAIN_TIMEOUT_MIN_MS, fedCount × DRAIN_TIMEOUT_PER_CHUNK_MS).
+ * Small feeds (6 chunks) get the 3s floor; large replay-from-keyframe feeds (434 chunks)
+ * scale up proportionally so legitimate slow decoding isn't killed prematurely.
+ */
+const DRAIN_TIMEOUT_MIN_MS = 3_000;
+const DRAIN_TIMEOUT_PER_CHUNK_MS = 25;
 
 /** Maximum number of automatic decoder rebuilds per export. */
 const MAX_REBUILDS = 4;
@@ -42,7 +47,8 @@ interface CachedChunk {
     type: 'key' | 'delta';
     timestamp: number;   // microseconds
     duration: number;    // microseconds
-    data: ArrayBuffer;
+    /** Raw encoded data. Nulled after the chunk is safely past the rebuild watermark to free memory. */
+    data: ArrayBuffer | null;
 }
 
 export class FrameExtractor {
@@ -282,6 +288,9 @@ export class FrameExtractor {
     }
 
     private chunkToEncoded(chunk: CachedChunk): EncodedVideoChunk {
+        if (!chunk.data) {
+            throw new Error(`[FrameExtractor] Chunk at ${chunk.timestamp}µs has been released — cannot decode`);
+        }
         return new EncodedVideoChunk({
             type: chunk.type,
             timestamp: chunk.timestamp,
@@ -299,6 +308,30 @@ export class FrameExtractor {
         while (this.decodedFrames.length > 1 &&
             this.decodedFrames[1].timestamp <= targetMicros) {
             this.decodedFrames.shift()!.close();
+        }
+    }
+
+    /**
+     * Release ArrayBuffer data for chunks safely behind the rebuild watermark.
+     * A rebuild rewinds to the nearest keyframe at or before the target, so we
+     * keep data from the *second-to-last* keyframe onward and null everything
+     * before it. For a typical 30fps/2s-GOP video at frame 450, this releases
+     * ~420 chunks worth of ArrayBuffers that would otherwise stay in RAM until
+     * export completes.
+     */
+    private releaseConsumedChunks(): void {
+        let lastKf = -1;
+        let prevKf = -1;
+        for (let i = 0; i < this.nextChunkIndex && i < this.chunks.length; i++) {
+            if (this.chunks[i].type === 'key' && this.chunks[i].data !== null) {
+                prevKf = lastKf;
+                lastKf = i;
+            }
+        }
+        if (prevKf > 0) {
+            for (let i = 0; i < prevKf; i++) {
+                this.chunks[i].data = null;
+            }
         }
     }
 
@@ -473,6 +506,9 @@ export class FrameExtractor {
         }
         this.decodedFrames = this.decodedFrames.slice(bestIndex);
 
+        // 7. Release memory for consumed chunks (safe for rebuilds)
+        this.releaseConsumedChunks();
+
         return this.decodedFrames[0].clone();
     }
 
@@ -506,6 +542,7 @@ export class FrameExtractor {
     private async awaitDecoderDrain(fedCount: number): Promise<void> {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
 
+        const drainTimeoutMs = Math.max(DRAIN_TIMEOUT_MIN_MS, fedCount * DRAIN_TIMEOUT_PER_CHUNK_MS);
         const drainStart = performance.now();
         const frameCountBefore = this.decodedFrames.length;
         let lastQueueSize = this.decoder.decodeQueueSize;
@@ -517,96 +554,97 @@ export class FrameExtractor {
 
         try {
 
-        while (this.decoder.decodeQueueSize > 0) {
-            const now = performance.now();
+            while (this.decoder.decodeQueueSize > 0) {
+                const now = performance.now();
 
-            // If we've received at least as many new frames as we fed,
-            // the decoder has done its job — break even if queueSize is stuck.
-            const newFrames = this.decodedFrames.length - frameCountBefore;
-            if (newFrames >= fedCount) {
-                if (this.decoder.decodeQueueSize > 0) {
-                    console.warn(`[FrameExtractor] Drain: queueSize stuck at ${this.decoder.decodeQueueSize} but ${newFrames} frames received — proceeding`);
+                // If we've received at least as many new frames as we fed,
+                // the decoder has done its job — break even if queueSize is stuck.
+                const newFrames = this.decodedFrames.length - frameCountBefore;
+                if (newFrames >= fedCount) {
+                    if (this.decoder.decodeQueueSize > 0) {
+                        console.warn(`[FrameExtractor] Drain: queueSize stuck at ${this.decoder.decodeQueueSize} but ${newFrames} frames received — proceeding`);
+                    }
+                    break;
                 }
-                break;
+
+                if (this.decoder.decodeQueueSize !== lastQueueSize) {
+                    lastQueueSize = this.decoder.decodeQueueSize;
+                    lastChangeTime = now;
+                    stallWarned = false;
+                } else if (now - lastChangeTime > 2000 && !stallWarned) {
+                    stallWarned = true;
+                    console.warn(`[FrameExtractor] Decoder queue stuck at ${this.decoder.decodeQueueSize} for 2s`);
+                    Sentry.addBreadcrumb({
+                        category: 'codec',
+                        message: `Decoder queue stalled (queueSize=${this.decoder.decodeQueueSize}, elapsed=${Math.round(now - drainStart)}ms)`,
+                        level: 'warning',
+                        data: { queueSize: this.decoder.decodeQueueSize, elapsedMs: Math.round(now - drainStart) },
+                    });
+                }
+
+                if (now - drainStart > drainTimeoutMs) {
+                    const framesReceived = this.decodedFrames.length - frameCountBefore;
+                    const stallDurationMs = Math.round(now - lastChangeTime);
+                    const decodeMode = this.forceSoftware ? 'software (CPU)' : 'hardware (GPU)';
+                    const gpuRenderer = FrameExtractor.getGpuRenderer();
+                    const errorMsg = `Decoder drain timed out after ${drainTimeoutMs}ms (queueSize=${this.decoder.decodeQueueSize})`;
+                    console.error(`[FrameExtractor] ${errorMsg}`);
+                    Sentry.captureMessage(errorMsg, {
+                        level: 'error',
+                        tags: {
+                            component: 'FrameExtractor',
+                            decodeMode: this.forceSoftware ? 'software' : 'hardware',
+                            'codec.reclaim': this.decoder.state === 'closed' ? 'true' : 'false',
+                        },
+                        extra: {
+                            // Queue & decoder state
+                            queueSize: this.decoder.decodeQueueSize,
+                            decoderState: this.decoder.state,
+                            rebuildCount: this.rebuildCount,
+
+                            // Frame accounting
+                            decodedFrameBuffer: this.decodedFrames.length,
+                            framesReceivedDuringDrain: framesReceived,
+                            fedCount,
+                            totalChunks: this.chunks.length,
+                            nextChunkIndex: this.nextChunkIndex,
+
+                            // Source info
+                            sourceWidth: this.width,
+                            sourceHeight: this.height,
+                            codec: this.decoderConfig?.codec,
+                            sourceResolution: `${this.width}x${this.height}`,
+
+                            // Decode mode & hardware
+                            decodeMode,
+                            gpuRenderer,
+                            hardwareConcurrency: navigator.hardwareConcurrency,
+                            deviceMemoryGB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 'unknown',
+
+                            // Timing & visibility
+                            drainTimeoutMs,
+                            stallDurationMs,
+                            documentVisible: document.visibilityState,
+                            wasHiddenDuringDrain,
+                            userAgent: navigator.userAgent,
+                        },
+                    });
+                    throw new Error(errorMsg);
+                }
+
+                if ((this.decoder.state as string) === 'closed') return;
+
+                await new Promise(r => setTimeout(r, 1));
             }
 
-            if (this.decoder.decodeQueueSize !== lastQueueSize) {
-                lastQueueSize = this.decoder.decodeQueueSize;
-                lastChangeTime = now;
-                stallWarned = false;
-            } else if (now - lastChangeTime > 2000 && !stallWarned) {
-                stallWarned = true;
-                console.warn(`[FrameExtractor] Decoder queue stuck at ${this.decoder.decodeQueueSize} for 2s`);
-                Sentry.addBreadcrumb({
-                    category: 'codec',
-                    message: `Decoder queue stalled (queueSize=${this.decoder.decodeQueueSize}, elapsed=${Math.round(now - drainStart)}ms)`,
-                    level: 'warning',
-                    data: { queueSize: this.decoder.decodeQueueSize, elapsedMs: Math.round(now - drainStart) },
-                });
+            // Wait for output callback to deliver decoded frames if they haven't
+            // arrived yet. Uses frameCountBefore (captured at top of drain) to
+            // correctly detect frames that arrived during the drain loop itself.
+            let postDrainWait = 0;
+            while (this.decodedFrames.length === frameCountBefore && postDrainWait < 500) {
+                await new Promise(r => setTimeout(r, 1));
+                postDrainWait++;
             }
-
-            if (now - drainStart > DRAIN_TIMEOUT_MS) {
-                const framesReceived = this.decodedFrames.length - frameCountBefore;
-                const stallDurationMs = Math.round(now - lastChangeTime);
-                const decodeMode = this.forceSoftware ? 'software (CPU)' : 'hardware (GPU)';
-                const gpuRenderer = FrameExtractor.getGpuRenderer();
-                const errorMsg = `Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`;
-                console.error(`[FrameExtractor] ${errorMsg}`);
-                Sentry.captureMessage(errorMsg, {
-                    level: 'error',
-                    tags: {
-                        component: 'FrameExtractor',
-                        decodeMode: this.forceSoftware ? 'software' : 'hardware',
-                        'codec.reclaim': this.decoder.state === 'closed' ? 'true' : 'false',
-                    },
-                    extra: {
-                        // Queue & decoder state
-                        queueSize: this.decoder.decodeQueueSize,
-                        decoderState: this.decoder.state,
-                        rebuildCount: this.rebuildCount,
-
-                        // Frame accounting
-                        decodedFrameBuffer: this.decodedFrames.length,
-                        framesReceivedDuringDrain: framesReceived,
-                        fedCount,
-                        totalChunks: this.chunks.length,
-                        nextChunkIndex: this.nextChunkIndex,
-
-                        // Source info
-                        sourceWidth: this.width,
-                        sourceHeight: this.height,
-                        codec: this.decoderConfig?.codec,
-                        sourceResolution: `${this.width}x${this.height}`,
-
-                        // Decode mode & hardware
-                        decodeMode,
-                        gpuRenderer,
-                        hardwareConcurrency: navigator.hardwareConcurrency,
-                        deviceMemoryGB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 'unknown',
-
-                        // Timing & visibility
-                        stallDurationMs,
-                        documentVisible: document.visibilityState,
-                        wasHiddenDuringDrain,
-                        userAgent: navigator.userAgent,
-                    },
-                });
-                throw new Error(errorMsg);
-            }
-
-            if ((this.decoder.state as string) === 'closed') return;
-
-            await new Promise(r => setTimeout(r, 1));
-        }
-
-        // Wait for output callback to deliver decoded frames if they haven't
-        // arrived yet. Uses frameCountBefore (captured at top of drain) to
-        // correctly detect frames that arrived during the drain loop itself.
-        let postDrainWait = 0;
-        while (this.decodedFrames.length === frameCountBefore && postDrainWait < 500) {
-            await new Promise(r => setTimeout(r, 1));
-            postDrainWait++;
-        }
 
         } finally {
             document.removeEventListener('visibilitychange', visibilityHandler);

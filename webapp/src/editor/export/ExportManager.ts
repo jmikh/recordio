@@ -129,8 +129,20 @@ export class ExportManager {
         const videoCodec = await resolveVideoCodec(quality, width, height, fps);
         const audioCodec = await resolveAudioCodec();
 
+        // Stream muxer output into a growable chunk list instead of a single
+        // ArrayBuffer. This avoids mp4-muxer's internal double-buffering during
+        // finalize, which can OOM on long videos (e.g., 8+ min on Opera/Windows).
+        // fastStart: false puts moov at file end — fine since the output is
+        // downloaded or uploaded, never streamed for live playback.
+        const muxedChunks: { data: Uint8Array; position: number }[] = [];
         const muxer = new Mp4Muxer.Muxer({
-            target: new Mp4Muxer.ArrayBufferTarget(),
+            target: new Mp4Muxer.StreamTarget({
+                onData: (data, position) => {
+                    muxedChunks.push({ data, position });
+                },
+                chunked: true,
+                chunkSize: 16 * 1024 * 1024,
+            }),
             video: {
                 codec: videoCodec.muxerCodec,
                 width,
@@ -141,7 +153,7 @@ export class ExportManager {
                 numberOfChannels: 2,
                 sampleRate: 44100
             },
-            fastStart: 'in-memory'
+            fastStart: false
         });
 
         let videoEncoderError: Error | null = null;
@@ -400,8 +412,15 @@ export class ExportManager {
             }
             muxer.finalize();
 
-            const { buffer } = muxer.target;
-            const blob = new Blob([buffer], { type: 'video/mp4' });
+            // Assemble final MP4 from streamed chunks. StreamTarget may write
+            // non-sequentially (position arg), so we stitch respecting offsets.
+            const totalSize = muxedChunks.reduce((max, c) => Math.max(max, c.position + c.data.byteLength), 0);
+            const finalBuffer = new Uint8Array(totalSize);
+            for (const chunk of muxedChunks) {
+                finalBuffer.set(chunk.data, chunk.position);
+            }
+            muxedChunks.length = 0; // free chunk list immediately
+            const blob = new Blob([finalBuffer], { type: 'video/mp4' });
 
             if (!options?.skipDownload) {
                 this.downloadBlob(blob, `${project.name}_${quality}_${fps}fps.mp4`);
