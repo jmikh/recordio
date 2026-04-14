@@ -26,7 +26,7 @@ import { WebDemuxer } from 'web-demuxer';
 const FEED_AHEAD_MS = 200;
 
 /** Maximum time (ms) to wait for decoder drain before treating it as stuck. */
-const DRAIN_TIMEOUT_MS = 10_000;
+const DRAIN_TIMEOUT_MS = 3_000;
 
 /** Maximum number of automatic decoder rebuilds per export. */
 const MAX_REBUILDS = 4;
@@ -476,6 +476,22 @@ export class FrameExtractor {
         return this.decodedFrames[0].clone();
     }
 
+    /** Detect GPU renderer string via a throwaway WebGL context. */
+    private static getGpuRenderer(): string {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) return 'unknown (no webgl)';
+            const ext = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+            if (!ext) return 'unknown (no debug ext)';
+            const renderer = (gl as WebGLRenderingContext).getParameter(ext.UNMASKED_RENDERER_WEBGL) as string;
+            const vendor = (gl as WebGLRenderingContext).getParameter(ext.UNMASKED_VENDOR_WEBGL) as string;
+            return `${vendor} | ${renderer}`;
+        } catch {
+            return 'unknown (error)';
+        }
+    }
+
     /**
      * Wait for the decoder to process all queued chunks.
      *
@@ -495,6 +511,11 @@ export class FrameExtractor {
         let lastQueueSize = this.decoder.decodeQueueSize;
         let lastChangeTime = drainStart;
         let stallWarned = false;
+        let wasHiddenDuringDrain = false;
+        const visibilityHandler = () => { if (document.visibilityState === 'hidden') wasHiddenDuringDrain = true; };
+        document.addEventListener('visibilitychange', visibilityHandler);
+
+        try {
 
         while (this.decoder.decodeQueueSize > 0) {
             const now = performance.now();
@@ -526,23 +547,47 @@ export class FrameExtractor {
 
             if (now - drainStart > DRAIN_TIMEOUT_MS) {
                 const framesReceived = this.decodedFrames.length - frameCountBefore;
+                const stallDurationMs = Math.round(now - lastChangeTime);
+                const decodeMode = this.forceSoftware ? 'software (CPU)' : 'hardware (GPU)';
+                const gpuRenderer = FrameExtractor.getGpuRenderer();
                 const errorMsg = `Decoder drain timed out after ${DRAIN_TIMEOUT_MS}ms (queueSize=${this.decoder.decodeQueueSize})`;
                 console.error(`[FrameExtractor] ${errorMsg}`);
                 Sentry.captureMessage(errorMsg, {
                     level: 'error',
-                    tags: { component: 'FrameExtractor' },
+                    tags: {
+                        component: 'FrameExtractor',
+                        decodeMode: this.forceSoftware ? 'software' : 'hardware',
+                        'codec.reclaim': this.decoder.state === 'closed' ? 'true' : 'false',
+                    },
                     extra: {
+                        // Queue & decoder state
                         queueSize: this.decoder.decodeQueueSize,
                         decoderState: this.decoder.state,
                         rebuildCount: this.rebuildCount,
+
+                        // Frame accounting
                         decodedFrameBuffer: this.decodedFrames.length,
                         framesReceivedDuringDrain: framesReceived,
                         fedCount,
                         totalChunks: this.chunks.length,
                         nextChunkIndex: this.nextChunkIndex,
+
+                        // Source info
                         sourceWidth: this.width,
                         sourceHeight: this.height,
+                        codec: this.decoderConfig?.codec,
+                        sourceResolution: `${this.width}x${this.height}`,
+
+                        // Decode mode & hardware
+                        decodeMode,
+                        gpuRenderer,
+                        hardwareConcurrency: navigator.hardwareConcurrency,
+                        deviceMemoryGB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 'unknown',
+
+                        // Timing & visibility
+                        stallDurationMs,
                         documentVisible: document.visibilityState,
+                        wasHiddenDuringDrain,
                         userAgent: navigator.userAgent,
                     },
                 });
@@ -561,6 +606,10 @@ export class FrameExtractor {
         while (this.decodedFrames.length === frameCountBefore && postDrainWait < 500) {
             await new Promise(r => setTimeout(r, 1));
             postDrainWait++;
+        }
+
+        } finally {
+            document.removeEventListener('visibilitychange', visibilityHandler);
         }
     }
 
