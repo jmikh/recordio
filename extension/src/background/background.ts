@@ -10,7 +10,7 @@
  */
 
 import { initSentry, captureException } from '../utils/sentry';
-import { trackRecordingStarted, trackRecordingFinished, trackRecordingErrored, getDistinctId } from '../utils/mixpanel';
+import { trackRecordingStarted, trackRecordingFinished, getDistinctId } from '../utils/mixpanel';
 
 import { SECONDARY_COLOR_HEX, TEXT_ON_SECONDARY_HEX } from '../utils/colors';
 import { MSG_TYPES, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';

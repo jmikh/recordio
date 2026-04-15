@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Modal, Button, Notice } from '@shared/components';
+import { Modal, Button} from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useUIStore } from '../../stores/useUIStore';

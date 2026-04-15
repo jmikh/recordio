@@ -16,7 +16,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { VideoRecorder } from '../shared/videoRecorder';
 import { MSG_TYPES, type RecordingConfig, STORAGE_KEYS } from '../shared/messageTypes';
 import type { WindowDetectionResult } from '../shared/windowDetector';
-import { MultiToggle, Toggle, Dropdown, Button, InfoTooltip, Tooltip, CollapsibleCard, Notice, Modal } from '@shared/components';
+import { Toggle, Dropdown, Button, InfoTooltip, Tooltip, Modal } from '@shared/components';
 import { AudioVisualizer } from './AudioVisualizer';
 import viewPermissionsImage from '../assets/view-permissions.png';
 import permissionsImage from '../assets/permissions.png';
@@ -1213,7 +1213,7 @@ function RecordingPhase({ hasAudio, hasCamera, onStop }: {
             </div>
 
             {/* Card */}
-            <div className="flex flex-col items-center gap-6 bg-surface-raised border border-border rounded-xl px-10 py-8 shadow-card">
+            <div className="flex flex-col items-center gap-6 bg-surface-raised border border-border rounded-xl px-10 py-8 shadow-sm">
                 {/* Timer + Recording Indicator */}
                 <div className="flex items-center gap-3">
                     <div className="w-3 h-3 bg-destructive rounded-full animate-pulse" />

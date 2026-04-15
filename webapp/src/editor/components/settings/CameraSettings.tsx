@@ -2,7 +2,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Button, Slider, MultiToggle, Toggle, Notice, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { Button, Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
 import { FaRegCircle, FaRegSquare } from 'react-icons/fa';
 import { MdAspectRatio } from 'react-icons/md';
@@ -30,7 +30,7 @@ export const CameraSettings = () => {
     if (!cameraConfig) {
         return (
             <div className="p-4">
-                <Notice>No camera configured for this project.</Notice>
+                No camera configured for this project.
             </div>
         );
     }

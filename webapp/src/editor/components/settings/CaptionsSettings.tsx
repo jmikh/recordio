@@ -13,7 +13,6 @@ import { TranscriptionService } from '../../../core/transcription/TranscriptionS
 import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
 
 
-import { Notice } from '@shared/components';
 import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
 import { useToast } from '../Toast';

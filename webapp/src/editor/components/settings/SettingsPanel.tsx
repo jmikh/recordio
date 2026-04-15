@@ -140,7 +140,7 @@ export const SettingsPanel = () => {
     const selectedOverlaySegment = selectedOverlaySegmentId ? (overlaySegments || []).find(b => b.id === selectedOverlaySegmentId) : null;
 
     return (
-        <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface" style={{ boxShadow: 'var(--shadow-panel)' }}>
+        <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface">
             <div className="flex flex-1 min-h-0">
             {/* Sidebar Navigation */}
             <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col py-6 pl-0 pr-3 border-r border-border">

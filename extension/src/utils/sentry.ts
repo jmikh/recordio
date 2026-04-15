@@ -75,10 +75,3 @@ export function captureException(error: Error) {
     sentryScope.captureException(error);
 }
 
-export function captureMessage(message: string) {
-    if (!sentryScope) {
-        console.error('[Sentry] Cannot capture message: Sentry not initialized');
-        return;
-    }
-    sentryScope.captureMessage(message);
-}

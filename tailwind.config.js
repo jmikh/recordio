@@ -51,7 +51,6 @@ export default {
       track: "var(--track-height)",
     },
     boxShadow: {
-      'inner-bold': 'var(--shadow-inner-bold)',
       'float': 'var(--shadow-float)',
     },
     fontFamily: {

@@ -97,15 +97,3 @@ export function trackRecordingFinished(props: {
     track('recording_finished', props);
 }
 
-export function trackRecordingErrored(props: {
-    mode: string;
-    error: string;
-    hasAudio: boolean;
-    hasCamera: boolean;
-}) {
-    track('recording_errored', props);
-}
-
-export function trackExtensionInstalled() {
-    track('extension_installed');
-}

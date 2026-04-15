@@ -83,7 +83,7 @@ const BASE_HEIGHT = 28;
 export function holdShapeBase(height: number = BASE_HEIGHT): CSSProperties {
     return {
         height,
-        boxShadow: 'var(--shadow-segment)',
+        boxShadow: '0 1px 3px oklch(0 0 0 / 12%), 0 0 0 1px oklch(0 0 0 / 5%)',
         background: 'linear-gradient(to bottom, color-mix(in srgb, var(--block-bg) 100%, transparent), color-mix(in srgb, var(--block-bg) 75%, transparent))',
     };
 }

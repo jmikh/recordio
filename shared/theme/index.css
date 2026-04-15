@@ -77,16 +77,10 @@
 
    /* ─────────────────────────────────────────────────────────
      Shadows - Centralized for Tailwind utilities
-     Use: shadow-sm, shadow-button, shadow-card, shadow-panel, shadow-segment, shadow-float
+     Use: shadow-sm, shadow-float
      ───────────────────────────────────────────────────────── */
-   --shadow-inner-bold: inset 0 2px 4px oklch(0 0 0 / 6%);
    --shadow-float: 0 8px 24px oklch(0 0 0 / 10%), 0 2px 6px oklch(0 0 0 / 6%);
-   --shadow-panel: 0 1px 3px oklch(0 0 0 / 6%), 0 0 0 1px oklch(0 0 0 / 3%);
-   --shadow-card: 0 2px 4px oklch(0 0 0 / 6%);
    --shadow-sm: 0 1px 2px oklch(0 0 0 / 6%);
-   --shadow-button: 0 1px 2px oklch(0 0 0 / 8%), inset 0 1px 0 oklch(1 0 0 / 8%);
-   --shadow-segment: 0 1px 3px oklch(0 0 0 / 12%), 0 0 0 1px oklch(0 0 0 / 5%);
-   --shadow-thumb: 0 1px 3px oklch(0 0 0 / 15%), 0 0 0 1px oklch(0 0 0 / 5%);
 
    /* ─────────────────────────────────────────────────────────
      Radius
@@ -203,10 +197,6 @@
    --text-muted: oklch(0.98 0 0 / 60%);
    --text-disabled: oklch(0.98 0 0 / 38%);
 
-   /* Shadows - Slightly stronger for dark background */
-   --shadow-panel: 0 1px 3px oklch(0 0 0 / 20%), 0 0 0 1px oklch(1 0 0 / 5%);
-   --shadow-card: 0 2px 4px oklch(0 0 0 / 20%);
-   --shadow-button: 0 1px 2px oklch(0 0 0 / 20%), inset 0 1px 0 oklch(1 0 0 / 5%);
 }
 
 /* Global font applied outside @layer to ensure it's not tree-shaken */
@@ -261,7 +251,7 @@ body,
    /* Interactive Destructive - for dangerous/irreversible actions */
    .interactive-destructive {
       @apply h-9 px-3 bg-destructive border border-destructive rounded-[var(--radius-interactive)] text-sm text-white font-medium hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default;
-      box-shadow: var(--shadow-button);
+      box-shadow: 0 1px 2px oklch(0 0 0 / 8%), inset 0 1px 0 oklch(1 0 0 / 8%);
    }
 
    /* Interactive Selected State - secondary border with glow */

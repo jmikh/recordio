@@ -31,30 +31,6 @@ export function initSentry() {
     initialized = true;
 }
 
-export function captureBugReport(description: string, additionalContext?: Record<string, any>) {
-    Sentry.withScope((scope) => {
-        scope.setLevel("info");
-        scope.setTag("report.type", "user-submitted");
-        scope.setExtra("userDescription", description);
-
-        if (additionalContext) {
-            Object.entries(additionalContext).forEach(([key, value]) => {
-                scope.setExtra(key, value);
-            });
-        }
-
-        Sentry.captureMessage(`User Bug Report: ${description}`);
-    });
-}
-
-export function captureException(error: Error) {
-    Sentry.captureException(error);
-}
-
-export function captureMessage(message: string) {
-    Sentry.captureMessage(message);
-}
-
 // ============================================
 // Import Error Reporting
 // ============================================
