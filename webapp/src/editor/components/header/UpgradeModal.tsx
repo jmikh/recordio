@@ -139,10 +139,8 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
 
     const monthlyPrice = 15;
     const yearlyPrice = 48;
-    const lifetimePrice = 89;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
-    const isLifetime = billingInterval === 'lifetime';
     const isLifetimeSubscriber = isPro && subscription.billingInterval === 'lifetime';
 
     // ── Already-Pro View ──
@@ -352,60 +350,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         disabled={loading}
                     >
                         {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
-                    </Button>
-                </div>
-
-                {/* ── Lifetime Card ── */}
-                <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
-                    <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Lifetime</h3>
-
-                    {/* Launch Sale Badge */}
-                    <div className="flex justify-center mb-3">
-                        <span className="bg-surface px-3 py-1 rounded-full text-xs font-semibold text-primary border border-border">
-                            🚀 Launch Sale
-                        </span>
-                    </div>
-
-                    {/* Price */}
-                    <div className="text-center mb-1 flex items-baseline justify-center gap-2">
-                        <span className="text-lg text-text-muted line-through">$119</span>
-                        <span className="text-4xl font-bold text-primary">
-                            ${lifetimePrice}
-                        </span>
-                    </div>
-                    <p className="text-xs text-text-muted text-center mb-5">
-                        one-time
-                    </p>
-
-                    {/* Feature List */}
-                    <ul className="space-y-3 mb-6 flex-1">
-                        <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
-                            <span className="text-text-highlighted font-medium">Everything in Pro</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
-                            <span className="text-text-highlighted">Pay once, yours forever</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
-                            <span className="text-text-highlighted">Lifetime updates</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
-                            <span className="text-text-highlighted">Priority support</span>
-                        </li>
-                    </ul>
-
-                    {/* Get Lifetime Button */}
-                    <Button
-                        variant="primary"
-                        onClick={() => handleUpgradeWithInterval('lifetime')}
-                        fullWidth
-                        className="py-3 text-sm font-semibold rounded-lg"
-                        disabled={loading}
-                    >
-                        {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Lifetime' : 'Get Lifetime'}
                     </Button>
                 </div>
             </div>
