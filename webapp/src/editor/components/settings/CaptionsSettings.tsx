@@ -51,7 +51,7 @@ export function CaptionsSettings() {
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const { addToast } = useToast();
-    const hideCloudTranscription = true; // TODO: remove after per-user limits are live
+    const hideCloudTranscription = false; // TODO: remove after per-user limits are live
     const [engine, setEngine] = useState<TranscriptionEngine>('local');
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -536,7 +536,7 @@ export function CaptionsSettings() {
                 <div
                     ref={popoverRef}
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-surface-raised border border-border rounded-lg shadow-float flex items-center gap-0.5 px-1 py-1"
+                    className={`bg-surface-raised border border-border ${selection.isEditing ? 'rounded-lg' : 'rounded-full'} shadow-float flex items-center gap-0.5 px-1 py-1`}
                     style={{
                         position: 'fixed',
                         bottom: window.innerHeight - selection.anchorRect.top + 4,
