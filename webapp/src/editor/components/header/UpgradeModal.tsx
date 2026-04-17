@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCheck, FaCog } from 'react-icons/fa';
+import { LuCheck, LuSettings } from 'react-icons/lu';
 import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal, Button } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
@@ -196,7 +196,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         fullWidth
                         className="py-3 text-base font-semibold rounded-lg"
                     >
-                        <FaCog size={14} />
+                        <LuSettings className="icon-sm" />
                         {loading ? 'Loading...' : 'Manage Subscription'}
                     </Button>
                 )}
@@ -245,7 +245,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             {/* Success Message */}
             {success && (
                 <div className="mb-6 bg-success/10 border border-success/30 rounded-sm p-4 text-center">
-                    <FaCheck className="text-success mx-auto mb-2" size={32} />
+                    <LuCheck className="text-success mx-auto mb-2" size={32} />
                     <p className="text-lg font-semibold text-success mb-1">
                         🎉 Welcome to Pro!
                     </p>
@@ -324,19 +324,19 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                     {/* Feature List */}
                     <ul className="space-y-3 mb-6 flex-1">
                         <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <LuCheck className="icon-sm text-primary shrink-0" />
                             <span className="text-text-highlighted font-medium">Everything in Free, plus:</span>
                         </li>
                         <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <LuCheck className="icon-sm text-primary shrink-0" />
                             <span className="text-text-highlighted">Unlimited 4K exports</span>
                         </li>
                         <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <LuCheck className="icon-sm text-primary shrink-0" />
                             <span className="text-text-highlighted">No watermarks</span>
                         </li>
                         <li className="flex items-center gap-3 text-sm">
-                            <FaCheck className="text-primary shrink-0" size={12} />
+                            <LuCheck className="icon-sm text-primary shrink-0" />
                             <span className="text-text-highlighted">Shareable links</span>
                         </li>
                     </ul>

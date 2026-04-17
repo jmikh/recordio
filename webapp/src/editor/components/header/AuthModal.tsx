@@ -69,7 +69,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                     {loading ? (
                         <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
                     ) : (
-                        <FcGoogle className="group-hover:scale-110 transition-transform" size={20} />
+                        <FcGoogle className="icon-lg group-hover:scale-110 transition-transform" />
                     )}
                     <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
                 </button>

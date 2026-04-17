@@ -170,7 +170,7 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMo
                     <div className="flex items-center gap-2 text-xs text-text-muted">
                         {analytics && analytics.views > 0 && (
                             <span className="flex items-center gap-1">
-                                <TbEye size={12} />
+                                <TbEye className="icon-sm" />
                                 {analytics.views}
                             </span>
                         )}
@@ -186,7 +186,7 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMo
                             <span className="flex items-center gap-1 text-xs text-text-disabled">
                                 No Project
                                 <Tooltip text="The project was deleted from your computer or this video was recorded on a different device.">
-                                    <TbInfoCircle size={13} className="text-text-disabled cursor-help" />
+                                    <TbInfoCircle className="icon-sm text-text-disabled cursor-help" />
                                 </Tooltip>
                             </span>
                         )}
@@ -194,12 +194,12 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMo
                     <div className="flex-1" />
                     <Tooltip text="Copy share link">
                         <button onClick={copyLink} className="interactive-icon">
-                            <TbCopy size={14} />
+                            <TbCopy className="icon-sm" />
                         </button>
                     </Tooltip>
                     <Tooltip text="Open watch page">
                         <button onClick={openWatchPage} className="interactive-icon">
-                            <TbExternalLink size={14} />
+                            <TbExternalLink className="icon-sm" />
                         </button>
                     </Tooltip>
                 </div>

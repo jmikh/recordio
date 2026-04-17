@@ -11,7 +11,6 @@ import {
     ghostCameraMove,
     blockIconClass,
     ghostIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -186,7 +185,7 @@ export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isColl
                                     }}
                                 >
                                     {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <PiWebcamBold className={ghostIconClass} size={BLOCK_ICON_SIZE} />
+                                        <PiWebcamBold className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             )}

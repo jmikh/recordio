@@ -278,7 +278,7 @@ export function WatchPage() {
                                 )}
                             </div>
                             <Button size="sm" fullWidth onClick={copyLink} className="mt-4">
-                                <TbCopy size={15} />
+                                <TbCopy className="icon-sm" />
                                 {linkCopied ? 'Copied!' : 'Copy link'}
                             </Button>
                         </div>

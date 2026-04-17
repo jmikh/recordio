@@ -12,7 +12,7 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <MdOutlineBugReport size={20} className="text-text-highlighted" />
+                        <MdOutlineBugReport className="icon-lg text-text-highlighted" />
                         <h2 className="text-lg font-semibold text-text-highlighted">Report a Bug</h2>
                     </div>
                     <XButton onClick={onClose} />

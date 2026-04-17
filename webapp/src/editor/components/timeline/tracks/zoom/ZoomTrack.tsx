@@ -12,7 +12,6 @@ import {
     ghostZoom,
     blockIconClass,
     ghostIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -218,7 +217,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                     }}
                                 >
                                     {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={ghostIconClass} size={BLOCK_ICON_SIZE} />
+                                        <AiOutlineZoomIn className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             )}

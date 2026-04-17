@@ -207,6 +207,33 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'job-name');
 
 ---
 
+## Database Functions
+
+Database functions live in `webapp/supabase/sql/functions/`, one file per function. **Never put new function definitions inline in migration files.**
+
+### Conventions
+
+- **One file per function** — named after the function (e.g., `handle_new_user.sql`)
+- **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_stale_uploads.sql`)
+- **Doc comment at the top** of every file: purpose, trigger/caller, and tables touched
+- **[FUNCTIONS.md](webapp/supabase/sql/functions/FUNCTIONS.md)** is the index — update it when adding/removing functions
+
+### Adding a new function
+
+1. Create `webapp/supabase/sql/functions/<name>.sql` with `CREATE OR REPLACE FUNCTION` and a doc comment
+2. Update `FUNCTIONS.md` with the new entry
+3. Run `webapp/supabase/sql/build-functions.sh` to generate a migration, or create a standalone migration that applies just the new function
+
+### Build script
+
+`webapp/supabase/sql/build-functions.sh` concatenates all `sql/functions/*.sql` files into a single migration-compatible SQL file. Since every function uses `CREATE OR REPLACE`, the output is idempotent.
+
+```bash
+./webapp/supabase/sql/build-functions.sh > webapp/supabase/migrations/YYYYMMDDHHMMSS_functions.sql
+```
+
+---
+
 ## Database Conventions
 
 - **Always enable RLS on new tables** — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` after every `CREATE TABLE`. Tables accessed directly from the webapp (via publishable key) need `auth.uid()` policies. Tables only accessed from edge functions (via secret key) need no policies — secret key bypasses RLS, so deny-all is the default

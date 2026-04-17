@@ -4,7 +4,7 @@ import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Button, Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
-import { FaRegCircle, FaRegSquare } from 'react-icons/fa';
+import { LuCircle, LuSquare } from 'react-icons/lu';
 import { MdAspectRatio } from 'react-icons/md';
 import { RiPaletteLine, RiFocus3Line } from 'react-icons/ri';
 import { TbShape, TbBorderOuter } from 'react-icons/tb';
@@ -113,15 +113,15 @@ export const CameraSettings = () => {
                 {/* Shape Settings */}
                 <CollapsibleCard
                     title="Shape"
-                    icon={<TbShape size={16} />}
+                    icon={<TbShape className="icon-md" />}
                     previewItems={[
                         {
                             type: 'custom',
                             content: shape === 'rect'
-                                ? <MdAspectRatio size={16} className="text-text-muted" />
+                                ? <MdAspectRatio className="icon-md text-text-muted" />
                                 : shape === 'square'
-                                    ? <FaRegSquare size={12} className="text-text-muted" />
-                                    : <FaRegCircle size={12} className="text-text-muted" />
+                                    ? <LuSquare className="icon-sm text-text-muted" />
+                                    : <LuCircle className="icon-sm text-text-muted" />
                         }
                     ]}
                     isExpanded={showCollapsibleCameraShape}
@@ -169,7 +169,7 @@ export const CameraSettings = () => {
                 {/* Style Settings */}
                 <CollapsibleCard
                     title="Style"
-                    icon={<RiPaletteLine size={16} />}
+                    icon={<RiPaletteLine className="icon-md" />}
                     previewItems={[
                         ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
                         ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
@@ -216,7 +216,7 @@ export const CameraSettings = () => {
 
                 <CollapsibleCard
                     title="Outline"
-                    icon={<TbBorderOuter size={16} />}
+                    icon={<TbBorderOuter className="icon-md" />}
                     previewItems={borderPreviewItems}
                     isExpanded={showCollapsibleBorder}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBorder', v)}

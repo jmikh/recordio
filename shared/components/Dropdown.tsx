@@ -136,8 +136,7 @@ export function Dropdown<T>({
                 <div className="flex items-center gap-1.5">
                     {!hideSuffixInTrigger && currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}
                     <MdKeyboardArrowDown
-                        size={18}
-                        className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        className={`icon-lg transition-transform ${isOpen ? 'rotate-180' : ''}`}
                     />
                     {suffix}
                 </div>

@@ -61,7 +61,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     }, [win.id, isLastWindow, removeOutputWindow]);
 
     return (
-        <CollapsibleCard title="Clip" icon={<PiVideoBold size={16} />} notCollapsible>
+        <CollapsibleCard title="Clip" icon={<PiVideoBold className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Check the box to apply to all clips.</p>
 

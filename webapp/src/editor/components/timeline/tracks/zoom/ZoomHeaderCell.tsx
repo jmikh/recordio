@@ -15,7 +15,7 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollap
     return (
         <TimelineHeaderCell
             title="Zoom"
-            icon={<TbZoomIn size={16} />}
+            icon={<TbZoomIn className="icon-md" />}
             height={height}
             disabled={!zoomEnabled}
             isCollapsed={isCollapsed}

@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MdEdit, MdVisibilityOff, MdVisibility } from 'react-icons/md';
 import { RiPaletteLine } from 'react-icons/ri';
-import { TbSparkles } from 'react-icons/tb';
-import { FaRegClosedCaptioning } from 'react-icons/fa';
+import { TbSparkles, TbCopy, TbDownload } from 'react-icons/tb';
+import { LuCaptions } from 'react-icons/lu';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -64,6 +64,7 @@ export function CaptionsSettings() {
     const popoverRef = useRef<HTMLDivElement>(null);
     const editInputRef = useRef<HTMLInputElement>(null);
 
+
     const captionSegments = project.timeline.captionSegments;
     const settings = project.settings.captions || { enabled: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
     const hasMicrophone = !!project.microphoneSource;
@@ -97,7 +98,44 @@ export function CaptionsSettings() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [selection]);
 
+    /** Build visible transcript text from segments (shared by copy & download). */
+    const getVisibleTranscriptSegments = () => {
+        if (!captionSegments) return [];
+        return captionSegments
+            .filter(s => s.visible)
+            .map(s => ({
+                start: s.outputStartTimeMs,
+                end: s.outputEndTimeMs,
+                text: s.words.filter(w => !w.hidden).map(w => w.word).join(' '),
+            }))
+            .filter(s => s.text.length > 0);
+    };
 
+    const formatSubtitleTime = (ms: number, separator: string) => {
+        const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+        const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+        const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+        const ms3 = String(Math.floor(ms % 1000)).padStart(3, '0');
+        return `${h}:${m}:${s}${separator}${ms3}`;
+    };
+
+    const downloadFile = (content: string, filename: string, mime: string) => {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleDownloadSrt = () => {
+        const segments = getVisibleTranscriptSegments();
+        const srt = segments.map((s, i) =>
+            `${i + 1}\n${formatSubtitleTime(s.start, ',')} --> ${formatSubtitleTime(s.end, ',')}\n${s.text}`
+        ).join('\n\n');
+        downloadFile(srt, `${project.name || 'captions'}.srt`, 'text/srt');
+    };
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
@@ -346,7 +384,7 @@ export function CaptionsSettings() {
                 return (
                     <CollapsibleCard
                         title="A.I."
-                        icon={<TbSparkles size={16} />}
+                        icon={<TbSparkles className="icon-md" />}
                         previewItems={aiPreviewItems}
                         isExpanded={showCollapsibleCaptionAI}
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionAI', v)}
@@ -405,7 +443,7 @@ export function CaptionsSettings() {
             <div ref={captionsCardRef}>
             <CollapsibleCard
                 title="Captions"
-                icon={<FaRegClosedCaptioning size={16} />}
+                icon={<LuCaptions className="icon-md" />}
                 previewItems={[
                     {
                         type: 'text', content: captionSegments && captionSegments.length > 0
@@ -418,6 +456,34 @@ export function CaptionsSettings() {
             >
                 {captionSegments && captionSegments.length > 0 ? (
                     <div className="flex flex-col gap-1.5">
+                        <div className="flex gap-1.5 mb-1.5">
+                            <Tooltip text="Copy without timestamps" className="flex-1">
+                                <Button
+                                    variant="base"
+                                    size="sm"
+                                    fullWidth
+                                    icon={TbCopy}
+                                    onClick={() => {
+                                        const text = getVisibleTranscriptSegments().map(s => s.text).join('\n');
+                                        navigator.clipboard.writeText(text);
+                                        addToast({ type: 'success', title: 'Transcript copied' });
+                                    }}
+                                >
+                                    Copy
+                                </Button>
+                            </Tooltip>
+                            <Tooltip text="Download in SRT format" className="flex-1">
+                                <Button
+                                    variant="base"
+                                    size="sm"
+                                    fullWidth
+                                    icon={TbDownload}
+                                    onClick={handleDownloadSrt}
+                                >
+                                    Download
+                                </Button>
+                            </Tooltip>
+                        </div>
                         {captionSegments.filter(s => s.visible).map(segment => (
                             <div key={segment.id} className="flex items-start gap-1">
                                 {/* Timestamp */}
@@ -462,7 +528,7 @@ export function CaptionsSettings() {
             {/* Style Settings Card - only show when captions exist */}
             {captionSegments && captionSegments.length > 0 && <CollapsibleCard
                 title="Style"
-                icon={<RiPaletteLine size={16} />}
+                icon={<RiPaletteLine className="icon-md" />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -480,6 +546,12 @@ export function CaptionsSettings() {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionStyle', v)}
             >
                 <div className="flex flex-col gap-4">
+                    <Toggle
+                        label="Hide"
+                        value={!settings.enabled}
+                        onChange={(value) => updateSettings({ captions: { ...settings, enabled: !value } })}
+                    />
+
                     <Toggle
                         label="Word Highlight"
                         value={settings.wordHighlight ?? true}
@@ -573,10 +645,9 @@ export function CaptionsSettings() {
                                     <Button
                                         variant="icon"
                                         className="size-7!"
+                                        icon={MdEdit}
                                         onClick={() => setSelection({ ...selection, isEditing: true })}
-                                    >
-                                        <MdEdit size={14} />
-                                    </Button>
+                                    />
                                 </Tooltip>
                             )}
                             {/* Hide/Show — show both when selection has a mix */}
@@ -592,10 +663,9 @@ export function CaptionsSettings() {
                                                 <Button
                                                     variant="icon"
                                                     className="size-7!"
+                                                    icon={MdVisibilityOff}
                                                     onClick={handleHideSelected}
-                                                >
-                                                    <MdVisibilityOff size={14} />
-                                                </Button>
+                                                />
                                             </Tooltip>
                                         )}
                                         {hasHidden && (
@@ -603,10 +673,9 @@ export function CaptionsSettings() {
                                                 <Button
                                                     variant="icon"
                                                     className="size-7!"
+                                                    icon={MdVisibility}
                                                     onClick={handleShowSelected}
-                                                >
-                                                    <MdVisibility size={14} />
-                                                </Button>
+                                                />
                                             </Tooltip>
                                         )}
                                     </>

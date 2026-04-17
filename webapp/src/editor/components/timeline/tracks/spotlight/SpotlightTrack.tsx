@@ -13,7 +13,6 @@ import {
     ghostSpotlight,
     blockIconClass,
     ghostIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -208,7 +207,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                                     }}
                                 >
                                     {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
-                                        <RiLightbulbFlashLine className={ghostIconClass} size={BLOCK_ICON_SIZE} />
+                                        <RiLightbulbFlashLine className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             );

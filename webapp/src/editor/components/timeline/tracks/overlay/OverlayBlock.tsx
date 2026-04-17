@@ -9,16 +9,15 @@ import {
     resizeHandle,
     dragHandleIndicator,
     blockIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 
 const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <MdBlurOn size={BLOCK_ICON_SIZE} />,
-    text: <MdOutlineTextFields size={BLOCK_ICON_SIZE} />,
-    arrow: <RiArrowRightUpFill size={BLOCK_ICON_SIZE} />,
-    border: <MdBorderOuter size={BLOCK_ICON_SIZE} />,
+    blur: <MdBlurOn className="icon-md" />,
+    text: <MdOutlineTextFields className="icon-md" />,
+    arrow: <RiArrowRightUpFill className="icon-md" />,
+    border: <MdBorderOuter className="icon-md" />,
 };
 
 interface OverlayBlockProps {

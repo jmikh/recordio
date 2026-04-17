@@ -288,9 +288,7 @@ export function DashboardPage() {
                     <div className="flex-1" />
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
-                            <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Report a Bug">
-                                <MdOutlineBugReport size={18} />
-                            </Button>
+                            <Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
                             <ThemeToggle />
                         </div>
                         {isAuthenticated ? (

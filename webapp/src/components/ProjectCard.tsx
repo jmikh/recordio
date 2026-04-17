@@ -150,7 +150,7 @@ export const ProjectCard = ({
                     )}
                     <div className="flex items-center gap-1.5 shrink-0">
                         {isShared && (
-                            <TbLink size={13} className="text-primary" title="Published" />
+                            <TbLink className="icon-sm text-primary" title="Published" />
                         )}
                         <span className="text-xs text-text-muted">{timeAgo(project.createdAt)}</span>
                         {isActive && <span className="chosen-dot"></span>}

@@ -245,7 +245,7 @@ export const TimelineToolbar: React.FC = () => {
                         onMouseLeave={() => setScissorsHovered(false)}
                         className={!canSplit ? 'opacity-40 cursor-not-allowed' : ''}
                     >
-                        <FaScissors size={13} />
+                        <FaScissors className="icon-sm" />
                     </Button>
                 </Tooltip>
 
@@ -257,7 +257,7 @@ export const TimelineToolbar: React.FC = () => {
                             onClick={handleAutoCut}
                             className={isAnalyzing ? 'animate-pulse' : ''}
                         >
-                            <AiAudioIcon size={18} />
+                            <AiAudioIcon className="icon-lg" />
                         </Button>
                     </Tooltip>
                 )}
@@ -265,24 +265,16 @@ export const TimelineToolbar: React.FC = () => {
                 <div className="w-px h-5 bg-border mx-1" />
 
                 <Tooltip text="Add Blur" position="top-start">
-                    <Button variant="icon" onClick={() => handleAddOverlay('blur')}>
-                        <MdBlurOn size={16} />
-                    </Button>
+                    <Button variant="icon" icon={MdBlurOn} onClick={() => handleAddOverlay('blur')} />
                 </Tooltip>
                 <Tooltip text="Add Text" position="top-start">
-                    <Button variant="icon" onClick={() => handleAddOverlay('text')}>
-                        <MdOutlineTextFields size={16} />
-                    </Button>
+                    <Button variant="icon" icon={MdOutlineTextFields} onClick={() => handleAddOverlay('text')} />
                 </Tooltip>
                 <Tooltip text="Add Arrow" position="top-start">
-                    <Button variant="icon" onClick={() => handleAddOverlay('arrow')}>
-                        <RiArrowRightUpFill size={16} />
-                    </Button>
+                    <Button variant="icon" icon={RiArrowRightUpFill} onClick={() => handleAddOverlay('arrow')} />
                 </Tooltip>
                 <Tooltip text="Add Outline" position="top-start">
-                    <Button variant="icon" onClick={() => handleAddOverlay('border')}>
-                        <MdBorderOuter size={16} />
-                    </Button>
+                    <Button variant="icon" icon={MdBorderOuter} onClick={() => handleAddOverlay('border')} />
                 </Tooltip>
             </div>
 
@@ -292,7 +284,7 @@ export const TimelineToolbar: React.FC = () => {
                     onClick={onTogglePlay}
                     className="w-7 h-7 rounded-full border-2 border-primary text-primary hover:border-primary-highlighted hover:text-primary-highlighted hover:scale-110 transition-all flex items-center justify-center shrink-0"
                 >
-                    {isPlaying ? <MdPause size={18} /> : <MdPlayArrow size={18} />}
+                    {isPlaying ? <MdPause className="icon-lg" /> : <MdPlayArrow className="icon-lg" />}
                 </button>
                 <div className="flex items-baseline gap-1.5">
                     <div
@@ -321,10 +313,9 @@ export const TimelineToolbar: React.FC = () => {
                 </Button>
                 <Button
                     variant="icon"
+                    icon={MdRemove}
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
-                >
-                    <MdRemove size={14} />
-                </Button>
+                />
                 <div className="w-24">
                     <Slider
                         value={pixelsPerSec}
@@ -337,10 +328,9 @@ export const TimelineToolbar: React.FC = () => {
                 </div>
                 <Button
                     variant="icon"
+                    icon={MdAdd}
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
-                >
-                    <MdAdd size={14} />
-                </Button>
+                />
             </div>
         </div>
     );

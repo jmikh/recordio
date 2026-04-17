@@ -9,9 +9,6 @@ import type { CSSProperties } from 'react';
 
 // ============= ICON CONSTANTS =============
 
-/** Size of the block icon in pixels */
-export const BLOCK_ICON_SIZE = 16;
-
 /** Minimum hold width (in px) before the icon is hidden */
 export const MIN_ICON_WIDTH_PX = 28;
 

@@ -285,7 +285,7 @@ export const BackgroundSettings = () => {
     return (
         <CollapsibleCard
             title="Background"
-            icon={<TbBackground size={16} />}
+            icon={<TbBackground className="icon-md" />}
             notCollapsible
         >
             <div className="flex flex-col gap-4 text-sm select-none">
@@ -320,7 +320,7 @@ export const BackgroundSettings = () => {
                             title="Color / Gradient"
                         >
                             <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
-                                <IoIosColorFilter size={20} />
+                                <IoIosColorFilter className="icon-lg" />
                             </div>
                         </div>
 
@@ -335,7 +335,7 @@ export const BackgroundSettings = () => {
                             title="Upload Image"
                         >
                             <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">
-                                <CiImageOn size={20} />
+                                <CiImageOn className="icon-lg" />
                             </div>
                             <input
                                 type="file"

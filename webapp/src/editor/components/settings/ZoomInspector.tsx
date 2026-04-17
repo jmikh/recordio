@@ -105,7 +105,7 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
     }, [segment, allZoomSegments, zoomSettings, updateZoomSegment, updateSettings]);
 
     return (
-        <CollapsibleCard title="Zoom" icon={<TbZoomIn size={16} />} notCollapsible>
+        <CollapsibleCard title="Zoom" icon={<TbZoomIn className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Check the box to apply to all zooms.</p>
                 {/* Transition Duration — custom label row with inline checkbox */}

@@ -7,7 +7,6 @@ import {
     resizeHandle,
     dragHandleIndicator,
     blockIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -118,8 +117,8 @@ export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
                         isHidden
-                            ? <PiWebcamSlashBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
-                            : <PiWebcamBold className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                            ? <PiWebcamSlashBold className={`${blockIconClass} icon-md`} />
+                            : <PiWebcamBold className={`${blockIconClass} icon-md`} />
                     )}
                 </div>
             )}

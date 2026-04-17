@@ -8,7 +8,6 @@ import {
     dragHandleIndicator,
     zoomOutBlock,
     transitionInStyle,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -123,7 +122,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {!isCollapsed && clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className="text-main opacity-60" size={BLOCK_ICON_SIZE} />
+                        <AiOutlineZoomIn className="icon-md text-main opacity-60" />
                     )}
                 </div>
             )}
@@ -160,7 +159,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {!isCollapsed && zoomOutWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomOut className="text-main opacity-70" size={BLOCK_ICON_SIZE} />
+                        <AiOutlineZoomOut className="icon-md text-main opacity-70" />
                     )}
                 </div>
             )}

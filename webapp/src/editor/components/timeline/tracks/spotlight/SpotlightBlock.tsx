@@ -9,7 +9,6 @@ import {
     fadeStyle,
     holdStyle,
     blockIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -134,7 +133,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     }}
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <RiLightbulbFlashLine className={blockIconClass} size={BLOCK_ICON_SIZE} />
+                        <RiLightbulbFlashLine className={`${blockIconClass} icon-md`} />
                     )}
                 </div>
             )}

@@ -19,10 +19,10 @@ const OVERLAY_TYPE_LABELS: Record<OverlayItemType, string> = {
 };
 
 const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <MdBlurOn size={14} />,
-    text: <MdOutlineTextFields size={14} />,
-    arrow: <RiArrowRightUpFill size={14} />,
-    border: <MdBorderOuter size={14} />,
+    blur: <MdBlurOn className="icon-sm" />,
+    text: <MdOutlineTextFields className="icon-sm" />,
+    arrow: <RiArrowRightUpFill className="icon-sm" />,
+    border: <MdBorderOuter className="icon-sm" />,
 };
 
 // ============================================================================

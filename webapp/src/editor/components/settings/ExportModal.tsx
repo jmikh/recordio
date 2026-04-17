@@ -34,10 +34,10 @@ const FPS_OPTIONS: { value: ExportFps; label: string; proOnly: boolean }[] = [
 ];
 
 const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string; icon: React.ReactNode }[] = [
-    { value: 'top-left', label: 'Top Left', icon: <TbBoxAlignTopLeft size={18} /> },
-    { value: 'top-right', label: 'Top Right', icon: <TbBoxAlignTopRight size={18} /> },
-    { value: 'bottom-left', label: 'Bottom Left', icon: <TbBoxAlignBottomLeft size={18} /> },
-    { value: 'bottom-right', label: 'Bottom Right', icon: <TbBoxAlignBottomRight size={18} /> },
+    { value: 'top-left', label: 'Top Left', icon: <TbBoxAlignTopLeft className="icon-lg" /> },
+    { value: 'top-right', label: 'Top Right', icon: <TbBoxAlignTopRight className="icon-lg" /> },
+    { value: 'bottom-left', label: 'Bottom Left', icon: <TbBoxAlignBottomLeft className="icon-lg" /> },
+    { value: 'bottom-right', label: 'Bottom Right', icon: <TbBoxAlignBottomRight className="icon-lg" /> },
 ];
 
 /** Format remaining trial time as a human-readable string */
@@ -411,7 +411,7 @@ export function ExportModal() {
         <Modal isOpen={isOpen} onClose={() => setExportModalOpen(false)} maxWidth="max-w-[480px]">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-text-main flex items-center gap-2">
-                    <TbDownload size={20} />
+                    <TbDownload className="icon-lg" />
                     Export Project
                 </h2>
                 <XButton onClick={() => setExportModalOpen(false)} />
@@ -504,7 +504,7 @@ export function ExportModal() {
                                         className={`text-sm font-medium ${publishDisabled ? 'pointer-events-none' : ''}`}
                                         disabled={publishDisabled}
                                     >
-                                        <TbLink size={16} />
+                                        <TbLink className="icon-md" />
                                         {isPublishing ? 'Sharing...' : existingShare ? 'Reshare' : 'Share'}
                                     </Button>
                                 </Tooltip>
@@ -525,7 +525,7 @@ export function ExportModal() {
                                                 }
                                             }}
                                         >
-                                            <TbCopy size={16} />
+                                            <TbCopy className="icon-md" />
                                             Copy Link
                                         </Button>
                                         <span className="subtext">Published {timeAgo(existingShare.updated_at)}</span>
@@ -544,7 +544,7 @@ export function ExportModal() {
                             className="text-sm font-medium"
                             disabled={busy || needsProFeature}
                         >
-                            <TbDownload size={16} />
+                            <TbDownload className="icon-md" />
                             Download
                         </Button>
                     </Tooltip>
@@ -562,7 +562,7 @@ export function ExportModal() {
                 {/* Advanced Settings */}
                 <div className="flex flex-col gap-4">
                     <h3 className="font-medium text-text-highlighted flex items-center gap-2">
-                        <TbSettings2 size={16} />
+                        <TbSettings2 className="icon-md" />
                         Advanced
                     </h3>
                     <div className="flex flex-col gap-3">

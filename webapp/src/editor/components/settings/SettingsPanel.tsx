@@ -18,7 +18,7 @@ import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
 import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick } from 'react-icons/tb';
 import { PiWebcamBold } from 'react-icons/pi';
-import { FaChevronRight } from 'react-icons/fa';
+import { LuChevronRight } from 'react-icons/lu';
 
 
 
@@ -54,7 +54,7 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
         >
             <span className="flex">{icon}</span>
             {label && <span className="text-base font-medium">{label}</span>}
-            {isActive && <FaChevronRight size={12} className={isPrimary ? 'text-white ml-auto' : 'text-primary ml-auto'} />}
+            {isActive && <LuChevronRight className={`icon-sm ${isPrimary ? 'text-white ml-auto' : 'text-primary ml-auto'}`} />}
         </button>
     );
 };
@@ -84,25 +84,25 @@ export const SettingsPanel = () => {
     const navItems = useMemo(() => {
         const items: { id: SettingsPanelTab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
 
-            { id: 'background', label: 'Background', icon: <TbBackground size={20} /> },
-            { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop size={20} /> },
-            { id: 'effects', label: 'Effects', icon: <TbClick size={20} /> },
+            { id: 'background', label: 'Background', icon: <TbBackground className="icon-lg" /> },
+            { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop className="icon-lg" /> },
+            { id: 'effects', label: 'Effects', icon: <TbClick className="icon-lg" /> },
             {
                 id: 'camera',
                 label: 'Camera',
-                icon: <PiWebcamBold size={20} />,
+                icon: <PiWebcamBold className="icon-lg" />,
                 disabled: !hasCameraSource,
                 disabledTooltip: 'No camera detected'
             },
             {
                 id: 'captions',
                 label: 'Captions',
-                icon: <TbArticle size={20} />,
+                icon: <TbArticle className="icon-lg" />,
             },
             {
                 id: 'audio',
                 label: 'Audio',
-                icon: <TbMusic size={20} />,
+                icon: <TbMusic className="icon-lg" />,
             },
         ];
         return items;
@@ -216,7 +216,7 @@ export const SettingsPanel = () => {
             </nav>
 
             {/* Content Area */}
-            <div id="settings-content" className="w-72 flex flex-row relative h-full bg-surface-body">
+            <div id="settings-content" className="w-80 flex flex-row relative h-full bg-surface-body">
                 <div
                     ref={setScrollContainer}
                     className="p-2 flex-1 overflow-y-auto text-text-main custom-scrollbar scrollbar-hide"

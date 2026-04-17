@@ -84,7 +84,7 @@ export const EffectsSettings = () => {
             {/* MOUSE SETTINGS */}
             <CollapsibleCard
                 title="Mouse"
-                icon={<MdAdsClick size={16} />}
+                icon={<MdAdsClick className="icon-md" />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -113,7 +113,7 @@ export const EffectsSettings = () => {
                             onClick={() => previewClickSound(mouseSettings.soundVolume ?? 0.5)}
                             title="Preview sound"
                         >
-                            <TbPlayerPlay size={13} />
+                            <TbPlayerPlay className="icon-sm" />
                         </button>
                     </Toggle>
 
@@ -192,7 +192,7 @@ export const EffectsSettings = () => {
             {/* KEYBOARD SETTINGS */}
             <CollapsibleCard
                 title="Keyboard"
-                icon={<MdOutlineKeyboardCommandKey size={16} />}
+                icon={<MdOutlineKeyboardCommandKey className="icon-md" />}
                 previewItems={[
                     { type: 'text', content: (keyboardSettings.showHotkeys ?? true) ? 'On' : 'Off' },
                     ...((keyboardSettings.showHotkeys ?? true) ? [

@@ -84,6 +84,24 @@ Defined in `shared/theme/index.css`. Light and dark themes are fully covered —
 
 ---
 
+## Icon Sizing
+
+All icons use standardized CSS classes instead of inline `size` props. Defined in `@layer components` in `shared/theme/index.css`.
+
+| Class | Size | Usage |
+|---|---|---|
+| `icon-sm` | 14px | Small inline icons, chevrons, secondary actions |
+| `icon-md` | 16px | Default icon size, settings icons, timeline block icons |
+| `icon-lg` | 20px | Prominent icons, nav icons, modal headers |
+
+### Rules
+- **Never use inline `size={N}` on react-icons** — always use `className="icon-sm"` / `icon-md` / `icon-lg`
+- **Button `icon` prop**: Pass a component type (not element) to auto-size: `<Button variant="icon" icon={FaUndo} />`. Icon-variant buttons get `icon-md`; other variants get `icon-sm`.
+- **Hero/decorative icons** (32px+) are the only exception — use inline `size` for one-off large display icons
+- Icons from `react-icons` accept `className`; CSS `width`/`height` override SVG attribute dimensions
+
+---
+
 ## CSS Component Classes
 
 Defined in `@layer components` in `shared/theme/index.css`.

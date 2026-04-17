@@ -55,8 +55,8 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
                 `}
             >
                 {isDark
-                    ? <MdDarkMode size={12} className="text-primary" />
-                    : <MdLightMode size={12} className="text-surface" />
+                    ? <MdDarkMode className="icon-sm text-primary" />
+                    : <MdLightMode className="icon-sm text-surface" />
                 }
             </div>
         </button>

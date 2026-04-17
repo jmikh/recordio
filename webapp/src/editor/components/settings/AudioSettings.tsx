@@ -245,7 +245,7 @@ export const AudioSettingsPanel = () => {
             {/* Audio Source Toggles */}
             <CollapsibleCard
                 title="Audio"
-                icon={<TbVolume size={16} />}
+                icon={<TbVolume className="icon-md" />}
                 previewItems={audioTogglePreviewItems}
                 isExpanded={showCollapsibleAudioToggles}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
@@ -323,7 +323,7 @@ export const AudioSettingsPanel = () => {
             {/* Background Music */}
             <CollapsibleCard
                 title="Music"
-                icon={<TbMusic size={16} />}
+                icon={<TbMusic className="icon-md" />}
                 previewItems={musicPreviewItems}
                 isExpanded={showCollapsibleMusic}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMusic', v)}
@@ -418,12 +418,12 @@ export const AudioSettingsPanel = () => {
                                                     title={previewingUrl === preset.url ? 'Stop preview' : 'Preview'}
                                                 >
                                                     {previewingUrl === preset.url ? (
-                                                        <TbPlayerPause size={14} />
+                                                        <TbPlayerPause className="icon-sm" />
                                                     ) : (
-                                                        <TbPlayerPlay size={14} />
+                                                        <TbPlayerPlay className="icon-sm" />
                                                     )}
                                                 </button>
-                                                <TbMusic size={14} className="flex-shrink-0 text-text-muted" />
+                                                <TbMusic className="icon-sm flex-shrink-0 text-text-muted" />
                                                 <span className="text-sm truncate">{preset.name}</span>
                                                 {isActive && (
                                                     <span className="chosen-dot ml-auto" />
@@ -442,7 +442,7 @@ export const AudioSettingsPanel = () => {
                                         className="flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors cursor-pointer"
                                         onClick={() => fileInputRef.current?.click()}
                                     >
-                                        <TbUpload size={12} />
+                                        <TbUpload className="icon-sm" />
                                         Upload
                                     </button>
                                     <input
@@ -496,12 +496,12 @@ export const AudioSettingsPanel = () => {
                                                         title={previewingEntryId === entry.id ? 'Stop preview' : 'Preview'}
                                                     >
                                                         {previewingEntryId === entry.id ? (
-                                                            <TbPlayerPause size={14} />
+                                                            <TbPlayerPause className="icon-sm" />
                                                         ) : (
-                                                            <TbPlayerPlay size={14} />
+                                                            <TbPlayerPlay className="icon-sm" />
                                                         )}
                                                     </button>
-                                                    <TbMusic size={14} className="flex-shrink-0 text-text-muted" />
+                                                    <TbMusic className="icon-sm flex-shrink-0 text-text-muted" />
                                                     <span className="text-sm truncate">{entry.name}</span>
                                                     {isActive && (
                                                         <span className="chosen-dot ml-auto mr-1" />

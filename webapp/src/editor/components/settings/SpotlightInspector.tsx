@@ -143,7 +143,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     }, [segment, allSpotlightSegments, spotlightSettings, updateSpotlight, updateSettings]);
 
     return (
-        <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine size={16} />} notCollapsible headerAction={<SpotlightTooltip />}>
+        <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine className="icon-md" />} notCollapsible headerAction={<SpotlightTooltip />}>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Check the box to apply to all spotlights.</p>
 

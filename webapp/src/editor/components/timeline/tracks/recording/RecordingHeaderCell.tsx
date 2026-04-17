@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaUndoAlt } from 'react-icons/fa';
+import { LuUndo2 } from 'react-icons/lu';
 import { BiVideoRecording } from 'react-icons/bi';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 import { useProjectStore } from '../../../../stores/useProjectStore';
@@ -23,7 +23,7 @@ export const RecordingHeaderCell: React.FC<RecordingHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Recording"
-            icon={<BiVideoRecording size={16} />}
+            icon={<BiVideoRecording className="icon-md" />}
             height={height}
             infoElement={
                 needsReset ? (
@@ -36,7 +36,7 @@ export const RecordingHeaderCell: React.FC<RecordingHeaderCellProps> = ({ height
                         className="!text-text-disabled hover:!text-text-muted"
                         title="Reset to single window at 1× speed"
                     >
-                        <FaUndoAlt size={12} />
+                        <LuUndo2 className="icon-sm" />
                     </Button>
                 ) : null
             }

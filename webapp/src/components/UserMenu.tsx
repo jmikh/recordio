@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
+import { LuUser, LuLogOut, LuSettings } from 'react-icons/lu';
 import { BiCrown } from 'react-icons/bi';
 import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -75,7 +75,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                     <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
                 ) : (
                     <div className="w-full h-full bg-surface-raised flex items-center justify-center text-text-muted">
-                        <FaUser size={14} />
+                        <LuUser className="icon-sm" />
                     </div>
                 )}
 
@@ -90,7 +90,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                     <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
                                 ) : (
                                     <div className="w-full h-full bg-surface-light flex items-center justify-center text-text-muted">
-                                        <FaUser size={16} />
+                                        <LuUser className="icon-md" />
                                     </div>
                                 )}
                             </div>
@@ -132,7 +132,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                     onClick={handleManageSubscription}
                                     className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
                                 >
-                                    <FaCog size={14} className="text-text-muted" />
+                                    <LuSettings className="icon-sm text-text-muted" />
                                     Manage Subscription
                                 </button>
                             )
@@ -141,7 +141,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                 onClick={handleUpgrade}
                                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-primary/10 rounded-md transition-colors text-left font-medium group"
                             >
-                                <BiCrown size={14} className="group-hover:scale-110 transition-transform" />
+                                <BiCrown className="icon-sm group-hover:scale-110 transition-transform" />
                                 Upgrade to Pro
                             </button>
                         )}
@@ -152,7 +152,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                             onClick={handleSignOut}
                             className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors text-left"
                         >
-                            <FaSignOutAlt size={14} />
+                            <LuLogOut className="icon-sm" />
                             Sign Out
                         </button>
                     </div>

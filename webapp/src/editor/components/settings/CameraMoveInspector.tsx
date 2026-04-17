@@ -92,7 +92,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
     const isHidden = !!segment.hidden;
 
     return (
-        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold size={16} />} notCollapsible headerAction={<CameraMoveTooltip />}>
+        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold className="icon-md" />} notCollapsible headerAction={<CameraMoveTooltip />}>
             <div className="flex flex-col gap-5">
                 <p className="subtext">Adjust the camera position, size, and shape for this segment.</p>
 
@@ -128,7 +128,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
                             fullWidth
                             className="text-text-muted hover:text-text"
                         >
-                            <RxEnterFullScreen size={14} />
+                            <RxEnterFullScreen className="icon-sm" />
                             <span>Fill Screen</span>
                         </Button>
                     </>

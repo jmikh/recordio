@@ -5,7 +5,7 @@ import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';
-import { FaCheck } from 'react-icons/fa';
+import { LuCheck } from 'react-icons/lu';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
 import { CgToolbarTop } from 'react-icons/cg';
 import { TbResize, TbFrame } from 'react-icons/tb';
@@ -93,15 +93,15 @@ export const ScreenSettings = () => {
                     toolbarPreviewItems.push({
                         type: 'custom',
                         content: screenConfig.toolbar.theme === 'dark'
-                            ? <MdDarkMode size={14} className="text-text-muted" />
-                            : <MdLightMode size={14} className="text-text-muted" />
+                            ? <MdDarkMode className="icon-sm text-text-muted" />
+                            : <MdLightMode className="icon-sm text-text-muted" />
                     });
                 }
 
                 return (
                     <CollapsibleCard
                         title="Toolbar"
-                        icon={<CgToolbarTop size={16} />}
+                        icon={<CgToolbarTop className="icon-md" />}
                         previewItems={toolbarPreviewItems}
                         isExpanded={showCollapsibleToolbar}
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleToolbar', v)}
@@ -142,7 +142,7 @@ export const ScreenSettings = () => {
             {/* Frame Settings */}
             <CollapsibleCard
                 title="Frame"
-                icon={<TbFrame size={16} />}
+                icon={<TbFrame className="icon-md" />}
                 previewItems={framePreviewItems}
                 isExpanded={showCollapsibleFrame}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleFrame', v)}
@@ -262,7 +262,7 @@ export const ScreenSettings = () => {
             {/* Size Settings */}
             <CollapsibleCard
                 title="Size"
-                icon={<TbResize size={16} />}
+                icon={<TbResize className="icon-md" />}
                 previewItems={sizePreviewItems}
                 isExpanded={showCollapsibleSize}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSize', v)}
@@ -293,7 +293,7 @@ export const ScreenSettings = () => {
                         onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
                         className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
                     >
-                        {isEditingCrop ? <FaCheck /> : <IoCropSharp className="w-4 h-4" />}
+                        {isEditingCrop ? <LuCheck /> : <IoCropSharp className="w-4 h-4" />}
                         {isEditingCrop ? 'Done' : 'Crop Screen'}
                     </button>
 

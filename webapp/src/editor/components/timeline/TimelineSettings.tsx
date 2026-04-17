@@ -190,8 +190,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
                         {visibleCount}/{totalCount}
                     </span>
                     <MdKeyboardArrowUp
-                        size={12}
-                        className={`transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
+                        className={`icon-sm transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
                     />
                 </div>
             </button>

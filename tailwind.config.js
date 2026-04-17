@@ -55,6 +55,9 @@ export default {
     },
     fontFamily: {
       sans: ["var(--font-sans)"],
+    },
+    fontSize: {
+      xs: ['0.7875rem', '1rem'],
     }
   },
   plugins: [],

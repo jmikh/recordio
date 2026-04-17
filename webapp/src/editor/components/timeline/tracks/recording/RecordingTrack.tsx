@@ -106,7 +106,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                 className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-text-on-primary border border-transparent pointer-events-none transition-[opacity] duration-150 z-[var(--z-index-tooltip)] ${isScissorsHovered ? 'opacity-100' : 'opacity-0'}`}
                 style={{ left: `${playheadX}px` }}
             >
-                <FaScissors size={12} />
+                <FaScissors className="icon-sm" />
             </div>
 
         </div >

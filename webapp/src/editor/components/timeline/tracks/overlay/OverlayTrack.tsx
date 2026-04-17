@@ -12,7 +12,6 @@ import {
     ghostLabel,
     blockBorder,
     ghostIconClass,
-    BLOCK_ICON_SIZE,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
     holdShapeBase,
@@ -254,7 +253,7 @@ export const OverlayTrack: React.FC<OverlayTrackProps> = ({ height, isCollapsed 
                                 }}
                             >
                                 {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
-                                    <LuLayers3 className={ghostIconClass} size={BLOCK_ICON_SIZE} />
+                                    <LuLayers3 className={`${ghostIconClass} icon-md`} />
                                 )}
                             </div>
                         </div>

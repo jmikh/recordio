@@ -76,8 +76,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
             >
                 {trigger ?? (
                     <MdInfoOutline
-                        size={14}
-                        className="text-text-muted hover:text-text-highlighted transition-colors"
+                        className="icon-sm text-text-muted hover:text-text-highlighted transition-colors"
                     />
                 )}
             </div>

@@ -77,7 +77,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                                 className={isMuted ? '!text-destructive' : ''}
                                 title={isMuted ? "Unmute" : "Mute"}
                             >
-                                {isMuted ? <MdVolumeOff size={14} /> : <MdVolumeUp size={14} />}
+                                {isMuted ? <MdVolumeOff className="icon-sm" /> : <MdVolumeUp className="icon-sm" />}
                             </Button>
                         )}
                         {onToggleApply !== undefined && (
@@ -90,7 +90,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                                 className={!applyEnabled ? '!text-text-disabled hover:!text-text-muted' : '!text-text-muted hover:!text-text-highlighted'}
                                 title={applyEnabled ? 'Disable effect' : 'Enable effect'}
                             >
-                                {applyEnabled ? <AiOutlineEye size={14} /> : <AiOutlineEyeInvisible size={14} />}
+                                {applyEnabled ? <AiOutlineEye className="icon-md" /> : <AiOutlineEyeInvisible className="icon-md" />}
                             </Button>
                         )}
                     </div>

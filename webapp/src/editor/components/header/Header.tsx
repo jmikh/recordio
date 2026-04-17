@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useProjectStore, useProjectData, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { FaUndo, FaRedo } from 'react-icons/fa';
+import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 
 import { MdOutlineBugReport } from 'react-icons/md';
 import { TbFolder } from 'react-icons/tb';
@@ -72,20 +72,18 @@ export const Header = () => {
                     <div className="flex items-center gap-1">
                         <Button
                             variant="icon"
+                            icon={LuUndo2}
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
-                        >
-                            <FaUndo size={14} />
-                        </Button>
+                        />
                         <Button
                             variant="icon"
+                            icon={LuRedo2}
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
-                        >
-                            <FaRedo size={14} />
-                        </Button>
+                        />
                         {true && <span className="text-[10px] text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>}
@@ -131,12 +129,8 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <Button variant="icon" onClick={() => window.location.href = '/'} title="Dashboard">
-                            <TbFolder size={18} />
-                        </Button>
-                        <Button variant="icon" onClick={() => setIsSupportModalOpen(true)} title="Report a Bug">
-                            <MdOutlineBugReport size={18} />
-                        </Button>
+                        <Button variant="icon" icon={TbFolder} onClick={() => window.location.href = '/'} title="Dashboard" />
+                        <Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
                         <ThemeToggle />
                     </div>
                     {isAuthenticated ? (

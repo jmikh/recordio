@@ -53,7 +53,7 @@ export const ProgressModal = ({
 
                     <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-main">
                         <span className="text-primary flex-shrink-0 flex items-center justify-center">
-                            <HiOutlineBolt size={18} />
+                            <HiOutlineBolt className="icon-lg" />
                         </span>
                         <span>Do not switch tab during export for best performance</span>
                     </div>

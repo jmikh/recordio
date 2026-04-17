@@ -16,7 +16,7 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
     return (
         <TimelineHeaderCell
             title="Layout"
-            icon={<PiWebcamBold size={16} />}
+            icon={<PiWebcamBold className="icon-md" />}
             height={height}
             disabled={!cameraMoveEnabled}
             isCollapsed={isCollapsed}
