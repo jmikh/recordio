@@ -51,8 +51,7 @@ export async function authenticateRequest(
         return null;
     }
 
-    const status = subscription?.status;
-    if (status !== 'active' && status !== 'trialing') {
+    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trialing')) {
         reply.code(403).send({ error: 'pro_required', message: 'Pro subscription required' });
         return null;
     }
@@ -64,7 +63,7 @@ export async function authenticateRequest(
 
     return {
         userId: user.id,
-        subscriptionStatus: status,
+        subscriptionStatus: subscription.status,
         currentPeriodEnd: new Date(subscription.current_period_end),
         billingInterval: subscription.billing_interval,
     };

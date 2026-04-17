@@ -56,7 +56,7 @@ export async function transcribeAudio(
         'audio/x-m4a': 'm4a', 'video/webm': 'webm', 'video/mp4': 'mp4',
     };
     const ext = extMap[mimeType.split(';')[0]] ?? 'webm';
-    const file = new File([audioBuffer], `audio.${ext}`, { type: mimeType });
+    const file = new File([new Uint8Array(audioBuffer)], `audio.${ext}`, { type: mimeType });
 
     const response = await openai.audio.transcriptions.create({
         model: 'whisper-1',
