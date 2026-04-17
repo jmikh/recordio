@@ -13,9 +13,6 @@ const REF_CORNER_RADIUS = 12;
 /** Opacity for non-highlighted words */
 const DIM_OPACITY = 0.6;
 
-/** Default caption text color */
-const DEFAULT_TEXT_COLOR = '#ffffff';
-
 /**
  * Convert hex color string + opacity to rgba() for canvas rendering.
  * Supports 6-char (#rrggbb) and 8-char (#rrggbbaa) hex strings.
@@ -36,11 +33,11 @@ function hexToRgba(hex: string, opacity: number): string {
 
 /**
  * Draws captions at the bottom of the canvas with progressive word highlighting.
+ * Highlighting is driven by each word's output timestamps, not a proportional algorithm.
  *
  * @param ctx 2D Canvas Context
- * @param captionSegments Caption segments from transcription (with source timestamps)
+ * @param captionSegments Caption segments from transcription (words carry timestamps)
  * @param settings Caption display settings
- * @param timeMapper Time mapper for source-to-output time conversion
  * @param currentTimeMs Current output time
  * @param outputSize Size of the output canvas
  */
@@ -86,24 +83,29 @@ export function drawCaptions(
     // Start from the bottom - this is where the bottom of the first caption box will be
     let boxBottomY = outputSize.height - marginBottom;
 
+    const highlightEnabled = settings.wordHighlight !== false;
+
     for (const caption of visibleCaptions) {
-        const text = caption.text || '[empty]';
-        const words = text.split(' ').filter(w => w.length > 0);
+        // Only render words that are not explicitly hidden
+        const words = caption.words.filter(w => !w.hidden);
+        if (words.length === 0) continue;
 
-        // Calculate elapsed ratio within this segment (using cached output times)
-        const segmentStart = caption.outputStartTimeMs;
-        const segmentEnd = caption.outputEndTimeMs;
-        const segmentDuration = segmentEnd - segmentStart;
-        const elapsedRatio = segmentDuration > 0
-            ? (currentTimeMs - segmentStart) / segmentDuration
-            : 0;
+        // Find the last word with a valid output time that's been reached.
+        // All words up to (and including) this index are highlighted.
+        let highlightUpToIndex = -1;
+        if (highlightEnabled) {
+            for (let i = words.length - 1; i >= 0; i--) {
+                if (words[i].outputStartTimeMs >= 0 && currentTimeMs >= words[i].outputStartTimeMs) {
+                    highlightUpToIndex = i;
+                    break;
+                }
+            }
+        }
 
-        // Get which word should be highlighted (if highlighting is enabled)
-        const highlightEnabled = settings.wordHighlight !== false;
-        const highlightedWordIndex = highlightEnabled ? getHighlightedWordIndex(words, elapsedRatio) : -1;
+        const wordStrings = words.map(w => w.word);
 
         // Word wrap the text if it exceeds maxWidth - returns lines with word indices
-        const wrappedLines = wrapTextWithWordInfo(ctx, words, maxWidth - (paddingX * 2));
+        const wrappedLines = wrapTextWithWordInfo(ctx, wordStrings, maxWidth - (paddingX * 2));
 
         // Calculate box dimensions
         const lineHeight = fontSize * 1.4;
@@ -143,7 +145,7 @@ export function drawCaptions(
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 1 * scale;
 
-        // Draw each line with per-word opacity
+        // Draw each line with per-word opacity based on word timestamps
         const textColor = settings.textColor;
         let lineY = boxY + paddingY + lineHeight / 2;
         for (const lineInfo of wrappedLines) {
@@ -152,7 +154,7 @@ export function drawCaptions(
                 lineInfo,
                 centerX,
                 lineY,
-                highlightedWordIndex,
+                highlightUpToIndex,
                 highlightEnabled,
                 textColor
             );
@@ -164,26 +166,6 @@ export function drawCaptions(
     }
 
     ctx.restore();
-}
-
-/**
- * Calculates which word should be highlighted based on elapsed time in segment.
- * Uses letter count + base value for proportional timing.
- */
-function getHighlightedWordIndex(words: string[], elapsedRatio: number): number {
-    if (words.length === 0) return -1;
-    if (words.length === 1) return 0;
-
-    const WORD_BASE_VALUE = 3;
-    const weights = words.map(word => word.length + WORD_BASE_VALUE);
-    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-
-    let cumulative = 0;
-    for (let i = 0; i < words.length; i++) {
-        cumulative += weights[i] / totalWeight;
-        if (elapsedRatio < cumulative) return i;
-    }
-    return words.length - 1;
 }
 
 interface LineInfo {
@@ -236,15 +218,15 @@ function wrapTextWithWordInfo(
 
 /**
  * Draws a line of text with per-word highlighting.
- * When highlightEnabled is true, the highlighted word is drawn at full opacity, others at DIM_OPACITY.
- * When highlightEnabled is false, all words are drawn at full opacity.
+ * When highlightEnabled is true, words at globalIndex <= highlightUpToIndex are
+ * fully opaque; the rest are dimmed. When false, all words are full opacity.
  */
 function drawLineWithHighlight(
     ctx: CanvasRenderingContext2D,
     lineInfo: LineInfo,
     centerX: number,
     y: number,
-    highlightedWordIndex: number,
+    highlightUpToIndex: number,
     highlightEnabled: boolean,
     textColor: string
 ) {
@@ -261,7 +243,8 @@ function drawLineWithHighlight(
 
     for (let i = 0; i < words.length; i++) {
         const { word, globalIndex } = words[i];
-        const isHighlighted = globalIndex <= highlightedWordIndex;
+
+        const isHighlighted = globalIndex <= highlightUpToIndex;
 
         // Set opacity based on highlight state (all full opacity if highlighting disabled)
         const opacity = !highlightEnabled || isHighlighted ? 1 : DIM_OPACITY;

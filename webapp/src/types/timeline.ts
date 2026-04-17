@@ -38,12 +38,24 @@ export interface TimeSegment {
 // ==========================================
 
 /**
+ * A single word within a caption segment.
+ * Extends TimeSegment so each word carries its own source/output timestamps
+ * and participates in output-time recomputation like any other segment.
+ */
+export interface Word extends TimeSegment {
+    word: string;
+    /** When true, this word is hidden from the rendered caption (but stays in data). */
+    hidden?: boolean;
+}
+
+/**
  * A transcribed caption segment.
+ * Contains an array of Word objects — text is derived from words, never stored separately.
  * Timestamps are in source time (before window cuts and speed adjustments).
  * Output times are cached on the segment via recomputeOutputTimes().
  */
 export interface CaptionSegment extends TimeSegment {
-    text: string;
+    words: Word[];
 }
 
 // ==========================================

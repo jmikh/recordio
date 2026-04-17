@@ -9,11 +9,13 @@ when_to_use: When writing or modifying Supabase edge functions, SQL migrations, 
 ## Hard Rules
 
 - **Always deploy with `--no-verify-jwt`** (or `verify_jwt = false` in `.config.toml`) — Supabase's built-in JWT handling is deprecated; authentication is always verified manually inside the function
-- **Never use `SUPABASE_SERVICE_ROLE_KEY` in user-facing functions** — service role bypasses RLS entirely; only use it for internal/cron functions
+- **Never use `SUPABASE_SECRET_KEY` in user-facing functions** — service role bypasses RLS entirely. Use `SUPABASE_PUBLISHABLE_KEY`; only use it for internal/cron functions
 - **Always handle CORS preflight** — every edge function must respond to `OPTIONS` with `corsHeaders`
 - **Use `maybeSingle()` not `single()`** when the row might not exist — `single()` throws on missing rows
+- **Always enable RLS on new tables** — every `CREATE TABLE` must be followed by `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` and at least one policy. No exceptions, even for internal tables (use a service-role-only policy instead of skipping RLS)
 - **New migrations go in `webapp/supabase/migrations/`** with a timestamped filename (`YYYYMMDD_description.sql`)
-- **Cron jobs that call edge functions must pass `Authorization: Bearer <SERVICE_ROLE_KEY>`** so the function knows it's an internal call
+- **Cron jobs that call edge functions must pass `Authorization: Bearer <SUPABASE_SECRET_KEY>`** so the function knows it's an internal call
+- **ALWAYS use Secret API keys instead of service role key** for internal functions, server usage..etc. Service role and anon keys are deprecated in supabase.
 
 ---
 
@@ -207,7 +209,7 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'job-name');
 
 ## Database Conventions
 
-- **RLS is on for all user-facing tables** — internal tables (e.g. `deleted_videos`) are accessed only by service role and have no RLS policies
+- **Always enable RLS on new tables** — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` after every `CREATE TABLE`. Tables accessed directly from the webapp (via publishable key) need `auth.uid()` policies. Tables only accessed from edge functions (via secret key) need no policies — secret key bypasses RLS, so deny-all is the default
 - **`SECURITY DEFINER`** on cron functions — they run as the function owner, not the calling role
 - **`pg_net` HTTP calls from SQL** — use for firing webhooks or calling external APIs from cron without leaving the DB layer; fire-and-forget, not awaited
 

@@ -5,7 +5,7 @@ import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 // Default display settings for tracks — single source of truth
 const DEFAULT_DISPLAY_SETTINGS = {

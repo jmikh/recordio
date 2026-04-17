@@ -1,114 +1,101 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { MdEdit } from 'react-icons/md';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { MdEdit, MdVisibilityOff, MdVisibility } from 'react-icons/md';
 import { RiPaletteLine } from 'react-icons/ri';
 import { TbSparkles } from 'react-icons/tb';
 import { FaRegClosedCaptioning } from 'react-icons/fa';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore, CanvasMode } from '../../stores/useUIStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
-import type { CaptionSegment } from '../../../types';
-import { Slider, CollapsibleCard, Toggle, Dropdown, Tooltip, Button, type PreviewItem, type DropdownOption } from '@shared/components';
+import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
-import { WHISPER_LANGUAGES } from '../../../core/transcription/whisperLanguages';
+import { CloudTranscriptionService, RateLimitError } from '../../../core/transcription/CloudTranscriptionService';
 
+import { UpgradeModal } from '../header/UpgradeModal';
+import { AuthModal } from '../header/AuthModal';
 
-import { XButton } from '@shared/components';
 import { trackCaptionsGenerated } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ColorButton } from './ColorButton';
 
-/**
- * Settings panel for managing captions.
- */
+type TranscriptionEngine = 'local' | 'openai';
+
+/** Selection state for words in captions. */
+interface WordSelection {
+    segmentId: string;
+    wordIds: string[];
+    anchorRect: DOMRect;
+    isEditing: boolean;
+}
+
 export function CaptionsSettings() {
     const project = useProjectStore(state => state.project);
     const updateSettings = useProjectStore(state => state.updateSettings);
-    const updateCaptionSegment = useProjectStore(state => state.updateCaptionSegment);
-    const deleteCaptionSegment = useProjectStore(state => state.deleteCaptionSegment);
     const setCaptionSegments = useProjectStore(state => state.setCaptionSegments);
-    const restoreCaptionsFromBaseline = useProjectStore(state => state.restoreCaptionsFromBaseline);
+    const updateWord = useProjectStore(state => state.updateWord);
 
     // UI Store actions
-    const canvasMode = useUIStore(state => state.canvasMode);
-    const setCanvasMode = useUIStore(state => state.setCanvasMode);
-    const isPlaying = useUIStore(state => state.isPlaying);
     const setIsPlaying = useUIStore(state => state.setIsPlaying);
-    const currentTimeMs = useUIStore(state => state.currentTimeMs);
     const setCurrentTime = useUIStore(state => state.setCurrentTime);
-    const selectedCaptionId = useUIStore(state => state.selectedCaptionId);
-    const selectCaption = useUIStore(state => state.selectCaption);
-    const selectedSettingsPanel = useUIStore(state => state.selectedSettingsPanel);
-
     // Collapsible visibility state
     const showCollapsibleCaptionAI = useUIStore(state => state.showCollapsibleCaptionAI);
     const showCollapsibleCaptionStyle = useUIStore(state => state.showCollapsibleCaptionStyle);
     const showCollapsibleCaptionPosition = useUIStore(state => state.showCollapsibleCaptionPosition);
     const setCollapsibleVisibility = useUIStore(state => state.setCollapsibleVisibility);
 
+    const isTranscribing = useProjectStore(state => state.isTranscribing);
+    const transcriptionPhase = useProjectStore(state => state.transcriptionPhase);
+    const modelDownloadProgress = useProjectStore(state => state.modelDownloadProgress);
+    const setTranscriptionState = useProjectStore(state => state.setTranscriptionState);
+
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
-    const { addToast, updateToast, removeToast } = useToast();
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [isTranscribing, setIsTranscribing] = useState(false);
-    const [emptyCaptionsNotice, setEmptyCaptionsNotice] = useState(false);
-    const inputRef = useRef<HTMLSpanElement>(null);
-    // Snapshot of segment text when editing starts. Rendered as the contentEditable's
-    // children during editing so React sees stable content and never overwrites the DOM.
-    // This prevents cursor jumps and preserves the browser's native undo stack.
-    const editStartTextRef = useRef<string>('');
+    const { addToast } = useToast();
+    const hideCloudTranscription = true; // TODO: remove after per-user limits are live
+    const [engine, setEngine] = useState<TranscriptionEngine>('local');
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const toastIdRef = useRef<string | null>(null);
-    const captionsContainerRef = useRef<HTMLDivElement>(null);
-    const [selectedLanguage, setSelectedLanguage] = useState('en');
+    const captionsCardRef = useRef<HTMLDivElement>(null);
+
+    // Word selection state
+    const [selection, setSelection] = useState<WordSelection | null>(null);
+    const [editText, setEditText] = useState('');
+    const popoverRef = useRef<HTMLDivElement>(null);
+    const editInputRef = useRef<HTMLInputElement>(null);
 
     const captionSegments = project.timeline.captionSegments;
-    const outputWindows = project.timeline.outputWindows;
     const settings = project.settings.captions || { enabled: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
     const hasMicrophone = !!project.microphoneSource;
 
-
-    // Focus when editing starts
+    // Close selection on click outside (words call stopPropagation so this won't fire for them)
     useEffect(() => {
-        if (editingId && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [editingId]);
+        if (!selection) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (popoverRef.current?.contains(e.target as Node)) return;
+            setSelection(null);
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [selection]);
 
-
-
-    // Exit edit mode when playback starts
+    // Focus edit input when entering edit mode
     useEffect(() => {
-        if (isPlaying && editingId) {
-            setEditingId(null);
-            endInteraction();
+        if (selection?.isEditing && editInputRef.current) {
+            editInputRef.current.focus();
+            editInputRef.current.select();
         }
-    }, [isPlaying, editingId, endInteraction]);
+    }, [selection?.isEditing]);
 
-    // Scroll selected caption into view and auto-enter edit mode when selected from timeline
+    // Escape to deselect
     useEffect(() => {
-        if (!selectedCaptionId) return;
-        // Auto-enter edit mode
-        if (editingId !== selectedCaptionId) {
-            // Snapshot the segment text before editing begins
-            const seg = captionSegments?.find(s => s.id === selectedCaptionId);
-            if (seg) editStartTextRef.current = seg.text;
-            setEditingId(selectedCaptionId);
-            startInteraction();
-        }
-        if (!captionsContainerRef.current) return;
-        // Auto-expand the captions card so the segment is visible
-        if (!showCollapsibleCaptionPosition) {
-            setCollapsibleVisibility('showCollapsibleCaptionPosition', true);
-        }
-        // Defer scroll to allow CollapsibleCard expansion animation (200ms) to complete
-        const timeoutId = setTimeout(() => {
-            const el = captionsContainerRef.current?.querySelector(`[data-caption-id="${selectedCaptionId}"]`);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 250);
-        return () => clearTimeout(timeoutId);
-    }, [selectedCaptionId]);
+        if (!selection) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setSelection(null);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [selection]);
 
 
 
@@ -125,11 +112,23 @@ export function CaptionsSettings() {
             return;
         }
 
+        // Pro gate for OpenAI engine
+        if (engine === 'openai') {
+            const { isAuthenticated, hasProAccess } = useUserStore.getState();
+            if (!isAuthenticated) {
+                setIsAuthModalOpen(true);
+                return;
+            }
+            if (!hasProAccess()) {
+                setIsUpgradeModalOpen(true);
+                return;
+            }
+        }
 
         try {
             // Pause playback
             setIsPlaying(false);
-            setIsTranscribing(true);
+            setTranscriptionState({ isTranscribing: true, transcriptionPhase: 'generating', modelDownloadProgress: 0 });
 
             // Setup AbortController
             if (abortControllerRef.current) {
@@ -138,40 +137,43 @@ export function CaptionsSettings() {
             abortControllerRef.current = new AbortController();
             const signal = abortControllerRef.current.signal;
 
-            // Show progress toast
-            const toastId = addToast({
-                type: 'progress',
-                title: 'Generating Captions',
-                message: 'Loading audio...',
-                progress: 0,
-                onCancel: handleCancel
-            });
-            toastIdRef.current = toastId;
-
             // Fetch microphone audio
             const response = await fetch(micSource.runtimeUrl!);
             if (!response.ok) throw new Error(`Failed to fetch audio: ${response.statusText}`);
-            const videoBlob = await response.blob();
+            const micBlob = await response.blob();
 
             if (signal.aborted) throw new Error('Aborted');
 
-            updateToast(toastId, { progress: 0.1, message: 'Transcribing audio...' });
+            let transcriptionData;
 
-            // Run transcription on entire audio (runs in Web Worker)
-            const transcriptionService = TranscriptionService.getInstance();
-            const transcriptionData = await transcriptionService.transcribe(
-                videoBlob,
-                (progress: number) => {
-                    // Scale progress: 10% for loading + 90% for transcription
-                    const scaledProgress = 0.1 + (progress * 0.9);
-                    updateToast(toastId, { progress: scaledProgress });
-                },
-                signal,
-                selectedLanguage
-            );
+            if (engine === 'openai') {
+                setTranscriptionState({ transcriptionPhase: 'generating' });
+                transcriptionData = await CloudTranscriptionService.transcribe(
+                    micBlob,
+                    'auto',
+                    () => {},
+                    signal,
+                );
+            } else {
+                const transcriptionService = TranscriptionService.getInstance();
+                transcriptionData = await transcriptionService.transcribe(
+                    micBlob,
+                    () => {},
+                    signal,
+                    (phase, progress) => {
+                        setTranscriptionState({
+                            transcriptionPhase: phase,
+                            ...(phase === 'downloading' && progress !== undefined ? { modelDownloadProgress: progress } : {}),
+                        });
+                    },
+                );
+            }
 
-            // Success
-            setCaptionSegments(transcriptionData);
+            // Store result (even if empty, so button state updates)
+            setCaptionSegments(transcriptionData, {
+                engine,
+                language: engine === 'openai' ? 'auto' : 'en',
+            });
 
             // Track caption generation
             const { isAuthenticated, isPro } = useUserStore.getState();
@@ -179,57 +181,61 @@ export function CaptionsSettings() {
                 segment_count: transcriptionData.length,
                 is_authenticated: isAuthenticated,
                 is_pro: isPro,
+                transcription_method: engine === 'openai' ? 'cloud' : 'local',
             });
 
-            // Show success toast
-            updateToast(toastId, {
-                type: 'success',
-                title: 'Captions Generated',
-                message: `${transcriptionData.length} caption${transcriptionData.length !== 1 ? 's' : ''} created`
-            });
-
-            // Check if captions are empty (no audible speech detected)
             if (transcriptionData.length === 0) {
-                setEmptyCaptionsNotice(true);
+                addToast({
+                    type: 'error',
+                    title: 'No Speech Detected',
+                    message: engine === 'local'
+                        ? 'Local models running in the browser need clear speech to work well. Try the OpenAI model for better results.'
+                        : 'Transcription completed but no speech was detected in the audio.',
+                });
             } else {
-                setEmptyCaptionsNotice(false);
+                addToast({
+                    type: 'success',
+                    title: 'Captions Generated',
+                    message: `${transcriptionData.length} caption${transcriptionData.length !== 1 ? 's' : ''} created`
+                });
+
+                // Expand captions card and scroll it into view
+                setCollapsibleVisibility('showCollapsibleCaptionPosition', true);
+                requestAnimationFrame(() => {
+                    captionsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
             }
 
         } catch (error: any) {
-            if (error.message === 'Aborted') {
+            if (error.message === 'Aborted') return;
 
-                if (toastIdRef.current) {
-                    removeToast(toastIdRef.current);
-                }
+            // Handle rate limit errors from cloud transcription
+            if (error instanceof RateLimitError) {
+                const resetDate = new Date(error.resetsAt);
+                const resetStr = resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                addToast({
+                    type: 'error',
+                    title: 'Transcription Limit Reached',
+                    message: `${error.cycleMinutesUsed.toFixed(0)} of ${error.cycleMinutesLimit} minutes used. Resets ${resetStr}.`
+                });
                 return;
             }
-            console.error('[CaptionsSettings] Failed to generate transcription:', error);
-            setEmptyCaptionsNotice(false);
 
-            // Show error toast
-            if (toastIdRef.current) {
-                updateToast(toastIdRef.current, {
-                    type: 'error',
-                    title: 'Caption Generation Failed',
-                    message: 'Please try again'
-                });
-            }
+            console.error('[CaptionsSettings] Failed to generate transcription:', error);
+
+            addToast({
+                type: 'error',
+                title: 'Caption Generation Failed',
+                message: 'Please try again'
+            });
         } finally {
-            setIsTranscribing(false);
-            toastIdRef.current = null;
+            setTranscriptionState({ isTranscribing: false, transcriptionPhase: 'idle', modelDownloadProgress: 0 });
             if (abortControllerRef.current?.signal.aborted) {
                 abortControllerRef.current = null;
             }
         }
     };
 
-    const handleCancel = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
-        TranscriptionService.getInstance().abort();
-    };
 
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000);
@@ -238,99 +244,104 @@ export function CaptionsSettings() {
         return `${mins}:${String(secs).padStart(2, '0')}`;
     };
 
-    // Handle clicking on a caption segment
-    const handleSegmentClick = (segment: CaptionSegment) => {
-        const isEditing = editingId === segment.id;
+    // Handle clicking on a word — calendar-style selection
+    const handleWordClick = (segmentId: string, wordId: string, e: React.MouseEvent<HTMLSpanElement>) => {
+        e.stopPropagation();
+        const rect = (e.target as HTMLElement).getBoundingClientRect();
 
-        if (isEditing) {
-            // Already editing, do nothing (let contentEditable handle it)
-            return;
-        }
-
-        // Snapshot segment text before editing begins (see editStartTextRef comment)
-        editStartTextRef.current = segment.text;
-
-        // Select, move CTI, and enter edit mode immediately
-        selectCaption(segment.id);
-        setEditingId(segment.id);
-        setCanvasMode(CanvasMode.CaptionEdit);
-        setIsPlaying(false);
-        startInteraction();
-
-        // Move CTI to the start of the caption
-        setCurrentTime(segment.outputStartTimeMs + 1);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        // Prevent Enter key from creating newlines
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            // Blur to save
-            if (inputRef.current) {
-                inputRef.current.blur();
+        setSelection(prev => {
+            // No existing selection, or clicking in a different segment → select single word
+            if (!prev || prev.segmentId !== segmentId) {
+                return { segmentId, wordIds: [wordId], anchorRect: rect, isEditing: false };
             }
-        }
-    };
 
-    const handleInput = (e: React.FormEvent<HTMLSpanElement>, segmentId: string) => {
-        let text = e.currentTarget.textContent || '';
+            const isSingle = prev.wordIds.length === 1;
+            const isRange = prev.wordIds.length > 1;
 
-        // Enforce 200 character limit
-        if (text.length > 200) {
-            text = text.substring(0, 200);
-            e.currentTarget.textContent = text;
+            // Single word selected
+            if (isSingle) {
+                // Clicking the same word → deselect
+                if (prev.wordIds[0] === wordId) return null;
 
-            // Move cursor to end after truncation
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(e.currentTarget);
-            range.collapse(false);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-        }
+                // Clicking a different word in the same segment → create range
+                const seg = captionSegments?.find(s => s.id === segmentId);
+                if (!seg) return { segmentId, wordIds: [wordId], anchorRect: rect, isEditing: false };
 
-        // Update the store so the canvas renders the live caption text.
-        // Cursor restoration is NOT needed here because editStartTextRef keeps
-        // React from overwriting the contentEditable DOM (see render logic).
-        batchAction(() => {
-            updateCaptionSegment(segmentId, { text });
+                const wordIndices = [prev.wordIds[0], wordId].map(
+                    id => seg.words.findIndex(w => w.id === id)
+                );
+                const minIdx = Math.min(...wordIndices);
+                const maxIdx = Math.max(...wordIndices);
+                const rangeIds = seg.words.slice(minIdx, maxIdx + 1).map(w => w.id);
+
+                return { segmentId, wordIds: rangeIds, anchorRect: prev.anchorRect, isEditing: false };
+            }
+
+            // Range selected → clicking any word resets to single
+            if (isRange) {
+                return { segmentId, wordIds: [wordId], anchorRect: rect, isEditing: false };
+            }
+
+            return { segmentId, wordIds: [wordId], anchorRect: rect, isEditing: false };
         });
-    };
 
-    const handleBlur = () => {
-        if (editingId) {
-            setEditingId(null);
-            setCanvasMode(CanvasMode.Preview);
-            endInteraction();
-            // Keep selection when exiting edit mode
+        // Move CTI to the word's output time
+        const seg = captionSegments?.find(s => s.id === segmentId);
+        const word = seg?.words.find(w => w.id === wordId);
+        if (word?.visible) {
+            setIsPlaying(false);
+            setCurrentTime(word.outputStartTimeMs + 1);
         }
+
+        // Set edit text for single-word editing
+        if (word) setEditText(word.word);
     };
 
-    const handleDelete = (segmentId: string) => {
-        deleteCaptionSegment(segmentId);
+    const handleEditSave = () => {
+        if (!selection || selection.wordIds.length !== 1 || !editText.trim()) return;
+        updateWord(selection.segmentId, selection.wordIds[0], { word: editText.trim() });
+        setSelection(null);
+    };
+
+    const handleHideSelected = () => {
+        if (!selection) return;
+        for (const wId of selection.wordIds) {
+            updateWord(selection.segmentId, wId, { hidden: true });
+        }
+        setSelection(null);
+    };
+
+    const handleShowSelected = () => {
+        if (!selection) return;
+        for (const wId of selection.wordIds) {
+            updateWord(selection.segmentId, wId, { hidden: false });
+        }
+        setSelection(null);
     };
 
     return (
         <div className="space-y-4">
             {/* A.I. Transcription Card */}
-            {!isTranscribing && (() => {
-                // Derive A.I. status for preview
-                const hasGenerated = !!settings.generatedAt;
-                const generatedEmpty = hasGenerated && (!settings.baselineCaptions || settings.baselineCaptions.length === 0);
-                const generatedSuccess = hasGenerated && !generatedEmpty;
+            {(() => {
+                const source = settings.transcriptionSource;
 
-                const aiPreviewItems: PreviewItem[] = generatedSuccess
-                    ? [{ type: 'text', content: '✓ Generated' }]
-                    : generatedEmpty
-                        ? [{ type: 'text', content: 'No speech detected' }]
-                        : [];
+                // Disable when the same engine was already used
+                const alreadyGenerated = !!source && source.engine === engine;
 
-                // Tooltip: warn on re-transcribe after empty result
-                const transcribeTooltip = !hasMicrophone
-                    ? 'No microphone detected'
-                    : emptyCaptionsNotice
-                        ? 'Re-transcribing with the same language will yield the same results. Transcription requires clear, spoken audio.'
-                        : '';
+                // Preview pill when collapsed
+                const aiPreviewItems: PreviewItem[] = source
+                    ? [{ type: 'text', content: source.engine === 'openai' ? 'OpenAI' : 'Local' }]
+                    : [];
+
+                const buttonDisabled = !hasMicrophone || alreadyGenerated || isTranscribing;
+                const emptyCaptions = alreadyGenerated && (!captionSegments || captionSegments.length === 0);
+                const buttonLabel = isTranscribing
+                    ? (transcriptionPhase === 'downloading' ? 'Downloading Model...' : 'Generating...')
+                    : alreadyGenerated
+                        ? (emptyCaptions ? 'No Speech Detected' : 'Captions Generated')
+                        : source
+                            ? 'Re-generate Captions'
+                            : 'Generate Captions';
 
                 return (
                     <CollapsibleCard
@@ -341,49 +352,112 @@ export function CaptionsSettings() {
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionAI', v)}
                     >
                         <div className="flex flex-col gap-3">
-                            <Tooltip text={transcribeTooltip} className="w-full">
+                            {/* Engine Toggle */}
+                            {!hideCloudTranscription && (
+                                <MultiToggle
+                                    options={[
+                                        { value: 'local' as TranscriptionEngine, label: 'Local' },
+                                        { value: 'openai' as TranscriptionEngine, label: 'OpenAI', icon: <ProBadge /> },
+                                    ]}
+                                    value={engine}
+                                    onChange={setEngine}
+                                />
+                            )}
+
+                            <Tooltip text={!hasMicrophone ? 'No microphone detected' : ''} className="w-full">
                                 <Button
                                     variant="primary"
                                     onClick={handleGenerate}
-                                    disabled={!hasMicrophone}
+                                    disabled={buttonDisabled}
                                     fullWidth
                                 >
-                                    Transcribe
+                                    {isTranscribing && (
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    )}
+                                    {buttonLabel}
                                 </Button>
                             </Tooltip>
 
-                            {/* Language Dropdown */}
-                            <Dropdown
-                                options={WHISPER_LANGUAGES.map(lang => ({ value: lang.code, label: lang.label }))}
-                                value={selectedLanguage}
-                                onChange={setSelectedLanguage}
-                            />
+                            {/* Model download progress bar */}
+                            {isTranscribing && transcriptionPhase === 'downloading' && (
+                                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                        className="bg-secondary h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${Math.round(modelDownloadProgress * 100)}%` }}
+                                    />
+                                </div>
+                            )}
 
                             <p className="subtext">
-                                Powered by Whisper — runs locally in your browser. Your audio never leaves your device.
+                                {engine === 'openai'
+                                    ? 'Powered by OpenAI Whisper — highest accuracy with multi-language support.'
+                                    : hideCloudTranscription
+                                        ? 'Runs locally in your browser — no data leaves your device.'
+                                        : 'Runs locally in your browser. For better accuracy and faster transcription and multi-language support, use OpenAI.'
+                                }
                             </p>
-
-                            {/* Restore Button */}
-                            {settings.baselineCaptions && settings.baselineCaptions.length > 0 &&
-                                JSON.stringify(captionSegments) !== JSON.stringify(settings.baselineCaptions) && (
-                                    <Tooltip text="Restore transcription from the last AI-generated captions" className="w-full">
-                                        <Button
-                                            onClick={() => {
-                                                selectCaption(null);
-                                                setEditingId(null);
-                                                endInteraction();
-                                                restoreCaptionsFromBaseline();
-                                            }}
-                                            fullWidth
-                                        >
-                                            Restore
-                                        </Button>
-                                    </Tooltip>
-                                )}
                         </div>
                     </CollapsibleCard>
                 );
             })()}
+
+            {/* Captions Card */}
+            <div ref={captionsCardRef}>
+            <CollapsibleCard
+                title="Captions"
+                icon={<FaRegClosedCaptioning size={16} />}
+                previewItems={[
+                    {
+                        type: 'text', content: captionSegments && captionSegments.length > 0
+                            ? `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}`
+                            : 'None'
+                    }
+                ]}
+                isExpanded={showCollapsibleCaptionPosition}
+                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
+            >
+                {captionSegments && captionSegments.length > 0 ? (
+                    <div className="flex flex-col gap-1.5">
+                        {captionSegments.filter(s => s.visible).map(segment => (
+                            <div key={segment.id} className="flex items-start gap-1">
+                                {/* Timestamp */}
+                                <span className="text-xs text-text-disabled tabular-nums shrink-0 select-none pt-0.5" style={{ minWidth: '3.2em' }}>
+                                    {formatTime(segment.outputStartTimeMs)}
+                                </span>
+
+                                {/* Words rendered inline */}
+                                <span className="text-xs flex-1 leading-relaxed">
+                                    {segment.words.map((word, wordIdx) => {
+                                        const isHidden = !!word.hidden;
+                                        const isSelected = selection?.segmentId === segment.id && selection.wordIds.includes(word.id);
+
+                                        return (
+                                            <span
+                                                key={word.id}
+                                                onClick={(e) => handleWordClick(segment.id, word.id, e)}
+                                                className={[
+                                                    'rounded-[3px] transition-colors cursor-pointer',
+                                                    !isHidden && !isSelected && 'text-text-muted hover:text-text-highlighted hover:bg-white/10',
+                                                    isHidden && !isSelected && 'text-text-disabled line-through hover:text-text-muted hover:bg-white/10',
+                                                    isSelected && 'bg-secondary/20 text-secondary',
+                                                    isSelected && isHidden && 'line-through',
+                                                ].filter(Boolean).join(' ')}
+                                            >
+                                                {wordIdx > 0 && ' '}{word.word}
+                                            </span>
+                                        );
+                                    })}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="subtext">
+                        Transcribe automatically with AI to generate captions.
+                    </p>
+                )}
+            </CollapsibleCard>
+            </div>
 
             {/* Style Settings Card - only show when captions exist */}
             {captionSegments && captionSegments.length > 0 && <CollapsibleCard
@@ -457,88 +531,109 @@ export function CaptionsSettings() {
                 </div>
             </CollapsibleCard>}
 
-
-            {/* Captions Card - only show when there are segments */}
-            <CollapsibleCard
-                title="Captions"
-                icon={<FaRegClosedCaptioning size={16} />}
-                previewItems={[
-                    {
-                        type: 'text', content: captionSegments && captionSegments.length > 0
-                            ? `${captionSegments.length} caption${captionSegments.length !== 1 ? 's' : ''}`
-                            : 'None'
-                    }
-                ]}
-                isExpanded={showCollapsibleCaptionPosition}
-                onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionPosition', v)}
-            >
-                {captionSegments && captionSegments.length > 0 ? (
-                    <div ref={captionsContainerRef} className="flex flex-col gap-0.5">
-                        {captionSegments.map(segment => {
-                            const isSelected = selectedCaptionId === segment.id;
-                            const isEditing = isSelected || editingId === segment.id;
-
-                            return (
-                                <div
-                                    key={segment.id}
-                                    data-caption-id={segment.id}
-                                    onClick={() => handleSegmentClick(segment)}
-                                    className="group relative flex items-baseline gap-1 cursor-pointer"
-                                >
-                                    {/* Timestamp */}
-                                    <span className="text-xs text-text-disabled tabular-nums shrink-0 select-none" style={{ minWidth: '3.2em', lineHeight: 2 }}>
-                                        {formatTime(segment.outputStartTimeMs)}
-                                    </span>
-
-                                    {/* Caption text - inline editable */}
-                                    <span
-                                        ref={isEditing ? inputRef : null}
-                                        contentEditable={isEditing}
-                                        suppressContentEditableWarning
-                                        onInput={(e) => handleInput(e, segment.id)}
-                                        onKeyDown={handleKeyDown}
-                                        onBlur={handleBlur}
-                                        data-placeholder="[empty]"
-                                        className={`text-xs transition-all outline-none editable-placeholder flex-1 ${isEditing
-                                            ? 'text-text-highlighted bg-secondary/20'
-                                            : 'text-text-muted hover:text-text-main'
-                                            }`}
-                                        style={{
-                                            lineHeight: 2,
-                                            padding: isEditing ? '2px 4px' : '2px 0',
-                                            borderRadius: isEditing ? '3px' : '0',
-                                            minWidth: isEditing ? '20px' : undefined,
-                                        }}
+            {/* Word Action Popover — positioned above the first selected word */}
+            {selection && createPortal(
+                <div
+                    ref={popoverRef}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-surface-raised border border-border rounded-lg shadow-float flex items-center gap-0.5 px-1 py-1"
+                    style={{
+                        position: 'fixed',
+                        bottom: window.innerHeight - selection.anchorRect.top + 4,
+                        left: selection.anchorRect.left,
+                        zIndex: 9999,
+                    }}
+                >
+                    {selection.isEditing ? (
+                        <div className="flex items-center gap-1 px-0.5">
+                            <input
+                                ref={editInputRef}
+                                type="text"
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleEditSave();
+                                    if (e.key === 'Escape') setSelection(null);
+                                }}
+                                className="bg-surface text-text-highlighted text-xs px-2 py-1 rounded border border-border outline-none focus:border-secondary"
+                                style={{ width: `${Math.max(editText.length, 3) + 2}ch` }}
+                            />
+                            <button
+                                onClick={handleEditSave}
+                                className="text-xs text-secondary hover:text-secondary-hover px-1 py-0.5 cursor-pointer"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Edit — only for single word */}
+                            {selection.wordIds.length === 1 && (
+                                <Tooltip text="Edit word">
+                                    <Button
+                                        variant="icon"
+                                        className="size-7!"
+                                        onClick={() => setSelection({ ...selection, isEditing: true })}
                                     >
-                                        {isEditing
-                                            ? (editStartTextRef.current || '')
-                                            : (segment.text || '')
-                                        }
-                                    </span>
+                                        <MdEdit size={14} />
+                                    </Button>
+                                </Tooltip>
+                            )}
+                            {/* Hide/Show — show both when selection has a mix */}
+                            {(() => {
+                                const seg = captionSegments?.find(s => s.id === selection.segmentId);
+                                const selectedWords = seg?.words.filter(w => selection.wordIds.includes(w.id)) || [];
+                                const hasVisible = selectedWords.some(w => !w.hidden);
+                                const hasHidden = selectedWords.some(w => w.hidden);
+                                return (
+                                    <>
+                                        {hasVisible && (
+                                            <Tooltip text="Hide">
+                                                <Button
+                                                    variant="icon"
+                                                    className="size-7!"
+                                                    onClick={handleHideSelected}
+                                                >
+                                                    <MdVisibilityOff size={14} />
+                                                </Button>
+                                            </Tooltip>
+                                        )}
+                                        {hasHidden && (
+                                            <Tooltip text="Show">
+                                                <Button
+                                                    variant="icon"
+                                                    className="size-7!"
+                                                    onClick={handleShowSelected}
+                                                >
+                                                    <MdVisibility size={14} />
+                                                </Button>
+                                            </Tooltip>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </>
+                    )}
+                </div>,
+                document.body
+            )}
 
-                                    {/* Delete button - floating top-right on hover */}
-                                    <span className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <XButton
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDelete(segment.id);
-                                            }}
-                                            title="Delete caption"
-                                        />
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="subtext">
-                        Transcribe automatically with AI or add them manually on the captions track in the timeline.
-                    </p>
-                )}
-            </CollapsibleCard>
 
 
-
-        </div >
+            {/* Modals for OpenAI pro gate */}
+            <UpgradeModal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                onSignInRequest={() => {
+                    setIsUpgradeModalOpen(false);
+                    setIsAuthModalOpen(true);
+                }}
+            />
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                onAuthSuccess={() => setIsAuthModalOpen(false)}
+            />
+        </div>
     );
 }

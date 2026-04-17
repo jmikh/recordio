@@ -20,13 +20,12 @@ export const TRACK_HEIGHT = 32;
 /** Collapsed track height (~40% of full) */
 export const COLLAPSED_HEIGHT = 13;
 
-type EffectTrack = 'zoom' | 'spotlight' | 'captions' | 'cameraMove' | 'overlay';
+type EffectTrack = 'zoom' | 'spotlight' | 'cameraMove' | 'overlay';
 
 /** Track ordering for effect tracks (recording is handled separately) */
 const EFFECT_TRACK_ORDER: EffectTrack[] = [
     'zoom',
     'spotlight',
-    'captions',
     'cameraMove',
     'overlay',
 ];
@@ -35,7 +34,6 @@ const EFFECT_TRACK_ORDER: EffectTrack[] = [
 const SHOW_KEY: Record<EffectTrack, keyof DisplaySettings> = {
     zoom: 'showZoom',
     spotlight: 'showSpotlight',
-    captions: 'showCaptions',
     cameraMove: 'showCameraMove',
     overlay: 'showOverlay',
 };

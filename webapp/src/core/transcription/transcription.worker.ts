@@ -13,15 +13,12 @@ env.allowLocalModels = false;
 env.remoteHost = 'https://huggingface.co/';
 env.remotePathTemplate = '{model}/resolve/main/';
 
-// Model names
-const MODEL_NAME_EN = 'Xenova/whisper-base.en';
-const MODEL_NAME_MULTILINGUAL = 'Xenova/whisper-base';
+const MODEL_NAME = 'Xenova/whisper-small.en';
 
 // Types
 interface TranscribeMessage {
     type: 'transcribe';
     audioBuffer: ArrayBuffer;
-    language?: string;
 }
 
 interface AbortMessage {
@@ -32,36 +29,48 @@ type WorkerMessage = TranscribeMessage | AbortMessage;
 
 // State
 let whisperPipeline: Pipeline | null = null;
-let currentModelName: string | null = null;
 let isLoading = false;
 let aborted = false;
 
-async function loadModel(language: string): Promise<void> {
-    const modelName = language === 'en' ? MODEL_NAME_EN : MODEL_NAME_MULTILINGUAL;
-
-    // If we already have the right model loaded, skip
-    if (whisperPipeline && currentModelName === modelName) return;
+async function loadModel(): Promise<void> {
+    if (whisperPipeline) return;
     if (isLoading) return;
 
     isLoading = true;
+    self.postMessage({ type: 'model_loading' });
 
     try {
-        // @ts-ignore - Hugging Face Hub configured at module level
-        whisperPipeline = await pipeline('automatic-speech-recognition', modelName);
-        currentModelName = modelName;
+        // Track per-file download progress and aggregate into a single 0→1 value.
+        // Each file reports its own 0→100, so we weight by file size (loaded/total bytes).
+        const fileProgress = new Map<string, { loaded: number; total: number }>();
+
+        // @ts-ignore — union type too complex for TS
+        whisperPipeline = await pipeline('automatic-speech-recognition', MODEL_NAME, {
+            progress_callback: (event: any) => {
+                if (event.status === 'progress' && event.file) {
+                    fileProgress.set(event.file, { loaded: event.loaded ?? 0, total: event.total ?? 1 });
+                    let totalBytes = 0, loadedBytes = 0;
+                    for (const f of fileProgress.values()) {
+                        totalBytes += f.total;
+                        loadedBytes += f.loaded;
+                    }
+                    self.postMessage({ type: 'model_progress', progress: totalBytes > 0 ? loadedBytes / totalBytes : 0 });
+                }
+            },
+        });
     } finally {
         isLoading = false;
     }
 }
 
-async function transcribe(audioBuffer: ArrayBuffer, language: string = 'en'): Promise<void> {
+async function transcribe(audioBuffer: ArrayBuffer): Promise<void> {
     aborted = false;
 
     const audioData = new Float32Array(audioBuffer);
 
     self.postMessage({ type: 'progress', progress: 0.1 });
 
-    await loadModel(language);
+    await loadModel();
 
     if (aborted) throw new Error('Aborted');
     if (!whisperPipeline) throw new Error('Model failed to load');
@@ -82,20 +91,12 @@ async function transcribe(audioBuffer: ArrayBuffer, language: string = 'en'): Pr
         self.postMessage({ type: 'progress', progress });
     }, 100);
 
-    // Build pipeline options
-    const pipelineOptions: any = {
+    // Audio is already 16kHz - pass directly to Whisper
+    const result = await whisperPipeline(audioData, {
         return_timestamps: true,
         chunk_length_s: 30,
-        stride_length_s: 5
-    };
-
-    // For non-English, pass language to multilingual model
-    if (language !== 'en') {
-        pipelineOptions.language = language;
-    }
-
-    // Audio is already 16kHz - pass directly to Whisper
-    const result = await whisperPipeline(audioData, pipelineOptions);
+        stride_length_s: 5,
+    });
 
     clearInterval(fakeInterval);
 
@@ -117,7 +118,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
     if (type === 'transcribe') {
         try {
-            await transcribe(event.data.audioBuffer, event.data.language);
+            await transcribe(event.data.audioBuffer);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Unknown error';
             if (msg !== 'Aborted') {

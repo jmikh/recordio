@@ -1,4 +1,5 @@
 import type { CaptionSegment } from '../../types';
+import { textToWords } from '../captionUtils';
 
 const SAMPLE_RATE = 16000;
 
@@ -6,11 +7,19 @@ const SAMPLE_RATE = 16000;
 interface TranscribeMessage {
     type: 'transcribe';
     audioBuffer: ArrayBuffer;
-    language?: string;
 }
 
 interface AbortMessage {
     type: 'abort';
+}
+
+interface ModelLoadingMessage {
+    type: 'model_loading';
+}
+
+interface ModelProgressMessage {
+    type: 'model_progress';
+    progress: number;
 }
 
 interface ProgressMessage {
@@ -31,7 +40,7 @@ interface ErrorMessage {
     error: string;
 }
 
-type WorkerResponse = ProgressMessage | ResultMessage | ErrorMessage;
+type WorkerResponse = ModelLoadingMessage | ModelProgressMessage | ProgressMessage | ResultMessage | ErrorMessage;
 
 /**
  * Simple transcription service.
@@ -100,7 +109,7 @@ export class TranscriptionService {
         videoBlob: Blob,
         onProgress?: (progress: number) => void,
         signal?: AbortSignal,
-        language: string = 'en'
+        onPhaseChange?: (phase: 'downloading' | 'generating', progress?: number) => void,
     ): Promise<CaptionSegment[]> {
         onProgress?.(0.1);
 
@@ -114,22 +123,25 @@ export class TranscriptionService {
             samples,
             (p) => onProgress?.(0.2 + p * 0.75),
             signal,
-            language
+            onPhaseChange,
         );
 
 
 
-        // Convert to CaptionSegments
+        // Convert to CaptionSegments with generated word timestamps
         const segments: CaptionSegment[] = [];
         for (const chunk of chunks) {
             const text = chunk.text?.trim();
             if (!text) continue;
 
+            const sourceStartTimeMs = Math.round((chunk.timestamp[0] || 0) * 1000);
+            const sourceEndTimeMs = Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000);
+
             segments.push({
                 id: crypto.randomUUID(),
-                text,
-                sourceStartTimeMs: Math.round((chunk.timestamp[0] || 0) * 1000),
-                sourceEndTimeMs: Math.round((chunk.timestamp[1] || chunk.timestamp[0] + 1) * 1000),
+                words: textToWords(text, sourceStartTimeMs, sourceEndTimeMs),
+                sourceStartTimeMs,
+                sourceEndTimeMs,
                 outputStartTimeMs: 0,
                 outputEndTimeMs: 0,
                 visible: false, // Will be stamped by setCaptionSegments
@@ -144,7 +156,7 @@ export class TranscriptionService {
         samples: Float32Array,
         onProgress?: (progress: number) => void,
         signal?: AbortSignal,
-        language: string = 'en'
+        onPhaseChange?: (phase: 'downloading' | 'generating', progress?: number) => void,
     ): Promise<Array<{ text: string; timestamp: [number, number | null] }>> {
         const worker = this.initWorker();
         const audioBuffer = samples.buffer.slice(0) as ArrayBuffer;
@@ -165,7 +177,14 @@ export class TranscriptionService {
 
             const messageHandler = (event: MessageEvent<WorkerResponse>) => {
                 switch (event.data.type) {
+                    case 'model_loading':
+                        onPhaseChange?.('downloading');
+                        break;
+                    case 'model_progress':
+                        onPhaseChange?.('downloading', event.data.progress);
+                        break;
                     case 'progress':
+                        onPhaseChange?.('generating');
                         onProgress?.(event.data.progress);
                         break;
                     case 'result':
@@ -183,7 +202,7 @@ export class TranscriptionService {
             worker.addEventListener('message', messageHandler);
 
             worker.postMessage(
-                { type: 'transcribe', audioBuffer, language } as TranscribeMessage,
+                { type: 'transcribe', audioBuffer } as TranscribeMessage,
                 [audioBuffer]
             );
         });

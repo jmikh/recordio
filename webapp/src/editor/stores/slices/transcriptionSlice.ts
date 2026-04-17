@@ -1,20 +1,35 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { CaptionSegment } from '../../../types';
+import type { CaptionSegment, Word } from '../../../types';
 import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { useUIStore } from '../useUIStore';
 
+/** Recomputes output times for caption segments AND their nested words. */
+function recomputeCaptionOutputTimes(
+    segments: CaptionSegment[],
+    timeMapper: InstanceType<typeof import('../../../core/mappers/timeMapper').TimeMapper>
+): CaptionSegment[] {
+    return recomputeOutputTimes(segments, timeMapper).map(segment => ({
+        ...segment,
+        words: recomputeOutputTimes(segment.words, timeMapper),
+    }));
+}
+
+
+
+export type TranscriptionPhase = 'idle' | 'downloading' | 'generating';
 
 export interface TranscriptionSlice {
     isTranscribing: boolean;
+    transcriptionPhase: TranscriptionPhase;
+    modelDownloadProgress: number;
     transcriptionProgress: number;
     transcriptionError: string | null;
 
-    setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionProgress: number; transcriptionError: string | null }>) => void;
-    setCaptionSegments: (segments: CaptionSegment[]) => void;
-    restoreCaptionsFromBaseline: () => void;
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => void;
+    setTranscriptionState: (updates: Partial<{ isTranscribing: boolean; transcriptionPhase: TranscriptionPhase; modelDownloadProgress: number; transcriptionProgress: number; transcriptionError: string | null }>) => void;
+    setCaptionSegments: (segments: CaptionSegment[], source: { engine: 'local' | 'openai'; language: string }) => void;
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ words: Word[]; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => void;
+    updateWord: (segmentId: string, wordId: string, updates: Partial<{ word: string; hidden: boolean }>) => void;
     deleteCaptionSegment: (segmentId: string) => void;
     deleteAllCaptions: () => void;
     addCaptionSegment: (segment: CaptionSegment) => void;
@@ -27,6 +42,8 @@ export const createTranscriptionSlice: StateCreator<
     TranscriptionSlice
 > = (set, _get, _store) => ({
     isTranscribing: false,
+    transcriptionPhase: 'idle' as TranscriptionPhase,
+    modelDownloadProgress: 0,
     transcriptionProgress: 0,
     transcriptionError: null,
 
@@ -34,10 +51,10 @@ export const createTranscriptionSlice: StateCreator<
         set(updates);
     },
 
-    setCaptionSegments: (segments) => {
+    setCaptionSegments: (segments, source) => {
         set(state => {
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
-            const stamped = recomputeOutputTimes(segments, timeMapper);
+            const stamped = recomputeCaptionOutputTimes(segments, timeMapper);
             return ({
                 project: {
                     ...state.project,
@@ -49,36 +66,12 @@ export const createTranscriptionSlice: StateCreator<
                         ...state.project.settings,
                         captions: {
                             ...state.project.settings.captions,
-                            baselineCaptions: segments.map(s => ({ ...s })),
-                            generatedAt: Date.now()
+                            transcriptionSource: source
                         }
                     },
                     updatedAt: new Date()
                 }
             });
-        });
-
-        // Auto-enable captions track visibility
-        useUIStore.getState().setTrackShow('showCaptions', true);
-    },
-
-    restoreCaptionsFromBaseline: () => {
-        set(state => {
-            const baseline = state.project.settings.captions?.baselineCaptions;
-            if (!baseline || baseline.length === 0) {
-                console.warn('[TranscriptionSlice] No baseline captions to restore');
-                return state;
-            }
-            return {
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        captionSegments: baseline.map(s => ({ ...s }))
-                    },
-                    updatedAt: new Date()
-                }
-            };
         });
     },
 
@@ -94,19 +87,16 @@ export const createTranscriptionSlice: StateCreator<
                     ...state.project.settings,
                     captions: {
                         ...state.project.settings.captions,
-                        generatedAt: undefined
+                        transcriptionSource: undefined
                     }
                 },
                 updatedAt: new Date()
             },
             transcriptionError: null
         }));
-
-        // Auto-hide captions track visibility
-        useUIStore.getState().setTrackShow('showCaptions', false);
     },
 
-    updateCaptionSegment: (segmentId: string, updates: Partial<{ text: string; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {
+    updateCaptionSegment: (segmentId: string, updates: Partial<{ words: Word[]; sourceStartTimeMs: number; sourceEndTimeMs: number }>) => {
         set(state => {
             const captionSegments = state.project.timeline.captionSegments;
             if (!captionSegments || captionSegments.length === 0) {
@@ -126,9 +116,9 @@ export const createTranscriptionSlice: StateCreator<
                 ...updates
             };
 
-            // Stamp output times if source times changed
+            // Stamp output times on segments and their words
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
-            const stamped = recomputeOutputTimes(updatedSegments, timeMapper);
+            const stamped = recomputeCaptionOutputTimes(updatedSegments, timeMapper);
 
             return {
                 project: {
@@ -136,6 +126,37 @@ export const createTranscriptionSlice: StateCreator<
                     timeline: {
                         ...state.project.timeline,
                         captionSegments: stamped
+                    },
+                    updatedAt: new Date()
+                }
+            };
+        });
+    },
+
+    updateWord: (segmentId: string, wordId: string, updates: Partial<{ word: string; hidden: boolean }>) => {
+        set(state => {
+            const captionSegments = state.project.timeline.captionSegments;
+            if (!captionSegments || captionSegments.length === 0) return state;
+
+            const segmentIndex = captionSegments.findIndex(s => s.id === segmentId);
+            if (segmentIndex === -1) return state;
+
+            const segment = captionSegments[segmentIndex];
+            const wordIndex = segment.words.findIndex(w => w.id === wordId);
+            if (wordIndex === -1) return state;
+
+            const updatedWords = [...segment.words];
+            updatedWords[wordIndex] = { ...updatedWords[wordIndex], ...updates };
+
+            const updatedSegments = [...captionSegments];
+            updatedSegments[segmentIndex] = { ...segment, words: updatedWords };
+
+            return {
+                project: {
+                    ...state.project,
+                    timeline: {
+                        ...state.project.timeline,
+                        captionSegments: updatedSegments
                     },
                     updatedAt: new Date()
                 }
@@ -180,9 +201,9 @@ export const createTranscriptionSlice: StateCreator<
                 (a, b) => a.sourceStartTimeMs - b.sourceStartTimeMs
             );
 
-            // Stamp output times
+            // Stamp output times on segments and words
             const timeMapper = getTimeMapper(state.project.timeline.outputWindows);
-            const stamped = recomputeOutputTimes(updatedSegments, timeMapper);
+            const stamped = recomputeCaptionOutputTimes(updatedSegments, timeMapper);
 
             return {
                 project: {

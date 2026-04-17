@@ -5,7 +5,6 @@
  */
 
 import type { ID, Size, Rect } from '@shared/types';
-import type { CaptionSegment } from './timeline';
 // ==========================================
 // EASING
 // ==========================================
@@ -195,11 +194,8 @@ export interface CaptionSettings {
     backgroundColor: string; // Background box color in 8-char hex with alpha (e.g. '#000000cc')
     wordHighlight: boolean; // Whether to progressively highlight words (karaoke-style)
 
-    /** Baseline captions from last successful transcription (never modified by editing) */
-    baselineCaptions?: CaptionSegment[];
-    /** When captions were generated (if any) */
-    /** When captions were generated (Unix timestamp ms), if any */
-    generatedAt?: number;
+    /** Which engine (and language, for local) produced the current captions */
+    transcriptionSource?: { engine: 'local' | 'openai'; language: string };
 }
 
 // ==========================================

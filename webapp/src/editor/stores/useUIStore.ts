@@ -228,21 +228,8 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCameraMove(null);
             get().selectOverlaySegment(null);
         }
-        set((state) => {
+        set(() => {
             if (selectedCaptionId) {
-                // Also ensure captions track is visible in project timeline
-                const ds = useProjectStore.getState().project.timeline.displaySettings;
-                if (!ds.showCaptions) {
-                    useProjectStore.setState(s => ({
-                        project: {
-                            ...s.project,
-                            timeline: {
-                                ...s.project.timeline,
-                                displaySettings: { ...s.project.timeline.displaySettings, showCaptions: true }
-                            }
-                        }
-                    }));
-                }
                 return {
                     selectedCaptionId,
                     selectedSettingsPanel: SettingsPanel.Screen,

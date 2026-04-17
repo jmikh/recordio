@@ -2,7 +2,19 @@ import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { ID, OutputWindow, Project } from '../../../types';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import { recomputeOutputTimes, TimeMapper } from '../../../core/mappers/timeMapper';
+import type { CaptionSegment } from '../../../types';
+
+/** Recomputes output times for caption segments AND their nested words. */
+export function recomputeCaptionOutputTimes(
+    segments: CaptionSegment[],
+    timeMapper: TimeMapper
+): CaptionSegment[] {
+    return recomputeOutputTimes(segments, timeMapper).map(segment => ({
+        ...segment,
+        words: recomputeOutputTimes(segment.words, timeMapper),
+    }));
+}
 
 export interface WindowSlice {
     updateOutputWindow: (id: ID, updates: Partial<OutputWindow>) => void;
@@ -11,6 +23,8 @@ export interface WindowSlice {
     mergeWindows: (keepId: ID, removeId: ID) => void;
     setOutputWindows: (windows: OutputWindow[]) => void;
     resetWindows: () => void;
+    /** Cut a source time range out of output windows, creating a gap (trim). */
+    cutSourceRange: (startMs: number, endMs: number) => void;
 }
 
 const getWindowDuration = (w: OutputWindow) => {
@@ -27,8 +41,8 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
     // Spotlight: recompute output times for existing segments
     const nextSpotlightSegments = recomputeOutputTimes(project.timeline.spotlightSegments, timeMapper);
 
-    // Captions: always recompute output times
-    const nextCaptionSegments = recomputeOutputTimes(project.timeline.captionSegments || [], timeMapper);
+    // Captions: recompute output times on segments AND their nested words
+    const nextCaptionSegments = recomputeCaptionOutputTimes(project.timeline.captionSegments || [], timeMapper);
 
     // Overlays: recompute output times for overlay segments
     const nextOverlaySegments = recomputeOutputTimes(project.timeline.overlaySegments || [], timeMapper);
@@ -166,6 +180,52 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             };
 
             return { project: applyNewWindows(state.project, [resetWindow]) };
+        });
+    },
+
+    cutSourceRange: (cutStart: number, cutEnd: number) => {
+        set((state) => {
+            const currentWindows = state.project.timeline.outputWindows;
+            const MIN_WINDOW_DURATION_MS = 100;
+            const nextWindows: OutputWindow[] = [];
+
+            for (const win of currentWindows) {
+                // No overlap — keep window as-is
+                if (cutEnd <= win.startMs || cutStart >= win.endMs) {
+                    nextWindows.push(win);
+                    continue;
+                }
+
+                // Left portion survives
+                if (cutStart > win.startMs) {
+                    const leftEnd = cutStart;
+                    if (getWindowDuration({ ...win, endMs: leftEnd }) >= MIN_WINDOW_DURATION_MS) {
+                        nextWindows.push({ ...win, endMs: leftEnd });
+                    }
+                }
+
+                // Right portion survives
+                if (cutEnd < win.endMs) {
+                    const rightStart = cutEnd;
+                    if (getWindowDuration({ ...win, startMs: rightStart }) >= MIN_WINDOW_DURATION_MS) {
+                        nextWindows.push({
+                            id: crypto.randomUUID(),
+                            startMs: rightStart,
+                            endMs: win.endMs,
+                            speed: win.speed,
+                        });
+                    }
+                }
+            }
+
+            // Don't allow empty windows — keep at least one
+            if (nextWindows.length === 0) {
+                console.warn('[cutSourceRange] Cut would remove all windows — aborting');
+                return state;
+            }
+
+            nextWindows.sort((a, b) => a.startMs - b.startMs);
+            return { project: applyNewWindows(state.project, nextWindows) };
         });
     },
 

@@ -16,8 +16,8 @@ export function recomputeOutputTimes<T extends TimeSegment>(
         );
         return {
             ...segment,
-            outputStartTimeMs: range?.start ?? 0,
-            outputEndTimeMs: range?.end ?? 0,
+            outputStartTimeMs: range?.start ?? -1,
+            outputEndTimeMs: range?.end ?? -1,
             visible: range !== null,
         };
     });
@@ -150,8 +150,8 @@ export class TimeMapper {
         let startOutput: number | null = null;
         let endOutput: number | null = null;
 
-        // If sourceEndTimeMs is undefined, this is a point event (e.g. click), otherwise it's a range (e.g. scroll).
-        const isPoint = sourceEndTimeMs === undefined;
+        // Treat as a point event when end is undefined OR when start === end (zero-duration words from rounding).
+        const isPoint = sourceEndTimeMs === undefined || sourceStartTimeMs === sourceEndTimeMs;
         const effectiveEnd = isPoint ? sourceStartTimeMs : sourceEndTimeMs;
 
         for (const w of this.windows) {

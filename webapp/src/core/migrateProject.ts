@@ -1,4 +1,41 @@
 import { CURRENT_SCHEMA_VERSION } from './Project';
+import { textToWords } from './captionUtils';
+
+/** Weight per word: letter count + base value. Matches textToWords(). */
+const WORD_BASE_VALUE = 3;
+
+/**
+ * Convert a legacy caption segment (has text, may lack words) into the v3
+ * format where words[] is required and text is removed.
+ */
+function migrateCaptionSegment(seg: any): any {
+    // Already has words in v3 format (sourceStartTimeMs on words)
+    if (Array.isArray(seg.words) && seg.words.length > 0 && seg.words[0].sourceStartTimeMs !== undefined) {
+        delete seg.text;
+        return seg;
+    }
+
+    // Has words in old format (sourceStartMs / sourceEndMs) — rename fields
+    if (Array.isArray(seg.words) && seg.words.length > 0 && seg.words[0].sourceStartMs !== undefined) {
+        seg.words = seg.words.map((w: any) => ({
+            id: w.id ?? crypto.randomUUID(),
+            word: w.word,
+            sourceStartTimeMs: w.sourceStartMs,
+            sourceEndTimeMs: w.sourceEndMs,
+            outputStartTimeMs: 0,
+            outputEndTimeMs: 0,
+            visible: false,
+        }));
+        delete seg.text;
+        return seg;
+    }
+
+    // No words — generate from text + segment timing
+    const text: string = seg.text ?? '';
+    seg.words = textToWords(text, seg.sourceStartTimeMs ?? 0, seg.sourceEndTimeMs ?? 0);
+    delete seg.text;
+    return seg;
+}
 
 /**
  * Migrates a raw project loaded from storage to the current schema.
@@ -23,6 +60,17 @@ export function migrateProject(raw: any): any {
         if (raw.timeline?.displaySettings?.showCameraLayout !== undefined) {
             raw.timeline.displaySettings.showCameraMove = raw.timeline.displaySettings.showCameraLayout;
             delete raw.timeline.displaySettings.showCameraLayout;
+        }
+    }
+
+    // v2 → v3: CaptionSegment.text removed, words[] required (Word extends TimeSegment)
+    if (version < 3) {
+        if (Array.isArray(raw.timeline?.captionSegments)) {
+            raw.timeline.captionSegments = raw.timeline.captionSegments.map(migrateCaptionSegment);
+        }
+        // Clean up removed baseline captions field
+        if (raw.settings?.captions?.baselineCaptions) {
+            delete raw.settings.captions.baselineCaptions;
         }
     }
 

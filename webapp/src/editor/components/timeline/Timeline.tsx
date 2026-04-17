@@ -8,7 +8,7 @@ import { ZoomTrack } from './tracks/zoom/ZoomTrack';
 import { SpotlightTrack } from './tracks/spotlight/SpotlightTrack';
 import { SpotlightHeaderCell } from './tracks/spotlight/SpotlightHeaderCell';
 import { LayoutHeaderCell } from './tracks/cameraMove/LayoutHeaderCell';
-import { CaptionTrack } from './tracks/caption/CaptionTrack';
+
 import { CameraMoveTrack } from './tracks/cameraMove/CameraMoveTrack';
 import { OverlayTrack } from './tracks/overlay/OverlayTrack';
 import { OverlayHeaderCell } from './tracks/overlay/OverlayHeaderCell';
@@ -24,7 +24,7 @@ import { useTimelineInteraction } from './useTimelineInteraction';
 import { TimelinePlayhead } from './TimelinePlayhead';
 import { TimelineSettings } from './TimelineSettings';
 import { ZoomHeaderCell } from './tracks/zoom/ZoomHeaderCell';
-import { CaptionsHeaderCell } from './tracks/caption/CaptionsHeaderCell';
+
 import { useTrackSizing, TRACK_GAP } from './tracks/shared/useTrackSizing';
 
 import { useUIStore } from '../../stores/useUIStore';
@@ -162,9 +162,6 @@ export function Timeline() {
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectWindow = useUIStore(s => s.selectWindow);
     const removeOutputWindow = useProjectStore(s => s.removeOutputWindow);
-    const selectedCaptionId = useUIStore(s => s.selectedCaptionId);
-    const selectCaption = useUIStore(s => s.selectCaption);
-    const deleteCaptionSegment = useProjectStore(s => s.deleteCaptionSegment);
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
@@ -184,10 +181,6 @@ export function Timeline() {
                 if (selectedWindowId) {
                     e.preventDefault();
                     removeOutputWindow(selectedWindowId);
-                } else if (selectedCaptionId) {
-                    e.preventDefault();
-                    deleteCaptionSegment(selectedCaptionId);
-                    selectCaption(null);
                 } else if (selectedCameraMoveId) {
                     e.preventDefault();
                     deleteCameraMove(selectedCameraMoveId);
@@ -213,7 +206,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectedCaptionId, deleteCaptionSegment, selectCaption, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -283,13 +276,6 @@ export function Timeline() {
                         {displaySettings.showSpotlight && (
                             <div className="shrink-0" style={{ height: trackSizing.spotlight.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                 <SpotlightHeaderCell height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
-                            </div>
-                        )}
-
-                        {/* Header: Captions */}
-                        {displaySettings.showCaptions && (
-                            <div className="shrink-0" style={{ height: trackSizing.captions.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('captions')}>
-                                <CaptionsHeaderCell height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                             </div>
                         )}
 
@@ -386,13 +372,6 @@ export function Timeline() {
                                     {displaySettings.showSpotlight && (
                                         <TimelineTrackRow height={trackSizing.spotlight.height} onMouseEnter={() => setHoveredTrack('spotlight')}>
                                             <SpotlightTrack height={trackSizing.spotlight.height} isCollapsed={trackSizing.spotlight.isCollapsed} />
-                                        </TimelineTrackRow>
-                                    )}
-
-                                    {/* Caption Track */}
-                                    {displaySettings.showCaptions && (
-                                        <TimelineTrackRow height={trackSizing.captions.height} onMouseEnter={() => setHoveredTrack('captions')}>
-                                            <CaptionTrack height={trackSizing.captions.height} isCollapsed={trackSizing.captions.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 

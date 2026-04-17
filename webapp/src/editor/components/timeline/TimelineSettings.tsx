@@ -29,16 +29,6 @@ function buildTrackConfigs(): TrackConfig[] {
             toggle: () => useProjectStore.getState().toggleSpotlightEnabled(),
         },
         {
-            showKey: 'showCaptions',
-            label: 'Captions',
-            getEnabled: (s) => s.project.settings.captions.enabled ?? true,
-            toggle: () => {
-                const state = useProjectStore.getState();
-                const captions = state.project.settings.captions;
-                state.updateSettings({ captions: { ...captions, enabled: !(captions.enabled ?? true) } });
-            },
-        },
-        {
             showKey: 'showCameraMove',
             label: 'Camera',
             requiresCamera: true,
@@ -71,7 +61,6 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
 
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
-    const captionsEnabled = useProjectStore(s => s.project.settings.captions.enabled ?? true);
     const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
     const overlayEnabled = useProjectStore(s => s.project.settings.overlay?.enabled ?? true);
 
@@ -85,7 +74,6 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const enabledMap: Record<string, boolean> = {
         showZoom: zoomEnabled,
         showSpotlight: spotlightEnabled,
-        showCaptions: captionsEnabled,
         showCameraMove: cameraMoveEnabled,
         showOverlay: overlayEnabled,
     };

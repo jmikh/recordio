@@ -344,7 +344,7 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
         blur_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'blur').length,
         outline_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'border').length,
         arrow_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'arrow').length,
-        captions_generated: !!settings.captions.generatedAt,
+        captions_generated: !!settings.captions.transcriptionSource,
         captions_visible: settings.captions.enabled ?? true,
         auto_cut_used: settings.autoCutApplied ?? false,
     };
@@ -396,6 +396,7 @@ export interface CaptionsGeneratedParams {
     segment_count: number;
     is_authenticated: boolean;
     is_pro: boolean;
+    transcription_method?: 'cloud' | 'local';
 }
 
 export function trackCaptionsGenerated(params: CaptionsGeneratedParams) {
