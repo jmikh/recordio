@@ -5,7 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
-import { FaScissors } from 'react-icons/fa6';
+import { FiScissors } from 'react-icons/fi';
 import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
 import { RiArrowRightUpFill } from 'react-icons/ri';
 import { Slider, Button, Tooltip, AiAudioIcon } from '@shared/components';
@@ -79,10 +79,12 @@ export const TimelineToolbar: React.FC = () => {
                 }
             }
 
+            const currentWindows = useProjectStore.getState().project.timeline.outputWindows;
             const { windows, totalRemovedMs } = analyzeForAutoCut(
                 speechSegments,
                 userEvents,
-                sourceDurationMs
+                sourceDurationMs,
+                currentWindows
             );
 
             if (windows.length > 0) {
@@ -245,7 +247,7 @@ export const TimelineToolbar: React.FC = () => {
                         onMouseLeave={() => setScissorsHovered(false)}
                         className={!canSplit ? 'opacity-40 cursor-not-allowed' : ''}
                     >
-                        <FaScissors className="icon-sm" />
+                        <FiScissors className="icon-sm" />
                     </Button>
                 </Tooltip>
 

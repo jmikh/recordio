@@ -104,18 +104,22 @@ export interface AutoCutResult {
 }
 
 /**
- * Analyze speech segments and events to derive output windows, 
+ * Analyze speech segments and events to derive output windows,
  * removing silent/inactive gaps from the timeline.
- * 
+ *
  * @param speechSegments Speech segments detected by VAD (or empty if no audio)
  * @param userEvents User interaction events
  * @param totalDurationMs Total source video duration
+ * @param currentWindows Existing output windows to respect — autocut will never
+ *                       re-add source time that is not already included in these windows.
+ *                       If omitted, operates on the full source duration.
  * @returns New output windows and total milliseconds removed
  */
 export function analyzeForAutoCut(
     speechSegments: SpeechSegment[],
     userEvents: UserEvents,
-    totalDurationMs: number
+    totalDurationMs: number,
+    currentWindows?: OutputWindow[]
 ): AutoCutResult {
     // 1. Get activity ranges from events
     const eventRanges = getEventActiveRanges(userEvents, totalDurationMs);
@@ -166,16 +170,35 @@ export function analyzeForAutoCut(
         filteredRanges.push(current);
     }
 
-    // 6. Convert to OutputWindows
-    const windows: OutputWindow[] = filteredRanges.map(seg => ({
+    // 6. Intersect with existing output windows so we never re-add cut source time
+    let finalRanges = filteredRanges;
+    if (currentWindows && currentWindows.length > 0) {
+        const sortedCurrent = [...currentWindows].sort((a, b) => a.startMs - b.startMs);
+        const intersected: Array<{ startMs: number; endMs: number }> = [];
+
+        for (const range of filteredRanges) {
+            for (const win of sortedCurrent) {
+                const start = Math.max(range.startMs, win.startMs);
+                const end = Math.min(range.endMs, win.endMs);
+                if (start < end) {
+                    intersected.push({ startMs: start, endMs: end });
+                }
+            }
+        }
+
+        finalRanges = mergeRanges(intersected);
+    }
+
+    // 7. Convert to OutputWindows
+    const windows: OutputWindow[] = finalRanges.map(seg => ({
         id: crypto.randomUUID(),
         startMs: seg.startMs,
         endMs: seg.endMs,
         speed: 1.0
     }));
 
-    // 7. Calculate total removed time
-    const keptDuration = filteredRanges.reduce(
+    // 8. Calculate total removed time
+    const keptDuration = finalRanges.reduce(
         (acc, seg) => acc + (seg.endMs - seg.startMs),
         0
     );

@@ -50,7 +50,7 @@ export function useSpotlightHover(
      * DISABLED while dragging or when any zoom/spotlight is selected.
      */
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (dragState || editingSpotlightId || selectedZoomId) {
+        if (dragState || editingSpotlightId || selectedZoomId || useUIStore.getState().highlightRange) {
             setHoverInfo(null);
             return;
         }

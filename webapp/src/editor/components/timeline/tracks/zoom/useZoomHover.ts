@@ -41,8 +41,8 @@ export function useZoomHover(
     }, [editingZoomId]);
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        // No ghost while dragging or when something is selected
-        if (dragState || editingZoomId || selectedSpotlightId) {
+        // No ghost while dragging, when something is selected, or when highlight range is active
+        if (dragState || editingZoomId || selectedSpotlightId || useUIStore.getState().highlightRange) {
             setHoverInfo(null);
             return;
         }

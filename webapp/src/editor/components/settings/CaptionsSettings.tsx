@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MdEdit, MdVisibilityOff, MdVisibility } from 'react-icons/md';
+import { FiScissors } from 'react-icons/fi';
 import { RiPaletteLine } from 'react-icons/ri';
 import { TbSparkles, TbCopy, TbDownload } from 'react-icons/tb';
 import { LuCaptions } from 'react-icons/lu';
@@ -34,6 +35,7 @@ export function CaptionsSettings() {
     const updateSettings = useProjectStore(state => state.updateSettings);
     const setCaptionSegments = useProjectStore(state => state.setCaptionSegments);
     const updateWord = useProjectStore(state => state.updateWord);
+    const cutOutputRange = useProjectStore(state => state.cutOutputRange);
 
     // UI Store actions
     const setIsPlaying = useUIStore(state => state.setIsPlaying);
@@ -98,6 +100,36 @@ export function CaptionsSettings() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [selection]);
 
+    // Sync caption word selection → timeline highlight range
+    useEffect(() => {
+        if (!selection) return;
+
+        const seg = captionSegments?.find(s => s.id === selection.segmentId);
+        if (!seg) return;
+
+        const selectedWords = seg.words.filter(w => selection.wordIds.includes(w.id) && w.visible);
+        if (selectedWords.length === 0) return;
+
+        const startMs = Math.min(...selectedWords.map(w => w.outputStartTimeMs));
+        const endMs = Math.max(...selectedWords.map(w => w.outputEndTimeMs));
+
+        useUIStore.getState().setHighlightRange({ startMs, endMs });
+    }, [selection, captionSegments]);
+
+    // Clear caption word selection when highlight range is cleared externally
+    // (e.g. user clicks on ruler, selects a zoom, presses Escape on timeline)
+    useEffect(() => {
+        if (!selection) return;
+        let prevRange = useUIStore.getState().highlightRange;
+        const unsub = useUIStore.subscribe((state) => {
+            if (prevRange && !state.highlightRange) {
+                setSelection(null);
+            }
+            prevRange = state.highlightRange;
+        });
+        return unsub;
+    }, [selection]);
+
     /** Build visible transcript text from segments (shared by copy & download). */
     const getVisibleTranscriptSegments = () => {
         if (!captionSegments) return [];
@@ -106,7 +138,7 @@ export function CaptionsSettings() {
             .map(s => ({
                 start: s.outputStartTimeMs,
                 end: s.outputEndTimeMs,
-                text: s.words.filter(w => !w.hidden).map(w => w.word).join(' '),
+                text: s.words.filter(w => w.visible && !w.hidden).map(w => w.word).join(' '),
             }))
             .filter(s => s.text.length > 0);
     };
@@ -357,6 +389,14 @@ export function CaptionsSettings() {
         setSelection(null);
     };
 
+    const handleCutSelected = () => {
+        const range = useUIStore.getState().highlightRange;
+        if (!range) return;
+        cutOutputRange(range.startMs, range.endMs);
+        useUIStore.getState().setHighlightRange(null);
+        setSelection(null);
+    };
+
     return (
         <div className="space-y-4">
             {/* A.I. Transcription Card */}
@@ -491,9 +531,9 @@ export function CaptionsSettings() {
                                     {formatTime(segment.outputStartTimeMs)}
                                 </span>
 
-                                {/* Words rendered inline */}
+                                {/* Words rendered inline — hide words fully cut from output */}
                                 <span className="text-xs flex-1 leading-relaxed">
-                                    {segment.words.map((word, wordIdx) => {
+                                    {segment.words.filter(w => w.visible).map((word, wordIdx) => {
                                         const isHidden = !!word.hidden;
                                         const isSelected = selection?.segmentId === segment.id && selection.wordIds.includes(word.id);
 
@@ -659,7 +699,7 @@ export function CaptionsSettings() {
                                 return (
                                     <>
                                         {hasVisible && (
-                                            <Tooltip text="Hide">
+                                            <Tooltip text="Hide from caption">
                                                 <Button
                                                     variant="icon"
                                                     className="size-7!"
@@ -681,6 +721,14 @@ export function CaptionsSettings() {
                                     </>
                                 );
                             })()}
+                            {/* Cut — removes the selected words' time range from the output */}
+                            <Tooltip text="Cut from video">
+                                <Button
+                                    variant="icon"
+                                    icon={FiScissors}
+                                    onClick={handleCutSelected}
+                                />
+                            </Tooltip>
                         </>
                     )}
                 </div>,

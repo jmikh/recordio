@@ -146,6 +146,7 @@ export function Timeline() {
     // -- Interaction Hook --
     const {
         hoverTime,
+        isDraggingHighlight,
         handleMouseMove,
         handleMouseDown,
         handleMouseLeave,
@@ -157,6 +158,10 @@ export function Timeline() {
     });
 
 
+
+    // --- Highlighted Range ---
+    const highlightRange = useUIStore(s => s.highlightRange);
+    const cutOutputRange = useProjectStore(s => s.cutOutputRange);
 
     // --- Global Key Listeners (Delete + Escape) ---
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
@@ -177,6 +182,15 @@ export function Timeline() {
                 // Don't delete if user is editing text
                 const active = document.activeElement;
                 if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) return;
+
+                // Check for highlighted range first
+                const range = useUIStore.getState().highlightRange;
+                if (range) {
+                    e.preventDefault();
+                    cutOutputRange(range.startMs, range.endMs);
+                    useUIStore.getState().setHighlightRange(null);
+                    return;
+                }
 
                 if (selectedWindowId) {
                     e.preventDefault();
@@ -206,7 +220,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments]);
+    }, [selectedWindowId, removeOutputWindow, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments, cutOutputRange]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -322,6 +336,7 @@ export function Timeline() {
 
                         <div
                             className="w-full h-full overflow-x-auto overflow-y-hidden relative scrollbar-thin"
+                            style={isDraggingHighlight ? { cursor: 'col-resize' } : undefined}
                             ref={setContainerRef}
                             onScroll={handleScroll}
                             onMouseMove={handleMouseMove}
@@ -349,7 +364,7 @@ export function Timeline() {
                                 />
 
                                 {/* Tracks Container */}
-                                <div id="timeline-tracks" className="flex flex-col relative pl-0" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
+                                <div id="timeline-tracks" className={`flex flex-col relative pl-0 ${isDraggingHighlight ? 'pointer-events-none' : ''}`} style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
                                     {/* Recording Track (always visible) */}
                                     <TimelineTrackRow height={recordingHeight}>
                                         <RecordingTrack
@@ -390,6 +405,17 @@ export function Timeline() {
                                     )}
 
                                 </div>
+
+                                {/* Highlighted Segment Overlay */}
+                                {highlightRange && (
+                                    <div
+                                        className="absolute top-0 bottom-0 pointer-events-none z-31 bg-secondary/20 border-l border-r border-secondary/50"
+                                        style={{
+                                            left: `${(highlightRange.startMs / 1000) * pixelsPerSec}px`,
+                                            width: `${((highlightRange.endMs - highlightRange.startMs) / 1000) * pixelsPerSec}px`,
+                                        }}
+                                    />
+                                )}
 
                                 {/* Hover Line */}
                                 {hoverTime !== null && (

@@ -32,7 +32,7 @@ export function useOverlayHover(
     }, [selectedId]);
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (dragState || selectedId) {
+        if (dragState || selectedId || useUIStore.getState().highlightRange) {
             setHoverInfo(null);
             return;
         }

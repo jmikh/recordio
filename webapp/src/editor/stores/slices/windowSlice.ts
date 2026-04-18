@@ -25,6 +25,8 @@ export interface WindowSlice {
     resetWindows: () => void;
     /** Cut a source time range out of output windows, creating a gap (trim). */
     cutSourceRange: (startMs: number, endMs: number) => void;
+    /** Cut an output time range, converting to source time per-window. */
+    cutOutputRange: (outputStartMs: number, outputEndMs: number) => void;
 }
 
 const getWindowDuration = (w: OutputWindow) => {
@@ -221,6 +223,67 @@ export const createWindowSlice: StateCreator<ProjectState, [["zustand/subscribeW
             // Don't allow empty windows — keep at least one
             if (nextWindows.length === 0) {
                 console.warn('[cutSourceRange] Cut would remove all windows — aborting');
+                return state;
+            }
+
+            nextWindows.sort((a, b) => a.startMs - b.startMs);
+            return { project: applyNewWindows(state.project, nextWindows) };
+        });
+    },
+
+    cutOutputRange: (outputStartMs: number, outputEndMs: number) => {
+        set((state) => {
+            const currentWindows = state.project.timeline.outputWindows;
+            const MIN_WINDOW_DURATION_MS = 100;
+            const nextWindows: OutputWindow[] = [];
+
+            let outputAccumulator = 0;
+
+            for (const win of currentWindows) {
+                const speed = win.speed || 1.0;
+                const windowOutputDuration = (win.endMs - win.startMs) / speed;
+                const windowOutputStart = outputAccumulator;
+                const windowOutputEnd = outputAccumulator + windowOutputDuration;
+                outputAccumulator = windowOutputEnd;
+
+                // No overlap with highlight range: keep entire window
+                if (outputEndMs <= windowOutputStart || outputStartMs >= windowOutputEnd) {
+                    nextWindows.push(win);
+                    continue;
+                }
+
+                // Calculate the overlap in output time, then convert to source time
+                const overlapOutputStart = Math.max(outputStartMs, windowOutputStart);
+                const overlapOutputEnd = Math.min(outputEndMs, windowOutputEnd);
+
+                const cutSourceStart = win.startMs + (overlapOutputStart - windowOutputStart) * speed;
+                const cutSourceEnd = win.startMs + (overlapOutputEnd - windowOutputStart) * speed;
+
+                // Left portion survives (before the cut)
+                if (cutSourceStart > win.startMs) {
+                    const leftOutputDuration = (cutSourceStart - win.startMs) / speed;
+                    if (leftOutputDuration >= MIN_WINDOW_DURATION_MS) {
+                        nextWindows.push({ ...win, endMs: cutSourceStart });
+                    }
+                }
+
+                // Right portion survives (after the cut)
+                if (cutSourceEnd < win.endMs) {
+                    const rightOutputDuration = (win.endMs - cutSourceEnd) / speed;
+                    if (rightOutputDuration >= MIN_WINDOW_DURATION_MS) {
+                        nextWindows.push({
+                            id: crypto.randomUUID(),
+                            startMs: cutSourceEnd,
+                            endMs: win.endMs,
+                            speed: win.speed,
+                        });
+                    }
+                }
+            }
+
+            // Safety: don't remove all windows
+            if (nextWindows.length === 0) {
+                console.warn('[cutOutputRange] Cut would remove all windows — aborting');
                 return state;
             }
 

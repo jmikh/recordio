@@ -136,6 +136,10 @@ export interface UIState {
     isScissorsHovered: boolean;
     setScissorsHovered: (hovered: boolean) => void;
 
+    // Highlighted Range (timeline range selection)
+    highlightRange: { startMs: number; endMs: number } | null;
+    setHighlightRange: (range: { startMs: number; endMs: number } | null) => void;
+
     // Explicit reset to default state
     reset: () => void;
 }
@@ -173,6 +177,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectCameraMove(null);
             get().selectOverlaySegment(null);
+            set({ highlightRange: null });
         }
         set({
             selectedWindowId,
@@ -187,6 +192,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectWindow(null);
             get().selectCameraMove(null);
             get().selectOverlaySegment(null);
+            set({ highlightRange: null });
         }
         set((state) => {
             if (selectedZoomId) {
@@ -207,6 +213,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectWindow(null);
             get().selectCameraMove(null);
             get().selectOverlaySegment(null);
+            set({ highlightRange: null });
         }
         set((state) => {
             if (selectedSpotlightId) {
@@ -227,6 +234,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectWindow(null);
             get().selectCameraMove(null);
             get().selectOverlaySegment(null);
+            set({ highlightRange: null });
         }
         set(() => {
             if (selectedCaptionId) {
@@ -249,6 +257,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectOverlaySegment(null);
+            set({ highlightRange: null });
         }
         set((state) => {
             if (selectedCameraMoveId) {
@@ -269,7 +278,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         get().selectCaption(null);
         get().selectCameraMove(null);
         get().selectOverlaySegment(null);
-        set({ canvasMode: CanvasMode.Preview });
+        set({ canvasMode: CanvasMode.Preview, highlightRange: null });
     },
 
     selectOverlaySegment: (selectedOverlaySegmentId) => {
@@ -279,6 +288,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
+            set({ highlightRange: null });
         }
         set((state) => {
             if (selectedOverlaySegmentId) {
@@ -425,6 +435,19 @@ export const useUIStore = create<UIState>((set, get) => ({
     isScissorsHovered: false,
     setScissorsHovered: (isScissorsHovered) => set({ isScissorsHovered }),
 
+    // Highlighted Range
+    highlightRange: null,
+    setHighlightRange: (highlightRange) => {
+        if (highlightRange) {
+            const s = get();
+            // Only deselect if something is actually selected
+            if (s.selectedZoomId || s.selectedSpotlightId || s.selectedWindowId || s.selectedCaptionId || s.selectedCameraMoveId || s.selectedOverlaySegmentId) {
+                s.deselectAllSegments();
+            }
+        }
+        set({ highlightRange });
+    },
+
     reset: () => {
         get().selectCaption(null);
         set({
@@ -465,6 +488,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
             hoveredTrack: null,
             isScissorsHovered: false,
+            highlightRange: null,
         });
     }
 }));
