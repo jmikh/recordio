@@ -311,9 +311,8 @@ export const TimelineToolbar: React.FC = () => {
                     <button
                         ref={overlayBtnRef}
                         onClick={() => setOverlayMenuOpen(!overlayMenuOpen)}
-                        className="interactive-base flex items-center gap-1.5 px-2 py-1 text-xs"
+                        className="interactive-ghost flex items-center gap-1.5 px-2 py-1 text-xs"
                     >
-                        <MdLayers className="icon-sm" />
                         <span>Add Overlay</span>
                         <MdKeyboardArrowDown className={`icon-sm transition-transform ${overlayMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -366,15 +365,16 @@ export const TimelineToolbar: React.FC = () => {
 
             {/* Right: zoom controls */}
             <div className="flex-1 flex items-center justify-end gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleFit}
-                    className="px-2 py-0.5"
-                    title="Fit timeline to screen"
-                >
-                    Fit
-                </Button>
+                <Tooltip text="Fit timeline to screen">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleFit}
+                        className="px-2 py-0.5"
+                    >
+                        Fit
+                    </Button>
+                </Tooltip>
                 <Button
                     variant="icon"
                     icon={MdRemove}

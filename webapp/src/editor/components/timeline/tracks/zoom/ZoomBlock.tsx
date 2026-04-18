@@ -1,5 +1,5 @@
 import React from 'react';
-import { AiOutlineZoomIn, AiOutlineZoomOut } from 'react-icons/ai';
+import { AiOutlineZoomIn } from 'react-icons/ai';
 import {
     transitionSegment,
     holdSegment,
@@ -8,6 +8,7 @@ import {
     dragHandleIndicator,
     zoomOutBlock,
     transitionInStyle,
+    blockIconClass,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
@@ -111,7 +112,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             {/* Transition-in segment */}
             {clampedTransitionWidth > 0 && (
                 <div
-                    className={`${transitionSegment.base} ${transitionColorClass} ${transitionHoverClass} flex items-center justify-center overflow-hidden`}
+                    className={`${transitionSegment.base} ${transitionColorClass} ${transitionHoverClass}`}
                     data-part="transition-in"
                     style={{
                         left: 0,
@@ -120,17 +121,13 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         ...transitionStyle,
                         height: segmentHeight,
                     }}
-                >
-                    {!isCollapsed && clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className="icon-md text-main opacity-60" />
-                    )}
-                </div>
+                />
             )}
 
             {/* Hold segment */}
             {holdWidth > 0 && (
                 <div
-                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass}`}
+                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
                     data-part="hold"
                     style={{
                         left: clampedTransitionWidth,
@@ -141,7 +138,11 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         borderRadius: hasZoomOut ? 0 : `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                         borderRight: hasZoomOut && !isSelected ? 'none' : undefined,
                     }}
-                />
+                >
+                    {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
+                        <AiOutlineZoomIn className={`${blockIconClass} icon-md`} />
+                    )}
+                </div>
             )}
 
             {/* Zoom-out segment (overflows the container to the right) */}
@@ -157,11 +158,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                         height: segmentHeight,
                         zIndex: 2,
                     }}
-                >
-                    {!isCollapsed && zoomOutWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomOut className="icon-md text-main opacity-70" />
-                    )}
-                </div>
+                />
             )}
 
             {/* Left resize handle */}

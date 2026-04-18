@@ -10,7 +10,6 @@ import { ZoomBlock } from './ZoomBlock';
 import { K_MIN_ZOOM_HOLD_MS } from './ZoomTrackUtils';
 import {
     ghostZoom,
-    blockIconClass,
     ghostIconClass,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
@@ -205,7 +204,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                             {/* Ghost transition-in */}
                             {clampedTransitionWidth > 0 && (
                                 <div
-                                    className={`${ghostZoom.transitionIn.className} flex items-center justify-center overflow-hidden`}
+                                    className={ghostZoom.transitionIn.className}
                                     style={{
                                         position: 'absolute',
                                         left: 0,
@@ -215,17 +214,13 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                         height: height - 2,
                                         ...(holdWidth <= 0 ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
                                     }}
-                                >
-                                    {clampedTransitionWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={`${ghostIconClass} icon-md`} />
-                                    )}
-                                </div>
+                                />
                             )}
 
                             {/* Ghost hold */}
                             {holdWidth > 0 && (
                                 <div
-                                    className={ghostZoom.hold.className}
+                                    className={`${ghostZoom.hold.className} flex items-center justify-center overflow-hidden`}
                                     style={{
                                         position: 'absolute',
                                         left: clampedTransitionWidth,
@@ -235,7 +230,11 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                         height: height - 2,
                                         borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
                                     }}
-                                />
+                                >
+                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
+                                        <AiOutlineZoomIn className={`${ghostIconClass} icon-md`} />
+                                    )}
+                                </div>
                             )}
                         </div>
                     );

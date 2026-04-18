@@ -167,7 +167,7 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
                 {/* Auto Generate */}
                 {hasTrackableContent && (
                     <Button variant="primary" size="sm" onClick={() => { resetZooms(); selectZoom(null); }}>
-                        <span>Auto Generate Zooms</span>
+                        <span>Regenerate Auto Zooms</span>
                     </Button>
                 )}
             </div>

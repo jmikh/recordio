@@ -229,7 +229,18 @@ body,
 
    /* Interactive Ghost - borderless, backgroundless variant for subtle toolbar actions */
    .interactive-ghost {
-      @apply h-9 px-3 bg-transparent border-none rounded-full text-sm text-text-muted hover:text-text-highlighted hover:bg-state-hover transition-colors cursor-pointer disabled:text-text-disabled disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-text-disabled;
+      @apply h-9 px-3 bg-transparent border-none rounded-full text-sm text-text-muted cursor-pointer disabled:text-text-disabled disabled:cursor-default disabled:hover:text-text-disabled;
+      transition: color 0.15s, transform 0.15s, font-weight 0.15s;
+   }
+
+   .interactive-ghost:hover {
+      @apply text-text-highlighted font-medium;
+      transform: scale(1.05);
+   }
+
+   .interactive-ghost:disabled:hover {
+      transform: none;
+      font-weight: normal;
    }
 
    /* Interactive Icon - circular icon-only button with scale hover */

@@ -253,7 +253,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                             onClick={() => { resetSpotlights(); selectSpotlight(null); }}
                             disabled={!hasHoveredCards}
                         >
-                            <span>Auto Generate Spotlights</span>
+                            <span>Regenerate Auto Spotlights</span>
                         </Button>
                     </Tooltip>
                 )}
