@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { MdPlayArrow, MdPause, MdAdd, MdRemove } from 'react-icons/md';
+import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdLayers, MdKeyboardArrowDown } from 'react-icons/md';
 import { FiScissors } from 'react-icons/fi';
 import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
 import { RiArrowRightUpFill } from 'react-icons/ri';
@@ -21,9 +22,49 @@ export const MAX_PIXELS_PER_SEC = 200;
 
 
 
+const OVERLAY_OPTIONS: { type: OverlayItemType; label: string; icon: React.ReactNode }[] = [
+    { type: 'blur', label: 'Blur', icon: <MdBlurOn className="icon-md" /> },
+    { type: 'text', label: 'Text', icon: <MdOutlineTextFields className="icon-md" /> },
+    { type: 'arrow', label: 'Arrow', icon: <RiArrowRightUpFill className="icon-md" /> },
+    { type: 'border', label: 'Outline', icon: <MdBorderOuter className="icon-md" /> },
+];
+
 export const TimelineToolbar: React.FC = () => {
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
+    const [overlayMenuOpen, setOverlayMenuOpen] = useState(false);
+    const overlayBtnRef = useRef<HTMLButtonElement>(null);
+    const overlayMenuRef = useRef<HTMLDivElement>(null);
+    const [overlayMenuStyle, setOverlayMenuStyle] = useState<React.CSSProperties>({});
+
+    // Position overlay menu when opened
+    useEffect(() => {
+        if (!overlayMenuOpen || !overlayBtnRef.current) return;
+        const rect = overlayBtnRef.current.getBoundingClientRect();
+        setOverlayMenuStyle({
+            position: 'fixed',
+            bottom: window.innerHeight - rect.top + 4,
+            left: rect.left,
+            zIndex: 9999,
+        });
+    }, [overlayMenuOpen]);
+
+    // Close overlay menu on click outside
+    useEffect(() => {
+        if (!overlayMenuOpen) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (
+                overlayBtnRef.current && !overlayBtnRef.current.contains(target) &&
+                overlayMenuRef.current && !overlayMenuRef.current.contains(target)
+            ) {
+                setOverlayMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [overlayMenuOpen]);
+
     const isPlaying = useUIStore(s => s.isPlaying);
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -266,18 +307,39 @@ export const TimelineToolbar: React.FC = () => {
 
                 <div className="w-px h-5 bg-border mx-1" />
 
-                <Tooltip text="Add Blur" position="top-start">
-                    <Button variant="icon" icon={MdBlurOn} onClick={() => handleAddOverlay('blur')} />
-                </Tooltip>
-                <Tooltip text="Add Text" position="top-start">
-                    <Button variant="icon" icon={MdOutlineTextFields} onClick={() => handleAddOverlay('text')} />
-                </Tooltip>
-                <Tooltip text="Add Arrow" position="top-start">
-                    <Button variant="icon" icon={RiArrowRightUpFill} onClick={() => handleAddOverlay('arrow')} />
-                </Tooltip>
-                <Tooltip text="Add Outline" position="top-start">
-                    <Button variant="icon" icon={MdBorderOuter} onClick={() => handleAddOverlay('border')} />
-                </Tooltip>
+                <div className="relative">
+                    <button
+                        ref={overlayBtnRef}
+                        onClick={() => setOverlayMenuOpen(!overlayMenuOpen)}
+                        className="interactive-base flex items-center gap-1.5 px-2 py-1 text-xs"
+                    >
+                        <MdLayers className="icon-sm" />
+                        <span>Add Overlay</span>
+                        <MdKeyboardArrowDown className={`icon-sm transition-transform ${overlayMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {overlayMenuOpen && createPortal(
+                        <div
+                            ref={overlayMenuRef}
+                            className="bg-surface-raised border border-border rounded-lg shadow-float py-1 px-1"
+                            style={overlayMenuStyle}
+                        >
+                            {OVERLAY_OPTIONS.map(({ type, label, icon }) => (
+                                <button
+                                    key={type}
+                                    onClick={() => {
+                                        handleAddOverlay(type);
+                                        setOverlayMenuOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 rounded-md text-text-main hover:bg-state-hover"
+                                >
+                                    <span className="shrink-0">{icon}</span>
+                                    <span>{label}</span>
+                                </button>
+                            ))}
+                        </div>,
+                        document.body
+                    )}
+                </div>
             </div>
 
             {/* Center: play button + time */}

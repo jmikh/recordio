@@ -123,7 +123,7 @@ export function identifyExtensionUser(extensionDistinctId: string) {
 // ============================================================================
 
 // Lazy-resolved to avoid circular dependency (useUserStore imports from this module)
-let _getUserStore: (() => { isAuthenticated: boolean; subscription: { status: string | null } }) | null = null;
+let _getUserStore: (() => { isAuthenticated: boolean; isPro: boolean; subscription: { status: string | null } }) | null = null;
 function getUserStore() {
     if (!_getUserStore) {
         // Dynamic require — module is already loaded by the time any event fires
@@ -135,14 +135,14 @@ function getUserStore() {
 
 function getGlobalProperties(): Record<string, any> {
     try {
-        const { isAuthenticated, subscription } = getUserStore();
+        const { isAuthenticated, isPro, subscription } = getUserStore();
         const planType = subscription.status === 'active' ? 'pro'
             : subscription.status === 'trialing' ? 'pro_trial'
                 : 'basic';
-        return { is_authenticated: isAuthenticated, plan_type: planType };
+        return { is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType };
     } catch {
         // Store not yet initialized (e.g. during early boot)
-        return { is_authenticated: false, plan_type: 'basic' };
+        return { is_authenticated: false, is_pro: false, plan_type: 'basic' };
     }
 }
 
@@ -177,8 +177,6 @@ export interface ExportCompletedParams {
     // Export context
     quality: '480p' | '720p' | '1080p' | '2K' | '4K';
     fps: 30 | 60;
-    is_authenticated: boolean;
-    is_pro: boolean;
     export_duration_ms: number;
 
     // Recording context
@@ -260,7 +258,7 @@ import type { Project } from '../../types';
 import { TimeMapper } from '../mappers/timeMapper';
 
 export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
-    'quality' | 'fps' | 'export_type' | 'is_authenticated' | 'is_pro' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
+    'quality' | 'fps' | 'export_type' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
 > {
     const { settings, timeline, screenSource } = project;
     const userEvents = project.userEvents ?? { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] };
@@ -357,7 +355,7 @@ export function extractProjectProperties(project: Project): Omit<ExportCompleted
 }
 
 export type ExportStartedParams = Omit<ExportCompletedParams,
-    'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
+    'export_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
 > & {
     export_type: 'download' | 'publish';
 };
@@ -398,15 +396,15 @@ export function trackGetProClicked(billingInterval: 'monthly' | 'yearly' | 'life
     trackEvent('get_pro_clicked', { billing_interval: billingInterval });
 }
 
-export interface CaptionsGeneratedParams {
+export interface GenerateCaptionsParams {
     segment_count: number;
-    is_authenticated: boolean;
-    is_pro: boolean;
-    transcription_method?: 'cloud' | 'local';
+    transcription_method: 'cloud' | 'local';
+    success: boolean;
+    error?: string;
 }
 
-export function trackCaptionsGenerated(params: CaptionsGeneratedParams) {
-    trackEvent('captions_generated', params);
+export function trackGenerateCaptions(params: GenerateCaptionsParams) {
+    trackEvent('generate_captions', params);
 }
 
 // ============================================================================

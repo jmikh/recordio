@@ -16,7 +16,7 @@ import { CloudTranscriptionService, RateLimitError } from '../../../core/transcr
 import { UpgradeModal } from '../header/UpgradeModal';
 import { AuthModal } from '../header/AuthModal';
 
-import { trackCaptionsGenerated } from '../../../core/analytics';
+import { trackGenerateCaptions } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ColorButton } from './ColorButton';
 
@@ -245,13 +245,10 @@ export function CaptionsSettings() {
                 language: engine === 'openai' ? 'auto' : 'en',
             });
 
-            // Track caption generation
-            const { isAuthenticated, isPro } = useUserStore.getState();
-            trackCaptionsGenerated({
+            trackGenerateCaptions({
                 segment_count: transcriptionData.length,
-                is_authenticated: isAuthenticated,
-                is_pro: isPro,
                 transcription_method: engine === 'openai' ? 'cloud' : 'local',
+                success: true,
             });
 
             if (transcriptionData.length === 0) {
@@ -292,6 +289,13 @@ export function CaptionsSettings() {
             }
 
             console.error('[CaptionsSettings] Failed to generate transcription:', error);
+
+            trackGenerateCaptions({
+                segment_count: 0,
+                transcription_method: engine === 'openai' ? 'cloud' : 'local',
+                success: false,
+                error: error.message,
+            });
 
             addToast({
                 type: 'error',
