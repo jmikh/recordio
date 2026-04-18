@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { identifyUser, resetUser, updatePlanType } from '../../core/analytics';
+import { identifyUser, setUserProfileOnce, resetUser } from '../../core/analytics';
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 export type ExportFps = 30 | 60;
@@ -64,6 +64,7 @@ export const useUserStore = create<UserState>()(
             // Actions
             setUser: (userId, email, name = null, picture = null, pictureSourceUrl = null) => {
                 const isDevPro = DEV_PRO_UID ? userId === DEV_PRO_UID : false;
+                const wasAuthenticated = get().isAuthenticated;
                 set({
                     userId,
                     email,
@@ -73,7 +74,10 @@ export const useUserStore = create<UserState>()(
                     isAuthenticated: true,
                     ...(isDevPro ? { isPro: true } : {})
                 });
-                identifyUser(userId, email);
+                identifyUser(userId);
+                if (!wasAuthenticated) {
+                    setUserProfileOnce(email);
+                }
             },
 
             setSubscription: (subscription) => {
@@ -83,7 +87,6 @@ export const useUserStore = create<UserState>()(
                     subscription,
                     isPro: isDevPro || subscription.status === 'active' || subscription.status === 'trialing'
                 });
-                updatePlanType(subscription.status);
             },
 
             clearUser: () => {

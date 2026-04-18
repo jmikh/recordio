@@ -188,7 +188,7 @@ export const CameraSettings = () => {
 
                         {/* Auto Shrink */}
                         <Toggle
-                            label="Enable Shrinking"
+                            label="Auto Shrink"
                             value={autoShrink}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
                         >
@@ -198,7 +198,7 @@ export const CameraSettings = () => {
                         {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}
                         {autoShrink && (
                             <Slider
-                                label="Shrinking Size"
+                                label="Shrink Size"
                                 min={0.25}
                                 max={0.75}
                                 value={shrinkScale}

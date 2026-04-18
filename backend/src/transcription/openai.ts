@@ -63,7 +63,7 @@ export async function transcribeAudio(
         file,
         timestamp_granularities: ['segment', 'word'],
         response_format: 'verbose_json',
-        prompt: 'Remove filler words such as um, uh, like, you know. Use proper punctuation and capitalization.',
+        prompt: 'This is a clear, professional recording with proper punctuation and capitalization. The speaker communicates articulately without hesitation.',
         ...(language !== 'auto' && { language }),
     });
 

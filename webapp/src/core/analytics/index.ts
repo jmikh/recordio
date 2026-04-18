@@ -77,22 +77,22 @@ function getOrCreateLocalUserId(): string {
  * Called from useUserStore.setUser on login and session restore.
  * Merges any anonymous events into the identified profile.
  */
-export function identifyUser(userId: string, email: string) {
+export function identifyUser(userId: string) {
     mixpanel.identify(userId);
-    mixpanel.people.set({ $email: email });
-    // Set signup_date only once (won't overwrite on subsequent sessions)
-    mixpanel.people.set_once({ signup_date: new Date().toISOString() });
 }
 
+// TODO: Move these engage calls to the backend (on-user-created or stripe-webhooks edge function)
 /**
- * Update plan type on the Mixpanel profile.
- * Called from useUserStore.setSubscription so trial users
- * get their plan type set on first load (not just via webhook).
+ * Set profile properties on first login. Uses set_once so values
+ * are never overwritten — safe to call multiple times but should
+ * only be called on actual login, not session restore.
  */
-export function updatePlanType(status: string | null) {
-    const planType = status === 'active' ? 'pro' : status === 'trialing' ? 'pro_trial' : 'basic';
-    mixpanel.people.set({ current_plan_type: planType });
+export function setUserProfileOnce(email: string) {
+    mixpanel.people.set_once({ $email: email, signup_date: new Date().toISOString() });
 }
+
+// TODO: plan type should be set from the backend (stripe-webhooks edge function)
+// Removed updatePlanType — was firing people.set on every session restore
 
 /**
  * Reset Mixpanel to anonymous state.
@@ -106,8 +106,15 @@ export function resetUser() {
  * Link the webapp's anonymous Mixpanel profile with the extension's anonymous ID.
  * Called during handoff so extension recording events merge into the same profile.
  * If the user later authenticates, identifyUser() will further merge into the Supabase ID.
+ *
+ * Skipped when already authenticated — identifyUser() has already set the distinct_id
+ * to the Supabase ID, and calling identify(extId) would overwrite it.
  */
 export function identifyExtensionUser(extensionDistinctId: string) {
+    try {
+        const { isAuthenticated } = getUserStore();
+        if (isAuthenticated) return;
+    } catch { /* store not ready — safe to proceed */ }
     mixpanel.identify(extensionDistinctId);
 }
 
@@ -157,7 +164,6 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
             console.warn(`[Analytics] Mixpanel not ready, dropping event: ${eventName}`);
         }
         mixpanel.track(eventName, allParams);
-        mixpanel.people.set({ last_active_date: new Date().toISOString() });
     } catch (e) {
         console.error(`[Analytics] Mixpanel track failed for ${eventName}:`, e);
     }
@@ -409,14 +415,6 @@ export function trackCaptionsGenerated(params: CaptionsGeneratedParams) {
 // as default dimensions — no need to send them explicitly.
 // ============================================================================
 
-const PROJECTS_CREATED_KEY = 'recordio-total-projects-created';
-
-function incrementProjectCount(): number {
-    const current = parseInt(localStorage.getItem(PROJECTS_CREATED_KEY) ?? '0', 10);
-    const next = current + 1;
-    localStorage.setItem(PROJECTS_CREATED_KEY, String(next));
-    return next;
-}
 
 export interface ProjectCreatedParams {
     duration_ms: number;
@@ -441,8 +439,7 @@ export interface ProjectCreatedParams {
 }
 
 export function trackProjectCreated(params: ProjectCreatedParams) {
-    const totalProjectsCreated = incrementProjectCount();
-    trackEvent('project_created', { ...params, total_projects_created: totalProjectsCreated });
+    trackEvent('project_created', params);
 }
 
 export function trackProjectOpened() {
