@@ -212,6 +212,7 @@ drawCaptions(ctx, captionSegments, settings, currentTimeMs, outputSize)
 - Click a word -> popover appears above it (portal on `document.body`)
 - Click another word in same segment -> selects range
 - Click same word again -> deselects
+- Click the time label -> selects all visible words in the segment
 - Popover actions: Edit (pencil, single word only), Hide, Show
 - Edit mode: inline text input + Save button
 - **Popover uses `onClick stopPropagation`** to prevent the document-level click-outside handler from closing it during edit interactions

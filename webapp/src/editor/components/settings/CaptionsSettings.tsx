@@ -102,7 +102,10 @@ export function CaptionsSettings() {
 
     // Sync caption word selection → timeline highlight range
     useEffect(() => {
-        if (!selection) return;
+        if (!selection) {
+            useUIStore.getState().setHighlightRange(null);
+            return;
+        }
 
         const seg = captionSegments?.find(s => s.id === selection.segmentId);
         if (!seg) return;
@@ -530,8 +533,31 @@ export function CaptionsSettings() {
                         </div>
                         {captionSegments.filter(s => s.visible).map(segment => (
                             <div key={segment.id} className="flex items-start gap-1">
-                                {/* Timestamp */}
-                                <span className="text-xs text-text-disabled tabular-nums shrink-0 select-none pt-0.5" style={{ minWidth: '3.2em' }}>
+                                {/* Timestamp — click to select all words in segment */}
+                                <span
+                                    className="text-xs text-text-disabled tabular-nums shrink-0 select-none pt-0.5 cursor-pointer hover:text-text-muted transition-colors"
+                                    style={{ minWidth: '3.2em' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const visibleWords = segment.words.filter(w => w.visible);
+                                        if (visibleWords.length === 0) return;
+                                        // If all words in this segment are already selected, deselect
+                                        const allSelected = selection?.segmentId === segment.id
+                                            && visibleWords.every(w => selection.wordIds.includes(w.id))
+                                            && selection.wordIds.length === visibleWords.length;
+                                        if (allSelected) {
+                                            setSelection(null);
+                                            return;
+                                        }
+                                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                        setSelection({
+                                            segmentId: segment.id,
+                                            wordIds: visibleWords.map(w => w.id),
+                                            anchorRect: rect,
+                                            isEditing: false,
+                                        });
+                                    }}
+                                >
                                     {formatTime(segment.outputStartTimeMs)}
                                 </span>
 

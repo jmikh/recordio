@@ -3,6 +3,7 @@
  * 
  * Finds the outermost "group" element (card, modal, container) matching visual criteria:
  * - Visual signal (any ONE): box-shadow OR drop-shadow OR border OR modal backdrop OR opaque background
+ * - Border radius: must have non-zero border-radius (own, inherited from same-size parent, or shadow DOM)
  * - Size: configurable min, 80% viewport max
  * - Must be fully visible in viewport
  */
@@ -116,7 +117,10 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
         // the child is visually independent (e.g., dropdown overflowing container).
         // Only stop when: child had visual signals AND parent doesn't clip overflow.
         // Transparent layout wrappers (noVisual) can safely overflow without breaking.
-        if (!isSameSize && prevRect && prevHadVisualSignal) {
+        // Skip overflow check for display:contents elements — they have no box,
+        // so children trivially "overflow" the 0x0 rect, but it's not a real boundary.
+        const isContentsDisplay = style.display === 'contents';
+        if (!isSameSize && prevRect && prevHadVisualSignal && !isContentsDisplay) {
             const OVERFLOW_TOLERANCE = 5; // px
             const childOverflows =
                 prevRect.right > rect.right + OVERFLOW_TOLERANCE ||
@@ -357,6 +361,16 @@ export function findElementGroup(element: Element, minSize: number = 150, debug:
                 break;
             }
         }
+    }
+
+    // Require border-radius: cards/modals must have rounded corners
+    if (farthestMatch && farthestMatchRadius.every(r => r === 0)) {
+        if (debug) {
+            const tag = farthestMatch.tagName.toLowerCase();
+            const cls = typeof (farthestMatch as HTMLElement).className === 'string' ? (farthestMatch as HTMLElement).className.split(' ')[0] : '';
+            console.log(`[HoveredCard]   ⏹ <${tag}${cls ? '.' + cls : ''}> — rejected: no border-radius`);
+        }
+        farthestMatch = null;
     }
 
     if (debug) {
