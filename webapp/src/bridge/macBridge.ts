@@ -1,3 +1,5 @@
+import { navigate } from '../navigate';
+
 /**
  * Mac Native Bridge — handles recording handoff from the RecordioMac WKWebView.
  *
@@ -81,7 +83,7 @@ export function initMacBridge(): void {
                 sendToNative('HANDOFF_COMPLETE', { projectId: project.id });
 
                 // Navigate to the editor
-                window.location.href = `/editor?projectId=${project.id}`;
+                navigate(`/editor?projectId=${project.id}`);
 
             } catch (error) {
                 console.error('[MacBridge] Handoff failed:', error);

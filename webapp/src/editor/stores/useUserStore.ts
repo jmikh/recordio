@@ -161,6 +161,12 @@ export const useUserStore = create<UserState>()(
                     if (state.userId && !state.isAuthenticated) {
                         useUserStore.setState({ isAuthenticated: true });
                     }
+                    // Re-derive isPro from persisted subscription (isPro itself is not persisted)
+                    const isDevPro = DEV_PRO_UID ? state.userId === DEV_PRO_UID : false;
+                    const status = state.subscription?.status;
+                    if (isDevPro || status === 'active' || status === 'trialing') {
+                        useUserStore.setState({ isPro: true });
+                    }
                 }
             }
         }

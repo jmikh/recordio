@@ -1,9 +1,3 @@
----
-name: supabase
-description: Supabase reference for this codebase. Covers edge functions, auth patterns, deployment, cron jobs, and database conventions.
-when_to_use: When writing or modifying Supabase edge functions, SQL migrations, cron jobs, or anything touching the Supabase backend.
----
-
 # Supabase Guidelines
 
 ## Hard Rules
@@ -16,12 +10,21 @@ when_to_use: When writing or modifying Supabase edge functions, SQL migrations, 
 - **New migrations go in `webapp/supabase/migrations/`** with a timestamped filename (`YYYYMMDD_description.sql`)
 - **Cron jobs that call edge functions must pass `Authorization: Bearer <SUPABASE_SECRET_KEY>`** so the function knows it's an internal call
 - **ALWAYS use Secret API keys instead of service role key** for internal functions, server usage..etc. Service role and anon keys are deprecated in supabase.
+- **Keep table docs current** — when adding, removing, or modifying a table, update the corresponding file in `tables/`. When adding a new table, create a new `tables/<table_name>.md`. When removing a table, delete its file.
+
+---
+
+## Tables
+
+See `tables/` for per-table documentation. Each file describes what the table is for, which functions/services access it, and its RLS policy.
+
+Current tables: `deleted_videos`, `email_unsubscribes`, `shared_videos`, `subscriptions`, `transcription_usage`.
 
 ---
 
 ## Edge Functions
 
-All functions live in `webapp/supabase/functions/<function-name>/index.ts`.
+All functions live in `functions/<function-name>/index.ts`.
 
 ### Boilerplate
 
@@ -81,7 +84,7 @@ if (error || !user) {
 // user.id is now safe to trust
 ```
 
-See: `webapp/supabase/functions/get-video-analytics/index.ts`, `webapp/supabase/functions/create-checkout-session/index.ts`
+See: `functions/get-video-analytics/index.ts`, `functions/create-checkout-session/index.ts`
 
 ### Pattern 2 — Internal / cron-triggered functions (service role)
 
@@ -99,7 +102,7 @@ const supabase = createClient(
 );
 ```
 
-See: `webapp/supabase/functions/purge-deleted-videos/index.ts`
+See: `functions/purge-deleted-videos/index.ts`
 
 ### Pattern 3 — External webhook functions (Stripe, etc.)
 
@@ -109,7 +112,7 @@ No JWT at all. Validate the webhook's own signature instead:
 const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 ```
 
-See: `webapp/supabase/functions/stripe-webhooks/index.ts`
+See: `functions/stripe-webhooks/index.ts`
 
 ---
 
@@ -125,13 +128,13 @@ supabase functions deploy <function-name> --no-verify-jwt
 
 ### Persist the setting in-repo (preferred)
 
-Create `webapp/supabase/functions/<function-name>/.config.toml` so the setting is checked in and doesn't need to be passed on every deploy:
+Create `functions/<function-name>/.config.toml` so the setting is checked in and doesn't need to be passed on every deploy:
 
 ```toml
 verify_jwt = false
 ```
 
-See: `webapp/supabase/functions/create-checkout-session/.config.toml`
+See: `functions/create-checkout-session/.config.toml`
 
 ---
 
@@ -158,7 +161,7 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'my-job');
 SELECT cron.schedule('my-job', '0 * * * *', $$SELECT public.my_job()$$);
 ```
 
-See: `webapp/supabase/migrations/20260227_trial_expiry_cron.sql`
+See: `migrations/20260227_trial_expiry_cron.sql`
 
 **Pattern B — cron calls an edge function** (use when you need external API access or heavy logic):
 ```sql
@@ -186,7 +189,7 @@ SELECT cron.schedule(
 
 The edge function checks for the `Authorization` header to verify it's an internal call (Pattern 2 auth). Replace `<SUPABASE_URL>` and `<SERVICE_ROLE_KEY>` with actual values before running in the Supabase Dashboard.
 
-See: `webapp/supabase/migrations/20260413_direct_upload_and_soft_delete.sql`
+See: `migrations/20260413_direct_upload_and_soft_delete.sql`
 
 ### Cron syntax quick-ref
 
@@ -209,27 +212,27 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'job-name');
 
 ## Database Functions
 
-Database functions live in `webapp/supabase/sql/functions/`, one file per function. **Never put new function definitions inline in migration files.**
+Database functions live in `sql/functions/`, one file per function. **Never put new function definitions inline in migration files.**
 
 ### Conventions
 
 - **One file per function** — named after the function (e.g., `handle_new_user.sql`)
 - **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_stale_uploads.sql`)
 - **Doc comment at the top** of every file: purpose, trigger/caller, and tables touched
-- **[FUNCTIONS.md](webapp/supabase/sql/functions/FUNCTIONS.md)** is the index — update it when adding/removing functions
+- **[FUNCTIONS.md](sql/functions/FUNCTIONS.md)** is the index — update it when adding/removing functions
 
 ### Adding a new function
 
-1. Create `webapp/supabase/sql/functions/<name>.sql` with `CREATE OR REPLACE FUNCTION` and a doc comment
+1. Create `sql/functions/<name>.sql` with `CREATE OR REPLACE FUNCTION` and a doc comment
 2. Update `FUNCTIONS.md` with the new entry
-3. Run `webapp/supabase/sql/build-functions.sh` to generate a migration, or create a standalone migration that applies just the new function
+3. Run `sql/build-functions.sh` to generate a migration, or create a standalone migration that applies just the new function
 
 ### Build script
 
-`webapp/supabase/sql/build-functions.sh` concatenates all `sql/functions/*.sql` files into a single migration-compatible SQL file. Since every function uses `CREATE OR REPLACE`, the output is idempotent.
+`sql/build-functions.sh` concatenates all `sql/functions/*.sql` files into a single migration-compatible SQL file. Since every function uses `CREATE OR REPLACE`, the output is idempotent.
 
 ```bash
-./webapp/supabase/sql/build-functions.sh > webapp/supabase/migrations/YYYYMMDDHHMMSS_functions.sql
+./sql/build-functions.sh > migrations/YYYYMMDDHHMMSS_functions.sql
 ```
 
 ---
@@ -246,7 +249,9 @@ Database functions live in `webapp/supabase/sql/functions/`, one file per functi
 
 | Path | Purpose |
 |---|---|
-| `webapp/supabase/functions/` | All edge functions |
-| `webapp/supabase/functions/_shared/` | Shared utilities (email templates, Resend client) |
-| `webapp/supabase/migrations/` | All SQL migrations |
-| `webapp/supabase/functions/<name>/.config.toml` | Per-function deploy config (`verify_jwt = false`) |
+| `functions/` | All edge functions |
+| `functions/_shared/` | Shared utilities (email templates, Resend client) |
+| `migrations/` | All SQL migrations |
+| `tables/` | Per-table documentation |
+| `sql/functions/` | Database function source files |
+| `functions/<name>/.config.toml` | Per-function deploy config (`verify_jwt = false`) |

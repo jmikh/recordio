@@ -1,7 +1,6 @@
 import { Modal, Button } from '@shared/components';
 import { trackReviewModalShown, trackReviewModalDismissed, trackReviewModalReviewClicked } from '../../../core/analytics';
-
-const REVIEW_TOAST_KEY = 'recordio-review-toast-shown';
+import { LocalPreferences } from '../../../storage/localPreferences';
 const REVIEW_URL = 'https://chromewebstore.google.com/detail/recordio-smart-screen-rec/bbcdpipjplklaneplfmlhhibnllhinii/reviews';
 
 interface ReviewModalProps {
@@ -71,8 +70,8 @@ export function ReviewModal({ isOpen, onClose }: ReviewModalProps) {
  */
 export function shouldShowReviewModal(): boolean {
     // ⚠️ DEV ONLY — remove `!import.meta.env.DEV &&` after testing:
-    if (localStorage.getItem(REVIEW_TOAST_KEY) === 'true') return false;
-    localStorage.setItem(REVIEW_TOAST_KEY, 'true');
+    if (LocalPreferences.hasShownReviewModal()) return false;
+    LocalPreferences.markReviewModalShown();
     trackReviewModalShown();
     return true;
 }

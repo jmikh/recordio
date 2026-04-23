@@ -39,8 +39,7 @@ const MAX_REBUILDS = 4;
 /** Timeout (ms) for the hardware decode probe during initialization. */
 const HW_PROBE_TIMEOUT_MS = 2_000;
 
-/** localStorage key — persisted when hardware decode fails and software is required. */
-const SW_DECODE_KEY = 'recordio:prefer-software-decode';
+import { LocalPreferences } from '../../storage/localPreferences';
 
 /** Cached chunk — lightweight copy of EncodedVideoChunk for replay/rebuild. */
 interface CachedChunk {
@@ -175,7 +174,7 @@ export class FrameExtractor {
             `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}`);
 
         // Check if software decode was previously required
-        if (localStorage.getItem(SW_DECODE_KEY) === 'true') {
+        if (LocalPreferences.getPreferSoftwareDecode()) {
             console.log('[FrameExtractor] Using software decode (persisted from previous failure)');
             this.forceSoftware = true;
         } else {
@@ -230,14 +229,14 @@ export class FrameExtractor {
                     data: { probeTimeoutMs: HW_PROBE_TIMEOUT_MS, codec: this.decoderConfig.codec },
                 });
                 this.forceSoftware = true;
-                localStorage.setItem(SW_DECODE_KEY, 'true');
+                LocalPreferences.setPreferSoftwareDecode(true);
             } else {
                 console.log(`[FrameExtractor] Hardware decode probe OK (${(performance.now() - start).toFixed(0)}ms)`);
             }
         } catch (e) {
             console.warn('[FrameExtractor] Hardware decode probe threw — switching to software decode', e);
             this.forceSoftware = true;
-            localStorage.setItem(SW_DECODE_KEY, 'true');
+            LocalPreferences.setPreferSoftwareDecode(true);
         } finally {
             try { if (probe.state !== 'closed') probe.close(); } catch { /* OK */ }
         }
@@ -341,7 +340,7 @@ export class FrameExtractor {
         // On first rebuild, switch to software decode — hardware is unreliable
         if (!this.forceSoftware) {
             this.forceSoftware = true;
-            localStorage.setItem(SW_DECODE_KEY, 'true');
+            LocalPreferences.setPreferSoftwareDecode(true);
             console.warn(`[FrameExtractor] Switching to software decode after hardware failure`);
         }
 

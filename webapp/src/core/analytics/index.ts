@@ -1,21 +1,10 @@
 /**
- * @fileoverview Analytics Integration (GA4 + Mixpanel)
- * 
- * GA4 is loaded via gtag.js in index.html.
- * Mixpanel is initialized here via the npm SDK.
- * All events are dual-tracked to both platforms.
- * 
+ * @fileoverview Analytics Integration (Mixpanel)
+ *
  * ⚠️  When adding or modifying events/properties, update ./mixpanel-events.md
  */
 
 import mixpanel from 'mixpanel-browser';
-
-// Declare gtag on window
-declare global {
-    interface Window {
-        gtag: (...args: any[]) => void;
-    }
-}
 
 // ============================================================================
 // Mixpanel Initialization
@@ -54,21 +43,6 @@ async function detectBrowser(): Promise<string> {
 }
 
 // ============================================================================
-// Anonymous Local User ID (GA4 only — Mixpanel uses identify/reset)
-// ============================================================================
-
-const LOCAL_USER_ID_KEY = 'recordio-local-user-id';
-
-function getOrCreateLocalUserId(): string {
-    let id = localStorage.getItem(LOCAL_USER_ID_KEY);
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem(LOCAL_USER_ID_KEY, id);
-    }
-    return id;
-}
-
-// ============================================================================
 // Mixpanel User Identity
 // ============================================================================
 
@@ -79,6 +53,10 @@ function getOrCreateLocalUserId(): string {
  */
 export function identifyUser(userId: string) {
     mixpanel.identify(userId);
+    // Ensure super properties (is_authenticated, is_pro, plan_type) are synced.
+    // identifyUser is called from setUser, which fires before any tracked events,
+    // so this guarantees the subscription is set up early.
+    getUserStore();
 }
 
 // TODO: Move these engage calls to the backend (on-user-created or stripe-webhooks edge function)
@@ -119,51 +97,50 @@ export function identifyExtensionUser(extensionDistinctId: string) {
 }
 
 // ============================================================================
-// Event Tracking (dual: GA4 + Mixpanel)
+// Event Tracking
 // ============================================================================
 
 // Lazy-resolved to avoid circular dependency (useUserStore imports from this module)
 let _getUserStore: (() => { isAuthenticated: boolean; isPro: boolean; subscription: { status: string | null } }) | null = null;
+let _storeSubscribed = false;
 function getUserStore() {
     if (!_getUserStore) {
         // Dynamic require — module is already loaded by the time any event fires
         const { useUserStore } = require('../../editor/stores/useUserStore');
         _getUserStore = () => useUserStore.getState();
+
+        // Subscribe to store changes + hydration to keep Mixpanel super properties in sync.
+        // Super properties are auto-attached to every event, so even events that fire
+        // before we read the store will get the correct values once hydration completes.
+        if (!_storeSubscribed) {
+            _storeSubscribed = true;
+            const syncSuperProperties = () => {
+                try {
+                    const { isAuthenticated, isPro, subscription } = useUserStore.getState();
+                    const status = subscription?.status;
+                    const planType = status === 'active' ? 'pro'
+                        : status === 'trialing' ? 'pro_trial'
+                            : 'basic';
+                    mixpanel.register({ is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType });
+                } catch { /* store not ready */ }
+            };
+            // Sync after hydration (covers page refresh)
+            useUserStore.persist.onFinishHydration(syncSuperProperties);
+            // Sync on every state change (covers login, subscription updates, logout)
+            useUserStore.subscribe(syncSuperProperties);
+            // Sync now in case hydration already completed
+            if (useUserStore.persist.hasHydrated()) syncSuperProperties();
+        }
     }
     return _getUserStore();
 }
 
-function getGlobalProperties(): Record<string, any> {
-    try {
-        const { isAuthenticated, isPro, subscription } = getUserStore();
-        const planType = subscription.status === 'active' ? 'pro'
-            : subscription.status === 'trialing' ? 'pro_trial'
-                : 'basic';
-        return { is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType };
-    } catch {
-        // Store not yet initialized (e.g. during early boot)
-        return { is_authenticated: false, is_pro: false, plan_type: 'basic' };
-    }
-}
-
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
-    const globalProps = getGlobalProperties();
-    const allParams = { ...globalProps, ...params };
-
-    // GA4
-    if (typeof window.gtag === 'function') {
-        window.gtag('event', eventName, {
-            local_user_id: getOrCreateLocalUserId(),
-            ...allParams,
-        });
-    }
-
-    // Mixpanel
     try {
         if (!mixpanelReady) {
             console.warn(`[Analytics] Mixpanel not ready, dropping event: ${eventName}`);
         }
-        mixpanel.track(eventName, allParams);
+        mixpanel.track(eventName, params);
     } catch (e) {
         console.error(`[Analytics] Mixpanel track failed for ${eventName}:`, e);
     }
@@ -409,8 +386,6 @@ export function trackGenerateCaptions(params: GenerateCaptionsParams) {
 
 // ============================================================================
 // Project Created
-// NOTE: Browser, browser version, and OS are auto-collected by GA4 via gtag.js
-// as default dimensions — no need to send them explicitly.
 // ============================================================================
 
 

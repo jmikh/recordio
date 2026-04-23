@@ -1,3 +1,5 @@
+import { navigate } from '../navigate';
+
 /**
  * Mac Handoff Page — shown when the RecordioMac native app opens the editor
  * after a recording is completed. Shows initialization progress and errors.
@@ -80,7 +82,7 @@ export function MacHandoffPage() {
 
                     // Navigate to editor
                     setTimeout(() => {
-                        window.location.href = `/editor?projectId=${project.id}`;
+                        navigate(`/editor?projectId=${project.id}`);
                     }, 800);
                 } catch (error: any) {
                     console.error('[MacHandoff] Import failed:', error);
@@ -178,7 +180,7 @@ export function MacHandoffPage() {
 
                 {isError && (
                     <button
-                        onClick={() => window.location.href = '/'}
+                        onClick={() => navigate('/')}
                         style={{
                             marginTop: 16,
                             padding: '8px 16px',

@@ -3,8 +3,7 @@ import type { ID, TimeMs, Size } from '../../types';
 import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
 import { useProjectStore } from './useProjectStore';
 import type { DisplaySettings } from '../../types/timeline';
-
-const SW_DECODE_KEY = 'recordio:prefer-software-decode';
+import { LocalPreferences } from '../../storage/localPreferences';
 
 export const CanvasMode = {
     Preview: 'preview',
@@ -391,14 +390,9 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
-    // Export decode preference — synced to localStorage
-    videoDecodePreference: localStorage.getItem(SW_DECODE_KEY) === 'true' ? 'cpu' : 'gpu',
+    videoDecodePreference: LocalPreferences.getPreferSoftwareDecode() ? 'cpu' : 'gpu',
     setVideoDecodePreference: (pref) => {
-        if (pref === 'cpu') {
-            localStorage.setItem(SW_DECODE_KEY, 'true');
-        } else {
-            localStorage.setItem(SW_DECODE_KEY, 'false');
-        }
+        LocalPreferences.setPreferSoftwareDecode(pref === 'cpu');
         set({ videoDecodePreference: pref });
     },
 

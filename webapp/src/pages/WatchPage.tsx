@@ -5,6 +5,7 @@ import { Button } from '@shared/components/Button';
 import { ThemeToggle } from '@shared/components';
 import { TbCopy } from 'react-icons/tb';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
+import { navigate } from '../navigate';
 
 
 
@@ -151,7 +152,7 @@ export function WatchPage() {
                     {!isAuthenticated && (
                         <Button
                             size="sm"
-                            onClick={() => { window.location.href = '/'; }}
+                            onClick={() => { navigate('/'); }}
                         >
                             Sign in
                         </Button>

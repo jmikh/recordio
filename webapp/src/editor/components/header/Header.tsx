@@ -8,6 +8,7 @@ import { TbFolder } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
+import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
@@ -129,7 +130,7 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <Button variant="icon" icon={TbFolder} onClick={() => window.location.href = '/'} title="Dashboard" />
+                        <Button variant="icon" icon={TbFolder} onClick={() => navigate('/')} title="Dashboard" />
                         <Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
                         <ThemeToggle />
                     </div>

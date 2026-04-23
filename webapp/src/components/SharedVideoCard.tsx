@@ -6,6 +6,7 @@ import { ShareService } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
 import { Tooltip } from '@shared/components/Tooltip';
 import { CardCheckbox } from './CardCheckbox';
+import { navigate } from '../navigate';
 
 interface SharedVideoCardProps {
     video: SharedVideo;
@@ -73,7 +74,7 @@ export const SharedVideoCard = ({ video, localProjectExists, analytics, selectMo
 
     const openProject = (e: React.MouseEvent) => {
         e.stopPropagation();
-        window.location.href = `/editor?projectId=${video.project_id}`;
+        navigate(`/editor?projectId=${video.project_id}`);
     };
 
     const handlePlayClick = (e: React.MouseEvent) => {

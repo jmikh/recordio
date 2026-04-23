@@ -22,6 +22,7 @@ import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from './stores/useUserStore';
 import { ShareService } from './services/ShareService';
 import { trackEditorLoaded } from '../core/analytics';
+import { navigate } from '../navigate';
 
 /** Fetch a remote image once and return it as a data URL to avoid repeated network requests. */
 async function cacheAvatarUrl(url: string): Promise<string | null> {
@@ -175,7 +176,7 @@ function Editor() {
         async function init() {
             if (!projectId) {
                 // No project ID - redirect to dashboard
-                window.location.href = '/';
+                navigate('/', { replace: true });
                 return;
             }
             try {
@@ -193,7 +194,7 @@ function Editor() {
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
                 // Redirect to dashboard with error message
-                window.location.href = `/?error=${encodeURIComponent('Project not found')}`;
+                navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
             }
         }
 
@@ -293,7 +294,7 @@ function Editor() {
 
     // No project loaded (shouldn't happen with redirects, but safety fallback)
     if (!hasActiveProject) {
-        window.location.href = '/';
+        navigate('/');
         return null;
     }
 

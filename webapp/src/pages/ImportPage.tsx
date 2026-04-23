@@ -5,6 +5,7 @@ import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { LogoLink } from '@shared/components';
+import { navigate } from '../navigate';
 
 type ImportStatus =
     | 'init'
@@ -56,7 +57,7 @@ export function ImportPage() {
                     // Project already exists, redirect to editor
                     setStatus('success');
                     setProjectId(projectId);
-                    window.location.href = `/editor?projectId=${projectId}`;
+                    navigate(`/editor?projectId=${projectId}`);
                 } else {
                     // Project doesn't exist, initiate handoff
                     requestHandoff(recordingId);
@@ -141,7 +142,7 @@ export function ImportPage() {
                     } catch { /* analytics should never break the app */ }
 
                     setTimeout(() => {
-                        window.location.href = `/editor?projectId=${project.id}`;
+                        navigate(`/editor?projectId=${project.id}`);
                     }, 1500);
                 })
                 .catch((error) => {
@@ -311,7 +312,7 @@ export function ImportPage() {
 
                 {isError && (
                     <button
-                        onClick={() => window.location.href = '/'}
+                        onClick={() => navigate('/')}
                         className="mt-4 px-4 py-2 bg-surface-raised hover:bg-state-hover rounded-lg text-sm"
                     >
                         Go to Dashboard

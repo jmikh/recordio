@@ -79,6 +79,19 @@ export const useProjectStore = create<ProjectState>()(
                 })),
 
                 loadProject: async (project) => {
+                    // Revoke old blob URLs to prevent memory leaks during SPA navigation
+                    const prev = get().project;
+                    const blobUrls = [
+                        prev.screenSource?.runtimeUrl,
+                        prev.cameraSource?.runtimeUrl,
+                        prev.microphoneSource?.runtimeUrl,
+                        prev.settings?.background?.customRuntimeUrl,
+                        prev.settings?.audio?.music?.customRuntimeUrl,
+                    ];
+                    for (const url of blobUrls) {
+                        if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+                    }
+
                     // Separate userEvents from the project so undo/redo history
                     // (via zundo's `partialize`) doesn't snapshot the potentially
                     // massive event arrays on every mutation. Events are immutable

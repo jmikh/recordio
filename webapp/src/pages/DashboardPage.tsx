@@ -21,6 +21,7 @@ import { useAuthListener } from '../hooks/useAuthListener';
 import * as Sentry from '@sentry/react';
 import { trackProjectOpened } from '../core/analytics';
 import { importProjectFromZip } from '../storage/projectTransfer';
+import { navigate } from '../navigate';
 
 type TabId = 'projects' | 'published';
 type SortOrder = 'newest' | 'oldest' | 'name';
@@ -65,7 +66,7 @@ export function DashboardPage() {
         try {
             const projectId = await importProjectFromZip(file);
             addToast({ type: 'success', title: 'Project Imported', message: 'Opening project...' });
-            window.location.href = `/editor?projectId=${projectId}`;
+            navigate(`/editor?projectId=${projectId}`);
         } catch (err: any) {
             console.error('Import failed:', err);
             addToast({ type: 'error', title: 'Import Failed', message: err?.message || 'Invalid archive' });
@@ -181,7 +182,7 @@ export function DashboardPage() {
 
     const handleOpen = (projectId: string) => {
         trackProjectOpened();
-        window.location.href = `/editor?projectId=${projectId}`;
+        navigate(`/editor?projectId=${projectId}`);
     };
 
     const handleRename = useCallback(async (projectId: string, newName: string) => {
