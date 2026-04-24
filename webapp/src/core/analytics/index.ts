@@ -53,10 +53,6 @@ async function detectBrowser(): Promise<string> {
  */
 export function identifyUser(userId: string) {
     mixpanel.identify(userId);
-    // Ensure super properties (is_authenticated, is_pro, plan_type) are synced.
-    // identifyUser is called from setUser, which fires before any tracked events,
-    // so this guarantees the subscription is set up early.
-    getUserStore();
 }
 
 // TODO: Move these engage calls to the backend (on-user-created or stripe-webhooks edge function)
@@ -89,51 +85,12 @@ export function resetUser() {
  * to the Supabase ID, and calling identify(extId) would overwrite it.
  */
 export function identifyExtensionUser(extensionDistinctId: string) {
-    try {
-        const { isAuthenticated } = getUserStore();
-        if (isAuthenticated) return;
-    } catch { /* store not ready — safe to proceed */ }
     mixpanel.identify(extensionDistinctId);
 }
 
 // ============================================================================
 // Event Tracking
 // ============================================================================
-
-// Lazy-resolved to avoid circular dependency (useUserStore imports from this module)
-let _getUserStore: (() => { isAuthenticated: boolean; isPro: boolean; subscription: { status: string | null } }) | null = null;
-let _storeSubscribed = false;
-function getUserStore() {
-    if (!_getUserStore) {
-        // Dynamic require — module is already loaded by the time any event fires
-        const { useUserStore } = require('../../editor/stores/useUserStore');
-        _getUserStore = () => useUserStore.getState();
-
-        // Subscribe to store changes + hydration to keep Mixpanel super properties in sync.
-        // Super properties are auto-attached to every event, so even events that fire
-        // before we read the store will get the correct values once hydration completes.
-        if (!_storeSubscribed) {
-            _storeSubscribed = true;
-            const syncSuperProperties = () => {
-                try {
-                    const { isAuthenticated, isPro, subscription } = useUserStore.getState();
-                    const status = subscription?.status;
-                    const planType = status === 'active' ? 'pro'
-                        : status === 'trialing' ? 'pro_trial'
-                            : 'basic';
-                    mixpanel.register({ is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType });
-                } catch { /* store not ready */ }
-            };
-            // Sync after hydration (covers page refresh)
-            useUserStore.persist.onFinishHydration(syncSuperProperties);
-            // Sync on every state change (covers login, subscription updates, logout)
-            useUserStore.subscribe(syncSuperProperties);
-            // Sync now in case hydration already completed
-            if (useUserStore.persist.hasHydrated()) syncSuperProperties();
-        }
-    }
-    return _getUserStore();
-}
 
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
     try {
