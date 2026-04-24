@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
+import { SyncService } from '../storage/syncService';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -33,9 +34,9 @@ export function ImportPage() {
 
     const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
 
-    // Get recording ID from URL
+    // Get recording ID from URL, stripping any legacy "proj-" prefix
     const params = new URLSearchParams(window.location.search);
-    const recordingId = params.get('id');
+    const recordingId = params.get('id')?.replace(/^proj-/, '') ?? null;
 
     // Check for existing project and start handoff when page loads
     useEffect(() => {
@@ -48,7 +49,7 @@ export function ImportPage() {
         setHasStarted(true);
 
         // Check if project already exists in local DB
-        const projectId = `proj-${recordingId}`;
+        const projectId = recordingId;
         setStatus('checking');
 
         ProjectStorage.loadProjectRaw(projectId)
@@ -97,6 +98,10 @@ export function ImportPage() {
                     setProjectId(project.id);
                     setStatus('success');
                     confirmHandoff(project.id);
+
+                    // Upload project metadata to cloud (non-blocking)
+                    const { userId, isPro } = useUserStore.getState();
+                    SyncService.onProjectCreated(project, userId, isPro).catch(console.error);
 
                     // --- Analytics: project_created ---
                     try {

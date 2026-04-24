@@ -22,6 +22,7 @@ export class AuthManager {
         }
 
         supabase.auth.onAuthStateChange((event, session) => {
+            console.log(`[Auth] onAuthStateChange: ${event}, session: ${session ? session.user.id : 'null'}`);
             callback(session);
         });
     }
@@ -75,9 +76,10 @@ export class AuthManager {
             // In the Mac app, redirect OAuth through the browser → recordio:// URL scheme
             // so the native app receives the callback and injects the session.
             // In the browser, redirect back to the current page.
+            // Strip hash fragment to avoid ##access_token double-hash on redirect back
             const redirectTo = isRecordioMacApp()
                 ? 'recordio://auth-callback'
-                : window.location.href;
+                : window.location.origin + window.location.pathname + window.location.search;
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider,

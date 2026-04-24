@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../storage/projectStorage';
-import type { Project } from '../types';
+import { SyncService, type ProjectListItem } from '../storage/syncService';
+import { CloudStorage } from '../storage/cloudStorage';
 import { ProjectCard } from '../components/ProjectCard';
-import { SharedVideoCard } from '../components/SharedVideoCard';
 import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
@@ -15,27 +15,22 @@ import { SupportModal } from '../components/SupportModal';
 import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { UpgradeModal } from '../editor/components/header/UpgradeModal';
-import { ShareService, type SharedVideo, type VideoAnalytics, MAX_SHARED_VIDEOS } from '../editor/services/ShareService';
 import { useToast } from '../editor/components/Toast';
 import { useAuthListener } from '../hooks/useAuthListener';
-import * as Sentry from '@sentry/react';
 import { trackProjectOpened } from '../core/analytics';
 import { importProjectFromZip } from '../storage/projectTransfer';
 import { navigate } from '../navigate';
 
-type TabId = 'projects' | 'published';
 type SortOrder = 'newest' | 'oldest' | 'name';
 
 const SORT_OPTIONS = [
     { value: 'newest' as SortOrder, label: 'Newest first' },
     { value: 'oldest' as SortOrder, label: 'Oldest first' },
-    { value: 'name' as SortOrder, label: 'Name A–Z' },
+    { value: 'name' as SortOrder, label: 'Name A\u2013Z' },
 ];
 
 export function DashboardPage() {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [sharedVideos, setSharedVideos] = useState<SharedVideo[]>([]);
-    const [analytics, setAnalytics] = useState<Record<string, VideoAnalytics>>({});
+    const [projects, setProjects] = useState<ProjectListItem[]>([]);
     const [loading, setLoading] = useState(true);
 
     const { userId, hasProAccess } = useUserStore();
@@ -51,8 +46,7 @@ export function DashboardPage() {
     const importInputRef = useRef<HTMLInputElement>(null);
     const [isImporting, setIsImporting] = useState(false);
 
-    // Tab, sort, and select state
-    const [activeTab, setActiveTab] = useState<TabId>('projects');
+    // Sort and select state
     const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const selectMode = selectedIds.size > 0;
@@ -111,28 +105,14 @@ export function DashboardPage() {
         ProjectStorage.estimateIndexedDBUsage().then(setStorageUsed).catch(console.error);
     }, []);
 
-    // Load shared videos + analytics (reactive to auth state)
+    // Reload projects when auth state changes (login/logout)
     useEffect(() => {
-        if (!isAuthenticated) {
-            setSharedVideos([]);
-            setAnalytics({});
-            return;
-        }
-        ShareService.getSharedVideos().then(videos => {
-            setSharedVideos(videos);
-            if (videos.length > 0) {
-                const uids = videos.map(v => v.cf_video_uid);
-                ShareService.getVideoAnalytics(uids).then(setAnalytics);
-            }
-        });
+        loadProjects();
     }, [isAuthenticated]);
 
     const loadProjects = async () => {
         try {
-            const allProjects = await ProjectStorage.listProjects();
-            allProjects.sort((a: Project, b: Project) =>
-                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-            );
+            const allProjects = await SyncService.listProjects(userId);
             setProjects(allProjects);
         } catch (error) {
             console.error('Failed to load projects:', error);
@@ -158,38 +138,66 @@ export function DashboardPage() {
         return sorted;
     }, [projects, sortOrder]);
 
-    // Sort shared videos
-    const sortedSharedVideos = useMemo(() => {
-        const sorted = [...sharedVideos];
-        switch (sortOrder) {
-            case 'newest':
-                sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                break;
-            case 'oldest':
-                sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                break;
-            case 'name':
-                sorted.sort((a, b) => a.project_name.localeCompare(b.project_name));
-                break;
+    const [downloadingProjectId, setDownloadingProjectId] = useState<string | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<{ type: string; fraction: number } | null>(null);
+
+    const handleOpen = async (item: ProjectListItem) => {
+        if (item.hasLocal) {
+            trackProjectOpened();
+            navigate(`/editor?projectId=${item.id}`);
+            return;
         }
-        return sorted;
-    }, [sharedVideos, sortOrder]);
 
-    // Derive set of project IDs that have shared links (no extra API calls)
-    const sharedProjectIds = useMemo(() => {
-        return new Set(sharedVideos.map(v => v.project_id));
-    }, [sharedVideos]);
+        // Cloud-only project — download metadata + media first
+        try {
+            setDownloadingProjectId(item.id);
+            setDownloadProgress(null);
 
-    const handleOpen = (projectId: string) => {
-        trackProjectOpened();
-        navigate(`/editor?projectId=${projectId}`);
+            // 1. Download project metadata from cloud
+            const cloudProject = await CloudStorage.loadProjectMetadata(item.id);
+            if (!cloudProject) {
+                addToast({ type: 'error', title: 'Download Failed', message: 'Project not found in cloud.' });
+                return;
+            }
+
+            // 2. Save project metadata locally
+            const project = cloudProject.project_data;
+            project.id = item.id;
+            await ProjectStorage.saveProject(project);
+
+            // 3. Save sync metadata
+            await ProjectStorage.saveSyncMeta({
+                projectId: item.id,
+                userId: cloudProject.user_id,
+                cloudId: item.id,
+                cloudVersion: cloudProject.cloud_version,
+                uploadStatus: cloudProject.upload_status === 'ready' ? 'ready' : 'pending',
+                lastSyncedAt: Date.now(),
+            });
+
+            // 4. Download media blobs
+            await SyncService.downloadProjectMedia(item.id, cloudProject, (type, fraction) => {
+                setDownloadProgress({ type, fraction });
+            });
+
+            setDownloadingProjectId(null);
+            setDownloadProgress(null);
+            trackProjectOpened();
+            navigate(`/editor?projectId=${item.id}`);
+        } catch (err) {
+            console.error('[Dashboard] Failed to download cloud project:', err);
+            addToast({ type: 'error', title: 'Download Failed', message: 'Could not download project from cloud.' });
+            setDownloadingProjectId(null);
+            setDownloadProgress(null);
+        }
     };
 
-    const handleRename = useCallback(async (projectId: string, newName: string) => {
+    const handleRename = useCallback(async (item: ProjectListItem, newName: string) => {
+        if (!item.hasLocal) return;
         try {
-            await ProjectStorage.renameProject(projectId, newName);
+            await ProjectStorage.renameProject(item.id, newName);
             setProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, name: newName, updatedAt: new Date() } : p
+                p.id === item.id ? { ...p, name: newName, updatedAt: new Date().toISOString() } : p
             ));
         } catch (error) {
             console.error('Failed to rename project:', error);
@@ -202,7 +210,7 @@ export function DashboardPage() {
         const count = selectedIds.size;
         try {
             for (const id of selectedIds) {
-                await ProjectStorage.deleteProject(id);
+                await SyncService.deleteProject(id);
             }
             setProjects(prev => prev.filter(p => !selectedIds.has(p.id)));
             setSelectedIds(new Set());
@@ -215,13 +223,13 @@ export function DashboardPage() {
         }
     };
 
-    const toggleSelect = (projectId: string) => {
+    const toggleSelect = (id: string) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
-            if (next.has(projectId)) {
-                next.delete(projectId);
+            if (next.has(id)) {
+                next.delete(id);
             } else {
-                next.add(projectId);
+                next.add(id);
             }
             return next;
         });
@@ -236,45 +244,6 @@ export function DashboardPage() {
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    };
-
-    const handleUnshare = async (video: SharedVideo) => {
-        // Optimistic removal — remove from UI immediately
-        setSharedVideos(prev => prev.filter(v => v.id !== video.id));
-
-        try {
-            await ShareService.deleteSharedVideo(video.id);
-            addToast({ type: 'success', title: 'Video Unshared', message: `"${video.project_name}" is no longer shared` });
-        } catch (e: any) {
-            console.error('[Dashboard] Unshare failed:', e);
-            Sentry.captureException(e, { extra: { shareId: video.id, phase: 'unshare' } });
-            // Restore the card on failure
-            setSharedVideos(prev => [...prev, video]);
-            addToast({ type: 'error', title: 'Unshare Failed', message: e?.message || 'Something went wrong' });
-        }
-    };
-
-    const handleBulkDelist = async () => {
-        const videosToRemove = sharedVideos.filter(v => selectedIds.has(v.id));
-        const count = videosToRemove.length;
-        setIsBulkDeleting(true);
-        try {
-            for (const video of videosToRemove) {
-                await handleUnshare(video);
-            }
-            setSelectedIds(new Set());
-            addToast({ type: 'success', title: 'Videos Delisted', message: `${count} video${count !== 1 ? 's' : ''} delisted` });
-        } catch (error) {
-            console.error('Failed to delist videos:', error);
-        } finally {
-            setIsBulkDeleting(false);
-        }
-    };
-
-    const handleTabChange = (tab: TabId) => {
-        setActiveTab(tab);
-        // Exit select mode when switching tabs
-        exitSelectMode();
     };
 
     return (
@@ -305,43 +274,22 @@ export function DashboardPage() {
 
             <div style={{ maxWidth: 1400 }} className="mx-auto">
 
-
-                {/* Tab Bar */}
+                {/* Toolbar Bar */}
                 <div className="mx-6 mt-4 px-6 flex items-center gap-6 border border-border rounded-xl bg-surface">
-                    <TabButton
-                        active={activeTab === 'projects'}
-                        count={projects.length}
-                        onClick={() => handleTabChange('projects')}
-                    >
-                        Projects
-                    </TabButton>
-                    <TabButton
-                        active={activeTab === 'published'}
-                        count={sharedVideos.length}
-                        onClick={() => handleTabChange('published')}
-                    >
-                        Published
-                    </TabButton>
+                    <div className="py-3 text-sm font-medium text-text-highlighted relative self-stretch flex items-center">
+                        <span>Projects</span>
+                        <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
+                            {projects.length}
+                        </span>
+                        <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
+                    </div>
                     <div className="flex-1" />
-                    {activeTab === 'projects' && projects.length > 0 && storageUsed != null && (
+                    {projects.length > 0 && storageUsed != null && (
                         <span className="text-xs text-text-muted">
                             <span className="text-text-main">{formatBytes(storageUsed)}</span> local storage used
                         </span>
                     )}
-                    {activeTab === 'published' && isAuthenticated && sharedVideos.length > 0 && (
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-text-muted">
-                                {sharedVideos.length} of {MAX_SHARED_VIDEOS}
-                            </span>
-                            <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-primary rounded-full transition-all duration-300"
-                                    style={{ width: `${(sharedVideos.length / MAX_SHARED_VIDEOS) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
-                    <div className={`my-2 ${((activeTab === 'projects' && projects.length > 1) || (activeTab === 'published' && sharedVideos.length > 1)) ? 'visible' : 'invisible'}`}>
+                    <div className={`my-2 ${projects.length > 1 ? 'visible' : 'invisible'}`}>
                         <Dropdown
                             options={SORT_OPTIONS}
                             value={sortOrder}
@@ -352,112 +300,64 @@ export function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Projects Tab */}
-                {activeTab === 'projects' && (
-                    <main className="p-6">
-                        {/* Toolbar */}
-                        <div className="flex items-center gap-3 mb-4">
-                            {import.meta.env.DEV && (
-                                <>
-                                    <input
-                                        ref={importInputRef}
-                                        type="file"
-                                        accept=".zip"
-                                        className="hidden"
-                                        onChange={handleImportProject}
-                                    />
-                                    <button
-                                        onClick={() => importInputRef.current?.click()}
-                                        disabled={isImporting}
-                                        className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
-                                    >
-                                        {isImporting ? 'Importing...' : '📦 Import Project'}
-                                    </button>
-                                </>
-                            )}
+                {/* Projects Grid */}
+                <main className="p-6">
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-3 mb-4">
+                        {import.meta.env.DEV && (
+                            <>
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".zip"
+                                    className="hidden"
+                                    onChange={handleImportProject}
+                                />
+                                <button
+                                    onClick={() => importInputRef.current?.click()}
+                                    disabled={isImporting}
+                                    className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
+                                >
+                                    {isImporting ? 'Importing...' : 'Import Project'}
+                                </button>
+                            </>
+                        )}
+                    </div>
 
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="text-text-muted">Loading projects...</div>
                         </div>
-
-                        {loading ? (
-                            <div className="flex items-center justify-center h-64">
-                                <div className="text-text-muted">Loading projects...</div>
-                            </div>
-                        ) : projects.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                <p className="text-sm text-text-muted">
-                                    Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {sortedProjects.map(project => (
-                                    <ProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        onOpen={() => handleOpen(project.id)}
-                                        selectMode={selectMode}
-                                        selected={selectedIds.has(project.id)}
-                                        onSelect={() => toggleSelect(project.id)}
-                                        isShared={sharedProjectIds.has(project.id)}
-                                        onRename={(newName) => handleRename(project.id, newName)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </main>
-                )}
-
-                {/* Published Tab */}
-                {activeTab === 'published' && (
-                    <section className="p-6">
-                        {isAuthenticated && sharedVideos.length > 0 && sharedVideos.length >= MAX_SHARED_VIDEOS && (
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-xs text-text-muted">
-                                    Limit reached — contact <a href="mailto:support@recordio.cc" className="underline text-primary hover:text-primary-highlighted">support@recordio.cc</a> to request an increase
-                                </span>
-                            </div>
-                        )}
-                        {!isAuthenticated ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                <p className="text-sm text-text-muted">Sign in to see your published videos</p>
-                                <Button size="sm" onClick={() => setIsAuthModalOpen(true)}>Sign in</Button>
-                            </div>
-                        ) : sharedVideos.length === 0 ? (
-                            <p className="text-sm text-text-muted">You have no published videos</p>
-                        ) : (() => {
-                            const localProjectIds = new Set(projects.map(p => p.id));
-                            return (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {sortedSharedVideos.map(video => (
-                                        <SharedVideoCard
-                                            key={video.id}
-                                            video={video}
-                                            localProjectExists={localProjectIds.has(video.project_id)}
-                                            analytics={analytics[video.cf_video_uid]}
-                                            selectMode={selectMode}
-                                            selected={selectedIds.has(video.id)}
-                                            onSelect={() => toggleSelect(video.id)}
-                                            onRename={async (newName) => {
-                                                setSharedVideos(prev => prev.map(v =>
-                                                    v.id === video.id ? { ...v, project_name: newName } : v
-                                                ));
-                                                try {
-                                                    await ShareService.updateSharedVideoMeta(video.id, { project_name: newName });
-                                                } catch (err) {
-                                                    console.error('Failed to rename shared video:', err);
-                                                    setSharedVideos(prev => prev.map(v =>
-                                                        v.id === video.id ? { ...v, project_name: video.project_name } : v
-                                                    ));
-                                                    addToast({ type: 'error', title: 'Rename Failed' });
-                                                }
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })()}
-                    </section>
-                )}
+                    ) : projects.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 gap-3">
+                            <p className="text-sm text-text-muted">
+                                Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {sortedProjects.map(item => (
+                                <ProjectCard
+                                    key={item.id}
+                                    project={{
+                                        id: item.id,
+                                        name: item.name,
+                                        thumbnail: item.thumbnail,
+                                        createdAt: item.createdAt,
+                                    }}
+                                    onOpen={() => handleOpen(item)}
+                                    selectMode={selectMode}
+                                    selected={selectedIds.has(item.id)}
+                                    onSelect={() => toggleSelect(item.id)}
+                                    isShared={!!item.cfVideoUid}
+                                    cloudOnly={!item.hasLocal}
+                                    downloadProgress={downloadingProjectId === item.id ? (downloadProgress?.fraction ?? 0) : null}
+                                    onRename={(newName) => handleRename(item, newName)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </main>
             </div>
 
             {/* Floating Action Bar — Select Mode */}
@@ -472,9 +372,7 @@ export function DashboardPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                const allIds = activeTab === 'projects'
-                                    ? projects.map(p => p.id)
-                                    : sharedVideos.map(v => v.id);
+                                const allIds = projects.map(p => p.id);
                                 if (selectedIds.size === allIds.length) {
                                     setSelectedIds(new Set());
                                 } else {
@@ -482,22 +380,15 @@ export function DashboardPage() {
                                 }
                             }}
                         >
-                            {selectedIds.size === (activeTab === 'projects' ? projects.length : sharedVideos.length)
-                                ? 'Deselect All' : 'Select All'}
+                            {selectedIds.size === projects.length ? 'Deselect All' : 'Select All'}
                         </Button>
                         <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => {
-                                if (activeTab === 'projects') {
-                                    setShowBulkDeleteModal(true);
-                                } else {
-                                    handleBulkDelist();
-                                }
-                            }}
+                            onClick={() => setShowBulkDeleteModal(true)}
                             disabled={isBulkDeleting}
                         >
-                            {activeTab === 'projects' ? 'Delete' : 'Delist'}
+                            Delete
                         </Button>
                         <Button
                             size="sm"
@@ -582,41 +473,5 @@ export function DashboardPage() {
                 </Button>
             </Modal>
         </div>
-    );
-}
-
-/** Tab button with active underline and count badge */
-function TabButton({ active, count, onClick, children }: {
-    active: boolean;
-    count: number;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            onClick={onClick}
-            className={`
-                py-3 text-sm font-medium transition-colors relative cursor-pointer self-stretch flex items-center
-                ${active
-                    ? 'text-text-highlighted'
-                    : 'text-text-muted hover:text-text-main'
-                }
-            `}
-        >
-            <span>{children}</span>
-            <span className={`
-                ml-1.5 text-xs px-1.5 py-0.5 rounded-full
-                ${active
-                    ? 'bg-primary/20 text-primary'
-                    : 'bg-state-inactive text-text-muted'
-                }
-            `}>
-                {count}
-            </span>
-            {/* Active underline — sits on the border */}
-            {active && (
-                <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-        </button>
     );
 }

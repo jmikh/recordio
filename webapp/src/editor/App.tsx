@@ -10,6 +10,8 @@ import { getTimeMapper } from './hooks/useTimeMapper';
 
 
 import { ProjectStorage } from '../storage/projectStorage';
+import { CloudStorage } from '../storage/cloudStorage';
+import { SyncService } from '../storage/syncService';
 import { ProgressModal } from '@shared/components';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
@@ -189,6 +191,9 @@ function Editor() {
                 if (useUserStore.getState().isAuthenticated) {
                     ShareService.getShareForProject(loadedProject.id);
                     ShareService.getSharedVideos();
+
+                    // Update last_accessed_at in cloud
+                    CloudStorage.updateLastAccessed(loadedProject.id).catch(console.error);
                 }
 
             } catch (err: any) {
@@ -199,6 +204,18 @@ function Editor() {
         }
 
         init();
+    }, []);
+
+    // Flush pending cloud syncs on page unload
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            const { project, userEvents } = useProjectStore.getState();
+            const { userId, isPro } = useUserStore.getState();
+            const fullProject = { ...project, userEvents };
+            SyncService.flushPendingSync(fullProject, userId, isPro);
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
     // Global Key Listener for Undo/Redo & Play/Pause

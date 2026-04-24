@@ -100,39 +100,46 @@ export function identifyExtensionUser(extensionDistinctId: string) {
 // Event Tracking
 // ============================================================================
 
-// Lazy-resolved to avoid circular dependency (useUserStore imports from this module)
-let _getUserStore: (() => { isAuthenticated: boolean; isPro: boolean; subscription: { status: string | null } }) | null = null;
+// Lazy-resolved to avoid circular dependency (useUserStore imports from this module).
+// TODO: Refactor to properly buffer analytics events until user store is initialized,
+// instead of returning defaults. Current approach may drop super properties on early events.
+let _userStoreModule: any = null;
 let _storeSubscribed = false;
-function getUserStore() {
-    if (!_getUserStore) {
-        // Dynamic require — module is already loaded by the time any event fires
-        const { useUserStore } = require('../../editor/stores/useUserStore');
-        _getUserStore = () => useUserStore.getState();
 
-        // Subscribe to store changes + hydration to keep Mixpanel super properties in sync.
-        // Super properties are auto-attached to every event, so even events that fire
-        // before we read the store will get the correct values once hydration completes.
-        if (!_storeSubscribed) {
-            _storeSubscribed = true;
-            const syncSuperProperties = () => {
-                try {
-                    const { isAuthenticated, isPro, subscription } = useUserStore.getState();
-                    const status = subscription?.status;
-                    const planType = status === 'active' ? 'pro'
-                        : status === 'trialing' ? 'pro_trial'
-                            : 'basic';
-                    mixpanel.register({ is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType });
-                } catch { /* store not ready */ }
-            };
-            // Sync after hydration (covers page refresh)
-            useUserStore.persist.onFinishHydration(syncSuperProperties);
-            // Sync on every state change (covers login, subscription updates, logout)
-            useUserStore.subscribe(syncSuperProperties);
-            // Sync now in case hydration already completed
-            if (useUserStore.persist.hasHydrated()) syncSuperProperties();
-        }
+const DEFAULT_USER_STATE = { isAuthenticated: false, isPro: false, subscription: { status: null } };
+
+function getUserStore(): { isAuthenticated: boolean; isPro: boolean; subscription: { status: string | null } } {
+    if (!_userStoreModule) return DEFAULT_USER_STATE;
+    return _userStoreModule.useUserStore.getState();
+}
+
+/**
+ * Initialize the analytics ↔ userStore bridge. Called from useAuthListener
+ * once the store module is loaded, breaking the circular dependency.
+ */
+export function initAnalyticsUserStore(userStoreModule: any) {
+    if (_userStoreModule) return;
+    _userStoreModule = userStoreModule;
+
+    const { useUserStore } = userStoreModule;
+
+    // Subscribe to store changes + hydration to keep Mixpanel super properties in sync.
+    if (!_storeSubscribed) {
+        _storeSubscribed = true;
+        const syncSuperProperties = () => {
+            try {
+                const { isAuthenticated, isPro, subscription } = useUserStore.getState();
+                const status = subscription?.status;
+                const planType = status === 'active' ? 'pro'
+                    : status === 'trialing' ? 'pro_trial'
+                        : 'basic';
+                mixpanel.register({ is_authenticated: isAuthenticated, is_pro: isPro, plan_type: planType });
+            } catch { /* store not ready */ }
+        };
+        useUserStore.persist.onFinishHydration(syncSuperProperties);
+        useUserStore.subscribe(syncSuperProperties);
+        if (useUserStore.persist.hasHydrated()) syncSuperProperties();
     }
-    return _getUserStore();
 }
 
 function trackEvent(eventName: string, params: Record<string, any> = {}) {

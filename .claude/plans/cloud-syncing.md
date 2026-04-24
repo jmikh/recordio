@@ -5,7 +5,7 @@
 Projects are currently stored entirely in IndexedDB (browser-local). "Clear browsing data" permanently destroys all work. The goal is to introduce cloud-backed project storage via Supabase so that authenticated users' projects are durable, accessible from any device, and survive browser data clears. IndexedDB becomes a cache layer.
 
 **Key constraints:**
-- **Unauthenticated:** one local project max. No dashboard/library. New recording presents choice: "Sign in to keep both" or "Overwrite."
+- **Unauthenticated:** one local project max (enforced in production). No dashboard/library. New recording presents choice: "Sign in to sync all your projects" or "Overwrite" (deletes all existing local projects). **Debug mode** (local builds only): allows keeping multiple local projects for testing — on login sync, uploads most recent first and drops the rest if per-user quota is exceeded.
 - **Authenticated (all tiers):** cloud sync enabled. Full library. IndexedDB caches locally with cloud project IDs. Background media download prioritizes recently-accessed projects.
 - **Pro/Trial:** cloud data persists indefinitely (no expiration).
 - **Not Pro (free/expired):** cloud data has a **14-day expiry from first upload**. After 14 days the data is cleaned up. Re-subscribing to Pro clears the expiry (data persists).
@@ -21,12 +21,11 @@ Projects are currently stored entirely in IndexedDB (browser-local). "Clear brow
 
 ```sql
 CREATE TABLE public.projects (
-    id TEXT NOT NULL,                        -- client-side ID e.g. "proj-abc123"
+    id UUID DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL DEFAULT 'Untitled',
-    schema_version INT NOT NULL DEFAULT 3,
-
     -- Full project JSON (settings, timeline, userEvents, source metadata — no blobs)
+    -- Schema version lives inside project_data JSONB itself (no separate column needed)
     project_data JSONB NOT NULL,
 
     -- Media storage paths in Supabase Storage bucket
@@ -58,8 +57,6 @@ CREATE TABLE public.projects (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,                  -- soft delete
     expires_at TIMESTAMPTZ,                  -- set when user loses Pro (NOW() + 14 days), null when Pro
-
-    PRIMARY KEY (id, user_id)
 );
 
 CREATE INDEX idx_projects_user_updated ON public.projects(user_id, updated_at DESC)
@@ -80,19 +77,20 @@ CREATE POLICY "Users can update own projects"
 ```
 
 **Design notes:**
+- `id UUID` is server-generated (no client-side IDs). Stored in IndexedDB `syncMeta` as `cloudId` to link local projects to their cloud counterpart.
 - `project_data JSONB` stores the full Project object (same structure as IndexedDB). JSONB avoids schema migrations when project settings change.
-- Composite PK `(id, user_id)` prevents cross-user collision on client-generated IDs.
-- `last_accessed_at` drives the background download priority queue.
+- `last_accessed_at` tracks when user last opened the project (for UI sorting).
 - `expires_at` — expiration logic depends on user's subscription status:
   - **Non-Pro user uploads a project:** `expires_at = created_at + 14 days` (set at creation time)
   - **Pro user uploads a project:** `expires_at = NULL` (no expiration)
   - **User loses Pro:** `expires_at = NOW() + 14 days` set on all their projects
   - **User becomes Pro:** `expires_at = NULL` set on all their projects (clears countdown)
   - Cron job soft-deletes projects past their `expires_at`.
-- `upload_status` tracks media upload progress:
+- `upload_status` tracks media lifecycle:
   - `'pending'` on creation (some media still needs to upload)
   - `'ready'` when all media is uploaded (all non-NULL paths have real storage paths, no `'pending'` values remain)
-  - On app reload, SyncService checks for projects where `upload_status != 'ready'` and resumes uploads.
+  - On app reload, SyncService checks for projects where `upload_status = 'pending'` and resumes uploads.
+- **Soft-delete cleanup flow:** when a project is soft-deleted (`deleted_at` set), the cleanup edge function sets `upload_status = 'deleting'` first, then deletes Storage files + CF Stream, then hard-deletes the row. The `get_user_storage_bytes()` function excludes `'deleting'` projects so quota is freed immediately on soft-delete rather than after Storage cleanup completes.
 - Storage path sentinel values: `NULL` means the media type doesn't exist (e.g. no camera was recorded). `'pending'` means it exists locally but hasn't uploaded. This distinguishes "no camera" from "camera not yet uploaded."
 - `deleted_at` soft delete — actual Storage file cleanup handled by an edge function.
 
@@ -141,7 +139,9 @@ CREATE OR REPLACE FUNCTION public.get_user_storage_bytes(p_user_id UUID)
 RETURNS BIGINT LANGUAGE sql SECURITY DEFINER AS $$
     SELECT COALESCE(SUM(screen_size_bytes + camera_size_bytes + mic_size_bytes), 0)
     FROM public.projects
-    WHERE user_id = p_user_id AND deleted_at IS NULL;
+    WHERE user_id = p_user_id
+      AND deleted_at IS NULL
+      AND upload_status != 'deleting';  -- exclude projects mid-cleanup
 $$;
 ```
 
@@ -208,34 +208,35 @@ project-media/
       music-{uuid}.mp3
 ```
 
-### 2.1 Access model: signed URLs via backend (enterprise-ready)
+### 2.1 Access model: signed URLs via edge functions
 
-Rather than giving the webapp direct write access to Storage (which would require exposing RLS policies to the client), all uploads and downloads go through **signed URLs generated by the backend**:
+Rather than giving the webapp direct write access to Storage (which would require RLS policies on `storage.objects`), all uploads and downloads go through **signed URLs generated by Supabase Edge Functions**:
 
-1. **Client requests a signed upload URL** from the backend (sends project_id, file type, size)
-2. **Backend validates:** auth, subscription status, quota check
-3. **Backend generates** a short-lived signed URL for Supabase Storage
-4. **Client uploads directly** to Storage using the signed URL (no double-hop through backend)
-5. Same pattern for downloads: backend generates signed download URL, client fetches directly
+1. **Client calls edge function** (sends project_id, file type, size)
+2. **Edge function validates:** JWT auth, subscription status, quota check (direct DB query — no network hop)
+3. **Edge function generates** a short-lived signed URL via `createSignedUploadUrl()`
+4. **Client uploads directly** to Storage using tus protocol (resumable, chunked, with progress)
+5. Same pattern for downloads: edge function generates signed download URL, client fetches directly
 
 This means:
 - No RLS policies needed on storage.objects for client-side access
-- Backend controls all authorization (enterprise-ready, auditable)
+- Edge functions control all authorization (enterprise-ready, auditable)
 - No bandwidth penalty (client uploads/downloads directly to S3)
-- The existing `backend/` Fastify server gets new routes for URL signing
+- No dependency on the Fastify backend being up — uploads work independently
+- Edge functions run inside Supabase infrastructure — DB queries for quota checks have no external network hop
 
 ```sql
--- Bucket creation (no client-side RLS — access is via signed URLs from backend)
+-- Bucket creation (no client-side RLS — access is via signed URLs from edge functions)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('project-media', 'project-media', false, 5368709120,
+VALUES ('project-media', 'project-media', false, 10737418240,  -- 10 GB per file
     ARRAY['video/webm','video/mp4','audio/wav','audio/webm','audio/mpeg',
           'image/png','image/jpeg','image/webp','image/avif']);
 ```
 
-New backend routes:
-- `POST /storage/upload-url` — returns signed upload URL after auth + quota validation
-- `POST /storage/download-url` — returns signed download URL after auth validation
-- `POST /storage/confirm-upload` — updates projects table with storage path + size after upload completes
+New edge functions:
+- `supabase/functions/storage-upload-url` — verifies JWT, checks quota via `get_user_storage_bytes()`, returns signed upload URL
+- `supabase/functions/storage-download-url` — verifies JWT + ownership, returns signed download URL
+- `supabase/functions/storage-confirm-upload` — updates `projects` row with storage path + size, sets `upload_status = 'ready'` when all paths are filled
 
 ### 2.2 Global assets: duplication model
 
@@ -267,7 +268,9 @@ Thumbnails are resized before upload:
 | `webapp/src/storage/syncStatusStore.ts` | Zustand store exposing sync state to UI (upload progress, sync status) |
 | `webapp/supabase/migrations/YYYYMMDD_create_projects_table.sql` | DB migration |
 | `webapp/supabase/functions/cleanup-expired-projects/index.ts` | Edge function: Storage file + CF Stream cleanup for soft-deleted projects |
-| `backend/src/routes/storage.ts` | Backend routes: signed URL generation for uploads/downloads, quota enforcement |
+| `webapp/supabase/functions/storage-upload-url/index.ts` | Edge function: JWT + quota validation, returns signed upload URL |
+| `webapp/supabase/functions/storage-download-url/index.ts` | Edge function: JWT + ownership validation, returns signed download URL |
+| `webapp/supabase/functions/storage-confirm-upload/index.ts` | Edge function: updates project storage path + size after upload completes |
 
 ### 3.2 cloudStorage.ts — key methods
 
@@ -284,14 +287,14 @@ class CloudStorage {
     publishVideo(projectId: string, cfVideoUid: string): Promise<void>
     unpublishVideo(projectId: string): Promise<void>
 
-    // Media (via backend signed URLs — no direct Storage access from client)
+    // Media (via edge function signed URLs — no direct Storage access from client)
     requestUploadUrl(projectId: string, type: 'screen'|'camera'|'mic'|'thumbnail', sizeBytes: number): Promise<{ signedUrl: string }>
     requestDownloadUrl(storagePath: string): Promise<{ signedUrl: string }>
     confirmUpload(projectId: string, type: string, sizeBytes: number): Promise<void>
-    uploadBlob(signedUrl: string, blob: Blob, onProgress?: (frac: number) => void): Promise<void>
+    uploadBlob(signedUrl: string, blob: Blob, onProgress?: (frac: number) => void): Promise<void>  // uses tus protocol
     downloadBlob(signedUrl: string): Promise<Blob>
 
-    // Quota (via backend)
+    // Quota (via edge function)
     getStorageUsage(): Promise<{ usedBytes: number; limitBytes: number }>
 }
 ```
@@ -326,9 +329,6 @@ class SyncService {
     // Delete (local + cloud soft delete + cascade published video)
     deleteProject(projectId: string): Promise<void>
 
-    // Prioritize downloading media for a specific project
-    prioritizeProject(projectId: string): void
-
     // State observable
     subscribe(listener: (state: SyncState) => void): () => void
 }
@@ -341,13 +341,12 @@ When a new recording is imported:
 1. **Blobs saved to IndexedDB** (existing behavior — instant, user can start editing immediately)
 2. **Project metadata uploaded to `projects` table** with `upload_status = 'pending'`. Storage paths set to `'pending'` for media that exists, `NULL` for media that doesn't (e.g. no camera).
 3. **Media blobs queued for background upload:**
-   - Request signed upload URL from backend (validates auth + quota)
-   - Upload directly to Supabase Storage using signed URL
-   - For files >100MB: use resumable tus upload
+   - Request signed upload URL from edge function (validates auth + quota)
+   - Upload directly to Supabase Storage using tus protocol (resumable, chunked, with progress tracking)
    - Upload screen video (largest, can be 5GB), camera (if present), mic (if present)
    - Upload thumbnail (resized to <50KB WebP first)
-4. **On each upload completion:** call backend `confirm-upload` to update `projects` row — replace `'pending'` with actual `*_storage_path` and set `*_size_bytes`
-5. **When all uploads complete:** set `upload_status = 'ready'`
+4. **On each upload completion:** call `storage-confirm-upload` edge function to update `projects` row — replace `'pending'` with actual `*_storage_path` and set `*_size_bytes`. The edge function atomically updates the path AND checks if all non-NULL paths are now non-`'pending'` in a single SQL statement — if so, sets `upload_status = 'ready'` in the same UPDATE. No read-then-write race.
+5. **When all uploads complete:** `upload_status` is already `'ready'` (set atomically by the last `confirm-upload` call)
 6. **Upload continues even if user navigates away** from import page (runs in SyncService singleton)
 7. **If app closes mid-upload:** on next load, SyncService finds projects where `upload_status != 'ready'` and resumes uploads for any paths still set to `'pending'`
 
@@ -358,11 +357,10 @@ The user doesn't wait for uploads — they edit immediately against local Indexe
 Project settings (timeline, zoom, spotlight, captions, etc.) change frequently during editing. Sync protocol:
 
 1. **Auto-save to IndexedDB** — existing 2s debounce (unchanged)
-2. **Auto-sync to cloud** — on the same debounce trigger, upsert `project_data` JSONB in the `projects` table with `cloud_version + 1`
-3. **This is cheap** — a few KB of JSON, no media. Supabase handles it in <100ms.
-4. If the 2s debounce feels too aggressive for cloud writes, we can extend to 10-20s for the cloud leg only while keeping the IndexedDB leg at 2s. Start with matching debounce and observe.
+2. **Auto-sync to cloud** — separate 30s debounce for cloud writes. Also flushes immediately on page navigation (`beforeunload` / route change) via `navigator.sendBeacon` or a final sync call.
+3. **This is cheap** — a few KB of JSON, no media. Supabase handles it in <100ms. The 30s debounce keeps cloud writes infrequent while the `beforeunload` flush ensures no edits are lost when the user leaves.
 
-**Conflict resolution:** Last-write-wins with `cloud_version`. On conflict (another device wrote higher version), show toast and pull cloud version. Multi-device simultaneous editing is not a real scenario for a video editor.
+**Conflict resolution:** Optimistic concurrency with `cloud_version`. Every cloud write sends the expected `cloud_version` in a conditional UPDATE (`WHERE cloud_version = expected`). If the UPDATE affects 0 rows (another device wrote a higher version), the write fails and the UI shows a banner: "This project was updated elsewhere" with two buttons: **"Reload"** (pull the cloud version, discard local) and **"Force my version"** (overwrite cloud with local, incrementing `cloud_version`). No silent data loss.
 
 ### 3.6 How project loading works on new device / cleared cache
 
@@ -371,30 +369,25 @@ When a logged-in user opens the dashboard:
 1. **Fetch project list from cloud:** `listProjectsSummary()` returns id, name, thumbnail path, last_accessed_at, upload_status, cf_video_uid
 2. **Check what's in local IndexedDB:** compare cloud list with local projects (matched by project ID + userId)
 3. **For each cloud project:**
-   - If locally cached (blobs in IndexedDB) → show from cache (fast)
-   - If not cached → show with cloud thumbnail (downloaded from Storage) and name
-4. **Background media download:** only download blobs for the **5 most recently accessed** projects (ordered by `last_accessed_at` DESC). Older projects show in the list but their media is fetched on demand.
-5. **If user opens a project:** `SyncService.prioritizeProject(projectId)` bumps it to the front of the download queue. If media isn't cached yet, show a "Loading project..." screen with progress bar.
+   - If locally cached (blobs in IndexedDB) → show from local thumbnail (fast)
+   - If not cached → download only the thumbnail from cloud (small WebP, <50KB) to display on the card. Media blobs are **not** prefetched.
+4. **No background prefetching.** Media blobs are only downloaded when the user opens a project.
+5. **If user opens a project** and media isn't cached locally, show a "Loading project..." screen with progress bar while downloading blobs from cloud.
 
 ### 3.7 IndexedDB local identity + cloud tracking
 
 Once a project is synced to the cloud, the local IndexedDB `syncMeta` store tracks:
 - `userId` — which user owns this cloud project
-- `cloudId` — the project ID in the `projects` table (same as local `id`)
+- `cloudId` — the server-generated UUID from the `projects` table
 - `cloud_version`, `last_synced_at`, upload status
 
 **Unauthenticated filtering:** When a user is logged out, only show local projects that have **no `userId`** set (truly local, never-synced). Projects with a `userId` are hidden — they belong to a cloud account. This prevents unauthenticated users from seeing or overwriting cloud-synced projects.
 
 When the user logs back in, their cached projects (filtered by matching `userId`) reappear.
 
-### 3.8 IndexedDB blob cache management (LRU eviction)
+### 3.8 IndexedDB blob cache management
 
-IndexedDB stores media blobs as a cache. To prevent unbounded growth (which could cause issues for other sites sharing the browser's storage):
-
-- **LRU limit: keep blobs for the last 5 accessed projects only.** When a new project's blobs are downloaded/saved, evict blobs for the oldest cloud-synced project beyond the 5-project window. These can be re-downloaded from cloud on demand.
-- **Never evict blobs for projects that haven't been synced to cloud** (no cloud backup = local-only, losing them would be data loss).
-- **On `QuotaExceededError`:** catch the error on any IndexedDB write. Show a toast: "Local storage is full. Freeing space..." Then evict the oldest cached cloud-synced blobs. If eviction isn't sufficient (e.g. single recording is too large): show error "Not enough local storage. Free up browser storage or sign in to save to the cloud."
-- **For unauthenticated users** with no cloud backup: never auto-evict. Warn: "Storage is full. Sign in to save your project to the cloud, or delete your existing project."
+IndexedDB stores media blobs as a local cache. Blobs are cached when a project is opened (downloaded from cloud) or created (recorded locally). Local storage capacity handling (eviction, quota errors) will be addressed in a future iteration.
 
 ### 3.9 URL scheme
 
@@ -410,7 +403,6 @@ This means **no changes to the hydration logic** in `projectStorage.ts:loadProje
 - Bump `DB_VERSION` to 6, add `syncMeta` object store (tracks: userId, cloudId, cloud_version, upload status, last_synced_at per project)
 - Add `hasRecordingBlob(id): Promise<boolean>` — check existence without loading the blob
 - Add methods to read/write sync metadata
-- Add LRU blob eviction: `evictOldestCachedBlobs(keepCount: number)` — deletes blobs for cloud-synced projects beyond the keep window
 - No changes to hydration logic (storageUrl stays `recordio-blob://`)
 
 ### 4.2 `webapp/src/editor/stores/useProjectStore.ts`
@@ -428,9 +420,10 @@ This means **no changes to the hydration logic** in `projectStorage.ts:loadProje
 
 ### 4.4 `webapp/src/pages/ImportPage.tsx`
 - After `importFromRawRecording`, call `SyncService.onProjectCreated()` to upload metadata + queue media
-- **Unauthenticated with existing local project:** Show choice dialog:
-  - "Sign in to keep both projects" → auth flow → both sync to cloud
-  - "Overwrite existing project" → delete old, save new
+- **Unauthenticated with existing local project(s):** Show banner: "You have existing projects." Two options:
+  - "Sign in to sync all" → auth flow → sync all local projects to cloud (most recent first, drop if quota exceeded)
+  - "Overwrite" → delete ALL existing local projects, save new one
+  - **Debug mode (local builds only):** third button "Keep both" — allows accumulating multiple local projects for testing
 - **Unauthenticated with no existing project:** Just save and proceed (no dialog)
 
 ### 4.5 `webapp/src/editor/stores/useUserStore.ts`
@@ -460,9 +453,9 @@ Local projects with a `userId` set (previously synced to a cloud account) are **
 
 | Action | Behavior |
 |--------|----------|
-| Visit `/` | If local project (no userId) exists: show it as single card with "Open" + sign-in CTA. If none: "Start recording" CTA. Cloud-synced projects from a previous session are hidden, not shown or overwritable. |
+| Visit `/` | If local project(s) (no userId) exist: show most recent as single card with "Open" + sign-in CTA. If none: "Start recording" CTA. Cloud-synced projects from a previous session are hidden, not shown or overwritable. |
 | New recording (no existing local) | Save to IndexedDB, open editor. |
-| New recording (existing local, no userId) | Choice dialog: "Sign in to keep both" / "Overwrite". |
+| New recording (existing local, no userId) | Banner: "You have existing projects." Two options: "Sign in to sync all your projects" → auth flow → syncs all local projects to cloud (most recent first, drops rest if hits quota). "Overwrite" → deletes all existing local projects, saves new one. |
 | Edit/export | Full editing at free tier (480p/720p with watermark). |
 | Sign in | Existing local project(s) migrate to cloud. Hidden cloud-synced projects reappear. Transition to library view. |
 | Browser data cleared | Local project gone. Expected — communicated upfront. |
@@ -507,16 +500,17 @@ Same as expired Pro but softer message: "Your payment needs updating." Link to S
 
 ### 5.6 Key state transitions
 
-**New recording with existing local project (unauthenticated):**
+**New recording with existing local project(s) (unauthenticated):**
 ```
-[Record] → "You already have a project"
-  ├─ "Sign in to keep both" → Auth flow → migrate both to cloud → library view
-  └─ "Overwrite" → Delete old → Save new → Open editor
+[Record] → "You have existing projects"
+  ├─ "Sign in to sync all" → Auth flow → sync all local projects to cloud (most recent first, drop if quota exceeded) → library view
+  └─ "Overwrite" → Delete ALL existing local projects → Save new → Open editor
 ```
 
-**First login (has local project):**
-1. Migrate local project to cloud (upload metadata + queue media)
-2. Transition to dashboard/library view
+**First login (has local projects):**
+1. Migrate all local projects to cloud (most recent first — upload metadata + queue media)
+2. If per-user quota is exceeded mid-sync, stop and drop remaining projects (notify user)
+3. Transition to dashboard/library view
 
 **Logout:**
 1. Keep local IndexedDB cache intact (blobs + syncMeta with userId)
@@ -593,29 +587,27 @@ SyncService maintains a persistent queue in IndexedDB (`syncMeta` store). On rec
 **Goal:** Full end-to-end cloud storage. Media uploads after recording, downloads on demand. Unauthenticated restrictions. Expired pro handling.
 
 **New files:**
-- Supabase Storage bucket config (no client-side RLS — signed URLs via backend)
-- `backend/src/routes/storage.ts` — signed URL generation, quota enforcement, upload confirmation
+- Supabase Storage bucket config (no client-side RLS — signed URLs via edge functions)
+- `webapp/supabase/functions/storage-upload-url/index.ts` — JWT + quota validation, returns signed upload URL
+- `webapp/supabase/functions/storage-download-url/index.ts` — JWT + ownership validation, returns signed download URL
+- `webapp/supabase/functions/storage-confirm-upload/index.ts` — updates project storage path + size after upload
 - `webapp/supabase/functions/cleanup-expired-projects/index.ts` — Storage file + CF Stream cleanup for soft-deleted projects
 
 **Modified files:**
-- `webapp/src/storage/cloudStorage.ts` — add signed URL requests, upload/download via signed URLs, thumbnail resize + upload, quota check via backend
-- `webapp/src/storage/syncService.ts` — add media upload queue, background download with priority queue, `prioritizeProject()`, `onProjectCreated()` with media upload
-- `webapp/src/pages/ImportPage.tsx` — trigger media upload, unauthenticated overwrite dialog
-- `webapp/src/pages/DashboardPage.tsx` — unauthenticated single-project view, expired pro banner with countdown, download progress indicators
-- `webapp/src/App.tsx` — unauthenticated default route (single project view instead of dashboard)
-- `webapp/src/editor/App.tsx` — expiry countdown banner, download progress on project open
-- `webapp/src/editor/services/ShareService.ts` — no internal changes, but SyncService.deleteProject cascades to it
+- `webapp/src/storage/cloudStorage.ts` — add signed URL requests via edge functions, XHR upload/download with progress, thumbnail upload
+- `webapp/src/storage/syncService.ts` — add `uploadProjectMedia()` (background, after project creation), `resumePendingUploads()` (on startup), `downloadProjectMedia()` (on-demand when user opens a cloud-only project)
+- `webapp/src/pages/DashboardPage.tsx` — download flow in `handleOpen` for cloud-only projects (download metadata + media → save to IndexedDB → open editor), download progress indicators
+- `webapp/src/editor/App.tsx` — call `resumePendingUploads()` on authenticated startup
+
+**Media download strategy:** Media blobs are **only** downloaded when the user opens a project. The dashboard never prefetches blobs. When a user clicks a cloud-only project card, the dashboard downloads project metadata + media blobs with a progress indicator, saves everything to IndexedDB, then navigates to the editor. Subsequent opens are instant (served from IndexedDB cache).
 
 **Testable outcomes:**
-- Record new project as pro → `upload_status` goes `pending → uploading → ready`, media appears in `project-media` bucket
-- Log in on second browser → open project → "Loading project..." with progress → editor loads
-- Background download only caches blobs for last 5 accessed projects
-- Unauthenticated: record project → record another → see overwrite/sign-in dialog (cloud-synced projects hidden)
-- Expired pro: countdown banner, free-tier export, can still edit cached projects
+- Record new project as pro → `upload_status` goes `pending → ready`, media appears in `project-media` bucket
+- Log in on second browser → dashboard shows project cards (no media prefetch, no background download)
+- Open non-cached project → download progress shown → media downloads → editor loads
+- Close app mid-upload → reopen → uploads resume for paths still `'pending'`
 - Delete project → published video also deleted from Cloudflare Stream
 - Quota: upload blocked when usage exceeds `storage_limit_bytes`
-- LRU eviction: 6th project download evicts oldest cached blobs
-- QuotaExceededError: toast shown, oldest cloud-synced blobs evicted
 
 ---
 
@@ -650,16 +642,15 @@ Well within Pro subscription revenue ($15/mo or $48/yr per user). 25 GB default 
 **Chunk 2 tests:**
 11. Record project → `upload_status` transitions `pending → ready` → verify in Storage bucket
 12. Close app mid-upload → reopen → uploads resume for paths still `'pending'`
-13. Second browser → open project → "Loading project..." with progress → editor works
-14. Background download only keeps blobs for last 5 accessed projects
-15. 6th project opened → oldest cached blobs evicted
-16. Unauthenticated: new recording with existing (no userId) shows overwrite dialog
+13. Second browser → dashboard shows thumbnails only (no media prefetch)
+14. Open non-cached project → "Loading project..." with progress → editor works
+15. Conflict: edit on two tabs → second tab's save fails → shows "updated elsewhere" banner with Reload / Force buttons
+16. Unauthenticated: new recording with existing local shows "Sign in to sync all" / "Overwrite" banner
 17. Unauthenticated: cloud-synced projects not visible or overwritable
-18. Unauthenticated: sign-in migrates local project to cloud
+18. Unauthenticated: sign-in migrates all local projects to cloud (most recent first, drops if quota exceeded)
 19. Expired pro: countdown banner on dashboard + editor, free-tier export, can still edit
 20. Free user: new project gets `expires_at` = 14 days, countdown badge on project card
 21. After `expires_at` passes: cron soft-deletes projects, edge function cleans Storage + CF Stream
 22. Delete project → Cloudflare Stream video also deleted (via `cf_video_uid`)
 23. Quota enforcement: upload blocked at limit, warning at 80%
-24. QuotaExceededError in IndexedDB → toast shown, oldest cloud-synced blobs evicted
-25. Offline: edit works, sync queues, flushes on reconnect
+24. Offline: edit works, sync queues, flushes on reconnect

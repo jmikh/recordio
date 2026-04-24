@@ -18,7 +18,7 @@
 
 See `tables/` for per-table documentation. Each file describes what the table is for, which functions/services access it, and its RLS policy.
 
-Current tables: `deleted_videos`, `email_unsubscribes`, `shared_videos`, `subscriptions`, `transcription_usage`.
+Current tables: `deleted_videos`, `email_unsubscribes`, `projects`, `shared_videos`, `subscriptions`, `transcription_usage`, `user_assets`, `user_quotas`.
 
 ---
 

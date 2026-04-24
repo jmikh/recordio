@@ -1,18 +1,33 @@
 import { useState, useRef, useEffect } from 'react';
 import { TbLink } from 'react-icons/tb';
-import type { Project } from '../types';
 import { CardCheckbox } from './CardCheckbox';
 import { timeAgo } from '../utils/timeAgo';
 
+/** Minimal project info needed for the card — works with both Project and ProjectListItem */
+export interface ProjectCardData {
+    id: string;
+    name: string;
+    thumbnail?: string | null;
+    createdAt: Date | string;
+    /** Duration string override (e.g. "2m 30s"). If not provided, computed from timeline. */
+    durationLabel?: string;
+    /** Full timeline — used to compute duration if durationLabel not provided */
+    timeline?: { outputWindows?: Array<{ startMs: number; endMs: number }> };
+}
+
 interface ProjectCardProps {
-    project: Project;
+    project: ProjectCardData;
     isActive?: boolean;
     variant?: 'sidebar' | 'grid';
-    onOpen: (project: Project) => void;
+    onOpen: (project: ProjectCardData) => void;
     selectMode?: boolean;
     selected?: boolean;
     onSelect?: () => void;
     isShared?: boolean;
+    /** Whether this project only exists in the cloud (not cached locally) */
+    cloudOnly?: boolean;
+    /** Download progress (0–1) when downloading from cloud, null when not downloading */
+    downloadProgress?: number | null;
     onRename?: (newName: string) => void;
 }
 
@@ -25,6 +40,8 @@ export const ProjectCard = ({
     selected = false,
     onSelect,
     isShared = false,
+    cloudOnly = false,
+    downloadProgress = null,
     onRename
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
@@ -108,7 +125,7 @@ export const ProjectCard = ({
 
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-[10px] px-1.5 py-0.5 rounded">
-                    {(() => {
+                    {project.durationLabel ?? (() => {
                         const windows = project.timeline?.outputWindows || [];
                         const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
                         const seconds = Math.floor(ms / 1000);
@@ -123,6 +140,27 @@ export const ProjectCard = ({
                         return parts.join(' ');
                     })()}
                 </div>
+                {/* Cloud-only indicator */}
+                {cloudOnly && downloadProgress === null && (
+                    <div className="absolute top-2 left-2 bg-surface-body/90 backdrop-blur-sm text-text-muted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                        </svg>
+                        Cloud
+                    </div>
+                )}
+                {/* Download progress overlay */}
+                {downloadProgress !== null && (
+                    <div className="absolute inset-0 bg-surface-body/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-10">
+                        <svg className="w-6 h-6 text-primary animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <div className="w-3/4 h-1.5 bg-border rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.round(downloadProgress * 100)}%` }} />
+                        </div>
+                        <span className="text-text-muted text-[10px]">Downloading {Math.round(downloadProgress * 100)}%</span>
+                    </div>
+                )}
             </div>
 
             {/* Info */}

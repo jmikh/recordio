@@ -11,7 +11,7 @@ const isWebsite = typeof window !== 'undefined' &&
         window.location.origin === EDITOR_ORIGIN_PROD);
 
 const DB_NAME = isWebsite ? 'recordio-editor' : 'RecordioDB';
-const DB_VERSION = 5; // Added customMusic store
+const DB_VERSION = 6; // Added syncMeta store for cloud sync
 
 /**
  * Entry in the global custom backgrounds library.
@@ -30,6 +30,25 @@ export interface CustomMusicEntry {
     blob: Blob;
     name: string;      // Original filename
     createdAt: number; // timestamp
+}
+
+/**
+ * Sync metadata for a project — tracks cloud sync state per project.
+ * Stored in the `syncMeta` IndexedDB store, keyed by local project ID.
+ */
+export interface SyncMeta {
+    /** Local project ID (key) */
+    projectId: string;
+    /** User ID that owns this cloud project */
+    userId: string;
+    /** Server-generated UUID from the `projects` table */
+    cloudId: string;
+    /** Last known cloud version (for optimistic concurrency) */
+    cloudVersion: number;
+    /** Upload status: 'pending' | 'ready' */
+    uploadStatus: 'pending' | 'ready';
+    /** Last time this project was synced to cloud */
+    lastSyncedAt: number; // timestamp
 }
 
 export class ProjectStorage {
@@ -69,6 +88,11 @@ export class ProjectStorage {
                     db.createObjectStore('customMusic', { keyPath: 'id' });
                 }
 
+                // 6. Sync Metadata Store (cloud sync tracking)
+                if (!db.objectStoreNames.contains('syncMeta')) {
+                    db.createObjectStore('syncMeta', { keyPath: 'projectId' });
+                }
+
                 // Remove legacy sources store if it exists
                 if (db.objectStoreNames.contains('sources')) {
                     db.deleteObjectStore('sources');
@@ -77,6 +101,10 @@ export class ProjectStorage {
 
             request.onsuccess = (event) => {
                 resolve((event.target as IDBOpenDBRequest).result);
+            };
+
+            request.onblocked = () => {
+                console.warn('[RecordioDB] Upgrade blocked — close other tabs and refresh');
             };
 
             request.onerror = (event) => {
@@ -373,7 +401,7 @@ export class ProjectStorage {
         const db = await this.getDB();
 
         // Transaction across all stores
-        const tx = db.transaction(['projects', 'recordings', 'thumbnails'], 'readwrite');
+        const tx = db.transaction(['projects', 'recordings', 'thumbnails', 'syncMeta'], 'readwrite');
 
         // 1. Delete Project
         tx.objectStore('projects').delete(projectId);
@@ -394,6 +422,9 @@ export class ProjectStorage {
 
         // 3. Delete Thumbnail
         tx.objectStore('thumbnails').delete(projectId);
+
+        // 4. Delete Sync Metadata
+        tx.objectStore('syncMeta').delete(projectId);
 
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
@@ -435,6 +466,72 @@ export class ProjectStorage {
             const store = tx.objectStore('projects');
             const req = store.put(project);
             req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // SYNC METADATA
+    // ===========================================
+
+    static async getSyncMeta(projectId: ID): Promise<SyncMeta | undefined> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readonly');
+            const store = tx.objectStore('syncMeta');
+            const req = store.get(projectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async saveSyncMeta(meta: SyncMeta): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const req = store.put(meta);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async deleteSyncMeta(projectId: ID): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const req = store.delete(projectId);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async listSyncMeta(): Promise<SyncMeta[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readonly');
+            const store = tx.objectStore('syncMeta');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result as SyncMeta[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // BLOB EXISTENCE CHECK
+    // ===========================================
+
+    /**
+     * Check if a recording blob exists without loading it into memory.
+     */
+    static async hasRecordingBlob(id: ID): Promise<boolean> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('recordings', 'readonly');
+            const store = tx.objectStore('recordings');
+            const req = store.count(id);
+            req.onsuccess = () => resolve(req.result > 0);
             req.onerror = () => reject(req.error);
         });
     }
@@ -693,21 +790,21 @@ export async function importFromRawRecording(
     cameraBlob?: Blob,
     micBlob?: Blob
 ): Promise<Project> {
-    const projectId = `proj-${recording.id}`;
+    const projectId = recording.id;
 
     // 1. Save blobs
-    const screenBlobId = `rec-${projectId}-screen`;
+    const screenBlobId = `${projectId}-screen`;
     await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
     let cameraBlobId: string | undefined;
     if (cameraBlob) {
-        cameraBlobId = `rec-${projectId}-camera`;
+        cameraBlobId = `${projectId}-camera`;
         await ProjectStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
     }
 
     let micBlobId: string | undefined;
     if (micBlob) {
-        micBlobId = `rec-${projectId}-mic`;
+        micBlobId = `${projectId}-mic`;
         await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
     }
 
