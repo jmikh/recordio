@@ -1,6 +1,6 @@
 import type { Project, ID } from '../types';
 import * as Sentry from '@sentry/react';
-import { ProjectStorage } from './projectStorage';
+import { LocalStorage } from './localStorage';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type MediaFileType } from './cloudStorage';
 import { useSyncStatusStore } from './syncStatusStore';
 
@@ -16,15 +16,11 @@ export interface ProjectListItem {
     createdAt: string;
     lastAccessedAt: string | null;
     expiresAt: string | null;
-    uploadStatus: string | null;
+    cloudSynced: boolean;
     cfVideoUid: string | null;
     cloudVersion: number | null;
     /** Duration in milliseconds (from output windows) */
     durationMs: number | null;
-    /** Whether this project exists locally (in IndexedDB) */
-    hasLocal: boolean;
-    /** Whether this project exists in the cloud */
-    hasCloud: boolean;
 }
 
 // Cloud sync debounce (30 seconds)
@@ -34,7 +30,7 @@ const CLOUD_SYNC_DEBOUNCE_MS = 30_000;
  * SyncService — orchestrates IndexedDB ↔ cloud sync for project metadata + media.
  *
  * Usage:
- *   - Auto-save subscriber calls `SyncService.saveProject()` instead of `ProjectStorage.saveProject()`.
+ *   - Auto-save subscriber calls `SyncService.saveProject()` instead of `LocalStorage.saveProject()`.
  *   - Dashboard calls `SyncService.listProjects()` for a merged local + cloud list.
  *   - Login triggers `SyncService.onLogin()` to sync cloud project list.
  *   - Import triggers `SyncService.onProjectCreated()` to upload metadata + queue media.
@@ -64,19 +60,19 @@ export class SyncService {
      */
     static async initProjectHash(project: Project): Promise<void> {
         const hash = await this.projectDataHash(project);
-        const syncMeta = await ProjectStorage.getSyncMeta(project.id);
+        const syncMeta = await LocalStorage.getSyncMeta(project.id);
         if (syncMeta) {
-            await ProjectStorage.saveSyncMeta({ ...syncMeta, projectHash: hash });
+            await LocalStorage.saveSyncMeta({ ...syncMeta, projectHash: hash });
         }
     }
 
     /**
      * Save project to IndexedDB (fast) + queue cloud sync (debounced).
-     * Replaces direct `ProjectStorage.saveProject()` calls in auto-save.
+     * Replaces direct `LocalStorage.saveProject()` calls in auto-save.
      */
     static async saveProject(project: Project, userId: string | null, isPro: boolean): Promise<void> {
         // 1. Always save locally first (fast path)
-        await ProjectStorage.saveProject(project);
+        await LocalStorage.saveProject(project);
 
         // 2. Queue cloud sync if authenticated
         if (userId) {
@@ -116,32 +112,33 @@ export class SyncService {
         store.setSyncing();
 
         try {
-            const syncMeta = await ProjectStorage.getSyncMeta(project.id);
+            const syncMeta = await LocalStorage.getSyncMeta(project.id);
 
-            // Skip cloud write if project data hasn't changed since last sync
-            const hash = await this.projectDataHash(project);
-            if (syncMeta?.projectHash === hash) {
+            // Only sync projects that are fully cloud-synced (media uploaded + ready)
+            if (!syncMeta?.cloudSynced) {
                 store.setIdle();
                 return;
             }
 
-            const expectedVersion = syncMeta?.cloudVersion;
+            // Skip cloud write if project data hasn't changed since last sync
+            const hash = await this.projectDataHash(project);
+            if (syncMeta.projectHash === hash) {
+                store.setIdle();
+                return;
+            }
 
             const result = await CloudStorage.saveProjectMetadata(
                 project,
                 userId,
-                expectedVersion,
+                syncMeta.cloudVersion,
                 isPro,
             );
 
             // Update local sync metadata (including new project hash)
-            await ProjectStorage.saveSyncMeta({
-                projectId: project.id,
-                userId,
+            await LocalStorage.saveSyncMeta({
+                ...syncMeta,
                 cloudVersion: result.cloudVersion,
-                uploadStatus: syncMeta?.uploadStatus ?? 'pending',
                 lastSyncedAt: Date.now(),
-                thumbnailHash: syncMeta?.thumbnailHash,
                 projectHash: hash,
             });
 
@@ -188,12 +185,12 @@ export class SyncService {
         userId: string | null,
         onThumbnailLoaded?: (projectId: string, thumbnailUrl: string) => void,
     ): Promise<ProjectListItem[]> {
-        const localProjects = await ProjectStorage.listProjects();
+        const localProjects = await LocalStorage.listProjects();
         const localMap = new Map(localProjects.map(p => [p.id, p]));
 
         // If not authenticated, show only local-only projects (never synced to any account)
         if (!userId) {
-            const allSyncMeta = await ProjectStorage.listSyncMeta();
+            const allSyncMeta = await LocalStorage.listSyncMeta();
             const syncedIds = new Set(allSyncMeta.map(m => m.projectId));
             return localProjects
                 .filter(p => !syncedIds.has(p.id))
@@ -216,7 +213,7 @@ export class SyncService {
         const cloudIds = new Set<string>();
 
         // Pre-fetch all sync meta for local lastAccessedAt
-        const allSyncMetaForAccess = await ProjectStorage.listSyncMeta();
+        const allSyncMetaForAccess = await LocalStorage.listSyncMeta();
         const syncMetaAccessMap = new Map(allSyncMetaForAccess.map(m => [m.projectId, m]));
 
         // 1. Cloud projects — attach local thumbnail if available, queue download if not
@@ -235,12 +232,10 @@ export class SyncService {
                     ? new Date(meta.lastAccessedAt).toISOString()
                     : cloud.last_accessed_at,
                 expiresAt: cloud.expires_at,
-                uploadStatus: cloud.upload_status,
+                cloudSynced: true,
                 cfVideoUid: cloud.cf_video_uid,
                 cloudVersion: cloud.cloud_version,
                 durationMs: cloud.duration_ms,
-                hasLocal: !!local,
-                hasCloud: true,
             });
 
             // Download cloud thumbnail in background if missing locally
@@ -249,7 +244,7 @@ export class SyncService {
                     this.downloadThumbnailIfMissing(cloud.id, cloud.thumbnail_storage_path)
                         .then(() => {
                             if (!onThumbnailLoaded) return;
-                            return ProjectStorage.getThumbnail(cloud.id).then(blob => {
+                            return LocalStorage.getThumbnail(cloud.id).then(blob => {
                                 if (blob) onThumbnailLoaded(cloud.id, URL.createObjectURL(blob));
                             });
                         })
@@ -272,7 +267,7 @@ export class SyncService {
             if (hasSyncMeta && !cloudFetchFailed) {
                 // Was synced to cloud but no longer exists there — delete local copy
                 console.log(`[SyncService] Project ${local.id} deleted from cloud, removing local copy`);
-                ProjectStorage.deleteProject(local.id).catch(console.error);
+                LocalStorage.deleteProject(local.id).catch(console.error);
             } else {
                 // Genuinely local-only (never synced), or cloud fetch failed so we keep it
                 result.push(this.localToListItem(local));
@@ -298,11 +293,11 @@ export class SyncService {
         try {
             const result = await CloudStorage.saveProjectMetadata(project, userId, undefined, isPro);
 
-            await ProjectStorage.saveSyncMeta({
+            await LocalStorage.saveSyncMeta({
                 projectId: project.id,
                 userId,
                 cloudVersion: result.cloudVersion,
-                uploadStatus: 'pending',
+                cloudSynced: false,
                 lastSyncedAt: Date.now(),
             });
 
@@ -322,8 +317,8 @@ export class SyncService {
      * Uploads metadata for any local projects that don't have syncMeta.
      */
     static async onLogin(userId: string, isPro: boolean): Promise<void> {
-        const localProjects = await ProjectStorage.listProjects();
-        const allSyncMeta = await ProjectStorage.listSyncMeta();
+        const localProjects = await LocalStorage.listProjects();
+        const allSyncMeta = await LocalStorage.listSyncMeta();
         const syncMetaMap = new Map(allSyncMeta.map(m => [m.projectId, m]));
 
         // Find local projects without syncMeta (never synced)
@@ -363,7 +358,7 @@ export class SyncService {
         }
 
         // Local delete
-        await ProjectStorage.deleteProject(projectId);
+        await LocalStorage.deleteProject(projectId);
     }
 
     /**
@@ -375,21 +370,23 @@ export class SyncService {
 
         const rawProject = cloudProject.project_data as Project;
         rawProject.id = projectId;
-        await ProjectStorage.saveProject(rawProject);
+        await LocalStorage.saveProject(rawProject);
 
-        const syncMeta = await ProjectStorage.getSyncMeta(projectId);
-        await ProjectStorage.saveSyncMeta({
+        const syncMeta = await LocalStorage.getSyncMeta(projectId);
+        const hash = await this.projectDataHash(rawProject);
+        await LocalStorage.saveSyncMeta({
             projectId,
             userId: syncMeta?.userId ?? '',
             cloudVersion: cloudProject.cloud_version,
-            uploadStatus: syncMeta?.uploadStatus ?? 'pending',
+            cloudSynced: true,
             lastSyncedAt: Date.now(),
+            projectHash: hash,
         });
 
         useSyncStatusStore.getState().clearConflict();
 
         // Re-load through loadProjectOrFail to hydrate runtimeUrls from IndexedDB blobs
-        return ProjectStorage.loadProjectOrFail(projectId);
+        return LocalStorage.loadProjectOrFail(projectId);
     }
 
     /**
@@ -410,13 +407,14 @@ export class SyncService {
             isPro,
         );
 
-        const syncMeta = await ProjectStorage.getSyncMeta(project.id);
-        await ProjectStorage.saveSyncMeta({
+        const hash = await this.projectDataHash(project);
+        await LocalStorage.saveSyncMeta({
             projectId: project.id,
             userId,
             cloudVersion: result.cloudVersion,
-            uploadStatus: syncMeta?.uploadStatus ?? 'pending',
+            cloudSynced: true,
             lastSyncedAt: Date.now(),
+            projectHash: hash,
         });
 
         useSyncStatusStore.getState().clearConflict();
@@ -444,13 +442,13 @@ export class SyncService {
             const cameraBlobId = `${projectId}-camera`;
             const micBlobId = `${projectId}-mic`;
 
-            if (await ProjectStorage.hasRecordingBlob(screenBlobId)) {
+            if (await LocalStorage.hasRecordingBlob(screenBlobId)) {
                 mediaTypes.push({ fileType: 'screen', blobId: screenBlobId });
             }
-            if (await ProjectStorage.hasRecordingBlob(cameraBlobId)) {
+            if (await LocalStorage.hasRecordingBlob(cameraBlobId)) {
                 mediaTypes.push({ fileType: 'camera', blobId: cameraBlobId });
             }
-            if (await ProjectStorage.hasRecordingBlob(micBlobId)) {
+            if (await LocalStorage.hasRecordingBlob(micBlobId)) {
                 mediaTypes.push({ fileType: 'mic', blobId: micBlobId });
             }
 
@@ -460,7 +458,7 @@ export class SyncService {
 
             for (const { fileType, blobId } of mediaTypes) {
                 try {
-                    const blob = await ProjectStorage.getRecordingBlob(blobId);
+                    const blob = await LocalStorage.getRecordingBlob(blobId);
                     if (!blob) {
                         console.warn(`[SyncService] Blob ${blobId} not found in IndexedDB, skipping`);
                         continue;
@@ -485,11 +483,11 @@ export class SyncService {
             store.setPendingMediaUploads(0);
 
             // Update local syncMeta upload status
-            const syncMeta = await ProjectStorage.getSyncMeta(projectId);
+            const syncMeta = await LocalStorage.getSyncMeta(projectId);
             if (syncMeta && uploaded === mediaTypes.length) {
-                await ProjectStorage.saveSyncMeta({
+                await LocalStorage.saveSyncMeta({
                     ...syncMeta,
-                    uploadStatus: 'ready',
+                    cloudSynced: true,
                 });
             }
         } finally {
@@ -499,12 +497,12 @@ export class SyncService {
 
     /**
      * Resume pending media uploads — called on app startup.
-     * Finds projects with upload_status = 'pending' in cloud and re-uploads missing media.
+     * Finds projects not yet cloud-synced and re-uploads their media.
      */
     static async resumePendingUploads(): Promise<void> {
         try {
-            const allSyncMeta = await ProjectStorage.listSyncMeta();
-            const pending = allSyncMeta.filter(m => m.uploadStatus === 'pending');
+            const allSyncMeta = await LocalStorage.listSyncMeta();
+            const pending = allSyncMeta.filter(m => !m.cloudSynced);
 
             if (pending.length === 0) return;
             console.log(`[SyncService] Resuming uploads for ${pending.length} projects`);
@@ -527,7 +525,7 @@ export class SyncService {
      */
     static async backfillThumbnails(): Promise<void> {
         try {
-            const allSyncMeta = await ProjectStorage.listSyncMeta();
+            const allSyncMeta = await LocalStorage.listSyncMeta();
             const missing = allSyncMeta.filter(m => !m.thumbnailHash);
 
             for (const meta of missing) {
@@ -567,7 +565,7 @@ export class SyncService {
 
         for (const { fileType, storagePath, blobId } of downloads) {
             // Skip if already cached locally
-            if (await ProjectStorage.hasRecordingBlob(blobId)) continue;
+            if (await LocalStorage.hasRecordingBlob(blobId)) continue;
 
             store.setCurrentDownload({ projectId, type: fileType, progress: 0 });
 
@@ -576,7 +574,7 @@ export class SyncService {
                 onProgress?.(fileType, frac);
             });
 
-            await ProjectStorage.saveRecordingBlob(blobId, blob);
+            await LocalStorage.saveRecordingBlob(blobId, blob);
             console.log(`[SyncService] Downloaded ${fileType} for ${projectId}`);
         }
 
@@ -590,18 +588,18 @@ export class SyncService {
      * Compares SHA-256 hash against the last uploaded version stored in syncMeta.
      */
     private static async syncThumbnailToCloud(projectId: string): Promise<void> {
-        const blob = await ProjectStorage.getThumbnail(projectId);
+        const blob = await LocalStorage.getThumbnail(projectId);
         if (!blob) return;
 
         const hash = await this.blobHash(blob);
-        const syncMeta = await ProjectStorage.getSyncMeta(projectId);
+        const syncMeta = await LocalStorage.getSyncMeta(projectId);
         if (syncMeta?.thumbnailHash === hash) return;
 
         await CloudStorage.uploadMediaFile(projectId, 'thumbnail', blob);
 
         // Update syncMeta with new hash
         if (syncMeta) {
-            await ProjectStorage.saveSyncMeta({ ...syncMeta, thumbnailHash: hash });
+            await LocalStorage.saveSyncMeta({ ...syncMeta, thumbnailHash: hash });
         }
     }
 
@@ -622,11 +620,11 @@ export class SyncService {
         if (!thumbnailStoragePath || thumbnailStoragePath === 'pending') return;
 
         // Skip if we already have it locally
-        const existing = await ProjectStorage.getThumbnail(projectId);
+        const existing = await LocalStorage.getThumbnail(projectId);
         if (existing) return;
 
         const blob = await CloudStorage.downloadMediaFile(thumbnailStoragePath);
-        await ProjectStorage.saveThumbnail(projectId, blob);
+        await LocalStorage.saveThumbnail(projectId, blob);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────
@@ -642,12 +640,10 @@ export class SyncService {
             createdAt: project.createdAt?.toString() ?? '',
             lastAccessedAt: null,
             expiresAt: null,
-            uploadStatus: null,
+            cloudSynced: false,
             cfVideoUid: null,
             cloudVersion: null,
             durationMs,
-            hasLocal: true,
-            hasCloud: false,
         };
     }
 }

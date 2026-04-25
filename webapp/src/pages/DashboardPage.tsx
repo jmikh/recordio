@@ -147,14 +147,9 @@ export function DashboardPage() {
         }
     };
 
-    // Filter: only show projects that are usable
-    //  - Cloud-ready: all media uploaded to cloud (uploadStatus === 'ready')
-    //  - Local: blobs exist in IndexedDB (hasLocal), even if still uploading
-    // This hides cloud-only projects whose media upload never completed.
-    const visibleProjects = useMemo(() =>
-        projects.filter(p => p.uploadStatus === 'ready' || p.hasLocal),
-        [projects],
-    );
+    // All projects from listProjects are usable: cloud projects are filtered
+    // for ready status, and local projects always have blobs.
+    const visibleProjects = projects;
 
     // Sort projects
     const sortedProjects = useMemo(() => {

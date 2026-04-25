@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import { identifyUser, setUserProfileOnce, resetUser } from '../../core/analytics';
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
-export type ExportFps = 30 | 60;
 
 const DEV_PRO_UID = import.meta.env.VITE_DEV_PRO_UID as string | undefined;
 
@@ -36,7 +35,6 @@ export interface UserState {
 
     // Helper methods
     canExportQuality: (quality: ExportQuality) => boolean;
-    canExportFps: (fps: ExportFps) => boolean;
     hasFreeTrial: () => boolean;
     hasProAccess: () => boolean;
 }
@@ -137,11 +135,7 @@ export const useUserStore = create<UserState>()(
                 return get().hasProAccess();
             },
 
-            // Helper to check if user can export at fps
-            canExportFps: (fps: ExportFps) => {
-                if (fps === 30) return true;
-                return get().hasProAccess();
-            }
+
         }),
         {
             name: 'recordio-user-storage',

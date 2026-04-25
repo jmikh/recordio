@@ -9,7 +9,7 @@ import { useUIStore, CanvasMode } from './stores/useUIStore';
 import { getTimeMapper } from './hooks/useTimeMapper';
 
 
-import { ProjectStorage } from '../storage/projectStorage';
+import { LocalStorage } from '../storage/localStorage';
 import { CloudStorage } from '../storage/cloudStorage';
 import { SyncService } from '../storage/syncService';
 import { ProgressModal, Modal } from '@shared/components';
@@ -185,7 +185,7 @@ function Editor() {
             }
             try {
                 const isAuthed = useUserStore.getState().isAuthenticated;
-                let loadedProject = await ProjectStorage.loadProject(projectId);
+                let loadedProject = await LocalStorage.loadProject(projectId);
                 let cloudProject: Awaited<ReturnType<typeof CloudStorage.loadProjectMetadata>> = null;
 
                 // If not found locally, try downloading from cloud
@@ -198,16 +198,16 @@ function Editor() {
                     }
                     const project = cloudProject.project_data;
                     project.id = projectId;
-                    await ProjectStorage.saveProject(project);
-                    await ProjectStorage.saveSyncMeta({
+                    await LocalStorage.saveProject(project);
+                    await LocalStorage.saveSyncMeta({
                         projectId,
                         userId: cloudProject.user_id,
                         cloudVersion: cloudProject.cloud_version,
-                        uploadStatus: cloudProject.upload_status === 'ready' ? 'ready' : 'pending',
+                        cloudSynced: cloudProject.upload_status === 'ready',
                         lastSyncedAt: Date.now(),
                         lastAccessedAt: Date.now(),
                     });
-                    loadedProject = await ProjectStorage.loadProject(projectId);
+                    loadedProject = await LocalStorage.loadProject(projectId);
                 }
 
                 if (!loadedProject) {
@@ -218,7 +218,7 @@ function Editor() {
                 // Sync local ↔ cloud versions on open
                 if (isAuthed) {
                     try {
-                        const syncMeta = await ProjectStorage.getSyncMeta(projectId);
+                        const syncMeta = await LocalStorage.getSyncMeta(projectId);
                         const localVersion = syncMeta?.cloudVersion ?? 0;
                         const cloudVersion = await CloudStorage.getCloudVersion(projectId);
 
@@ -228,16 +228,16 @@ function Editor() {
                             if (cloudProject?.project_data) {
                                 const project = cloudProject.project_data as typeof loadedProject;
                                 project!.id = projectId;
-                                await ProjectStorage.saveProject(project!);
-                                await ProjectStorage.saveSyncMeta({
+                                await LocalStorage.saveProject(project!);
+                                await LocalStorage.saveSyncMeta({
                                     projectId,
                                     userId: syncMeta?.userId ?? useUserStore.getState().userId ?? '',
                                     cloudVersion: cloudProject.cloud_version,
-                                    uploadStatus: syncMeta?.uploadStatus ?? 'ready',
+                                    cloudSynced: true,
                                     lastSyncedAt: Date.now(),
                                     lastAccessedAt: Date.now(),
                                 });
-                                loadedProject = await ProjectStorage.loadProject(projectId);
+                                loadedProject = await LocalStorage.loadProject(projectId);
                                 console.log(`[Editor] Loaded newer cloud version (v${cloudVersion} > local v${localVersion})`);
                             }
                         } else if (cloudVersion !== null && cloudVersion < localVersion) {
@@ -266,7 +266,7 @@ function Editor() {
                     if (cloudProject) {
                         await SyncService.downloadProjectMedia(projectId, cloudProject);
                         // Re-hydrate now that blobs are in IndexedDB
-                        loadedProject = await ProjectStorage.loadProject(projectId);
+                        loadedProject = await LocalStorage.loadProject(projectId);
                     }
 
                     // Verify media loaded successfully
@@ -289,7 +289,7 @@ function Editor() {
                 SyncService.initProjectHash({ ...storedProject, userEvents: storedEvents }).catch(console.error);
 
                 // Update local last-accessed timestamp
-                ProjectStorage.touchSyncMetaAccess(loadedProject!.id).catch(console.error);
+                LocalStorage.touchSyncMetaAccess(loadedProject!.id).catch(console.error);
 
                 // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
                 if (isAuthed) {

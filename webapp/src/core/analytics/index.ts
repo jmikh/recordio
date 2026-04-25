@@ -110,7 +110,7 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
 export interface ExportCompletedParams {
     // Export context
     quality: '480p' | '720p' | '1080p' | '2K' | '4K';
-    fps: 30 | 60;
+    fps: number;
     export_duration_ms: number;
 
     // Recording context

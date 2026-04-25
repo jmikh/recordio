@@ -43,8 +43,8 @@ export interface SyncMeta {
     userId: string;
     /** Last known cloud version (for optimistic concurrency) */
     cloudVersion: number;
-    /** Upload status: 'pending' | 'ready' */
-    uploadStatus: 'pending' | 'ready';
+    /** Whether all project media has been uploaded to cloud */
+    cloudSynced: boolean;
     /** Last time this project was synced to cloud */
     lastSyncedAt: number; // timestamp
     /** Last time this project was opened locally */
@@ -55,7 +55,7 @@ export interface SyncMeta {
     projectHash?: string;
 }
 
-export class ProjectStorage {
+export class LocalStorage {
     private static dbPromise: Promise<IDBDatabase> | null = null;
 
     static async getDB(): Promise<IDBDatabase> {
@@ -628,6 +628,36 @@ export class ProjectStorage {
     }
 
     // ===========================================
+    // ORPHAN DETECTION
+    // ===========================================
+
+    /**
+     * Find orphaned projects — projects missing any expected blobs
+     * AND not cloud-synced (no syncMeta or cloudSynced is false).
+     */
+    static async getOrphanedProjects(): Promise<Project[]> {
+        const [projects, allSyncMeta, blobKeys] = await Promise.all([
+            this.listProjects(),
+            this.listSyncMeta(),
+            this.listRecordingBlobKeys(),
+        ]);
+
+        const syncMetaMap = new Map(allSyncMeta.map(m => [m.projectId, m]));
+        const blobKeySet = new Set(blobKeys);
+
+        return projects.filter(project => {
+            const meta = syncMetaMap.get(project.id);
+            if (meta?.cloudSynced) return false;
+
+            if (project.screenSource && !blobKeySet.has(`${project.id}-screen`)) return true;
+            if (project.cameraSource && !blobKeySet.has(`${project.id}-camera`)) return true;
+            if (project.microphoneSource && !blobKeySet.has(`${project.id}-mic`)) return true;
+
+            return false;
+        });
+    }
+
+    // ===========================================
     // CUSTOM BACKGROUNDS LIBRARY (Global)
     // ===========================================
 
@@ -816,46 +846,6 @@ export class ProjectStorage {
         });
     }
 
-    /**
-     * Estimate total IndexedDB usage in bytes by iterating all stores.
-     * Sums Blob sizes for binary entries, and rough JSON size for metadata.
-     */
-    static async estimateIndexedDBUsage(): Promise<number> {
-        const db = await this.getDB();
-        const storeNames = Array.from(db.objectStoreNames);
-        let totalBytes = 0;
-
-        const tx = db.transaction(storeNames, 'readonly');
-
-        const storePromises = storeNames.map(name => {
-            return new Promise<number>((resolve, reject) => {
-                const store = tx.objectStore(name);
-                const req = store.openCursor();
-                let storeBytes = 0;
-
-                req.onsuccess = (e) => {
-                    const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
-                    if (cursor) {
-                        const val = cursor.value;
-                        if (val?.blob instanceof Blob) {
-                            storeBytes += val.blob.size;
-                        } else {
-                            // Rough estimate for metadata entries
-                            try { storeBytes += JSON.stringify(val).length * 2; } catch { /* skip */ }
-                        }
-                        cursor.continue();
-                    } else {
-                        resolve(storeBytes);
-                    }
-                };
-                req.onerror = () => reject(req.error);
-            });
-        });
-
-        const results = await Promise.all(storePromises);
-        totalBytes = results.reduce((sum, n) => sum + n, 0);
-        return totalBytes;
-    }
 
     /**
      * Migrates a single project that has a "proj-" prefixed ID.
@@ -958,7 +948,7 @@ export class ProjectStorage {
             tx.onerror = () => reject(tx.error);
         });
 
-        console.log(`[ProjectStorage] Migrated project ${oldProjectId} → ${newId}`);
+        console.log(`[LocalStorage] Migrated project ${oldProjectId} → ${newId}`);
         return newId;
     }
 }
@@ -990,18 +980,18 @@ export async function importFromRawRecording(
 
     // 1. Save blobs
     const screenBlobId = `${projectId}-screen`;
-    await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
+    await LocalStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
     let cameraBlobId: string | undefined;
     if (cameraBlob) {
         cameraBlobId = `${projectId}-camera`;
-        await ProjectStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
+        await LocalStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
     }
 
     let micBlobId: string | undefined;
     if (micBlob) {
         micBlobId = `${projectId}-mic`;
-        await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
+        await LocalStorage.saveRecordingBlob(micBlobId, micBlob);
     }
 
     // 2. Build source metadata with new storage URLs
@@ -1040,7 +1030,7 @@ export async function importFromRawRecording(
     );
 
     // 4. Save project
-    await ProjectStorage.saveProject(project);
+    await LocalStorage.saveProject(project);
 
 
     return project;

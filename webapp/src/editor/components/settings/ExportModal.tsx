@@ -8,7 +8,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
-import type { ExportQuality, ExportFps, ExportCodecInfo } from '../../export/ExportManager';
+import type { ExportQuality, ExportCodecInfo } from '../../export/ExportManager';
 
 import { trackExportStarted, trackExportCompleted, trackVideoPublished, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
@@ -28,10 +28,6 @@ const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }
     { value: '4K', label: '4K', proOnly: true },
 ];
 
-const FPS_OPTIONS: { value: ExportFps; label: string; proOnly: boolean }[] = [
-    { value: 30, label: '30 fps', proOnly: false },
-    { value: 60, label: '60 fps', proOnly: true },
-];
 
 /** Format remaining trial time as a human-readable string */
 function formatTrialRemaining(endDate: Date | null): string {
@@ -49,7 +45,6 @@ export function ExportModal() {
     const setExportModalOpen = useUIStore(s => s.setExportModalOpen);
 
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('720p');
-    const [selectedFps, setSelectedFps] = useState<ExportFps>(30);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -78,17 +73,17 @@ export function ExportModal() {
     const handleDownload = () => {
         if (isExporting) return;
 
-        const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K' || selectedFps === 60);
+        const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K');
 
         if (proAccess || !needsProFeature) {
-            startDownload(selectedQuality, selectedFps);
+            startDownload(selectedQuality);
             return;
         }
 
         setIsUpgradeModalOpen(true);
     };
 
-    const startDownload = async (quality: ExportQuality, fps: ExportFps) => {
+    const startDownload = async (quality: ExportQuality) => {
         useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
 
@@ -102,19 +97,19 @@ export function ExportModal() {
         trackExportStarted({
             ...extractProjectProperties(fullProject),
             quality,
-            fps,
+            fps: 30,
             export_type: 'download',
         });
 
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress);
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, onProgress);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
                 ...extractProjectProperties(fullProject),
                 quality,
-                fps,
+                fps: 30,
                 export_duration_ms: exportDuration,
                 success: true,
                 video_codec: codecs.video.encoder,
@@ -132,7 +127,7 @@ export function ExportModal() {
             trackExportCompleted({
                 ...extractProjectProperties(fullProject),
                 quality,
-                fps,
+                fps: 30,
                 export_duration_ms: Date.now() - exportStart,
                 success: false,
                 error: e?.message || 'Unknown error',
@@ -189,7 +184,7 @@ export function ExportModal() {
         trackExportStarted({
             ...extractProjectProperties(fullProject),
             quality: selectedQuality,
-            fps: selectedFps,
+            fps: 30,
             export_type: 'publish',
         });
 
@@ -199,7 +194,7 @@ export function ExportModal() {
         let exportDuration = 0;
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, selectedQuality, selectedFps, onProgress, {
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, selectedQuality, onProgress, {
                 skipDownload: true,
             });
             exportDuration = Date.now() - exportStart;
@@ -211,7 +206,7 @@ export function ExportModal() {
             trackExportCompleted({
                 ...extractProjectProperties(fullProject),
                 quality: selectedQuality,
-                fps: selectedFps,
+                fps: 30,
                 export_duration_ms: exportDuration,
                 success: true,
                 video_codec: codecs.video.encoder,
@@ -250,7 +245,7 @@ export function ExportModal() {
             trackVideoPublished({
                 ...extractProjectProperties(fullProject),
                 quality: selectedQuality,
-                fps: selectedFps,
+                fps: 30,
                 export_duration_ms: exportDuration,
                 upload_duration_ms: uploadDuration,
                 success: true,
@@ -279,7 +274,7 @@ export function ExportModal() {
                 trackVideoPublished({
                     ...extractProjectProperties(fullProject),
                     quality: selectedQuality,
-                    fps: selectedFps,
+                    fps: 30,
                     export_duration_ms: exportDuration,
                     upload_duration_ms: Date.now() - exportStart - exportDuration,
                     success: false,
@@ -297,7 +292,7 @@ export function ExportModal() {
                 trackExportCompleted({
                     ...extractProjectProperties(fullProject),
                     quality: selectedQuality,
-                    fps: selectedFps,
+                    fps: 30,
                     export_duration_ms: Date.now() - exportStart,
                     success: false,
                     error: e?.message || 'Unknown error',
@@ -326,8 +321,7 @@ export function ExportModal() {
 
     // Determine if currently selected options require Pro
     const selectedQualityOption = QUALITY_OPTIONS.find(o => o.value === selectedQuality);
-    const selectedFpsOption = FPS_OPTIONS.find(o => o.value === selectedFps);
-    const needsProFeature = (selectedQualityOption?.proOnly || selectedFpsOption?.proOnly) && !proAccess;
+    const needsProFeature = selectedQualityOption?.proOnly && !proAccess;
 
     // Inline trial/auth status badge — only show when user doesn't have pro access
     const statusBadge = proAccess ? null : (
@@ -373,20 +367,6 @@ export function ExportModal() {
                             }))}
                             value={selectedQuality}
                             onChange={(val) => setSelectedQuality(val)}
-                        />
-                    </div>
-
-                    {/* FPS Selection */}
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted w-1/3 shrink-0">Frame Rate</span>
-                        <Dropdown
-                            options={FPS_OPTIONS.map(opt => ({
-                                value: opt.value,
-                                label: opt.label,
-                                suffix: opt.proOnly && !isPro ? proBadge : undefined,
-                            }))}
-                            value={selectedFps}
-                            onChange={(val) => setSelectedFps(val)}
                         />
                     </div>
 

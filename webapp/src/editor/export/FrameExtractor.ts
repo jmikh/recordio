@@ -34,7 +34,7 @@ const DRAIN_TIMEOUT_MIN_MS = 3_000;
 const DRAIN_TIMEOUT_PER_CHUNK_MS = 25;
 
 /** Maximum number of automatic decoder rebuilds per export. */
-const MAX_REBUILDS = 4;
+const MAX_REBUILDS = 25;
 
 /** Timeout (ms) for the hardware decode probe during initialization. */
 const HW_PROBE_TIMEOUT_MS = 2_000;
@@ -363,12 +363,27 @@ export class FrameExtractor {
         this.decodedFrames = [];
 
         const targetTimeMicros = targetTimeMs * 1000;
-        let keyframeIndex = 0;
+        let keyframeIndex = -1;
         for (let i = 0; i < this.chunks.length; i++) {
-            if (this.chunks[i].type === 'key' && this.chunks[i].timestamp <= targetTimeMicros) {
+            if (this.chunks[i].type === 'key' && this.chunks[i].data !== null && this.chunks[i].timestamp <= targetTimeMicros) {
                 keyframeIndex = i;
             }
         }
+
+        // No keyframe with data before target — use earliest available
+        if (keyframeIndex === -1) {
+            for (let i = 0; i < this.chunks.length; i++) {
+                if (this.chunks[i].type === 'key' && this.chunks[i].data !== null) {
+                    keyframeIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (keyframeIndex === -1) {
+            throw new Error(`[FrameExtractor] Rebuild failed — all chunk data has been released`);
+        }
+
         this.nextChunkIndex = keyframeIndex;
         this.flushed = false;
 

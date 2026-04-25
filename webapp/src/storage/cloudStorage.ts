@@ -13,7 +13,6 @@ export interface CloudProjectSummary {
     updated_at: string;
     created_at: string;
     expires_at: string | null;
-    upload_status: string;
     cf_video_uid: string | null;
     cloud_version: number;
     duration_ms: number | null;
@@ -165,8 +164,9 @@ export class CloudStorage {
 
         const { data, error } = await supabase
             .from('projects')
-            .select('id, name, thumbnail_storage_path, last_accessed_at, updated_at, created_at, expires_at, upload_status, cf_video_uid, cloud_version, duration_ms')
+            .select('id, name, thumbnail_storage_path, last_accessed_at, updated_at, created_at, expires_at, cf_video_uid, cloud_version, duration_ms')
             .is('deleted_at', null)
+            .eq('upload_status', 'ready')
             .order('updated_at', { ascending: false });
 
         if (error) throw error;

@@ -9,7 +9,7 @@ import { CiImageOn } from "react-icons/ci";
 import { XButton, Slider, CollapsibleCard } from '@shared/components';
 import { TbBackground } from 'react-icons/tb';
 import type { PreviewItem } from '@shared/components';
-import { ProjectStorage, type CustomBackgroundEntry } from '../../../storage/projectStorage';
+import { LocalStorage, type CustomBackgroundEntry } from '../../../storage/localStorage';
 
 
 
@@ -49,7 +49,7 @@ export const BackgroundSettings = () => {
 
     // Load custom backgrounds library
     const loadLibrary = useCallback(async () => {
-        const entries = await ProjectStorage.listCustomBackgrounds();
+        const entries = await LocalStorage.listCustomBackgrounds();
         setCustomLibrary(entries);
 
         // Create blob URLs for thumbnails
@@ -174,7 +174,7 @@ export const BackgroundSettings = () => {
     const handleLibraryDelete = async (libraryId: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Don't trigger select
 
-        await ProjectStorage.deleteCustomBackground(libraryId);
+        await LocalStorage.deleteCustomBackground(libraryId);
 
         // Revoke URL
         if (libraryUrls[libraryId]) {

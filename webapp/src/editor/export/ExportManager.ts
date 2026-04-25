@@ -15,7 +15,7 @@ import { useUIStore } from '../stores/useUIStore';
 
 
 // Re-export types that consumers depend on
-export type { ExportQuality, ExportFps } from './codecResolver';
+export type { ExportQuality } from './codecResolver';
 
 export interface ExportProgress {
     progress: number;
@@ -48,7 +48,6 @@ export class ExportManager {
     async exportProject(
         project: Project,
         quality: import('./codecResolver').ExportQuality,
-        fps: import('./codecResolver').ExportFps,
         onProgress: (state: ExportProgress) => void,
         options?: { skipDownload?: boolean }
     ): Promise<ExportResult> {
@@ -73,7 +72,7 @@ export class ExportManager {
             }
 
             try {
-                const result = await this.runExport(project, quality, fps, onProgress, signal, options);
+                const result = await this.runExport(project, quality, onProgress, signal, options);
                 return result;
             } catch (e) {
                 if (signal.aborted) throw new Error('Export cancelled');
@@ -109,11 +108,11 @@ export class ExportManager {
     private async runExport(
         project: Project,
         quality: import('./codecResolver').ExportQuality,
-        fps: import('./codecResolver').ExportFps,
         onProgress: (state: ExportProgress) => void,
         signal: AbortSignal,
         options?: { skipDownload?: boolean }
     ): Promise<ExportResult> {
+        const fps = 30;
         const targetHeight = getHeightForQuality(quality);
         const aspectRatio = project.settings.outputSize.width / project.settings.outputSize.height;
         const targetWidth = Math.round(targetHeight * aspectRatio);
@@ -125,7 +124,7 @@ export class ExportManager {
         const renderProject = ProjectImpl.scale(project, { width, height });
 
         // Probe codec support: prefer H.264, fall back to VP9; prefer AAC, fall back to Opus
-        const videoCodec = await resolveVideoCodec(quality, width, height, fps);
+        const videoCodec = await resolveVideoCodec(quality, width, height);
         const audioCodec = await resolveAudioCodec();
 
         // Stream muxer output into a growable chunk list instead of a single
@@ -409,7 +408,7 @@ export class ExportManager {
             const blob = new Blob([finalBuffer], { type: 'video/mp4' });
 
             if (!options?.skipDownload) {
-                this.downloadBlob(blob, `${project.name}_${quality}_${fps}fps.mp4`);
+                this.downloadBlob(blob, `${project.name}_${quality}.mp4`);
             }
 
             // Flag abnormally slow exports (>2× output duration)

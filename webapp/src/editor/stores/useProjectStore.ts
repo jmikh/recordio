@@ -3,7 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, UserEvents } from '../../types';
 import { ProjectImpl } from '../../core/Project';
-import { ProjectStorage } from '../../storage/projectStorage';
+import { LocalStorage } from '../../storage/localStorage';
 import { SyncService } from '../../storage/syncService';
 import { useUserStore } from './useUserStore';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
@@ -142,7 +142,7 @@ export const useProjectStore = create<ProjectState>()(
                 saveProject: async () => {
                     set({ isSaving: true });
                     try {
-                        await ProjectStorage.saveProject(get().project);
+                        await LocalStorage.saveProject(get().project);
                     } catch (e) {
                         console.error("Failed to save project:", e);
                     } finally {
@@ -155,12 +155,12 @@ export const useProjectStore = create<ProjectState>()(
                     const projectId = state.project.id;
 
                     // 1. Save to global library
-                    const libraryId = await ProjectStorage.saveCustomBackground(blob);
+                    const libraryId = await LocalStorage.saveCustomBackground(blob);
 
 
                     // 2. Copy to project recordings
                     const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
-                    await ProjectStorage.saveRecordingBlob(copyId, blob);
+                    await LocalStorage.saveRecordingBlob(copyId, blob);
 
 
                     // 3. Create URLs
@@ -175,14 +175,14 @@ export const useProjectStore = create<ProjectState>()(
                     const projectId = state.project.id;
 
                     // 1. Get blob from library
-                    const blob = await ProjectStorage.getCustomBackground(libraryId);
+                    const blob = await LocalStorage.getCustomBackground(libraryId);
                     if (!blob) {
                         throw new Error(`Background ${libraryId} not found in library`);
                     }
 
                     // 2. Copy to project recordings
                     const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
-                    await ProjectStorage.saveRecordingBlob(copyId, blob);
+                    await LocalStorage.saveRecordingBlob(copyId, blob);
 
 
                     // 3. Create URLs
@@ -198,7 +198,7 @@ export const useProjectStore = create<ProjectState>()(
 
                     if (currentUrl?.startsWith('recordio-blob://')) {
                         const blobId = currentUrl.replace('recordio-blob://', '');
-                        await ProjectStorage.deleteRecordingBlob(blobId);
+                        await LocalStorage.deleteRecordingBlob(blobId);
 
                     }
                 },

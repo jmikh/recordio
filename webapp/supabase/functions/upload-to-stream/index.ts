@@ -33,10 +33,10 @@ serve(withAuth(async (req, { user, supabase }) => {
     }
 
     // 2. Parse JSON body
-    const { projectId, projectName } = await req.json();
+    const { projectId, projectName, fileSize } = await req.json();
 
-    if (!projectId || !projectName) {
-        return errorResponse('Missing required fields: projectId, projectName', 400);
+    if (!projectId || !projectName || !fileSize) {
+        return errorResponse('Missing required fields: projectId, projectName, fileSize', 400);
     }
 
     // 3. Look up the project — must exist and belong to this user (RLS enforced)
@@ -53,31 +53,35 @@ serve(withAuth(async (req, { user, supabase }) => {
 
     const isReshare = !!project.cf_video_uid;
 
-    // 4. Request a one-time upload URL from Cloudflare (Direct Creator Upload)
+    // 4. Request a TUS upload URL from Cloudflare (Direct Creator Upload via TUS)
     const cfResponse = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/direct_upload`,
+        `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream?direct_user=true`,
         {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${CF_API_TOKEN}`,
-                'Content-Type': 'application/json',
+                'Tus-Resumable': '1.0.0',
+                'Upload-Length': String(fileSize),
+                'Upload-Creator': user.id,
+                'Upload-Metadata': `maxDurationSeconds ${btoa('3600')}`,
             },
-            body: JSON.stringify({
-                maxDurationSeconds: 3600,
-                creator: user.id,
-            }),
         }
     );
 
     if (!cfResponse.ok) {
         const cfError = await cfResponse.text();
-        console.error('[Stream] CF direct_upload request failed:', cfError);
+        console.error('[Stream] CF TUS create failed:', cfError);
         return jsonResponse({ error: 'Failed to create upload URL', details: cfError }, 502);
     }
 
-    const cfData = await cfResponse.json();
-    const uploadURL = cfData.result.uploadURL;
-    const newVideoUid = cfData.result.uid;
+    const uploadURL = cfResponse.headers.get('Location') || cfResponse.headers.get('location');
+    if (!uploadURL) {
+        return errorResponse('CF did not return a TUS upload URL', 502);
+    }
+
+    // Extract video UID from the TUS URL (last path segment)
+    const newVideoUid = cfResponse.headers.get('stream-media-id')
+        || uploadURL.split('/').pop() || '';
 
     // 5. Handle re-share: queue old video for deletion
     if (isReshare && project.cf_video_uid) {

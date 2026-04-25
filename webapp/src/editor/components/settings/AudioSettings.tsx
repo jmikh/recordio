@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
-import { ProjectStorage, type CustomMusicEntry } from '../../../storage/projectStorage';
+import { LocalStorage, type CustomMusicEntry } from '../../../storage/localStorage';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
 
 // CDN preset music tracks
@@ -39,7 +39,7 @@ export const AudioSettingsPanel = () => {
 
     // Load custom music library
     const loadLibrary = useCallback(async () => {
-        const entries = await ProjectStorage.listCustomMusic();
+        const entries = await LocalStorage.listCustomMusic();
         setCustomLibrary(entries);
     }, []);
 
@@ -142,7 +142,7 @@ export const AudioSettingsPanel = () => {
 
         // Store blob in project recordings for persistence
         const blobId = `audio-music-${entry.id}`;
-        await ProjectStorage.saveRecordingBlob(blobId, entry.blob);
+        await LocalStorage.saveRecordingBlob(blobId, entry.blob);
         const storageUrl = `recordio-blob://${blobId}`;
 
         updateSettings({
@@ -166,11 +166,11 @@ export const AudioSettingsPanel = () => {
 
         try {
             // Save to global library
-            const libraryId = await ProjectStorage.saveCustomMusic(file, file.name);
+            const libraryId = await LocalStorage.saveCustomMusic(file, file.name);
 
             // Store blob in project recordings for persistence
             const blobId = `audio-music-${libraryId}`;
-            await ProjectStorage.saveRecordingBlob(blobId, file);
+            await LocalStorage.saveRecordingBlob(blobId, file);
             const storageUrl = `recordio-blob://${blobId}`;
             const runtimeUrl = URL.createObjectURL(file);
 
@@ -208,7 +208,7 @@ export const AudioSettingsPanel = () => {
             setPreviewingEntryId(null);
         }
 
-        await ProjectStorage.deleteCustomMusic(id);
+        await LocalStorage.deleteCustomMusic(id);
         await loadLibrary();
     };
 

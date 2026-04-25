@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { ProjectStorage } from '../../../storage/projectStorage';
+import { LocalStorage } from '../../../storage/localStorage';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
@@ -319,7 +319,7 @@ export const CanvasContainer = () => {
                     offscreen.height = thumbH;
                     offscreen.getContext('2d')!.drawImage(canvas, 0, 0, thumbW, thumbH);
                     offscreen.toBlob((blob) => {
-                        if (blob) ProjectStorage.saveThumbnail(project.id, blob).catch(console.warn);
+                        if (blob) LocalStorage.saveThumbnail(project.id, blob).catch(console.warn);
                     }, 'image/webp', 0.8);
                 }
             };
@@ -368,7 +368,7 @@ export const CanvasContainer = () => {
     useEffect(() => {
         if (!project?.id) return;
         lastCapturedBgRef.current = null;
-        ProjectStorage.getThumbnail(project.id).then((existing) => {
+        LocalStorage.getThumbnail(project.id).then((existing) => {
             if (!existing) scheduleThumbnailCapture(3000);
         });
         return () => {

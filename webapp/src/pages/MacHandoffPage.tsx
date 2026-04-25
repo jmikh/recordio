@@ -13,7 +13,7 @@ import { navigate } from '../navigate';
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { importFromRawRecording } from '../storage/projectStorage';
+import { importFromRawRecording } from '../storage/localStorage';
 import { isRecordioMacApp, sendToNative } from '../bridge/macBridge';
 import { LogoLink } from '@shared/components';
 

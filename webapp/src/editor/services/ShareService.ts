@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react';
+import * as tus from 'tus-js-client';
 import { supabase, AuthManager } from '../../auth/AuthManager';
 
 const SHARE_BASE_URL = import.meta.env.PROD
@@ -103,9 +104,9 @@ export class ShareService {
             throw new Error('Not authenticated');
         }
 
-        // Step 1: Get one-time upload URL from edge function (tiny JSON request)
+        // Step 1: Get TUS upload URL from edge function
         const uploadData = await ShareService.requestUploadUrl(
-            session.access_token, projectId, projectName
+            session.access_token, projectId, projectName, blob.size
         );
 
         // Step 2: Upload directly to Cloudflare (XHR for progress tracking)
@@ -127,9 +128,9 @@ export class ShareService {
         };
     }
 
-    /** Step 1: Request a one-time upload URL from the edge function */
+    /** Step 1: Request a TUS upload URL from the edge function */
     private static async requestUploadUrl(
-        accessToken: string, projectId: string, projectName: string
+        accessToken: string, projectId: string, projectName: string, fileSize: number
     ): Promise<{ uploadURL: string; uid: string; shareId: string; isUpdate: boolean }> {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const url = `${supabaseUrl}/functions/v1/upload-to-stream`;
@@ -140,7 +141,7 @@ export class ShareService {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ projectId, projectName }),
+            body: JSON.stringify({ projectId, projectName, fileSize }),
         });
 
         const data = await response.json();
@@ -152,35 +153,26 @@ export class ShareService {
         return data;
     }
 
-    /** Step 2: Upload video blob directly to Cloudflare via the one-time URL */
+    /** Step 2: Upload video blob directly to Cloudflare via TUS */
     private static async uploadDirectToCF(
         uploadURL: string, blob: Blob, onUploadProgress?: (fraction: number) => void
     ): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', uploadURL);
-
-            if (onUploadProgress) {
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        onUploadProgress(e.loaded / e.total);
-                    }
-                };
-            }
-
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
+            const upload = new tus.Upload(blob, {
+                uploadUrl: uploadURL,
+                chunkSize: 50 * 1024 * 1024, // 50 MB chunks
+                retryDelays: [0, 3000, 5000, 10000, 20000],
+                onError: (error) => {
+                    reject(new Error(`TUS upload failed: ${error.message}`));
+                },
+                onProgress: (bytesUploaded, bytesTotal) => {
+                    onUploadProgress?.(bytesUploaded / bytesTotal);
+                },
+                onSuccess: () => {
                     resolve();
-                } else {
-                    reject(new Error(`Direct upload failed (${xhr.status})`));
-                }
-            };
-
-            xhr.onerror = () => reject(new Error('Network error during direct upload'));
-
-            const formData = new FormData();
-            formData.append('file', blob, 'video.mp4');
-            xhr.send(formData);
+                },
+            });
+            upload.start();
         });
     }
 

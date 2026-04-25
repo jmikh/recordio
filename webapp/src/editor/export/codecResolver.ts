@@ -8,7 +8,7 @@
  */
 
 export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
-export type ExportFps = 30 | 60;
+export type ExportFps = 30;
 
 export interface VideoCodecResult {
     config: VideoEncoderConfig;
@@ -36,9 +36,8 @@ export async function resolveVideoCodec(
     quality: ExportQuality,
     width: number,
     height: number,
-    fps: ExportFps
 ): Promise<VideoCodecResult> {
-    const bitrate = getBitrate(quality, fps);
+    const bitrate = getBitrate(quality);
     const tried: string[] = [];
 
     // H.264 candidates ordered by preference (best quality first)
@@ -46,7 +45,7 @@ export async function resolveVideoCodec(
     for (const codec of h264Candidates) {
         tried.push(codec);
         try {
-            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: fps };
+            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30 };
             const result = await VideoEncoder.isConfigSupported(config);
             if (result.supported) {
                 return { config, muxerCodec: 'avc', fallback: false, tried };
@@ -60,7 +59,7 @@ export async function resolveVideoCodec(
     const vp9Codec = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
     tried.push(vp9Codec);
     try {
-        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, framerate: fps };
+        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, framerate: 30 };
         const result = await VideoEncoder.isConfigSupported(config);
         if (result.supported) {
             console.warn('[Export] H.264 not supported — falling back to VP9');
@@ -139,16 +138,12 @@ export function getHeightForQuality(q: ExportQuality): number {
     }
 }
 
-export function getBitrate(q: ExportQuality, fps: ExportFps): number {
-    // Base bitrates at 30fps (bits per second)
-    let base: number;
+export function getBitrate(q: ExportQuality): number {
     switch (q) {
-        case '480p': base = 2_000_000; break; // 2 Mbps
-        case '720p': base = 5_000_000; break; // 5 Mbps
-        case '1080p': base = 8_000_000; break; // 8 Mbps
-        case '2K': base = 15_000_000; break; // 15 Mbps
-        case '4K': base = 25_000_000; break; // 25 Mbps
+        case '480p': return 2_000_000;  // 2 Mbps
+        case '720p': return 5_000_000;  // 5 Mbps
+        case '1080p': return 8_000_000; // 8 Mbps
+        case '2K': return 15_000_000;   // 15 Mbps
+        case '4K': return 25_000_000;   // 25 Mbps
     }
-    // Scale up 1.5x for 60fps to maintain per-frame quality
-    return fps === 60 ? Math.round(base * 1.5) : base;
 }

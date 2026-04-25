@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { ProjectStorage } from './projectStorage';
+import { LocalStorage } from './localStorage';
 import { downloadViaNative } from '../bridge/macBridge';
 import type { Project } from '../types';
 
@@ -34,7 +34,7 @@ function collectBlobEntries(project: Project): { id: string; mimeType: string }[
  * Exports a project and all its blobs to a downloadable .zip file.
  */
 export async function exportProjectToZip(projectId: string): Promise<void> {
-    const project = await ProjectStorage.loadProjectRaw(projectId);
+    const project = await LocalStorage.loadProjectRaw(projectId);
     if (!project) throw new Error(`Project ${projectId} not found`);
 
     const zip = new JSZip();
@@ -43,7 +43,7 @@ export async function exportProjectToZip(projectId: string): Promise<void> {
 
     // Add each blob to the zip
     for (const { id: blobId, mimeType: expectedMimeType } of blobEntries) {
-        const blob = await ProjectStorage.getRecordingBlob(blobId);
+        const blob = await LocalStorage.getRecordingBlob(blobId);
         if (blob) {
             zip.file(`blobs/${blobId}.bin`, blob);
             // Use blob.type if available, otherwise fall back to expected MIME type
@@ -55,7 +55,7 @@ export async function exportProjectToZip(projectId: string): Promise<void> {
     }
 
     // Add thumbnail if it exists
-    const thumbnail = await ProjectStorage.getThumbnail(projectId);
+    const thumbnail = await LocalStorage.getThumbnail(projectId);
     if (thumbnail) {
         zip.file('thumbnail.bin', thumbnail);
     }
@@ -114,7 +114,7 @@ export async function importProjectFromZip(file: File): Promise<string> {
             const mimeType = manifest[blobId]?.mimeType || 'application/octet-stream';
             const blob = new Blob([data], { type: mimeType });
             console.log(`[Import] Restored blob: ${blobId} (${mimeType}, ${(blob.size / 1024 / 1024).toFixed(1)} MB)`);
-            await ProjectStorage.saveRecordingBlob(blobId, blob);
+            await LocalStorage.saveRecordingBlob(blobId, blob);
         }
     }
 
@@ -123,14 +123,14 @@ export async function importProjectFromZip(file: File): Promise<string> {
     if (thumbnailFile) {
         const data = await thumbnailFile.async('arraybuffer');
         const blob = new Blob([data], { type: 'image/jpeg' });
-        await ProjectStorage.saveThumbnail(project.id, blob);
+        await LocalStorage.saveThumbnail(project.id, blob);
     }
 
     // Save project
-    await ProjectStorage.saveProject(project);
+    await LocalStorage.saveProject(project);
 
     // Diagnostic: verify the stored project can be loaded and hydrated
-    const loaded = await ProjectStorage.loadProject(project.id);
+    const loaded = await LocalStorage.loadProject(project.id);
     if (loaded) {
         console.log('[Import] Verification — screenSource:', {
             storageUrl: loaded.screenSource?.storageUrl,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
-import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
+import { importFromRawRecording, LocalStorage } from '../storage/localStorage';
 import { SyncService } from '../storage/syncService';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
@@ -70,7 +70,7 @@ export function ImportPage() {
         const projectId = recordingId;
         setStatus('checking');
 
-        ProjectStorage.loadProjectRaw(projectId)
+        LocalStorage.loadProjectRaw(projectId)
             .then((existingProject) => {
                 if (existingProject) {
                     // Project already exists, redirect to editor
@@ -170,8 +170,8 @@ export function ImportPage() {
                         setTimeout(() => navigate(`/editor?projectId=${project.id}`), 1500);
                     } else {
                         // Not logged in — check for other unsynced local projects
-                        ProjectStorage.listProjects().then(async (allLocal) => {
-                            const allSyncMeta = await ProjectStorage.listSyncMeta();
+                        LocalStorage.listProjects().then(async (allLocal) => {
+                            const allSyncMeta = await LocalStorage.listSyncMeta();
                             const syncedIds = new Set(allSyncMeta.map(m => m.projectId));
                             const unsyncedOthers = allLocal.filter(
                                 p => p.id !== project.id && !syncedIds.has(p.id)
@@ -316,7 +316,7 @@ export function ImportPage() {
         setIsDeleting(true);
         try {
             for (const id of existingProjectsPrompt.projectIds) {
-                await ProjectStorage.deleteProject(id);
+                await LocalStorage.deleteProject(id);
             }
         } catch (e) {
             console.error('[ImportPage] Failed to delete existing projects:', e);

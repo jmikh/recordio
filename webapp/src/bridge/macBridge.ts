@@ -13,7 +13,7 @@ import { navigate } from '../navigate';
  * 4. Navigates to the editor
  */
 
-import { importFromRawRecording } from '../storage/projectStorage';
+import { importFromRawRecording } from '../storage/localStorage';
 
 /** Detect if running inside the RecordioMac WKWebView */
 export function isRecordioMacApp(): boolean {
