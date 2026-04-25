@@ -136,8 +136,9 @@ async function evictFreshProjectsUntilHealthy(
  * Runs silently; never throws.
  */
 export async function cleanupStorageIfNeeded(): Promise<void> {
-    if (running) return;
-    running = true;
+    // TODO: disabled — suspected of deleting blobs for valid projects
+    console.log('[StorageCleanup] Skipped (temporarily disabled)');
+    return;
 
     try {
         let { usage = 0, quota = 0 } = await navigator.storage.estimate();
