@@ -218,7 +218,7 @@ Database functions live in `sql/functions/`, one file per function. **Never put 
 ### Conventions
 
 - **One file per function** — named after the function (e.g., `handle_new_user.sql`)
-- **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_stale_uploads.sql`)
+- **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_expired_projects.sql`)
 - **Doc comment at the top** of every file: purpose, trigger/caller, and tables touched
 - **[FUNCTIONS.md](sql/functions/FUNCTIONS.md)** is the index — update it when adding/removing functions
 

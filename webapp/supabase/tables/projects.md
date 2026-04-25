@@ -21,7 +21,7 @@ Cloud-backed project storage. Stores project metadata (settings, timeline, segme
 - `syncService.ts` (webapp) — orchestrates sync
 - `storage-upload-url` edge function — quota check
 - `storage-confirm-upload` edge function — updates paths after upload
-- `cleanup-expired-projects` edge function — Storage/CF cleanup for soft-deleted rows
+- `purge-deleted-projects` edge function — hard-deletes projects soft-deleted 3+ days, cleans up Storage + CF Stream
 - `stripe-webhooks` edge function — sets expiry via `set_project_expiry()`
 
 ## RLS
