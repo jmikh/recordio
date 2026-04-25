@@ -481,7 +481,7 @@ export class CloudStorage {
     /** Compute total output duration in ms from a project's output windows. */
     private static computeDurationMs(project: Project): number {
         const windows = project.timeline?.outputWindows ?? [];
-        return windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
+        return Math.round(windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0));
     }
 
     /**

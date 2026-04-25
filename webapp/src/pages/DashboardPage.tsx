@@ -147,9 +147,18 @@ export function DashboardPage() {
         }
     };
 
+    // Filter: only show projects that are usable
+    //  - Cloud-ready: all media uploaded to cloud (uploadStatus === 'ready')
+    //  - Local: blobs exist in IndexedDB (hasLocal), even if still uploading
+    // This hides cloud-only projects whose media upload never completed.
+    const visibleProjects = useMemo(() =>
+        projects.filter(p => p.uploadStatus === 'ready' || p.hasLocal),
+        [projects],
+    );
+
     // Sort projects
     const sortedProjects = useMemo(() => {
-        const sorted = [...projects];
+        const sorted = [...visibleProjects];
         switch (sortOrder) {
             case 'newest':
                 sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -162,7 +171,7 @@ export function DashboardPage() {
                 break;
         }
         return sorted;
-    }, [projects, sortOrder]);
+    }, [visibleProjects, sortOrder]);
 
     const handleOpen = (item: ProjectListItem) => {
         trackProjectOpened();
@@ -237,7 +246,7 @@ export function DashboardPage() {
                     <div className="py-3 text-sm font-medium text-text-highlighted relative self-stretch flex items-center">
                         <span>Projects</span>
                         <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
-                            {projects.length}
+                            {visibleProjects.length}
                         </span>
                         <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
                     </div>
@@ -245,7 +254,7 @@ export function DashboardPage() {
                     <Button variant="primary" size="sm" icon={MdFiberManualRecord} onClick={handleRecord}>
                         Record
                     </Button>
-                    <div className={`my-2 ${projects.length > 1 ? 'visible' : 'invisible'}`}>
+                    <div className={`my-2 ${visibleProjects.length > 1 ? 'visible' : 'invisible'}`}>
                         <Dropdown
                             options={SORT_OPTIONS}
                             value={sortOrder}
@@ -284,7 +293,7 @@ export function DashboardPage() {
                         <div className="flex items-center justify-center h-64">
                             <div className="text-text-muted">Loading projects...</div>
                         </div>
-                    ) : projects.length === 0 ? (
+                    ) : visibleProjects.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-3">
                             <p className="text-sm text-text-muted">
                                 Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.
@@ -326,7 +335,7 @@ export function DashboardPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                const allIds = projects.map(p => p.id);
+                                const allIds = visibleProjects.map(p => p.id);
                                 if (selectedIds.size === allIds.length) {
                                     setSelectedIds(new Set());
                                 } else {
@@ -334,7 +343,7 @@ export function DashboardPage() {
                                 }
                             }}
                         >
-                            {selectedIds.size === projects.length ? 'Deselect All' : 'Select All'}
+                            {selectedIds.size === visibleProjects.length ? 'Deselect All' : 'Select All'}
                         </Button>
                         <Button
                             variant="destructive"
