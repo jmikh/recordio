@@ -1,8 +1,8 @@
 import { ProjectStorage } from './projectStorage';
 
 const QUOTA_THRESHOLD = 0.75; // 75% of browser quota
-const ABSOLUTE_THRESHOLD = 250 * 1024 * 1024; // 250 MB (testing — restore to 10 GB for prod)
-const STALE_MS = 60 * 1000; // 1 minute (testing — restore to 7 days for prod)
+const ABSOLUTE_THRESHOLD = 15 * 1024 * 1024 * 1024; // 10 GB
+const STALE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** Prevent concurrent runs. */
 let running = false;
