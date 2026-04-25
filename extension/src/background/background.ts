@@ -439,6 +439,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
                 sendResponse({ success: true });
                 break;
 
+            case BRIDGE_MSG.OPEN_CONTROLLER:
+                await openControllerTab();
+                sendResponse({ success: true });
+                break;
+
             default:
                 sendResponse({ success: false, error: 'Unknown message type', code: 'UNKNOWN' });
         }

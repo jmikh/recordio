@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ProjectStorage } from '../storage/projectStorage';
 import { SyncService, type ProjectListItem } from '../storage/syncService';
 import { ProjectCard } from '../components/ProjectCard';
 import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
-import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
-import { MdOutlineBugReport } from 'react-icons/md';
+import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
+import { MdOutlineBugReport, MdFiberManualRecord } from 'react-icons/md';
 import { FcGoogle } from 'react-icons/fc';
 
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -21,6 +20,11 @@ import { useAuthListener } from '../hooks/useAuthListener';
 import { trackProjectOpened } from '../core/analytics';
 import { importProjectFromZip } from '../storage/projectTransfer';
 import { navigate } from '../navigate';
+import { cleanupStorageIfNeeded } from '../storage/storageCleanup';
+
+const EXTENSION_ID = import.meta.env.DEV
+    ? 'lpponocoanighhephabalkejmdbjlhmi'
+    : 'bbcdpipjplklaneplfmlhhibnllhinii';
 
 type SortOrder = 'newest' | 'oldest' | 'name';
 
@@ -41,7 +45,6 @@ export function DashboardPage() {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
-    const [storageUsed, setStorageUsed] = useState<number | null>(null);
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     useAuthListener();
     const importInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +74,20 @@ export function DashboardPage() {
             setIsImporting(false);
             if (importInputRef.current) importInputRef.current.value = '';
         }
+    };
+
+    const handleRecord = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chr = (window as any).chrome;
+        if (!chr?.runtime?.sendMessage) {
+            window.open(CHROME_EXTENSION_URL, '_blank');
+            return;
+        }
+        chr.runtime.sendMessage(EXTENSION_ID, { type: BRIDGE_MSG.OPEN_CONTROLLER }, (response: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (chr.runtime.lastError || !response?.success) {
+                window.open(CHROME_EXTENSION_URL, '_blank');
+            }
+        });
     };
 
     const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | 'lifetime' | undefined>();
@@ -105,7 +122,8 @@ export function DashboardPage() {
         }
 
         loadProjects();
-        ProjectStorage.estimateIndexedDBUsage().then(setStorageUsed).catch(console.error);
+        cleanupStorageIfNeeded();
+
     }, []);
 
     // Reload projects when auth state changes (login/logout)
@@ -133,10 +151,10 @@ export function DashboardPage() {
         const sorted = [...projects];
         switch (sortOrder) {
             case 'newest':
-                sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 break;
             case 'oldest':
-                sorted.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+                sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
                 break;
             case 'name':
                 sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -185,13 +203,6 @@ export function DashboardPage() {
         setSelectedIds(new Set());
     };
 
-    const formatBytes = (bytes: number): string => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    };
-
     return (
         <div className="min-h-screen bg-surface-body text-text-main">
             {/* Header */}
@@ -230,11 +241,9 @@ export function DashboardPage() {
                         <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
                     </div>
                     <div className="flex-1" />
-                    {projects.length > 0 && storageUsed != null && (
-                        <span className="text-xs text-text-muted">
-                            <span className="text-text-main">{formatBytes(storageUsed)}</span> local storage used
-                        </span>
-                    )}
+                    <Button variant="primary" size="sm" icon={MdFiberManualRecord} onClick={handleRecord}>
+                        Record
+                    </Button>
                     <div className={`my-2 ${projects.length > 1 ? 'visible' : 'invisible'}`}>
                         <Dropdown
                             options={SORT_OPTIONS}

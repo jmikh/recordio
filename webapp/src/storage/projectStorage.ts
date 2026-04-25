@@ -597,6 +597,34 @@ export class ProjectStorage {
         });
     }
 
+    /**
+     * Returns all keys from the recordings store without loading blob data.
+     */
+    static async listRecordingBlobKeys(): Promise<string[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('recordings', 'readonly');
+            const store = tx.objectStore('recordings');
+            const req = store.getAllKeys();
+            req.onsuccess = () => resolve(req.result as string[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Returns all project IDs without loading full project data.
+     */
+    static async listProjectIds(): Promise<string[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.getAllKeys();
+            req.onsuccess = () => resolve(req.result as string[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
     // ===========================================
     // CUSTOM BACKGROUNDS LIBRARY (Global)
     // ===========================================

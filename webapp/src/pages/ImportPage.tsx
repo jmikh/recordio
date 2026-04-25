@@ -10,6 +10,7 @@ import { AuthManager } from '../auth/AuthManager';
 import { FcGoogle } from 'react-icons/fc';
 import { LogoLink, Modal, Button } from '@shared/components';
 import { navigate } from '../navigate';
+import { cleanupStorageIfNeeded } from '../storage/storageCleanup';
 
 type ImportStatus =
     | 'init'
@@ -61,6 +62,9 @@ export function ImportPage() {
 
         if (hasStarted) return;
         setHasStarted(true);
+
+        // Free space before importing a new recording
+        cleanupStorageIfNeeded();
 
         // Check if project already exists in local DB
         const projectId = recordingId;
