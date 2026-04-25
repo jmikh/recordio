@@ -46,6 +46,31 @@ export class SyncService {
     private static activeUploads = new Set<string>();
 
     /**
+     * Compute SHA-256 hash of the cloud-serializable project data.
+     * Used to skip no-op cloud writes when the project hasn't changed.
+     */
+    private static async projectDataHash(project: Project): Promise<string> {
+        const stripped = CloudStorage.stripForCloud(project);
+        const json = JSON.stringify(stripped);
+        const buffer = new TextEncoder().encode(json);
+        const hash = await crypto.subtle.digest('SHA-256', buffer);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Set the baseline project hash after loading a project.
+     * Prevents the auto-save subscriber from triggering a no-op cloud write
+     * when the project hasn't been edited.
+     */
+    static async initProjectHash(project: Project): Promise<void> {
+        const hash = await this.projectDataHash(project);
+        const syncMeta = await ProjectStorage.getSyncMeta(project.id);
+        if (syncMeta) {
+            await ProjectStorage.saveSyncMeta({ ...syncMeta, projectHash: hash });
+        }
+    }
+
+    /**
      * Save project to IndexedDB (fast) + queue cloud sync (debounced).
      * Replaces direct `ProjectStorage.saveProject()` calls in auto-save.
      */
@@ -92,6 +117,14 @@ export class SyncService {
 
         try {
             const syncMeta = await ProjectStorage.getSyncMeta(project.id);
+
+            // Skip cloud write if project data hasn't changed since last sync
+            const hash = await this.projectDataHash(project);
+            if (syncMeta?.projectHash === hash) {
+                store.setIdle();
+                return;
+            }
+
             const expectedVersion = syncMeta?.cloudVersion;
 
             const result = await CloudStorage.saveProjectMetadata(
@@ -101,13 +134,15 @@ export class SyncService {
                 isPro,
             );
 
-            // Update local sync metadata
+            // Update local sync metadata (including new project hash)
             await ProjectStorage.saveSyncMeta({
                 projectId: project.id,
                 userId,
                 cloudVersion: result.cloudVersion,
                 uploadStatus: syncMeta?.uploadStatus ?? 'pending',
                 lastSyncedAt: Date.now(),
+                thumbnailHash: syncMeta?.thumbnailHash,
+                projectHash: hash,
             });
 
             store.setLastSyncedAt(new Date());

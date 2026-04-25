@@ -51,6 +51,8 @@ export interface SyncMeta {
     lastAccessedAt?: number; // timestamp
     /** SHA-256 hash of the last uploaded thumbnail blob (skip re-upload if unchanged) */
     thumbnailHash?: string;
+    /** SHA-256 hash of the last synced project data (skip no-op cloud writes) */
+    projectHash?: string;
 }
 
 export class ProjectStorage {

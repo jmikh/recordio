@@ -123,6 +123,7 @@ export function DashboardPage() {
 
         loadProjects();
         cleanupStorageIfNeeded();
+        SyncService.resumePendingUploads().catch(console.error);
 
     }, []);
 

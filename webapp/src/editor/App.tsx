@@ -282,6 +282,12 @@ function Editor() {
                 setIsLoading(false);
                 trackEditorLoaded();
 
+                // Set baseline project hash so auto-save doesn't trigger a
+                // no-op cloud write (prevents spurious sync conflicts when the
+                // same project is open in multiple browsers without edits).
+                const { project: storedProject, userEvents: storedEvents } = useProjectStore.getState();
+                SyncService.initProjectHash({ ...storedProject, userEvents: storedEvents }).catch(console.error);
+
                 // Update local last-accessed timestamp
                 ProjectStorage.touchSyncMetaAccess(loadedProject!.id).catch(console.error);
 
@@ -289,6 +295,7 @@ function Editor() {
                 if (isAuthed) {
                     ShareService.getShareForProject(loadedProject!.id);
                     CloudStorage.updateLastAccessed(loadedProject!.id).catch(console.error);
+                    SyncService.resumePendingUploads().catch(console.error);
                 }
 
             } catch (err: any) {

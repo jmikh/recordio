@@ -488,7 +488,7 @@ export class CloudStorage {
      * Strip transient/non-serializable fields from project before storing as JSONB.
      * Removes runtimeUrl, keeps storageUrl.
      */
-    private static stripForCloud(project: Project): any {
+    static stripForCloud(project: Project): any {
         const stripped = { ...project };
 
         // Strip runtimeUrl from sources
