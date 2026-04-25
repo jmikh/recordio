@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { timeAgo } from '../../../utils/timeAgo';
 import * as Sentry from '@sentry/react';
 
-import { TbSettings2, TbBoxAlignTopLeft, TbBoxAlignTopRight, TbBoxAlignBottomLeft, TbBoxAlignBottomRight, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
+import { TbSettings2, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
 import { MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge, Modal, XButton } from '@shared/components';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
 import type { ExportQuality, ExportFps, ExportCodecInfo } from '../../export/ExportManager';
-import type { WatermarkPosition } from '../../../core/painters/watermarkPainter';
+
 import { trackExportStarted, trackExportCompleted, trackVideoPublished, extractProjectProperties } from '../../../core/analytics';
 import { useToast } from '../Toast';
-import { ShareService, type SharedVideo, MAX_SHARED_VIDEOS } from '../../services/ShareService';
+import { ShareService, type SharedVideo } from '../../services/ShareService';
 
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
@@ -33,13 +33,6 @@ const FPS_OPTIONS: { value: ExportFps; label: string; proOnly: boolean }[] = [
     { value: 60, label: '60 fps', proOnly: true },
 ];
 
-const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string; icon: React.ReactNode }[] = [
-    { value: 'top-left', label: 'Top Left', icon: <TbBoxAlignTopLeft className="icon-lg" /> },
-    { value: 'top-right', label: 'Top Right', icon: <TbBoxAlignTopRight className="icon-lg" /> },
-    { value: 'bottom-left', label: 'Bottom Left', icon: <TbBoxAlignBottomLeft className="icon-lg" /> },
-    { value: 'bottom-right', label: 'Bottom Right', icon: <TbBoxAlignBottomRight className="icon-lg" /> },
-];
-
 /** Format remaining trial time as a human-readable string */
 function formatTrialRemaining(endDate: Date | null): string {
     if (!endDate) return '';
@@ -57,8 +50,6 @@ export function ExportModal() {
 
     const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('720p');
     const [selectedFps, setSelectedFps] = useState<ExportFps>(30);
-    const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>('bottom-right');
-    const [showWatermark, setShowWatermark] = useState<boolean | null>(null);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -66,25 +57,10 @@ export function ExportModal() {
     // Share state
     const [existingShare, setExistingShare] = useState<SharedVideo | null>(null);
     const [isPublishing, setIsPublishing] = useState(false);
-    const [publishedCount, setPublishedCount] = useState(0);
 
     const { isAuthenticated, isPro, hasProAccess, hasFreeTrial } = useUserStore();
     const proAccess = hasProAccess();
     const activeTrial = hasFreeTrial();
-
-    // Watermark defaults: OFF for pro/trial, ON for everyone else
-    const effectiveShowWatermark = showWatermark ?? !proAccess;
-
-    // Sync watermark preview to canvas via UIStore
-    const setWatermarkPreviewPosition = useUIStore(s => s.setWatermarkPreviewPosition);
-    useEffect(() => {
-        setWatermarkPreviewPosition(effectiveShowWatermark ? watermarkPosition : null);
-    }, [effectiveShowWatermark, watermarkPosition]);
-
-    // Clean up watermark preview on unmount
-    useEffect(() => {
-        return () => setWatermarkPreviewPosition(null);
-    }, []);
 
     const project = useProjectData();
     const setExportState = useProjectStore(s => s.setExportState);
@@ -94,7 +70,6 @@ export function ExportModal() {
     useEffect(() => {
         if (isAuthenticated && project?.id) {
             ShareService.getShareForProject(project.id).then(setExistingShare);
-            ShareService.getSharedVideos().then(videos => setPublishedCount(videos.length));
         }
     }, [isAuthenticated, project?.id]);
 
@@ -106,14 +81,14 @@ export function ExportModal() {
         const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K' || selectedFps === 60);
 
         if (proAccess || !needsProFeature) {
-            startDownload(selectedQuality, selectedFps, { watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined });
+            startDownload(selectedQuality, selectedFps);
             return;
         }
 
         setIsUpgradeModalOpen(true);
     };
 
-    const startDownload = async (quality: ExportQuality, fps: ExportFps, options?: { watermarkPosition?: WatermarkPosition }) => {
+    const startDownload = async (quality: ExportQuality, fps: ExportFps) => {
         useUIStore.getState().setIsPlaying(false);
         setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
 
@@ -133,7 +108,7 @@ export function ExportModal() {
 
         try {
             (window as any).__activeExportManager = manager;
-            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress, options);
+            const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, quality, fps, onProgress);
             const exportDuration = Date.now() - exportStart;
 
             trackExportCompleted({
@@ -199,19 +174,6 @@ export function ExportModal() {
             return;
         }
 
-        // Pre-flight quota check (skip if re-publishing same project)
-        if (!existingShare) {
-            const quota = await ShareService.checkQuota(project.id);
-            if (!quota.canShare) {
-                addToast({
-                    type: 'error',
-                    title: 'Publish Limit Reached',
-                    message: `You've used ${quota.current} of ${quota.max} published video slots. Unpublish an existing video to free up a slot.`,
-                });
-                return;
-            }
-        }
-
         // Export (skip download) then upload
         setIsPublishing(true);
         useUIStore.getState().setIsPlaying(false);
@@ -238,7 +200,6 @@ export function ExportModal() {
         try {
             (window as any).__activeExportManager = manager;
             const { blob, codecs, videoDecodeMode, videoDecodeFallback } = await manager.exportProject(fullProject, selectedQuality, selectedFps, onProgress, {
-                watermarkPosition: effectiveShowWatermark ? watermarkPosition : undefined,
                 skipDownload: true,
             });
             exportDuration = Date.now() - exportStart;
@@ -282,8 +243,6 @@ export function ExportModal() {
             // Refresh state
             const updatedShare = await ShareService.getShareForProject(project.id);
             setExistingShare(updatedShare);
-            const videos = await ShareService.getSharedVideos();
-            setPublishedCount(videos.length);
 
             // Notify Header
             window.dispatchEvent(new Event('share-updated'));
@@ -431,53 +390,12 @@ export function ExportModal() {
                         />
                     </div>
 
-                    {/* Watermark */}
-                    {proAccess ? (
-                        <div className="flex flex-col gap-2">
-                            <Toggle
-                                label="Recordio Watermark"
-                                value={effectiveShowWatermark}
-                                onChange={(val) => setShowWatermark(val)}
-                            />
-                            {effectiveShowWatermark && (
-                                <MultiToggle
-                                    options={WATERMARK_POSITIONS.map(pos => ({
-                                        value: pos.value,
-                                        icon: pos.icon,
-                                        tooltip: pos.label,
-                                    }))}
-                                    value={watermarkPosition}
-                                    onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}
-                                />
-                            )}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-text-muted">Recordio Watermark</span>
-                                <span className="text-[10px] text-text-disabled">Pro to remove</span>
-                            </div>
-                            <MultiToggle
-                                options={WATERMARK_POSITIONS.map(pos => ({
-                                    value: pos.value,
-                                    icon: pos.icon,
-                                    tooltip: pos.label,
-                                }))}
-                                value={watermarkPosition}
-                                onChange={(val) => setWatermarkPosition(val as WatermarkPosition)}
-                            />
-                        </div>
-                    )}
-
                     {/* Publish / Republish Button */}
                     {(() => {
-                        const quotaFull = proAccess && publishedCount >= MAX_SHARED_VIDEOS && !existingShare;
-                        const publishDisabled = busy || !proAccess || quotaFull;
+                        const publishDisabled = busy || !proAccess;
                         const tooltipText = !proAccess
                             ? 'Shareable links are a Pro feature'
-                            : quotaFull
-                                ? `You've used all ${MAX_SHARED_VIDEOS} slots. Delist a shared video from the dashboard to free up a slot.`
-                                : '';
+                            : '';
 
                         return (
                             <div className="flex flex-col items-center gap-1.5">
@@ -492,9 +410,6 @@ export function ExportModal() {
                                         {isPublishing ? 'Sharing...' : existingShare ? 'Reshare' : 'Share'}
                                     </Button>
                                 </Tooltip>
-                                {proAccess && !existingShare && (
-                                    <span className="subtext">{publishedCount} of {MAX_SHARED_VIDEOS} published</span>
-                                )}
                                 {existingShare && (
                                     <>
                                         <Button

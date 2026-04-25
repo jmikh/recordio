@@ -1,4 +1,5 @@
 import type { Project, ID } from '../types';
+import * as Sentry from '@sentry/react';
 import { ProjectStorage } from './projectStorage';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type MediaFileType } from './cloudStorage';
 import { useSyncStatusStore } from './syncStatusStore';
@@ -18,6 +19,8 @@ export interface ProjectListItem {
     uploadStatus: string | null;
     cfVideoUid: string | null;
     cloudVersion: number | null;
+    /** Duration in milliseconds (from output windows) */
+    durationMs: number | null;
     /** Whether this project exists locally (in IndexedDB) */
     hasLocal: boolean;
     /** Whether this project exists in the cloud */
@@ -77,7 +80,12 @@ export class SyncService {
 
     /**
      * Immediately sync a project's metadata to cloud.
+     * Public alias: `syncNow` (used when editor detects local is ahead of cloud on open).
      */
+    static async syncNow(project: Project, userId: string, isPro: boolean): Promise<void> {
+        return this.syncProjectToCloud(project, userId, isPro);
+    }
+
     private static async syncProjectToCloud(project: Project, userId: string, isPro: boolean): Promise<void> {
         const store = useSyncStatusStore.getState();
         store.setSyncing();
@@ -97,7 +105,6 @@ export class SyncService {
             await ProjectStorage.saveSyncMeta({
                 projectId: project.id,
                 userId,
-                cloudId: project.id,
                 cloudVersion: result.cloudVersion,
                 uploadStatus: syncMeta?.uploadStatus ?? 'pending',
                 lastSyncedAt: Date.now(),
@@ -105,12 +112,19 @@ export class SyncService {
 
             store.setLastSyncedAt(new Date());
             store.setIdle();
+
+            // Upload thumbnail in background (non-blocking, best-effort)
+            this.syncThumbnailToCloud(project.id).catch(err => {
+                console.warn('[SyncService] Thumbnail sync failed:', err);
+                Sentry.captureException(err, { extra: { phase: 'thumbnail_sync', projectId: project.id } });
+            });
         } catch (err) {
             if (err instanceof CloudVersionConflictError) {
                 store.setConflict({ projectId: err.projectId, projectName: project.name });
                 store.setIdle();
             } else {
                 console.error('[SyncService] Cloud sync failed:', err);
+                Sentry.captureException(err, { extra: { phase: 'cloud_sync', projectId: project.id } });
                 store.setError(err instanceof Error ? err.message : 'Cloud sync failed');
             }
         }
@@ -135,49 +149,97 @@ export class SyncService {
      * List projects — merges local IndexedDB projects with cloud projects.
      * Since local ID === cloud ID, matching is trivial.
      */
-    static async listProjects(userId: string | null): Promise<ProjectListItem[]> {
+    static async listProjects(
+        userId: string | null,
+        onThumbnailLoaded?: (projectId: string, thumbnailUrl: string) => void,
+    ): Promise<ProjectListItem[]> {
         const localProjects = await ProjectStorage.listProjects();
         const localMap = new Map(localProjects.map(p => [p.id, p]));
 
-        // If not authenticated, show all local projects
+        // If not authenticated, show only local-only projects (never synced to any account)
         if (!userId) {
-            return localProjects.map(p => this.localToListItem(p));
+            const allSyncMeta = await ProjectStorage.listSyncMeta();
+            const syncedIds = new Set(allSyncMeta.map(m => m.projectId));
+            return localProjects
+                .filter(p => !syncedIds.has(p.id))
+                .map(p => this.localToListItem(p));
         }
 
         // Fetch cloud projects
         let cloudProjects: CloudProjectSummary[] = [];
+        let cloudFetchFailed = false;
         try {
             cloudProjects = await CloudStorage.listProjectsSummary();
         } catch (err) {
+            cloudFetchFailed = true;
             console.error('[SyncService] Failed to fetch cloud projects:', err);
+            Sentry.captureException(err, { extra: { phase: 'list_projects_cloud_fetch' } });
+            useSyncStatusStore.getState().setError('Failed to load cloud projects');
         }
 
         const result: ProjectListItem[] = [];
-        const seen = new Set<string>();
+        const cloudIds = new Set<string>();
 
-        // 1. Cloud projects — attach local data (thumbnail) if available
+        // Pre-fetch all sync meta for local lastAccessedAt
+        const allSyncMetaForAccess = await ProjectStorage.listSyncMeta();
+        const syncMetaAccessMap = new Map(allSyncMetaForAccess.map(m => [m.projectId, m]));
+
+        // 1. Cloud projects — attach local thumbnail if available, queue download if not
+        const thumbnailDownloads: Promise<void>[] = [];
         for (const cloud of cloudProjects) {
-            seen.add(cloud.id);
+            cloudIds.add(cloud.id);
             const local = localMap.get(cloud.id);
+            const meta = syncMetaAccessMap.get(cloud.id);
             result.push({
                 id: cloud.id,
                 name: cloud.name,
                 thumbnail: local?.thumbnail ?? null,
                 updatedAt: cloud.updated_at,
                 createdAt: cloud.created_at,
-                lastAccessedAt: cloud.last_accessed_at,
+                lastAccessedAt: meta?.lastAccessedAt
+                    ? new Date(meta.lastAccessedAt).toISOString()
+                    : cloud.last_accessed_at,
                 expiresAt: cloud.expires_at,
                 uploadStatus: cloud.upload_status,
                 cfVideoUid: cloud.cf_video_uid,
                 cloudVersion: cloud.cloud_version,
+                durationMs: cloud.duration_ms,
                 hasLocal: !!local,
                 hasCloud: true,
             });
+
+            // Download cloud thumbnail in background if missing locally
+            if (cloud.thumbnail_storage_path) {
+                thumbnailDownloads.push(
+                    this.downloadThumbnailIfMissing(cloud.id, cloud.thumbnail_storage_path)
+                        .then(() => {
+                            if (!onThumbnailLoaded) return;
+                            return ProjectStorage.getThumbnail(cloud.id).then(blob => {
+                                if (blob) onThumbnailLoaded(cloud.id, URL.createObjectURL(blob));
+                            });
+                        })
+                        .catch(err => console.warn(`[SyncService] Thumbnail download failed for ${cloud.id}:`, err))
+                );
+            }
         }
 
-        // 2. Local-only projects (not yet synced to cloud)
+        // Fire thumbnail downloads in parallel (non-blocking for list return)
+        if (thumbnailDownloads.length > 0) {
+            Promise.all(thumbnailDownloads).catch(() => {});
+        }
+
+        // 2. Local-only projects
         for (const local of localProjects) {
-            if (!seen.has(local.id)) {
+            if (cloudIds.has(local.id)) continue;
+
+            const hasSyncMeta = syncMetaAccessMap.has(local.id);
+
+            if (hasSyncMeta && !cloudFetchFailed) {
+                // Was synced to cloud but no longer exists there — delete local copy
+                console.log(`[SyncService] Project ${local.id} deleted from cloud, removing local copy`);
+                ProjectStorage.deleteProject(local.id).catch(console.error);
+            } else {
+                // Genuinely local-only (never synced), or cloud fetch failed so we keep it
                 result.push(this.localToListItem(local));
             }
         }
@@ -204,7 +266,6 @@ export class SyncService {
             await ProjectStorage.saveSyncMeta({
                 projectId: project.id,
                 userId,
-                cloudId: project.id,
                 cloudVersion: result.cloudVersion,
                 uploadStatus: 'pending',
                 lastSyncedAt: Date.now(),
@@ -213,10 +274,11 @@ export class SyncService {
             // Queue media uploads in background (non-blocking)
             this.uploadProjectMedia(project.id).catch(err => {
                 console.error(`[SyncService] Background media upload failed for ${project.id}:`, err);
+                Sentry.captureException(err, { extra: { phase: 'background_media_upload', projectId: project.id } });
             });
         } catch (err) {
             console.error('[SyncService] Failed to create cloud project:', err);
-            // Non-fatal — project is saved locally, cloud sync will retry
+            Sentry.captureException(err, { extra: { phase: 'create_cloud_project', projectId: project.id } });
         }
     }
 
@@ -248,6 +310,7 @@ export class SyncService {
                 console.log(`[SyncService] Synced project ${project.id} to cloud`);
             } catch (err) {
                 console.error(`[SyncService] Failed to sync project ${project.id} on login:`, err);
+                Sentry.captureException(err, { extra: { phase: 'on_login_sync', projectId: project.id } });
             }
         }
     }
@@ -261,6 +324,7 @@ export class SyncService {
             await CloudStorage.softDeleteProject(projectId);
         } catch (err) {
             console.error('[SyncService] Failed to soft-delete cloud project:', err);
+            Sentry.captureException(err, { extra: { phase: 'soft_delete', projectId } });
         }
 
         // Local delete
@@ -274,22 +338,23 @@ export class SyncService {
         const cloudProject = await CloudStorage.loadProjectMetadata(projectId);
         if (!cloudProject) return null;
 
-        const project = cloudProject.project_data as Project;
-        project.id = projectId;
-        await ProjectStorage.saveProject(project);
+        const rawProject = cloudProject.project_data as Project;
+        rawProject.id = projectId;
+        await ProjectStorage.saveProject(rawProject);
 
         const syncMeta = await ProjectStorage.getSyncMeta(projectId);
         await ProjectStorage.saveSyncMeta({
             projectId,
             userId: syncMeta?.userId ?? '',
-            cloudId: projectId,
             cloudVersion: cloudProject.cloud_version,
             uploadStatus: syncMeta?.uploadStatus ?? 'pending',
             lastSyncedAt: Date.now(),
         });
 
         useSyncStatusStore.getState().clearConflict();
-        return project;
+
+        // Re-load through loadProjectOrFail to hydrate runtimeUrls from IndexedDB blobs
+        return ProjectStorage.loadProjectOrFail(projectId);
     }
 
     /**
@@ -300,13 +365,13 @@ export class SyncService {
         userId: string,
         isPro: boolean,
     ): Promise<void> {
-        const cloudProject = await CloudStorage.loadProjectMetadata(project.id);
-        if (!cloudProject) return;
+        const cloudVersion = await CloudStorage.getCloudVersion(project.id);
+        if (cloudVersion === null) return;
 
         const result = await CloudStorage.saveProjectMetadata(
             project,
             userId,
-            cloudProject.cloud_version,
+            cloudVersion,
             isPro,
         );
 
@@ -314,7 +379,6 @@ export class SyncService {
         await ProjectStorage.saveSyncMeta({
             projectId: project.id,
             userId,
-            cloudId: project.id,
             cloudVersion: result.cloudVersion,
             uploadStatus: syncMeta?.uploadStatus ?? 'pending',
             lastSyncedAt: Date.now(),
@@ -355,24 +419,6 @@ export class SyncService {
                 mediaTypes.push({ fileType: 'mic', blobId: micBlobId });
             }
 
-            // Also upload thumbnail if present
-            const project = await ProjectStorage.loadProject(projectId);
-            if (project?.thumbnail) {
-                // Thumbnail is a data URL — convert to blob
-                const thumbBlob = await this.dataUrlToBlob(project.thumbnail);
-                if (thumbBlob) {
-                    try {
-                        store.setCurrentUpload({ projectId, type: 'thumbnail', progress: 0 });
-                        await CloudStorage.uploadMediaFile(projectId, 'thumbnail', thumbBlob, (frac) => {
-                            store.setCurrentUpload({ projectId, type: 'thumbnail', progress: frac });
-                        });
-                        console.log(`[SyncService] Uploaded thumbnail for ${projectId}`);
-                    } catch (err) {
-                        console.error(`[SyncService] Thumbnail upload failed for ${projectId}:`, err);
-                    }
-                }
-            }
-
             // Upload each media blob
             let uploaded = 0;
             store.setPendingMediaUploads(mediaTypes.length);
@@ -396,7 +442,7 @@ export class SyncService {
                     console.log(`[SyncService] Uploaded ${fileType} for ${projectId}`);
                 } catch (err) {
                     console.error(`[SyncService] Failed to upload ${fileType} for ${projectId}:`, err);
-                    // Continue with other files — partial upload is better than none
+                    Sentry.captureException(err, { extra: { phase: 'media_upload', projectId, fileType } });
                 }
             }
 
@@ -431,10 +477,33 @@ export class SyncService {
             for (const meta of pending) {
                 this.uploadProjectMedia(meta.projectId).catch(err => {
                     console.error(`[SyncService] Resume upload failed for ${meta.projectId}:`, err);
+                    Sentry.captureException(err, { extra: { phase: 'resume_upload', projectId: meta.projectId } });
                 });
             }
         } catch (err) {
             console.error('[SyncService] Failed to resume pending uploads:', err);
+            Sentry.captureException(err, { extra: { phase: 'resume_pending_uploads' } });
+        }
+    }
+
+    /**
+     * Backfill thumbnails that have never been uploaded to cloud.
+     * Called on app startup alongside resumePendingUploads.
+     */
+    static async backfillThumbnails(): Promise<void> {
+        try {
+            const allSyncMeta = await ProjectStorage.listSyncMeta();
+            const missing = allSyncMeta.filter(m => !m.thumbnailHash);
+
+            for (const meta of missing) {
+                this.syncThumbnailToCloud(meta.projectId).catch(err => {
+                    console.warn(`[SyncService] Thumbnail backfill failed for ${meta.projectId}:`, err);
+                    Sentry.captureException(err, { extra: { phase: 'thumbnail_backfill', projectId: meta.projectId } });
+                });
+            }
+        } catch (err) {
+            console.error('[SyncService] Failed to backfill thumbnails:', err);
+            Sentry.captureException(err, { extra: { phase: 'thumbnail_backfill_init' } });
         }
     }
 
@@ -479,18 +548,57 @@ export class SyncService {
         store.setCurrentDownload(null);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────
+    // ─── Thumbnail Sync ────────────────────────────────────────
 
-    private static async dataUrlToBlob(dataUrl: string): Promise<Blob | null> {
-        try {
-            const response = await fetch(dataUrl);
-            return response.blob();
-        } catch {
-            return null;
+    /**
+     * Upload the local thumbnail blob to Supabase Storage if it changed.
+     * Compares SHA-256 hash against the last uploaded version stored in syncMeta.
+     */
+    private static async syncThumbnailToCloud(projectId: string): Promise<void> {
+        const blob = await ProjectStorage.getThumbnail(projectId);
+        if (!blob) return;
+
+        const hash = await this.blobHash(blob);
+        const syncMeta = await ProjectStorage.getSyncMeta(projectId);
+        if (syncMeta?.thumbnailHash === hash) return;
+
+        await CloudStorage.uploadMediaFile(projectId, 'thumbnail', blob);
+
+        // Update syncMeta with new hash
+        if (syncMeta) {
+            await ProjectStorage.saveSyncMeta({ ...syncMeta, thumbnailHash: hash });
         }
     }
 
+    private static async blobHash(blob: Blob): Promise<string> {
+        const buffer = await blob.arrayBuffer();
+        const hash = await crypto.subtle.digest('SHA-256', buffer);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Download thumbnail from cloud and save to local IndexedDB.
+     * No-op if local thumbnail already exists.
+     */
+    static async downloadThumbnailIfMissing(
+        projectId: string,
+        thumbnailStoragePath: string | null,
+    ): Promise<void> {
+        if (!thumbnailStoragePath || thumbnailStoragePath === 'pending') return;
+
+        // Skip if we already have it locally
+        const existing = await ProjectStorage.getThumbnail(projectId);
+        if (existing) return;
+
+        const blob = await CloudStorage.downloadMediaFile(thumbnailStoragePath);
+        await ProjectStorage.saveThumbnail(projectId, blob);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────
+
     private static localToListItem(project: Project): ProjectListItem {
+        const windows = project.timeline?.outputWindows ?? [];
+        const durationMs = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
         return {
             id: project.id,
             name: project.name,
@@ -502,6 +610,7 @@ export class SyncService {
             uploadStatus: null,
             cfVideoUid: null,
             cloudVersion: null,
+            durationMs,
             hasLocal: true,
             hasCloud: false,
         };

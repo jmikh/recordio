@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectStorage } from '../storage/projectStorage';
 import { SyncService, type ProjectListItem } from '../storage/syncService';
-import { CloudStorage } from '../storage/cloudStorage';
 import { ProjectCard } from '../components/ProjectCard';
 import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { MdOutlineBugReport } from 'react-icons/md';
+import { FcGoogle } from 'react-icons/fc';
 
 import { useUserStore } from '../editor/stores/useUserStore';
+import { AuthManager } from '../auth/AuthManager';
 
 import { SupportModal } from '../components/SupportModal';
 import { UserMenu } from '../components/UserMenu';
@@ -45,6 +46,8 @@ export function DashboardPage() {
     useAuthListener();
     const importInputRef = useRef<HTMLInputElement>(null);
     const [isImporting, setIsImporting] = useState(false);
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [loginError, setLoginError] = useState<string | null>(null);
 
     // Sort and select state
     const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
@@ -112,7 +115,11 @@ export function DashboardPage() {
 
     const loadProjects = async () => {
         try {
-            const allProjects = await SyncService.listProjects(userId);
+            const allProjects = await SyncService.listProjects(userId, (projectId, thumbnailUrl) => {
+                setProjects(prev => prev.map(p =>
+                    p.id === projectId ? { ...p, thumbnail: thumbnailUrl } : p
+                ));
+            });
             setProjects(allProjects);
         } catch (error) {
             console.error('Failed to load projects:', error);
@@ -138,71 +145,10 @@ export function DashboardPage() {
         return sorted;
     }, [projects, sortOrder]);
 
-    const [downloadingProjectId, setDownloadingProjectId] = useState<string | null>(null);
-    const [downloadProgress, setDownloadProgress] = useState<{ type: string; fraction: number } | null>(null);
-
-    const handleOpen = async (item: ProjectListItem) => {
-        if (item.hasLocal) {
-            trackProjectOpened();
-            navigate(`/editor?projectId=${item.id}`);
-            return;
-        }
-
-        // Cloud-only project — download metadata + media first
-        try {
-            setDownloadingProjectId(item.id);
-            setDownloadProgress(null);
-
-            // 1. Download project metadata from cloud
-            const cloudProject = await CloudStorage.loadProjectMetadata(item.id);
-            if (!cloudProject) {
-                addToast({ type: 'error', title: 'Download Failed', message: 'Project not found in cloud.' });
-                return;
-            }
-
-            // 2. Save project metadata locally
-            const project = cloudProject.project_data;
-            project.id = item.id;
-            await ProjectStorage.saveProject(project);
-
-            // 3. Save sync metadata
-            await ProjectStorage.saveSyncMeta({
-                projectId: item.id,
-                userId: cloudProject.user_id,
-                cloudId: item.id,
-                cloudVersion: cloudProject.cloud_version,
-                uploadStatus: cloudProject.upload_status === 'ready' ? 'ready' : 'pending',
-                lastSyncedAt: Date.now(),
-            });
-
-            // 4. Download media blobs
-            await SyncService.downloadProjectMedia(item.id, cloudProject, (type, fraction) => {
-                setDownloadProgress({ type, fraction });
-            });
-
-            setDownloadingProjectId(null);
-            setDownloadProgress(null);
-            trackProjectOpened();
-            navigate(`/editor?projectId=${item.id}`);
-        } catch (err) {
-            console.error('[Dashboard] Failed to download cloud project:', err);
-            addToast({ type: 'error', title: 'Download Failed', message: 'Could not download project from cloud.' });
-            setDownloadingProjectId(null);
-            setDownloadProgress(null);
-        }
+    const handleOpen = (item: ProjectListItem) => {
+        trackProjectOpened();
+        navigate(`/editor?projectId=${item.id}`);
     };
-
-    const handleRename = useCallback(async (item: ProjectListItem, newName: string) => {
-        if (!item.hasLocal) return;
-        try {
-            await ProjectStorage.renameProject(item.id, newName);
-            setProjects(prev => prev.map(p =>
-                p.id === item.id ? { ...p, name: newName, updatedAt: new Date().toISOString() } : p
-            ));
-        } catch (error) {
-            console.error('Failed to rename project:', error);
-        }
-    }, []);
 
     // Bulk delete
     const handleBulkDelete = async () => {
@@ -344,15 +290,13 @@ export function DashboardPage() {
                                         name: item.name,
                                         thumbnail: item.thumbnail,
                                         createdAt: item.createdAt,
+                                        durationMs: item.durationMs,
                                     }}
                                     onOpen={() => handleOpen(item)}
                                     selectMode={selectMode}
                                     selected={selectedIds.has(item.id)}
                                     onSelect={() => toggleSelect(item.id)}
                                     isShared={!!item.cfVideoUid}
-                                    cloudOnly={!item.hasLocal}
-                                    downloadProgress={downloadingProjectId === item.id ? (downloadProgress?.fraction ?? 0) : null}
-                                    onRename={(newName) => handleRename(item, newName)}
                                 />
                             ))}
                         </div>
@@ -471,6 +415,44 @@ export function DashboardPage() {
                 >
                     Get Started
                 </Button>
+            </Modal>
+
+            {/* Mandatory login modal — non-dismissable when not authenticated */}
+            <Modal isOpen={!isAuthenticated} maxWidth="max-w-[400px]">
+                <h2 className="text-lg font-semibold text-text-highlighted mb-2">
+                    Sign In to Recordio
+                </h2>
+                <p className="text-sm text-text-main mb-6">
+                    Sign in to manage your projects.
+                </p>
+
+                {loginError && (
+                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs mb-4">
+                        {loginError}
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    onClick={async () => {
+                        setLoginLoading(true);
+                        setLoginError(null);
+                        const result = await AuthManager.signInWithProvider('google');
+                        if (result.error) {
+                            setLoginError(result.error.message);
+                            setLoginLoading(false);
+                        }
+                    }}
+                    disabled={loginLoading}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50"
+                >
+                    {loginLoading ? (
+                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
+                    ) : (
+                        <FcGoogle className="icon-lg" />
+                    )}
+                    <span>{loginLoading ? 'Connecting...' : 'Continue with Google'}</span>
+                </button>
             </Modal>
         </div>
     );

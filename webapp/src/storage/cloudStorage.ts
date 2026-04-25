@@ -15,6 +15,7 @@ export interface CloudProjectSummary {
     upload_status: string;
     cf_video_uid: string | null;
     cloud_version: number;
+    duration_ms: number | null;
 }
 
 /**
@@ -80,6 +81,7 @@ export class CloudStorage {
                     name: project.name,
                     project_data: projectData,
                     cloud_version: expectedVersion + 1,
+                    duration_ms: this.computeDurationMs(project),
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', project.id)
@@ -104,6 +106,7 @@ export class CloudStorage {
                     user_id: userId,
                     name: project.name,
                     project_data: projectData,
+                    duration_ms: this.computeDurationMs(project),
                     upload_status: 'pending',
                     screen_storage_path: project.screenSource ? 'pending' : null,
                     camera_storage_path: project.cameraSource ? 'pending' : null,
@@ -116,6 +119,24 @@ export class CloudStorage {
             if (error) throw error;
             return { cloudVersion: data.cloud_version };
         }
+    }
+
+    /**
+     * Fetch only the cloud_version for a project (lightweight — no project_data).
+     * Returns null if the project doesn't exist in cloud.
+     */
+    static async getCloudVersion(projectId: string): Promise<number | null> {
+        if (!supabase) return null;
+
+        const { data, error } = await supabase
+            .from('projects')
+            .select('cloud_version')
+            .eq('id', projectId)
+            .is('deleted_at', null)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return data.cloud_version;
     }
 
     /**
@@ -143,7 +164,7 @@ export class CloudStorage {
 
         const { data, error } = await supabase
             .from('projects')
-            .select('id, name, thumbnail_storage_path, last_accessed_at, updated_at, created_at, expires_at, upload_status, cf_video_uid, cloud_version')
+            .select('id, name, thumbnail_storage_path, last_accessed_at, updated_at, created_at, expires_at, upload_status, cf_video_uid, cloud_version, duration_ms')
             .is('deleted_at', null)
             .order('updated_at', { ascending: false });
 
@@ -239,18 +260,30 @@ export class CloudStorage {
         return data;
     }
 
+    /** Map fileType to the clean MIME type expected by the storage bucket */
+    private static mimeForFileType(fileType: MediaFileType): string {
+        switch (fileType) {
+            case 'screen': return 'video/webm';
+            case 'camera': return 'video/webm';
+            case 'mic':    return 'audio/wav';
+            case 'thumbnail': return 'image/webp';
+        }
+    }
+
     /**
      * Upload a blob to the signed URL. Uses XMLHttpRequest for progress tracking.
+     * @param contentType Explicit MIME type — avoids codec params in blob.type causing 400s.
      */
     static async uploadBlob(
         signedUrl: string,
         blob: Blob,
+        contentType: string,
         onProgress?: (fraction: number) => void,
     ): Promise<void> {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', signedUrl, true);
-            xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+            xhr.setRequestHeader('Content-Type', contentType);
 
             if (onProgress) {
                 xhr.upload.onprogress = (e) => {
@@ -264,7 +297,7 @@ export class CloudStorage {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     resolve();
                 } else {
-                    reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+                    reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
                 }
             };
 
@@ -308,7 +341,7 @@ export class CloudStorage {
             projectId, fileType, blob.size,
         );
 
-        await this.uploadBlob(signedUrl, blob, onProgress);
+        await this.uploadBlob(signedUrl, blob, this.mimeForFileType(fileType), onProgress);
         await this.confirmMediaUpload(projectId, fileType, storagePath, blob.size);
 
         return storagePath;
@@ -375,6 +408,12 @@ export class CloudStorage {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────
+
+    /** Compute total output duration in ms from a project's output windows. */
+    private static computeDurationMs(project: Project): number {
+        const windows = project.timeline?.outputWindows ?? [];
+        return windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
+    }
 
     /**
      * Strip transient/non-serializable fields from project before storing as JSONB.

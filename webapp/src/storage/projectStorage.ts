@@ -37,18 +37,20 @@ export interface CustomMusicEntry {
  * Stored in the `syncMeta` IndexedDB store, keyed by local project ID.
  */
 export interface SyncMeta {
-    /** Local project ID (key) */
+    /** Local project ID (key) — same ID used in cloud */
     projectId: string;
     /** User ID that owns this cloud project */
     userId: string;
-    /** Server-generated UUID from the `projects` table */
-    cloudId: string;
     /** Last known cloud version (for optimistic concurrency) */
     cloudVersion: number;
     /** Upload status: 'pending' | 'ready' */
     uploadStatus: 'pending' | 'ready';
     /** Last time this project was synced to cloud */
     lastSyncedAt: number; // timestamp
+    /** Last time this project was opened locally */
+    lastAccessedAt?: number; // timestamp
+    /** SHA-256 hash of the last uploaded thumbnail blob (skip re-upload if unchanged) */
+    thumbnailHash?: string;
 }
 
 export class ProjectStorage {
@@ -209,13 +211,36 @@ export class ProjectStorage {
     static async loadProject(projectId: ID): Promise<Project | null> {
         const db = await this.getDB();
 
-        const projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
+        let projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.get(projectId);
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
+
+        // If not found, check for legacy "proj-" prefixed version and migrate
+        if (!projectRaw && !projectId.startsWith('proj-')) {
+            const legacyId = `proj-${projectId}`;
+            const legacyRaw = await new Promise<Project | undefined>((resolve, reject) => {
+                const tx = db.transaction('projects', 'readonly');
+                const store = tx.objectStore('projects');
+                const req = store.get(legacyId);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            if (legacyRaw) {
+                await this.migrateProjectPrefix(legacyId);
+                // Re-read after migration
+                projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
+                    const tx = db.transaction('projects', 'readonly');
+                    const store = tx.objectStore('projects');
+                    const req = store.get(projectId);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+        }
 
         if (!projectRaw) return null;
 
@@ -330,7 +355,7 @@ export class ProjectStorage {
      */
     static async listProjects(): Promise<Project[]> {
         const db = await this.getDB();
-        const projects = await new Promise<Project[]>((resolve, reject) => {
+        let projects = await new Promise<Project[]>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.getAll();
@@ -338,11 +363,29 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
 
+        // Migrate any legacy "proj-" prefixed projects before hydration
+        const prefixed = projects.filter((p) => p.id.startsWith('proj-'));
+        if (prefixed.length > 0) {
+            for (const p of prefixed) {
+                await this.migrateProjectPrefix(p.id);
+            }
+            // Re-read after migration
+            projects = await new Promise<Project[]>((resolve, reject) => {
+                const tx = db.transaction('projects', 'readonly');
+                const store = tx.objectStore('projects');
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result as Project[]);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
         // Hydrate Thumbnails
         for (const p of projects) {
             const thumbBlob = await this.getThumbnail(p.id);
             if (thumbBlob) {
                 p.thumbnail = URL.createObjectURL(thumbBlob);
+            } else {
+                p.thumbnail = undefined;
             }
         }
 
@@ -493,6 +536,24 @@ export class ProjectStorage {
             const req = store.put(meta);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async touchSyncMetaAccess(projectId: ID): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const getReq = store.get(projectId);
+            getReq.onsuccess = () => {
+                const existing = getReq.result as SyncMeta | undefined;
+                if (!existing) { resolve(); return; }
+                existing.lastAccessedAt = Date.now();
+                const putReq = store.put(existing);
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = () => reject(putReq.error);
+            };
+            getReq.onerror = () => reject(getReq.error);
         });
     }
 
@@ -764,6 +825,111 @@ export class ProjectStorage {
         const results = await Promise.all(storePromises);
         totalBytes = results.reduce((sum, n) => sum + n, 0);
         return totalBytes;
+    }
+
+    /**
+     * Migrates a single project that has a "proj-" prefixed ID.
+     * Re-keys the project, recordings, thumbnails, and syncMeta in one transaction,
+     * and updates internal IDs (source IDs, storageUrls) within the project.
+     * No-op if the ID doesn't start with "proj-".
+     */
+    static async migrateProjectPrefix(oldProjectId: string): Promise<string> {
+        if (!oldProjectId.startsWith('proj-')) return oldProjectId;
+
+        const newId = oldProjectId.slice(5); // strip "proj-"
+        const db = await this.getDB();
+
+        const project = await new Promise<any>((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const req = tx.objectStore('projects').get(oldProjectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+
+        if (!project) return newId; // already migrated or doesn't exist
+
+        // --- Update IDs within the project object ---
+        project.id = newId;
+
+        const rewriteId = (id: string | undefined) =>
+            id?.replace(oldProjectId, newId);
+        const rewriteUrl = (url: string | undefined) =>
+            url?.replace(`rec-${oldProjectId}`, newId).replace(oldProjectId, newId);
+
+        if (project.screenSource) {
+            project.screenSource.id = rewriteId(project.screenSource.id);
+            project.screenSource.storageUrl = rewriteUrl(project.screenSource.storageUrl);
+        }
+        if (project.cameraSource) {
+            project.cameraSource.id = rewriteId(project.cameraSource.id);
+            project.cameraSource.storageUrl = rewriteUrl(project.cameraSource.storageUrl);
+        }
+        if (project.microphoneSource) {
+            project.microphoneSource.id = rewriteId(project.microphoneSource.id);
+            project.microphoneSource.storageUrl = rewriteUrl(project.microphoneSource.storageUrl);
+        }
+        if (project.settings?.background?.customStorageUrl) {
+            project.settings.background.customStorageUrl =
+                rewriteUrl(project.settings.background.customStorageUrl);
+        }
+        if (project.settings?.audio?.music?.customStorageUrl) {
+            project.settings.audio.music.customStorageUrl =
+                rewriteUrl(project.settings.audio.music.customStorageUrl);
+        }
+
+        // --- Single transaction to re-key everything ---
+        const tx = db.transaction(['projects', 'recordings', 'thumbnails', 'syncMeta'], 'readwrite');
+
+        // Re-key project
+        tx.objectStore('projects').delete(oldProjectId);
+        tx.objectStore('projects').put(project);
+
+        // Re-key thumbnail
+        const thumbStore = tx.objectStore('thumbnails');
+        const thumbReq = thumbStore.get(oldProjectId);
+        thumbReq.onsuccess = () => {
+            if (thumbReq.result) {
+                thumbStore.delete(oldProjectId);
+                thumbStore.put({ ...thumbReq.result, id: newId });
+            }
+        };
+
+        // Re-key syncMeta
+        const syncStore = tx.objectStore('syncMeta');
+        const syncReq = syncStore.get(oldProjectId);
+        syncReq.onsuccess = () => {
+            if (syncReq.result) {
+                syncStore.delete(oldProjectId);
+                syncStore.put({ ...syncReq.result, projectId: newId });
+            }
+        };
+
+        // Re-key recording blobs (strip "rec-" prefix and rename project ID segment)
+        const recStore = tx.objectStore('recordings');
+        const recCursor = recStore.openCursor();
+        recCursor.onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+            if (cursor) {
+                const key = cursor.key.toString();
+                if (key.includes(oldProjectId)) {
+                    const entry = cursor.value;
+                    const newKey = key
+                        .replace(`rec-${oldProjectId}`, newId)
+                        .replace(oldProjectId, newId);
+                    cursor.delete();
+                    recStore.put({ ...entry, id: newKey });
+                }
+                cursor.continue();
+            }
+        };
+
+        await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+
+        console.log(`[ProjectStorage] Migrated project ${oldProjectId} → ${newId}`);
+        return newId;
     }
 }
 

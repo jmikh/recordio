@@ -135,8 +135,7 @@ export function WatchPage() {
 
     // Cloudflare Stream embed URL
     const cfEmbedUrl = `https://customer-${getCfCustomerSubdomain()}.cloudflarestream.com/${sharedVideo.cf_video_uid}/iframe`;
-    const creatorName = sharedVideo.creator_name || 'A Recordio user';
-    const sharedDate = new Date(sharedVideo.created_at);
+    const sharedDate = new Date(sharedVideo.published_at);
 
     return (
         <div className="min-h-screen bg-surface-body flex flex-col">
@@ -173,15 +172,12 @@ export function WatchPage() {
                 <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
                     {/* Left column — Video + actions */}
                     <div className="flex-1 min-w-0 border border-border rounded-xl bg-surface p-5">
-                        {/* Creator attribution */}
+                        {/* Attribution */}
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
-                                {getInitials(creatorName)}
+                                {getInitials(sharedVideo.project_name)}
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-text-highlighted">
-                                    {creatorName} shared a recording
-                                </p>
                                 <p className="text-xs text-text-muted">
                                     {sharedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                     {' · '}
@@ -271,12 +267,6 @@ export function WatchPage() {
                                         {sharedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </span>
                                 </div>
-                                {sharedVideo.version > 1 && (
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-text-muted">Version</span>
-                                        <span className="text-text-highlighted">v{sharedVideo.version}</span>
-                                    </div>
-                                )}
                             </div>
                             <Button size="sm" fullWidth onClick={copyLink} className="mt-4">
                                 <TbCopy className="icon-sm" />

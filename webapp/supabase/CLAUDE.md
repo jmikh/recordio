@@ -11,6 +11,7 @@
 - **Cron jobs that call edge functions must pass `Authorization: Bearer <SUPABASE_SECRET_KEY>`** so the function knows it's an internal call
 - **ALWAYS use Secret API keys instead of service role key** for internal functions, server usage..etc. Service role and anon keys are deprecated in supabase.
 - **Keep table docs current** — when adding, removing, or modifying a table, update the corresponding file in `tables/`. When adding a new table, create a new `tables/<table_name>.md`. When removing a table, delete its file.
+- **ALWAYS** create new migrations rather edit existing ones. i push the relatively often.
 
 ---
 

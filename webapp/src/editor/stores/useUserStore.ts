@@ -128,7 +128,7 @@ export const useUserStore = create<UserState>()(
 
             // Helper to check if user can export at quality
             canExportQuality: (quality: ExportQuality) => {
-                // Free users can export 480p and 720p (with watermark)
+                // Free users can export 480p and 720p
                 if (quality === '480p' || quality === '720p') {
                     return true;
                 }

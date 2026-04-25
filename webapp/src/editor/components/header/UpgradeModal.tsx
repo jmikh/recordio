@@ -3,7 +3,6 @@ import { LuCheck, LuSettings } from 'react-icons/lu';
 import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal, Button } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
-import { MAX_SHARED_VIDEOS } from '../../services/ShareService';
 import { useUserStore } from '../../stores/useUserStore';
 import { supabase } from '../../../auth/AuthManager';
 import { trackUpgradeModalViewed, trackUpgradeModalDismissed, trackGetProClicked } from '../../../core/analytics';
@@ -166,7 +165,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         You're already a Pro member
                     </p>
                     <p className="text-sm text-text-muted text-center">
-                        You have full access to all Pro features including unlimited 4K exports, no watermarks, and shareable links.
+                        You have full access to all Pro features including unlimited 4K exports and shareable links.
                     </p>
                 </div>
 
@@ -330,10 +329,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         <li className="flex items-center gap-3 text-sm">
                             <LuCheck className="icon-sm text-primary shrink-0" />
                             <span className="text-text-highlighted">Unlimited 4K exports</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <LuCheck className="icon-sm text-primary shrink-0" />
-                            <span className="text-text-highlighted">No watermarks</span>
                         </li>
                         <li className="flex items-center gap-3 text-sm">
                             <LuCheck className="icon-sm text-primary shrink-0" />

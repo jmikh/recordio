@@ -15,11 +15,11 @@ import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEdit
 import { OverlayEditor, renderOverlayEditor } from './CanvasOverlayEditor';
 import { CanvasHoverLayer } from './CanvasHoverLayer';
 import { drawBackground } from '../../../core/painters/backgroundPainter';
-import { drawWatermark } from '../../../core/painters/watermarkPainter';
-import { getDeviceFrame } from '../../../core/deviceFrames';
-import watermarkPng from '../../../assets/watermark.png';
 
-import type { CameraSettings, Rect, SourceMetadata } from '../../../types';
+import { getDeviceFrame } from '../../../core/deviceFrames';
+
+
+import type { BackgroundSettings, CameraSettings, Rect, SourceMetadata } from '../../../types';
 import type { OverlayItem } from '../../../types/overlay';
 
 export const CanvasContainer = () => {
@@ -67,7 +67,7 @@ export const CanvasContainer = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const bgRef = useRef<HTMLImageElement>(null);
     const deviceFrameRef = useRef<HTMLImageElement>(null);
-    const watermarkRef = useRef<HTMLImageElement>(null);
+
 
     // Mutable State for Dragging (60fps preview)
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
@@ -306,20 +306,21 @@ export const CanvasContainer = () => {
                     }
                 });
 
-                // 6. WATERMARK PREVIEW (drawn last, on top of everything)
-                const watermarkPos = uiState.watermarkPreviewPosition;
-                if (watermarkPos && watermarkRef.current?.complete) {
-                    drawWatermark(ctx, watermarkRef.current, canvas.width, canvas.height, watermarkPos);
-                }
-
-                // Thumbnail capture (after rendering is complete)
-                if (pendingThumbnailCaptureRef.current) {
+                // Thumbnail capture — only in playback mode, scaled to 480px webp
+                if (pendingThumbnailCaptureRef.current && canvasMode === CanvasMode.Preview) {
                     pendingThumbnailCaptureRef.current = false;
-                    canvas.toBlob((blob) => {
+                    lastCapturedBgRef.current = { ...project.settings.background };
+                    const thumbMaxW = 480;
+                    const scale = Math.min(thumbMaxW / canvas.width, 1);
+                    const thumbW = Math.round(canvas.width * scale);
+                    const thumbH = Math.round(canvas.height * scale);
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = thumbW;
+                    offscreen.height = thumbH;
+                    offscreen.getContext('2d')!.drawImage(canvas, 0, 0, thumbW, thumbH);
+                    offscreen.toBlob((blob) => {
                         if (blob) ProjectStorage.saveThumbnail(project.id, blob).catch(console.warn);
-                    }, 'image/jpeg', 0.5);
-                    // Schedule next capture in 60s
-                    scheduleThumbnailCapture(60000);
+                    }, 'image/webp', 0.8);
                 }
             };
         };
@@ -351,9 +352,10 @@ export const CanvasContainer = () => {
         ? getDeviceFrame(project.settings.screen.deviceFrameId)
         : undefined;
 
-    // Thumbnail Capture Flag (set by timer, captured at end of render loop)
+    // Thumbnail capture — only when background changes or no thumbnail exists
     const pendingThumbnailCaptureRef = useRef(false);
     const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastCapturedBgRef = useRef<BackgroundSettings | null>(null);
 
     const scheduleThumbnailCapture = (delayMs: number) => {
         if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
@@ -362,13 +364,25 @@ export const CanvasContainer = () => {
         }, delayMs);
     };
 
-    // Start thumbnail capture schedule
+    // On project load: capture if no thumbnail exists
     useEffect(() => {
-        scheduleThumbnailCapture(3000); // Initial capture after 3s
+        if (!project?.id) return;
+        lastCapturedBgRef.current = null;
+        ProjectStorage.getThumbnail(project.id).then((existing) => {
+            if (!existing) scheduleThumbnailCapture(3000);
+        });
         return () => {
             if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
         };
     }, [project?.id]);
+
+    // Debounced capture when background settings change
+    const bg = project.settings.background;
+    useEffect(() => {
+        // Skip if we haven't captured yet (initial capture handles that)
+        if (!lastCapturedBgRef.current) return;
+        scheduleThumbnailCapture(2000);
+    }, [bg.type, bg.color, bg.colorMode, bg.gradientColors, bg.gradientDirection, bg.imageUrl, bg.customStorageUrl, bg.backgroundBlurPx]);
 
     // -----------------------------------------------------------
     // RENDER
@@ -405,8 +419,7 @@ export const CanvasContainer = () => {
                     {deviceFrame && (
                         <img ref={deviceFrameRef} src={deviceFrame.imageUrl} className="hidden" crossOrigin={deviceFrame.imageUrl.startsWith('blob:') ? undefined : 'anonymous'} />
                     )}
-                    {/* Watermark image for live preview */}
-                    <img ref={watermarkRef} src={watermarkPng} className="hidden" />
+
                     {Object.values(sources).map((source) => {
                         const audioSettings = project.settings.audio;
                         const isScreenSource = source.id === project.screenSource?.id;

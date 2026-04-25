@@ -83,6 +83,7 @@ export function useAuthListener() {
                 const isPro = useUserStore.getState().isPro;
                 SyncService.onLogin(session.user.id, isPro).then(() => {
                     SyncService.resumePendingUploads().catch(console.error);
+                    SyncService.backfillThumbnails().catch(console.error);
                 }).catch(console.error);
             } else {
                 clearUser();

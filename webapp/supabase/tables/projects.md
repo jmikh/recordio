@@ -6,8 +6,9 @@ Cloud-backed project storage. Stores project metadata (settings, timeline, segme
 
 | Column | Purpose |
 |--------|---------|
-| `local_project_id` | Client-side project ID (`proj-xxx`). Unique per user for dedup across tabs |
+| `id` | UUID primary key — same as client-side project ID |
 | `project_data` | Full Project JSON (settings, timeline, segments — no blobs) |
+| `duration_ms` | Total output duration in ms (derived from output windows). Written on every sync so dashboard can show duration without loading project_data |
 | `screen/camera/mic_storage_path` | Supabase Storage paths. NULL = doesn't exist. `'pending'` = not yet uploaded |
 | `upload_status` | `'pending'` (media uploading), `'ready'` (all uploaded), `'deleting'` (cleanup in progress) |
 | `cf_video_uid` | Cloudflare Stream UID (non-null = published) |

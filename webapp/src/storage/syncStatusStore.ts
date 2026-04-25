@@ -9,6 +9,8 @@ export interface SyncState {
     error: string | null;
     /** Set when another device wrote a newer version */
     conflict: { projectId: string; projectName: string } | null;
+    /** Path to navigate to after conflict resolution (set when leaving editor mid-conflict) */
+    pendingNavigation: string | null;
 }
 
 interface SyncStatusStore extends SyncState {
@@ -22,6 +24,7 @@ interface SyncStatusStore extends SyncState {
     setCurrentDownload: (download: SyncState['currentDownload']) => void;
     setConflict: (conflict: SyncState['conflict']) => void;
     clearConflict: () => void;
+    setPendingNavigation: (path: string | null) => void;
 }
 
 export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
@@ -32,6 +35,7 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     currentDownload: null,
     error: null,
     conflict: null,
+    pendingNavigation: null,
 
     setSyncing: () => set({ status: 'syncing', error: null }),
     setIdle: () => set({ status: 'idle', error: null }),
@@ -42,5 +46,6 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     setCurrentUpload: (upload) => set({ currentUpload: upload }),
     setCurrentDownload: (download) => set({ currentDownload: download }),
     setConflict: (conflict) => set({ conflict }),
-    clearConflict: () => set({ conflict: null }),
+    clearConflict: () => set({ conflict: null, pendingNavigation: null }),
+    setPendingNavigation: (path) => set({ pendingNavigation: path }),
 }));

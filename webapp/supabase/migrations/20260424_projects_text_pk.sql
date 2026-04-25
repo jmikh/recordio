@@ -1,4 +1,4 @@
--- Change projects PK from UUID to TEXT so local project ID (proj-xxx) is used directly.
+-- Change projects PK from UUID to TEXT so local project ID is used directly.
 -- This makes local and cloud IDs identical, eliminating the need for a separate mapping.
 
 -- Drop dependent indexes first
