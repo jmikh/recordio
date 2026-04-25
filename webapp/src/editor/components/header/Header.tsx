@@ -12,6 +12,8 @@ import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
+import { SyncService } from '../../../storage/syncService';
+import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 
 import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
@@ -57,6 +59,22 @@ export const Header = () => {
     const pastStates = useProjectHistory(state => state.pastStates);
     const futureStates = useProjectHistory(state => state.futureStates);
 
+    const handleGoToDashboard = async () => {
+        const { userId, isPro } = useUserStore.getState();
+        if (userId) {
+            const { project: proj, userEvents } = useProjectStore.getState();
+            const fullProject = { ...proj, userEvents };
+            await SyncService.flushPendingSync(fullProject, userId, isPro);
+
+            if (useSyncStatusStore.getState().conflict) {
+                // Conflict arose during flush — defer navigation until modal resolves it
+                useSyncStatusStore.getState().setPendingNavigation('/');
+                return;
+            }
+        }
+        navigate('/');
+    };
+
 
 
     return (
@@ -64,7 +82,7 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <LogoLink className="mr-2" imgClassName="h-7" />
+                    <LogoLink className="mr-2" imgClassName="h-7" onClick={(e) => { e.preventDefault(); handleGoToDashboard(); }} />
                     {hasProAccess() && (
                         <ProBadge className="-ml-3" />
                     )}
@@ -130,7 +148,7 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <Button variant="icon" icon={TbFolder} onClick={() => navigate('/')} title="Dashboard" />
+                        <Button variant="icon" icon={TbFolder} onClick={handleGoToDashboard} title="Dashboard" />
                         <Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
                         <ThemeToggle />
                     </div>

@@ -21,6 +21,8 @@ export const BRIDGE_MSG = {
     HANDOFF_REQUEST: 'HANDOFF_REQUEST',
     /** Website → Extension: Confirm storage complete, extension can delete */
     HANDOFF_COMPLETE: 'HANDOFF_COMPLETE',
+    /** Website → Extension: Open the controller tab for a new recording */
+    OPEN_CONTROLLER: 'OPEN_CONTROLLER',
 } as const;
 
 export type BridgeMessageType = typeof BRIDGE_MSG[keyof typeof BRIDGE_MSG];

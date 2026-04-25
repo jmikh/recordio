@@ -1,103 +1,64 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 
 /**
- * Delete-from-Stream Edge Function (Soft Delete)
+ * Delete-from-Stream Edge Function (Unpublish)
  *
- * Instead of calling Cloudflare Stream API directly (which is slow),
- * this function moves the cf_video_uid to the deleted_videos queue
- * and returns immediately. The purge-deleted-videos cron handles
- * actual CF deletion asynchronously.
+ * Clears the publish columns on the projects row and queues the
+ * Cloudflare Stream video for async deletion via deleted_videos.
  */
-serve(async (req) => {
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+serve(withAuth(async (req, { user, supabase }) => {
+    // 1. Parse request body
+    const { cf_video_uid } = await req.json();
+    if (!cf_video_uid || typeof cf_video_uid !== 'string') {
+        return errorResponse('Missing cf_video_uid', 400);
     }
 
-    try {
-        // 1. Verify auth
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized: Missing auth header' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
+    // 2. Verify ownership via projects table (RLS scopes to user's own projects)
+    const { data: project, error: lookupError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('cf_video_uid', cf_video_uid)
+        .maybeSingle();
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: authHeader } } }
-        );
-
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized: Invalid user' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 2. Parse request body
-        const { cf_video_uid } = await req.json();
-        if (!cf_video_uid || typeof cf_video_uid !== 'string') {
-            return new Response(
-                JSON.stringify({ error: 'Missing cf_video_uid' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 3. Verify ownership — the video must belong to this user
-        const { data: share, error: lookupError } = await supabase
-            .from('shared_videos')
-            .select('id, user_id')
-            .eq('cf_video_uid', cf_video_uid)
-            .maybeSingle();
-
-        if (lookupError) {
-            console.error('[delete-from-stream] DB lookup error:', lookupError);
-        }
-
-        if (!share || share.user_id !== user.id) {
-            return new Response(
-                JSON.stringify({ error: 'Video not found or not owned by user' }),
-                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 4. Queue for async deletion (instant — no CF API call)
-        const adminSupabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        );
-
-        const { error: queueError } = await adminSupabase
-            .from('deleted_videos')
-            .insert({ cf_video_uid, source: 'user_delete' });
-
-        if (queueError) {
-            console.error('[delete-from-stream] Failed to queue deletion:', queueError);
-            return new Response(
-                JSON.stringify({ error: 'Failed to queue video for deletion' }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        return new Response(
-            JSON.stringify({ success: true }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-
-    } catch (err) {
-        console.error('[delete-from-stream] Unexpected error:', err);
-        return new Response(
-            JSON.stringify({ error: 'Internal server error' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    if (lookupError) {
+        console.error('[delete-from-stream] DB lookup error:', lookupError);
     }
-});
+
+    if (!project) {
+        return errorResponse('Video not found or not owned by user', 403);
+    }
+
+    // 3. Queue for async CF deletion (instant — no CF API call)
+    const adminSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const { error: queueError } = await adminSupabase
+        .from('deleted_videos')
+        .insert({ cf_video_uid, source: 'user_delete' });
+
+    if (queueError) {
+        console.error('[delete-from-stream] Failed to queue deletion:', queueError);
+        return errorResponse('Failed to queue video for deletion', 500);
+    }
+
+    // 4. Clear publish columns on the project
+    const { error: clearError } = await supabase
+        .from('projects')
+        .update({
+            cf_video_uid: null,
+            published_at: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', project.id);
+
+    if (clearError) {
+        console.error('[delete-from-stream] Failed to clear publish columns:', clearError);
+        // Don't fail the request — the video is already queued for deletion
+    }
+
+    return jsonResponse({ success: true });
+}));

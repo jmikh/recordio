@@ -10,10 +10,13 @@ import { getTimeMapper } from './hooks/useTimeMapper';
 
 
 import { ProjectStorage } from '../storage/projectStorage';
-import { ProgressModal } from '@shared/components';
+import { CloudStorage } from '../storage/cloudStorage';
+import { SyncService } from '../storage/syncService';
+import { ProgressModal, Modal } from '@shared/components';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
+import { ConflictModal } from './components/ConflictModal';
 
 
 
@@ -65,6 +68,8 @@ function Editor() {
 
     // Initialization State
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingStatus, setLoadingStatus] = useState('Loading project...');
+    const [loadError, setLoadError] = useState<string | null>(null);
 
 
     // Initialize authentication
@@ -175,30 +180,142 @@ function Editor() {
 
         async function init() {
             if (!projectId) {
-                // No project ID - redirect to dashboard
                 navigate('/', { replace: true });
                 return;
             }
             try {
-                const loadedProject = await ProjectStorage.loadProjectOrFail(projectId);
-                loadProject(loadedProject);
+                const isAuthed = useUserStore.getState().isAuthenticated;
+                let loadedProject = await ProjectStorage.loadProject(projectId);
+                let cloudProject: Awaited<ReturnType<typeof CloudStorage.loadProjectMetadata>> = null;
+
+                // If not found locally, try downloading from cloud
+                if (!loadedProject && isAuthed) {
+                    setLoadingStatus('Downloading project from cloud...');
+                    cloudProject = await CloudStorage.loadProjectMetadata(projectId);
+                    if (!cloudProject) {
+                        navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
+                        return;
+                    }
+                    const project = cloudProject.project_data;
+                    project.id = projectId;
+                    await ProjectStorage.saveProject(project);
+                    await ProjectStorage.saveSyncMeta({
+                        projectId,
+                        userId: cloudProject.user_id,
+                        cloudVersion: cloudProject.cloud_version,
+                        uploadStatus: cloudProject.upload_status === 'ready' ? 'ready' : 'pending',
+                        lastSyncedAt: Date.now(),
+                        lastAccessedAt: Date.now(),
+                    });
+                    loadedProject = await ProjectStorage.loadProject(projectId);
+                }
+
+                if (!loadedProject) {
+                    navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
+                    return;
+                }
+
+                // Sync local ↔ cloud versions on open
+                if (isAuthed) {
+                    try {
+                        const syncMeta = await ProjectStorage.getSyncMeta(projectId);
+                        const localVersion = syncMeta?.cloudVersion ?? 0;
+                        const cloudVersion = await CloudStorage.getCloudVersion(projectId);
+
+                        if (cloudVersion !== null && cloudVersion > localVersion) {
+                            setLoadingStatus('Syncing project...');
+                            cloudProject = await CloudStorage.loadProjectMetadata(projectId);
+                            if (cloudProject?.project_data) {
+                                const project = cloudProject.project_data as typeof loadedProject;
+                                project!.id = projectId;
+                                await ProjectStorage.saveProject(project!);
+                                await ProjectStorage.saveSyncMeta({
+                                    projectId,
+                                    userId: syncMeta?.userId ?? useUserStore.getState().userId ?? '',
+                                    cloudVersion: cloudProject.cloud_version,
+                                    uploadStatus: syncMeta?.uploadStatus ?? 'ready',
+                                    lastSyncedAt: Date.now(),
+                                    lastAccessedAt: Date.now(),
+                                });
+                                loadedProject = await ProjectStorage.loadProject(projectId);
+                                console.log(`[Editor] Loaded newer cloud version (v${cloudVersion} > local v${localVersion})`);
+                            }
+                        } else if (cloudVersion !== null && cloudVersion < localVersion) {
+                            const { userId, isPro } = useUserStore.getState();
+                            if (userId) {
+                                SyncService.syncNow(loadedProject!, userId, isPro).catch(err => {
+                                    console.warn('[Editor] Failed to push local version to cloud on open:', err);
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('[Editor] Cloud version check failed, using local:', err);
+                    }
+                }
+
+                // Check for missing media blobs and download from cloud
+                const missingMedia = loadedProject!.screenSource?.storageUrl && !loadedProject!.screenSource?.runtimeUrl
+                    || loadedProject!.cameraSource?.storageUrl && !loadedProject!.cameraSource?.runtimeUrl
+                    || loadedProject!.microphoneSource?.storageUrl && !loadedProject!.microphoneSource?.runtimeUrl;
+
+                if (missingMedia && isAuthed) {
+                    setLoadingStatus('Downloading media...');
+                    if (!cloudProject) {
+                        cloudProject = await CloudStorage.loadProjectMetadata(projectId);
+                    }
+                    if (cloudProject) {
+                        await SyncService.downloadProjectMedia(projectId, cloudProject);
+                        // Re-hydrate now that blobs are in IndexedDB
+                        loadedProject = await ProjectStorage.loadProject(projectId);
+                    }
+
+                    // Verify media loaded successfully
+                    const stillMissing = loadedProject!.screenSource?.storageUrl && !loadedProject!.screenSource?.runtimeUrl;
+                    if (stillMissing) {
+                        setLoadError('Could not load project media. Please contact support.');
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+
+                loadProject(loadedProject!);
                 setIsLoading(false);
                 trackEditorLoaded();
 
+                // Update local last-accessed timestamp
+                ProjectStorage.touchSyncMetaAccess(loadedProject!.id).catch(console.error);
+
                 // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
-                if (useUserStore.getState().isAuthenticated) {
-                    ShareService.getShareForProject(loadedProject.id);
-                    ShareService.getSharedVideos();
+                if (isAuthed) {
+                    ShareService.getShareForProject(loadedProject!.id);
+                    CloudStorage.updateLastAccessed(loadedProject!.id).catch(console.error);
                 }
 
             } catch (err: any) {
                 console.error("Project Init Failed:", err);
-                // Redirect to dashboard with error message
-                navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
+                // If we got far enough to have a project but media failed, show error in editor
+                if (loadingStatus === 'Downloading media...') {
+                    setLoadError('Could not load project media. Please contact support.');
+                    setIsLoading(false);
+                } else {
+                    navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
+                }
             }
         }
 
         init();
+    }, []);
+
+    // Flush pending cloud syncs on page unload
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            const { project, userEvents } = useProjectStore.getState();
+            const { userId, isPro } = useUserStore.getState();
+            const fullProject = { ...project, userEvents };
+            SyncService.flushPendingSync(fullProject, userId, isPro);
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
     // Global Key Listener for Undo/Redo & Play/Pause
@@ -283,23 +400,45 @@ function Editor() {
         };
     }
 
-    // Loading state
-    if (isLoading) {
-        return (
-            <div className="w-full h-screen bg-surface-body flex items-center justify-center">
-                <div className="text-text-main">Loading Project...</div>
-            </div>
-        );
-    }
-
-    // No project loaded (shouldn't happen with redirects, but safety fallback)
-    if (!hasActiveProject) {
+    // No project loaded and not loading — redirect to dashboard
+    if (!isLoading && !loadError && !hasActiveProject) {
         navigate('/');
         return null;
     }
 
     return (
         <div id="editor-root" className="w-full h-screen bg-surface-body flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
+
+            {/* Project loading / error modal — blocks editor until ready */}
+            <Modal isOpen={isLoading || !!loadError} maxWidth="max-w-sm">
+                <div className="flex flex-col items-center gap-4 text-center py-2">
+                    {loadError ? (
+                        <>
+                            <div className="text-text-highlighted font-semibold text-lg">Failed to Load Project</div>
+                            <p className="text-text-main text-sm">{loadError}</p>
+                            <div className="flex gap-3 mt-2">
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-highlighted text-sm rounded-lg border border-border transition-colors"
+                                >
+                                    Back to Dashboard
+                                </button>
+                                <a
+                                    href="mailto:support@recordio.cc"
+                                    className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg transition-colors"
+                                >
+                                    Contact Support
+                                </a>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <div className="text-text-main text-sm">{loadingStatus}</div>
+                        </>
+                    )}
+                </div>
+            </Modal>
 
             {/* Header / Toolbar */}
             <Header />
@@ -329,7 +468,6 @@ function Editor() {
                         }}
                     >
 
-
                         {hasActiveProject && (
                             <div
                                 id="canvas-rendered-wrapper"
@@ -338,7 +476,6 @@ function Editor() {
                                 <CanvasContainer />
                             </div>
                         )}
-                        {isLoading && <div className="text-text-main">Loading Project...</div>}
                     </div>
                 </div>
             </div>
@@ -348,6 +485,7 @@ function Editor() {
                 <Timeline />
             </div>
 
+            <ConflictModal />
             <ProgressModal
                 isOpen={isExporting}
                 title={

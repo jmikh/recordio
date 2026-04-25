@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { SyncService } from '../storage/syncService';
+import { initAnalyticsUserStore } from '../core/analytics';
+
+// Initialize the analytics ↔ userStore bridge (breaks circular dep)
+import * as userStoreModule from '../editor/stores/useUserStore';
+initAnalyticsUserStore(userStoreModule);
 
 /** Cache a remote avatar URL as a data URL to avoid CORS issues on reload */
 async function cacheAvatarUrl(url: string): Promise<string | null> {
@@ -72,6 +78,13 @@ export function useAuthListener() {
                         // Subscription table not configured yet
                     }
                 }
+
+                // Sync local projects to cloud on login + resume interrupted uploads
+                const isPro = useUserStore.getState().isPro;
+                SyncService.onLogin(session.user.id, isPro).then(() => {
+                    SyncService.resumePendingUploads().catch(console.error);
+                    SyncService.backfillThumbnails().catch(console.error);
+                }).catch(console.error);
             } else {
                 clearUser();
             }

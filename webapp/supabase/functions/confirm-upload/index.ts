@@ -1,85 +1,37 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 
 /**
  * Confirm-Upload Edge Function
  *
  * Called by the client after a successful direct upload to Cloudflare Stream.
- * Marks the shared_videos record as status='ready', making it visible on the
+ * Sets published_at on the projects row, making the video visible on the
  * watch page and dashboard.
  */
-serve(async (req) => {
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+serve(withAuth(async (req, { user, supabase }) => {
+    // 1. Parse request body — shareId is the project ID
+    const { shareId } = await req.json();
+    if (!shareId) {
+        return errorResponse('Missing shareId', 400);
     }
 
-    try {
-        // 1. Verify auth
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized: Missing auth header' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
+    // 2. Set published_at to mark the upload as complete
+    //    Only transition from null → set (uploading → published)
+    const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+            published_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', shareId)
+        .eq('user_id', user.id)
+        .is('published_at', null)
+        .not('cf_video_uid', 'is', null);
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: authHeader } } }
-        );
-
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized: Invalid user' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 2. Parse request body
-        const { shareId } = await req.json();
-        if (!shareId) {
-            return new Response(
-                JSON.stringify({ error: 'Missing shareId' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // 3. Update status to 'ready' (RLS ensures only the owner can update)
-        const { error: updateError } = await supabase
-            .from('shared_videos')
-            .update({
-                status: 'ready',
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', shareId)
-            .eq('user_id', user.id)
-            .eq('status', 'uploading');   // Only transition from uploading → ready
-
-        if (updateError) {
-            console.error('[confirm-upload] DB update failed:', updateError);
-            return new Response(
-                JSON.stringify({ error: 'Failed to confirm upload' }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        return new Response(
-            JSON.stringify({ success: true }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-
-    } catch (err) {
-        console.error('[confirm-upload] Unexpected error:', err);
-        return new Response(
-            JSON.stringify({ error: 'Internal server error' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    if (updateError) {
+        console.error('[confirm-upload] DB update failed:', updateError);
+        return errorResponse('Failed to confirm upload', 500);
     }
-});
+
+    return jsonResponse({ success: true });
+}));

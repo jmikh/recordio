@@ -1,19 +1,26 @@
-import { useState, useRef, useEffect } from 'react';
 import { TbLink } from 'react-icons/tb';
-import type { Project } from '../types';
 import { CardCheckbox } from './CardCheckbox';
 import { timeAgo } from '../utils/timeAgo';
 
+/** Minimal project info needed for the card — works with both Project and ProjectListItem */
+export interface ProjectCardData {
+    id: string;
+    name: string;
+    thumbnail?: string | null;
+    createdAt: Date | string;
+    /** Duration in milliseconds (from output windows) */
+    durationMs?: number | null;
+}
+
 interface ProjectCardProps {
-    project: Project;
+    project: ProjectCardData;
     isActive?: boolean;
     variant?: 'sidebar' | 'grid';
-    onOpen: (project: Project) => void;
+    onOpen: (project: ProjectCardData) => void;
     selectMode?: boolean;
     selected?: boolean;
     onSelect?: () => void;
     isShared?: boolean;
-    onRename?: (newName: string) => void;
 }
 
 export const ProjectCard = ({
@@ -25,50 +32,14 @@ export const ProjectCard = ({
     selected = false,
     onSelect,
     isShared = false,
-    onRename
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
-    const [isEditing, setIsEditing] = useState(false);
-    const [editName, setEditName] = useState(project.name);
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (isEditing) {
-            inputRef.current?.focus();
-            inputRef.current?.select();
-        }
-    }, [isEditing]);
 
     const handleClick = () => {
-        if (isEditing) return;
         if (selectMode && onSelect) {
             onSelect();
         } else {
             onOpen(project);
-        }
-    };
-
-    const handleEditClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setEditName(project.name);
-        setIsEditing(true);
-    };
-
-    const commitRename = () => {
-        const trimmed = editName.trim();
-        setIsEditing(false);
-        if (trimmed && trimmed !== project.name) {
-            onRename?.(trimmed);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            commitRename();
-        } else if (e.key === 'Escape') {
-            setIsEditing(false);
-            setEditName(project.name);
         }
     };
 
@@ -109,14 +80,11 @@ export const ProjectCard = ({
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-[10px] px-1.5 py-0.5 rounded">
                     {(() => {
-                        const windows = project.timeline?.outputWindows || [];
-                        const ms = windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0);
+                        const ms = project.durationMs ?? 0;
                         const seconds = Math.floor(ms / 1000);
                         const m = Math.floor(seconds / 60);
                         const s = seconds % 60;
-
                         if (m === 0 && s === 0) return '0s';
-
                         const parts = [];
                         if (m > 0) parts.push(`${m}m`);
                         if (s > 0) parts.push(`${s}s`);
@@ -128,26 +96,11 @@ export const ProjectCard = ({
             {/* Info */}
             <div className="w-full min-w-0 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                    {isEditing ? (
-                        <input
-                            ref={inputRef}
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            onBlur={commitRename}
-                            onKeyDown={handleKeyDown}
-                            onClick={e => e.stopPropagation()}
-                            className="font-normal text-sm text-text-highlighted bg-transparent border-b border-primary outline-none w-full mr-2"
-                        />
-                    ) : (
-                        <div className="flex items-center gap-1 min-w-0 mr-2">
-                            <h3
-                                className={`font-normal truncate text-text-highlighted text-sm ${!selectMode && onRename ? 'cursor-text hover:text-primary transition-colors' : ''}`}
-                                onClick={!selectMode && onRename ? handleEditClick : undefined}
-                            >
-                                {project.name}
-                            </h3>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-1 min-w-0 mr-2">
+                        <h3 className="font-normal truncate text-text-highlighted text-sm">
+                            {project.name}
+                        </h3>
+                    </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         {isShared && (
                             <TbLink className="icon-sm text-primary" title="Published" />

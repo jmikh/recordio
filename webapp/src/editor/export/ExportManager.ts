@@ -3,8 +3,7 @@ import * as Sentry from '@sentry/react';
 import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
-import { drawWatermark } from '../../core/painters/watermarkPainter';
-import type { WatermarkPosition } from '../../core/painters/watermarkPainter';
+
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
 import { FrameExtractor } from './FrameExtractor';
@@ -13,7 +12,7 @@ import { renderAudioBuffer, encodeAudioBuffer } from './audioProcessor';
 import type { Project, SourceMetadata } from '../../types';
 import { downloadViaNative } from '../../bridge/macBridge';
 import { useUIStore } from '../stores/useUIStore';
-import watermarkPng from '../../assets/watermark.png';
+
 
 // Re-export types that consumers depend on
 export type { ExportQuality, ExportFps } from './codecResolver';
@@ -51,7 +50,7 @@ export class ExportManager {
         quality: import('./codecResolver').ExportQuality,
         fps: import('./codecResolver').ExportFps,
         onProgress: (state: ExportProgress) => void,
-        options?: { watermarkPosition?: WatermarkPosition; skipDownload?: boolean }
+        options?: { skipDownload?: boolean }
     ): Promise<ExportResult> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -113,7 +112,7 @@ export class ExportManager {
         fps: import('./codecResolver').ExportFps,
         onProgress: (state: ExportProgress) => void,
         signal: AbortSignal,
-        options?: { watermarkPosition?: WatermarkPosition; skipDownload?: boolean }
+        options?: { skipDownload?: boolean }
     ): Promise<ExportResult> {
         const targetHeight = getHeightForQuality(quality);
         const aspectRatio = project.settings.outputSize.width / project.settings.outputSize.height;
@@ -187,7 +186,7 @@ export class ExportManager {
         const ctx = offscreenCanvas.getContext('2d') as unknown as CanvasRenderingContext2D;
 
         const frameExtractors: Record<string, FrameExtractor> = {};
-        const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null, watermark: HTMLImageElement | null } = { bg: null, device: null, watermark: null };
+        const imageElements: { bg: HTMLImageElement | null, device: HTMLImageElement | null } = { bg: null, device: null };
 
         const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
@@ -259,15 +258,6 @@ export class ExportManager {
                     useUIStore.getState().setVideoDecodePreference('cpu');
                     onProgress({ progress: 1, timeRemainingSeconds: null, phase: 'preparing', decodeFallback: true });
                 }
-            }
-
-            // --- Watermark Resolution ---
-            // The UI layer decides whether to show the watermark based on pro/unlock status.
-            // If watermarkPosition is provided, show watermark; otherwise skip.
-            const shouldShowWatermark = !!options?.watermarkPosition;
-
-            if (shouldShowWatermark) {
-                imageElements.watermark = await loadImage(watermarkPng);
             }
 
             const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
@@ -345,10 +335,6 @@ export class ExportManager {
                     timeMapper: timeMapper
                 });
 
-                // Draw watermark for non-pro users (last, on top of all layers; skipped in dev)
-                if (shouldShowWatermark && imageElements.watermark) {
-                    drawWatermark(ctx, imageElements.watermark, width, height, options?.watermarkPosition);
-                }
                 const t2 = performance.now();
 
                 const durationMicros = 1000000 / fps;

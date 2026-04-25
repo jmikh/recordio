@@ -4,6 +4,8 @@ import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, UserEvents } from '../../types';
 import { ProjectImpl } from '../../core/Project';
 import { ProjectStorage } from '../../storage/projectStorage';
+import { SyncService } from '../../storage/syncService';
+import { useUserStore } from './useUserStore';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
 import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActionSlice';
@@ -235,6 +237,10 @@ export const useProjectStore = create<ProjectState>()(
 // the full Project record back to IndexedDB. This is the inverse of the
 // split performed in loadProject, ensuring the persisted record always
 // contains the complete userEvents.
+//
+// SyncService.saveProject handles both local (IndexedDB) and cloud sync:
+//   - Local save: immediate (2s debounce here)
+//   - Cloud sync: separate 30s debounce inside SyncService
 let saveTimeout: any = null;
 useProjectStore.subscribe(
     (state) => state.project,
@@ -244,7 +250,9 @@ useProjectStore.subscribe(
         saveTimeout = setTimeout(() => {
             const userEvents = useProjectStore.getState().userEvents;
             const fullProject = { ...project, userEvents };
-            ProjectStorage.saveProject(fullProject).catch(console.error);
+            // SyncService saves locally first, then queues cloud sync if authenticated
+            const { userId, isPro } = useUserStore.getState();
+            SyncService.saveProject(fullProject, userId, isPro).catch(console.error);
         }, 2000);
     }
 );

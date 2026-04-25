@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { importFromRawRecording, ProjectStorage } from '../storage/projectStorage';
+import { SyncService } from '../storage/syncService';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
-import { LogoLink } from '@shared/components';
+import { useAuthListener } from '../hooks/useAuthListener';
+import { AuthManager } from '../auth/AuthManager';
+import { FcGoogle } from 'react-icons/fc';
+import { LogoLink, Modal, Button } from '@shared/components';
 import { navigate } from '../navigate';
+import { cleanupStorageIfNeeded } from '../storage/storageCleanup';
 
 type ImportStatus =
     | 'init'
@@ -31,11 +36,22 @@ export function ImportPage() {
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
     const [hasStarted, setHasStarted] = useState(false);
 
-    const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
+    // Existing-projects prompt (shown when not logged in and other local projects exist)
+    const [existingProjectsPrompt, setExistingProjectsPrompt] = useState<{
+        newProjectId: string;
+        projectIds: string[];
+    } | null>(null);
+    const [isSigningIn, setIsSigningIn] = useState(false);
+    const [signInError, setSignInError] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [syncPromptProjectId, setSyncPromptProjectId] = useState<string | null>(null);
 
-    // Get recording ID from URL
+    const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
+    useAuthListener();
+
+    // Get recording ID from URL, stripping any legacy "proj-" prefix
     const params = new URLSearchParams(window.location.search);
-    const recordingId = params.get('id');
+    const recordingId = params.get('id')?.replace(/^proj-/, '') ?? null;
 
     // Check for existing project and start handoff when page loads
     useEffect(() => {
@@ -47,8 +63,11 @@ export function ImportPage() {
         if (hasStarted) return;
         setHasStarted(true);
 
+        // Free space before importing a new recording
+        cleanupStorageIfNeeded();
+
         // Check if project already exists in local DB
-        const projectId = `proj-${recordingId}`;
+        const projectId = recordingId;
         setStatus('checking');
 
         ProjectStorage.loadProjectRaw(projectId)
@@ -98,6 +117,10 @@ export function ImportPage() {
                     setStatus('success');
                     confirmHandoff(project.id);
 
+                    // Upload project metadata to cloud (non-blocking)
+                    const { userId, isPro } = useUserStore.getState();
+                    SyncService.onProjectCreated(project, userId, isPro).catch(console.error);
+
                     // --- Analytics: project_created ---
                     try {
                         const recording = state.recording!;
@@ -141,9 +164,31 @@ export function ImportPage() {
                         });
                     } catch { /* analytics should never break the app */ }
 
-                    setTimeout(() => {
-                        navigate(`/editor?projectId=${project.id}`);
-                    }, 1500);
+                    // Check if user needs to handle existing local projects
+                    const { userId: currentUserId } = useUserStore.getState();
+                    if (currentUserId) {
+                        setTimeout(() => navigate(`/editor?projectId=${project.id}`), 1500);
+                    } else {
+                        // Not logged in — check for other unsynced local projects
+                        ProjectStorage.listProjects().then(async (allLocal) => {
+                            const allSyncMeta = await ProjectStorage.listSyncMeta();
+                            const syncedIds = new Set(allSyncMeta.map(m => m.projectId));
+                            const unsyncedOthers = allLocal.filter(
+                                p => p.id !== project.id && !syncedIds.has(p.id)
+                            );
+
+                            if (unsyncedOthers.length === 0) {
+                                setSyncPromptProjectId(project.id);
+                            } else {
+                                setExistingProjectsPrompt({
+                                    newProjectId: project.id,
+                                    projectIds: unsyncedOthers.map(p => p.id),
+                                });
+                            }
+                        }).catch(() => {
+                            setSyncPromptProjectId(project.id);
+                        });
+                    }
                 })
                 .catch((error) => {
                     console.error('[ImportPage] Storage failed:', error);
@@ -254,6 +299,31 @@ export function ImportPage() {
         }
     }, [state, confirmHandoff]);
 
+    const handleSignIn = async () => {
+        setIsSigningIn(true);
+        setSignInError(null);
+        const result = await AuthManager.signInWithProvider('google');
+        if (result.error) {
+            setSignInError(result.error.message);
+            setIsSigningIn(false);
+        }
+        // If no error, browser redirects to Google — on return, useAuthListener
+        // picks up the session and the import page redirects to editor
+    };
+
+    const handleStartFresh = async () => {
+        if (!existingProjectsPrompt) return;
+        setIsDeleting(true);
+        try {
+            for (const id of existingProjectsPrompt.projectIds) {
+                await ProjectStorage.deleteProject(id);
+            }
+        } catch (e) {
+            console.error('[ImportPage] Failed to delete existing projects:', e);
+        }
+        navigate(`/editor?projectId=${existingProjectsPrompt.newProjectId}`);
+    };
+
     const getStatusMessage = () => {
         switch (status) {
             case 'init':
@@ -311,14 +381,93 @@ export function ImportPage() {
 
 
                 {isError && (
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={() => navigate('/')}
-                        className="mt-4 px-4 py-2 bg-surface-raised hover:bg-state-hover rounded-lg text-sm"
+                        className="mt-4"
                     >
                         Go to Dashboard
-                    </button>
+                    </Button>
                 )}
             </div>
+
+            {/* Existing projects prompt — shown when not logged in and other local projects exist */}
+            <Modal isOpen={!!existingProjectsPrompt} maxWidth="max-w-[400px]">
+                <h2 className="text-lg font-semibold text-text-highlighted mb-2">
+                    Existing Projects Found
+                </h2>
+                <p className="text-sm text-text-main mb-6">
+                    You have {existingProjectsPrompt?.projectIds.length} existing project{existingProjectsPrompt?.projectIds.length !== 1 ? 's' : ''} on this device.
+                    Sign in to sync them to the cloud, or overwrite.
+                </p>
+
+                {signInError && (
+                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs mb-4">
+                        {signInError}
+                    </div>
+                )}
+
+                <div className="space-y-3">
+                    <button
+                        type="button"
+                        onClick={handleSignIn}
+                        disabled={isSigningIn || isDeleting}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50"
+                    >
+                        {isSigningIn ? (
+                            <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
+                        ) : (
+                            <FcGoogle className="icon-lg" />
+                        )}
+                        <span>{isSigningIn ? 'Connecting...' : 'Continue with Google'}</span>
+                    </button>
+                    <Button
+                        fullWidth
+                        onClick={handleStartFresh}
+                        disabled={isDeleting || isSigningIn}
+                    >
+                        {isDeleting ? 'Deleting...' : 'Overwrite'}
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Sync prompt — shown when not logged in and no other local projects */}
+            <Modal isOpen={!!syncPromptProjectId} maxWidth="max-w-[400px]">
+                <h2 className="text-lg font-semibold text-text-highlighted mb-2">
+                    Project Ready
+                </h2>
+                <p className="text-sm text-text-main mb-6">
+                    Sign in to sync your project to the cloud, or continue locally.
+                </p>
+
+                {signInError && (
+                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs mb-4">
+                        {signInError}
+                    </div>
+                )}
+
+                <div className="space-y-3">
+                    <button
+                        type="button"
+                        onClick={handleSignIn}
+                        disabled={isSigningIn}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50"
+                    >
+                        {isSigningIn ? (
+                            <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
+                        ) : (
+                            <FcGoogle className="icon-lg" />
+                        )}
+                        <span>{isSigningIn ? 'Connecting...' : 'Continue with Google'}</span>
+                    </button>
+                    <Button
+                        fullWidth
+                        onClick={() => navigate(`/editor?projectId=${syncPromptProjectId}`)}
+                    >
+                        Continue Locally
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }

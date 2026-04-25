@@ -11,6 +11,7 @@
 - **Cron jobs that call edge functions must pass `Authorization: Bearer <SUPABASE_SECRET_KEY>`** so the function knows it's an internal call
 - **ALWAYS use Secret API keys instead of service role key** for internal functions, server usage..etc. Service role and anon keys are deprecated in supabase.
 - **Keep table docs current** — when adding, removing, or modifying a table, update the corresponding file in `tables/`. When adding a new table, create a new `tables/<table_name>.md`. When removing a table, delete its file.
+- **ALWAYS** create new migrations rather edit existing ones. i push the relatively often.
 
 ---
 
@@ -18,7 +19,7 @@
 
 See `tables/` for per-table documentation. Each file describes what the table is for, which functions/services access it, and its RLS policy.
 
-Current tables: `deleted_videos`, `email_unsubscribes`, `shared_videos`, `subscriptions`, `transcription_usage`.
+Current tables: `deleted_videos`, `email_unsubscribes`, `projects`, `shared_videos`, `subscriptions`, `transcription_usage`, `user_assets`, `user_quotas`.
 
 ---
 
@@ -217,7 +218,7 @@ Database functions live in `sql/functions/`, one file per function. **Never put 
 ### Conventions
 
 - **One file per function** — named after the function (e.g., `handle_new_user.sql`)
-- **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_stale_uploads.sql`)
+- **`cron_` prefix** for functions triggered by pg_cron (e.g., `cron_cleanup_expired_projects.sql`)
 - **Doc comment at the top** of every file: purpose, trigger/caller, and tables touched
 - **[FUNCTIONS.md](sql/functions/FUNCTIONS.md)** is the index — update it when adding/removing functions
 

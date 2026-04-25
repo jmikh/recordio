@@ -256,6 +256,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     console.log('[Webhook] Subscription created/updated for user:', userId);
 
+    // Set project expiry: Pro users get no expiry, non-Pro get 14 days
+    await supabase.rpc('set_project_expiry', {
+        p_user_id: userId,
+        p_expires_at: null, // New checkout = active Pro = no expiry
+    });
+
     // --- Mixpanel Tracking ---
     const email = await getUserEmail(userId);
 
@@ -334,6 +340,20 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     if (error) {
         console.error('[Webhook] Error updating subscription:', error);
         return;
+    }
+
+    // Update project expiry based on new subscription status
+    const isNowPro = newStatus === 'active' || newStatus === 'trialing';
+    const wasPro = oldStatus === 'active' || oldStatus === 'trialing';
+    if (isNowPro && !wasPro) {
+        // Regained Pro — clear expiry on all projects
+        await supabase.rpc('set_project_expiry', { p_user_id: userId, p_expires_at: null });
+    } else if (!isNowPro && wasPro) {
+        // Lost Pro — set 14-day expiry on all projects
+        await supabase.rpc('set_project_expiry', {
+            p_user_id: userId,
+            p_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        });
     }
 
     // --- Mixpanel Tracking ---
@@ -431,6 +451,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     if (error) {
         console.error('[Webhook] Error marking subscription as canceled:', error);
         return;
+    }
+
+    // Set 14-day expiry on all projects (subscription deleted = lost Pro)
+    if (existingSub) {
+        await supabase.rpc('set_project_expiry', {
+            p_user_id: existingSub.user_id,
+            p_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        });
     }
 
     // --- Mixpanel Tracking ---

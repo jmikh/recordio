@@ -42,7 +42,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                         Sign In to Recordio
                     </h2>
                     <p className="text-xs text-text-muted mt-1">
-                        Unlock Pro features and remove watermarks
+                        Unlock Pro features
                     </p>
                 </div>
                 <XButton

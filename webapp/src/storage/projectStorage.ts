@@ -11,7 +11,7 @@ const isWebsite = typeof window !== 'undefined' &&
         window.location.origin === EDITOR_ORIGIN_PROD);
 
 const DB_NAME = isWebsite ? 'recordio-editor' : 'RecordioDB';
-const DB_VERSION = 5; // Added customMusic store
+const DB_VERSION = 6; // Added syncMeta store for cloud sync
 
 /**
  * Entry in the global custom backgrounds library.
@@ -30,6 +30,27 @@ export interface CustomMusicEntry {
     blob: Blob;
     name: string;      // Original filename
     createdAt: number; // timestamp
+}
+
+/**
+ * Sync metadata for a project — tracks cloud sync state per project.
+ * Stored in the `syncMeta` IndexedDB store, keyed by local project ID.
+ */
+export interface SyncMeta {
+    /** Local project ID (key) — same ID used in cloud */
+    projectId: string;
+    /** User ID that owns this cloud project */
+    userId: string;
+    /** Last known cloud version (for optimistic concurrency) */
+    cloudVersion: number;
+    /** Upload status: 'pending' | 'ready' */
+    uploadStatus: 'pending' | 'ready';
+    /** Last time this project was synced to cloud */
+    lastSyncedAt: number; // timestamp
+    /** Last time this project was opened locally */
+    lastAccessedAt?: number; // timestamp
+    /** SHA-256 hash of the last uploaded thumbnail blob (skip re-upload if unchanged) */
+    thumbnailHash?: string;
 }
 
 export class ProjectStorage {
@@ -69,6 +90,11 @@ export class ProjectStorage {
                     db.createObjectStore('customMusic', { keyPath: 'id' });
                 }
 
+                // 6. Sync Metadata Store (cloud sync tracking)
+                if (!db.objectStoreNames.contains('syncMeta')) {
+                    db.createObjectStore('syncMeta', { keyPath: 'projectId' });
+                }
+
                 // Remove legacy sources store if it exists
                 if (db.objectStoreNames.contains('sources')) {
                     db.deleteObjectStore('sources');
@@ -77,6 +103,10 @@ export class ProjectStorage {
 
             request.onsuccess = (event) => {
                 resolve((event.target as IDBOpenDBRequest).result);
+            };
+
+            request.onblocked = () => {
+                console.warn('[RecordioDB] Upgrade blocked — close other tabs and refresh');
             };
 
             request.onerror = (event) => {
@@ -181,13 +211,36 @@ export class ProjectStorage {
     static async loadProject(projectId: ID): Promise<Project | null> {
         const db = await this.getDB();
 
-        const projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
+        let projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.get(projectId);
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
+
+        // If not found, check for legacy "proj-" prefixed version and migrate
+        if (!projectRaw && !projectId.startsWith('proj-')) {
+            const legacyId = `proj-${projectId}`;
+            const legacyRaw = await new Promise<Project | undefined>((resolve, reject) => {
+                const tx = db.transaction('projects', 'readonly');
+                const store = tx.objectStore('projects');
+                const req = store.get(legacyId);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            if (legacyRaw) {
+                await this.migrateProjectPrefix(legacyId);
+                // Re-read after migration
+                projectRaw = await new Promise<Project | undefined>((resolve, reject) => {
+                    const tx = db.transaction('projects', 'readonly');
+                    const store = tx.objectStore('projects');
+                    const req = store.get(projectId);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+        }
 
         if (!projectRaw) return null;
 
@@ -302,7 +355,7 @@ export class ProjectStorage {
      */
     static async listProjects(): Promise<Project[]> {
         const db = await this.getDB();
-        const projects = await new Promise<Project[]>((resolve, reject) => {
+        let projects = await new Promise<Project[]>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.getAll();
@@ -310,11 +363,29 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
 
+        // Migrate any legacy "proj-" prefixed projects before hydration
+        const prefixed = projects.filter((p) => p.id.startsWith('proj-'));
+        if (prefixed.length > 0) {
+            for (const p of prefixed) {
+                await this.migrateProjectPrefix(p.id);
+            }
+            // Re-read after migration
+            projects = await new Promise<Project[]>((resolve, reject) => {
+                const tx = db.transaction('projects', 'readonly');
+                const store = tx.objectStore('projects');
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result as Project[]);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
         // Hydrate Thumbnails
         for (const p of projects) {
             const thumbBlob = await this.getThumbnail(p.id);
             if (thumbBlob) {
                 p.thumbnail = URL.createObjectURL(thumbBlob);
+            } else {
+                p.thumbnail = undefined;
             }
         }
 
@@ -373,7 +444,7 @@ export class ProjectStorage {
         const db = await this.getDB();
 
         // Transaction across all stores
-        const tx = db.transaction(['projects', 'recordings', 'thumbnails'], 'readwrite');
+        const tx = db.transaction(['projects', 'recordings', 'thumbnails', 'syncMeta'], 'readwrite');
 
         // 1. Delete Project
         tx.objectStore('projects').delete(projectId);
@@ -394,6 +465,9 @@ export class ProjectStorage {
 
         // 3. Delete Thumbnail
         tx.objectStore('thumbnails').delete(projectId);
+
+        // 4. Delete Sync Metadata
+        tx.objectStore('syncMeta').delete(projectId);
 
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
@@ -435,6 +509,118 @@ export class ProjectStorage {
             const store = tx.objectStore('projects');
             const req = store.put(project);
             req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // SYNC METADATA
+    // ===========================================
+
+    static async getSyncMeta(projectId: ID): Promise<SyncMeta | undefined> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readonly');
+            const store = tx.objectStore('syncMeta');
+            const req = store.get(projectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async saveSyncMeta(meta: SyncMeta): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const req = store.put(meta);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async touchSyncMetaAccess(projectId: ID): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const getReq = store.get(projectId);
+            getReq.onsuccess = () => {
+                const existing = getReq.result as SyncMeta | undefined;
+                if (!existing) { resolve(); return; }
+                existing.lastAccessedAt = Date.now();
+                const putReq = store.put(existing);
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = () => reject(putReq.error);
+            };
+            getReq.onerror = () => reject(getReq.error);
+        });
+    }
+
+    static async deleteSyncMeta(projectId: ID): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readwrite');
+            const store = tx.objectStore('syncMeta');
+            const req = store.delete(projectId);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    static async listSyncMeta(): Promise<SyncMeta[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('syncMeta', 'readonly');
+            const store = tx.objectStore('syncMeta');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result as SyncMeta[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===========================================
+    // BLOB EXISTENCE CHECK
+    // ===========================================
+
+    /**
+     * Check if a recording blob exists without loading it into memory.
+     */
+    static async hasRecordingBlob(id: ID): Promise<boolean> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('recordings', 'readonly');
+            const store = tx.objectStore('recordings');
+            const req = store.count(id);
+            req.onsuccess = () => resolve(req.result > 0);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Returns all keys from the recordings store without loading blob data.
+     */
+    static async listRecordingBlobKeys(): Promise<string[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('recordings', 'readonly');
+            const store = tx.objectStore('recordings');
+            const req = store.getAllKeys();
+            req.onsuccess = () => resolve(req.result as string[]);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Returns all project IDs without loading full project data.
+     */
+    static async listProjectIds(): Promise<string[]> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const store = tx.objectStore('projects');
+            const req = store.getAllKeys();
+            req.onsuccess = () => resolve(req.result as string[]);
             req.onerror = () => reject(req.error);
         });
     }
@@ -668,6 +854,111 @@ export class ProjectStorage {
         totalBytes = results.reduce((sum, n) => sum + n, 0);
         return totalBytes;
     }
+
+    /**
+     * Migrates a single project that has a "proj-" prefixed ID.
+     * Re-keys the project, recordings, thumbnails, and syncMeta in one transaction,
+     * and updates internal IDs (source IDs, storageUrls) within the project.
+     * No-op if the ID doesn't start with "proj-".
+     */
+    static async migrateProjectPrefix(oldProjectId: string): Promise<string> {
+        if (!oldProjectId.startsWith('proj-')) return oldProjectId;
+
+        const newId = oldProjectId.slice(5); // strip "proj-"
+        const db = await this.getDB();
+
+        const project = await new Promise<any>((resolve, reject) => {
+            const tx = db.transaction('projects', 'readonly');
+            const req = tx.objectStore('projects').get(oldProjectId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+
+        if (!project) return newId; // already migrated or doesn't exist
+
+        // --- Update IDs within the project object ---
+        project.id = newId;
+
+        const rewriteId = (id: string | undefined) =>
+            id?.replace(oldProjectId, newId);
+        const rewriteUrl = (url: string | undefined) =>
+            url?.replace(`rec-${oldProjectId}`, newId).replace(oldProjectId, newId);
+
+        if (project.screenSource) {
+            project.screenSource.id = rewriteId(project.screenSource.id);
+            project.screenSource.storageUrl = rewriteUrl(project.screenSource.storageUrl);
+        }
+        if (project.cameraSource) {
+            project.cameraSource.id = rewriteId(project.cameraSource.id);
+            project.cameraSource.storageUrl = rewriteUrl(project.cameraSource.storageUrl);
+        }
+        if (project.microphoneSource) {
+            project.microphoneSource.id = rewriteId(project.microphoneSource.id);
+            project.microphoneSource.storageUrl = rewriteUrl(project.microphoneSource.storageUrl);
+        }
+        if (project.settings?.background?.customStorageUrl) {
+            project.settings.background.customStorageUrl =
+                rewriteUrl(project.settings.background.customStorageUrl);
+        }
+        if (project.settings?.audio?.music?.customStorageUrl) {
+            project.settings.audio.music.customStorageUrl =
+                rewriteUrl(project.settings.audio.music.customStorageUrl);
+        }
+
+        // --- Single transaction to re-key everything ---
+        const tx = db.transaction(['projects', 'recordings', 'thumbnails', 'syncMeta'], 'readwrite');
+
+        // Re-key project
+        tx.objectStore('projects').delete(oldProjectId);
+        tx.objectStore('projects').put(project);
+
+        // Re-key thumbnail
+        const thumbStore = tx.objectStore('thumbnails');
+        const thumbReq = thumbStore.get(oldProjectId);
+        thumbReq.onsuccess = () => {
+            if (thumbReq.result) {
+                thumbStore.delete(oldProjectId);
+                thumbStore.put({ ...thumbReq.result, id: newId });
+            }
+        };
+
+        // Re-key syncMeta
+        const syncStore = tx.objectStore('syncMeta');
+        const syncReq = syncStore.get(oldProjectId);
+        syncReq.onsuccess = () => {
+            if (syncReq.result) {
+                syncStore.delete(oldProjectId);
+                syncStore.put({ ...syncReq.result, projectId: newId });
+            }
+        };
+
+        // Re-key recording blobs (strip "rec-" prefix and rename project ID segment)
+        const recStore = tx.objectStore('recordings');
+        const recCursor = recStore.openCursor();
+        recCursor.onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+            if (cursor) {
+                const key = cursor.key.toString();
+                if (key.includes(oldProjectId)) {
+                    const entry = cursor.value;
+                    const newKey = key
+                        .replace(`rec-${oldProjectId}`, newId)
+                        .replace(oldProjectId, newId);
+                    cursor.delete();
+                    recStore.put({ ...entry, id: newKey });
+                }
+                cursor.continue();
+            }
+        };
+
+        await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+
+        console.log(`[ProjectStorage] Migrated project ${oldProjectId} → ${newId}`);
+        return newId;
+    }
 }
 
 // ============================================
@@ -693,21 +984,21 @@ export async function importFromRawRecording(
     cameraBlob?: Blob,
     micBlob?: Blob
 ): Promise<Project> {
-    const projectId = `proj-${recording.id}`;
+    const projectId = recording.id;
 
     // 1. Save blobs
-    const screenBlobId = `rec-${projectId}-screen`;
+    const screenBlobId = `${projectId}-screen`;
     await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
     let cameraBlobId: string | undefined;
     if (cameraBlob) {
-        cameraBlobId = `rec-${projectId}-camera`;
+        cameraBlobId = `${projectId}-camera`;
         await ProjectStorage.saveRecordingBlob(cameraBlobId, cameraBlob);
     }
 
     let micBlobId: string | undefined;
     if (micBlob) {
-        micBlobId = `rec-${projectId}-mic`;
+        micBlobId = `${projectId}-mic`;
         await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
     }
 
