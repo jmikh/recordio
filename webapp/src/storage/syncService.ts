@@ -264,8 +264,9 @@ export class SyncService {
 
             const hasSyncMeta = syncMetaAccessMap.has(local.id);
 
-            if (hasSyncMeta && !cloudFetchFailed) {
-                // Was synced to cloud but no longer exists there — delete local copy
+            const syncMeta = syncMetaAccessMap.get(local.id);
+            if (hasSyncMeta && syncMeta?.cloudSynced && !cloudFetchFailed) {
+                // Was fully synced to cloud but no longer exists there — delete local copy
                 console.log(`[SyncService] Project ${local.id} deleted from cloud, removing local copy`);
                 LocalStorage.deleteProject(local.id).catch(console.error);
             } else {

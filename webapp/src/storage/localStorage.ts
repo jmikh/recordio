@@ -443,6 +443,9 @@ export class LocalStorage {
     }
 
     static async deleteProject(projectId: ID): Promise<void> {
+        const caller = new Error().stack;
+        console.warn(`[LocalStorage] deleteProject called for ${projectId}`, caller);
+
         const db = await this.getDB();
 
         // Transaction across all stores
@@ -478,6 +481,9 @@ export class LocalStorage {
     }
 
     static async deleteRecordingBlob(id: ID): Promise<void> {
+        const caller = new Error().stack;
+        console.warn(`[LocalStorage] deleteRecordingBlob called for ${id}`, caller);
+
         const db = await this.getDB();
         return new Promise((resolve, reject) => {
             const tx = db.transaction('recordings', 'readwrite');
