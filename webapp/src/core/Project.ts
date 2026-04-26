@@ -5,7 +5,7 @@ import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 // Default display settings for tracks — single source of truth
 const DEFAULT_DISPLAY_SETTINGS = {
@@ -104,7 +104,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         gradientDirection: 135,
         colorMode: 'gradient',
         backgroundBlurPx: 0,
-        imageUrl: '/assets/backgrounds/bg10.avif'
+        imageUrl: 'https://cdn.recordio.cc/backgrounds/bg10.avif'
     },
 
     captions: {

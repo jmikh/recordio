@@ -1,19 +1,10 @@
 /**
- * Abstraction over browser canvas/image APIs so painters can run
- * in environments without DOM (e.g. Node.js with node-canvas).
+ * Re-export shared interfaces + browser-specific implementation.
  */
 
-import type { Size } from '../types';
+export type { RenderContext, CanvasHandle } from '@shared/utils/renderContext';
 
-export interface RenderContext {
-  createCanvas(width: number, height: number): CanvasHandle;
-  loadImage(src: string): Promise<CanvasImageSource>;
-}
-
-export interface CanvasHandle {
-  canvas: CanvasImageSource & Size;
-  ctx: CanvasRenderingContext2D;
-}
+import type { RenderContext, CanvasHandle } from '@shared/utils/renderContext';
 
 /** Browser-native implementation — uses OffscreenCanvas + Image. */
 export const browserRenderContext: RenderContext = {

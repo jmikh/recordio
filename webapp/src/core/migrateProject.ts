@@ -74,6 +74,17 @@ export function migrateProject(raw: any): any {
         }
     }
 
+    // v3 → v4: rewrite preset background imageUrl from relative to CDN
+    if (version < 4) {
+        const bgUrl = raw.settings?.background?.imageUrl;
+        if (typeof bgUrl === 'string' && bgUrl.startsWith('/assets/backgrounds/')) {
+            raw.settings.background.imageUrl = bgUrl.replace(
+                '/assets/backgrounds/',
+                'https://cdn.recordio.cc/backgrounds/'
+            );
+        }
+    }
+
     // Backfill displaySettings if missing (pre-displaySettings projects)
     if (raw.timeline && !raw.timeline.displaySettings) {
         raw.timeline.displaySettings = {

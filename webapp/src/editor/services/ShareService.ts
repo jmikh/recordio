@@ -251,14 +251,6 @@ export class ShareService {
     }
 
     /**
-     * Get a thumbnail URL for a Cloudflare Stream video.
-     */
-    static getThumbnailUrl(cfVideoUid: string): string {
-        const subdomain = import.meta.env.VITE_CF_CUSTOMER_SUBDOMAIN || 'placeholder';
-        return `https://customer-${subdomain}.cloudflarestream.com/${cfVideoUid}/thumbnails/thumbnail.jpg`;
-    }
-
-    /**
      * Get the current authenticated user's ID (or null).
      */
     static async getCurrentUserId(): Promise<string | null> {

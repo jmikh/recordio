@@ -13,22 +13,24 @@ import { LocalStorage, type CustomBackgroundEntry } from '../../../storage/local
 
 
 
+const CDN = 'https://cdn.recordio.cc/backgrounds';
+
 const BACKGROUND_IMAGES = [
-    { name: 'Dark Glass', url: '/assets/backgrounds/bg4.avif', thumbnail: '/assets/backgrounds/bg4-small.avif' },
-    { name: 'Bubble Funky', url: '/assets/backgrounds/bg3.avif', thumbnail: '/assets/backgrounds/bg3-small.avif' },
-    { name: 'Dark Pink Washed', url: '/assets/backgrounds/bg6.avif', thumbnail: '/assets/backgrounds/bg6-small.avif' },
-    { name: 'Dark Pink Splatter', url: '/assets/backgrounds/bg5.avif', thumbnail: '/assets/backgrounds/bg5-small.avif' },
-    { name: 'Blue Purple Layers', url: '/assets/backgrounds/bg1.avif', thumbnail: '/assets/backgrounds/bg1-small.avif' },
-    { name: 'Layered Purples', url: '/assets/backgrounds/bg8.avif', thumbnail: '/assets/backgrounds/bg8-small.avif' },
-    { name: 'Blue Purple Wash', url: '/assets/backgrounds/bg2.avif', thumbnail: '/assets/backgrounds/bg2-small.avif' },
-    { name: 'Pink Blue Washed', url: '/assets/backgrounds/bg10.avif', thumbnail: '/assets/backgrounds/bg10-small.avif' },
-    { name: 'Pink Purple Funky', url: '/assets/backgrounds/bg15.avif', thumbnail: '/assets/backgrounds/bg15-small.avif' },
-    { name: 'Purple Pink Funky', url: '/assets/backgrounds/bg14.avif', thumbnail: '/assets/backgrounds/bg14-small.avif' },
-    { name: 'Pink Purple Splash', url: '/assets/backgrounds/bg12.avif', thumbnail: '/assets/backgrounds/bg12-small.avif' },
-    { name: 'Pink Clouds', url: '/assets/backgrounds/bg11.avif', thumbnail: '/assets/backgrounds/bg11-small.avif' },
-    { name: 'Orange Teal Funky', url: '/assets/backgrounds/bg9.avif', thumbnail: '/assets/backgrounds/bg9-small.avif' },
-    { name: 'Pink Teal Funky', url: '/assets/backgrounds/bg13.avif', thumbnail: '/assets/backgrounds/bg13-small.avif' },
-    { name: 'Fluorescent Stripes', url: '/assets/backgrounds/bg7.avif', thumbnail: '/assets/backgrounds/bg7-small.avif' },
+    { name: 'Dark Glass', url: `${CDN}/bg4.avif`, thumbnail: `${CDN}/bg4-small.avif` },
+    { name: 'Bubble Funky', url: `${CDN}/bg3.avif`, thumbnail: `${CDN}/bg3-small.avif` },
+    { name: 'Dark Pink Washed', url: `${CDN}/bg6.avif`, thumbnail: `${CDN}/bg6-small.avif` },
+    { name: 'Dark Pink Splatter', url: `${CDN}/bg5.avif`, thumbnail: `${CDN}/bg5-small.avif` },
+    { name: 'Blue Purple Layers', url: `${CDN}/bg1.avif`, thumbnail: `${CDN}/bg1-small.avif` },
+    { name: 'Layered Purples', url: `${CDN}/bg8.avif`, thumbnail: `${CDN}/bg8-small.avif` },
+    { name: 'Blue Purple Wash', url: `${CDN}/bg2.avif`, thumbnail: `${CDN}/bg2-small.avif` },
+    { name: 'Pink Blue Washed', url: `${CDN}/bg10.avif`, thumbnail: `${CDN}/bg10-small.avif` },
+    { name: 'Pink Purple Funky', url: `${CDN}/bg15.avif`, thumbnail: `${CDN}/bg15-small.avif` },
+    { name: 'Purple Pink Funky', url: `${CDN}/bg14.avif`, thumbnail: `${CDN}/bg14-small.avif` },
+    { name: 'Pink Purple Splash', url: `${CDN}/bg12.avif`, thumbnail: `${CDN}/bg12-small.avif` },
+    { name: 'Pink Clouds', url: `${CDN}/bg11.avif`, thumbnail: `${CDN}/bg11-small.avif` },
+    { name: 'Orange Teal Funky', url: `${CDN}/bg9.avif`, thumbnail: `${CDN}/bg9-small.avif` },
+    { name: 'Pink Teal Funky', url: `${CDN}/bg13.avif`, thumbnail: `${CDN}/bg13-small.avif` },
+    { name: 'Fluorescent Stripes', url: `${CDN}/bg7.avif`, thumbnail: `${CDN}/bg7-small.avif` },
 ];
 
 export const BackgroundSettings = () => {

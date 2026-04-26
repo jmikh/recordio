@@ -2,9 +2,9 @@ import type { BaseEvent, DragEvent } from '@shared/types';
 import type { TimeMapper } from '../mappers/timeMapper';
 import { useUIStore } from '../../editor/stores/useUIStore';
 
-const CLICK_SOUND_URL = '/assets/sounds/mouse-click.mp3';
-const MOUSE_DOWN_SOUND_URL = '/assets/sounds/mouse_down.mp3';
-const MOUSE_UP_SOUND_URL = '/assets/sounds/mouse_up.mp3';
+const CLICK_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-click.mp3';
+const MOUSE_DOWN_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-down.mp3';
+const MOUSE_UP_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-up.mp3';
 
 let audioContext: AudioContext | null = null;
 let audioBuffer: AudioBuffer | null = null;

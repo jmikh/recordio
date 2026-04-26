@@ -1,0 +1,20 @@
+{
+  "name": "recordio-render-worker",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx --env-file=.env src/index.ts"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "@supabase/supabase-js": "^2.90.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.3"
+  }
+}
