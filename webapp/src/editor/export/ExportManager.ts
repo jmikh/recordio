@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react';
 import { ProjectImpl } from '../../core/Project';
 import { PlaybackRenderer } from '../components/canvas/PlaybackRenderer';
 import { drawBackground } from '../../core/painters/backgroundPainter';
+import { browserRenderContext } from '../../core/renderContext';
 
 import { getDeviceFrame } from '../../core/deviceFrames';
 import { TimeMapper } from '../../core/mappers/timeMapper';
@@ -317,16 +318,17 @@ export class ExportManager {
                     ctx,
                     renderProject.settings.background,
                     renderProject.settings.background.backgroundBlurPx,
-                    offscreenCanvas as unknown as HTMLCanvasElement,
+                    { width, height },
                     imageElements.bg
                 );
 
                 PlaybackRenderer.render({
-                    canvas: offscreenCanvas as unknown as HTMLCanvasElement,
                     ctx,
+                    renderCtx: browserRenderContext,
                     bgRef: imageElements.bg,
                     videoRefs: currentFrameRefs,
-                    deviceFrameImg: imageElements.device
+                    deviceFrameImg: imageElements.device,
+                    sourceCanvas: offscreenCanvas
                 }, {
                     project: renderProject,
                     userEvents: renderProject.userEvents,

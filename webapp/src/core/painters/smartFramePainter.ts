@@ -1,4 +1,4 @@
-import type { DeviceFrame } from '../../types';
+import type { DeviceFrame, Size } from '../../types';
 
 export interface SliceSegment {
     start: number; // Percent 0-1
@@ -19,7 +19,7 @@ export interface FrameScalingConfig {
  */
 function drawSmartFrame(
     ctx: CanvasRenderingContext2D,
-    img: HTMLImageElement | HTMLCanvasElement,
+    img: CanvasImageSource & Size,
     dx: number,
     dy: number,
     dw: number,
@@ -133,7 +133,7 @@ function drawSmartFrame(
  */
 export function resolveScreenRect(
     screenRect: { x: number; y: number; width: number; height: number },
-    imageSize: { width: number; height: number },
+    imageSize: Size,
     destRect: { x: number; y: number; width: number; height: number },
     config: FrameScalingConfig
 ): { x: number; y: number; width: number; height: number } {
@@ -216,9 +216,9 @@ export function resolveScreenRect(
 export function drawDeviceFrame(
     ctx: CanvasRenderingContext2D,
     deviceFrame: DeviceFrame,
-    img: HTMLImageElement,
+    img: CanvasImageSource,
     frameRect: { x: number; y: number; width: number; height: number }
 ): void {
     ctx.imageSmoothingQuality = 'high';
-    drawSmartFrame(ctx, img, frameRect.x, frameRect.y, frameRect.width, frameRect.height, deviceFrame.customScaling);
+    drawSmartFrame(ctx, img as CanvasImageSource & Size, frameRect.x, frameRect.y, frameRect.width, frameRect.height, deviceFrame.customScaling);
 }

@@ -1,15 +1,7 @@
-import type { BackgroundSettings } from '../../types';
+import type { BackgroundSettings, Size } from '../../types';
 
-/**
- * Validates whether a string is a parseable CSS color.
- * Uses an OffscreenCanvas context which silently rejects invalid values.
- */
-const _colorValidationCtx = new OffscreenCanvas(1, 1).getContext('2d')!;
-const isValidCssColor = (color: string): boolean => {
-    _colorValidationCtx.fillStyle = '#000000'; // reset to known value
-    _colorValidationCtx.fillStyle = color;
-    return _colorValidationCtx.fillStyle !== '#000000' || color === '#000000';
-};
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const isValidHexColor = (color: string): boolean => HEX_RE.test(color);
 
 /**
  * Draws the project background (solid color or image) onto the canvas.
@@ -18,31 +10,31 @@ export const drawBackground = (
     ctx: CanvasRenderingContext2D,
     background: BackgroundSettings,
     blurRadius: number,
-    canvas: HTMLCanvasElement,
-    bgImage: HTMLImageElement | null
+    canvasSize: Size,
+    bgImage: CanvasImageSource | null
 ) => {
+    const { width, height } = canvasSize;
+
     // 1. Solid Color
     if (background.type === 'color' && background.colorMode === 'solid' && background.color) {
-        if (!isValidCssColor(background.color)) {
+        if (!isValidHexColor(background.color)) {
             console.error(`[backgroundPainter] Invalid solid color: "${background.color}"`);
             return;
         }
         ctx.fillStyle = background.color;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, width, height);
     }
     // 2. Gradient
     else if (background.type === 'color' && background.colorMode === 'gradient') {
         const { gradientColors, gradientDirection } = background;
-        const w = canvas.width;
-        const h = canvas.height;
 
         // Convert CSS gradient angle to canvas coordinates
         // CSS: 0° = up, 90° = right, 180° = down, 270° = left
         // Canvas: calculate start/end points based on angle
         const angleRad = (gradientDirection - 90) * (Math.PI / 180);
-        const diagonal = Math.sqrt(w * w + h * h) / 2;
-        const centerX = w / 2;
-        const centerY = h / 2;
+        const diagonal = Math.sqrt(width * width + height * height) / 2;
+        const centerX = width / 2;
+        const centerY = height / 2;
 
         // Calculate gradient line endpoints
         const x0 = centerX - Math.cos(angleRad) * diagonal;
@@ -51,8 +43,8 @@ export const drawBackground = (
         const y1 = centerY + Math.sin(angleRad) * diagonal;
 
         const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-        const color0 = isValidCssColor(gradientColors[0]) ? gradientColors[0] : '#000000';
-        const color1 = isValidCssColor(gradientColors[1]) ? gradientColors[1] : '#000000';
+        const color0 = isValidHexColor(gradientColors[0]) ? gradientColors[0] : '#000000';
+        const color1 = isValidHexColor(gradientColors[1]) ? gradientColors[1] : '#000000';
         if (color0 !== gradientColors[0] || color1 !== gradientColors[1]) {
             console.error(`[backgroundPainter] Invalid gradient color: "${gradientColors[0]}", "${gradientColors[1]}"`);
         }
@@ -60,21 +52,18 @@ export const drawBackground = (
         gradient.addColorStop(1, color1);
 
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillRect(0, 0, width, height);
     }
     // 3. Image (Cover Mode) - for both preset and custom backgrounds
     else if ((background.type === 'preset' || background.type === 'custom') && bgImage) {
-        if (bgImage.complete && bgImage.naturalWidth > 0) {
-            const imgW = bgImage.naturalWidth;
-            const imgH = bgImage.naturalHeight;
-            const canvasW = canvas.width;
-            const canvasH = canvas.height;
+        // Extract image dimensions — works for HTMLImageElement, ImageBitmap, etc.
+        const imgW = 'naturalWidth' in bgImage ? (bgImage as HTMLImageElement).naturalWidth : (bgImage as ImageBitmap).width;
+        const imgH = 'naturalHeight' in bgImage ? (bgImage as HTMLImageElement).naturalHeight : (bgImage as ImageBitmap).height;
+        const isReady = 'complete' in bgImage ? (bgImage as HTMLImageElement).complete : true;
 
-
-
-
-            let drawW = canvasW;
-            let drawH = canvasH;
+        if (isReady && imgW > 0) {
+            let drawW = width;
+            let drawH = height;
             let offsetX = 0;
             let offsetY = 0;
 
@@ -83,8 +72,8 @@ export const drawBackground = (
             const safeMargin = blurRadius * 3; // 3x to be safe from any vignette
 
             // We effectively want to cover a slightly larger rectangle
-            const targetW = canvasW + (safeMargin * 2);
-            const targetH = canvasH + (safeMargin * 2);
+            const targetW = width + (safeMargin * 2);
+            const targetH = height + (safeMargin * 2);
 
             // Calculate scale to cover the target area
             const scale = Math.max(targetW / imgW, targetH / imgH);
@@ -93,8 +82,8 @@ export const drawBackground = (
             drawH = imgH * scale;
 
             // Center (relative to real canvas)
-            offsetX = (canvasW - drawW) / 2;
-            offsetY = (canvasH - drawH) / 2;
+            offsetX = (width - drawW) / 2;
+            offsetY = (height - drawH) / 2;
 
             // Apply Blur
             if (blurRadius > 0) {

@@ -1,6 +1,5 @@
 import { drawScreen } from '../../../core/painters/screenPainter';
 import { paintMouseClicks } from '../../../core/painters/mouseClickPainter';
-import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
 import { drawDragEffects } from '../../../core/painters/mouseDragPainter';
 import { drawCamera } from '../../../core/painters/cameraPainter';
 import { drawKeyboardOverlay } from '../../../core/painters/keyboardPainter';
@@ -8,25 +7,24 @@ import { drawCaptions } from '../../../core/painters/captionPainter';
 import { drawOverlays } from '../../../core/painters/overlayPainter';
 import { paintZoomDebug } from '../../../core/painters/zoomDebugPainter';
 
-
 import { getViewportStateAtTime } from '../../../core/zoom';
 import { getSpotlightStateAtTime } from '../../../core/spotlight/spotlightAnimator';
 import { drawSpotlight } from '../../../core/painters/spotlightPainter';
-import { getCameraStateAtTime, getCameraAnchor, scaleCameraSettings, getResolvedCameraStateAtTime } from '../../../core/zoom/cameraAnimator';
+import { getResolvedCameraStateAtTime } from '../../../core/zoom/cameraAnimator';
 import type { TimeMapper } from '../../../core/mappers/timeMapper';
+import type { RenderContext } from '../../../core/renderContext';
 import { type FocusArea } from '../../../types';
-import type { Project, Rect, CameraSettings } from '../../../types';
+import type { Project, Rect, Size, CameraSettings } from '../../../types';
 import type { UserEvents } from '@shared/types';
 
-/** A video source that can be drawn with ctx.drawImage — either a DOM video element or a decoded WebCodecs frame */
-export type VideoSource = HTMLVideoElement | VideoFrame;
-
 export interface RenderResources {
-    canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
-    bgRef: HTMLImageElement | null;
-    videoRefs: { [sourceId: string]: VideoSource };
-    deviceFrameImg: HTMLImageElement | null;
+    renderCtx: RenderContext;
+    bgRef: CanvasImageSource | null;
+    videoRefs: { [sourceId: string]: CanvasImageSource };
+    deviceFrameImg: CanvasImageSource | null;
+    /** Canvas element (or equivalent) for spotlight snapshot */
+    sourceCanvas?: CanvasImageSource & Size;
 }
 
 export class PlaybackRenderer {
@@ -42,7 +40,7 @@ export class PlaybackRenderer {
             showDebugOverlays?: boolean
         }
     ) {
-        const { ctx, videoRefs } = resources;
+        const { ctx, renderCtx, videoRefs } = resources;
         const { project, currentTimeMs, userEvents } = state;
         const outputSize = project.settings.outputSize;
 
@@ -87,7 +85,7 @@ export class PlaybackRenderer {
             );
             viewMapper = result.viewMapper;
 
-            // Mouse click/drag effects (visual and sound are independent)
+            // Mouse click/drag effects (visual only — audio is handled by the caller)
             const mouse = project.settings.mouse;
             if (mouse) {
                 if (mouse.mouseClickEnabled) {
@@ -95,10 +93,6 @@ export class PlaybackRenderer {
                 }
                 if (mouse.mouseDragEnabled) {
                     drawDragEffects(ctx, userEvents, currentTimeMs, effectiveViewport, viewMapper, mouse, timeMapper, project.settings.outputSize);
-                }
-                if (mouse.soundEnabled) {
-                    playClickSounds(userEvents.mouseClicks, currentTimeMs, mouse.soundVolume ?? 0.5, timeMapper);
-                    playDragSounds(userEvents.drags, currentTimeMs, mouse.soundVolume ?? 0.5, timeMapper);
                 }
             }
 
@@ -120,7 +114,7 @@ export class PlaybackRenderer {
                 viewMapper
             );
 
-            drawSpotlight(ctx, spotlightState, outputSize, resources.canvas);
+            drawSpotlight(ctx, spotlightState, outputSize, resources.sourceCanvas, renderCtx);
         }
 
         // Render Keyboard Overlay (after spotlight, so it appears on top of dimming)
@@ -157,7 +151,7 @@ export class PlaybackRenderer {
 
                 if (state.overrideCameraSettings) {
                     // Override mode (drag preview): use provided settings directly, no resolver
-                    drawCamera(ctx, video, cameraSource.size, state.overrideCameraSettings, outputSize);
+                    drawCamera(ctx, video, cameraSource.size, state.overrideCameraSettings, outputSize, renderCtx);
                 } else {
                     // Use the unified resolver: layout blocks → transitions → auto-shrink
                     const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
@@ -185,10 +179,10 @@ export class PlaybackRenderer {
                         if (resolved.opacity < 1) {
                             ctx.save();
                             ctx.globalAlpha = resolved.opacity;
-                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize);
+                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize, renderCtx);
                             ctx.restore();
                         } else {
-                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize);
+                            drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize, renderCtx);
                         }
                     }
                 }

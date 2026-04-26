@@ -5,6 +5,7 @@ import type { TimeMapper } from '../mappers/timeMapper';
 import { getDeviceFrame } from '../deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
 import { drawToolbar, getUrlAtTime } from './toolbarPainter';
+import { roundRectPath } from './utils/roundRect';
 
 const REF_OUTPUT_HEIGHT = 1080;
 const REF_SHADOW_BLUR = 20;
@@ -20,8 +21,7 @@ function defineScreenPath(
     rect: Rect,
     radius: number
 ) {
-    ctx.beginPath();
-    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, radius);
+    roundRectPath(ctx, rect.x, rect.y, rect.width, rect.height, radius);
 }
 
 /**
@@ -31,10 +31,10 @@ function defineScreenPath(
  */
 export function drawScreen(
     ctx: CanvasRenderingContext2D,
-    video: HTMLVideoElement | VideoFrame,
+    video: CanvasImageSource,
     project: Project,
     effectiveViewport: Rect, // Injected from caller
-    deviceFrameImg: HTMLImageElement | null, // Cached device frame image
+    deviceFrameImg: CanvasImageSource | null, // Cached device frame image
     currentOutputTimeMs?: number, // Current playback time (output) for URL lookup
     timeMapper?: TimeMapper, // For converting output time → source time
     urlChanges?: UrlChangeEvent[], // URL change events (passed explicitly; project.userEvents separated from project at runtime)
@@ -49,12 +49,16 @@ export function drawScreen(
         hasGlow: false
     };
 
-    // 1. Resolve video dimensions: VideoFrame uses displayWidth/Height, HTMLVideoElement uses videoWidth/Height
-    const inputSize = video instanceof VideoFrame
-        ? { width: video.displayWidth, height: video.displayHeight }
-        : (video.videoWidth && video.videoHeight
-            ? { width: video.videoWidth, height: video.videoHeight }
-            : project.screenSource.size);
+    // 1. Resolve video dimensions from the source
+    // Supports HTMLVideoElement (videoWidth), VideoFrame (displayWidth), and generic CanvasImageSource (width)
+    const v = video as any;
+    const inputSize = v.displayWidth
+        ? { width: v.displayWidth, height: v.displayHeight }
+        : v.videoWidth
+            ? { width: v.videoWidth, height: v.videoHeight }
+            : v.width
+                ? { width: v.width, height: v.height }
+                : project.screenSource.size;
 
     if (!inputSize || inputSize.width === 0) {
         throw new Error(`[drawScreen] Invalid inputSize for screen.`);
@@ -137,7 +141,8 @@ export function drawScreen(
 
             // Draw Device Frame Overlay — zoom-aware frame rect
             const projectedFrameRect = viewMapper.getProjectedFrameRect(effectiveViewport);
-            if (deviceFrame && deviceFrameImg?.complete && projectedFrameRect) {
+            const frameReady = deviceFrameImg && ('complete' in deviceFrameImg ? (deviceFrameImg as HTMLImageElement).complete : true);
+            if (deviceFrame && frameReady && projectedFrameRect) {
                 drawDeviceFrame(ctx, deviceFrame, deviceFrameImg, projectedFrameRect);
             }
 

@@ -1,4 +1,6 @@
 import type { CameraSettings, Size } from '../../types';
+import type { RenderContext, CanvasHandle } from '../renderContext';
+import { roundRectPath } from './utils/roundRect';
 
 const REF_OUTPUT_HEIGHT = 1080;
 const REF_SHADOW_BLUR = 20;
@@ -8,10 +10,8 @@ const REF_GLOW_BLUR = 25;
 const FEATHER_SIZE = 40;
 
 // Canvas cache for feather effect (reuse to avoid creating new canvases every frame)
-let cachedOffscreenCanvas: HTMLCanvasElement | null = null;
-let cachedOffscreenCtx: CanvasRenderingContext2D | null = null;
-let cachedMaskCanvas: HTMLCanvasElement | null = null;
-let cachedMaskCtx: CanvasRenderingContext2D | null = null;
+let cachedOffscreen: CanvasHandle | null = null;
+let cachedMask: CanvasHandle | null = null;
 let cachedWidth = 0;
 let cachedHeight = 0;
 let cachedShape: 'circle' | 'rect' | 'square' | null = null;
@@ -29,10 +29,11 @@ let cachedMaskShape: 'circle' | 'rect' | 'square' | null = null;
  */
 export function drawCamera(
     ctx: CanvasRenderingContext2D,
-    video: HTMLVideoElement | VideoFrame,
+    video: CanvasImageSource,
     inputSize: Size,
     settings: CameraSettings,
-    outputSize?: Size
+    outputSize?: Size,
+    renderCtx?: RenderContext
 ) {
     const {
         xPx: x, yPx: y, widthPx: width, heightPx: height,
@@ -106,14 +107,14 @@ export function drawCamera(
     // effective radius (circle = min(w,h)/2) and interpolates during transitions.
     // Shape is only used by the bounding box for aspect ratio constraints.
     const definePath = () => {
-        ctx.beginPath();
         const r = Math.min(scaledBorderRadius, width / 2, height / 2);
         if (r > 0) {
-            ctx.roundRect(x, y, width, height, r);
+            roundRectPath(ctx, x, y, width, height, r);
         } else {
+            ctx.beginPath();
             ctx.rect(x, y, width, height);
+            ctx.closePath();
         }
-        ctx.closePath();
     };
 
 
@@ -167,21 +168,18 @@ export function drawCamera(
     }
 
     // 3. Content Pass
-    if (hasFeather && featherAmount > 0) {
+    if (hasFeather && featherAmount > 0 && renderCtx) {
         // Feather mode: use off-screen canvas for clean compositing isolation
         // Reuse cached canvas if dimensions and shape match, otherwise create new one
-        if (!cachedOffscreenCanvas || cachedWidth !== width || cachedHeight !== height || cachedShape !== shape) {
-            cachedOffscreenCanvas = document.createElement('canvas');
-            cachedOffscreenCanvas.width = width;
-            cachedOffscreenCanvas.height = height;
-            cachedOffscreenCtx = cachedOffscreenCanvas.getContext('2d')!;
+        if (!cachedOffscreen || cachedWidth !== width || cachedHeight !== height || cachedShape !== shape) {
+            cachedOffscreen = renderCtx.createCanvas(width, height);
             cachedWidth = width;
             cachedHeight = height;
             cachedShape = shape;
         }
 
-        const offscreen = cachedOffscreenCanvas;
-        const offCtx = cachedOffscreenCtx!;
+        const offscreen = cachedOffscreen.canvas;
+        const offCtx = cachedOffscreen.ctx;
 
         // Clear previous frame
         offCtx.clearRect(0, 0, width, height);
@@ -216,18 +214,15 @@ export function drawCamera(
             const featherSize = smallerDim * featherAmount;
 
             // Reuse cached mask canvas if dimensions and shape match
-            if (!cachedMaskCanvas || cachedMaskWidth !== width || cachedMaskHeight !== height || cachedMaskShape !== shape) {
-                cachedMaskCanvas = document.createElement('canvas');
-                cachedMaskCanvas.width = width;
-                cachedMaskCanvas.height = height;
-                cachedMaskCtx = cachedMaskCanvas.getContext('2d')!;
+            if (!cachedMask || cachedMaskWidth !== width || cachedMaskHeight !== height || cachedMaskShape !== shape) {
+                cachedMask = renderCtx.createCanvas(width, height);
                 cachedMaskWidth = width;
                 cachedMaskHeight = height;
                 cachedMaskShape = shape;
             }
 
-            const maskCanvas = cachedMaskCanvas;
-            const maskCtx = cachedMaskCtx!;
+            const maskCanvas = cachedMask.canvas;
+            const maskCtx = cachedMask.ctx;
 
             // Clear and rebuild mask
             maskCtx.clearRect(0, 0, width, height);

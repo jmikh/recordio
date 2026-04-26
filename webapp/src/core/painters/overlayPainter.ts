@@ -10,6 +10,7 @@
 
 import type { Size, Rect } from '../../types';
 import type { OverlaySegment, OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../types/overlay';
+import { roundRectPath } from './utils/roundRect';
 
 // Reference constants — scaled proportionally to output height (matching camera painter pattern)
 const REF_OUTPUT_HEIGHT = 1080;
@@ -116,13 +117,8 @@ function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, outputSi
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Create clipping path in canvas pixel space
-    ctx.beginPath();
-    if (ctx.roundRect) {
-        const scaledRadius = borderRadiusPx.map(r => r * scaleX) as [number, number, number, number];
-        ctx.roundRect(canvasX, canvasY, canvasW, canvasH, scaledRadius);
-    } else {
-        ctx.rect(canvasX, canvasY, canvasW, canvasH);
-    }
+    const scaledRadius = borderRadiusPx.map(r => r * scaleX) as [number, number, number, number];
+    roundRectPath(ctx, canvasX, canvasY, canvasW, canvasH, scaledRadius);
     ctx.clip();
 
     // Apply blur filter (now unambiguously in canvas pixel space)
@@ -170,12 +166,7 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSi
     if (item.backgroundColor) {
         const bgH = lines.length * lineHeightPx + pad * 2;
         ctx.fillStyle = item.backgroundColor;
-        ctx.beginPath();
-        if (ctx.roundRect && bgRadius > 0) {
-            ctx.roundRect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH, bgRadius);
-        } else {
-            ctx.rect(topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH);
-        }
+        roundRectPath(ctx, topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH, bgRadius);
         ctx.fill();
     }
 
@@ -308,12 +299,7 @@ function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem, effe
     // Fill
     if (item.fillColor) {
         ctx.fillStyle = item.fillColor;
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(rectPx.x, rectPx.y, rectPx.width, rectPx.height, borderRadiusPx);
-        } else {
-            ctx.rect(rectPx.x, rectPx.y, rectPx.width, rectPx.height);
-        }
+        roundRectPath(ctx, rectPx.x, rectPx.y, rectPx.width, rectPx.height, borderRadiusPx);
         ctx.fill();
     }
 
@@ -326,12 +312,7 @@ function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem, effe
 
     ctx.strokeStyle = color;
     ctx.lineWidth = borderWidthPx;
-    ctx.beginPath();
-    if (ctx.roundRect) {
-        ctx.roundRect(insetX, insetY, insetW, insetH, borderRadiusPx);
-    } else {
-        ctx.rect(insetX, insetY, insetW, insetH);
-    }
+    roundRectPath(ctx, insetX, insetY, insetW, insetH, borderRadiusPx);
     ctx.stroke();
 
     ctx.restore();

@@ -6,7 +6,8 @@ import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
 import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
-import { resetClickSounds } from '../../../core/audio/clickSoundPlayer';
+import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
+import { browserRenderContext } from '../../../core/renderContext';
 import { ZoomEditor, renderZoomEditor } from './CanvasZoomEditor';
 import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor';
 import { renderCropEditor, CropEditor } from './CanvasCropEditor';
@@ -194,7 +195,7 @@ export const CanvasContainer = () => {
                         ctx,
                         project.settings.background,
                         project.settings.background.backgroundBlurPx,
-                        canvas,
+                        { width: canvas.width, height: canvas.height },
                         bgRef.current
                     );
                 });
@@ -245,11 +246,12 @@ export const CanvasContainer = () => {
 
                 // 4. STRATEGY
                 const resources: RenderResources = {
-                    canvas,
                     ctx,
+                    renderCtx: browserRenderContext,
                     bgRef: bgRef.current,
                     videoRefs: internalVideoRefs.current,
-                    deviceFrameImg: deviceFrameRef.current
+                    deviceFrameImg: deviceFrameRef.current,
+                    sourceCanvas: canvas
                 };
 
                 perf('render', () => {
@@ -294,15 +296,23 @@ export const CanvasContainer = () => {
                             overrideOverlayItem: previewOverlayItemRef.current,
                         });
                     } else {
+                        const userEvents = useProjectStore.getState().userEvents;
                         PlaybackRenderer.render(resources, {
                             project,
-                            userEvents: useProjectStore.getState().userEvents,
+                            userEvents,
                             currentTimeMs: effectiveTimeMs,
                             timeMapper: timeMapperRef.current,
                             overrideCameraSettings: previewCameraSettingsRef.current || undefined,
                             focusAreas: focusAreasRef.current,
                             showDebugOverlays: uiState.showDebugOverlays
                         });
+
+                        // Audio side-effects (browser-only, not part of rendering pipeline)
+                        const mouse = project.settings.mouse;
+                        if (mouse?.soundEnabled) {
+                            playClickSounds(userEvents.mouseClicks, effectiveTimeMs, mouse.soundVolume ?? 0.5, timeMapperRef.current);
+                            playDragSounds(userEvents.drags, effectiveTimeMs, mouse.soundVolume ?? 0.5, timeMapperRef.current);
+                        }
                     }
                 });
 

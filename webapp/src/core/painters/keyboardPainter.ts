@@ -1,5 +1,6 @@
 
 import type { KeyboardEvent, Size } from '../../types';
+import { roundRectPath } from './utils/roundRect';
 import type { KeyboardSettings } from '../../types/settings';
 import type { TimeMapper } from '../mappers/timeMapper';
 
@@ -130,12 +131,7 @@ export function drawKeyboardOverlay(
     const boxX = x - boxWidth / 2;
     const boxY = y;
 
-    ctx.beginPath();
-    if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, cornerRadius);
-    } else {
-        ctx.rect(boxX, boxY, boxWidth, boxHeight);
-    }
+    roundRectPath(ctx, boxX, boxY, boxWidth, boxHeight, cornerRadius);
     ctx.fill();
     ctx.stroke();
 

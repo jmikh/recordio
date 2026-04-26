@@ -14,8 +14,10 @@
 
 import type { UrlChangeEvent, Rect } from '@shared/types';
 import type { ToolbarSettings } from '../../types/settings';
+import type { RenderContext } from '../renderContext';
 import logoUrl from '@shared/assets/logo.svg';
 import puzzleUrl from '@shared/assets/puzzle_icon.svg';
+import { roundRectPath } from './utils/roundRect';
 
 // ══════════════════════════════════════════
 // Reference Constants (designed for 60px height)
@@ -54,28 +56,24 @@ const REF_SECTION_GAP = 10;     // gap between traffic lights and address bar
 // Module-level cached images
 // ══════════════════════════════════════════
 
-let logoImg: HTMLImageElement | null = null;
+let logoImg: CanvasImageSource | null = null;
 let logoLoading = false;
-function getLogoImage(): HTMLImageElement | null {
+function getLogoImage(renderCtx: RenderContext): CanvasImageSource | null {
     if (logoImg) return logoImg;
     if (!logoLoading) {
         logoLoading = true;
-        const img = new Image();
-        img.src = logoUrl;
-        img.onload = () => { logoImg = img; };
+        renderCtx.loadImage(logoUrl).then(img => { logoImg = img; });
     }
     return null;
 }
 
-let puzzleImg: HTMLImageElement | null = null;
+let puzzleImg: CanvasImageSource | null = null;
 let puzzleLoading = false;
-function getPuzzleImage(): HTMLImageElement | null {
+function getPuzzleImage(renderCtx: RenderContext): CanvasImageSource | null {
     if (puzzleImg) return puzzleImg;
     if (!puzzleLoading) {
         puzzleLoading = true;
-        const img = new Image();
-        img.src = puzzleUrl;
-        img.onload = () => { puzzleImg = img; };
+        renderCtx.loadImage(puzzleUrl).then(img => { puzzleImg = img; });
     }
     return null;
 }
@@ -160,6 +158,7 @@ export function drawToolbar(
     rect: Rect,
     addressText: string,
     settings: ToolbarSettings,
+    renderCtx?: RenderContext
 ): void {
     const { x, y, width, height } = rect;
     const s = height / REF_TOOLBAR_HEIGHT; // Height-based scale for all elements
@@ -204,8 +203,7 @@ export function drawToolbar(
     if (addrBarWidth > 20 * s) {
         const addrBarRadius = addrBarHeight / 2;
 
-        ctx.beginPath();
-        ctx.roundRect(cx, addrBarY, addrBarWidth, addrBarHeight, addrBarRadius);
+        roundRectPath(ctx, cx, addrBarY, addrBarWidth, addrBarHeight, addrBarRadius);
         ctx.fillStyle = colors.addressBarBg;
         ctx.fill();
 
@@ -290,14 +288,14 @@ export function drawToolbar(
     // Puzzle icon (extensions)
     const iconSize = REF_ICON_SIZE * s;
     const puzzleX = dotsX - REF_ICON_GAP * s;
-    const puzzle = getPuzzleImage();
+    const puzzle = renderCtx ? getPuzzleImage(renderCtx) : null;
     if (puzzle) {
         ctx.drawImage(puzzle, puzzleX - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
     }
 
     // Recordio icon (branded logo)
     const ricoX = puzzleX - REF_ICON_GAP * s;
-    const logo = getLogoImage();
+    const logo = renderCtx ? getLogoImage(renderCtx) : null;
     if (logo) {
         ctx.drawImage(logo, ricoX - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
     }

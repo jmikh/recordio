@@ -1,9 +1,10 @@
 import type { Size, Rect } from '../../types';
 import type { SpotlightState } from '../spotlight/spotlightAnimator';
+import type { RenderContext, CanvasHandle } from '../renderContext';
+import { roundRectPath } from './utils/roundRect';
 
 // Cached offscreen canvas for spotlight snapshots (avoids per-frame allocation)
-let _snapshotCanvas: OffscreenCanvas | null = null;
-let _snapshotCtx: OffscreenCanvasRenderingContext2D | null = null;
+let _snapshot: CanvasHandle | null = null;
 
 /**
  * Draws the spotlight overlay effect on the canvas.
@@ -31,7 +32,8 @@ export function drawSpotlight(
     ctx: CanvasRenderingContext2D,
     spotlightState: SpotlightState | null,
     outputSize: Size,
-    sourceCanvas?: HTMLCanvasElement | OffscreenCanvas
+    sourceCanvas?: CanvasImageSource & Size,
+    renderCtx?: RenderContext
 ): void {
     // Skip if no spotlight state OR if there's no visual effect at all
     // (dimOpacity = 0 means no dimming, scale = 1 means no enlargement)
@@ -66,22 +68,19 @@ export function drawSpotlight(
     // (avoids expensive getImageData GPU→CPU readback)
     // Always snapshot when visible so we can restore content over the dim
     let hasSnapshot = false;
-    if (sourceCanvas) {
+    if (sourceCanvas && renderCtx) {
         const sx = Math.max(0, Math.round(originalRect.x));
         const sy = Math.max(0, Math.round(originalRect.y));
         const sw = Math.min(Math.round(originalRect.width), (sourceCanvas.width || 0) - sx);
         const sh = Math.min(Math.round(originalRect.height), (sourceCanvas.height || 0) - sy);
         if (sw > 0 && sh > 0) {
             // Reuse or create the cached offscreen canvas
-            if (!_snapshotCanvas || _snapshotCanvas.width !== sw || _snapshotCanvas.height !== sh) {
-                _snapshotCanvas = new OffscreenCanvas(sw, sh);
-                _snapshotCtx = _snapshotCanvas.getContext('2d');
+            if (!_snapshot || _snapshot.canvas.width !== sw || _snapshot.canvas.height !== sh) {
+                _snapshot = renderCtx.createCanvas(sw, sh);
             }
-            if (_snapshotCtx) {
-                _snapshotCtx.clearRect(0, 0, sw, sh);
-                _snapshotCtx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
-                hasSnapshot = true;
-            }
+            _snapshot.ctx.clearRect(0, 0, sw, sh);
+            _snapshot.ctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+            hasSnapshot = true;
         }
     }
 
@@ -92,13 +91,13 @@ export function drawSpotlight(
     ctx.restore();
 
     // Step 2: Draw spotlight content back on top of the dimmed canvas
-    if (hasSnapshot && _snapshotCanvas) {
+    if (hasSnapshot && _snapshot) {
         if (scale > 1.0 && scaledRect) {
             // Enlarged: draw scaled content
-            drawScaledCanvasContent(ctx, _snapshotCanvas, originalRect, scaledRect, scale, radiusPx);
+            drawScaledCanvasContent(ctx, _snapshot.canvas, originalRect, scaledRect, scale, radiusPx);
         } else {
             // No scaling: restore original content in the spotlight region
-            drawRestoredContent(ctx, _snapshotCanvas, originalRect, radiusPx);
+            drawRestoredContent(ctx, _snapshot.canvas, originalRect, radiusPx);
         }
     }
 }
@@ -109,7 +108,7 @@ export function drawSpotlight(
  */
 function drawScaledCanvasContent(
     ctx: CanvasRenderingContext2D,
-    snapshotCanvas: OffscreenCanvas,
+    snapshotCanvas: CanvasImageSource,
     originalRect: Rect,
     scaledRect: Rect,
     scale: number,
@@ -122,8 +121,6 @@ function drawScaledCanvasContent(
     ctx.save();
 
     // Create clipping path for scaled spotlight region (with rounded corners)
-    ctx.beginPath();
-
     const hasRoundedCorners = radiusPx.some(r => r > 0);
     if (hasRoundedCorners) {
         // Scale each corner radius proportionally
@@ -133,12 +130,9 @@ function drawScaledCanvasContent(
             radiusPx[2] * scale,
             radiusPx[3] * scale
         ];
-        if (ctx.roundRect) {
-            ctx.roundRect(scaledRect.x, scaledRect.y, scaledRect.width, scaledRect.height, scaledRadii);
-        } else {
-            drawRoundedRectPathMultiRadius(ctx, scaledRect.x, scaledRect.y, scaledRect.width, scaledRect.height, scaledRadii);
-        }
+        roundRectPath(ctx, scaledRect.x, scaledRect.y, scaledRect.width, scaledRect.height, scaledRadii);
     } else {
+        ctx.beginPath();
         ctx.rect(scaledRect.x, scaledRect.y, scaledRect.width, scaledRect.height);
     }
     ctx.clip();
@@ -160,22 +154,18 @@ function drawScaledCanvasContent(
  */
 function drawRestoredContent(
     ctx: CanvasRenderingContext2D,
-    snapshotCanvas: OffscreenCanvas,
+    snapshotCanvas: CanvasImageSource,
     originalRect: Rect,
     radiusPx: [number, number, number, number]
 ): void {
     ctx.save();
 
     // Clip to the spotlight shape (with rounded corners)
-    ctx.beginPath();
     const hasRoundedCorners = radiusPx.some(r => r > 0);
     if (hasRoundedCorners) {
-        if (ctx.roundRect) {
-            ctx.roundRect(originalRect.x, originalRect.y, originalRect.width, originalRect.height, radiusPx);
-        } else {
-            drawRoundedRectPathMultiRadius(ctx, originalRect.x, originalRect.y, originalRect.width, originalRect.height, radiusPx);
-        }
+        roundRectPath(ctx, originalRect.x, originalRect.y, originalRect.width, originalRect.height, radiusPx);
     } else {
+        ctx.beginPath();
         ctx.rect(originalRect.x, originalRect.y, originalRect.width, originalRect.height);
     }
     ctx.clip();
@@ -186,39 +176,3 @@ function drawRestoredContent(
     ctx.restore();
 }
 
-/**
- * Fallback for drawing rounded rectangle path with 4 independent corner radii.
- * Uses arcTo for true circular arcs matching CSS border-radius.
- * Radii order: [topLeft, topRight, bottomRight, bottomLeft]
- */
-function drawRoundedRectPathMultiRadius(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radii: [number, number, number, number]
-): void {
-    const [tl, tr, br, bl] = radii;
-
-    // Start at top-left, after the corner arc
-    ctx.moveTo(x + tl, y);
-
-    // Top edge and top-right corner
-    ctx.lineTo(x + width - tr, y);
-    ctx.arcTo(x + width, y, x + width, y + tr, tr);
-
-    // Right edge and bottom-right corner
-    ctx.lineTo(x + width, y + height - br);
-    ctx.arcTo(x + width, y + height, x + width - br, y + height, br);
-
-    // Bottom edge and bottom-left corner
-    ctx.lineTo(x + bl, y + height);
-    ctx.arcTo(x, y + height, x, y + height - bl, bl);
-
-    // Left edge and top-left corner
-    ctx.lineTo(x, y + tl);
-    ctx.arcTo(x, y, x + tl, y, tl);
-
-    ctx.closePath();
-}

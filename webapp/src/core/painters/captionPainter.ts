@@ -1,4 +1,5 @@
 import type { Size, CaptionSettings, CaptionSegment } from '../../types';
+import { roundRectPath } from './utils/roundRect';
 
 // ══════════════════════════════════════════
 // Reference Constants (designed for 1080px height)
@@ -130,12 +131,7 @@ export function drawCaptions(
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1 * scale;
 
-        ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, cornerRadius);
-        } else {
-            ctx.rect(boxX, boxY, boxWidth, boxHeight);
-        }
+        roundRectPath(ctx, boxX, boxY, boxWidth, boxHeight, cornerRadius);
         ctx.fill();
         ctx.stroke();
 
