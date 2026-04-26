@@ -1,7 +1,6 @@
 ---
 name: captions
-description: Captions & transcription system — local Whisper worker, OpenAI cloud API, caption rendering, word editing, rate limiting, and data model.
-when_to_use: When modifying transcription logic, caption rendering, word editing, caption settings UI, cloud transcription backend, rate limiting, or anything touching captionSegments/Word types.
+description: Captions & transcription system — local Whisper worker, OpenAI cloud API, caption rendering, word editing, rate limiting, and data model. Use when modifying transcription logic, caption rendering, word editing, caption settings UI, cloud transcription backend, or anything touching captionSegments/Word types.
 ---
 
 # Captions & Transcription

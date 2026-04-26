@@ -39,7 +39,7 @@ export interface Rect extends Point, Size { }
 interface BaseSourceMetadata {
     id: ID;
     /**
-     * Persistent URL to the media file (recordio-blob:// protocol).
+     * Persistent local browser storage based URL to the media file (recordio-blob:// protocol).
      * This is the storage reference that survives page reloads.
      */
     storageUrl: string;

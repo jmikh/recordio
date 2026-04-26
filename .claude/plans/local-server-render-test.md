@@ -2,7 +2,7 @@
 
 ## Context
 
-Phase 2 of the server-side rendering plan is complete (nodeRenderContext, ServerFrameExtractor, ServerAudioMixer). Before deploying to Fly.io, we want to test the entire render pipeline locally. This adds a "Server Export (Test)" button in the export modal that renders via the local Fastify backend instead of the browser. **This is temporary test code** — meant to be reverted once cloud rendering is stable.
+Phase 2 of the server-side rendering plan is complete (nodeRenderContext, ServerFrameExtractor, ServerAudioMixer). Before deploying to Fly.io, we want to test the entire render pipeline locally. This adds a "Server Export (Test)" button in the export modal that kicks off a render on the local Fastify backend. The rendered MP4 is written to `/tmp/` — no download, no cleanup, no job management. Progress and errors are logged to the backend console. **Temporary test code.**
 
 ---
 
@@ -10,7 +10,7 @@ Phase 2 of the server-side rendering plan is complete (nodeRenderContext, Server
 
 ### 1. Move `scaleProject` to shared
 
-Extract the pure `scale` + `scalePixelValues` logic from `webapp/src/core/Project.ts` → `shared/utils/projectScale.ts`. Webapp's `ProjectImpl.scale` becomes a thin wrapper. Render-worker can then import it.
+Extract the pure `scale` + `scalePixelValues` logic from `webapp/src/core/Project.ts` → `shared/utils/projectScale.ts`. Webapp's `ProjectImpl.scale` becomes a thin wrapper.
 
 **Files:**
 - `shared/utils/projectScale.ts` (new)
@@ -18,7 +18,7 @@ Extract the pure `scale` + `scalePixelValues` logic from `webapp/src/core/Projec
 
 ### 2. Move `ExportQuality` + `getHeightForQuality` to shared
 
-The trivial quality→height map from `webapp/src/editor/export/codecResolver.ts` needs to be importable from render-worker.
+The trivial quality→height map from `webapp/src/editor/export/codecResolver.ts`.
 
 **Files:**
 - `shared/utils/exportQuality.ts` (new — just the type + height map)
@@ -26,52 +26,36 @@ The trivial quality→height map from `webapp/src/editor/export/codecResolver.ts
 
 ### 3. Create `ServerExportPipeline` in render-worker
 
-The main orchestrator that ties together all Phase 2 components. Mirrors ExportManager's `runExport` but server-side.
+The orchestrator that ties together all Phase 2 components.
 
-**Input:** project JSON, quality, media file paths (temp dir), progress callback
+**Input:** project JSON, quality, media file paths, progress callback  
 **Steps:**
 1. Scale project via `scaleProject()`
 2. Init `ServerFrameExtractor` per video source (screen, camera)
 3. Build `TimeMapper` from output windows
-4. Load images (device frame, background) via `nodeRenderContext.loadImage()`
-5. Run `mixAudio()` → `audio.aac` in temp dir
-6. Spawn FFmpeg encoder: `ffmpeg -f rawvideo -pix_fmt rgba -s WxH -r 30 -i pipe:0 -i audio.aac -c:v libx264 -pix_fmt yuv420p -c:a copy output.mp4`
-7. Frame loop — for each frame at 30fps:
-   - Map output time → source time (TimeMapper)
-   - Extract source frame (ServerFrameExtractor)
-   - Create canvas, run painter stack (replicating PlaybackRenderer.render using shared/ painters)
-   - Get raw RGBA buffer (`canvas.data()`), pipe to FFmpeg stdin
-   - Report progress every 30 frames
-8. Close FFmpeg, await completion, dispose extractors
+4. Fetch CDN images (device frames, preset backgrounds) and load via `nodeRenderContext.loadImage()`. Custom backgrounds/music skipped for now.
+5. Run `mixAudio()` → `audio.aac`
+6. Spawn FFmpeg encoder: reads raw RGBA from stdin + audio file, outputs H.264 MP4
+7. Frame loop at 30fps — paint each frame using shared painters, pipe RGBA to FFmpeg
+8. Close FFmpeg, dispose extractors
 
 **File:** `render-worker/src/ServerExportPipeline.ts` (new)
 
 ### 4. Backend render route
 
-Three endpoints on the existing Fastify server:
-
-**POST `/render/start`** — starts a render job
+**Single endpoint: POST `/render`**
 - Auth via existing `authenticateRequest()`
 - Receives `{ projectData, quality }`
-- Downloads media from Supabase Storage using service key: `supabase.storage.from('project-media').download(storageUrl)`
-- Saves to temp dir with known names (screen.webm, camera.webm, etc.)
-- Kicks off `ServerExportPipeline` in background
-- Returns `{ jobId }`
-
-**GET `/render/:jobId/events`** — SSE progress stream
-- Sets `Content-Type: text/event-stream` headers on `reply.raw`
-- Streams `{ progress, phase, status }` events as they occur
-- Ends with `status: 'complete'` or `status: 'error'`
-
-**GET `/render/:jobId/download`** — serves completed MP4
-- Streams the output file, schedules temp dir cleanup
+- Downloads source media from Supabase Storage using service key → writes to tmp dir
+- Runs `ServerExportPipeline` synchronously (long-running request, fine for local testing)
+- Logs progress to console (`console.log`)
+- On success: responds `{ ok: true, outputPath: '/tmp/render-xxx/output.mp4' }`
+- On error: responds `{ ok: false, error: message }`
+- Output stays in `/tmp/` — no cleanup, no download serving
 
 **Files:**
-- `backend/src/render/route.ts` (new — all 3 endpoints)
-- `backend/src/render/jobStore.ts` (new — in-memory Map for job state)
-- `backend/src/render/mediaDownloader.ts` (new — Supabase Storage download logic)
+- `backend/src/render/route.ts` (new — single POST endpoint)
 - `backend/src/index.ts` (modify — register render route)
-- `backend/src/config.ts` (modify — add optional `WEBAPP_BASE_URL` for device frame images)
 - `backend/tsconfig.json` (modify — add `@shared/*` path alias, include shared + render-worker)
 - `backend/package.json` (modify — add `@napi-rs/canvas` dependency)
 
@@ -79,13 +63,7 @@ Three endpoints on the existing Fastify server:
 
 Add button in ExportModal, only visible in dev mode (`import.meta.env.DEV`).
 
-**Handler flow:**
-1. Set export state (reuse existing progress UI)
-2. Get auth token via `AuthManager.getSession()`
-3. POST full project JSON to `/render/start`
-4. Stream progress from `/render/:jobId/events` via fetch + ReadableStream (EventSource doesn't support auth headers)
-5. On completion, fetch `/render/:jobId/download`, create blob, trigger browser download
-6. On error, show toast
+**Handler:** POST full project JSON to `/render`, show a toast when it returns (success with file path, or error). No progress streaming — just fire and wait.
 
 **Files:**
 - `webapp/src/editor/components/settings/ExportModal.tsx` (modify — add button + handler)
@@ -94,20 +72,19 @@ Add button in ExportModal, only visible in dev mode (`import.meta.env.DEV`).
 
 ## Key design decisions
 
-- **Media download via Supabase service key** — backend calls `supabase.storage.from('project-media').download(path)` directly, no edge functions needed
-- **Device frame images** — fetched from webapp dev server URL (e.g., `http://localhost:5173/assets/devices/macbook.png`) via `WEBAPP_BASE_URL` config
-- **Painter stack replicated, not imported** — `PlaybackRenderer` lives in webapp and has editor deps. ServerExportPipeline reimplements the render call sequence using direct `@shared/painters/*` imports (~50 lines of orchestration)
-- **Auth required** — reuses existing `authenticateRequest()` pattern. For local dev, user must be logged in with an active subscription (same as regular export)
-- **In-memory job store** — no database needed for local testing. Jobs auto-cleanup after 30 minutes
-- **SSE via raw reply** — Fastify supports SSE by writing to `reply.raw` with event stream headers
+- **No job management** — single synchronous request, progress logged to backend console
+- **No download endpoint** — output stays in `/tmp/`, user opens it manually via Finder/terminal
+- **No cleanup** — files stay until OS cleans `/tmp/`
+- **All public assets on CDN** — device frames, preset backgrounds, preset music at `cdn.recordio.cc/*`. Server fetches by URL directly
+- **Custom assets deferred** — custom user-uploaded backgrounds and music won't work yet
+- **Painter stack replicated** — ServerExportPipeline reimplements PlaybackRenderer's render call sequence using direct `@shared/painters/*` imports
 
 ---
 
 ## Verification
 
-1. Start webapp dev server: `cd webapp && npm run dev`
-2. Start backend dev server: `cd backend && npm run dev` (with `.env` containing SUPABASE_URL, SUPABASE_SECRET_KEY, CORS_ORIGIN=http://localhost:5173, WEBAPP_BASE_URL=http://localhost:5173)
-3. Open a cloud-synced project in the webapp (needs `storageUrl` on sources)
-4. Open export modal → click "Server Export (Test)"
-5. Verify: progress updates in the modal, MP4 downloads on completion
-6. Compare: visually compare server-rendered frame vs browser-rendered frame for parity
+1. `cd webapp && npm run dev`
+2. `cd backend && npm run dev`
+3. Open a cloud-synced project → export modal → "Server Export (Test)"
+4. Watch backend console for frame-by-frame progress
+5. Open `/tmp/render-xxx/output.mp4` and compare visually with browser export

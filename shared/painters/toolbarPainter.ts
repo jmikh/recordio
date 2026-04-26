@@ -15,8 +15,8 @@
 import type { UrlChangeEvent, Rect } from '../types';
 import type { ToolbarSettings } from '../types/settings';
 import type { RenderContext } from '../utils/renderContext';
-import logoUrl from '@shared/assets/logo.svg';
-import puzzleUrl from '@shared/assets/puzzle_icon.svg';
+const logoUrl = 'https://cdn.recordio.cc/toolbar/logo.svg';
+const puzzleUrl = 'https://cdn.recordio.cc/toolbar/puzzle_icon.svg';
 import { roundRectPath } from './utils/roundRect';
 
 // ══════════════════════════════════════════
@@ -62,7 +62,7 @@ function getLogoImage(renderCtx: RenderContext): CanvasImageSource | null {
     if (logoImg) return logoImg;
     if (!logoLoading) {
         logoLoading = true;
-        renderCtx.loadImage(logoUrl).then(img => { logoImg = img; });
+        renderCtx.loadImage(logoUrl).then(img => { logoImg = img; }).catch(e => { console.warn('[toolbar] Failed to load logo:', e); });
     }
     return null;
 }
@@ -73,7 +73,7 @@ function getPuzzleImage(renderCtx: RenderContext): CanvasImageSource | null {
     if (puzzleImg) return puzzleImg;
     if (!puzzleLoading) {
         puzzleLoading = true;
-        renderCtx.loadImage(puzzleUrl).then(img => { puzzleImg = img; });
+        renderCtx.loadImage(puzzleUrl).then(img => { puzzleImg = img; }).catch(e => { console.warn('[toolbar] Failed to load puzzle:', e); });
     }
     return null;
 }

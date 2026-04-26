@@ -1,7 +1,6 @@
 ---
 name: ui-guidelines
-description: UI design system reference for this codebase. Use when building, reviewing, or modifying UI — covers design tokens, which shared components to reach for, CSS classes, and hard rules. ALWAYS load this skill before making any UI changes.
-when_to_use: Always load when making any UI changes — writing or modifying React components, adding UI to a page, picking colors/shadows/text styles, reviewing UI code for design system compliance, or touching any frontend visual code.
+description: UI design system reference for this codebase — covers design tokens, shared components, CSS classes, and hard rules. Always load before making any UI changes (React components, colors/shadows/text styles, or frontend visual code).
 ---
 
 # UI Guidelines

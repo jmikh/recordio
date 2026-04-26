@@ -1,9 +1,9 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ZoomSegment, type SpotlightSegment, type CameraMoveSegment, type CameraSettings, type ScreenSettings, type ProjectSettings, type Timeline } from '../types';
-import type { OverlaySegment } from '../types/overlay';
+import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ProjectSettings, type Timeline } from '../types';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
 import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
+import { scaleProject } from '@shared/utils/projectScale';
 
 export const CURRENT_SCHEMA_VERSION = 4;
 
@@ -305,121 +305,10 @@ export class ProjectImpl {
     }
 
     /**
-     * Recursively scales any number property ending in 'Px' by the given scale factor.
-     * Also handles Rect objects (only if parent field ends in Px) and arrays.
-     */
-    private static scalePixelValues(obj: any, scale: number, parentKey: string = ''): any {
-        if (obj === null || obj === undefined) return obj;
-
-        // Handle arrays (e.g. spotlight borderRadiusPx: [number, number, number, number])
-        if (Array.isArray(obj)) {
-            // Only scale array elements if parent key ends with Px
-            if (parentKey.endsWith('Px')) {
-                return obj.map(item => {
-                    if (typeof item === 'number') return item * scale;
-                    if (typeof item === 'object') return ProjectImpl.scalePixelValues(item, scale, parentKey);
-                    return item;
-                });
-            }
-            // Otherwise recurse without scaling
-            return obj.map(item => {
-                if (typeof item === 'object') return ProjectImpl.scalePixelValues(item, scale, parentKey);
-                return item;
-            });
-        }
-
-        // Handle Rect objects - ONLY scale if parent field ends with Px
-        if (obj.hasOwnProperty('x') && obj.hasOwnProperty('y') && obj.hasOwnProperty('width') && obj.hasOwnProperty('height')) {
-            if (parentKey.endsWith('Px')) {
-                return {
-                    x: obj.x * scale,
-                    y: obj.y * scale,
-                    width: obj.width * scale,
-                    height: obj.height * scale
-                };
-            }
-            // Don't scale source coordinate rects (e.g., ZoomSegment.rect, SpotlightSegment.sourceRect)
-            return obj;
-        }
-
-        // Handle Point objects ({x, y} without width/height) — overlay output coordinates.
-        // Fields like tail, head, topLeft are in output pixels but don't use the Px suffix.
-        const POINT_FIELDS_TO_SCALE = ['tail', 'head', 'topLeft'];
-        if (obj.hasOwnProperty('x') && obj.hasOwnProperty('y') && !obj.hasOwnProperty('width') && POINT_FIELDS_TO_SCALE.includes(parentKey)) {
-            return { x: obj.x * scale, y: obj.y * scale };
-        }
-
-        // Not an object — return as-is
-        if (typeof obj !== 'object') return obj;
-
-        const result: any = {};
-        for (const key in obj) {
-            if (!obj.hasOwnProperty(key)) continue;
-
-            const value = obj[key];
-
-            // Scale number fields ending in 'Px'
-            if (key.endsWith('Px') && typeof value === 'number') {
-                result[key] = value * scale;
-            }
-            // Recursively process nested objects (pass key for context)
-            else if (typeof value === 'object') {
-                result[key] = ProjectImpl.scalePixelValues(value, scale, key);
-            }
-            // Pass through all other values
-            else {
-                result[key] = value;
-            }
-        }
-        return result;
-    }
-
-    /**
      * Scales a project's spatial settings to match a new output size.
-     * Used for exporting at different resolutions while maintaining proportions.
-     * Automatically scales all fields ending in 'Px' (e.g. borderRadiusPx, widthPx).
+     * Delegates to shared/utils/projectScale.ts.
      */
     static scale(project: Project, newSize: Size): Project {
-        const oldSize = project.settings.outputSize;
-
-        const scaleX = newSize.width / oldSize.width;
-        const scaleY = newSize.height / oldSize.height;
-
-        // Verify uniform scaling (export changes quality, not aspect ratio)
-        const scaleDiff = Math.abs(scaleX - scaleY);
-        const tolerance = 0.001; // 0.1% tolerance
-        if (scaleDiff > tolerance) {
-            console.error(`Scale factors differ: scaleX=${scaleX}, scaleY=${scaleY}, diff=${scaleDiff}`);
-        }
-
-        // Use single scale factor (average of both for robustness)
-        const scale = (scaleX + scaleY) / 2;
-
-        return {
-            ...project,
-            settings: {
-                ...ProjectImpl.scalePixelValues(project.settings, scale),
-                outputSize: { ...newSize },
-            },
-            timeline: {
-                ...project.timeline,
-                // Auto-scale Px-suffixed fields in timeline actions:
-                //   ZoomSegment.rectPx (output coords) → scaled
-                //   SpotlightSegment.borderRadiusPx → scaled
-                //   SpotlightSegment.sourceRect (source coords, no Px suffix) → NOT scaled
-                zoomSegments: project.timeline.zoomSegments.map((za: ZoomSegment) =>
-                    ProjectImpl.scalePixelValues(za, scale) as ZoomSegment
-                ),
-                spotlightSegments: project.timeline.spotlightSegments.map((sa: SpotlightSegment) =>
-                    ProjectImpl.scalePixelValues(sa, scale) as SpotlightSegment
-                ),
-                cameraMoveSegments: (project.timeline.cameraMoveSegments || []).map((cl: CameraMoveSegment) =>
-                    ProjectImpl.scalePixelValues(cl, scale) as CameraMoveSegment
-                ),
-                overlaySegments: (project.timeline.overlaySegments || []).map((ob: OverlaySegment) =>
-                    ProjectImpl.scalePixelValues(ob, scale) as OverlaySegment
-                ),
-            }
-        };
+        return scaleProject(project, newSize);
     }
 }

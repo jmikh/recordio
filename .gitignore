@@ -32,8 +32,6 @@ extension.zip
 *.sln
 *.sw?
 
-# CDN assets (uploaded to R2)
-cdn/
 
 # TypeScript build info
 *.tsbuildinfo

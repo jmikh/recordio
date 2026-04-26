@@ -7,7 +7,8 @@
  *   Audio: AAC → Opus
  */
 
-export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
+export type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportQuality } from '@shared/utils/exportQuality';
 export type ExportFps = 30;
 
 export interface VideoCodecResult {
@@ -128,15 +129,7 @@ export async function resolveAudioCodec(): Promise<AudioCodecResult> {
 // Quality / Bitrate Helpers
 // ============================================================================
 
-export function getHeightForQuality(q: ExportQuality): number {
-    switch (q) {
-        case '480p': return 480;
-        case '720p': return 720;
-        case '1080p': return 1080;
-        case '2K': return 1440;
-        case '4K': return 2160;
-    }
-}
+export { getHeightForQuality } from '@shared/utils/exportQuality';
 
 export function getBitrate(q: ExportQuality): number {
     switch (q) {

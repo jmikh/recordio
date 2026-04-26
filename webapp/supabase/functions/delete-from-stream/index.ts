@@ -6,7 +6,7 @@ import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
  * Delete-from-Stream Edge Function (Unpublish)
  *
  * Clears the publish columns on the projects row and queues the
- * Cloudflare Stream video for async deletion via deleted_videos.
+ * Cloudflare Stream video for async deletion via the deleted_cf_streams queue.
  */
 serve(withAuth(async (req, { user, supabase }) => {
     // 1. Parse request body
@@ -37,7 +37,7 @@ serve(withAuth(async (req, { user, supabase }) => {
     );
 
     const { error: queueError } = await adminSupabase
-        .from('deleted_videos')
+        .from('deleted_cf_streams')
         .insert({ cf_video_uid, source: 'user_delete' });
 
     if (queueError) {

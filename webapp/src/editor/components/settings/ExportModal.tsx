@@ -17,6 +17,9 @@ import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
 import { ReviewModal, shouldShowReviewModal } from '../header/ReviewModal';
+import { AuthManager } from '../../../auth/AuthManager';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 
 
@@ -149,6 +152,47 @@ export function ExportModal() {
         } finally {
             setExportState({ isExporting: false });
             (window as any).__activeExportManager = null;
+        }
+    };
+
+    // ─── Server Export (Test) ────────────────────────────────────
+
+    const [isServerExporting, setIsServerExporting] = useState(false);
+
+    const handleServerExport = async () => {
+        if (isServerExporting || !BACKEND_URL) return;
+
+        setIsServerExporting(true);
+        addToast({ type: 'info', title: 'Server export started', message: 'Check backend console for progress...' });
+
+        try {
+            const session = await AuthManager.getSession();
+            if (!session) {
+                addToast({ type: 'error', title: 'Not authenticated' });
+                return;
+            }
+            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
+
+            const response = await fetch(`${BACKEND_URL}/render`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ projectData: fullProject, quality: selectedQuality }),
+            });
+
+            const result = await response.json();
+
+            if (result.ok) {
+                addToast({ type: 'success', title: 'Server render complete', message: result.outputPath, duration: 0 });
+            } else {
+                addToast({ type: 'error', title: 'Server render failed', message: result.error, duration: 0 });
+            }
+        } catch (e: any) {
+            addToast({ type: 'error', title: 'Server render error', message: e?.message || 'Connection failed', duration: 0 });
+        } finally {
+            setIsServerExporting(false);
         }
     };
 
@@ -427,6 +471,18 @@ export function ExportModal() {
                             Download
                         </Button>
                     </Tooltip>
+
+                    {/* Server Export (Test) — dev only */}
+                    {import.meta.env.DEV && BACKEND_URL && (
+                        <Button
+                            onClick={handleServerExport}
+                            fullWidth
+                            className="text-sm font-medium"
+                            disabled={busy || isServerExporting}
+                        >
+                            {isServerExporting ? 'Rendering on server...' : 'Server Export (Test)'}
+                        </Button>
+                    )}
 
                     {/* Inline status badge */}
                     {statusBadge && (

@@ -7,7 +7,7 @@
 - **Handle CORS preflight** — every edge function must respond to `OPTIONS` with `corsHeaders`
 - **Use `maybeSingle()` not `single()`** when the row might not exist
 - **Always enable RLS on new tables** — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + at least one policy. No exceptions
-- **New migrations go in `migrations/`** with timestamped filename (`YYYYMMDD_description.sql`). Never edit existing migrations
+- **New migrations go in `migrations/`** — see `migrations/CLAUDE.md` for naming and ordering rules. Never edit existing migrations
 
 ---
 

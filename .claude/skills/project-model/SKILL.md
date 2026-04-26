@@ -1,7 +1,6 @@
 ---
 name: project-model
 description: How projects are created, stored, versioned, edited with batched history, and how source/output time works. Use when modifying project types, storage, timeline logic, migrations, undo/redo, or time mapping.
-when_to_use: When modifying project structure, adding new segment types, changing timeline behavior, writing migrations, touching undo/redo or history batching, working with time conversions, or adding new persisted fields.
 ---
 
 # Project Model

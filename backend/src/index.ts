@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart';
 import { config } from './config.js';
 import { registerCors } from './plugins/cors.js';
 import { transcribeRoute } from './transcription/route.js';
+import { renderRoute } from './render/route.js';
 
 const app = Fastify({
     logger: {
@@ -19,6 +20,7 @@ await app.register(multipart);
 
 // Routes
 await app.register(transcribeRoute);
+await app.register(renderRoute);
 
 // Health check
 app.get('/health', async () => ({ status: 'ok' }));

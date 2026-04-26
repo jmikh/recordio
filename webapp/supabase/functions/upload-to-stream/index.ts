@@ -90,7 +90,7 @@ serve(withAuth(async (req, { user, supabase }) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
         );
         await adminSupabase
-            .from('deleted_videos')
+            .from('deleted_cf_streams')
             .insert({ cf_video_uid: project.cf_video_uid, source: 'reshare' });
     }
 

@@ -5,12 +5,12 @@ const CF_API_TOKEN = Deno.env.get('CF_STREAM_API_TOKEN')!;
 const CF_ACCOUNT_ID = Deno.env.get('CF_STREAM_ACCOUNT_ID')!;
 
 /**
- * Purge-Deleted-Videos Edge Function
+ * Purge-Deleted-CF-Streams Edge Function
  *
- * Called hourly by pg_cron via pg_net. Processes the deleted_videos queue
+ * Called hourly by pg_cron via pg_net. Processes the deleted_cf_streams queue
  * by calling Cloudflare Stream DELETE API for each entry.
  *
- * - On success: removes the row from deleted_videos
+ * - On success: removes the row from deleted_cf_streams
  * - On failure: increments attempts counter
  * - If attempts >= 5: leaves the row for manual review, stops retrying
  *
@@ -34,7 +34,7 @@ serve(async (req) => {
 
         // Fetch batch of pending deletions (attempts < 5)
         const { data: pending, error: fetchError } = await supabase
-            .from('deleted_videos')
+            .from('deleted_cf_streams')
             .select('id, cf_video_uid, attempts')
             .lt('attempts', 5)
             .order('deleted_at', { ascending: true })
@@ -71,7 +71,7 @@ serve(async (req) => {
                 if (cfResponse.ok || cfResponse.status === 404) {
                     // Success or already gone — remove from queue
                     await supabase
-                        .from('deleted_videos')
+                        .from('deleted_cf_streams')
                         .delete()
                         .eq('id', entry.id);
                     succeeded++;
@@ -80,7 +80,7 @@ serve(async (req) => {
                     const errorText = await cfResponse.text();
                     console.error(`[purge] CF delete failed for ${entry.cf_video_uid} (${cfResponse.status}):`, errorText);
                     await supabase
-                        .from('deleted_videos')
+                        .from('deleted_cf_streams')
                         .update({ attempts: entry.attempts + 1 })
                         .eq('id', entry.id);
                     failed++;
@@ -88,7 +88,7 @@ serve(async (req) => {
             } catch (e) {
                 console.error(`[purge] Error deleting ${entry.cf_video_uid}:`, e);
                 await supabase
-                    .from('deleted_videos')
+                    .from('deleted_cf_streams')
                     .update({ attempts: entry.attempts + 1 })
                     .eq('id', entry.id);
                 failed++;

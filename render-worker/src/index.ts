@@ -11,3 +11,4 @@
 export { nodeRenderContext } from './nodeRenderContext';
 export { ServerFrameExtractor } from './ServerFrameExtractor';
 export { mixAudio } from './ServerAudioMixer';
+export { renderProject, type RenderJobConfig, type RenderResult } from './ServerExportPipeline';
