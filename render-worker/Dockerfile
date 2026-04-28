@@ -38,9 +38,27 @@ COPY --from=worker-builder /build/render-worker/node_modules/ ./node_modules/
 COPY --from=render-page-builder /build/render-worker/render-page/dist/ ./render-page/dist/
 COPY render-worker/package.json ./
 
-# Install only Chromium browser (skip Firefox/WebKit)
+# Install ffmpeg, EGL/Vulkan libs for GPU support, and Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libegl1 \
+    libgles2 \
+    libvulkan1 \
+    vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
 RUN npx playwright install chromium
 
+# Create NVIDIA ICD discovery files so GLVND + Vulkan loader find the GPU drivers
+# Cloud Run mounts driver .so files at /usr/local/nvidia/lib64 but doesn't create these configs
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d /usr/share/vulkan/icd.d \
+    && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"/usr/local/nvidia/lib64/libEGL_nvidia.so.0"}}' \
+       > /usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"/usr/local/nvidia/lib64/libGLX_nvidia.so.0","api_version":"1.3"}}' \
+       > /usr/share/vulkan/icd.d/nvidia_icd.json
+
+# Ensure NVIDIA EGL vendor is discoverable (Cloud Run mounts drivers at /usr/local/nvidia)
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NODE_ENV=production
 ENV PORT=8080
 

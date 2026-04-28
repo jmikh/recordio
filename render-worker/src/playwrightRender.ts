@@ -1,8 +1,9 @@
 /**
  * Headless browser render orchestrator.
  *
- * Launches Playwright Chromium, navigates to the self-contained render page,
- * injects the job config, and extracts the resulting MP4 ArrayBuffer.
+ * Pre-launches Playwright Chromium at server startup so the ~26s cold start
+ * is paid once, not per job. Each render creates a fresh page (isolated context)
+ * on the shared browser instance.
  *
  * The render page runs the exact same ExportManager pipeline as the browser,
  * using WebCodecs for fast hardware/software video encoding.
@@ -12,6 +13,7 @@
  */
 
 import { chromium, type Browser, type Page } from 'playwright';
+import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -22,6 +24,7 @@ export interface MediaFileNames {
 }
 
 export interface PlaywrightRenderConfig {
+    jobId: string;
     project: unknown;
     quality: string;
     mediaDir: string;
@@ -61,26 +64,138 @@ function getMimeType(filePath: string): string {
     return MIME_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
 }
 
+// ── Shared browser instance ──────────────────────────────────
+
+let _browser: Browser | null = null;
+let _browserLaunching: Promise<Browser> | null = null;
+
+/**
+ * Pre-launch Chromium at server startup. Call this once from server.ts.
+ * The browser stays alive for the lifetime of the process.
+ */
+export async function warmBrowser(): Promise<void> {
+    // Log GPU driver visibility
+    const nvidiaPath = '/usr/local/nvidia/lib64';
+    console.log(`[Render] NVIDIA driver path exists: ${fs.existsSync(nvidiaPath)}`);
+    if (fs.existsSync(nvidiaPath)) {
+        const allLibs = fs.readdirSync(nvidiaPath);
+        console.log(`[Render] NVIDIA libs (${allLibs.length} files): ${allLibs.filter(f => f.includes('vulkan') || f.includes('EGL') || f.includes('nvidia')).join(', ')}`);
+    }
+    console.log(`[Render] LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH ?? '(unset)'}`);
+
+    // Log ICD discovery files
+    const eglVendorDir = '/usr/share/glvnd/egl_vendor.d';
+    const vulkanIcdDir = '/usr/share/vulkan/icd.d';
+    console.log(`[Render] EGL vendor configs: ${fs.existsSync(eglVendorDir) ? fs.readdirSync(eglVendorDir).join(', ') : '(dir missing)'}`);
+    console.log(`[Render] Vulkan ICD configs: ${fs.existsSync(vulkanIcdDir) ? fs.readdirSync(vulkanIcdDir).join(', ') : '(dir missing)'}`);
+
+    const start = Date.now();
+    console.log('[Render] Pre-launching Chromium...');
+    _browser = await launchBrowser();
+    console.log(`[Render] Chromium ready in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+
+    // Run nvidia-smi to check GPU visibility at OS level
+    try {
+        const smi = execSync('nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader', { timeout: 5000 }).toString().trim();
+        console.log(`[Render] nvidia-smi: ${smi}`);
+    } catch (e) {
+        console.warn(`[Render] nvidia-smi failed (GPU not visible at OS level): ${e}`);
+    }
+
+    // Check NVIDIA device nodes
+    for (const dev of ['/dev/nvidia0', '/dev/nvidiactl', '/dev/nvidia-uvm']) {
+        console.log(`[Render] ${dev}: ${fs.existsSync(dev) ? 'EXISTS' : 'MISSING'}`);
+    }
+
+    // Check Vulkan device visibility with loader debug
+    try {
+        const vkInfo = execSync('VK_LOADER_DEBUG=error vulkaninfo --summary 2>&1 | head -50', { timeout: 10000 }).toString().trim();
+        console.log(`[Render] vulkaninfo: ${vkInfo}`);
+    } catch (e) {
+        console.warn(`[Render] vulkaninfo failed: ${e}`);
+    }
+
+    // Check DRM render nodes — Chrome needs /dev/dri/renderD* for GPU access
+    try {
+        const driPath = '/dev/dri';
+        if (fs.existsSync(driPath)) {
+            const devices = fs.readdirSync(driPath);
+            console.log(`[Render] /dev/dri/ devices: ${devices.join(', ')}`);
+        } else {
+            console.warn(`[Render] /dev/dri/ missing — attempting to create render node...`);
+            // Try loading nvidia-drm module and creating device nodes
+            try {
+                execSync('modprobe nvidia-drm 2>&1 || true', { timeout: 5000 });
+                console.log(`[Render] modprobe nvidia-drm attempted`);
+            } catch { /* may not have permission */ }
+            try {
+                // nvidia-smi can trigger device node creation
+                execSync('nvidia-smi -q -d DISPLAY 2>&1 | head -5', { timeout: 5000 });
+            } catch { /* ignore */ }
+            try {
+                // Try mknod as fallback — renderD128 is major 226, minor 128
+                execSync('mkdir -p /dev/dri && mknod /dev/dri/renderD128 c 226 128 && chmod 666 /dev/dri/renderD128', { timeout: 5000 });
+                console.log(`[Render] Created /dev/dri/renderD128 manually`);
+            } catch (e2) {
+                console.warn(`[Render] Failed to create DRM device: ${e2}`);
+            }
+            // Check again
+            if (fs.existsSync(driPath)) {
+                console.log(`[Render] /dev/dri/ now has: ${fs.readdirSync(driPath).join(', ')}`);
+            } else {
+                console.error(`[Render] /dev/dri/ STILL missing — GPU rendering unavailable`);
+            }
+        }
+    } catch (e) {
+        console.warn(`[Render] DRM device check failed: ${e}`);
+    }
+}
+
+async function launchBrowser(): Promise<Browser> {
+    return chromium.launch({
+        headless: false,
+        args: [
+            '--headless=new',
+            '--use-angle=vulkan',
+            '--enable-features=Vulkan',
+            '--disable-vulkan-surface',
+            '--enable-gpu-rasterization',
+            '--ignore-gpu-blocklist',
+            '--disable-gpu-sandbox',
+            '--in-process-gpu',
+            '--disable-web-security',
+            '--autoplay-policy=no-user-gesture-required',
+            '--no-sandbox',
+            '--enable-logging=stderr',
+            '--vmodule=gpu*=1,*angle*=1,*vulkan*=1',
+        ],
+    });
+}
+
+async function getBrowser(): Promise<Browser> {
+    if (_browser?.isConnected()) return _browser;
+
+    // Avoid double-launching if two jobs arrive at once
+    if (_browserLaunching) return _browserLaunching;
+
+    console.warn('[Render] Browser not available — launching on demand...');
+    _browserLaunching = launchBrowser();
+    _browser = await _browserLaunching;
+    _browserLaunching = null;
+    return _browser;
+}
+
+// ── Render function ──────────────────────────────────────────
+
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { project, quality, mediaDir, mediaFileNames, onProgress } = config;
+    const { jobId, project, quality, mediaDir, mediaFileNames, onProgress } = config;
     const log = onProgress ?? ((phase: string, _p: number, msg: string) => console.log(`[Render] [${phase}] ${msg}`));
     const startTime = Date.now();
 
-    let browser: Browser | null = null;
+    const browser = await getBrowser();
+    const page: Page = await browser.newPage();
 
     try {
-        log('prepare', 0.2, 'Launching headless Chromium...');
-        browser = await chromium.launch({
-            headless: true,
-            args: [
-                '--enable-gpu-rasterization',
-                '--disable-web-security',
-                '--autoplay-policy=no-user-gesture-required',
-            ],
-        });
-
-        const page: Page = await browser.newPage();
-
         // --- Intercept requests to serve files locally ---
         // localhost URLs = secure context (required for crypto.randomUUID, WebCodecs)
 
@@ -103,24 +218,8 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             }
         });
 
-        // Serve media files at http://localhost:9998/*
-        await page.route('http://localhost:9998/**', async (route) => {
-            const url = new URL(route.request().url());
-            const filePath = url.pathname.slice(1); // remove leading /
-            const fullPath = path.join(mediaDir, filePath);
-
-            if (fs.existsSync(fullPath)) {
-                const body = fs.readFileSync(fullPath);
-                await route.fulfill({
-                    status: 200,
-                    contentType: getMimeType(fullPath),
-                    body,
-                });
-            } else {
-                console.warn(`[Render] Media 404: ${fullPath}`);
-                await route.fulfill({ status: 404, body: 'Not found' });
-            }
-        });
+        // Media files are served by the real HTTP server on port 9998 (see server.ts)
+        // This avoids CDP base64 overhead that kills the browser for large files.
 
         // Forward browser console to worker console
         page.on('console', msg => {
@@ -137,8 +236,16 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             console.error(`[Render][browser] Page error:`, err.message);
         });
 
+        page.on('crash', () => {
+            console.error(`[Render][browser] PAGE CRASHED`);
+        });
+
+        page.on('close', () => {
+            console.warn(`[Render][browser] Page closed unexpectedly`);
+        });
+
         // --- Inject job config before page loads ---
-        const mediaBaseUrl = 'http://localhost:9998/';
+        const mediaBaseUrl = `http://localhost:9998/${jobId}/`;
         const renderJob = { project, quality, mediaBaseUrl, mediaFileNames };
 
         await page.addInitScript((job: any) => {
@@ -151,27 +258,73 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             timeout: 30_000,
         });
 
+        // --- GPU diagnostic ---
+        const gpuInfo = await page.evaluate(() => {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+            const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
+            const renderer = debugInfo ? gl!.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'unknown';
+            const vendor = debugInfo ? gl!.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'unknown';
+
+            // Check if 2D canvas is accelerated
+            const c2d = document.createElement('canvas');
+            const ctx = c2d.getContext('2d');
+            const attrs = (ctx as any)?.getContextAttributes?.();
+
+            return {
+                renderer,
+                vendor,
+                canvas2dAccelerated: attrs?.willReadFrequently === false,
+                canvas2dAttrs: JSON.stringify(attrs ?? {}),
+                hardwareConcurrency: navigator.hardwareConcurrency,
+            };
+        });
+        console.log(`[Render] GPU info:`, JSON.stringify(gpuInfo));
+
         log('render', 0, 'Render page loaded, waiting for export to complete...');
 
-        // --- Wait for render to finish ---
-        const pollInterval = setInterval(async () => {
-            try {
-                const status = await page.evaluate(() => {
-                    const el = document.getElementById('status');
-                    return el?.textContent ?? '';
-                });
-                if (status) {
-                    log('render', 0.5, `Page status: ${status}`);
+        // --- Wait for render to finish with stale progress detection ---
+        // Instead of a fixed timeout, we check if progress has stalled for 30s.
+        const STALE_TIMEOUT_MS = 30_000;
+        let lastProgress = -1;
+        let lastProgressTime = Date.now();
+
+        await new Promise<void>((resolve, reject) => {
+            const pollInterval = setInterval(async () => {
+                try {
+                    const state = await page.evaluate(() => ({
+                        done: (window as any).__RENDER_DONE__ === true,
+                        progress: (window as any).__RENDER_PROGRESS__ as number | undefined,
+                        status: document.getElementById('status')?.textContent ?? '',
+                    }));
+
+                    if (state.done) {
+                        clearInterval(pollInterval);
+                        resolve();
+                        return;
+                    }
+
+                    if (state.status) {
+                        log('render', state.progress ?? 0, `Page status: ${state.status}`);
+                    }
+
+                    // Check for stale progress
+                    const currentProgress = state.progress ?? 0;
+                    if (currentProgress > lastProgress) {
+                        lastProgress = currentProgress;
+                        lastProgressTime = Date.now();
+                    } else if (Date.now() - lastProgressTime > STALE_TIMEOUT_MS) {
+                        clearInterval(pollInterval);
+                        reject(new Error(
+                            `Export stalled — no progress for ${STALE_TIMEOUT_MS / 1000}s ` +
+                            `(last progress: ${(lastProgress * 100).toFixed(1)}%, status: "${state.status}")`
+                        ));
+                    }
+                } catch {
+                    // page may be navigating or crashed — stale timer still ticking
                 }
-            } catch { /* page may be navigating */ }
-        }, 2000);
-
-        await page.waitForFunction('window.__RENDER_DONE__ === true', {
-            timeout: 300_000, // 5 minute timeout
-            polling: 500,
+            }, 2000);
         });
-
-        clearInterval(pollInterval);
 
         // --- Check for errors ---
         const error = await page.evaluate(() => (window as any).__RENDER_ERROR__);
@@ -179,25 +332,29 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page error: ${error}`);
         }
 
-        // --- Extract result ---
+        // --- Extract result via real HTTP upload (bypasses CDP base64 overhead) ---
         log('finalize', 0.8, 'Extracting MP4 from browser...');
-        const resultBuffer = await page.evaluate(() => {
-            const ab = (window as any).__RENDER_RESULT__ as ArrayBuffer;
-            return Array.from(new Uint8Array(ab));
-        });
-
         const outputPath = path.join(mediaDir, 'output.mp4');
-        fs.writeFileSync(outputPath, Buffer.from(resultBuffer));
 
+        // Browser PUTs the ArrayBuffer directly to the media server on port 9998
+        await page.evaluate(async (uploadUrl: string) => {
+            const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
+            const resp = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: ab,
+                headers: { 'Content-Type': 'application/octet-stream' },
+            });
+            if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
+        }, `http://localhost:9998/${jobId}/output.mp4`);
+
+        const stat = fs.statSync(outputPath);
         const durationMs = Date.now() - startTime;
-        const sizeMB = (resultBuffer.length / 1024 / 1024).toFixed(2);
+        const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
         log('finalize', 1, `Done! ${sizeMB} MB written to ${outputPath} in ${(durationMs / 1000).toFixed(1)}s`);
 
         return { outputPath, durationMs };
 
     } finally {
-        if (browser) {
-            await browser.close();
-        }
+        await page.close();
     }
 }

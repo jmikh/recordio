@@ -17,11 +17,8 @@ import { ShareService, type SharedVideo } from '../../services/ShareService';
 import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
 import { ReviewModal, shouldShowReviewModal } from '../header/ReviewModal';
-import { AuthManager } from '../../../auth/AuthManager';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-
-
+import { supabase } from '../../../auth/AuthManager';
+import { SyncService } from '../../../storage/syncService';
 
 const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }[] = [
     { value: '480p', label: '480p', proOnly: false },
@@ -155,44 +152,114 @@ export function ExportModal() {
         }
     };
 
-    // ─── Server Export (Test) ────────────────────────────────────
+    // ─── Server Render ─────────────────────────────────────────
 
     const [isServerExporting, setIsServerExporting] = useState(false);
+    const [serverRenderProgress, setServerRenderProgress] = useState(0);
 
     const handleServerExport = async () => {
-        if (isServerExporting || !BACKEND_URL) return;
+        if (isServerExporting) return;
+
+        if (!isAuthenticated) {
+            setIsAuthModalOpen(true);
+            return;
+        }
+        if (!proAccess) {
+            setIsUpgradeModalOpen(true);
+            return;
+        }
 
         setIsServerExporting(true);
-        addToast({ type: 'info', title: 'Server export started', message: 'Check backend console for progress...' });
+        setServerRenderProgress(0);
 
         try {
-            const session = await AuthManager.getSession();
-            if (!session) {
-                addToast({ type: 'error', title: 'Not authenticated' });
-                return;
+            // 1. Flush pending cloud save so cloud_version is current
+            const userId = useUserStore.getState().userId;
+            if (userId) {
+                const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
+                await SyncService.flushPendingSync(fullProject, userId, isPro);
             }
-            const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
 
-            const response = await fetch(`${BACKEND_URL}/render`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ projectData: fullProject, quality: selectedQuality }),
+            // 2. Start render job
+            const { data, error } = await supabase!.functions.invoke('render-start-job', {
+                body: { projectId: project.id },
             });
 
-            const result = await response.json();
-
-            if (result.ok) {
-                addToast({ type: 'success', title: 'Server render complete', message: result.outputPath, duration: 0 });
-            } else {
-                addToast({ type: 'error', title: 'Server render failed', message: result.error, duration: 0 });
+            if (error || data?.error) {
+                const msg = data?.error || data?.message || error?.message || 'Failed to start render';
+                addToast({ type: 'error', title: 'Server render failed', message: msg, duration: 0 });
+                return;
             }
+
+            const { jobId, status } = data;
+
+            if (status === 'completed') {
+                // Cache hit — download immediately
+                await downloadServerRender();
+                return;
+            }
+
+            // 3. Poll render_jobs for progress
+            addToast({ type: 'info', title: 'Server render started', message: 'Rendering on server...' });
+
+            const pollInterval = setInterval(async () => {
+                const { data: job } = await supabase!
+                    .from('render_jobs')
+                    .select('status, progress, error')
+                    .eq('id', jobId)
+                    .maybeSingle();
+
+                if (!job) return;
+
+                setServerRenderProgress(job.progress ?? 0);
+
+                if (job.status === 'completed') {
+                    clearInterval(pollInterval);
+                    await downloadServerRender();
+                    setIsServerExporting(false);
+                } else if (job.status === 'failed' || job.status === 'canceled') {
+                    clearInterval(pollInterval);
+                    addToast({
+                        type: 'error',
+                        title: 'Server render failed',
+                        message: job.error || `Render ${job.status}`,
+                        duration: 0,
+                    });
+                    setIsServerExporting(false);
+                }
+            }, 3000);
         } catch (e: any) {
             addToast({ type: 'error', title: 'Server render error', message: e?.message || 'Connection failed', duration: 0 });
         } finally {
+            if (!isServerExporting) return; // already cleaned up by poll
             setIsServerExporting(false);
+        }
+    };
+
+    const downloadServerRender = async () => {
+        try {
+            const { data, error } = await supabase!.functions.invoke('storage-download-url', {
+                body: { projectId: project.id, fileType: 'render' },
+            });
+
+            if (error || data?.error) {
+                addToast({ type: 'error', title: 'Download failed', message: data?.error || error?.message });
+                return;
+            }
+
+            // Download and trigger browser save
+            const resp = await fetch(data.signedUrl);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${project.name || 'render'}.mp4`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            addToast({ type: 'success', title: 'Server render complete', message: 'Download started' });
+        } catch (e: any) {
+            addToast({ type: 'error', title: 'Download failed', message: e?.message || 'Unknown error' });
         }
     };
 
@@ -472,17 +539,17 @@ export function ExportModal() {
                         </Button>
                     </Tooltip>
 
-                    {/* Server Export (Test) — dev only */}
-                    {import.meta.env.DEV && BACKEND_URL && (
-                        <Button
-                            onClick={handleServerExport}
-                            fullWidth
-                            className="text-sm font-medium"
-                            disabled={busy || isServerExporting}
-                        >
-                            {isServerExporting ? 'Rendering on server...' : 'Server Export (Test)'}
-                        </Button>
-                    )}
+                    {/* Server Render */}
+                    <Button
+                        onClick={handleServerExport}
+                        fullWidth
+                        className="text-sm font-medium"
+                        disabled={busy || isServerExporting}
+                    >
+                        {isServerExporting
+                            ? `Rendering on server... ${Math.round(serverRenderProgress * 100)}%`
+                            : 'Server Render'}
+                    </Button>
 
                     {/* Inline status badge */}
                     {statusBadge && (

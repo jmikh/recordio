@@ -29,6 +29,7 @@ declare global {
         __RENDER_JOB__?: RenderJob;
         __RENDER_DONE__?: boolean;
         __RENDER_ERROR__?: string;
+        __RENDER_PROGRESS__?: number;
         __RENDER_RESULT__?: ArrayBuffer;
     }
 }
@@ -47,7 +48,7 @@ const browserRenderContext: RenderContext = {
                 img.crossOrigin = 'anonymous';
             }
             img.onload = () => resolve(img);
-            img.onerror = reject;
+            img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
             img.src = src;
         });
     },
@@ -109,8 +110,11 @@ async function run() {
 
     const env: ExportEnvironment = {
         renderContext: browserRenderContext,
-        // Headless: always use software decode (no GPU)
-        videoDecodePreference: 'cpu',
+        videoDecodePreference: 'gpu',
+        decodePreferences: {
+            getPreferSoftwareDecode: () => false,
+            setPreferSoftwareDecode: () => {},
+        },
     };
 
     try {
@@ -120,6 +124,7 @@ async function run() {
             const phase = progress.phase ?? 'exporting';
             setStatus(`${phase}: ${pct}%`);
             setProgress(progress.progress);
+            window.__RENDER_PROGRESS__ = progress.progress;
             if (progress.timeRemainingSeconds != null) {
                 log(`${phase} ${pct}% — ETA ${progress.timeRemainingSeconds.toFixed(1)}s`);
             }

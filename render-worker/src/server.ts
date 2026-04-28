@@ -1,19 +1,81 @@
 /**
  * Render worker Fastify server.
  *
- * Deployed on Fly.io. Receives render jobs from the render-start-job edge
- * function with signed URLs for media download/upload. Has zero Supabase
+ * Deployed on Google Cloud Run. Receives render jobs from the render-start-job
+ * edge function with signed URLs for media download/upload. Has zero Supabase
  * credentials — reports status via HTTP callback to render-update-status.
  */
 
 import Fastify from 'fastify';
+import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
-import { renderViaPlaywright } from './playwrightRender.js';
+import { renderViaPlaywright, warmBrowser } from './playwrightRender.js';
 import { uploadResult } from './uploadResult.js';
+
+// ── Media file server (port 9998) ────────────────────────────
+// Serves media files over real HTTP to avoid CDP base64 overhead
+// that kills the browser for large files (100MB+).
+// Each job registers its temp dir under /jobId/filename.
+
+const MIME_TYPES: Record<string, string> = {
+    '.webm': 'video/webm', '.mp4': 'video/mp4', '.wav': 'audio/wav',
+    '.mp3': 'audio/mpeg', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
+    '.avif': 'image/avif', '.webp': 'image/webp', '.png': 'image/png',
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
+};
+
+export const mediaJobDirs = new Map<string, string>();
+
+const mediaServer = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    // URL format: /{jobId}/{filename}
+    const parts = url.pathname.slice(1).split('/');
+    if (parts.length < 2) {
+        res.writeHead(400);
+        res.end('Bad request');
+        return;
+    }
+    const [jobId, ...rest] = parts;
+    const fileName = rest.join('/');
+    const dir = mediaJobDirs.get(jobId);
+    if (!dir) {
+        res.writeHead(404);
+        res.end('Unknown job');
+        return;
+    }
+    const filePath = path.join(dir, fileName);
+
+    // PUT = upload file from browser (used for MP4 result extraction)
+    if (req.method === 'PUT') {
+        const writeStream = fs.createWriteStream(filePath);
+        req.pipe(writeStream);
+        writeStream.on('finish', () => {
+            res.writeHead(200);
+            res.end('ok');
+        });
+        writeStream.on('error', (err) => {
+            console.error(`[Media] Write error: ${err.message}`);
+            res.writeHead(500);
+            res.end('Write failed');
+        });
+        return;
+    }
+
+    if (!fs.existsSync(filePath)) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+    }
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
+    const stat = fs.statSync(filePath);
+    res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': stat.size });
+    fs.createReadStream(filePath).pipe(res);
+});
 
 const app = Fastify({
     logger: {
@@ -74,6 +136,7 @@ async function runRender(
     statusCallbackUrl: string,
 ) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
+    mediaJobDirs.set(jobId, tmpDir);
     console.log(`[Render] Job ${jobId}: starting in ${tmpDir}`);
 
     // Start heartbeat — reports progress every 15s, checks for cancel
@@ -92,8 +155,7 @@ async function runRender(
     }, 15_000);
 
     try {
-        // 1. Download media
-        currentProgress = 0;
+        // 1. Download media (progress stays at 0 during download)
         const mediaFileNames = await downloadMedia(
             mediaUrls,
             projectData as any,
@@ -103,27 +165,26 @@ async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // 2. Render via Playwright
-        currentProgress = 0.2;
+        // 2. Render via Playwright (progress tracks export: 0–0.9)
         const result = await renderViaPlaywright({
+            jobId,
             project: projectData,
             quality,
             mediaDir: tmpDir,
             mediaFileNames,
             onProgress: (phase, progress, message) => {
                 console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
-                // Map render progress to 0.2–0.8 range
-                currentProgress = 0.2 + progress * 0.6;
+                currentProgress = progress * 0.9;
             },
         });
 
         if (canceled) throw new CancelError();
 
-        // 3. Upload result via signed URL PUT
-        currentProgress = 0.85;
+        // 3. Upload result via signed URL PUT (progress: 0.9–1.0)
+        currentProgress = 0.9;
         console.log(`[Render] Uploading ${result.outputPath}`);
         await uploadResult(result.outputPath, uploadUrl, (fraction) => {
-            currentProgress = 0.85 + fraction * 0.15;
+            currentProgress = 0.9 + fraction * 0.1;
         });
 
         if (canceled) throw new CancelError();
@@ -144,6 +205,7 @@ async function runRender(
         }
     } finally {
         clearInterval(heartbeatInterval);
+        mediaJobDirs.delete(jobId);
         // Clean up temp directory
         try {
             fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -185,6 +247,12 @@ async function updateJob(
 // ── Start server ──────────────────────────────────────────────
 
 try {
+    // Start media file server on port 9998 (serves large files via real HTTP, not CDP)
+    mediaServer.listen(9998, '127.0.0.1', () => {
+        console.log('[Media] Media file server listening on port 9998');
+    });
+    // Pre-launch Chromium so the ~26s cold start is paid once at boot
+    await warmBrowser();
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info(`Render worker listening on port ${config.PORT}`);
 } catch (err) {

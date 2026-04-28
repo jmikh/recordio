@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsup",
     "start": "node dist/server.js",
-    "dev": "tsx --env-file=.env src/server.ts",
+    "dev": "tsx --env-file=.env.local src/server.ts",
     "build:render-page": "cd render-page && npx vite build"
   },
   "dependencies": {

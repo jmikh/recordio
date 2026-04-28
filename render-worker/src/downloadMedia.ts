@@ -44,8 +44,8 @@ export async function downloadMedia(
         }
     }
 
-    // Download media from signed URLs
-    for (const dl of downloads) {
+    // Download all media from signed URLs in parallel
+    await Promise.all(downloads.map(async (dl) => {
         console.log(`[Render] Downloading ${dl.name}`);
         const resp = await fetch(dl.url);
         if (!resp.ok) {
@@ -55,7 +55,7 @@ export async function downloadMedia(
         const buffer = Buffer.from(await resp.arrayBuffer());
         fs.writeFileSync(path.join(tmpDir, dl.name), buffer);
         console.log(`[Render] ✓ ${dl.name} downloaded (${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
-    }
+    }));
 
     const fileNames: MediaFileNames = {};
     for (const dl of downloads) {

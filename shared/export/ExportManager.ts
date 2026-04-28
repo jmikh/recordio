@@ -202,7 +202,10 @@ export class ExportManager {
             if (bgSettings.type === 'preset' || bgSettings.type === 'custom') {
                 const bgUrl = bgSettings.customRuntimeUrl || bgSettings.imageUrl;
                 if (bgUrl) {
+                    console.log(`[Export] Loading background image: ${bgUrl}`);
+                    const bgStart = performance.now();
                     imageElements.bg = await renderCtx.loadImage(bgUrl);
+                    console.log(`[Export] Background image loaded in ${(performance.now() - bgStart).toFixed(0)}ms`);
                 }
             }
 
@@ -210,11 +213,15 @@ export class ExportManager {
             if (deviceFrameSettings.mode === 'device' && deviceFrameSettings.deviceFrameId) {
                 const frameDef = getDeviceFrame(deviceFrameSettings.deviceFrameId);
                 if (frameDef) {
+                    console.log(`[Export] Loading device frame: ${frameDef.imageUrl}`);
+                    const dfStart = performance.now();
                     imageElements.device = await renderCtx.loadImage(frameDef.imageUrl);
+                    console.log(`[Export] Device frame loaded in ${(performance.now() - dfStart).toFixed(0)}ms`);
                 }
             }
 
             // Signal preparing phase
+            console.log(`[Export] Image loading complete, initializing frame extractors...`);
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'preparing' });
 
             // Initialize frame extractors
@@ -222,6 +229,7 @@ export class ExportManager {
             let sourceIndex = 0;
             for (const source of sources) {
                 if (source.runtimeUrl) {
+                    console.log(`[Export] Initializing extractor for: ${source.runtimeUrl}`);
                     const extractor = new FrameExtractor(source.runtimeUrl, env?.decodePreferences);
                     const si = sourceIndex;
                     await extractor.initialize((chunkProgress) => {
@@ -263,13 +271,18 @@ export class ExportManager {
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
             const frameInterval = 1000 / fps;
             totalFrames = Math.ceil(totalDurationMs / frameInterval);
+            console.log(`[Export] Starting frame loop: ${totalFrames} frames, ${totalDurationMs.toFixed(0)}ms duration, ${Object.keys(frameExtractors).length} sources`);
 
             const startTime = performance.now();
             framesProcessed = 0;
 
+            // Timing accumulators (reset every 30 frames for logging)
+            let accDecode = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
+
             for (let i = 0; i < totalFrames; i++) {
                 if (signal.aborted) throw new Error("Export cancelled");
 
+                const frameStart = performance.now();
                 const currentTimeMs = i * frameInterval;
                 const timestampMicros = i * (1000000 / fps);
 
@@ -290,10 +303,12 @@ export class ExportManager {
                 const sourceTimeMs = timeMapper.mapOutputToSourceTime(currentTimeMs);
 
                 // Decode frames at the target source time
+                const t0 = performance.now();
                 const currentFrameRefs: Record<string, VideoFrame> = {};
                 await Promise.all(Object.entries(frameExtractors).map(async ([id, ext]) => {
                     currentFrameRefs[id] = await ext.getFrameAtTime(sourceTimeMs / 1000);
                 }));
+                const t1 = performance.now();
 
                 // Render Frame
                 ctx.clearRect(0, 0, width, height);
@@ -319,6 +334,7 @@ export class ExportManager {
                     currentTimeMs: currentTimeMs,
                     timeMapper: timeMapper
                 });
+                const t2 = performance.now();
 
                 const durationMicros = 1000000 / fps;
                 const encoderFrame = new VideoFrame(offscreenCanvas, {
@@ -335,12 +351,13 @@ export class ExportManager {
                 }
                 videoEncoder.encode(encoderFrame, { keyFrame: i % (fps * 2) === 0 });
                 encoderFrame.close();
+                const t3 = performance.now();
 
                 Object.values(currentFrameRefs).forEach(f => f.close());
 
                 // Backpressure
                 const bpStart = performance.now();
-                while ((videoEncoder.state as string) !== 'closed' && videoEncoder.encodeQueueSize > 5) {
+                while ((videoEncoder.state as string) !== 'closed' && videoEncoder.encodeQueueSize > 15) {
                     if (performance.now() - bpStart > BACKPRESSURE_TIMEOUT_MS) {
                         console.error(`[Export] Backpressure timeout after ${BACKPRESSURE_TIMEOUT_MS}ms (queueSize=${videoEncoder.encodeQueueSize})`);
                         throw videoEncoderError
@@ -348,10 +365,23 @@ export class ExportManager {
                     }
                     await new Promise(r => setTimeout(r, 1));
                 }
+                const t4 = performance.now();
+
+                accDecode += t1 - t0;
+                accRender += t2 - t1;
+                accEncode += t3 - t2;
+                accBackpressure += t4 - t3;
+                accTotal += t4 - frameStart;
 
                 // Per-frame timing breakdown (every 30 frames)
                 if (framesProcessed % 30 === 0) {
-                    console.log(`[Export] Frame ${framesProcessed}/${totalFrames}`);
+                    console.log(`[Export] Frames ${framesProcessed - 29}-${framesProcessed}/${totalFrames}: ` +
+                        `decode=${accDecode.toFixed(0)}ms render=${accRender.toFixed(0)}ms ` +
+                        `encode=${accEncode.toFixed(0)}ms backpressure=${accBackpressure.toFixed(0)}ms ` +
+                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 30).toFixed(0)}ms/frame)`);
+                    const profile = PlaybackRenderer.flushProfile(30);
+                    if (profile) console.log(profile);
+                    accDecode = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
                 }
 
                 // Periodic yield for UI responsiveness

@@ -7,3 +7,6 @@ Skills serve as living knowledge/memory for this codebase. Whenever you load a s
 
 # Plans
 use actualy meaningful names for plans md files rather than randomly generated names.
+
+# Debugging
+If the cause of a problem is not obvious, suggest to add logs or reproduce the problem before directly trying to make a fix based on a guess. Once the root cause is confirmed we can fix it. 

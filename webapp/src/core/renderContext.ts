@@ -15,6 +15,9 @@ export const browserRenderContext: RenderContext = {
   loadImage(src: string): Promise<CanvasImageSource> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      if (!src.startsWith('blob:')) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => resolve(img);
       img.onerror = reject;
       img.src = src;

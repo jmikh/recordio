@@ -22,15 +22,16 @@
 import { WebDemuxer } from 'web-demuxer';
 
 /** How far ahead (ms) to feed packets beyond the requested time. */
-const FEED_AHEAD_MS = 200;
+const FEED_AHEAD_MS = 2000;
 
 /**
- * Decoder drain timeout = max(DRAIN_TIMEOUT_MIN_MS, fedCount × DRAIN_TIMEOUT_PER_CHUNK_MS).
- * Small feeds (6 chunks) get the 3s floor; large replay-from-keyframe feeds (434 chunks)
- * scale up proportionally so legitimate slow decoding isn't killed prematurely.
+ * Decoder drain timeout = max(DRAIN_TIMEOUT_MIN_MS, fedCount × perChunkMs).
+ * perChunkMs scales with pixel count: 25ms baseline at 1080p, proportionally
+ * more for larger resolutions (e.g. ~150ms/chunk at 4K+ in software mode).
  */
-const DRAIN_TIMEOUT_MIN_MS = 3_000;
-const DRAIN_TIMEOUT_PER_CHUNK_MS = 25;
+const DRAIN_TIMEOUT_MIN_MS = 5_000;
+const DRAIN_TIMEOUT_BASE_PER_CHUNK_MS = 25;
+const DRAIN_TIMEOUT_BASELINE_PIXELS = 1920 * 1080;
 
 /** Maximum number of automatic decoder rebuilds per export. */
 const MAX_REBUILDS = 25;
@@ -425,6 +426,10 @@ export class FrameExtractor {
 
             // 3. Wait for decoder drain
             if (fed > 0) {
+                const feedStart = performance.now();
+                if (fed >= 10) {
+                    console.log(`[FrameExtractor] Fed ${fed} chunks (nextIdx=${this.nextChunkIndex}/${this.chunks.length}), queueSize=${this.decoder!.decodeQueueSize}, waiting for drain...`);
+                }
                 try {
                     await this.awaitDecoderDrain(fed);
                 } catch {
@@ -434,12 +439,21 @@ export class FrameExtractor {
                     await this.rebuildDecoder(timeMs);
                     return this.getFrameAtTime(timeSec);
                 }
+                if (fed >= 10) {
+                    console.log(`[FrameExtractor] Drain complete: ${fed} chunks in ${(performance.now() - feedStart).toFixed(0)}ms, decodedFrames=${this.decodedFrames.length}`);
+                }
             }
 
             // 3b. Safari/WKWebView: frames only appear after flush().
             if ((this.decodedFrames.length === 0 && fed > 0) || this.safariFlushMode) {
                 if (fed > 0 && this.decoder && (this.decoder.state as string) !== 'closed') {
-                    await this.decoder.flush();
+                    console.log(`[FrameExtractor] No frames after drain — flushing decoder (safariFlushMode=${this.safariFlushMode})...`);
+                    const flushStart = performance.now();
+                    await Promise.race([
+                        this.decoder.flush(),
+                        new Promise<void>((_, reject) => setTimeout(() => reject(new Error('flush timeout')), 10_000)),
+                    ]);
+                    console.log(`[FrameExtractor] Flush done in ${(performance.now() - flushStart).toFixed(0)}ms, decodedFrames=${this.decodedFrames.length}`);
                     if (!this.safariFlushMode) {
                         console.log(`[FrameExtractor] Safari flush mode activated`);
                         this.safariFlushMode = true;
@@ -455,7 +469,12 @@ export class FrameExtractor {
         if (this.nextChunkIndex >= this.chunks.length && !this.flushed) {
             this.flushed = true;
             if ((this.decoder!.state as string) !== 'closed') {
-                await this.decoder!.flush();
+                console.log(`[FrameExtractor] Final flush (all chunks consumed)...`);
+                await Promise.race([
+                    this.decoder!.flush(),
+                    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('final flush timeout')), 10_000)),
+                ]);
+                console.log(`[FrameExtractor] Final flush done, decodedFrames=${this.decodedFrames.length}`);
             }
         }
 
@@ -507,7 +526,10 @@ export class FrameExtractor {
     private async awaitDecoderDrain(fedCount: number): Promise<void> {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
 
-        const drainTimeoutMs = Math.max(DRAIN_TIMEOUT_MIN_MS, fedCount * DRAIN_TIMEOUT_PER_CHUNK_MS);
+        const pixels = (this.width || 1920) * (this.height || 1080);
+        const resolutionScale = Math.max(1, pixels / DRAIN_TIMEOUT_BASELINE_PIXELS);
+        const perChunkMs = DRAIN_TIMEOUT_BASE_PER_CHUNK_MS * resolutionScale;
+        const drainTimeoutMs = Math.max(DRAIN_TIMEOUT_MIN_MS, fedCount * perChunkMs);
         const drainStart = performance.now();
         const frameCountBefore = this.decodedFrames.length;
         let lastQueueSize = this.decoder.decodeQueueSize;
