@@ -7,12 +7,13 @@
  * and exposes the result on window globals for Playwright to extract.
  *
  * The page does NO network I/O beyond fetching the pre-downloaded media files
- * from the backend's static file server.
+ * from the worker's static file server.
  */
 
-import { ExportManager } from '../../webapp/src/editor/export/ExportManager';
+import { ExportManager, type ExportEnvironment } from '@shared/export/ExportManager';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import type { Project } from '@shared/types';
+import type { RenderContext } from '@shared/utils/renderContext';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -31,6 +32,26 @@ declare global {
         __RENDER_RESULT__?: ArrayBuffer;
     }
 }
+
+// ── Browser render context (headless Chromium has full DOM/Canvas) ──
+
+const browserRenderContext: RenderContext = {
+    createCanvas(w: number, h: number) {
+        const canvas = new OffscreenCanvas(w, h);
+        return { canvas, ctx: canvas.getContext('2d')! as unknown as CanvasRenderingContext2D };
+    },
+    loadImage(src: string): Promise<CanvasImageSource> {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            if (!src.startsWith('blob:')) {
+                img.crossOrigin = 'anonymous';
+            }
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
+    },
+};
 
 // ── UI helpers ─────────────────────────────────────────────────
 
@@ -71,7 +92,6 @@ async function run() {
     log(`Media files: ${JSON.stringify(mediaFileNames)}`);
 
     // Patch runtimeUrl on each source to point at the local media server.
-    // Filenames come from the backend which knows the actual extensions.
     if (project.screenSource && mediaFileNames.screen) {
         project.screenSource.runtimeUrl = `${mediaBaseUrl}${mediaFileNames.screen}`;
         log(`Screen URL: ${project.screenSource.runtimeUrl}`);
@@ -87,6 +107,12 @@ async function run() {
 
     setStatus('Exporting...');
 
+    const env: ExportEnvironment = {
+        renderContext: browserRenderContext,
+        // Headless: always use software decode (no GPU)
+        videoDecodePreference: 'cpu',
+    };
+
     try {
         const exporter = new ExportManager();
         const result = await exporter.exportProject(project, quality, (progress) => {
@@ -97,7 +123,7 @@ async function run() {
             if (progress.timeRemainingSeconds != null) {
                 log(`${phase} ${pct}% — ETA ${progress.timeRemainingSeconds.toFixed(1)}s`);
             }
-        }, { skipDownload: true });
+        }, { skipDownload: true }, env);
 
         log(`Export complete! Blob size: ${(result.blob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
         log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`, 'success');

@@ -7,8 +7,6 @@ export default defineConfig({
     resolve: {
         alias: {
             '@shared': resolve(__dirname, '../../shared'),
-            // Point webapp imports to the actual webapp source
-            '../../webapp/src': resolve(__dirname, '../../webapp/src'),
         },
     },
 
