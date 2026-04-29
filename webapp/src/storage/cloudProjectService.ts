@@ -188,13 +188,7 @@ export class CloudProjectService {
             }
 
             // All uploads complete — confirm via RPC
-            const blobMap = new Map(blobs.map(b => [b.fileType, b.blob]));
-            await CloudStorage.confirmProjectUpload(
-                projectId,
-                blobMap.get('screen')?.size ?? 0,
-                blobMap.get('camera')?.size ?? 0,
-                blobMap.get('mic')?.size ?? 0,
-            );
+            await CloudStorage.confirmProjectUpload(projectId);
             store.setPendingMediaUploads(0);
             store.setCurrentUpload(null);
             store.setLastSyncedAt(new Date());

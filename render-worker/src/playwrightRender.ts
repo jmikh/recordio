@@ -24,20 +24,17 @@ export interface PlaywrightRenderConfig {
     project: unknown;
     projectName?: string;
     quality: string;
-    mediaDir: string;
     /** storagePath → local filename */
     mediaFileNames: MediaFileNames;
-    /** Signed URL for direct upload from browser. If provided, skips disk write. */
-    uploadUrl?: string;
+    /** Signed URL for direct upload from browser. */
+    uploadUrl: string;
     onProgress?: (phase: string, progress: number, message: string) => void;
 }
 
 export interface RenderResult {
-    /** Path to the rendered MP4. Null when uploaded directly from browser. */
-    outputPath: string | null;
     durationMs: number;
-    /** Size in bytes of the rendered file. */
     sizeBytes: number;
+    uploadDurationMs: number;
 }
 
 // In production (Docker): render-page/dist is at ../render-page/dist relative to dist/
@@ -191,7 +188,7 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { jobId, project, projectName, quality, mediaDir, mediaFileNames, uploadUrl, onProgress } = config;
+    const { jobId, project, projectName, quality, mediaFileNames, uploadUrl, onProgress } = config;
     const log = onProgress ?? ((phase: string, _p: number, msg: string) => console.log(`[Render] [${phase}] ${msg}`));
     const startTime = Date.now();
 
@@ -338,51 +335,29 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page error: ${error}`);
         }
 
-        // --- Upload result ---
-        if (uploadUrl) {
-            // Direct upload from browser to signed URL — skips disk write + re-upload
-            log('finalize', 0.8, 'Uploading MP4 directly from browser...');
-            const sizeBytes = await page.evaluate(async (url: string) => {
-                const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
-                const resp = await fetch(url, {
-                    method: 'PUT',
-                    body: ab,
-                    headers: {
-                        'Content-Type': 'video/mp4',
-                        'x-upsert': 'true',
-                    },
-                });
-                if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
-                return ab.byteLength;
-            }, uploadUrl);
+        // --- Upload result directly from browser ---
+        const uploadStart = Date.now();
+        log('finalize', 0.8, 'Uploading MP4 directly from browser...');
+        const sizeBytes = await page.evaluate(async (url: string) => {
+            const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
+            const resp = await fetch(url, {
+                method: 'PUT',
+                body: ab,
+                headers: {
+                    'Content-Type': 'video/mp4',
+                    'x-upsert': 'true',
+                },
+            });
+            if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
+            return ab.byteLength;
+        }, uploadUrl);
 
-            const durationMs = Date.now() - startTime;
-            const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
-            log('finalize', 1, `Done! ${sizeMB} MB uploaded directly in ${(durationMs / 1000).toFixed(1)}s`);
+        const uploadDurationMs = Date.now() - uploadStart;
+        const durationMs = Date.now() - startTime;
+        const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
+        log('finalize', 1, `Done! ${sizeMB} MB uploaded in ${(durationMs / 1000).toFixed(1)}s`);
 
-            return { outputPath: null, durationMs, sizeBytes };
-        } else {
-            // Fallback: extract to disk via local media server
-            log('finalize', 0.8, 'Extracting MP4 from browser...');
-            const outputPath = path.join(mediaDir, 'output.mp4');
-
-            await page.evaluate(async (localUrl: string) => {
-                const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
-                const resp = await fetch(localUrl, {
-                    method: 'PUT',
-                    body: ab,
-                    headers: { 'Content-Type': 'application/octet-stream' },
-                });
-                if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
-            }, `http://localhost:9998/${jobId}/output.mp4`);
-
-            const stat = fs.statSync(outputPath);
-            const durationMs = Date.now() - startTime;
-            const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
-            log('finalize', 1, `Done! ${sizeMB} MB written to ${outputPath} in ${(durationMs / 1000).toFixed(1)}s`);
-
-            return { outputPath, durationMs, sizeBytes: stat.size };
-        }
+        return { durationMs, sizeBytes, uploadDurationMs };
 
     } finally {
         intentionalClose = true;

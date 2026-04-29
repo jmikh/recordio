@@ -382,7 +382,7 @@ export const CanvasContainer = () => {
     useEffect(() => {
         if (!project?.id) return;
         lastCapturedBgRef.current = null;
-        scheduleThumbnailCapture(3000);
+        scheduleThumbnailCapture(1500);
         return () => {
             if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
         };

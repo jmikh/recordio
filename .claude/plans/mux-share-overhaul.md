@@ -4,13 +4,56 @@
 
 The current sharing flow requires users to manually click "Share" after export, which triggers a 3-step TUS upload from the browser to Cloudflare Stream. This is slow, unreliable (browser must stay active), and couples sharing to the client.
 
-**New approach:** User toggles "share" before server render. The render worker uploads the MP4 to Mux automatically after rendering. No client-side upload at all. OK to lose existing shared videos — clean break.
+**New approach:** User clicks "Share" and instantly gets a link. No render or upload needed at that moment. When someone visits the link, the system auto-triggers a render if needed. The render worker stays Mux-agnostic — edge functions handle Mux after render completion. Existing videos stay playable during updates.
+
+---
+
+## Core UX Flow
+
+```
+Owner clicks "Share" in editor
+  → Sets share_policy = 'public' on project
+  → Creates shared_videos row if none exists (mux IDs null)
+  → Owner gets link instantly: /watch/{projectId}
+
+Viewer visits /watch/{projectId}
+  → get-published-project edge function:
+     1. Check project.share_policy != 'private'
+     2. Query active shared_video (is_deleted = false)
+     3. If mux_playback_id exists + cloud_version is current → serve video
+     4. If mux_playback_id exists but cloud_version stale → serve old video + auto-trigger render
+     5. If no mux_playback_id (never rendered) → return 'processing' + auto-trigger render
+  → Watch page subscribes to shared_videos via Supabase Realtime
+  → When new row appears → swap player seamlessly
+
+Render completes → render-confirm-upload edge function:
+  1. Create new Mux asset (input from Supabase Storage signed URL)
+  2. Insert NEW shared_videos row with new Mux IDs + current cloud_version
+  3. Mark OLD shared_videos row(s) as is_deleted = true
+  4. Realtime fires → viewer sees new video
+  5. Cron job later deletes Mux assets for is_deleted rows
+
+Owner clicks "Unshare":
+  → Sets share_policy = 'private' on project
+  → Watch page returns 404 (policy check fails)
+  → Video + Mux asset stay alive — re-sharing is instant (flip back to 'public')
+```
 
 ---
 
 ## Phase 1: Database Migration
 
 **New file:** `webapp/supabase/migrations/<timestamp>_mux_share.sql`
+
+### Add share columns to `projects`
+
+```sql
+-- Access policy: controls who can view the shared video
+ALTER TABLE projects ADD COLUMN share_policy TEXT NOT NULL DEFAULT 'private';
+  -- 'private' | 'public' | 'password' | 'workspace'
+ALTER TABLE projects ADD COLUMN share_password_hash TEXT;
+  -- only set when share_policy = 'password'
+```
 
 ### New `shared_videos` table
 
@@ -20,130 +63,149 @@ CREATE TABLE public.shared_videos (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id),
 
-    -- Mux
-    mux_asset_id TEXT NOT NULL,
-    mux_playback_id TEXT NOT NULL,
+    -- Mux (null until render + upload completes)
+    mux_asset_id TEXT,
+    mux_playback_id TEXT,
 
-    -- Metadata (editable by owner)
-    title TEXT,
+    -- Which project version this video was rendered from (null until first render)
+    cloud_version INT,
+
+    -- Soft delete: marked true when replaced by new version or project deleted.
+    -- Cron cleans up the Mux asset and removes the row.
+    -- NOT used for unsharing — that's controlled by project.share_policy.
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Metadata (editable by owner on watch page)
     description TEXT,
 
-    -- Versioning (increments on each re-share)
-    version INT NOT NULL DEFAULT 1,
-
     published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    UNIQUE(project_id)  -- one published video per project
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE shared_videos ENABLE ROW LEVEL SECURITY;
 
--- Owner can read/update/delete their own shares
 CREATE POLICY "Users can manage own shares"
-    ON shared_videos FOR ALL
-    USING (auth.uid() = user_id);
+    ON shared_videos FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Public can read shared videos"
+    ON shared_videos FOR SELECT USING (true);
+
+-- One active (non-deleted) video per project
+CREATE UNIQUE INDEX idx_shared_videos_active
+    ON shared_videos(project_id) WHERE is_deleted = FALSE;
+
+-- For cron cleanup queries
+CREATE INDEX idx_shared_videos_deleted
+    ON shared_videos(is_deleted) WHERE is_deleted = TRUE;
+
+-- Enable Realtime for viewer subscriptions
+ALTER PUBLICATION supabase_realtime ADD TABLE shared_videos;
 ```
 
-### Add share flag to projects
+### Render job dedup index
 
 ```sql
-ALTER TABLE projects ADD COLUMN share_on_render BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_render_jobs_pending_dedup
+    ON render_jobs(project_id, cloud_version) WHERE status = 'pending';
 ```
 
-### Add Mux columns to render_jobs (worker writes on completion)
+`render-start-job` handles constraint violation: if insert fails (race loser), re-query for existing pending job and return it.
 
-```sql
-ALTER TABLE render_jobs ADD COLUMN mux_asset_id TEXT;
-ALTER TABLE render_jobs ADD COLUMN mux_playback_id TEXT;
-```
-
-### Drop CF Stream artifacts
-
-```sql
-ALTER TABLE projects DROP COLUMN IF EXISTS cf_video_uid;
-ALTER TABLE projects DROP COLUMN IF EXISTS published_at;
-ALTER TABLE projects DROP COLUMN IF EXISTS share_description;
-DROP TABLE IF EXISTS deleted_cf_streams;
-```
+**Do NOT drop CF columns yet** — defer to cleanup phase.
 
 ### Update DB functions (then run `sql/build-functions.sh`)
-- `sql/functions/project_list.sql` — return `share_on_render`; join or subquery `shared_videos` to return `is_shared` boolean
+- `project_list.sql` — add `share_policy`; LEFT JOIN `shared_videos` (`WHERE is_deleted = false`) to return `is_shared` boolean
+- `project_get.sql` — add `share_policy`, `share_password_hash`
 
 ---
 
-## Phase 2: Render Worker — Mux Upload
+## Phase 2: Edge Functions
 
-**Install:** `@mux/mux-node` in `render-worker/package.json`
+### 2a. `render-confirm-upload` (new) — Mux upload after render
+- New file: `webapp/supabase/functions/render-confirm-upload/index.ts`
+- Auth: `RENDER_SECRET`
+- Called once when render completes
+- Flow:
+  1. Look up active `shared_videos` row (`is_deleted = false`) for this project
+  2. If no active row → skip (project was never shared)
+  3. Generate signed URL for rendered MP4 from Supabase Storage
+  4. Create new Mux asset: `POST /video/v1/assets` with `{ input: [{ url: signedUrl }], playback_policy: ['public'] }`
+  5. Copy `description` from old row
+  6. Insert NEW `shared_videos` row with: new Mux IDs, current `cloud_version`, copied description
+  7. Mark OLD row(s) as `is_deleted = true`
+  8. Realtime fires → viewers see new video
+- Env vars: `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`
 
-**New file:** `render-worker/src/uploadToMux.ts`
-- Import Mux SDK, create client from `MUX_TOKEN_ID` + `MUX_TOKEN_SECRET` env vars
-- Create a direct upload via `mux.video.uploads.create({ new_asset_settings: { playback_policy: ['public'] } })`
-- PUT the MP4 file to the returned URL
-- Poll `mux.video.uploads.retrieve(uploadId)` until `asset_id` is available
-- Retrieve asset to get `playback_ids[0].id`
-- Return `{ muxAssetId, muxPlaybackId }`
-
-**Modify:** `render-worker/src/server.ts`
-- Add `shareOnRender: boolean` to `RenderBody` interface
-- In `runRender`, after Supabase upload (step 3), before "Done" (step 4):
-  - If `shareOnRender`, call `uploadToMux(outputFilePath)` 
-  - Pass `mux_asset_id` and `mux_playback_id` to `updateJob()` call on completion
-- Adjust progress allocation when sharing: render 0–0.85, Supabase upload 0.85–0.93, Mux upload 0.93–1.0
-
-**Modify:** `render-worker/src/config.ts`
-- Add optional `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` env vars
-
----
-
-## Phase 3: Edge Functions
-
-### 3a. `render-start-job` — pass share flag
-- File: `webapp/supabase/functions/render-start-job/index.ts`
-- Add `share_on_render` to the `.select()` on projects (line 47)
-- Pass `shareOnRender: project.share_on_render` in the JSON body to the render worker (line ~152)
-
-### 3b. `render-update-status` — persist Mux IDs → `shared_videos` table
+### 2b. `render-update-status` — heartbeat only
 - File: `webapp/supabase/functions/render-update-status/index.ts`
-- Accept `mux_asset_id` and `mux_playback_id` in request body
-- When `status === 'completed'` and Mux IDs are present:
-  - Write them to the `render_jobs` row
-  - Upsert into `shared_videos`: if row exists for `project_id`, delete old Mux asset first (call Mux API), then update with new IDs + increment `version` + reset `published_at`. If no row, insert.
-  - This requires `MUX_TOKEN_ID` + `MUX_TOKEN_SECRET` as edge function secrets (for deleting old asset on re-share)
+- Lightweight: progress updates + cancel signal only
+- No Mux logic
+- On `status: completed`: call `render-confirm-upload` internally
 
-### 3c. `get-published-project` — return from `shared_videos`
+### 2c. `get-published-project` — watch page data + auto-render trigger
 - File: `webapp/supabase/functions/get-published-project/index.ts`
-- Query `shared_videos` joined with `projects` (for project name) instead of querying projects directly
-- Return `{ id, project_id, user_id, title, description, mux_playback_id, published_at, version }`
+- No auth required (public endpoint, uses service role)
+- Flow:
+  1. Query project + active shared_video (`is_deleted = false`)
+  2. If no project or `share_policy = 'private'` → 404
+  3. If `share_policy = 'password'` → verify password against `share_password_hash`
+  4. If no active `shared_videos` row → create one + auto-trigger render → return `{ status: 'processing' }`
+  5. If `mux_playback_id IS NULL` → auto-trigger render → return `{ status: 'processing' }`
+  6. If `sv.cloud_version < p.cloud_version` → auto-trigger render → return `{ status: 'ready', mux_playback_id, stale: true }`
+  7. If current → return `{ status: 'ready', mux_playback_id, stale: false }`
+  8. Always include: `project_name`, `description`, `cloud_version`, `published_at`
 
-### 3d. New: `delete-from-mux`
-- New file: `webapp/supabase/functions/delete-from-mux/index.ts`
-- Auth: user JWT (via `withAuth`)
-- Verify user owns project (RLS on `shared_videos`)
-- Call Mux API to delete asset
-- Delete the `shared_videos` row
-- No async queue needed — Mux deletion is fast and idempotent
+### 2d. `delete-shared-video` (new) — owner removes share entirely
+- New file: `webapp/supabase/functions/delete-shared-video/index.ts`
+- Auth: user JWT via `withAuth`
+- Sets `share_policy = 'private'` on project
+- Marks active `shared_videos` row as `is_deleted = true`
+- Cron cleans up Mux asset later
+- Use this when owner wants to fully remove the video, not just hide it
+
+### 2e. `purge-deleted-shared-videos` (new) — cron cleanup
+- New file: `webapp/supabase/functions/purge-deleted-shared-videos/index.ts`
+- Cron: hourly via pg_cron → pg_net
+- Queries `shared_videos WHERE is_deleted = true AND mux_asset_id IS NOT NULL`
+- For each: `DELETE /video/v1/assets/{mux_asset_id}` (free, idempotent)
+- On success or 404 → delete the row
+- On failure → leave for next run
+- New cron: `webapp/supabase/sql/crons/cron_purge_deleted_shared_videos.sql`
+
+### 2f. `render-start-job` — two changes
+- Support service role auth (so `get-published-project` can call it)
+- Handle unique constraint violation on insert: catch error, re-query existing pending job, return it
 
 ---
 
-## Phase 4: ExportModal — Share Toggle
+## Phase 3: Render Worker — Minor Change
+
+**File:** `render-worker/src/server.ts`
+
+Render worker stays Mux-agnostic. Only change:
+- `render-update-status` calls `render-confirm-upload` internally on completion
+- Or: worker gets a second callback URL. Either way, worker has zero Mux knowledge.
+
+**No Mux SDK, no Mux env vars on the worker.**
+
+---
+
+## Phase 4: ExportModal — Share Button
 
 **File:** `webapp/src/editor/components/settings/ExportModal.tsx`
 
 **Remove:**
-- Entire `handlePublish` function (lines 271–434)
-- The "Share" / "Reshare" button block
-- The "Copy Link" + "Published X ago" block tied to `existingShare`
-- `ShareService.shareVideo()` import/usage
-- `isPublishing` state
+- Entire `handlePublish` function — no more client-side export+upload
+- "Share"/"Reshare" button that triggers export
+- "Copy Link" + "Published X ago" tied to CF
+- `isPublishing` state, `ShareService.shareVideo()` usage
 
 **Add:**
-- `shareOnRender` toggle state, initialized from project's `share_on_render` column
-- A `Toggle` component labeled "Share publicly" near the "Server Render" button
-- On toggle change: `supabase.from('projects').update({ share_on_render: value }).eq('id', project.id)`
-- After server render completes (in poll loop), check if `shared_videos` row exists for project:
-  - If yes: show share URL + "Copy Link" button
-  - Auto-copy to clipboard
+- "Share" button: sets `share_policy = 'public'` + creates `shared_videos` row if needed → shows link + "Copy Link"
+- If already shared (`share_policy != 'private'`): show "Copy Link" + "Unshare" option
+- "Unshare": sets `share_policy = 'private'` (video stays alive, just not accessible)
+- Share/unshare is instant — no render, no upload
+- Server Render button stays separate (for downloading renders)
 
 ---
 
@@ -151,87 +213,107 @@ DROP TABLE IF EXISTS deleted_cf_streams;
 
 **File:** `webapp/src/editor/services/ShareService.ts`
 
-**Remove:**
-- `tus-js-client` import
-- `shareVideo()`, `requestUploadUrl()`, `uploadDirectToCF()`, `confirmUpload()` methods
-- All CF Stream references
+**Remove:** `tus-js-client` import, `shareVideo()`, `requestUploadUrl()`, `uploadDirectToCF()`, `confirmUpload()`, all CF refs
 
-**Update:**
-- `SharedVideo` interface: `mux_playback_id` instead of `cf_video_uid`, add `version`
-- `getSharedVideoById()` — calls `get-published-project` which now queries `shared_videos`
-- `getShareForProject()` — query `shared_videos` table for project
-- `deleteSharedVideo()` — call `delete-from-mux` edge function
+**New/updated methods:**
+- `createShare(projectId, userId)` — set `share_policy = 'public'` + insert `shared_videos` row → return share URL
+- `unshare(projectId)` — set `share_policy = 'private'` (video stays, just hidden)
+- `deleteShare(projectId)` — call `delete-shared-video` (soft delete video + set private)
+- `getShareForProject(projectId)` — query active `shared_videos` for project
+- `SharedVideo` interface: `mux_playback_id?`, `cloud_version?`, `is_deleted`, `description`
 
-**Keep:** `getShareUrl()`, `getCurrentUserId()`, `updateSharedVideoMeta()`, cache logic
+**Keep:** `getShareUrl()`, `getCurrentUserId()`, `updateSharedVideoMeta()`, cache
 
 ---
 
 ## Phase 6: Watch Page Redesign
 
-**Install:** `@mux/mux-player-react` in webapp `package.json`
+**Install:** `@mux/mux-player-react` in webapp
 
 **File:** `webapp/src/pages/WatchPage.tsx`
 
-**Replace:**
-- CF Stream iframe with `<MuxPlayer playbackId={sharedVideo.mux_playback_id} />`
-- Remove `getCfCustomerSubdomain()` helper
-- Remove `VITE_CF_CUSTOMER_SUBDOMAIN` references
+**States:**
+1. **Loading** — fetching data from `get-published-project`
+2. **Processing** — no video yet (first share, never rendered). Branded "preparing your video" state
+3. **Ready** — video current. `<MuxPlayer playbackId={...} />`
+4. **Not found** — no share, policy = private, or project deleted
+5. **Password required** — show password input (future, design the state now)
 
-**Design changes:**
-- Mux Player handles aspect ratio natively — remove the `paddingTop: 56.25%` hack
-- Better loading state: shimmer skeleton instead of spinner
-- Keep: editable title/description for owners, copy link button, sidebar details card, CTA card
-- Keep: responsive two-column layout, header with logo/auth
+**Realtime subscription:**
+- Subscribe to `shared_videos` filtered by `project_id` and `is_deleted = false`
+- On INSERT (new version ready): update `mux_playback_id` in state → player swaps to new video
+- Works for `processing → ready` transition
+
+**Design:**
+- Remove CF Stream iframe, `getCfCustomerSubdomain()`, `VITE_CF_CUSTOMER_SUBDOMAIN`
+- Mux Player handles aspect ratio natively
+- Shimmer skeleton for processing state
+- Keep: editable description for owners, copy link, sidebar, responsive layout
 
 ---
 
 ## Phase 7: Update Types & Dashboard
 
-**Files:**
-- `webapp/src/storage/cloudProjectService.ts` — `ProjectListItem`: replace `cfVideoUid` with `isShared` boolean (from joined query)
-- `webapp/src/storage/cloudStorage.ts` — update `CloudProject` type, add `shareOnRender`
-- `webapp/src/components/ProjectCard.tsx` — `isShared` prop already exists, just update data source
-- Dashboard page — update share indicator logic
+- `cloudProjectService.ts` — `ProjectListItem`: replace `cfVideoUid` with `isShared` boolean + `sharePolicy`
+- `cloudStorage.ts` — update `CloudProject` type
+- `ProjectCard.tsx` — update share indicator data source
+- Dashboard — update accordingly
 
 ---
 
-## Phase 8: Cleanup
+## Phase 8: Cleanup (deferred — do last after everything works)
 
-**Delete edge functions:**
-- `webapp/supabase/functions/upload-to-stream/`
-- `webapp/supabase/functions/confirm-upload/`
-- `webapp/supabase/functions/delete-from-stream/`
-- `webapp/supabase/functions/purge-deleted-cf-streams/`
-
-**Delete cron:**
-- `webapp/supabase/sql/crons/cron_purge_deleted_cf_streams.sql`
-- Run `sql/build-functions.sh` to regenerate
-
-**Remove env vars:** `VITE_CF_CUSTOMER_SUBDOMAIN`, `CF_STREAM_API_TOKEN`, `CF_STREAM_ACCOUNT_ID`
-
-**Note:** Keep `tus-js-client` in root package.json — it's used by `cloudStorage.ts` for Supabase Storage resumable uploads (unrelated to CF Stream).
+**TODO:**
+- Drop CF columns: `ALTER TABLE projects DROP COLUMN cf_video_uid, published_at, share_description`
+- Drop `deleted_cf_streams` table
+- Delete edge functions: `upload-to-stream/`, `confirm-upload/`, `delete-from-stream/`, `purge-deleted-cf-streams/`
+- Delete cron: `sql/crons/cron_purge_deleted_cf_streams.sql`
+- Remove env vars: `VITE_CF_CUSTOMER_SUBDOMAIN`, `CF_STREAM_API_TOKEN`, `CF_STREAM_ACCOUNT_ID`
+- Keep `tus-js-client` — used by `cloudStorage.ts` for Supabase Storage uploads
 
 ---
 
 ## Key Design Decisions
 
-### Separate `shared_videos` table
-Share state lives in its own table rather than on `projects`. This isolates sharing complexity (Mux IDs, versioning, metadata, future fields like view counts / passwords / expiry) and keeps the projects table clean.
+### Share = instant link, render = on-demand
+Clicking "Share" sets `share_policy = 'public'` and creates a `shared_videos` row. Link is instant. First viewer triggers the render.
 
-### Re-share versioning
-Each re-share (new render with share enabled) creates a new Mux asset. The old asset is deleted and the `shared_videos` row is updated in-place with new Mux IDs + incremented `version`. The share URL stays the same (keyed by `project_id`). If cumulative analytics are needed later, a `shared_video_history` table can be added without touching the main schema.
+### Policy on `projects`, video state on `shared_videos`
+- `projects.share_policy` controls access: `'private'` (default), `'public'`, `'password'`, `'workspace'`
+- `projects.share_password_hash` for password-protected shares
+- `shared_videos` is purely the video artifact: Mux IDs, cloud_version, is_deleted, description
+- Changing policy is instant — one update to `projects`. No need to copy policy during version replacement.
 
-### Mux asset cleanup on re-share
-The `render-update-status` edge function handles old asset deletion when upserting. This ensures old Mux assets don't leak even if the client disconnects.
+### Unshare vs delete
+- **Unshare** = set `share_policy = 'private'`. Video + Mux asset stay alive. Re-sharing is instant.
+- **Delete** = mark `shared_videos` row as `is_deleted = true` + set `share_policy = 'private'`. Cron cleans up Mux asset. Use when owner wants to permanently remove the video.
+
+### `is_deleted` = only for Mux cleanup
+NOT used for access control. Only set when:
+1. A new video version replaces the old one (old row → deleted)
+2. Owner explicitly deletes the shared video
+3. Project itself is deleted (CASCADE)
+Cron deletes the Mux asset and removes the row.
+
+### Graceful version replacement
+Old video stays playable while new version renders. New `shared_videos` row is inserted, old row marked `is_deleted`. Realtime subscription on the table fires → viewer's player swaps seamlessly.
+
+### Partial unique index
+`UNIQUE(project_id) WHERE is_deleted = FALSE` — one active video per project, multiple deleted rows pending cleanup.
+
+### Render worker stays Mux-agnostic
+Worker renders + uploads MP4 to Supabase Storage. Edge function layer handles Mux. No Mux SDK or credentials on Cloud Run.
 
 ---
 
 ## Verification
 
-1. **Render + share flow:** Toggle share on → server render → verify Mux asset created → `shared_videos` row exists → watch page loads with Mux Player
-2. **Re-share:** Re-render with share on → verify old Mux asset deleted, new one created, `version` incremented, same share URL works
-3. **Share off:** Toggle share off → server render → verify no Mux upload, no `shared_videos` change
-4. **Watch page:** Visit `/watch/{projectId}` — video plays via Mux, title/description editable by owner
-5. **Unpublish:** Delete share → verify Mux asset deleted, `shared_videos` row removed, watch page shows "not found"
-6. **Dashboard:** Project card shows share indicator when `shared_videos` row exists
-7. **Deploy:** Render worker needs `MUX_TOKEN_ID` + `MUX_TOKEN_SECRET` in Cloud Run config; edge functions need them too (for old asset deletion on re-share)
+1. Click "Share" → `share_policy` set to `'public'`, link appears instantly, `shared_videos` row created with null Mux IDs
+2. Visit link → "processing" state → render auto-triggers → Realtime fires → video plays
+3. Edit project → visit link → old video plays → re-render auto-triggers → new row inserted, old marked deleted → video swaps
+4. "Unshare" → `share_policy = 'private'`, watch page returns 404, video + Mux asset stay alive
+5. "Re-share" → `share_policy = 'public'`, video instantly available again (no re-render)
+6. "Delete share" → row marked `is_deleted`, cron cleans up Mux asset
+7. Cron runs → deleted rows' Mux assets cleaned up, rows removed
+8. Dashboard shows share indicator based on `share_policy != 'private'`
+9. Deploy: edge functions need `MUX_TOKEN_ID` + `MUX_TOKEN_SECRET`. Render worker needs zero changes.

@@ -43,7 +43,7 @@ serve(withAuth(async (req, { user, supabase }) => {
     // 3. Look up project (RLS enforced — must belong to user)
     const { data: project, error: projectError } = await supabase
         .from('projects')
-        .select('id, name, project_data, cloud_version')
+        .select('id, name, project_data, cloud_version, duration_ms')
         .eq('id', projectId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -125,6 +125,7 @@ serve(withAuth(async (req, { user, supabase }) => {
             quality: '1080p',
             cloud_version: project.cloud_version,
             output_storage_path: outputStoragePath,
+            video_duration_s: project.duration_ms ? project.duration_ms / 1000 : null,
         })
         .select('id')
         .single();
@@ -134,52 +135,28 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Failed to create render job', 500);
     }
 
-    // 10. Dispatch to worker (10s timeout)
+    // 10. Dispatch to worker (fire-and-forget)
     const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/render-update-status`;
 
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
+    fetch(`${RENDER_WORKER_URL}/render`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${RENDER_SECRET}`,
+        },
+        body: JSON.stringify({
+            jobId: job.id,
+            projectData: project.project_data,
+            projectName: project.name,
+            quality: '1080p',
+            mediaUrls,
+            uploadUrl: uploadData.signedUrl,
+            statusCallbackUrl,
+        }),
+    }).catch(err => {
+        console.error('[render-start-job] Worker dispatch failed:', err);
+    });
 
-        const workerResp = await fetch(`${RENDER_WORKER_URL}/render`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RENDER_SECRET}`,
-            },
-            body: JSON.stringify({
-                jobId: job.id,
-                projectData: project.project_data,
-                projectName: project.name,
-                quality: '1080p',
-                mediaUrls,
-                uploadUrl: uploadData.signedUrl,
-                statusCallbackUrl,
-            }),
-            signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-
-        if (!workerResp.ok) {
-            const errorText = await workerResp.text();
-            console.error(`[render-start-job] Worker rejected job: ${workerResp.status} ${errorText}`);
-            await adminSupabase
-                .from('render_jobs')
-                .update({ status: 'failed', error: `Worker rejected: ${workerResp.status}`, updated_at: new Date().toISOString() })
-                .eq('id', job.id);
-            return errorResponse('Render worker rejected the job', 502);
-        }
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('[render-start-job] Worker unreachable:', message);
-        await adminSupabase
-            .from('render_jobs')
-            .update({ status: 'failed', error: `Worker unreachable: ${message}`, updated_at: new Date().toISOString() })
-            .eq('id', job.id);
-        return errorResponse('Render worker is unavailable', 503);
-    }
-
-    // 11. Job accepted
+    // 11. Job created — worker will pick it up
     return jsonResponse({ jobId: job.id, status: 'pending' });
 }));

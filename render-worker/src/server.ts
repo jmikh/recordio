@@ -14,7 +14,7 @@ import * as path from 'node:path';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
 import { renderViaPlaywright, warmBrowser } from './playwrightRender.js';
-import { uploadResult } from './uploadResult.js';
+
 
 // ── Media file server (port 9998) ────────────────────────────
 // Serves media files over real HTTP to avoid CDP base64 overhead
@@ -116,14 +116,11 @@ app.post('/render', async (request, reply) => {
         return reply.code(400).send({ error: 'Missing required fields' });
     }
 
-    // Respond immediately — render continues in background
-    reply.send({ ok: true, jobId });
+    // Render synchronously — with Cloud Run --concurrency=1, no second
+    // job lands on this instance while we're busy.
+    await runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
 
-    // Run render in background (don't await in handler)
-    runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl)
-        .catch(err => {
-            console.error(`[Render] Unhandled error in background render:`, err);
-        });
+    return reply.send({ ok: true, jobId });
 });
 
 // ── Background render logic ───────────────────────────────────
@@ -141,12 +138,18 @@ async function runRender(
     mediaJobDirs.set(jobId, tmpDir);
     console.log(`[Render] Job ${jobId}: starting in ${tmpDir}`);
 
-    // Start heartbeat — reports progress every 15s, checks for cancel
+    // Heartbeat — reports progress + durations every 15s, checks for cancel.
     let canceled = false;
     let currentProgress = 0;
+    const durations: Record<string, number> = {};
+    let phaseStart = Date.now();
+
     const heartbeatInterval = setInterval(async () => {
         try {
-            const shouldCancel = await updateJob(statusCallbackUrl, jobId, { progress: currentProgress });
+            const shouldCancel = await updateJob(statusCallbackUrl, jobId, {
+                progress: currentProgress,
+                ...durations,
+            });
             if (shouldCancel) {
                 canceled = true;
                 console.log(`[Render] Job ${jobId}: cancel signal received`);
@@ -156,51 +159,52 @@ async function runRender(
         }
     }, 15_000);
 
+    function endPhase(durationKey: string) {
+        durations[durationKey] = (Date.now() - phaseStart) / 1000;
+        phaseStart = Date.now();
+    }
+
     try {
-        // 1. Download media (progress stays at 0 during download)
+        // 1. Download media
+        console.log(`[Render] Job ${jobId}: downloading`);
         const mediaFileNames = await downloadMedia(
             mediaUrls,
             projectData as any,
             tmpDir,
         );
+        endPhase('download_duration_s');
         console.log(`[Render] Media downloaded: ${JSON.stringify(mediaFileNames)}`);
 
         if (canceled) throw new CancelError();
 
-        // 2. Render via Playwright (progress tracks export: 0–0.9)
-        //    Pass uploadUrl so the browser can upload directly, skipping disk write.
+        // 2. Render via Playwright (progress tracks export: 0–1)
+        console.log(`[Render] Job ${jobId}: rendering`);
         const result = await renderViaPlaywright({
             jobId,
             project: projectData,
             projectName,
             quality,
-            mediaDir: tmpDir,
             mediaFileNames,
             uploadUrl,
             onProgress: (phase, progress, message) => {
                 console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
-                currentProgress = progress * 0.9;
+                currentProgress = progress;
             },
         });
 
-        if (canceled) throw new CancelError();
-
-        // 3. Upload result if browser didn't upload directly
-        if (result.outputPath) {
-            currentProgress = 0.9;
-            console.log(`[Render] Uploading ${result.outputPath}`);
-            await uploadResult(result.outputPath, uploadUrl, (fraction) => {
-                currentProgress = 0.9 + fraction * 0.1;
-            });
-        } else {
-            console.log(`[Upload] ✓ Uploaded ${(result.sizeBytes / 1024 / 1024).toFixed(1)} MB (direct from browser)`);
-        }
+        // Upload happened inside renderViaPlaywright — subtract it from render time
+        const totalPhaseMs = Date.now() - phaseStart;
+        durations.render_duration_s = (totalPhaseMs - result.uploadDurationMs) / 1000;
+        durations.upload_duration_s = result.uploadDurationMs / 1000;
 
         if (canceled) throw new CancelError();
 
         // 4. Done
         clearInterval(heartbeatInterval);
-        await updateJob(statusCallbackUrl, jobId, { status: 'completed', progress: 1 });
+        await updateJob(statusCallbackUrl, jobId, {
+            status: 'completed',
+            ...durations,
+        });
         console.log(`[Render] Job ${jobId}: completed in ${(result.durationMs / 1000).toFixed(1)}s`);
 
     } catch (err) {

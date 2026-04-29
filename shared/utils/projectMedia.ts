@@ -41,7 +41,7 @@ export interface MediaEntry {
  * When new media types are added to the project, add them here and all
  * consumers pick them up automatically.
  *
- * // TODO: Also update the Deno copy at webapp/supabase/functions/_shared/projectMedia.ts
+ * // TODO: Also update the Deno copy at supabase/functions/_shared/projectMedia.ts
  */
 export function getProjectScreenPath(project: Project): string | null {
     return project.screenSource?.storagePath ?? null;

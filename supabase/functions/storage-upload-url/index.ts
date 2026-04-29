@@ -7,16 +7,16 @@ const BUCKET = 'project-media';
 /**
  * Storage Upload URL Edge Function
  *
- * Validates JWT + project ownership + quota, then returns a signed upload URL
+ * Validates JWT + project ownership, then returns a signed upload URL
  * for direct upload to Supabase Storage. The client uploads directly using the
  * signed URL — no blob passes through this function.
  *
- * Request body: { projectId, fileType: 'screen'|'camera'|'mic'|'thumbnail', sizeBytes }
+ * Request body: { projectId, fileType: 'screen'|'camera'|'mic'|'thumbnail' }
  * Response:     { signedUrl, token, storagePath }
  */
 serve(withAuth(async (req, { user, supabase }) => {
     // 1. Parse request
-    const { projectId, fileType, sizeBytes } = await req.json();
+    const { projectId, fileType } = await req.json();
 
     if (!projectId || !fileType) {
         return errorResponse('Missing projectId or fileType', 400);
@@ -38,35 +38,7 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Project not found', 404);
     }
 
-    // 3. Check quota (skip for thumbnails — they're tiny)
-    if (fileType !== 'thumbnail' && sizeBytes) {
-        const adminSupabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        );
-
-        const { data: usedBytes } = await adminSupabase
-            .rpc('get_user_storage_bytes', { p_user_id: user.id });
-
-        const { data: quota } = await adminSupabase
-            .from('user_quotas')
-            .select('storage_limit_bytes')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        const limitBytes = quota?.storage_limit_bytes ?? 26843545600; // 25 GB default
-
-        if ((usedBytes ?? 0) + sizeBytes > limitBytes) {
-            return jsonResponse({
-                error: 'quota_exceeded',
-                message: 'Storage quota exceeded',
-                usedBytes: usedBytes ?? 0,
-                limitBytes,
-            }, 413);
-        }
-    }
-
-    // 4. Build storage path and create signed upload URL
+    // 3. Build storage path and create signed upload URL
     const ext = fileType === 'thumbnail' ? 'webp'
         : fileType === 'mic' ? 'wav'
         : 'webm';

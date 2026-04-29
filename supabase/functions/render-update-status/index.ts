@@ -7,10 +7,11 @@ const RENDER_SECRET = Deno.env.get('RENDER_SECRET')!;
 /**
  * Render Update Status Edge Function (worker-only)
  *
- * Called by the Fly.io render worker to report progress, completion, or failure.
+ * Called by the render worker to report progress and durations.
  * Auth: RENDER_SECRET in Authorization header (not JWT — no withAuth).
  *
- * Request body: { jobId, status?, progress?, error? }
+ * Request body: { jobId, status?, progress?, error?,
+ *                 download_duration_s?, render_duration_s?, upload_duration_s? }
  * Response:     { ok: true, cancel: boolean }
  *
  * cancel=true tells the worker to abort (job was canceled or already finished).
@@ -28,7 +29,10 @@ serve(async (req: Request) => {
         }
 
         // 2. Parse request
-        const { jobId, status, progress, error: errorMsg } = await req.json();
+        const {
+            jobId, status, progress, error: errorMsg,
+            download_duration_s, render_duration_s, upload_duration_s,
+        } = await req.json();
         if (!jobId) {
             return errorResponse('Missing jobId', 400);
         }
@@ -38,10 +42,10 @@ serve(async (req: Request) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
         );
 
-        // 3. Read current job status
+        // 3. Read current job
         const { data: job, error: readError } = await adminSupabase
             .from('render_jobs')
-            .select('status')
+            .select('status, created_at, start_duration_s, project_id, cloud_version, output_storage_path')
             .eq('id', jobId)
             .maybeSingle();
 
@@ -49,21 +53,50 @@ serve(async (req: Request) => {
             return errorResponse('Job not found', 404);
         }
 
-        // 4. If current status is NOT pending, don't update — signal cancel
+        // 4. If job is not pending, signal cancel
         if (job.status !== 'pending') {
             return jsonResponse({ ok: true, cancel: true });
         }
 
-        // 5. Apply updates
-        const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        // 5. Build updates
+        const now = new Date();
+        const updates: Record<string, unknown> = { updated_at: now.toISOString() };
         if (status) updates.status = status;
         if (progress !== undefined) updates.progress = progress;
         if (errorMsg) updates.error = errorMsg;
+
+        // Store durations reported by worker
+        if (download_duration_s !== undefined) updates.download_duration_s = download_duration_s;
+        if (render_duration_s !== undefined) updates.render_duration_s = render_duration_s;
+        if (upload_duration_s !== undefined) updates.upload_duration_s = upload_duration_s;
+
+        // Compute start_duration_s on first update (dispatch + cold start latency)
+        if (job.start_duration_s === null) {
+            updates.start_duration_s = (now.getTime() - new Date(job.created_at).getTime()) / 1000;
+        }
+
+        // Compute total_duration_s on completion
+        if (status === 'completed') {
+            updates.total_duration_s = (now.getTime() - new Date(job.created_at).getTime()) / 1000;
+            updates.progress = 1;
+        }
 
         await adminSupabase
             .from('render_jobs')
             .update(updates)
             .eq('id', jobId);
+
+        // 6. On completion, update the project with render result
+        if (status === 'completed') {
+            await adminSupabase
+                .from('projects')
+                .update({
+                    render_storage_path: job.output_storage_path,
+                    render_cloud_version: job.cloud_version,
+                    updated_at: now.toISOString(),
+                })
+                .eq('id', job.project_id);
+        }
 
         return jsonResponse({ ok: true, cancel: false });
     } catch (err) {

@@ -1,7 +1,7 @@
--- project_confirm_upload(p_project_id, p_screen_size_bytes, p_camera_size_bytes, p_mic_size_bytes)
+-- project_confirm_upload(p_project_id)
 --
 -- Flips a project's upload_status from 'pending' to 'ready' after the client
--- has successfully uploaded all media blobs. Also records file sizes for quota tracking.
+-- has successfully uploaded all media blobs.
 -- Uses auth.uid() so it can only be called by the project owner.
 --
 -- Returns true if the row was updated, false if not found / already ready.
@@ -10,10 +10,7 @@
 -- Tables:   projects
 
 CREATE OR REPLACE FUNCTION public.project_confirm_upload(
-    p_project_id UUID,
-    p_screen_size_bytes BIGINT DEFAULT 0,
-    p_camera_size_bytes BIGINT DEFAULT 0,
-    p_mic_size_bytes BIGINT DEFAULT 0
+    p_project_id UUID
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -23,10 +20,7 @@ DECLARE
     rows_updated INT;
 BEGIN
     UPDATE public.projects
-    SET upload_status = 'ready',
-        screen_size_bytes = p_screen_size_bytes,
-        camera_size_bytes = p_camera_size_bytes,
-        mic_size_bytes = p_mic_size_bytes
+    SET upload_status = 'ready'
     WHERE id = p_project_id
       AND user_id = auth.uid()
       AND upload_status = 'pending';

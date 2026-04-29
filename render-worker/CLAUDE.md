@@ -52,7 +52,8 @@ docker buildx build --platform linux/amd64 \
 gcloud run deploy render-worker \
   --image us-central1-docker.pkg.dev/recordio-484905/render-worker/render-worker:TAG \
   --region us-east4 --project recordio-484905 \
-  --gpu=1 --gpu-type=nvidia-l4 --max-instances=1 \
+  --gpu=1 --gpu-type=nvidia-l4 \
+  --concurrency=1 --max-instances=4 \
   --set-secrets="RENDER_SECRET=render-secret:latest" \
   --no-cpu-throttling --cpu=8 --memory=32Gi
 ```

@@ -181,22 +181,13 @@ export class CloudStorage {
     }
 
     /**
-     * Confirm project media upload — flips upload_status from 'pending' to 'ready'
-     * and records file sizes for quota tracking.
+     * Confirm project media upload — flips upload_status from 'pending' to 'ready'.
      */
-    static async confirmProjectUpload(
-        projectId: string,
-        screenSizeBytes: number,
-        cameraSizeBytes: number,
-        micSizeBytes: number,
-    ): Promise<void> {
+    static async confirmProjectUpload(projectId: string): Promise<void> {
         if (!supabase) throw new Error('Supabase not configured');
 
         const { data, error } = await supabase.rpc('project_confirm_upload', {
             p_project_id: projectId,
-            p_screen_size_bytes: screenSizeBytes,
-            p_camera_size_bytes: cameraSizeBytes,
-            p_mic_size_bytes: micSizeBytes,
         });
 
         if (error) throw error;
