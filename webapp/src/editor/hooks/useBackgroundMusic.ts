@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useUIStore } from '../stores/useUIStore';
 import { useProjectData } from '../stores/useProjectStore';
+import { useMediaUrlStore } from '../stores/useMediaUrlStore';
 
 /**
  * Hook that manages background music playback in sync with the editor's
@@ -20,8 +21,9 @@ export const useBackgroundMusic = () => {
     const musicVolume = music?.volume ?? 0.3;
 
     // Resolve the music URL based on source type
+    const customBlobUrl = useMediaUrlStore(s => music?.storagePath ? s.urls[music.storagePath] : undefined);
     const musicUrl = musicEnabled
-        ? (music?.source === 'preset' ? music?.presetUrl : music?.customRuntimeUrl) ?? null
+        ? (music?.source === 'preset' ? music?.presetUrl : customBlobUrl) ?? null
         : null;
 
     // Create/destroy audio element when URL changes

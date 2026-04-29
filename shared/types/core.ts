@@ -37,17 +37,12 @@ export interface Rect extends Point, Size { }
  * Shared fields for all media source types.
  */
 interface BaseSourceMetadata {
-    id: ID;
     /**
-     * Persistent local browser storage based URL to the media file (recordio-blob:// protocol).
-     * This is the storage reference that survives page reloads.
+     * Storage path — the universal key for this source.
+     * Cloud: deterministic path like "userId/projectId/screen.webm".
+     * Extension: recordio-blob:// protocol URL (overwritten on cloud import).
      */
-    storageUrl: string;
-    /**
-     * Transient runtime URL (blob:// protocol).
-     * Populated on load, used for playback. Never persisted.
-     */
-    runtimeUrl?: string;
+    storagePath: string;
 
     /** Total duration of the source file in milliseconds */
     durationMs: TimeMs;

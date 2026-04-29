@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
+import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
@@ -93,7 +94,8 @@ export const TimelineToolbar: React.FC = () => {
     const sourceDurationMs = useProjectStore(s => s.project.timeline.durationMs);
     const setOutputWindows = useProjectStore(s => s.setOutputWindows);
 
-    const hasMic = !!micSource?.runtimeUrl;
+    const micUrl = useMediaUrlStore(s => micSource ? s.urls[micSource.storagePath] : undefined);
+    const hasMic = !!micUrl;
     const hasUserEvents = userEvents.mousePositions.length > 0;
     const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
 
@@ -108,7 +110,7 @@ export const TimelineToolbar: React.FC = () => {
         });
 
         try {
-            const audioUrl = micSource?.runtimeUrl || '';
+            const audioUrl = micSource ? (useMediaUrlStore.getState().urls[micSource.storagePath] || '') : '';
 
             const hasAudio = Boolean(audioUrl);
             let speechSegments: { startMs: number; endMs: number }[] = [];

@@ -17,24 +17,27 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-export interface MediaFileNames {
-    screen?: string;
-    camera?: string;
-    mic?: string;
-}
+import type { MediaFileNames } from './downloadMedia.js';
 
 export interface PlaywrightRenderConfig {
     jobId: string;
     project: unknown;
+    projectName?: string;
     quality: string;
     mediaDir: string;
+    /** storagePath → local filename */
     mediaFileNames: MediaFileNames;
+    /** Signed URL for direct upload from browser. If provided, skips disk write. */
+    uploadUrl?: string;
     onProgress?: (phase: string, progress: number, message: string) => void;
 }
 
 export interface RenderResult {
-    outputPath: string;
+    /** Path to the rendered MP4. Null when uploaded directly from browser. */
+    outputPath: string | null;
     durationMs: number;
+    /** Size in bytes of the rendered file. */
+    sizeBytes: number;
 }
 
 // In production (Docker): render-page/dist is at ../render-page/dist relative to dist/
@@ -188,12 +191,13 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { jobId, project, quality, mediaDir, mediaFileNames, onProgress } = config;
+    const { jobId, project, projectName, quality, mediaDir, mediaFileNames, uploadUrl, onProgress } = config;
     const log = onProgress ?? ((phase: string, _p: number, msg: string) => console.log(`[Render] [${phase}] ${msg}`));
     const startTime = Date.now();
 
     const browser = await getBrowser();
     const page: Page = await browser.newPage();
+    let intentionalClose = false;
 
     try {
         // --- Intercept requests to serve files locally ---
@@ -241,12 +245,14 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         });
 
         page.on('close', () => {
-            console.warn(`[Render][browser] Page closed unexpectedly`);
+            if (!intentionalClose) {
+                console.error(`[Render][browser] Page closed unexpectedly`);
+            }
         });
 
         // --- Inject job config before page loads ---
         const mediaBaseUrl = `http://localhost:9998/${jobId}/`;
-        const renderJob = { project, quality, mediaBaseUrl, mediaFileNames };
+        const renderJob = { project, projectName, quality, mediaBaseUrl, mediaFileNames };
 
         await page.addInitScript((job: any) => {
             (window as any).__RENDER_JOB__ = job;
@@ -332,29 +338,54 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page error: ${error}`);
         }
 
-        // --- Extract result via real HTTP upload (bypasses CDP base64 overhead) ---
-        log('finalize', 0.8, 'Extracting MP4 from browser...');
-        const outputPath = path.join(mediaDir, 'output.mp4');
+        // --- Upload result ---
+        if (uploadUrl) {
+            // Direct upload from browser to signed URL — skips disk write + re-upload
+            log('finalize', 0.8, 'Uploading MP4 directly from browser...');
+            const sizeBytes = await page.evaluate(async (url: string) => {
+                const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
+                const resp = await fetch(url, {
+                    method: 'PUT',
+                    body: ab,
+                    headers: {
+                        'Content-Type': 'video/mp4',
+                        'x-upsert': 'true',
+                    },
+                });
+                if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
+                return ab.byteLength;
+            }, uploadUrl);
 
-        // Browser PUTs the ArrayBuffer directly to the media server on port 9998
-        await page.evaluate(async (uploadUrl: string) => {
-            const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
-            const resp = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: ab,
-                headers: { 'Content-Type': 'application/octet-stream' },
-            });
-            if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
-        }, `http://localhost:9998/${jobId}/output.mp4`);
+            const durationMs = Date.now() - startTime;
+            const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
+            log('finalize', 1, `Done! ${sizeMB} MB uploaded directly in ${(durationMs / 1000).toFixed(1)}s`);
 
-        const stat = fs.statSync(outputPath);
-        const durationMs = Date.now() - startTime;
-        const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
-        log('finalize', 1, `Done! ${sizeMB} MB written to ${outputPath} in ${(durationMs / 1000).toFixed(1)}s`);
+            return { outputPath: null, durationMs, sizeBytes };
+        } else {
+            // Fallback: extract to disk via local media server
+            log('finalize', 0.8, 'Extracting MP4 from browser...');
+            const outputPath = path.join(mediaDir, 'output.mp4');
 
-        return { outputPath, durationMs };
+            await page.evaluate(async (localUrl: string) => {
+                const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
+                const resp = await fetch(localUrl, {
+                    method: 'PUT',
+                    body: ab,
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                });
+                if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
+            }, `http://localhost:9998/${jobId}/output.mp4`);
+
+            const stat = fs.statSync(outputPath);
+            const durationMs = Date.now() - startTime;
+            const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
+            log('finalize', 1, `Done! ${sizeMB} MB written to ${outputPath} in ${(durationMs / 1000).toFixed(1)}s`);
+
+            return { outputPath, durationMs, sizeBytes: stat.size };
+        }
 
     } finally {
+        intentionalClose = true;
         await page.close();
     }
 }

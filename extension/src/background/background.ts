@@ -470,7 +470,10 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             return;
         }
 
-        const screenBlobId = recording.screenSource.storageUrl.replace('recordio-blob://', '');
+        if (!recording.screenSource.storagePath) {
+            throw new Error('Screen source has no storage URL');
+        }
+        const screenBlobId = recording.screenSource.storagePath.replace('recordio-blob://', '');
         const screenBlob = await ProjectStorage.getRecordingBlob(screenBlobId);
 
         if (!screenBlob) {
@@ -478,14 +481,14 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
         }
 
         let cameraBlob: Blob | undefined;
-        if (recording.cameraSource?.storageUrl) {
-            const cameraBlobId = recording.cameraSource.storageUrl.replace('recordio-blob://', '');
+        if (recording.cameraSource?.storagePath) {
+            const cameraBlobId = recording.cameraSource.storagePath.replace('recordio-blob://', '');
             cameraBlob = await ProjectStorage.getRecordingBlob(cameraBlobId);
         }
 
         let micBlob: Blob | undefined;
-        if (recording.microphoneSource?.storageUrl) {
-            const micBlobId = recording.microphoneSource.storageUrl.replace('recordio-blob://', '');
+        if (recording.microphoneSource?.storagePath) {
+            const micBlobId = recording.microphoneSource.storagePath.replace('recordio-blob://', '');
             micBlob = await ProjectStorage.getRecordingBlob(micBlobId);
         }
 

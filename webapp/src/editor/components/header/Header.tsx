@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useProjectStore, useProjectData, useProjectHistory } from '../../stores/useProjectStore';
+import { useState, useEffect, useRef } from 'react';
+import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 
@@ -12,10 +12,11 @@ import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
-import { SyncService } from '../../../storage/syncService';
+import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 
-import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, type DropdownOption } from '@shared/components';
+import { TbCloudUpload } from 'react-icons/tb';
+import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
 import { useToast } from '../Toast';
 
@@ -24,6 +25,20 @@ const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRE
     label: preset.label,
     suffix: preset.orientation ? <span className="text-text-muted text-xs">{preset.orientation}</span> : undefined,
 }));
+
+function SyncIndicator() {
+    const pendingMediaUploads = useSyncStatusStore(s => s.pendingMediaUploads);
+
+    if (pendingMediaUploads <= 0) return null;
+
+    return (
+        <Tooltip text="Syncing to cloud...">
+            <div className="flex items-center">
+                <TbCloudUpload className="icon-md text-primary animate-pulse" />
+            </div>
+        </Tooltip>
+    );
+}
 
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -34,7 +49,15 @@ export const Header = () => {
     const { addToast } = useToast();
 
     const project = useProjectData();
+    const projectName = useProjectName();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
+    const [localName, setLocalName] = useState(projectName);
+    const localNameRef = useRef(localName);
+    localNameRef.current = localName;
+
+    // Sync local state when store name changes externally (e.g. project load)
+    useEffect(() => { setLocalName(projectName); }, [projectName]);
+
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const resetZooms = useProjectStore(s => s.resetZooms);
@@ -64,10 +87,9 @@ export const Header = () => {
         if (userId) {
             const { project: proj, userEvents } = useProjectStore.getState();
             const fullProject = { ...proj, userEvents };
-            await SyncService.flushPendingSync(fullProject, userId, isPro);
+            await CloudProjectService.saveProject(fullProject, userId, isPro);
 
             if (useSyncStatusStore.getState().conflict) {
-                // Conflict arose during flush — defer navigation until modal resolves it
                 useSyncStatusStore.getState().setPendingNavigation('/');
                 return;
             }
@@ -127,11 +149,20 @@ export const Header = () => {
 
                 {/* Project Name + Aspect Ratio + Share Link (Centered) */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                    <SyncIndicator />
                     <input
                         id="project-name-input"
                         type="text"
-                        value={project.name}
-                        onChange={(e) => updateProjectName(e.target.value)}
+                        value={localName}
+                        onChange={(e) => setLocalName(e.target.value)}
+                        onBlur={() => {
+                            if (localNameRef.current !== projectName) {
+                                updateProjectName(localNameRef.current);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        }}
                         maxLength={40}
                         className="h-9 bg-state-inactive text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-state-hover hover:border-border-highlighted focus:bg-state-hover focus:border-border-highlighted rounded-[var(--radius-interactive)] px-2 transition-colors placeholder-text-main w-[240px] focus-ring"
                         placeholder="Untitled Project"

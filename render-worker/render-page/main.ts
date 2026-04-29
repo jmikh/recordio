@@ -21,7 +21,8 @@ interface RenderJob {
     project: Project;
     quality: ExportQuality;
     mediaBaseUrl: string; // e.g. http://localhost:9998/
-    mediaFileNames: { screen?: string; camera?: string; mic?: string };
+    /** storagePath → local filename */
+    mediaFileNames: Record<string, string>;
 }
 
 declare global {
@@ -87,23 +88,17 @@ async function run() {
         return;
     }
 
-    const { project, quality, mediaBaseUrl, mediaFileNames } = job;
-    log(`Render job received: "${project.name}" @ ${quality}`);
+    const { project, projectName, quality, mediaBaseUrl, mediaFileNames } = job;
+    log(`Render job received: "${projectName ?? project.id}" @ ${quality}`);
     log(`Media base URL: ${mediaBaseUrl}`);
     log(`Media files: ${JSON.stringify(mediaFileNames)}`);
 
-    // Patch runtimeUrl on each source to point at the local media server.
-    if (project.screenSource && mediaFileNames.screen) {
-        project.screenSource.runtimeUrl = `${mediaBaseUrl}${mediaFileNames.screen}`;
-        log(`Screen URL: ${project.screenSource.runtimeUrl}`);
-    }
-    if (project.cameraSource && mediaFileNames.camera) {
-        project.cameraSource.runtimeUrl = `${mediaBaseUrl}${mediaFileNames.camera}`;
-        log(`Camera URL: ${project.cameraSource.runtimeUrl}`);
-    }
-    if (project.microphoneSource && mediaFileNames.mic) {
-        project.microphoneSource.runtimeUrl = `${mediaBaseUrl}${mediaFileNames.mic}`;
-        log(`Mic URL: ${project.microphoneSource.runtimeUrl}`);
+    // Build mediaUrls map for the export pipeline (storagePath → local HTTP URL)
+    const mediaUrls: Record<string, string> = {};
+    for (const [storagePath, localName] of Object.entries(mediaFileNames)) {
+        const url = `${mediaBaseUrl}${localName}`;
+        mediaUrls[storagePath] = url;
+        log(`Media: ${storagePath} → ${url}`);
     }
 
     setStatus('Exporting...');
@@ -115,6 +110,7 @@ async function run() {
             getPreferSoftwareDecode: () => false,
             setPreferSoftwareDecode: () => {},
         },
+        mediaUrls,
     };
 
     try {
@@ -128,7 +124,7 @@ async function run() {
             if (progress.timeRemainingSeconds != null) {
                 log(`${phase} ${pct}% — ETA ${progress.timeRemainingSeconds.toFixed(1)}s`);
             }
-        }, { skipDownload: true }, env);
+        }, { skipDownload: true }, env, projectName);
 
         log(`Export complete! Blob size: ${(result.blob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
         log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`, 'success');

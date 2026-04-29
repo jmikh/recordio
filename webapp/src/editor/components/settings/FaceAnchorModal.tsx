@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Modal, Button} from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -11,8 +12,9 @@ export const FaceAnchorModal: React.FC<{
     const project = useProjectStore(s => s.project);
     const currentTimeMs = useUIStore(s => s.currentTimeMs);
     const updateSettings = useProjectStore(s => s.updateSettings);
+    const mediaUrls = useMediaUrlStore(s => s.urls);
     const timeMapper = useTimeMapper();
-    
+
     const cameraSettings = project.settings.camera;
     const cameraSource = project.cameraSource;
 
@@ -155,10 +157,10 @@ export const FaceAnchorModal: React.FC<{
                     onPointerUp={handlePointerUp}
                     onPointerCancel={handlePointerUp}
                 >
-                    {cameraSource.runtimeUrl && (
-                        <video 
+                    {mediaUrls[cameraSource.storagePath] && (
+                        <video
                             ref={videoRef}
-                            src={cameraSource.runtimeUrl}
+                            src={mediaUrls[cameraSource.storagePath]}
                             className="w-full h-full object-contain pointer-events-none"
                             muted
                             playsInline

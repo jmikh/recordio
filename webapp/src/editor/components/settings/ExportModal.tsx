@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/react';
 
 import { TbSettings2, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
 import { MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge, Modal, XButton } from '@shared/components';
-import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { ExportManager } from '../../export/ExportManager';
@@ -18,7 +18,8 @@ import { AuthModal } from '../header/AuthModal';
 import { UpgradeModal } from '../header/UpgradeModal';
 import { ReviewModal, shouldShowReviewModal } from '../header/ReviewModal';
 import { supabase } from '../../../auth/AuthManager';
-import { SyncService } from '../../../storage/syncService';
+import { useSyncStatusStore } from '../../../storage/syncStatusStore';
+import { CloudProjectService } from '../../../storage/cloudProjectService';
 
 const QUALITY_OPTIONS: { value: ExportQuality; label: string; proOnly: boolean }[] = [
     { value: '480p', label: '480p', proOnly: false },
@@ -54,10 +55,12 @@ export function ExportModal() {
     const [isPublishing, setIsPublishing] = useState(false);
 
     const { isAuthenticated, isPro, hasProAccess, hasFreeTrial } = useUserStore();
+    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const proAccess = hasProAccess();
     const activeTrial = hasFreeTrial();
 
     const project = useProjectData();
+    const projectName = useProjectName();
     const setExportState = useProjectStore(s => s.setExportState);
     const isExporting = useProjectStore(s => s.exportState.isExporting);
 
@@ -173,11 +176,11 @@ export function ExportModal() {
         setServerRenderProgress(0);
 
         try {
-            // 1. Flush pending cloud save so cloud_version is current
+            // 1. Save to cloud so cloud_version is current before render
             const userId = useUserStore.getState().userId;
             if (userId) {
                 const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
-                await SyncService.flushPendingSync(fullProject, userId, isPro);
+                await CloudProjectService.saveProject(fullProject, userId, isPro);
             }
 
             // 2. Start render job
@@ -253,7 +256,7 @@ export function ExportModal() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${project.name || 'render'}.mp4`;
+            a.download = `${projectName || 'render'}.mp4`;
             a.click();
             URL.revokeObjectURL(url);
 
@@ -332,7 +335,7 @@ export function ExportModal() {
             // Upload to Cloudflare Stream
             setExportState({ isExporting: true, progress: 0, timeRemainingSeconds: null, phase: 'uploading' });
             const uploadStart = Date.now();
-            const result = await ShareService.shareVideo(blob, project.id, project.name, {
+            const result = await ShareService.shareVideo(blob, project.id, projectName, {
                 onUploadProgress: (fraction) => setExportState({ progress: fraction }),
             });
             const uploadDuration = Date.now() - uploadStart;
@@ -453,7 +456,7 @@ export function ExportModal() {
 
     const proBadge = <ProBadge />;
 
-    const busy = isExporting || isPublishing;
+    const busy = isExporting || isPublishing || isSyncingMedia;
 
     return (
         <Modal isOpen={isOpen} onClose={() => setExportModalOpen(false)} maxWidth="max-w-[480px]">
@@ -484,9 +487,11 @@ export function ExportModal() {
                     {/* Publish / Republish Button */}
                     {(() => {
                         const publishDisabled = busy || !proAccess;
-                        const tooltipText = !proAccess
-                            ? 'Shareable links are a Pro feature'
-                            : '';
+                        const tooltipText = isSyncingMedia
+                            ? 'Syncing to cloud...'
+                            : !proAccess
+                                ? 'Shareable links are a Pro feature'
+                                : '';
 
                         return (
                             <div className="flex flex-col items-center gap-1.5">
@@ -526,7 +531,7 @@ export function ExportModal() {
                     })()}
 
                     {/* Download Button (Primary) */}
-                    <Tooltip text={needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
+                    <Tooltip text={isSyncingMedia ? 'Syncing to cloud...' : needsProFeature ? 'Pro settings selected — upgrade to export' : ''}>
                         <Button
                             variant="primary"
                             onClick={handleDownload}

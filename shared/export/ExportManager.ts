@@ -47,6 +47,8 @@ export interface ExportEnvironment {
     decodePreferences?: DecodePreferences;
     /** Sound effect buffers for click/drag mixing. If omitted, sounds are skipped. */
     soundEffects?: SoundEffectBuffers;
+    /** Media URLs keyed by source ID. Used for video decoding and audio fetch. */
+    mediaUrls?: Record<string, string>;
 }
 
 /** Maximum number of full export retries on codec reclaim errors. */
@@ -64,6 +66,7 @@ export class ExportManager {
         onProgress: (state: ExportProgress) => void,
         options?: { skipDownload?: boolean },
         env?: ExportEnvironment,
+        projectName?: string,
     ): Promise<ExportResult> {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -79,7 +82,7 @@ export class ExportManager {
             }
 
             try {
-                const result = await this.runExport(project, quality, onProgress, signal, options, env);
+                const result = await this.runExport(project, quality, onProgress, signal, options, env, projectName);
                 return result;
             } catch (e) {
                 if (signal.aborted) throw new Error('Export cancelled');
@@ -110,6 +113,7 @@ export class ExportManager {
         signal: AbortSignal,
         options?: { skipDownload?: boolean },
         env?: ExportEnvironment,
+        projectName?: string,
     ): Promise<ExportResult> {
         const renderCtx = env?.renderContext;
         if (!renderCtx) {
@@ -200,7 +204,8 @@ export class ExportManager {
         try {
             const bgSettings = renderProject.settings.background;
             if (bgSettings.type === 'preset' || bgSettings.type === 'custom') {
-                const bgUrl = bgSettings.customRuntimeUrl || bgSettings.imageUrl;
+                const bgUrl = (bgSettings.storagePath && env?.mediaUrls?.[bgSettings.storagePath])
+                    || bgSettings.imageUrl;
                 if (bgUrl) {
                     console.log(`[Export] Loading background image: ${bgUrl}`);
                     const bgStart = performance.now();
@@ -225,18 +230,20 @@ export class ExportManager {
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'preparing' });
 
             // Initialize frame extractors
-            const sourceCount = sources.filter(s => s.runtimeUrl).length;
+            const mediaUrls = env?.mediaUrls ?? {};
+            const sourceCount = sources.filter(s => mediaUrls[s.storagePath]).length;
             let sourceIndex = 0;
             for (const source of sources) {
-                if (source.runtimeUrl) {
-                    console.log(`[Export] Initializing extractor for: ${source.runtimeUrl}`);
-                    const extractor = new FrameExtractor(source.runtimeUrl, env?.decodePreferences);
+                const sourceUrl = mediaUrls[source.storagePath];
+                if (sourceUrl) {
+                    console.log(`[Export] Initializing extractor for: ${sourceUrl}`);
+                    const extractor = new FrameExtractor(sourceUrl, env?.decodePreferences);
                     const si = sourceIndex;
                     await extractor.initialize((chunkProgress) => {
                         const overallProgress = (si + chunkProgress) / sourceCount;
                         onProgress({ progress: overallProgress, timeRemainingSeconds: null, phase: 'preparing' });
                     });
-                    frameExtractors[source.id] = extractor;
+                    frameExtractors[source.storagePath] = extractor;
                     sourceIndex++;
                 }
             }
@@ -264,6 +271,7 @@ export class ExportManager {
                 userEvents: renderProject.userEvents,
                 timeMapper,
                 soundEffects: env?.soundEffects,
+                mediaUrls,
             });
             encodeAudioBuffer(renderedAudioBuffer, audioEncoder);
 
@@ -330,6 +338,7 @@ export class ExportManager {
                     sourceCanvas: offscreenCanvas
                 }, {
                     project: renderProject,
+                    projectName,
                     userEvents: renderProject.userEvents,
                     currentTimeMs: currentTimeMs,
                     timeMapper: timeMapper

@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { getProjectMediaPaths } from '../_shared/projectMedia.ts';
 
 const RENDER_WORKER_URL = Deno.env.get('RENDER_WORKER_URL')!;
 const RENDER_SECRET = Deno.env.get('RENDER_SECRET')!;
@@ -42,7 +43,7 @@ serve(withAuth(async (req, { user, supabase }) => {
     // 3. Look up project (RLS enforced — must belong to user)
     const { data: project, error: projectError } = await supabase
         .from('projects')
-        .select('id, project_data, cloud_version, screen_storage_path, camera_storage_path, mic_storage_path')
+        .select('id, name, project_data, cloud_version')
         .eq('id', projectId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -87,24 +88,20 @@ serve(withAuth(async (req, { user, supabase }) => {
         .eq('status', 'pending');
 
     // 7. Generate signed download URLs for media (1h expiry)
+    //    Uses getProjectMediaPaths() to extract storagePaths from project_data,
+    //    so new media types are picked up automatically.
+    const mediaEntries = getProjectMediaPaths(project.project_data);
     const mediaUrls: Record<string, string> = {};
-    const storagePaths = {
-        screen: project.screen_storage_path,
-        camera: project.camera_storage_path,
-        mic: project.mic_storage_path,
-    };
 
-    for (const [key, storagePath] of Object.entries(storagePaths)) {
-        if (storagePath && storagePath !== 'pending') {
-            const { data, error } = await adminSupabase
-                .storage.from(BUCKET)
-                .createSignedUrl(storagePath, 3600);
-            if (error || !data) {
-                console.error(`[render-start-job] Failed to sign ${key}:`, error);
-                return errorResponse(`Failed to create signed URL for ${key}`, 500);
-            }
-            mediaUrls[key] = data.signedUrl;
+    for (const entry of mediaEntries) {
+        const { data, error } = await adminSupabase
+            .storage.from(BUCKET)
+            .createSignedUrl(entry.storagePath, 3600);
+        if (error || !data) {
+            console.error(`[render-start-job] Failed to sign ${entry.storagePath}:`, error);
+            return errorResponse(`Failed to create signed URL for ${entry.type}`, 500);
         }
+        mediaUrls[entry.storagePath] = data.signedUrl;
     }
 
     // 8. Generate signed upload URL for output
@@ -153,6 +150,7 @@ serve(withAuth(async (req, { user, supabase }) => {
             body: JSON.stringify({
                 jobId: job.id,
                 projectData: project.project_data,
+                projectName: project.name,
                 quality: '1080p',
                 mediaUrls,
                 uploadUrl: uploadData.signedUrl,

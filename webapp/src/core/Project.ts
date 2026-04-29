@@ -5,7 +5,7 @@ import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 import { scaleProject } from '@shared/utils/projectScale';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // Default display settings for tracks — single source of truth
 const DEFAULT_DISPLAY_SETTINGS = {
@@ -31,8 +31,7 @@ const EMPTY_USER_EVENTS: UserEvents = {
 
 // Create a placeholder source for empty projects
 const createPlaceholderSource = (): ScreenMetadata => ({
-    id: '',
-    storageUrl: '',
+    storagePath: '',
     durationMs: 0,
     size: { width: 1920, height: 1080 },
     hasAudio: false,
@@ -190,13 +189,10 @@ export class ProjectImpl {
      * Initializes a new Project with default structure.
      * NOTE: This creates a placeholder project that must be populated with createFromSource.
      */
-    static create(name: string = "New Project"): Project {
+    static create(): Project {
         return {
             id: crypto.randomUUID(),
             schemaVersion: CURRENT_SCHEMA_VERSION,
-            name,
-            createdAt: new Date(),
-            updatedAt: new Date(),
             screenSource: createPlaceholderSource(),
             userEvents: EMPTY_USER_EVENTS,
             settings: createDefaultSettings(),
@@ -215,14 +211,8 @@ export class ProjectImpl {
         screenSource: ScreenMetadata,
         userEvents: UserEvents,
         cameraSource?: CameraMetadata,
-        rawName?: string,
         microphoneSource?: MicrophoneMetadata
     ): Project {
-        let name = rawName || "New Project";
-        if (name.length > 40) {
-            name = name.substring(0, 37) + "...";
-        }
-
         const settings = createDefaultSettings();
 
         // Detect if user events were captured (Chrome tab/window vs desktop)
@@ -292,9 +282,6 @@ export class ProjectImpl {
         return {
             id: projectId,
             schemaVersion: CURRENT_SCHEMA_VERSION,
-            name,
-            createdAt: new Date(),
-            updatedAt: new Date(),
             screenSource,
             cameraSource,
             microphoneSource,

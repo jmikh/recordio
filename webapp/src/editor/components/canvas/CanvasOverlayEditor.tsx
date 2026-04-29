@@ -37,8 +37,8 @@ export const renderOverlayEditor = (
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // Render screen layer
-    if (screenSource.id) {
-        const video = videoRefs[screenSource.id];
+    if (screenSource.storagePath) {
+        const video = videoRefs[screenSource.storagePath];
         if (video) {
             drawScreen(ctx, video, project, effectiveViewport, resources.deviceFrameImg);
         }

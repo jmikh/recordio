@@ -37,8 +37,8 @@ export const renderCameraMoveEditor = (
 
     // Render Screen Layer
     const screenSource = project.screenSource;
-    if (screenSource.id) {
-        const video = videoRefs[screenSource.id];
+    if (screenSource.storagePath) {
+        const video = videoRefs[screenSource.storagePath];
         if (video) {
             drawScreen(ctx, video, project, effectiveViewport, resources.deviceFrameImg);
         }
@@ -49,7 +49,7 @@ export const renderCameraMoveEditor = (
     const cameraSettings = state.overrideCameraSettings;
 
     if (cameraSource && cameraSettings) {
-        const video = videoRefs[cameraSource.id];
+        const video = videoRefs[cameraSource.storagePath];
         if (video) {
             drawCamera(ctx, video, cameraSource.size, cameraSettings);
         }

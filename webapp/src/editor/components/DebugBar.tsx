@@ -1,6 +1,6 @@
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
-import { exportProjectToZip } from '../../storage/projectTransfer';
+
 import { getAllFocusAreas } from '../../core/zoom';
 import { useToast, type ToastType } from './Toast';
 
@@ -68,20 +68,6 @@ export const DebugBar = () => {
             {/* Separator */}
             <div className="w-px h-4 bg-gray-700 mx-2" />
 
-            {/* Export Project */}
-            <button
-                className="px-2 py-0.5 bg-teal-900/50 hover:bg-teal-800 text-teal-200 text-[10px] rounded cursor-pointer border border-teal-800"
-                onClick={async () => {
-                    try {
-                        await exportProjectToZip(project.id);
-                    } catch (e) {
-                        console.error('Export failed:', e);
-                    }
-                }}
-                title="Download project as .zip (JSON + blobs)"
-            >
-                📦 Export Project
-            </button>
 
             {/* Separator */}
             <div className="w-px h-4 bg-gray-700 mx-2" />

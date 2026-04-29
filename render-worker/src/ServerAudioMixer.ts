@@ -49,8 +49,8 @@ export async function mixAudio(options: AudioMixOptions): Promise<string> {
   // --- Screen audio ---
   const screenHasAudio = (project.screenSource as ScreenMetadata).hasAudio;
   if (screenHasAudio && !audioSettings?.muteScreenAudio) {
-    const screenPath = path.join(mediaDir, `screen${getExtension(project.screenSource.runtimeUrl ?? '')}`);
-    if (fs.existsSync(screenPath)) {
+    const screenPath = findMediaFile(mediaDir, 'screen');
+    if (screenPath) {
       const idx = inputIndex++;
       inputs.push('-i', screenPath);
       const label = buildWindowedAudio(
@@ -62,9 +62,9 @@ export async function mixAudio(options: AudioMixOptions): Promise<string> {
   }
 
   // --- Microphone audio ---
-  if (project.microphoneSource?.runtimeUrl && !audioSettings?.muteMicrophone) {
-    const micPath = path.join(mediaDir, `mic${getExtension(project.microphoneSource.runtimeUrl)}`);
-    if (fs.existsSync(micPath)) {
+  if (project.microphoneSource && !audioSettings?.muteMicrophone) {
+    const micPath = findMediaFile(mediaDir, 'mic');
+    if (micPath) {
       const idx = inputIndex++;
       inputs.push('-i', micPath);
       const label = buildWindowedAudio(
@@ -77,13 +77,13 @@ export async function mixAudio(options: AudioMixOptions): Promise<string> {
 
   // --- Background music ---
   if (audioSettings?.music?.enabled) {
-    const musicUrl = audioSettings.music.source === 'preset'
-      ? audioSettings.music.presetUrl
-      : audioSettings.music.customRuntimeUrl;
+    const hasMusic = audioSettings.music.source === 'preset'
+      ? !!audioSettings.music.presetUrl
+      : !!audioSettings.music.storagePath;
 
-    if (musicUrl) {
-      const musicPath = path.join(mediaDir, `music${getExtension(musicUrl)}`);
-      if (fs.existsSync(musicPath)) {
+    if (hasMusic) {
+      const musicPath = findMediaFile(mediaDir, 'music');
+      if (musicPath) {
         const idx = inputIndex++;
         inputs.push('-i', musicPath);
 
@@ -283,15 +283,14 @@ function runFFmpeg(args: string[]): Promise<void> {
 }
 
 /**
- * Extract file extension from a URL or path.
+ * Find a media file in the directory by prefix (e.g., 'screen' → 'screen.webm').
+ * Returns the full path if found, null otherwise.
  */
-function getExtension(urlOrPath: string): string {
-  try {
-    const u = new URL(urlOrPath);
-    const ext = path.extname(u.pathname);
-    return ext || '.webm';
-  } catch {
-    const ext = path.extname(urlOrPath);
-    return ext || '.webm';
+function findMediaFile(mediaDir: string, prefix: string): string | null {
+  const extensions = ['.webm', '.mp4', '.wav', '.mp3', '.aac', '.ogg'];
+  for (const ext of extensions) {
+    const filePath = path.join(mediaDir, `${prefix}${ext}`);
+    if (fs.existsSync(filePath)) return filePath;
   }
+  return null;
 }

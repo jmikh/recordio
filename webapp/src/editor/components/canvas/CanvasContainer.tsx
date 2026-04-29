@@ -1,7 +1,8 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { LocalStorage } from '../../../storage/localStorage';
+import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
+import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
@@ -40,17 +41,18 @@ export const CanvasContainer = () => {
     // Build sources array from project - now embedded directly
     const sources = useMemo(() => {
         const result: Record<string, SourceMetadata> = {};
-        if (project.screenSource.id) {
-            result[project.screenSource.id] = project.screenSource;
+        if (project.screenSource.storagePath) {
+            result[project.screenSource.storagePath] = project.screenSource;
         }
-        if (project.cameraSource?.id) {
-            result[project.cameraSource.id] = project.cameraSource;
+        if (project.cameraSource?.storagePath) {
+            result[project.cameraSource.storagePath] = project.cameraSource;
         }
         return result;
     }, [project.screenSource, project.cameraSource]);
 
     const isPlaying = useUIStore(s => s.isPlaying);
     const mutedSources = useProjectStore(s => s.mutedSources);
+    const mediaUrls = useMediaUrlStore(s => s.urls);
 
     // TimeMapper
     const timeMapper = useTimeMapper();
@@ -154,11 +156,11 @@ export const CanvasContainer = () => {
 
             // Build sources from project
             const sources: Record<string, SourceMetadata> = {};
-            if (project.screenSource.id) {
-                sources[project.screenSource.id] = project.screenSource;
+            if (project.screenSource.storagePath) {
+                sources[project.screenSource.storagePath] = project.screenSource;
             }
-            if (project.cameraSource?.id) {
-                sources[project.cameraSource.id] = project.cameraSource;
+            if (project.cameraSource?.storagePath) {
+                sources[project.cameraSource.storagePath] = project.cameraSource;
             }
 
             if (uiState.isPlaying) {
@@ -215,7 +217,7 @@ export const CanvasContainer = () => {
                     const playbackSpeed = windowInfo?.window.speed || 1.0;
 
                     Object.values(sources).forEach(source => {
-                        const video = internalVideoRefs.current[source.id];
+                        const video = internalVideoRefs.current[source.storagePath];
                         if (video) {
                             if (sourceTimeMs === -1) {
                                 if (!video.paused) video.pause();
@@ -299,6 +301,7 @@ export const CanvasContainer = () => {
                         const userEvents = useProjectStore.getState().userEvents;
                         PlaybackRenderer.render(resources, {
                             project,
+                            projectName: useProjectStore.getState().projectName,
                             userEvents,
                             currentTimeMs: effectiveTimeMs,
                             timeMapper: timeMapperRef.current,
@@ -329,7 +332,7 @@ export const CanvasContainer = () => {
                     offscreen.height = thumbH;
                     offscreen.getContext('2d')!.drawImage(canvas, 0, 0, thumbW, thumbH);
                     offscreen.toBlob((blob) => {
-                        if (blob) LocalStorage.saveThumbnail(project.id, blob).catch(console.warn);
+                        if (blob) CloudProjectService.saveThumbnail(project.id, blob).catch(console.warn);
                     }, 'image/webp', 0.8);
                 }
             };
@@ -354,8 +357,9 @@ export const CanvasContainer = () => {
     // -----------------------------------------------------------
     // RESOURCE HELPERS
     // -----------------------------------------------------------
-    // For backgrounds: prefer customRuntimeUrl (uploaded), fallback to imageUrl (preset)
-    const bgUrl = project.settings.background.customRuntimeUrl || project.settings.background.imageUrl;
+    // For backgrounds: prefer blob URL from mediaUrls (custom upload), fallback to imageUrl (preset)
+    const bgStoragePath = project.settings.background.storagePath;
+    const bgUrl = (bgStoragePath && mediaUrls[bgStoragePath]) || project.settings.background.imageUrl;
 
     // Device frame URL for caching
     const deviceFrame = project.settings.screen.mode === 'device'
@@ -374,13 +378,11 @@ export const CanvasContainer = () => {
         }, delayMs);
     };
 
-    // On project load: capture if no thumbnail exists
+    // On project load: always schedule a thumbnail capture
     useEffect(() => {
         if (!project?.id) return;
         lastCapturedBgRef.current = null;
-        LocalStorage.getThumbnail(project.id).then((existing) => {
-            if (!existing) scheduleThumbnailCapture(3000);
-        });
+        scheduleThumbnailCapture(3000);
         return () => {
             if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
         };
@@ -392,7 +394,7 @@ export const CanvasContainer = () => {
         // Skip if we haven't captured yet (initial capture handles that)
         if (!lastCapturedBgRef.current) return;
         scheduleThumbnailCapture(2000);
-    }, [bg.type, bg.color, bg.colorMode, bg.gradientColors, bg.gradientDirection, bg.imageUrl, bg.customStorageUrl, bg.backgroundBlurPx]);
+    }, [bg.type, bg.color, bg.colorMode, bg.gradientColors, bg.gradientDirection, bg.imageUrl, bg.storagePath, bg.backgroundBlurPx]);
 
     // -----------------------------------------------------------
     // RENDER
@@ -432,31 +434,32 @@ export const CanvasContainer = () => {
 
                     {Object.values(sources).map((source) => {
                         const audioSettings = project.settings.audio;
-                        const isScreenSource = source.id === project.screenSource?.id;
+                        const isScreenSource = source.storagePath === project.screenSource?.storagePath;
                         const settingsMuted = isScreenSource && audioSettings?.muteScreenAudio;
-                        const isMuted = !isPlaying || mutedSources[source.id] || !!settingsMuted;
+                        const isMuted = !isPlaying || mutedSources[source.storagePath] || !!settingsMuted;
                         const volume = isScreenSource
                             ? (audioSettings?.screenVolume ?? 1)
                             : 1;
-                        return source.runtimeUrl ? (
+                        const sourceUrl = mediaUrls[source.storagePath];
+                        return sourceUrl ? (
                             <video
-                                key={source.id}
+                                key={source.storagePath}
                                 ref={el => {
                                     if (el) {
-                                        internalVideoRefs.current[source.id] = el;
+                                        internalVideoRefs.current[source.storagePath] = el;
                                         el.volume = volume;
                                     } else {
-                                        delete internalVideoRefs.current[source.id];
+                                        delete internalVideoRefs.current[source.storagePath];
                                     }
                                 }}
-                                src={source.runtimeUrl}
+                                src={sourceUrl}
                                 muted={isMuted}
                                 playsInline
                                 onError={(e) => {
                                     const video = e.currentTarget;
                                     const err = video.error;
                                     console.error('[CanvasContainer] Video error:',
-                                        'sourceId=', source.id,
+                                        'sourceId=', source.storagePath,
                                         'code=', err?.code,
                                         'message=', err?.message,
                                         'currentTime=', video.currentTime,
@@ -466,9 +469,9 @@ export const CanvasContainer = () => {
                                     );
                                 }}
                                 onStalled={() => {
-                                    const video = internalVideoRefs.current[source.id];
+                                    const video = internalVideoRefs.current[source.storagePath];
                                     console.warn('[CanvasContainer] Video stalled:', {
-                                        sourceId: source.id,
+                                        sourceId: source.storagePath,
                                         currentTime: video?.currentTime,
                                         buffered: video?.buffered.length ?
                                             `${video.buffered.start(0)}-${video.buffered.end(video.buffered.length - 1)}` : 'none',
@@ -481,7 +484,7 @@ export const CanvasContainer = () => {
                         ) : null;
                     })}
                     {/* Mic audio element (separate track, no video) */}
-                    {project.microphoneSource?.runtimeUrl && (
+                    {project.microphoneSource && mediaUrls[project.microphoneSource.storagePath] && (
                         <audio
                             ref={el => {
                                 micAudioRef.current = el;
@@ -489,7 +492,7 @@ export const CanvasContainer = () => {
                                     el.volume = project.settings.audio?.microphoneVolume ?? 1;
                                 }
                             }}
-                            src={project.microphoneSource.runtimeUrl}
+                            src={mediaUrls[project.microphoneSource.storagePath]}
                             muted={!isPlaying || !!project.settings.audio?.muteMicrophone}
                             preload="auto"
                             onError={(e) => {
@@ -512,7 +515,7 @@ export const CanvasContainer = () => {
                 {/* CROP OVERLAY (Highest Priority) */}
                 {canvasMode === CanvasMode.CropEdit && (
                     <CropEditor videoSize={(() => {
-                        const screenId = project.screenSource.id;
+                        const screenId = project.screenSource.storagePath;
                         const v = internalVideoRefs.current[screenId];
                         return v ? { width: v.videoWidth, height: v.videoHeight } : undefined;
                     })()} />

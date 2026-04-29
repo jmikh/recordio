@@ -11,12 +11,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FUNCTIONS_DIR="$SCRIPT_DIR/functions"
 CRONS_DIR="$SCRIPT_DIR/crons"
 MIGRATIONS_DIR="$SCRIPT_DIR/../migrations"
-TIMESTAMP="$(date -u '+%Y%m%d%H%M%S')"
+COUNTER=0
 
 build_migration() {
     local src_dir="$1"
     local label="$2"
-    local out="$MIGRATIONS_DIR/${TIMESTAMP}_${label}.sql"
+    local ts="$(date -u '+%Y%m%d%H%M%S')"
+    # Offset each migration by 1 second to avoid duplicate timestamps
+    ts=$((ts + COUNTER))
+    COUNTER=$((COUNTER + 1))
+    local out="$MIGRATIONS_DIR/${ts}_${label}.sql"
 
     if ! ls "$src_dir"/*.sql &>/dev/null; then
         echo "No .sql files in $src_dir — skipping $label"

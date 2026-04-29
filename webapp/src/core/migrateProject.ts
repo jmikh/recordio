@@ -85,6 +85,14 @@ export function migrateProject(raw: any): any {
         }
     }
 
+    // v4 → v5: storagePath added to BaseSourceMetadata, BackgroundSettings, MusicSettings.
+    // storagePath is populated in CloudProjectService.loadProject() using the
+    // deterministic path pattern (userId/projectId/fileType.ext) because the
+    // migration function doesn't have access to userId.
+    if (version < 5) {
+        // No structural changes needed — storagePath is backfilled on load.
+    }
+
     // Backfill displaySettings if missing (pre-displaySettings projects)
     if (raw.timeline && !raw.timeline.displaySettings) {
         raw.timeline.displaySettings = {
@@ -95,6 +103,11 @@ export function migrateProject(raw: any): any {
             collapsed: false,
         };
     }
+
+    // Strip fields that are now DB-only columns (not part of project_data)
+    delete raw.name;
+    delete raw.createdAt;
+    delete raw.updatedAt;
 
     // Stamp current version
     raw.schemaVersion = CURRENT_SCHEMA_VERSION;

@@ -38,47 +38,27 @@
 
 Two cron patterns exist:
 
-**Pattern A — pure SQL** (DB-only work, `SECURITY DEFINER`):
-```sql
-CREATE OR REPLACE FUNCTION public.cron_my_job() ...
-```
-Then schedule via a separate migration with `cron.schedule()`.
+- **Pattern A — pure SQL** (DB-only work, `SECURITY DEFINER`): create function + schedule with `cron.schedule()`
+- **Pattern B — cron → edge function** (needs external APIs): `cron.schedule` calls `net.http_post` to the edge function
 
-**Pattern B — cron → edge function** (needs external APIs):
-```sql
-SELECT cron.schedule('my-job', '0 * * * *', $$
-    SELECT net.http_post(
-        url := '<SUPABASE_URL>/functions/v1/my-function',
-        headers := jsonb_build_object(
-            'Content-Type', 'application/json',
-            'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
-        ),
-        body := '{}'::jsonb
-    );
-$$);
-```
 Always `cron.unschedule` before `cron.schedule` for idempotency.
+
+---
+
+## Naming Conventions
+
+Use `{asset}_{verb}` for all named items that way  related functions are visually grouped together:
+
+| Item | Example |
+|---|---|
+| Edge functions | `render_start`, `project_delete` |
+| DB functions | `subscription_check`, `usage_reset` |
+| Cron jobs | `cron_subscription_check`, `cron_usage_reset` |
 
 ---
 
 ## Authentication Patterns
 
-### Pattern 1 — User-facing (forward caller's JWT, RLS applies)
-```ts
-const authHeader = req.headers.get('Authorization');
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
-    { global: { headers: { Authorization: authHeader } } });
-const { data: { user } } = await supabase.auth.getUser();
-```
-
-### Pattern 2 — Internal/cron (service role, bypasses RLS)
-```ts
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-```
-Caller authenticates by passing service role key in `Authorization` header.
-
-### Pattern 3 — External webhook (Stripe)
-No JWT — validate webhook signature instead:
-```ts
-const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-```
+- **User-facing**: forward caller's JWT via `Authorization` header, use anon key, RLS applies
+- **Internal/cron**: use `SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS
+- **External webhook (Stripe)**: no JWT — validate webhook signature instead

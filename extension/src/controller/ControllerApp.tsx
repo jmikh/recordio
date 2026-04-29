@@ -184,9 +184,15 @@ export function ControllerApp() {
                     video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: capturedSourceId } }
                 } as any);
             } catch (e) {
-                displayStream = await navigator.mediaDevices.getUserMedia({
-                    video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: capturedSourceId } }
-                } as any);
+                console.warn("[chooseSource] audio+video getUserMedia failed:", e instanceof OverconstrainedError ? `constraint=${e.constraint}` : e);
+                try {
+                    displayStream = await navigator.mediaDevices.getUserMedia({
+                        video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: capturedSourceId } }
+                    } as any);
+                } catch (e2) {
+                    console.error("[chooseSource] video-only getUserMedia also failed:", e2 instanceof OverconstrainedError ? `constraint=${(e2 as any).constraint}` : e2);
+                    throw e2;
+                }
             }
 
             displayStream.getVideoTracks()[0].onended = () => {

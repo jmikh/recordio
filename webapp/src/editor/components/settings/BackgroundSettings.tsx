@@ -1,15 +1,17 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
+import { useAssetLibraryStore } from '../../stores/useAssetLibraryStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { UserAssetService } from '../../../storage/userAssetService';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
 import { XButton, Slider, CollapsibleCard } from '@shared/components';
 import { TbBackground } from 'react-icons/tb';
 import type { PreviewItem } from '@shared/components';
-import { LocalStorage, type CustomBackgroundEntry } from '../../../storage/localStorage';
 
 
 
@@ -36,63 +38,39 @@ const BACKGROUND_IMAGES = [
 export const BackgroundSettings = () => {
     const project = useProjectData();
     const updateSettings = useProjectStore(s => s.updateSettings);
-    const uploadAndSelectBackground = useProjectStore(s => s.uploadAndSelectBackground);
-    const selectBackgroundFromLibrary = useProjectStore(s => s.selectBackgroundFromLibrary);
-    const clearProjectBackground = useProjectStore(s => s.clearProjectBackground);
+    const selectBackground = useProjectStore(s => s.selectBackground);
+    const clearBackground = useProjectStore(s => s.clearBackground);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Collapsible visibility state
     const showCollapsibleBackground = useUIStore(s => s.showCollapsibleBackground);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
-    // Custom backgrounds library state
-    const [customLibrary, setCustomLibrary] = useState<CustomBackgroundEntry[]>([]);
-    const [libraryUrls, setLibraryUrls] = useState<Record<string, string>>({});
-
-    // Load custom backgrounds library
-    const loadLibrary = useCallback(async () => {
-        const entries = await LocalStorage.listCustomBackgrounds();
-        setCustomLibrary(entries);
-
-        // Create blob URLs for thumbnails
-        const urls: Record<string, string> = {};
-        for (const entry of entries) {
-            urls[entry.id] = URL.createObjectURL(entry.blob);
-        }
-        // Revoke old URLs
-        Object.values(libraryUrls).forEach(url => URL.revokeObjectURL(url));
-        setLibraryUrls(urls);
-    }, []);
-
-    useEffect(() => {
-        loadLibrary();
-        return () => {
-            // Cleanup URLs on unmount
-            Object.values(libraryUrls).forEach(url => URL.revokeObjectURL(url));
-        };
-    }, []);
+    // Asset library (loaded once on project open, updated on upload/delete)
+    const customLibrary = useAssetLibraryStore(s => s.backgrounds);
+    const libraryUrls = useAssetLibraryStore(s => s.blobUrls);
+    const canUploadBg = useAssetLibraryStore(s => s.canUploadBackground);
+    const addAsset = useAssetLibraryStore(s => s.addAsset);
+    const removeAsset = useAssetLibraryStore(s => s.removeAsset);
+    const [isUploading, setIsUploading] = useState(false);
+    const canUpload = canUploadBg();
 
     // Defensive check
     if (!project) return null;
 
     const { settings } = project;
     const { background } = settings;
-    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, customLibraryId, gradientColors, gradientDirection, backgroundBlurPx, colorMode } = background;
+    const { type: backgroundType, color: backgroundColor, imageUrl: backgroundImageUrl, storagePath: bgStoragePath, gradientColors, gradientDirection, backgroundBlurPx, colorMode } = background;
+
+    // Read blob URL for current custom background from media URL store
+    const customBgBlobUrl = useMediaUrlStore(s => bgStoragePath ? s.urls[bgStoragePath] : undefined);
 
     // Helpers to determine active state
-    // colorMode is always used to determine solid vs gradient when type is 'color'
     const isSolid = colorMode === 'solid';
     const isGradient = colorMode === 'gradient';
     const isColorMode = backgroundType === 'color';
-
-    // Preset active if type is 'preset'
     const isPreset = backgroundType === 'preset';
-
-    // Custom active if type is 'custom'
     const isCustom = backgroundType === 'custom';
-
-    // The currently selected library entry ID (for matching in library display)
-    const selectedLibraryId = isCustom ? customLibraryId : undefined;
 
     // --- Undo/Redo Batching Helpers ---
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -133,85 +111,50 @@ export const BackgroundSettings = () => {
         });
     };
 
-    const handlePresetSelect = async (url: string) => {
-        // Clear old custom background copy if switching from custom
-        if (isCustom) {
-            await clearProjectBackground();
-        }
+    const handlePresetSelect = (url: string) => {
         updateSettings({
             background: {
                 type: 'preset',
                 imageUrl: url,
-                customStorageUrl: undefined,
-                customRuntimeUrl: undefined,
-                customLibraryId: undefined
+                storagePath: undefined,
             }
         });
     };
 
-    const handleLibrarySelect = async (libraryId: string) => {
-        // Don't re-select if already selected
-        if (selectedLibraryId === libraryId) return;
-
+    const handleLibrarySelect = async (storagePath: string) => {
+        if (bgStoragePath === storagePath) return;
         try {
-            // Clear old custom background copy
-            await clearProjectBackground();
-
-            // Copy from library to project
-            const { storageUrl, runtimeUrl } = await selectBackgroundFromLibrary(libraryId);
-            updateSettings({
-                background: {
-                    type: 'custom',
-                    imageUrl: undefined,
-                    customStorageUrl: storageUrl,
-                    customRuntimeUrl: runtimeUrl,
-                    customLibraryId: libraryId
-                }
-            });
+            await selectBackground(storagePath);
         } catch (err) {
-            console.error("Failed to select background from library", err);
+            console.error('Failed to select background from library', err);
         }
     };
 
-    const handleLibraryDelete = async (libraryId: string, e: React.MouseEvent) => {
-        e.stopPropagation(); // Don't trigger select
-
-        await LocalStorage.deleteCustomBackground(libraryId);
-
-        // Revoke URL
-        if (libraryUrls[libraryId]) {
-            URL.revokeObjectURL(libraryUrls[libraryId]);
+    const handleLibraryDelete = async (assetId: string, storagePath: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            if (bgStoragePath === storagePath) {
+                clearBackground();
+            }
+            await removeAsset(assetId, storagePath);
+        } catch (err) {
+            console.error('Failed to delete background asset', err);
         }
-
-        // Reload library
-        await loadLibrary();
     };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        setIsUploading(true);
         try {
-            // Clear old custom background copy
-            await clearProjectBackground();
-
-            // Upload to library AND select for project
-            const { libraryId, storageUrl, runtimeUrl } = await uploadAndSelectBackground(file);
-            updateSettings({
-                background: {
-                    type: 'custom',
-                    imageUrl: undefined,
-                    customStorageUrl: storageUrl,
-                    customRuntimeUrl: runtimeUrl,
-                    customLibraryId: libraryId
-                }
-            });
-
-            // Reload library to show new entry
-            await loadLibrary();
+            const asset = await UserAssetService.uploadAsset(file, 'background');
+            addAsset(asset);
+            await selectBackground(asset.storagePath);
         } catch (err) {
-            console.error("Failed to upload background", err);
+            console.error('Failed to upload background', err);
         } finally {
+            setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -260,8 +203,8 @@ export const BackgroundSettings = () => {
             const match = BACKGROUND_IMAGES.find(bg => bg.url === backgroundImageUrl);
             const previewUrl = match?.thumbnail ?? backgroundImageUrl;
             return { backgroundImage: `url(${previewUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
-        } else if (backgroundType === 'custom' && background.customRuntimeUrl) {
-            return { backgroundImage: `url(${background.customRuntimeUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+        } else if (backgroundType === 'custom' && customBgBlobUrl) {
+            return { backgroundImage: `url(${customBgBlobUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
         }
         return { background: backgroundColor };
     };
@@ -332,9 +275,13 @@ export const BackgroundSettings = () => {
                     <div className="flex flex-col items-center gap-2">
                         <span className="text-xs text-text-main">Upload</span>
                         <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="cursor-pointer w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all hover:scale-110 border border-transparent bg-surface-raised ring-1 ring-border hover:ring-border-hover not-hover:bg-state-inactive hover:bg-state-hover"
-                            title="Upload Image"
+                            onClick={() => canUpload && !isUploading && fileInputRef.current?.click()}
+                            className={`w-14 h-14 rounded-full flex items-center justify-center relative overflow-hidden transition-all border border-transparent bg-surface-raised ring-1 ring-border ${
+                                !canUpload || isUploading
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : 'cursor-pointer hover:scale-110 hover:ring-border-hover not-hover:bg-state-inactive hover:bg-state-hover'
+                            }`}
+                            title={!canUpload ? 'Library full (10/10) — delete an image to upload a new one' : isUploading ? 'Uploading...' : 'Upload Image'}
                         >
                             <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">
                                 <CiImageOn className="icon-lg" />
@@ -353,14 +300,11 @@ export const BackgroundSettings = () => {
                 {/* Row 2: Custom Library (if any) */}
                 {customLibrary.length > 0 && (
                     <div className="flex flex-col items-center gap-2 w-full">
-                        <span className="text-xs text-text-main">Custom</span>
+                        <span className="text-xs text-text-main">Your Library</span>
                         <div className="flex flex-wrap justify-center gap-4">
                             {customLibrary.map(entry => {
-                                const url = libraryUrls[entry.id];
-                                // Check if this library entry is the one currently selected
-                                const isActive = selectedLibraryId === entry.id;
-                                // Can't delete the selected entry
-                                const canDelete = !isActive;
+                                const url = libraryUrls[entry.storagePath];
+                                const isActive = bgStoragePath === entry.storagePath;
                                 return (
                                     <div
                                         key={entry.id}
@@ -370,18 +314,16 @@ export const BackgroundSettings = () => {
                                             className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
                                                 ? 'outline outline-2 outline-offset-2 outline-primary'
                                                 : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
-                                            onClick={() => handleLibrarySelect(entry.id)}
-                                            title="Select background"
+                                            onClick={() => handleLibrarySelect(entry.storagePath)}
+                                            title={entry.name ?? 'Custom background'}
                                         >
-                                            {url && <img src={url} alt="Custom background" className="w-full h-full object-cover" />}
+                                            {url && <img src={url} alt={entry.name ?? 'Custom background'} className="w-full h-full object-cover" />}
                                         </div>
-                                        {canDelete && (
-                                            <XButton
-                                                onClick={(e) => handleLibraryDelete(entry.id, e)}
-                                                title="Remove from library"
-                                                className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            />
-                                        )}
+                                        <XButton
+                                            onClick={(e) => handleLibraryDelete(entry.id, entry.storagePath, e)}
+                                            title="Remove from library"
+                                            className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        />
                                     </div>
                                 );
                             })}

@@ -1,5 +1,4 @@
 import { supabase } from '../../auth/AuthManager';
-import { isRecordioMacApp } from '../../bridge/macBridge';
 
 export class StripeService {
     /**
@@ -16,20 +15,12 @@ export class StripeService {
         }
 
         try {
-            const isMac = isRecordioMacApp();
-
-            // In Mac app: don't open a popup (WKWebView blocks it).
-            // In browser: open popup IMMEDIATELY in the synchronous click handler stack
+            // Open popup IMMEDIATELY in the synchronous click handler stack
             // to prevent mobile Safari and other browsers from blocking it.
-            const popup = isMac ? null : window.open('about:blank', '_blank');
+            const popup = window.open('about:blank', '_blank');
 
-            // Use recordio:// URL scheme for Mac app, regular origin URL for browser
-            const redirectUrl = isMac
-                ? 'recordio://payment-success'
-                : `${window.location.origin}/?subscription-success`;
-            const cancelUrl = isMac
-                ? 'recordio://payment-cancel'
-                : redirectUrl;
+            const redirectUrl = `${window.location.origin}/?subscription-success`;
+            const cancelUrl = redirectUrl;
 
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
@@ -53,15 +44,10 @@ export class StripeService {
                 return { error: new Error('No checkout URL returned') };
             }
 
-            if (isMac) {
-                // In Mac app: navigate WKWebView to the Stripe URL.
-                // EditorWebView.swift intercepts checkout.stripe.com and opens in browser.
-                window.location.href = data.url;
-            } else if (popup) {
+            if (popup) {
                 popup.location.href = data.url;
             } else {
-                // Fallback: redirect current page if popup was still somehow blocked
-                console.error('[Stripe] Popup was blocked despite synchronous open, falling back to redirect');
+                // Fallback: redirect current page if popup was blocked
                 window.location.href = data.url;
             }
 
@@ -84,9 +70,7 @@ export class StripeService {
         }
 
         try {
-            const returnUrl = isRecordioMacApp()
-                ? 'recordio://payment-success'
-                : window.location.href;
+            const returnUrl = window.location.href;
 
             const { data, error } = await supabase.functions.invoke('create-portal-session', {
                 body: {
@@ -98,11 +82,6 @@ export class StripeService {
             if (error) {
                 console.error('[Stripe] Failed to create portal session:', error);
                 return { error };
-            }
-
-            // In Mac app: navigate so EditorWebView intercepts and opens in browser
-            if (isRecordioMacApp() && data?.url) {
-                window.location.href = data.url;
             }
 
             return { url: data?.url };

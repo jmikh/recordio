@@ -38,6 +38,7 @@ export function drawScreen(
     currentOutputTimeMs?: number, // Current playback time (output) for URL lookup
     timeMapper?: TimeMapper, // For converting output time → source time
     urlChanges?: UrlChangeEvent[], // URL change events (passed explicitly; project.userEvents separated from project at runtime)
+    projectName?: string, // Project name for toolbar fallback (stored as DB column, not in project)
 ): { viewMapper: ViewMapper } {
     const screenConfig = project.settings.screen || {
         mode: 'device',
@@ -126,8 +127,8 @@ export function drawScreen(
                     : undefined;
                 const toolbarSettings = project.settings.screen.toolbar;
                 const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
-                    ? getUrlAtTime(urlChanges, sourceTimeMs, project.name, toolbarSettings.urlMode)
-                    : project.name;
+                    ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
+                    : projectName ?? '';
 
                 drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
             }
@@ -222,8 +223,8 @@ export function drawScreen(
                     : undefined;
                 const toolbarSettings = project.settings.screen.toolbar;
                 const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
-                    ? getUrlAtTime(urlChanges, sourceTimeMs, project.name, toolbarSettings.urlMode)
-                    : project.name;
+                    ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
+                    : projectName ?? '';
 
                 drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
             }

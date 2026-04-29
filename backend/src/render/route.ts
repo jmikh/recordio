@@ -33,7 +33,7 @@ export async function renderRoute(app: FastifyInstance) {
         // Create temp directory for this render
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'recordio-render-'));
         console.log(`[Render] Starting render job in ${tmpDir}`);
-        console.log(`[Render] Quality: ${quality}, Project: ${projectData.name} (${projectData.id})`);
+        console.log(`[Render] Quality: ${quality}, Project: ${projectData.id}`);
 
         try {
             // Fetch storage paths from the project table

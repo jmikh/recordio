@@ -59,7 +59,6 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
             captionSegments: nextCaptionSegments,
             overlaySegments: nextOverlaySegments,
         },
-        updatedAt: new Date()
     };
 };
 

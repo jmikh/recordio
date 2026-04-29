@@ -53,6 +53,7 @@ export class PlaybackRenderer {
         resources: RenderResources,
         state: {
             project: Project,
+            projectName?: string,
             userEvents: UserEvents,
             currentTimeMs: number,
             timeMapper: TimeMapper,
@@ -63,7 +64,7 @@ export class PlaybackRenderer {
     ) {
         PlaybackRenderer._profileCount++;
         const { ctx, renderCtx, videoRefs } = resources;
-        const { project, currentTimeMs, userEvents } = state;
+        const { project, projectName, currentTimeMs, userEvents } = state;
         const outputSize = project.settings.outputSize;
 
         const { timeline } = project;
@@ -92,7 +93,7 @@ export class PlaybackRenderer {
         // Render Screen Layer
         let viewMapper: import('../mappers/viewMapper').ViewMapper | undefined;
 
-        const screenVideo = videoRefs[screenSource.id];
+        const screenVideo = videoRefs[screenSource.storagePath];
         if (screenVideo) {
             this._t('screen', () => {
                 const result = drawScreen(
@@ -103,7 +104,8 @@ export class PlaybackRenderer {
                     resources.deviceFrameImg,
                     currentTimeMs,
                     state.timeMapper,
-                    userEvents?.urlChanges
+                    userEvents?.urlChanges,
+                    projectName
                 );
                 viewMapper = result.viewMapper;
             });
@@ -168,12 +170,12 @@ export class PlaybackRenderer {
 
         // Render Camera Layer (after overlays, so camera always appears on top)
         if (cameraSource) {
-            const video = videoRefs[cameraSource.id];
+            const video = videoRefs[cameraSource.storagePath];
             if (video) {
                 const cameraSettings = project.settings.camera;
 
                 if (!cameraSettings) {
-                    console.error(`[PlaybackRenderer] Missing camera settings for source ${cameraSource.id}`);
+                    console.error(`[PlaybackRenderer] Missing camera settings for source ${cameraSource.storagePath}`);
                     throw new Error("Mandatory camera settings are missing.");
                 }
 

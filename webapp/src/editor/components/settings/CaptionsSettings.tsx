@@ -6,6 +6,7 @@ import { RiPaletteLine } from 'react-icons/ri';
 import { TbSparkles, TbCopy, TbDownload } from 'react-icons/tb';
 import { LuCaptions } from 'react-icons/lu';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, type PreviewItem } from '@shared/components';
@@ -19,6 +20,7 @@ import { AuthModal } from '../header/AuthModal';
 import { trackGenerateCaptions } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ColorButton } from './ColorButton';
+import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 
 type TranscriptionEngine = 'local' | 'openai';
 
@@ -53,6 +55,7 @@ export function CaptionsSettings() {
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const { addToast } = useToast();
+    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hideCloudTranscription = false; // TODO: remove after per-user limits are live
     const [engine, setEngine] = useState<TranscriptionEngine>('local');
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -169,14 +172,16 @@ export function CaptionsSettings() {
         const srt = segments.map((s, i) =>
             `${i + 1}\n${formatSubtitleTime(s.start, ',')} --> ${formatSubtitleTime(s.end, ',')}\n${s.text}`
         ).join('\n\n');
-        downloadFile(srt, `${project.name || 'captions'}.srt`, 'text/srt');
+        const projectName = useProjectStore.getState().projectName;
+        downloadFile(srt, `${projectName || 'captions'}.srt`, 'text/srt');
     };
 
     const handleGenerate = async () => {
         const state = useProjectStore.getState();
         const micSource = state.project.microphoneSource;
 
-        if (!micSource?.runtimeUrl) {
+        const micUrl = micSource ? useMediaUrlStore.getState().urls[micSource.storagePath] : undefined;
+        if (!micUrl) {
             addToast({
                 type: 'error',
                 title: 'No microphone audio',
@@ -211,7 +216,7 @@ export function CaptionsSettings() {
             const signal = abortControllerRef.current.signal;
 
             // Fetch microphone audio
-            const response = await fetch(micSource.runtimeUrl!);
+            const response = await fetch(micUrl);
             if (!response.ok) throw new Error(`Failed to fetch audio: ${response.statusText}`);
             const micBlob = await response.blob();
 
@@ -418,7 +423,7 @@ export function CaptionsSettings() {
                     ? [{ type: 'text', content: source.engine === 'openai' ? 'OpenAI' : 'Local' }]
                     : [];
 
-                const buttonDisabled = !hasMicrophone || alreadyGenerated || isTranscribing;
+                const buttonDisabled = !hasMicrophone || alreadyGenerated || isTranscribing || isSyncingMedia;
                 const emptyCaptions = alreadyGenerated && (!captionSegments || captionSegments.length === 0);
                 const buttonLabel = isTranscribing
                     ? (transcriptionPhase === 'downloading' ? 'Downloading Model...' : 'Generating...')
@@ -449,7 +454,7 @@ export function CaptionsSettings() {
                                 />
                             )}
 
-                            <Tooltip text={!hasMicrophone ? 'No microphone detected' : ''} className="w-full">
+                            <Tooltip text={isSyncingMedia ? 'Syncing to cloud...' : !hasMicrophone ? 'No microphone detected' : ''} className="w-full">
                                 <Button
                                     variant="primary"
                                     onClick={handleGenerate}

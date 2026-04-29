@@ -7,9 +7,10 @@ import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
 import { DEVICE_FRAMES } from '../../../core/deviceFrames';
-import { Scrollbar, Button } from '@shared/components';
+import { Scrollbar, Button, Tooltip } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
@@ -74,6 +75,7 @@ export const SettingsPanel = () => {
     const project = useProjectStore(s => s.project);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
     const hasCameraSource = !!project.cameraSource;
+    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hasMicrophone = !!project.microphoneSource;
 
     const handleTabChange = (tab: SettingsPanelTab) => {
@@ -203,14 +205,17 @@ export const SettingsPanel = () => {
                 })}
 
                 <div className="mt-2 mx-3">
-                    <Button
-                        variant="primary"
-                        fullWidth
-                        onClick={() => useUIStore.getState().setExportModalOpen(true)}
-                        className="text-sm shadow-sm"
-                    >
-                        Export
-                    </Button>
+                    <Tooltip text={isSyncingMedia ? "Syncing to cloud..." : ""}>
+                        <Button
+                            variant="primary"
+                            fullWidth
+                            onClick={() => useUIStore.getState().setExportModalOpen(true)}
+                            className="text-sm shadow-sm"
+                            disabled={isSyncingMedia}
+                        >
+                            Export
+                        </Button>
+                    </Tooltip>
                 </div>
                 </div>
             </nav>

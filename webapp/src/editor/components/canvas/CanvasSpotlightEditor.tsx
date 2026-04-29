@@ -39,8 +39,8 @@ export const renderSpotlightEditor = (
     const effectiveViewport: Rect = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
 
     // Render Screen Layer
-    if (screenSource.id) {
-        const video = videoRefs[screenSource.id];
+    if (screenSource.storagePath) {
+        const video = videoRefs[screenSource.storagePath];
         if (video) {
             drawScreen(
                 ctx,
@@ -83,7 +83,7 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     // ViewMapper for source <-> output coordinate conversion
     const viewMapper = useMemo(() => {
         const screenSource = project.screenSource;
-        if (!screenSource.id) return null;
+        if (!screenSource.storagePath) return null;
 
         const deviceFrame = project.settings.screen.mode === 'device'
             ? getDeviceFrame(project.settings.screen.deviceFrameId)

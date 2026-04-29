@@ -32,10 +32,6 @@ export interface Project {
     id: ID;
     /** Schema version for migration support. Start at 1. */
     schemaVersion: number;
-    /** Human-readable name of the project */
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
     /** URL (blob or remote) to project, or just a generic placeholder if undefined */
     thumbnail?: string;
 

@@ -95,6 +95,7 @@ app.get('/health', async () => ({ status: 'ok' }));
 interface RenderBody {
     jobId: string;
     projectData: unknown;
+    projectName?: string;
     quality: string;
     mediaUrls: MediaUrls;
     uploadUrl: string;
@@ -109,7 +110,7 @@ app.post('/render', async (request, reply) => {
     }
 
     const body = request.body as RenderBody;
-    const { jobId, projectData, quality, mediaUrls, uploadUrl, statusCallbackUrl } = body;
+    const { jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl } = body;
 
     if (!jobId || !projectData || !quality || !uploadUrl || !statusCallbackUrl) {
         return reply.code(400).send({ error: 'Missing required fields' });
@@ -119,7 +120,7 @@ app.post('/render', async (request, reply) => {
     reply.send({ ok: true, jobId });
 
     // Run render in background (don't await in handler)
-    runRender(jobId, projectData, quality, mediaUrls, uploadUrl, statusCallbackUrl)
+    runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl)
         .catch(err => {
             console.error(`[Render] Unhandled error in background render:`, err);
         });
@@ -130,6 +131,7 @@ app.post('/render', async (request, reply) => {
 async function runRender(
     jobId: string,
     projectData: unknown,
+    projectName: string | undefined,
     quality: string,
     mediaUrls: MediaUrls,
     uploadUrl: string,
@@ -166,12 +168,15 @@ async function runRender(
         if (canceled) throw new CancelError();
 
         // 2. Render via Playwright (progress tracks export: 0–0.9)
+        //    Pass uploadUrl so the browser can upload directly, skipping disk write.
         const result = await renderViaPlaywright({
             jobId,
             project: projectData,
+            projectName,
             quality,
             mediaDir: tmpDir,
             mediaFileNames,
+            uploadUrl,
             onProgress: (phase, progress, message) => {
                 console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
                 currentProgress = progress * 0.9;
@@ -180,12 +185,16 @@ async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // 3. Upload result via signed URL PUT (progress: 0.9–1.0)
-        currentProgress = 0.9;
-        console.log(`[Render] Uploading ${result.outputPath}`);
-        await uploadResult(result.outputPath, uploadUrl, (fraction) => {
-            currentProgress = 0.9 + fraction * 0.1;
-        });
+        // 3. Upload result if browser didn't upload directly
+        if (result.outputPath) {
+            currentProgress = 0.9;
+            console.log(`[Render] Uploading ${result.outputPath}`);
+            await uploadResult(result.outputPath, uploadUrl, (fraction) => {
+                currentProgress = 0.9 + fraction * 0.1;
+            });
+        } else {
+            console.log(`[Upload] ✓ Uploaded ${(result.sizeBytes / 1024 / 1024).toFixed(1)} MB (direct from browser)`);
+        }
 
         if (canceled) throw new CancelError();
 

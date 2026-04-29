@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import type { Timeline as TimelineType } from '../../../../../types';
 import { useProjectStore } from '../../../../stores/useProjectStore';
+import { useMediaUrlStore } from '../../../../stores/useMediaUrlStore';
 import { useAudioAnalysis } from '../../../../hooks/useAudioAnalysis';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { getTimeMapper } from '../../../../hooks/useTimeMapper';
@@ -45,10 +46,11 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
     }, [timeline.outputWindows, pixelsPerSec]);
 
     // Prepare Audio Analysis: prefer microphone, fallback to video audio if screen has audio
-    const audioSourceId = microphoneSource?.id || (screenSource.hasAudio ? screenSource.id : '');
-    const audioSourceUrl = microphoneSource?.runtimeUrl || (screenSource.hasAudio ? screenSource.runtimeUrl : '') || '';
-    const screenAudio = useAudioAnalysis(audioSourceId, audioSourceUrl);
-    const cameraAudio = useAudioAnalysis(cameraSource?.id || '', cameraSource?.runtimeUrl || '');
+    const mediaUrls = useMediaUrlStore(s => s.urls);
+    const audioSourceKey = microphoneSource?.storagePath || (screenSource.hasAudio ? screenSource.storagePath : '');
+    const audioSourceUrl = mediaUrls[audioSourceKey] || '';
+    const screenAudio = useAudioAnalysis(audioSourceKey, audioSourceUrl);
+    const cameraAudio = useAudioAnalysis(cameraSource?.storagePath || '', cameraSource ? (mediaUrls[cameraSource.storagePath] || '') : '');
 
     const { dragState, handleDragStart } = useWindowDrag(timeline, coords);
 

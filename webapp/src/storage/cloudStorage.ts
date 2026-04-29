@@ -41,12 +41,6 @@ export interface CloudProject {
     thumbnail_storage_path: string | null;
 }
 
-export interface StorageQuota {
-    usedBytes: number;
-    limitBytes: number;
-    maxProjects: number;
-}
-
 export type MediaFileType = 'screen' | 'camera' | 'mic' | 'thumbnail';
 
 /**
@@ -58,7 +52,7 @@ export class CloudStorage {
     // ─── Metadata CRUD ──────────────────────────────────────────
 
     /**
-     * Upsert project metadata to cloud.
+     * Update project metadata in cloud.
      * Uses optimistic concurrency: if expectedVersion is provided, the update
      * only succeeds if cloud_version matches. Returns the new cloud_version.
      */
@@ -70,55 +64,35 @@ export class CloudStorage {
     ): Promise<{ cloudVersion: number }> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        // Strip non-serializable / transient fields from project before storing as JSONB
-        const projectData = this.stripForCloud(project);
+        const projectData = JSON.parse(JSON.stringify(project));
 
-        if (expectedVersion !== undefined) {
-            // Update existing — optimistic concurrency
-            const { data, error } = await supabase
-                .from('projects')
-                .update({
-                    name: project.name,
-                    project_data: projectData,
-                    cloud_version: expectedVersion + 1,
-                    duration_ms: this.computeDurationMs(project),
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('id', project.id)
-                .eq('cloud_version', expectedVersion)
-                .select('cloud_version')
-                .single();
+        const { data, error } = await supabase.rpc('project_update', {
+            p_project_id: project.id,
+            p_project_data: projectData,
+            p_duration_ms: this.computeDurationMs(project),
+            p_expected_version: expectedVersion ?? null,
+        });
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    throw new CloudVersionConflictError(project.id, expectedVersion);
-                }
-                throw error;
-            }
-
-            return { cloudVersion: data.cloud_version };
-        } else {
-            // Insert or update — upsert on PK handles dedup across tabs
-            const { data, error } = await supabase
-                .from('projects')
-                .upsert({
-                    id: project.id,
-                    user_id: userId,
-                    name: project.name,
-                    project_data: projectData,
-                    duration_ms: this.computeDurationMs(project),
-                    upload_status: 'pending',
-                    screen_storage_path: project.screenSource ? 'pending' : null,
-                    camera_storage_path: project.cameraSource ? 'pending' : null,
-                    mic_storage_path: project.microphoneSource ? 'pending' : null,
-                    expires_at: isPro ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-                })
-                .select('cloud_version')
-                .single();
-
-            if (error) throw error;
-            return { cloudVersion: data.cloud_version };
+        if (error) throw error;
+        if (data === null) {
+            throw new CloudVersionConflictError(project.id, expectedVersion!);
         }
+
+        return { cloudVersion: data };
+    }
+
+    /**
+     * Update only the project name column (no debouncing needed).
+     */
+    static async updateProjectName(projectId: string, name: string): Promise<void> {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { error } = await supabase.rpc('project_update_name', {
+            p_project_id: projectId,
+            p_name: name,
+        });
+
+        if (error) throw error;
     }
 
     /**
@@ -128,12 +102,11 @@ export class CloudStorage {
     static async getCloudVersion(projectId: string): Promise<number | null> {
         if (!supabase) return null;
 
-        const { data, error } = await supabase
-            .from('projects')
-            .select('cloud_version')
-            .eq('id', projectId)
-            .is('deleted_at', null)
-            .maybeSingle();
+        // project_get returns full metadata; we only need cloud_version.
+        // A dedicated lightweight RPC could be added later if perf matters.
+        const { data, error } = await supabase.rpc('project_get', {
+            p_project_id: projectId,
+        });
 
         if (error || !data) return null;
         return data.cloud_version;
@@ -141,16 +114,14 @@ export class CloudStorage {
 
     /**
      * Load full project metadata from cloud.
+     * Also bumps last_accessed_at server-side.
      */
     static async loadProjectMetadata(projectId: string): Promise<CloudProject | null> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase
-            .from('projects')
-            .select('*')
-            .eq('id', projectId)
-            .is('deleted_at', null)
-            .maybeSingle();
+        const { data, error } = await supabase.rpc('project_get', {
+            p_project_id: projectId,
+        });
 
         if (error) throw error;
         return data;
@@ -162,12 +133,7 @@ export class CloudStorage {
     static async listProjectsSummary(): Promise<CloudProjectSummary[]> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase
-            .from('projects')
-            .select('id, name, thumbnail_storage_path, last_accessed_at, updated_at, created_at, expires_at, cf_video_uid, cloud_version, duration_ms')
-            .is('deleted_at', null)
-            .eq('upload_status', 'ready')
-            .order('updated_at', { ascending: false });
+        const { data, error } = await supabase.rpc('project_list');
 
         if (error) throw error;
         return data ?? [];
@@ -179,75 +145,31 @@ export class CloudStorage {
     static async softDeleteProject(projectId: string): Promise<void> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { error } = await supabase
-            .from('projects')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', projectId);
+        const { error } = await supabase.rpc('project_delete', {
+            p_project_id: projectId,
+        });
 
         if (error) throw error;
-    }
-
-    /**
-     * Update last_accessed_at (called when user opens a project).
-     */
-    static async updateLastAccessed(projectId: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { error } = await supabase
-            .from('projects')
-            .update({ last_accessed_at: new Date().toISOString() })
-            .eq('id', projectId);
-
-        if (error) throw error;
-    }
-
-    // ─── Quota ──────────────────────────────────────────────────
-
-    /**
-     * Get the user's current storage usage and limits.
-     */
-    static async getStorageQuota(): Promise<StorageQuota> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        // Get usage via RPC
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
-
-        const { data: usedBytes, error: rpcError } = await supabase
-            .rpc('get_user_storage_bytes', { p_user_id: user.id });
-
-        if (rpcError) throw rpcError;
-
-        const { data: quota, error: quotaError } = await supabase
-            .from('user_quotas')
-            .select('storage_limit_bytes, max_projects')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (quotaError) throw quotaError;
-
-        return {
-            usedBytes: usedBytes ?? 0,
-            limitBytes: quota?.storage_limit_bytes ?? 26843545600, // 25 GB default
-            maxProjects: quota?.max_projects ?? 50,
-        };
     }
 
     // ─── Media Upload / Download ──────────────────────────────────
 
     /**
-     * Request a signed upload URL from the edge function.
-     * Returns the URL and storage path for a specific media file.
+     * Create a project on the server. Sends the full project struct;
+     * the server generates storage paths, stamps them into the project,
+     * saves to DB with upload_status='pending', and returns signed upload URLs.
+     *
+     * After uploading blobs, call confirmProjectUpload() to flip status to 'ready'.
      */
-    static async requestUploadUrl(
-        projectId: string,
-        fileType: MediaFileType,
-        sizeBytes: number,
-    ): Promise<{ signedUrl: string; token: string; storagePath: string }> {
+    static async createProject(
+        project: Project,
+        name: string,
+        isPro?: boolean,
+    ): Promise<{ projectId: string; uploads: { fileType: string; storagePath: string; signedUrl: string; token: string }[] }> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.functions.invoke('storage-upload-url', {
-            body: { projectId, fileType, sizeBytes },
+        const { data, error } = await supabase.functions.invoke('project-create', {
+            body: { project, name, isPro },
         });
 
         if (error) throw error;
@@ -261,15 +183,30 @@ export class CloudStorage {
         return data;
     }
 
-    /** Map fileType to the clean MIME type expected by the storage bucket */
-    private static mimeForFileType(fileType: MediaFileType): string {
-        switch (fileType) {
-            case 'screen': return 'video/webm';
-            case 'camera': return 'video/webm';
-            case 'mic':    return 'audio/wav';
-            case 'thumbnail': return 'image/webp';
-        }
+    /**
+     * Confirm project media upload — flips upload_status from 'pending' to 'ready'
+     * and records file sizes for quota tracking.
+     */
+    static async confirmProjectUpload(
+        projectId: string,
+        screenSizeBytes: number,
+        cameraSizeBytes: number,
+        micSizeBytes: number,
+    ): Promise<void> {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.rpc('project_confirm_upload', {
+            p_project_id: projectId,
+            p_screen_size_bytes: screenSizeBytes,
+            p_camera_size_bytes: cameraSizeBytes,
+            p_mic_size_bytes: micSizeBytes,
+        });
+
+        if (error) throw error;
+        if (!data) console.warn('[CloudStorage] project_confirm_upload returned false — project may already be ready');
     }
+
+
 
     /**
      * Upload a blob to the signed URL. Uses XMLHttpRequest for progress tracking.
@@ -366,54 +303,24 @@ export class CloudStorage {
     }
 
     /**
-     * Confirm a media upload completed — updates the project row with storage path and size.
-     * Atomically sets upload_status = 'ready' when all media is uploaded.
+     * Upload a thumbnail for a project. Requests a signed URL from
+     * storage-upload-url and uploads via PUT.
      */
-    static async confirmMediaUpload(
+    static async uploadThumbnail(
         projectId: string,
-        fileType: MediaFileType,
-        storagePath: string,
-        sizeBytes: number,
-    ): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.functions.invoke('storage-confirm-media', {
-            body: { projectId, fileType, storagePath, sizeBytes },
-        });
-
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-    }
-
-    /**
-     * Full media upload pipeline for a single file type:
-     * 1. Request upload URL (validates quota + ownership)
-     * 2. Upload blob — TUS resumable for large media, signed URL PUT for thumbnails
-     * 3. Confirm upload (updates project row)
-     */
-    static async uploadMediaFile(
-        projectId: string,
-        fileType: MediaFileType,
         blob: Blob,
         onProgress?: (fraction: number) => void,
     ): Promise<string> {
-        const { signedUrl, storagePath } = await this.requestUploadUrl(
-            projectId, fileType, blob.size,
-        );
+        if (!supabase) throw new Error('Supabase not configured');
 
-        const contentType = this.mimeForFileType(fileType);
+        const { data, error } = await supabase.functions.invoke('storage-upload-url', {
+            body: { projectId, fileType: 'thumbnail', sizeBytes: blob.size },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
 
-        if (fileType === 'thumbnail') {
-            // Thumbnails are small — use simple signed URL PUT
-            await this.uploadBlob(signedUrl, blob, contentType, onProgress);
-        } else {
-            // Screen/camera/mic can be large — use TUS resumable upload
-            await this.uploadBlobTus(storagePath, blob, contentType, onProgress);
-        }
-
-        await this.confirmMediaUpload(projectId, fileType, storagePath, blob.size);
-
-        return storagePath;
+        await this.uploadBlob(data.signedUrl, blob, 'image/webp', onProgress);
+        return data.storagePath;
     }
 
     /**
@@ -484,42 +391,6 @@ export class CloudStorage {
         return Math.round(windows.reduce((acc, w) => acc + (w.endMs - w.startMs), 0));
     }
 
-    /**
-     * Strip transient/non-serializable fields from project before storing as JSONB.
-     * Removes runtimeUrl, keeps storageUrl.
-     */
-    static stripForCloud(project: Project): any {
-        const stripped = { ...project };
-
-        // Strip runtimeUrl from sources
-        if (stripped.screenSource) {
-            const { runtimeUrl: _, ...rest } = stripped.screenSource;
-            stripped.screenSource = rest as typeof stripped.screenSource;
-        }
-        if (stripped.cameraSource) {
-            const { runtimeUrl: _, ...rest } = stripped.cameraSource;
-            stripped.cameraSource = rest as typeof stripped.cameraSource;
-        }
-        if (stripped.microphoneSource) {
-            const { runtimeUrl: _, ...rest } = stripped.microphoneSource;
-            stripped.microphoneSource = rest as typeof stripped.microphoneSource;
-        }
-
-        // Strip customRuntimeUrl from settings
-        if (stripped.settings?.background?.customRuntimeUrl) {
-            const { customRuntimeUrl: _, ...rest } = stripped.settings.background;
-            stripped.settings = { ...stripped.settings, background: rest as typeof stripped.settings.background };
-        }
-        if (stripped.settings?.audio?.music?.customRuntimeUrl) {
-            const { customRuntimeUrl: _, ...rest } = stripped.settings.audio.music;
-            stripped.settings = {
-                ...stripped.settings,
-                audio: { ...stripped.settings.audio, music: rest as typeof stripped.settings.audio.music }
-            };
-        }
-
-        return stripped;
-    }
 }
 
 /**

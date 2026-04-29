@@ -45,6 +45,8 @@ import { getHeightForQuality, type ExportQuality } from '@shared/utils/exportQua
 export interface RenderJobConfig {
     /** Full project data including userEvents */
     project: Project;
+    /** Project name (DB column, not in project_data) */
+    projectName?: string;
     /** Export quality */
     quality: ExportQuality;
     /** Directory containing downloaded media files */
@@ -63,7 +65,7 @@ export interface RenderResult {
  * Run the full server-side export pipeline.
  */
 export async function renderProject(config: RenderJobConfig): Promise<RenderResult> {
-    const { project, quality, mediaDir } = config;
+    const { project, projectName, quality, mediaDir } = config;
     const log = config.onProgress ?? ((phase, progress, msg) => {
         console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${msg}`);
     });
@@ -89,7 +91,7 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
     if (screenPath) {
         const ext = new ServerFrameExtractor(screenPath);
         await ext.initialize();
-        frameExtractors[renderProject.screenSource.id] = ext;
+        frameExtractors[renderProject.screenSource.storagePath] = ext;
         log('prepare', 0.3, `Screen extractor ready: ${ext.width}x${ext.height}, ${ext.duration.toFixed(1)}s`);
     }
 
@@ -98,7 +100,7 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
         if (cameraPath) {
             const ext = new ServerFrameExtractor(cameraPath);
             await ext.initialize();
-            frameExtractors[renderProject.cameraSource.id] = ext;
+            frameExtractors[renderProject.cameraSource.storagePath] = ext;
             log('prepare', 0.4, `Camera extractor ready: ${ext.width}x${ext.height}`);
         }
     }
@@ -240,7 +242,7 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
 
         // 2-7. Painter stack (replicating PlaybackRenderer.render)
         const t2 = Date.now();
-        renderFrame(ctx, nodeRenderContext, renderProject, userEvents, videoRefs, deviceFrameImg, canvas, currentTimeMs, timeMapper);
+        renderFrame(ctx, nodeRenderContext, renderProject, userEvents, videoRefs, deviceFrameImg, canvas, currentTimeMs, timeMapper, projectName);
         const paintMs = Date.now() - t2;
 
         // Get raw RGBA buffer and pipe to FFmpeg
@@ -334,6 +336,7 @@ function renderFrame(
     sourceCanvas: CanvasImageSource & { width: number; height: number },
     currentTimeMs: number,
     timeMapper: TimeMapper,
+    projectName?: string,
 ): void {
     const outputSize = project.settings.outputSize;
     const { timeline } = project;
@@ -351,12 +354,12 @@ function renderFrame(
 
     // Screen layer
     let viewMapper: any;
-    const screenVideo = videoRefs[screenSource.id];
+    const screenVideo = videoRefs[screenSource.storagePath];
     if (screenVideo) {
         const result = drawScreen(
             ctx, screenVideo, project, effectiveViewport,
             deviceFrameImg, currentTimeMs, timeMapper,
-            userEvents?.urlChanges
+            userEvents?.urlChanges, projectName
         );
         viewMapper = result.viewMapper;
 
@@ -399,7 +402,7 @@ function renderFrame(
 
     // Camera
     if (cameraSource) {
-        const video = videoRefs[cameraSource.id];
+        const video = videoRefs[cameraSource.storagePath];
         if (video) {
             const cameraSettings = project.settings.camera;
             if (cameraSettings) {

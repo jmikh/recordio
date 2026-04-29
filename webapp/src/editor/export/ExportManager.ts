@@ -8,8 +8,9 @@
 import * as Sentry from '@sentry/react';
 import { ExportManager as SharedExportManager, type ExportProgress, type ExportResult, type ExportEnvironment } from '@shared/export/ExportManager';
 import { browserRenderContext } from '../../core/renderContext';
-import { downloadViaNative } from '../../bridge/macBridge';
 import { useUIStore } from '../stores/useUIStore';
+import { useMediaUrlStore } from '../stores/useMediaUrlStore';
+import { useProjectStore } from '../stores/useProjectStore';
 import { getClickSoundBuffer, getDragSoundBuffers } from '../../core/audio/clickSoundPlayer';
 import { LocalPreferences } from '../../storage/localPreferences';
 import type { DecodePreferences } from '@shared/export/FrameExtractor';
@@ -49,6 +50,7 @@ export class ExportManager {
                 dragDown: dragBuffers.down,
                 dragUp: dragBuffers.up,
             },
+            mediaUrls: useMediaUrlStore.getState().urls,
         };
 
         const wrappedOnProgress = (state: ExportProgress) => {
@@ -56,10 +58,11 @@ export class ExportManager {
         };
 
         try {
-            const result = await this.inner.exportProject(project, quality, wrappedOnProgress, options, env);
+            const projectName = useProjectStore.getState().projectName;
+            const result = await this.inner.exportProject(project, quality, wrappedOnProgress, options, env, projectName);
 
             if (!options?.skipDownload) {
-                await this.downloadBlob(result.blob, `${project.name}_${quality}.mp4`);
+                await this.downloadBlob(result.blob, `${projectName}_${quality}.mp4`);
             }
 
             return result;
@@ -74,11 +77,6 @@ export class ExportManager {
     }
 
     private async downloadBlob(blob: Blob, filename: string) {
-        // In Mac app: use native save dialog via Swift bridge
-        const sentToNative = await downloadViaNative(blob, filename);
-        if (sentToNative) return;
-
-        // Browser fallback: standard anchor download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

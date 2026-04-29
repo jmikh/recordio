@@ -36,20 +36,11 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         const pollInterval = setInterval(async () => {
             if (!supabase) return;
 
-            // Check if user has active subscription
-            // Use maybeSingle() instead of single() to avoid 406 errors when subscription doesn't exist yet
-            const { data, error } = await supabase
-                .from('subscriptions')
-                .select('status, plan_id, current_period_end, cancel_at_period_end, stripe_customer_id, billing_interval')
-                .eq('user_id', userId)
-                .maybeSingle();
+            // Check if user has active subscription via RPC
+            const { data, error } = await supabase.rpc('subscription_get');
 
-            // Ignore "not found" - it's expected while waiting for webhook to create subscription
-            // Only log actual errors (network issues, permission errors, etc.)
-            if (error) {
-                console.error('[UpgradeModal] Error checking subscription status:', error);
-                return;
-            }
+            // Ignore errors — expected while waiting for webhook to create subscription
+            if (error || !data) return;
 
             if (data?.status === 'active') {
                 setSuccess(true);

@@ -30,6 +30,8 @@ interface AudioRenderOptions {
     sampleRate?: number;
     /** Optional sound effect buffers for click/drag mixing. */
     soundEffects?: SoundEffectBuffers;
+    /** Media URLs keyed by source ID. */
+    mediaUrls?: Record<string, string>;
 }
 
 /**
@@ -40,7 +42,7 @@ interface AudioRenderOptions {
  * volume control and speed-aware windowed playback.
  */
 export async function renderAudioBuffer(options: AudioRenderOptions): Promise<AudioBuffer> {
-    const { project, totalDurationSec, userEvents, timeMapper, sampleRate = 44100, soundEffects } = options;
+    const { project, totalDurationSec, userEvents, timeMapper, sampleRate = 44100, soundEffects, mediaUrls = {} } = options;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDurationSec), sampleRate);
 
     const audioSettings = project.settings.audio;
@@ -50,7 +52,7 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
 
     // Screen audio (system audio)
     if ((project.screenSource as ScreenMetadata).hasAudio && !audioSettings?.muteScreenAudio) {
-        const screenUrl = project.screenSource.runtimeUrl;
+        const screenUrl = mediaUrls[project.screenSource.storagePath];
         if (screenUrl) {
             audioSources.push({
                 url: screenUrl,
@@ -60,16 +62,21 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
     }
 
     // Microphone audio (separate track)
-    if (project.microphoneSource?.runtimeUrl && !audioSettings?.muteMicrophone) {
+    const micUrl = project.microphoneSource ? mediaUrls[project.microphoneSource.storagePath] : undefined;
+    if (micUrl && !audioSettings?.muteMicrophone) {
         audioSources.push({
-            url: project.microphoneSource.runtimeUrl,
+            url: micUrl,
             volume: audioSettings?.microphoneVolume ?? 1,
         });
     }
 
     await Promise.all(audioSources.map(async (audioSource) => {
         try {
+            console.log(`[Export:Audio] Fetching audio URL: "${audioSource.url}" (type=${audioSource.url?.startsWith('blob:') ? 'blob' : 'network'}, volume=${audioSource.volume})`);
             const response = await fetch(audioSource.url);
+            if (!response.ok) {
+                console.error(`[Export:Audio] Audio fetch returned ${response.status} ${response.statusText} for URL: "${audioSource.url}"`);
+            }
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
 
@@ -120,7 +127,8 @@ export async function renderAudioBuffer(options: AudioRenderOptions): Promise<Au
     if (audioSettings?.music?.enabled) {
         const musicUrl = audioSettings.music.source === 'preset'
             ? audioSettings.music.presetUrl
-            : audioSettings.music.customRuntimeUrl;
+            : (audioSettings.music.storagePath && mediaUrls?.[audioSettings.music.storagePath])
+              || undefined;
 
         if (musicUrl) {
             try {

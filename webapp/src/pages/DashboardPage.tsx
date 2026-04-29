@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { SyncService, type ProjectListItem } from '../storage/syncService';
+import { CloudProjectService, type ProjectListItem } from '../storage/cloudProjectService';
 import { ProjectCard } from '../components/ProjectCard';
 import { LogoLink, XButton, Modal, Button, ProBadge, ThemeToggle } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
@@ -16,11 +16,9 @@ import { UserMenu } from '../components/UserMenu';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { UpgradeModal } from '../editor/components/header/UpgradeModal';
 import { useToast } from '../editor/components/Toast';
-import { useAuthListener } from '../hooks/useAuthListener';
 import { trackProjectOpened } from '../core/analytics';
-import { importProjectFromZip } from '../storage/projectTransfer';
+
 import { navigate } from '../navigate';
-import { cleanupStorageIfNeeded } from '../storage/storageCleanup';
 
 const EXTENSION_ID = import.meta.env.DEV
     ? 'lpponocoanighhephabalkejmdbjlhmi'
@@ -46,9 +44,6 @@ export function DashboardPage() {
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
-    useAuthListener();
-    const importInputRef = useRef<HTMLInputElement>(null);
-    const [isImporting, setIsImporting] = useState(false);
     const [loginLoading, setLoginLoading] = useState(false);
     const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -58,23 +53,6 @@ export function DashboardPage() {
     const selectMode = selectedIds.size > 0;
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-
-    const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setIsImporting(true);
-        try {
-            const projectId = await importProjectFromZip(file);
-            addToast({ type: 'success', title: 'Project Imported', message: 'Opening project...' });
-            navigate(`/editor?projectId=${projectId}`);
-        } catch (err: any) {
-            console.error('Import failed:', err);
-            addToast({ type: 'error', title: 'Import Failed', message: err?.message || 'Invalid archive' });
-        } finally {
-            setIsImporting(false);
-            if (importInputRef.current) importInputRef.current.value = '';
-        }
-    };
 
     const handleRecord = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,31 +99,37 @@ export function DashboardPage() {
             window.history.replaceState({}, '', url.pathname + url.search + url.hash);
         }
 
-        loadProjects();
-        cleanupStorageIfNeeded();
-        SyncService.resumePendingUploads().catch(console.error);
 
     }, []);
 
-    // Reload projects when auth state changes (login/logout)
+    // Load projects once auth is ready, and reload on login/logout
     useEffect(() => {
-        loadProjects();
-    }, [isAuthenticated]);
+        if (!isAuthenticated) return;
 
-    const loadProjects = async () => {
-        try {
-            const allProjects = await SyncService.listProjects(userId, (projectId, thumbnailUrl) => {
-                setProjects(prev => prev.map(p =>
-                    p.id === projectId ? { ...p, thumbnail: thumbnailUrl } : p
-                ));
-            });
-            setProjects(allProjects);
-        } catch (error) {
-            console.error('Failed to load projects:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        const ctrl = { cancelled: false };
+        console.log('[Dashboard] effect fired, isAuthenticated=', isAuthenticated);
+        (async () => {
+            try {
+                await AuthManager.ready;
+                console.log('[Dashboard] ready resolved, cancelled=', ctrl.cancelled);
+                if (ctrl.cancelled) return;
+                const allProjects = await CloudProjectService.listProjects((projectId, thumbnailUrl) => {
+                    if (!ctrl.cancelled) {
+                        setProjects(prev => prev.map(p =>
+                            p.id === projectId ? { ...p, thumbnail: thumbnailUrl } : p
+                        ));
+                    }
+                });
+                if (!ctrl.cancelled) setProjects(allProjects);
+            } catch (error) {
+                if (!ctrl.cancelled) console.error('Failed to load projects:', error);
+            } finally {
+                if (!ctrl.cancelled) setLoading(false);
+            }
+        })();
+
+        return () => { ctrl.cancelled = true; };
+    }, [isAuthenticated]);
 
     // All projects from listProjects are usable: cloud projects are filtered
     // for ready status, and local projects always have blobs.
@@ -179,7 +163,7 @@ export function DashboardPage() {
         const count = selectedIds.size;
         try {
             for (const id of selectedIds) {
-                await SyncService.deleteProject(id);
+                await CloudProjectService.deleteProject(id);
             }
             setProjects(prev => prev.filter(p => !selectedIds.has(p.id)));
             setSelectedIds(new Set());
@@ -263,26 +247,6 @@ export function DashboardPage() {
                 {/* Projects Grid */}
                 <main className="p-6">
                     {/* Toolbar */}
-                    <div className="flex items-center gap-3 mb-4">
-                        {import.meta.env.DEV && (
-                            <>
-                                <input
-                                    ref={importInputRef}
-                                    type="file"
-                                    accept=".zip"
-                                    className="hidden"
-                                    onChange={handleImportProject}
-                                />
-                                <button
-                                    onClick={() => importInputRef.current?.click()}
-                                    disabled={isImporting}
-                                    className="text-xs text-primary hover:text-primary-highlighted transition-colors disabled:opacity-50"
-                                >
-                                    {isImporting ? 'Importing...' : 'Import Project'}
-                                </button>
-                            </>
-                        )}
-                    </div>
 
                     {loading ? (
                         <div className="flex items-center justify-center h-64">

@@ -1,10 +1,11 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useAssetLibraryStore } from '../../stores/useAssetLibraryStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { UserAssetService } from '../../../storage/userAssetService';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
-import { LocalStorage, type CustomMusicEntry } from '../../../storage/localStorage';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
 
 // CDN preset music tracks
@@ -19,6 +20,8 @@ const PRESET_MUSIC = [
 export const AudioSettingsPanel = () => {
     const project = useProjectData();
     const updateSettings = useProjectStore(s => s.updateSettings);
+    const selectMusic = useProjectStore(s => s.selectMusic);
+    const clearMusic = useProjectStore(s => s.clearMusic);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Collapsible state
@@ -26,8 +29,13 @@ export const AudioSettingsPanel = () => {
     const showCollapsibleMusic = useUIStore(s => s.showCollapsibleMusic);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
-    // Custom music library state
-    const [customLibrary, setCustomLibrary] = useState<CustomMusicEntry[]>([]);
+    // Asset library (loaded once on project open)
+    const customLibrary = useAssetLibraryStore(s => s.music);
+    const blobUrls = useAssetLibraryStore(s => s.blobUrls);
+    const canUploadMusic = useAssetLibraryStore(s => s.canUploadMusic);
+    const addAsset = useAssetLibraryStore(s => s.addAsset);
+    const removeAsset = useAssetLibraryStore(s => s.removeAsset);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Audio preview state
     const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
@@ -36,16 +44,6 @@ export const AudioSettingsPanel = () => {
 
     // Undo/redo batching
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
-    // Load custom music library
-    const loadLibrary = useCallback(async () => {
-        const entries = await LocalStorage.listCustomMusic();
-        setCustomLibrary(entries);
-    }, []);
-
-    useEffect(() => {
-        loadLibrary();
-    }, []);
 
     // Cleanup preview audio on unmount
     useEffect(() => {
@@ -129,74 +127,38 @@ export const AudioSettingsPanel = () => {
                     source: 'preset',
                     presetUrl: preset.url,
                     presetName: preset.name,
-                    customStorageUrl: undefined,
-                    customRuntimeUrl: undefined,
-                    customLibraryId: undefined,
+                    storagePath: undefined,
                 },
             },
         });
     };
 
-    const handleCustomSelect = async (entry: CustomMusicEntry) => {
-        const runtimeUrl = URL.createObjectURL(entry.blob);
-
-        // Store blob in project recordings for persistence
-        const blobId = `audio-music-${entry.id}`;
-        await LocalStorage.saveRecordingBlob(blobId, entry.blob);
-        const storageUrl = `recordio-blob://${blobId}`;
-
-        updateSettings({
-            audio: {
-                music: {
-                    enabled: true,
-                    source: 'custom',
-                    presetUrl: undefined,
-                    presetName: undefined,
-                    customStorageUrl: storageUrl,
-                    customRuntimeUrl: runtimeUrl,
-                    customLibraryId: entry.id,
-                },
-            },
-        });
+    const handleCustomSelect = async (storagePath: string) => {
+        try {
+            await selectMusic(storagePath);
+        } catch (err) {
+            console.error('Failed to select custom music', err);
+        }
     };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        setIsUploading(true);
         try {
-            // Save to global library
-            const libraryId = await LocalStorage.saveCustomMusic(file, file.name);
-
-            // Store blob in project recordings for persistence
-            const blobId = `audio-music-${libraryId}`;
-            await LocalStorage.saveRecordingBlob(blobId, file);
-            const storageUrl = `recordio-blob://${blobId}`;
-            const runtimeUrl = URL.createObjectURL(file);
-
-            updateSettings({
-                audio: {
-                    music: {
-                        enabled: true,
-                        source: 'custom',
-                        presetUrl: undefined,
-                        presetName: undefined,
-                        customStorageUrl: storageUrl,
-                        customRuntimeUrl: runtimeUrl,
-                        customLibraryId: libraryId,
-                    },
-                },
-            });
-
-            await loadLibrary();
+            const asset = await UserAssetService.uploadAsset(file, 'music');
+            addAsset(asset);
+            await selectMusic(asset.storagePath);
         } catch (err) {
             console.error('Failed to upload music', err);
         } finally {
+            setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
-    const handleLibraryDelete = async (id: string, e: React.MouseEvent) => {
+    const handleLibraryDelete = async (id: string, storagePath: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
         // Stop preview if this entry is being previewed
@@ -208,8 +170,12 @@ export const AudioSettingsPanel = () => {
             setPreviewingEntryId(null);
         }
 
-        await LocalStorage.deleteCustomMusic(id);
-        await loadLibrary();
+        // If deleted asset is currently selected, clear it
+        if (music?.storagePath === storagePath) {
+            clearMusic();
+        }
+
+        await removeAsset(id, storagePath);
     };
 
     // Build preview items for audio toggles card
@@ -238,7 +204,7 @@ export const AudioSettingsPanel = () => {
 
     // Determine which preset/custom is selected
     const selectedPresetUrl = music?.source === 'preset' ? music.presetUrl : undefined;
-    const selectedCustomId = music?.source === 'custom' ? music.customLibraryId : undefined;
+    const selectedCustomPath = music?.source === 'custom' ? music.storagePath : undefined;
 
     return (
         <div className="flex flex-col gap-2">
@@ -334,7 +300,7 @@ export const AudioSettingsPanel = () => {
                         label="Enabled"
                         value={music?.enabled ?? false}
                         onChange={(v) => {
-                            if (v && !music?.presetUrl && !music?.customRuntimeUrl) {
+                            if (v && !music?.presetUrl && !music?.storagePath) {
                                 // First time enabling: auto-select the first preset
                                 const first = PRESET_MUSIC[0];
                                 updateSettings({
@@ -439,11 +405,16 @@ export const AudioSettingsPanel = () => {
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-text-muted">Your Library</span>
                                     <button
-                                        className="flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors cursor-pointer"
-                                        onClick={() => fileInputRef.current?.click()}
+                                        className={`flex items-center gap-1 text-xs transition-colors ${
+                                            !canUploadMusic() || isUploading
+                                                ? 'text-text-disabled cursor-not-allowed'
+                                                : 'text-primary hover:text-primary-hover cursor-pointer'
+                                        }`}
+                                        onClick={() => canUploadMusic() && !isUploading && fileInputRef.current?.click()}
+                                        title={!canUploadMusic() ? 'Library full (10/10) — delete a track to upload a new one' : isUploading ? 'Uploading...' : 'Upload music'}
                                     >
                                         <TbUpload className="icon-sm" />
-                                        Upload
+                                        {isUploading ? 'Uploading...' : 'Upload'}
                                     </button>
                                     <input
                                         type="file"
@@ -457,7 +428,8 @@ export const AudioSettingsPanel = () => {
                                 {customLibrary.length > 0 ? (
                                     <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto scrollbar-thin">
                                         {customLibrary.map((entry) => {
-                                            const isActive = selectedCustomId === entry.id;
+                                            const isActive = selectedCustomPath === entry.storagePath;
+                                            const entryBlobUrl = blobUrls[entry.storagePath];
                                             return (
                                                 <div
                                                     key={entry.id}
@@ -465,7 +437,7 @@ export const AudioSettingsPanel = () => {
                                                         ? 'bg-primary/15 text-primary'
                                                         : 'bg-transparent text-text-main hover:bg-state-hover'
                                                         }`}
-                                                    onClick={() => handleCustomSelect(entry)}
+                                                    onClick={() => handleCustomSelect(entry.storagePath)}
                                                 >
                                                     <button
                                                         className="flex-shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors text-text-muted hover:text-text-highlighted"
@@ -477,10 +449,10 @@ export const AudioSettingsPanel = () => {
                                                                 setPreviewingUrl(null);
                                                                 setPreviewingEntryId(null);
                                                             } else {
+                                                                if (!entryBlobUrl) return;
                                                                 if (previewAudio) previewAudio.pause();
                                                                 useUIStore.getState().setIsPlaying(false);
-                                                                const blobUrl = URL.createObjectURL(entry.blob);
-                                                                const audio = new Audio(blobUrl);
+                                                                const audio = new Audio(entryBlobUrl);
                                                                 audio.volume = music?.volume ?? 0.3;
                                                                 audio.play().catch(console.error);
                                                                 audio.onended = () => {
@@ -489,7 +461,7 @@ export const AudioSettingsPanel = () => {
                                                                     setPreviewingEntryId(null);
                                                                 };
                                                                 setPreviewAudio(audio);
-                                                                setPreviewingUrl(blobUrl);
+                                                                setPreviewingUrl(entryBlobUrl);
                                                                 setPreviewingEntryId(entry.id);
                                                             }
                                                         }}
@@ -506,13 +478,11 @@ export const AudioSettingsPanel = () => {
                                                     {isActive && (
                                                         <span className="chosen-dot ml-auto mr-1" />
                                                     )}
-                                                    {!isActive && (
-                                                        <XButton
-                                                            onClick={(e) => handleLibraryDelete(entry.id, e)}
-                                                            title="Remove from library"
-                                                            className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        />
-                                                    )}
+                                                    <XButton
+                                                        onClick={(e) => handleLibraryDelete(entry.id, entry.storagePath, e)}
+                                                        title="Remove from library"
+                                                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    />
                                                 </div>
                                             );
                                         })}

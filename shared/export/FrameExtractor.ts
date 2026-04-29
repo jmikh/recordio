@@ -109,7 +109,17 @@ export class FrameExtractor {
 
         // Fetch video on main thread — web-demuxer's worker (blob: origin)
         // can't fetch blob: URLs from the main page.
-        const response = await fetch(this.url);
+        console.log(`[FrameExtractor] Fetching video URL: "${this.url}" (type=${this.url?.startsWith('blob:') ? 'blob' : 'network'})`);
+        let response: Response;
+        try {
+            response = await fetch(this.url);
+        } catch (e) {
+            console.error(`[FrameExtractor] Failed to fetch video URL: "${this.url}"`, e);
+            throw e;
+        }
+        if (!response.ok) {
+            console.error(`[FrameExtractor] Video fetch returned ${response.status} ${response.statusText} for URL: "${this.url}"`);
+        }
         const blob = await response.blob();
 
         // Detect container format from MIME type — web-demuxer uses the file

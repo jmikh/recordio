@@ -3,8 +3,10 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, UserEvents } from '../../types';
 import { ProjectImpl } from '../../core/Project';
-import { LocalStorage } from '../../storage/localStorage';
-import { SyncService } from '../../storage/syncService';
+import { CloudProjectService } from '../../storage/cloudProjectService';
+import { CloudStorage } from '../../storage/cloudStorage';
+import { BlobCache } from '../../storage/blobCache';
+import { useMediaUrlStore } from './useMediaUrlStore';
 import { useUserStore } from './useUserStore';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
@@ -17,22 +19,26 @@ import { createOverlaySlice, type OverlaySlice } from './slices/overlaySlice';
 
 export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, OverlaySlice {
     project: Project;
+    /** Project name — stored as DB column, not in project_data. */
+    projectName: string;
     /** Recording events — loaded once, never mutated, excluded from undo/redo history. */
     userEvents: UserEvents;
     isSaving: boolean;
 
 
     // Actions
-    loadProject: (project: Project) => Promise<void>;
+    loadProject: (project: Project, name: string) => Promise<void>;
     saveProject: () => Promise<void>;
 
-    // Background Library Actions
-    /** Upload to global library AND select for current project (copy-on-select) */
-    uploadAndSelectBackground: (file: Blob) => Promise<{ libraryId: string; storageUrl: string; runtimeUrl: string }>;
-    /** Select an existing library background for current project (copy-on-select) */
-    selectBackgroundFromLibrary: (libraryId: string) => Promise<{ libraryId: string; storageUrl: string; runtimeUrl: string }>;
-    /** Clear the current project's custom background copy */
-    clearProjectBackground: () => Promise<void>;
+    // Background/Music Actions
+    /** Select a library asset as the project's custom background */
+    selectBackground: (storagePath: string) => Promise<void>;
+    /** Clear the current project's custom background */
+    clearBackground: () => void;
+    /** Select a library asset as the project's custom music */
+    selectMusic: (storagePath: string) => Promise<void>;
+    /** Clear the current project's custom music */
+    clearMusic: () => void;
 
     // Audio State
     mutedSources: Record<ID, boolean>;
@@ -55,7 +61,8 @@ export const useProjectStore = create<ProjectState>()(
         temporal(
             (set, get, store) => ({
                 // Initialize with a default empty project
-                project: ProjectImpl.create('Untitled Project'),
+                project: ProjectImpl.create(),
+                projectName: 'Untitled Project',
                 userEvents: { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] },
                 isSaving: false,
                 mutedSources: {},
@@ -80,19 +87,9 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 })),
 
-                loadProject: async (project) => {
-                    // Revoke old blob URLs to prevent memory leaks during SPA navigation
-                    const prev = get().project;
-                    const blobUrls = [
-                        prev.screenSource?.runtimeUrl,
-                        prev.cameraSource?.runtimeUrl,
-                        prev.microphoneSource?.runtimeUrl,
-                        prev.settings?.background?.customRuntimeUrl,
-                        prev.settings?.audio?.music?.customRuntimeUrl,
-                    ];
-                    for (const url of blobUrls) {
-                        if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-                    }
+                loadProject: async (project, name) => {
+                    // Note: blob URL cleanup is handled by the caller (App.tsx)
+                    // before CloudProjectService.loadProject hydrates new URLs.
 
                     // Separate userEvents from the project so undo/redo history
                     // (via zundo's `partialize`) doesn't snapshot the potentially
@@ -133,7 +130,7 @@ export const useProjectStore = create<ProjectState>()(
                         projectWithoutEvents.settings.overlay.textDefaults.backgroundColor = '#ffdb57';
                     }
 
-                    set({ project: projectWithoutEvents as Project, userEvents });
+                    set({ project: projectWithoutEvents as Project, projectName: name, userEvents });
 
                     // Clear History so we can't undo into valid empty state or previous project
                     useProjectStore.temporal.getState().clear();
@@ -142,7 +139,12 @@ export const useProjectStore = create<ProjectState>()(
                 saveProject: async () => {
                     set({ isSaving: true });
                     try {
-                        await LocalStorage.saveProject(get().project);
+                        const { userId, isPro } = useUserStore.getState();
+                        if (userId) {
+                            const userEvents = get().userEvents;
+                            const fullProject = { ...get().project, userEvents };
+                            await CloudProjectService.saveProject(fullProject, userId, isPro);
+                        }
                     } catch (e) {
                         console.error("Failed to save project:", e);
                     } finally {
@@ -150,67 +152,65 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                uploadAndSelectBackground: async (blob) => {
-                    const state = get();
-                    const projectId = state.project.id;
+                selectBackground: async (storagePath) => {
+                    const blobUrl = await BlobCache.getBlobUrl(storagePath);
+                    useMediaUrlStore.getState().setUrl(storagePath, blobUrl);
 
-                    // 1. Save to global library
-                    const libraryId = await LocalStorage.saveCustomBackground(blob);
-
-
-                    // 2. Copy to project recordings
-                    const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
-                    await LocalStorage.saveRecordingBlob(copyId, blob);
-
-
-                    // 3. Create URLs
-                    const storageUrl = `recordio-blob://${copyId}`;
-                    const runtimeUrl = URL.createObjectURL(blob);
-
-                    return { libraryId, storageUrl, runtimeUrl };
+                    get().updateSettings({
+                        background: {
+                            ...get().project.settings.background,
+                            type: 'custom',
+                            storagePath,
+                            imageUrl: undefined,
+                        },
+                    });
                 },
 
-                selectBackgroundFromLibrary: async (libraryId) => {
-                    const state = get();
-                    const projectId = state.project.id;
-
-                    // 1. Get blob from library
-                    const blob = await LocalStorage.getCustomBackground(libraryId);
-                    if (!blob) {
-                        throw new Error(`Background ${libraryId} not found in library`);
-                    }
-
-                    // 2. Copy to project recordings
-                    const copyId = `${projectId}-bg-${crypto.randomUUID()}`;
-                    await LocalStorage.saveRecordingBlob(copyId, blob);
-
-
-                    // 3. Create URLs
-                    const storageUrl = `recordio-blob://${copyId}`;
-                    const runtimeUrl = URL.createObjectURL(blob);
-
-                    return { libraryId, storageUrl, runtimeUrl };
+                clearBackground: () => {
+                    get().updateSettings({
+                        background: {
+                            ...get().project.settings.background,
+                            type: 'color',
+                            storagePath: undefined,
+                        },
+                    });
                 },
 
-                clearProjectBackground: async () => {
-                    const state = get();
-                    const currentUrl = state.project.settings.background.customStorageUrl;
+                selectMusic: async (storagePath) => {
+                    const blobUrl = await BlobCache.getBlobUrl(storagePath);
+                    useMediaUrlStore.getState().setUrl(storagePath, blobUrl);
 
-                    if (currentUrl?.startsWith('recordio-blob://')) {
-                        const blobId = currentUrl.replace('recordio-blob://', '');
-                        await LocalStorage.deleteRecordingBlob(blobId);
+                    get().updateSettings({
+                        audio: {
+                            ...get().project.settings.audio,
+                            music: {
+                                ...get().project.settings.audio.music,
+                                source: 'custom',
+                                storagePath,
+                            },
+                        },
+                    });
+                },
 
-                    }
+                clearMusic: () => {
+                    get().updateSettings({
+                        audio: {
+                            ...get().project.settings.audio,
+                            music: {
+                                ...get().project.settings.audio.music,
+                                source: 'preset',
+                                storagePath: undefined,
+                                enabled: false,
+                            },
+                        },
+                    });
                 },
 
                 updateProjectName: (name: string) => {
-                    set((state) => ({
-                        project: {
-                            ...state.project,
-                            name,
-                            updatedAt: new Date()
-                        }
-                    }));
+                    set({ projectName: name });
+                    // Persist to DB immediately (fire-and-forget, no debounce)
+                    const projectId = get().project.id;
+                    CloudStorage.updateProjectName(projectId, name).catch(console.error);
                 },
 
                 setExportState: (updates) => {
@@ -233,32 +233,26 @@ export const useProjectStore = create<ProjectState>()(
 );
 
 // --- Auto-Save Subscription ---
-// Re-attaches userEvents (stripped on load — see loadProject) before writing
-// the full Project record back to IndexedDB. This is the inverse of the
-// split performed in loadProject, ensuring the persisted record always
-// contains the complete userEvents.
-//
-// SyncService.saveProject handles both local (IndexedDB) and cloud sync:
-//   - Local save: immediate (2s debounce here)
-//   - Cloud sync: separate 30s debounce inside SyncService
+// Debounces project changes and saves directly to cloud.
+// CloudProjectService.saveProject skips no-op writes via SHA-256 hash check.
 let saveTimeout: any = null;
 useProjectStore.subscribe(
     (state) => state.project,
     (project) => {
-        // Debounce save (e.g., 2 seconds)
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
+            const { userId, isPro } = useUserStore.getState();
+            if (!userId) return;
             const userEvents = useProjectStore.getState().userEvents;
             const fullProject = { ...project, userEvents };
-            // SyncService saves locally first, then queues cloud sync if authenticated
-            const { userId, isPro } = useUserStore.getState();
-            SyncService.saveProject(fullProject, userId, isPro).catch(console.error);
+            CloudProjectService.saveProject(fullProject, userId, isPro).catch(console.error);
         }, 2000);
     }
 );
 
 // --- Selectors ---
 
+export const useProjectName = () => useProjectStore(s => s.projectName);
 export const useProjectData = () => useProjectStore(s => s.project);
 export const useProjectTimeline = () => useProjectStore(s => s.project.timeline);
 export const useTimeline = () => useProjectStore(s => s.project.timeline);

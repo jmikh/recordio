@@ -4,12 +4,13 @@ import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
 import { WatchPage } from './pages/WatchPage';
 import { UninstallPage } from './pages/UninstallPage';
-import { MacHandoffPage } from './pages/MacHandoffPage';
 import { ToastProvider } from './editor/components/Toast';
-import { initMacBridge } from './bridge/macBridge';
+import { AuthManager } from './auth/AuthManager';
 
-// Initialize Mac native bridge (no-op if not inside WKWebView)
-initMacBridge();
+// Initialize auth before React renders — ensures onAuthStateChange fires
+// before any component tries to make Supabase queries.
+AuthManager.init();
+
 export function App() {
     const [path, setPath] = useState(window.location.pathname);
 
@@ -39,10 +40,6 @@ export function App() {
 
         if (path.startsWith('/watch/')) {
             return <WatchPage />;
-        }
-
-        if (path === '/mac-handoff' || path.startsWith('/mac-handoff')) {
-            return <MacHandoffPage />;
         }
 
         // Default to dashboard

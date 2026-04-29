@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '@shared/components';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
-import { SyncService } from '../../storage/syncService';
+import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useUserStore } from '../stores/useUserStore';
 import { navigate } from '../../navigate';
@@ -28,9 +28,9 @@ export function ConflictModal() {
     const handleLoadCloud = async () => {
         setLoading('load');
         try {
-            const project = await SyncService.resolveConflictReload(conflict.projectId);
-            if (project) {
-                useProjectStore.getState().loadProject(project);
+            const result = await CloudProjectService.resolveConflictReload(conflict.projectId);
+            if (result) {
+                useProjectStore.getState().loadProject(result.project, result.name);
             }
             afterResolve();
         } catch (err) {
@@ -47,7 +47,7 @@ export function ConflictModal() {
             const fullProject = { ...project, userEvents };
             const { userId, isPro } = useUserStore.getState();
             if (userId) {
-                await SyncService.resolveConflictForce(fullProject, userId, isPro);
+                await CloudProjectService.resolveConflictForce(fullProject, userId, isPro);
             }
             afterResolve();
         } catch (err) {
@@ -67,8 +67,8 @@ export function ConflictModal() {
             </div>
 
             <p className="text-sm text-text-main mb-6">
-                Failed to sync your local changes to <strong>{conflict.projectName}</strong> because
-                it was modified on another device. Choose how to resolve:
+                Failed to sync your local changes because
+                the project was modified on another device. Choose how to resolve:
             </p>
 
             <div className="flex flex-col gap-3">

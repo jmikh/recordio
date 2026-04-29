@@ -101,12 +101,8 @@ export interface BackgroundSettings {
     gradientDirection: number;
     /** Static URL for preset backgrounds (type: 'preset') */
     imageUrl?: string;
-    /** Persistent URL for custom uploads (type: 'custom'). recordio-blob:// protocol. */
-    customStorageUrl?: string;
-    /** Transient blob URL for custom uploads. Populated on load, never saved. */
-    customRuntimeUrl?: string;
-    /** ID of the global library entry this background came from. Used for matching. */
-    customLibraryId?: string;
+    /** Cloud storage path for custom background. Authoritative field for custom type. */
+    storagePath?: string;
     colorMode: 'gradient' | 'solid';
     backgroundBlurPx: number;
 }
@@ -213,12 +209,8 @@ export interface MusicSettings {
     presetUrl?: string;
     /** Display name of the selected preset */
     presetName?: string;
-    /** Persistent URL for custom uploads (recordio-blob:// protocol) */
-    customStorageUrl?: string;
-    /** Transient blob URL (populated on load, never saved) */
-    customRuntimeUrl?: string;
-    /** ID of the global music library entry */
-    customLibraryId?: string;
+    /** Cloud storage path for custom music. Authoritative field for custom source. */
+    storagePath?: string;
     /** Fade out duration in milliseconds. 0 = no fade. Default: 3000 */
     fadeOutDurationMs: number;
 }

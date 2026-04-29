@@ -1,32 +1,30 @@
 /**
  * Download project media files from signed URLs to a local temp directory.
+ *
+ * mediaUrls is keyed by storagePath (e.g. "userId/projectId/screen.webm" → signedUrl).
+ * Returns a map of storagePath → local filename so the render page can resolve them.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { MediaFileNames } from './playwrightRender.js';
 
-export interface MediaUrls {
-    screen?: string;
-    camera?: string;
-    mic?: string;
-}
+/** storagePath → signed download URL */
+export type MediaUrls = Record<string, string>;
+
+/** storagePath → local filename written to tmpDir */
+export type MediaFileNames = Record<string, string>;
 
 export async function downloadMedia(
     mediaUrls: MediaUrls,
     projectData: { settings?: { audio?: { music?: { enabled?: boolean; source?: string; presetUrl?: string } } } },
     tmpDir: string,
 ): Promise<MediaFileNames> {
-    const downloads: Array<{ name: string; url: string }> = [];
+    const downloads: Array<{ storagePath: string; localName: string; url: string }> = [];
 
-    if (mediaUrls.screen) {
-        downloads.push({ name: `screen${getExt(mediaUrls.screen)}`, url: mediaUrls.screen });
-    }
-    if (mediaUrls.camera) {
-        downloads.push({ name: `camera${getExt(mediaUrls.camera)}`, url: mediaUrls.camera });
-    }
-    if (mediaUrls.mic) {
-        downloads.push({ name: `mic${getExt(mediaUrls.mic)}`, url: mediaUrls.mic });
+    for (const [storagePath, signedUrl] of Object.entries(mediaUrls)) {
+        // Use the last segment of the storagePath as local filename (e.g. "screen.webm")
+        const localName = path.basename(storagePath);
+        downloads.push({ storagePath, localName, url: signedUrl });
     }
 
     // Background music (CDN preset URL — download directly)
@@ -46,22 +44,20 @@ export async function downloadMedia(
 
     // Download all media from signed URLs in parallel
     await Promise.all(downloads.map(async (dl) => {
-        console.log(`[Render] Downloading ${dl.name}`);
+        console.log(`[Render] Downloading ${dl.localName} (${dl.storagePath})`);
         const resp = await fetch(dl.url);
         if (!resp.ok) {
-            throw new Error(`Failed to download ${dl.name}: ${resp.status} ${resp.statusText}`);
+            throw new Error(`Failed to download ${dl.storagePath}: ${resp.status} ${resp.statusText}`);
         }
 
         const buffer = Buffer.from(await resp.arrayBuffer());
-        fs.writeFileSync(path.join(tmpDir, dl.name), buffer);
-        console.log(`[Render] ✓ ${dl.name} downloaded (${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
+        fs.writeFileSync(path.join(tmpDir, dl.localName), buffer);
+        console.log(`[Render] ✓ ${dl.localName} downloaded (${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
     }));
 
     const fileNames: MediaFileNames = {};
     for (const dl of downloads) {
-        if (dl.name.startsWith('screen')) fileNames.screen = dl.name;
-        else if (dl.name.startsWith('camera')) fileNames.camera = dl.name;
-        else if (dl.name.startsWith('mic')) fileNames.mic = dl.name;
+        fileNames[dl.storagePath] = dl.localName;
     }
     return fileNames;
 }

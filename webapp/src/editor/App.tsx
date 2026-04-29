@@ -1,48 +1,32 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { ExportModal } from './components/settings/ExportModal';
-import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
+import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
 import { TimelineToolbar } from './components/timeline/TimelineToolbar';
-import { useUIStore, CanvasMode } from './stores/useUIStore';
+import { useUIStore } from './stores/useUIStore';
 import { getTimeMapper } from './hooks/useTimeMapper';
 
 
-import { LocalStorage } from '../storage/localStorage';
-import { CloudStorage } from '../storage/cloudStorage';
-import { SyncService } from '../storage/syncService';
+import { CloudProjectService } from '../storage/cloudProjectService';
+import { useMediaUrlStore } from './stores/useMediaUrlStore';
+import { useAssetLibraryStore } from './stores/useAssetLibraryStore';
 import { ProgressModal, Modal } from '@shared/components';
 import { formatTimeCode } from './utils';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
+import { SyncFailedModal } from './components/SyncFailedModal';
 
 
 
-// Auth imports
-import { AuthManager, supabase } from '../auth/AuthManager';
 import { useUserStore } from './stores/useUserStore';
 import { ShareService } from './services/ShareService';
 import { trackEditorLoaded } from '../core/analytics';
 import { navigate } from '../navigate';
-
-/** Fetch a remote image once and return it as a data URL to avoid repeated network requests. */
-async function cacheAvatarUrl(url: string): Promise<string | null> {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-        });
-    } catch {
-        return null;
-    }
-}
+import { usePendingUploadStore } from '../storage/pendingUploadStore';
+import { useBackgroundUpload } from '../hooks/useBackgroundUpload';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -50,12 +34,12 @@ function Editor() {
 
     // -- Project State --
     const project = useProjectData();
-
+    const projectName = useProjectName();
     const loadProject = useProjectStore(s => s.loadProject);
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const showDebugBar = useUIStore(s => s.showDebugBar);
-    const canvasMode = useUIStore(s => s.canvasMode);
+
 
 
     // Export state (must be at top level - Rules of Hooks)
@@ -71,105 +55,21 @@ function Editor() {
     const [loadingStatus, setLoadingStatus] = useState('Loading project...');
     const [loadError, setLoadError] = useState<string | null>(null);
 
+    // Background upload: kicks off media upload for freshly imported projects
+    const projectId = new URLSearchParams(window.location.search).get('projectId');
+    const saveProject = useProjectStore(s => s.saveProject);
+    const { retry: retryUpload } = useBackgroundUpload(projectId, () => {
+        // Upload complete — flush any buffered edits
+        saveProject();
+    });
 
-    // Initialize authentication
+
+    // Clean up OAuth callback hash if present
     useEffect(() => {
-        if (!supabase) {
-            return;
-        }
-
-        // Check if this is an OAuth callback (tokens in URL hash)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-
-        if (accessToken) {
-
-            // Supabase will automatically process the hash and create a session
-            // Clear the hash after processing to clean up the URL
-            setTimeout(() => {
-                window.location.hash = '';
-
-            }, 1000);
+        if (hashParams.get('access_token')) {
+            setTimeout(() => { window.location.hash = ''; }, 1000);
         }
-
-        // Initialize auth state listener
-        AuthManager.initAuthListener(async (session) => {
-            const { setUser, setSubscription, clearUser } = useUserStore.getState();
-
-            if (session) {
-                // User is logged in
-
-
-                const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
-                const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
-                const rawPicture = avatar_url || picture || null;
-
-                // Skip fetch if we already initiated a cache for this source URL.
-                // The UI uses initials as a fallback while the data URL loads.
-                const cached = useUserStore.getState();
-                let userPicture: string | null;
-                if (rawPicture && cached.pictureSourceUrl === rawPicture) {
-                    userPicture = cached.picture;
-                } else {
-                    // Set pictureSourceUrl immediately so subsequent rapid
-                    // onAuthStateChange callbacks see the match and skip (prevents 429s)
-                    setUser(session.user.id, session.user.email || '', userName, null, rawPicture);
-                    userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
-                }
-
-                setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
-
-                // Fetch subscription status from database
-                try {
-                    const { data, error } = await supabase!
-                        .from('subscriptions')
-                        .select('*')
-                        .eq('user_id', session.user.id)
-                        .maybeSingle();
-
-                    if (error) {
-                        // User is on free plan (no subscription found)
-                    } else if (data) {
-                        setSubscription({
-                            status: data.status,
-                            planId: data.plan_id,
-                            currentPeriodEnd: new Date(data.current_period_end),
-                            cancelAtPeriodEnd: data.cancel_at_period_end,
-                            stripeCustomerId: data.stripe_customer_id,
-                            billingInterval: data.billing_interval || null
-                        });
-
-                    }
-                } catch (error) {
-                    // Subscription table not configured yet
-                }
-            } else {
-                // User is logged out
-                clearUser();
-            }
-        });
-
-        // Check initial session
-        AuthManager.getSession().then(async (session) => {
-            if (session) {
-                const { setUser } = useUserStore.getState();
-                const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
-                const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
-                const rawPicture = avatar_url || picture || null;
-
-                // Skip fetch if we already initiated a cache for this source URL.
-                const cached = useUserStore.getState();
-                let userPicture: string | null;
-                if (rawPicture && cached.pictureSourceUrl === rawPicture) {
-                    userPicture = cached.picture;
-                } else {
-                    setUser(session.user.id, session.user.email || '', userName, null, rawPicture);
-                    userPicture = rawPicture ? await cacheAvatarUrl(rawPicture) : null;
-                }
-
-                setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
-            }
-        });
     }, []);
 
 
@@ -183,125 +83,41 @@ function Editor() {
                 navigate('/', { replace: true });
                 return;
             }
-            try {
-                const isAuthed = useUserStore.getState().isAuthenticated;
-                let loadedProject = await LocalStorage.loadProject(projectId);
-                let cloudProject: Awaited<ReturnType<typeof CloudStorage.loadProjectMetadata>> = null;
 
-                // If not found locally, try downloading from cloud
-                if (!loadedProject && isAuthed) {
-                    setLoadingStatus('Downloading project from cloud...');
-                    cloudProject = await CloudStorage.loadProjectMetadata(projectId);
-                    if (!cloudProject) {
-                        navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
-                        return;
-                    }
-                    const project = cloudProject.project_data;
-                    project.id = projectId;
-                    await LocalStorage.saveProject(project);
-                    await LocalStorage.saveSyncMeta({
-                        projectId,
-                        userId: cloudProject.user_id,
-                        cloudVersion: cloudProject.cloud_version,
-                        cloudSynced: cloudProject.upload_status === 'ready',
-                        lastSyncedAt: Date.now(),
-                        lastAccessedAt: Date.now(),
-                    });
-                    loadedProject = await LocalStorage.loadProject(projectId);
+            const isAuthed = useUserStore.getState().isAuthenticated;
+            if (!isAuthed) {
+                navigate('/', { replace: true });
+                return;
+            }
+
+            try {
+                // If we just imported this project, blob URLs are already set
+                // in useMediaUrlStore by importRecordingLocal — don't revoke them.
+                const hasPendingUpload = usePendingUploadStore.getState().pending?.projectId === projectId;
+                if (!hasPendingUpload) {
+                    useMediaUrlStore.getState().revokeAll();
                 }
 
-                if (!loadedProject) {
+                const result = await CloudProjectService.loadProject(projectId, setLoadingStatus);
+
+                if (!result) {
                     navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
                     return;
                 }
 
-                // Sync local ↔ cloud versions on open
-                if (isAuthed) {
-                    try {
-                        const syncMeta = await LocalStorage.getSyncMeta(projectId);
-                        const localVersion = syncMeta?.cloudVersion ?? 0;
-                        const cloudVersion = await CloudStorage.getCloudVersion(projectId);
-
-                        if (cloudVersion !== null && cloudVersion > localVersion) {
-                            setLoadingStatus('Syncing project...');
-                            cloudProject = await CloudStorage.loadProjectMetadata(projectId);
-                            if (cloudProject?.project_data) {
-                                const project = cloudProject.project_data as typeof loadedProject;
-                                project!.id = projectId;
-                                await LocalStorage.saveProject(project!);
-                                await LocalStorage.saveSyncMeta({
-                                    projectId,
-                                    userId: syncMeta?.userId ?? useUserStore.getState().userId ?? '',
-                                    cloudVersion: cloudProject.cloud_version,
-                                    cloudSynced: true,
-                                    lastSyncedAt: Date.now(),
-                                    lastAccessedAt: Date.now(),
-                                });
-                                loadedProject = await LocalStorage.loadProject(projectId);
-                                console.log(`[Editor] Loaded newer cloud version (v${cloudVersion} > local v${localVersion})`);
-                            }
-                        } else if (cloudVersion !== null && cloudVersion < localVersion) {
-                            const { userId, isPro } = useUserStore.getState();
-                            if (userId) {
-                                SyncService.syncNow(loadedProject!, userId, isPro).catch(err => {
-                                    console.warn('[Editor] Failed to push local version to cloud on open:', err);
-                                });
-                            }
-                        }
-                    } catch (err) {
-                        console.warn('[Editor] Cloud version check failed, using local:', err);
-                    }
-                }
-
-                // Check for missing media blobs and download from cloud
-                const missingMedia = loadedProject!.screenSource?.storageUrl && !loadedProject!.screenSource?.runtimeUrl
-                    || loadedProject!.cameraSource?.storageUrl && !loadedProject!.cameraSource?.runtimeUrl
-                    || loadedProject!.microphoneSource?.storageUrl && !loadedProject!.microphoneSource?.runtimeUrl;
-
-                if (missingMedia && isAuthed) {
-                    setLoadingStatus('Downloading media...');
-                    if (!cloudProject) {
-                        cloudProject = await CloudStorage.loadProjectMetadata(projectId);
-                    }
-                    if (cloudProject) {
-                        await SyncService.downloadProjectMedia(projectId, cloudProject);
-                        // Re-hydrate now that blobs are in IndexedDB
-                        loadedProject = await LocalStorage.loadProject(projectId);
-                    }
-
-                    // Verify media loaded successfully
-                    const stillMissing = loadedProject!.screenSource?.storageUrl && !loadedProject!.screenSource?.runtimeUrl;
-                    if (stillMissing) {
-                        setLoadError('Could not load project media. Please contact support.');
-                        setIsLoading(false);
-                        return;
-                    }
-                }
-
-                loadProject(loadedProject!);
+                loadProject(result.project, result.name);
                 setIsLoading(false);
                 trackEditorLoaded();
 
-                // Set baseline project hash so auto-save doesn't trigger a
-                // no-op cloud write (prevents spurious sync conflicts when the
-                // same project is open in multiple browsers without edits).
-                const { project: storedProject, userEvents: storedEvents } = useProjectStore.getState();
-                SyncService.initProjectHash({ ...storedProject, userEvents: storedEvents }).catch(console.error);
-
-                // Update local last-accessed timestamp
-                LocalStorage.touchSyncMetaAccess(loadedProject!.id).catch(console.error);
+                // Load asset library in background (non-blocking)
+                useAssetLibraryStore.getState().load().catch(console.error);
 
                 // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
-                if (isAuthed) {
-                    ShareService.getShareForProject(loadedProject!.id);
-                    CloudStorage.updateLastAccessed(loadedProject!.id).catch(console.error);
-                    SyncService.resumePendingUploads().catch(console.error);
-                }
+                ShareService.getShareForProject(projectId);
 
-            } catch (err: any) {
-                console.error("Project Init Failed:", err);
-                // If we got far enough to have a project but media failed, show error in editor
-                if (loadingStatus === 'Downloading media...') {
+            } catch (err) {
+                console.error('[Editor] Project init failed:', err);
+                if (loadingStatus.includes('media') || loadingStatus.includes('Loading screen') || loadingStatus.includes('Loading camera') || loadingStatus.includes('Loading audio')) {
                     setLoadError('Could not load project media. Please contact support.');
                     setIsLoading(false);
                 } else {
@@ -311,18 +127,6 @@ function Editor() {
         }
 
         init();
-    }, []);
-
-    // Flush pending cloud syncs on page unload
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            const { project, userEvents } = useProjectStore.getState();
-            const { userId, isPro } = useUserStore.getState();
-            const fullProject = { ...project, userEvents };
-            SyncService.flushPendingSync(fullProject, userId, isPro);
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
     // Global Key Listener for Undo/Redo & Play/Pause
@@ -383,7 +187,7 @@ function Editor() {
 
     // Derived UI State
     // Check if we have a valid screen source to determine if project is "active" / has content
-    const hasActiveProject = !!project.screenSource?.id;
+    const hasActiveProject = !!project.screenSource?.storagePath;
     const projectOutputSize = project.settings.outputSize;
 
     // Calculate Rendered Rect (for overlay positioning)
@@ -493,6 +297,7 @@ function Editor() {
             </div>
 
             <ConflictModal />
+            <SyncFailedModal onRetry={retryUpload} />
             <ProgressModal
                 isOpen={isExporting}
                 title={
@@ -500,7 +305,7 @@ function Editor() {
                         : exportPhase === 'preparing' ? 'Preparing Export'
                             : 'Exporting Project'
                 }
-                projectName={project.name}
+                projectName={projectName}
                 progress={exportProgress}
                 statusText={
                     exportPhase === 'uploading'

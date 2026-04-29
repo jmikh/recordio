@@ -8,7 +8,7 @@ export interface SyncState {
     currentDownload: { projectId: string; type: string; progress: number } | null;
     error: string | null;
     /** Set when another device wrote a newer version */
-    conflict: { projectId: string; projectName: string } | null;
+    conflict: { projectId: string } | null;
     /** Path to navigate to after conflict resolution (set when leaving editor mid-conflict) */
     pendingNavigation: string | null;
 }

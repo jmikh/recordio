@@ -1,0 +1,123 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
+
+const BUCKET = 'project-media';
+
+const EXT_MAP: Record<string, string> = {
+    screen: 'webm',
+    camera: 'webm',
+    mic: 'wav',
+};
+
+/**
+ * Project Upload Edge Function
+ *
+ * Takes a full project struct, generates storage paths for all media,
+ * stamps them into the project, saves it to DB with upload_status='pending',
+ * and returns signed upload URLs for each media file.
+ *
+ * The client uploads blobs directly to Storage, then calls the
+ * project_confirm_upload RPC to flip status to 'ready'.
+ *
+ * Request:  { project, isPro? }
+ * Response: { projectId, uploads: [{ fileType, storagePath, signedUrl, token }] }
+ */
+serve(withAuth(async (req, { user, supabase }) => {
+    // deno-lint-ignore no-explicit-any
+    const { project, name, isPro } = await req.json() as { project: any; name?: string; isPro?: boolean };
+
+    if (!project || !project.id) {
+        return errorResponse('Missing project or project.id', 400);
+    }
+
+    // 1. Check quota — just current usage vs limit, no file size math
+    const adminSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const { data: usedBytes } = await adminSupabase
+        .rpc('get_user_storage_bytes', { p_user_id: user.id });
+
+    const { data: quota } = await adminSupabase
+        .from('user_quotas')
+        .select('storage_limit_bytes')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    const limitBytes = quota?.storage_limit_bytes ?? 26843545600; // 25 GB default
+
+    if ((usedBytes ?? 0) >= limitBytes) {
+        return jsonResponse({
+            error: 'quota_exceeded',
+            message: 'Storage quota exceeded',
+            usedBytes: usedBytes ?? 0,
+            limitBytes,
+        }, 413);
+    }
+
+    // 2. Determine which media files exist and generate storage paths
+    const projectId = project.id;
+    const mediaFiles: { fileType: string; storagePath: string }[] = [];
+
+    if (project.screenSource) {
+        const sp = `${user.id}/${projectId}/screen.${EXT_MAP.screen}`;
+        project.screenSource.storagePath = sp;
+        mediaFiles.push({ fileType: 'screen', storagePath: sp });
+    }
+    if (project.cameraSource) {
+        const sp = `${user.id}/${projectId}/camera.${EXT_MAP.camera}`;
+        project.cameraSource.storagePath = sp;
+        mediaFiles.push({ fileType: 'camera', storagePath: sp });
+    }
+    if (project.microphoneSource) {
+        const sp = `${user.id}/${projectId}/mic.${EXT_MAP.mic}`;
+        project.microphoneSource.storagePath = sp;
+        mediaFiles.push({ fileType: 'mic', storagePath: sp });
+    }
+
+    // 3. Save project to DB with upload_status='pending'
+    const { error: upsertError } = await adminSupabase
+        .from('projects')
+        .upsert({
+            id: projectId,
+            user_id: user.id,
+            name: name ?? 'Untitled',
+            project_data: project,
+            upload_status: 'pending',
+            screen_storage_path: project.screenSource?.storagePath ?? null,
+            camera_storage_path: project.cameraSource?.storagePath ?? null,
+            mic_storage_path: project.microphoneSource?.storagePath ?? null,
+            expires_at: isPro ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+    if (upsertError) {
+        console.error('[project-upload] Upsert failed:', upsertError);
+        return errorResponse('Failed to save project', 500);
+    }
+
+    // 4. Create signed upload URLs for each media file
+    const uploads: { fileType: string; storagePath: string; signedUrl: string; token: string }[] = [];
+
+    for (const mf of mediaFiles) {
+        const { data: signedData, error: signError } = await adminSupabase
+            .storage
+            .from(BUCKET)
+            .createSignedUploadUrl(mf.storagePath, { upsert: true });
+
+        if (signError || !signedData) {
+            console.error(`[project-upload] Signed URL creation failed for ${mf.fileType}:`, signError);
+            return errorResponse(`Failed to create upload URL for ${mf.fileType}`, 500);
+        }
+
+        uploads.push({
+            fileType: mf.fileType,
+            storagePath: mf.storagePath,
+            signedUrl: signedData.signedUrl,
+            token: signedData.token,
+        });
+    }
+
+    return jsonResponse({ projectId, uploads });
+}));

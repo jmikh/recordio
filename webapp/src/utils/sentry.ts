@@ -37,7 +37,7 @@ export function initSentry() {
 
 export interface ImportErrorContext {
     recordingId: string | null;
-    phase: 'checking' | 'receiving' | 'streaming' | 'storing' | 'unknown';
+    phase: 'checking' | 'receiving' | 'streaming' | 'storing' | 'uploading' | 'unknown';
     bridgeStatus?: string;
     progress?: {
         bytesReceived: number;

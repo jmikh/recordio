@@ -455,8 +455,7 @@ export class VideoRecorder {
         }
 
         const screenSource: ScreenMetadata = {
-            id: `src-${projectId}-screen`,
-            storageUrl: `recordio-blob://${screenBlobId}`,
+            storagePath: `recordio-blob://${screenBlobId}`,
             durationMs: duration,
             size: screenSize,
             frameRate: screenFrameRate,
@@ -474,8 +473,7 @@ export class VideoRecorder {
             await ProjectStorage.saveRecordingBlob(camBlobId, camBlob);
 
             cameraSource = {
-                id: `src-${projectId}-camera`,
-                storageUrl: `recordio-blob://${camBlobId}`,
+                storagePath: `recordio-blob://${camBlobId}`,
                 durationMs: duration,
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 frameRate: cameraFrameRate,
@@ -492,8 +490,7 @@ export class VideoRecorder {
             await ProjectStorage.saveRecordingBlob(micBlobId, micBlob);
 
             microphoneSource = {
-                id: `src-${projectId}-mic`,
-                storageUrl: `recordio-blob://${micBlobId}`,
+                storagePath: `recordio-blob://${micBlobId}`,
                 durationMs: duration,
                 createdAt: now,
             };

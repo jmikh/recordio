@@ -54,8 +54,8 @@ export const renderCropEditor = (
     };
 
     // Render Screen Layer
-    if (screenSource.id) {
-        const video = videoRefs[screenSource.id];
+    if (screenSource.storagePath) {
+        const video = videoRefs[screenSource.storagePath];
         if (video) {
             drawScreen(
                 ctx,
