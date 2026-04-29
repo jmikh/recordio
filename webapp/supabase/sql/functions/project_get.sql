@@ -35,9 +35,6 @@ BEGIN
         'updated_at', p.updated_at,
         'created_at', p.created_at,
         'expires_at', p.expires_at,
-        'screen_storage_path', p.screen_storage_path,
-        'camera_storage_path', p.camera_storage_path,
-        'mic_storage_path', p.mic_storage_path,
         'thumbnail_storage_path', p.thumbnail_storage_path
     ) INTO result
     FROM public.projects p

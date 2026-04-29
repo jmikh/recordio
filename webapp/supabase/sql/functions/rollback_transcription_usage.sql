@@ -1,3 +1,6 @@
+-- TODO: Remove this function — no longer called. Usage tracking is now handled
+-- directly by the transcribe edge function (simple SELECT + UPDATE).
+
 -- rollback_transcription_usage(p_user_id, p_minutes)
 --
 -- Decrements a user's transcription usage (floored at 0).

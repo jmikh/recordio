@@ -35,9 +35,6 @@ export interface CloudProject {
     updated_at: string;
     created_at: string;
     expires_at: string | null;
-    screen_storage_path: string | null;
-    camera_storage_path: string | null;
-    mic_storage_path: string | null;
     thumbnail_storage_path: string | null;
 }
 
@@ -303,23 +300,26 @@ export class CloudStorage {
     }
 
     /**
-     * Upload a thumbnail for a project. Requests a signed URL from
-     * storage-upload-url and uploads via PUT.
+     * Upload a thumbnail for a project. Sends the blob to the
+     * project-update-thumbnail edge function which uploads to storage
+     * and updates thumbnail_storage_path on the project row.
      */
     static async uploadThumbnail(
         projectId: string,
         blob: Blob,
-        onProgress?: (fraction: number) => void,
     ): Promise<string> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.functions.invoke('storage-upload-url', {
-            body: { projectId, fileType: 'thumbnail', sizeBytes: blob.size },
+        const formData = new FormData();
+        formData.append('projectId', projectId);
+        formData.append('file', blob, 'thumbnail.webp');
+
+        const { data, error } = await supabase.functions.invoke('project-update-thumbnail', {
+            body: formData,
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
-        await this.uploadBlob(data.signedUrl, blob, 'image/webp', onProgress);
         return data.storagePath;
     }
 

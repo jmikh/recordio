@@ -180,8 +180,7 @@ export function CaptionsSettings() {
         const state = useProjectStore.getState();
         const micSource = state.project.microphoneSource;
 
-        const micUrl = micSource ? useMediaUrlStore.getState().urls[micSource.storagePath] : undefined;
-        if (!micUrl) {
+        if (!micSource) {
             addToast({
                 type: 'error',
                 title: 'No microphone audio',
@@ -215,24 +214,25 @@ export function CaptionsSettings() {
             abortControllerRef.current = new AbortController();
             const signal = abortControllerRef.current.signal;
 
-            // Fetch microphone audio
-            const response = await fetch(micUrl);
-            if (!response.ok) throw new Error(`Failed to fetch audio: ${response.statusText}`);
-            const micBlob = await response.blob();
-
-            if (signal.aborted) throw new Error('Aborted');
-
             let transcriptionData;
 
             if (engine === 'openai') {
                 setTranscriptionState({ transcriptionPhase: 'generating' });
                 transcriptionData = await CloudTranscriptionService.transcribe(
-                    micBlob,
-                    'auto',
-                    () => {},
-                    signal,
+                    state.project.id,
                 );
             } else {
+                // Local engine still needs the audio blob
+                const micUrl = useMediaUrlStore.getState().urls[micSource.storagePath];
+                if (!micUrl) {
+                    throw new Error('Microphone audio not loaded');
+                }
+                const response = await fetch(micUrl);
+                if (!response.ok) throw new Error(`Failed to fetch audio: ${response.statusText}`);
+                const micBlob = await response.blob();
+
+                if (signal.aborted) throw new Error('Aborted');
+
                 const transcriptionService = TranscriptionService.getInstance();
                 transcriptionData = await transcriptionService.transcribe(
                     micBlob,

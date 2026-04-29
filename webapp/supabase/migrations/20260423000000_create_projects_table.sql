@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS public.projects (
     name TEXT NOT NULL DEFAULT 'Untitled',
     project_data JSONB NOT NULL,
 
-    -- Media storage paths in Supabase Storage bucket
+    -- DEPRECATED: these *_storage_path columns are redundant — the same paths
+    -- live inside project_data JSON (screenSource.storagePath, etc.).
+    -- Kept for now to avoid a breaking migration; do NOT use in new code.
     -- NULL = media doesn't exist, 'pending' = exists locally but not uploaded yet
     screen_storage_path TEXT,
     camera_storage_path TEXT,

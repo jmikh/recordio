@@ -1,3 +1,6 @@
+-- TODO: Remove this function — no longer called. Usage tracking is now handled
+-- directly by the transcribe edge function (simple SELECT + UPDATE).
+
 -- upsert_transcription_usage(p_user_id, p_minutes, p_reset_date, p_default_limit)
 --
 -- Tracks per-user transcription minutes. Inserts a new row on first use,

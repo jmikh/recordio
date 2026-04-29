@@ -544,8 +544,8 @@ export function ExportModal() {
                         </Button>
                     </Tooltip>
 
-                    {/* Server Render */}
-                    <Button
+                    {/* Server Render — hidden for now */}
+                    {false && <Button
                         onClick={handleServerExport}
                         fullWidth
                         className="text-sm font-medium"
@@ -554,7 +554,7 @@ export function ExportModal() {
                         {isServerExporting
                             ? `Rendering on server... ${Math.round(serverRenderProgress * 100)}%`
                             : 'Server Render'}
-                    </Button>
+                    </Button>}
 
                     {/* Inline status badge */}
                     {statusBadge && (

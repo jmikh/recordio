@@ -43,41 +43,43 @@ export interface MediaEntry {
  *
  * // TODO: Also update the Deno copy at webapp/supabase/functions/_shared/projectMedia.ts
  */
+export function getProjectScreenPath(project: Project): string | null {
+    return project.screenSource?.storagePath ?? null;
+}
+
+export function getProjectCameraPath(project: Project): string | null {
+    return project.cameraSource?.storagePath ?? null;
+}
+
+export function getProjectMicPath(project: Project): string | null {
+    return project.microphoneSource?.storagePath ?? null;
+}
+
+export function getProjectBackgroundPath(project: Project): string | null {
+    return project.settings?.background?.storagePath ?? null;
+}
+
+export function getProjectMusicPath(project: Project): string | null {
+    return project.settings?.audio?.music?.storagePath ?? null;
+}
+
 export function getProjectMediaPaths(project: Project): MediaEntry[] {
     const entries: MediaEntry[] = [];
 
-    entries.push({
-        storagePath: project.screenSource.storagePath,
-        type: 'screen',
-    });
+    const screen = getProjectScreenPath(project);
+    if (screen) entries.push({ storagePath: screen, type: 'screen' });
 
-    if (project.cameraSource) {
-        entries.push({
-            storagePath: project.cameraSource.storagePath,
-            type: 'camera',
-        });
-    }
+    const camera = getProjectCameraPath(project);
+    if (camera) entries.push({ storagePath: camera, type: 'camera' });
 
-    if (project.microphoneSource) {
-        entries.push({
-            storagePath: project.microphoneSource.storagePath,
-            type: 'mic',
-        });
-    }
+    const mic = getProjectMicPath(project);
+    if (mic) entries.push({ storagePath: mic, type: 'mic' });
 
-    if (project.settings?.background?.storagePath) {
-        entries.push({
-            storagePath: project.settings.background.storagePath,
-            type: 'background',
-        });
-    }
+    const background = getProjectBackgroundPath(project);
+    if (background) entries.push({ storagePath: background, type: 'background' });
 
-    if (project.settings?.audio?.music?.storagePath) {
-        entries.push({
-            storagePath: project.settings.audio.music.storagePath,
-            type: 'music',
-        });
-    }
+    const music = getProjectMusicPath(project);
+    if (music) entries.push({ storagePath: music, type: 'music' });
 
     return entries;
 }

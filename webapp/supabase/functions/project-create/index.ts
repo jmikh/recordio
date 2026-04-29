@@ -86,9 +86,6 @@ serve(withAuth(async (req, { user, supabase }) => {
             name: name ?? 'Untitled',
             project_data: project,
             upload_status: 'pending',
-            screen_storage_path: project.screenSource?.storagePath ?? null,
-            camera_storage_path: project.cameraSource?.storagePath ?? null,
-            mic_storage_path: project.microphoneSource?.storagePath ?? null,
             expires_at: isPro ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
