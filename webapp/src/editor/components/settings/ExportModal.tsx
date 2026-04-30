@@ -552,7 +552,7 @@ export function ExportModal() {
                     </Tooltip>
 
                     {/* Server Render — hidden for now */}
-                    {true && <Button
+                    {false && <Button
                         onClick={handleServerExport}
                         fullWidth
                         className="text-sm font-medium"
