@@ -45,7 +45,7 @@ serve(async (req: Request) => {
         // 3. Read current job
         const { data: job, error: readError } = await adminSupabase
             .from('render_jobs')
-            .select('status, created_at, start_duration_s, project_id, cloud_version, output_storage_path')
+            .select('status, created_at, start_duration_s, project_id, cloud_version, render_storage_path')
             .eq('id', jobId)
             .maybeSingle();
 
@@ -91,7 +91,7 @@ serve(async (req: Request) => {
             await adminSupabase
                 .from('projects')
                 .update({
-                    render_storage_path: job.output_storage_path,
+                    render_storage_path: job.render_storage_path,
                     render_cloud_version: job.cloud_version,
                     updated_at: now.toISOString(),
                 })

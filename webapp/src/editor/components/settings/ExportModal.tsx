@@ -197,8 +197,15 @@ export function ExportModal() {
             const { jobId, status } = data;
 
             if (status === 'completed') {
-                // Cache hit — download immediately
-                await downloadServerRender();
+                // Cache hit — download using render_storage_path from project
+                const { data: proj } = await supabase!
+                    .from('projects')
+                    .select('render_storage_path')
+                    .eq('id', project.id)
+                    .maybeSingle();
+                if (proj?.render_storage_path) {
+                    await downloadServerRender(proj.render_storage_path);
+                }
                 return;
             }
 
@@ -208,7 +215,7 @@ export function ExportModal() {
             const pollInterval = setInterval(async () => {
                 const { data: job } = await supabase!
                     .from('render_jobs')
-                    .select('status, progress, error')
+                    .select('status, progress, error, render_storage_path')
                     .eq('id', jobId)
                     .maybeSingle();
 
@@ -218,7 +225,7 @@ export function ExportModal() {
 
                 if (job.status === 'completed') {
                     clearInterval(pollInterval);
-                    await downloadServerRender();
+                    await downloadServerRender(job.render_storage_path);
                     setIsServerExporting(false);
                 } else if (job.status === 'failed' || job.status === 'canceled') {
                     clearInterval(pollInterval);
@@ -239,10 +246,10 @@ export function ExportModal() {
         }
     };
 
-    const downloadServerRender = async () => {
+    const downloadServerRender = async (storagePath: string) => {
         try {
             const { data, error } = await supabase!.functions.invoke('storage-download-url', {
-                body: { projectId: project.id, fileType: 'render' },
+                body: { storagePath },
             });
 
             if (error || data?.error) {
@@ -545,7 +552,7 @@ export function ExportModal() {
                     </Tooltip>
 
                     {/* Server Render — hidden for now */}
-                    {false && <Button
+                    {true && <Button
                         onClick={handleServerExport}
                         fullWidth
                         className="text-sm font-medium"

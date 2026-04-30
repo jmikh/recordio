@@ -7,51 +7,21 @@ const BUCKET = 'project-media';
 /**
  * Storage Download URL Edge Function
  *
- * Validates JWT + project ownership, returns a signed download URL.
- * The client downloads directly from Storage using the signed URL.
+ * Returns a signed download URL for a file in project-media storage.
+ * Verifies the caller owns the file by checking the storage path prefix.
  *
- * Two modes:
- *   Existing: { storagePath }
- *   Enum:     { projectId, fileType: 'render' }
- *
- * Response: { signedUrl }
+ * Request body: { storagePath }
+ * Response:     { signedUrl }
  */
-serve(withAuth(async (req, { user, supabase }) => {
-    const body = await req.json();
-    const { storagePath: rawStoragePath, projectId, fileType } = body;
+serve(withAuth(async (req, { user }) => {
+    const { storagePath } = await req.json();
+    if (!storagePath) {
+        return errorResponse('Missing storagePath', 400);
+    }
 
-    let storagePath: string;
-
-    if (projectId && fileType) {
-        // Enum mode — build path internally
-        // Verify project ownership via RLS
-        const { data: project, error: projectError } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('id', projectId)
-            .is('deleted_at', null)
-            .maybeSingle();
-
-        if (projectError || !project) {
-            return errorResponse('Project not found', 404);
-        }
-
-        const pathMap: Record<string, string> = {
-            render: `${user.id}/${projectId}/render_1080p.mp4`,
-        };
-
-        storagePath = pathMap[fileType];
-        if (!storagePath) {
-            return errorResponse(`Invalid fileType. Must be one of: ${Object.keys(pathMap).join(', ')}`, 400);
-        }
-    } else if (rawStoragePath) {
-        // Legacy mode — raw storage path
-        if (!rawStoragePath.startsWith(`${user.id}/`)) {
-            return errorResponse('Forbidden', 403);
-        }
-        storagePath = rawStoragePath;
-    } else {
-        return errorResponse('Missing storagePath or (projectId + fileType)', 400);
+    // Verify ownership: storage paths are prefixed with user_id
+    if (!storagePath.startsWith(`${user.id}/`)) {
+        return errorResponse('Forbidden', 403);
     }
 
     // Create signed download URL (1 hour expiry)
