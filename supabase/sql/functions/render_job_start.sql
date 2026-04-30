@@ -66,7 +66,7 @@ BEGIN
       AND rj.status = 'pending';
 
     -- 5. Insert new job (path is the single source of truth for render output location)
-    v_render_storage_path := p_user_id || '/' || p_project_id || '/render.mp4';
+    v_render_storage_path := p_user_id || '/' || p_project_id || '/render_v' || v_cloud_version || '.mp4';
 
     INSERT INTO public.render_jobs (project_id, user_id, cloud_version, render_storage_path)
     VALUES (p_project_id, p_user_id, v_cloud_version, v_render_storage_path)

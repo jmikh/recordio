@@ -382,7 +382,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
-    videoDecodePreference: LocalPreferences.getPreferSoftwareDecode() ? 'cpu' : 'gpu',
+    videoDecodePreference: 'cpu', // Always default to CPU during product restructuring
     setVideoDecodePreference: (pref) => {
         LocalPreferences.setPreferSoftwareDecode(pref === 'cpu');
         set({ videoDecodePreference: pref });

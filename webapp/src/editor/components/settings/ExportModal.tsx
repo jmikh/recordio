@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { timeAgo } from '../../../utils/timeAgo';
 import * as Sentry from '@sentry/react';
 
-import { TbSettings2, TbLink, TbDownload, TbCopy } from 'react-icons/tb';
-import { MultiToggle, Dropdown, Toggle, Tooltip, Button, ProBadge, Modal, XButton } from '@shared/components';
+import { TbLink, TbDownload, TbCopy } from 'react-icons/tb';
+import { Tooltip, Button, Modal, XButton } from '@shared/components';
 import { useProjectStore, useProjectData, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
@@ -45,7 +45,7 @@ export function ExportModal() {
     const isOpen = useUIStore(s => s.isExportModalOpen);
     const setExportModalOpen = useUIStore(s => s.setExportModalOpen);
 
-    const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('720p');
+    const [selectedQuality] = useState<ExportQuality>('1080p');
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -75,15 +75,7 @@ export function ExportModal() {
 
     const handleDownload = () => {
         if (isExporting) return;
-
-        const needsProFeature = (selectedQuality === '1080p' || selectedQuality === '2K' || selectedQuality === '4K');
-
-        if (proAccess || !needsProFeature) {
-            startDownload(selectedQuality);
-            return;
-        }
-
-        setIsUpgradeModalOpen(true);
+        startDownload(selectedQuality);
     };
 
     const startDownload = async (quality: ExportQuality) => {
@@ -440,9 +432,8 @@ export function ExportModal() {
         }
     };
 
-    // Determine if currently selected options require Pro
-    const selectedQualityOption = QUALITY_OPTIONS.find(o => o.value === selectedQuality);
-    const needsProFeature = selectedQualityOption?.proOnly && !proAccess;
+    // Pro gating disabled during product restructuring
+    const needsProFeature = false;
 
     // Inline trial/auth status badge — only show when user doesn't have pro access
     const statusBadge = proAccess ? null : (
@@ -461,7 +452,7 @@ export function ExportModal() {
         )
     );
 
-    const proBadge = <ProBadge />;
+    // const proBadge = <ProBadge />;
 
     const busy = isExporting || isPublishing || isSyncingMedia;
 
@@ -477,19 +468,7 @@ export function ExportModal() {
 
             <div className="flex flex-col gap-6 text-sm text-text-main overflow-y-auto max-h-[70vh] custom-scrollbar pr-2">
                 <div className="flex flex-col gap-5">
-                    {/* Quality Selection */}
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted w-1/3 shrink-0">Quality</span>
-                        <Dropdown
-                            options={QUALITY_OPTIONS.map(opt => ({
-                                value: opt.value,
-                                label: opt.label,
-                                suffix: opt.proOnly && !isPro ? proBadge : undefined,
-                            }))}
-                            value={selectedQuality}
-                            onChange={(val) => setSelectedQuality(val)}
-                        />
-                    </div>
+                    {/* Quality Selection — hidden during product restructuring */}
 
                     {/* Publish / Republish Button */}
                     {(() => {
@@ -551,8 +530,8 @@ export function ExportModal() {
                         </Button>
                     </Tooltip>
 
-                    {/* Server Render — hidden for now */}
-                    {true && <Button
+                    {/* Server Render — hidden during product restructuring */}
+                    {false && <Button
                         onClick={handleServerExport}
                         fullWidth
                         className="text-sm font-medium"
@@ -571,33 +550,7 @@ export function ExportModal() {
                     )}
                 </div>
 
-                <div className="h-[1px] w-full bg-border opacity-50 my-1" />
-
-                {/* Advanced Settings */}
-                <div className="flex flex-col gap-4">
-                    <h3 className="font-medium text-text-highlighted flex items-center gap-2">
-                        <TbSettings2 className="icon-md" />
-                        Advanced
-                    </h3>
-                    <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-text-muted shrink-0">Video Decoding</span>
-                            <MultiToggle
-                                options={[
-                                    { value: 'cpu', label: 'CPU' },
-                                    { value: 'gpu', label: 'GPU' },
-                                ]}
-                                value={useUIStore((s) => s.videoDecodePreference)}
-                                onChange={(val) => useUIStore.getState().setVideoDecodePreference(val as 'gpu' | 'cpu')}
-                            />
-                        </div>
-                        <p className="text-[11px] text-text-disabled leading-snug">
-                            Controls how video frames are decoded during export — <span className="font-semibold text-text-muted">this has no effect on the final video quality.</span> CPU works best for most machines. GPU may speed things up on high-end hardware, but some browser and OS combinations don't support it reliably. When in doubt, leave it on CPU.
-                        </p>
-                    </div>
-                    </div>
-                </div>
+                {/* Advanced Settings — hidden during product restructuring */}
             </div>
 
             {/* Modals */}

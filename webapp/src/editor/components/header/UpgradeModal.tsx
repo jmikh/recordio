@@ -264,8 +264,19 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Two-Card Layout */}
-            <div className="flex gap-4">
+            {/* Temporarily unavailable notice */}
+            <div className="flex flex-col items-center gap-4 py-8 px-4">
+                <BiCrown className="text-primary" size={40} />
+                <p className="text-base font-semibold text-text-highlighted text-center">
+                    Upgrades temporarily unavailable
+                </p>
+                <p className="text-sm text-text-muted text-center max-w-[360px] leading-relaxed">
+                    We're restructuring our product and pricing. Upgrades will be back soon — check back in a few days!
+                </p>
+            </div>
+
+            {/* Two-Card Layout — hidden during product restructuring */}
+            {false && <div className="flex gap-4">
                 {/* ── Pro Card ── */}
                 <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
                     <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Pro</h3>
@@ -338,11 +349,11 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
                     </Button>
                 </div>
-            </div>
+            </div>}
 
-            <p className="text-center text-xs text-text-muted mt-4">
+            {false && <p className="text-center text-xs text-text-muted mt-4">
                 Secure payment processed by Stripe
-            </p>
+            </p>}
         </Modal>
     );
 }

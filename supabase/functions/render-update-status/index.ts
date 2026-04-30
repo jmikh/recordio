@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
 
 const RENDER_SECRET = Deno.env.get('RENDER_SECRET')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 
 /**
  * Render Update Status Edge Function (worker-only)
@@ -96,6 +97,20 @@ serve(async (req: Request) => {
                     updated_at: now.toISOString(),
                 })
                 .eq('id', job.project_id);
+
+            // 7. Fire-and-forget: trigger Mux upload if project is shared
+            fetch(`${SUPABASE_URL}/functions/v1/mux-video-upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${RENDER_SECRET}`,
+                },
+                body: JSON.stringify({
+                    projectId: job.project_id,
+                }),
+            }).catch(err => {
+                console.error('[render-update-status] mux-video-upload dispatch failed:', err);
+            });
         }
 
         return jsonResponse({ ok: true, cancel: false });
