@@ -87,37 +87,37 @@ serve(async (req) => {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const userId = session.metadata?.userId || session.client_reference_id;
     const customerId = session.customer as string;
-    const subscriptionId = session.subscription as string | null;
-    const isLifetime = session.metadata?.interval === 'lifetime';
-
+    const subscriptionId = session.subscription as string;
     if (!userId) {
         console.error('[Webhook] No userId in checkout session');
         return;
     }
 
-    console.log('[Webhook] Checkout completed for user:', userId, isLifetime ? '(lifetime)' : '');
+    if (!subscriptionId) {
+        console.error('[Webhook] No subscription ID in checkout session');
+        return;
+    }
 
-    // For recurring plans, fetch authoritative data from Stripe BEFORE the upsert
+    console.log('[Webhook] Checkout completed for user:', userId);
+
+    // Fetch authoritative data from Stripe BEFORE the upsert
     // so we write the correct current_period_end, status, and billing_interval.
-    // Without this, the stale trial current_period_end from the auth trigger persists.
-    let billingInterval: string | null = isLifetime ? 'lifetime' : null;
+    let billingInterval: string | null = null;
     let stripeStatus: string = 'active';
     let stripePeriodEnd: string | null = null;
 
-    if (subscriptionId && !isLifetime) {
-        try {
-            const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-            const priceItem = stripeSub.items?.data?.[0]?.price;
-            billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-            stripeStatus = stripeSub.status;
-            // Post 2025-03-31.basil: current_period_end moved to items.data[]
-            const rawEnd = stripeSub.items?.data?.[0]?.current_period_end ?? stripeSub.current_period_end;
-            stripePeriodEnd = typeof rawEnd === 'number'
-                ? new Date(rawEnd * 1000).toISOString()
-                : new Date(rawEnd).toISOString();
-        } catch (err) {
-            console.error('[Webhook] Error fetching Stripe subscription details:', err);
-        }
+    try {
+        const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+        const priceItem = stripeSub.items?.data?.[0]?.price;
+        billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+        stripeStatus = stripeSub.status;
+        // Post 2025-03-31.basil: current_period_end moved to items.data[]
+        const rawEnd = stripeSub.items?.data?.[0]?.current_period_end ?? stripeSub.current_period_end;
+        stripePeriodEnd = typeof rawEnd === 'number'
+            ? new Date(rawEnd * 1000).toISOString()
+            : new Date(rawEnd).toISOString();
+    } catch (err) {
+        console.error('[Webhook] Error fetching Stripe subscription details:', err);
     }
 
     // Create or update subscription record
@@ -130,7 +130,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             status: stripeStatus,
             cancel_at_period_end: false,
             billing_interval: billingInterval,
-            current_period_end: isLifetime ? null : stripePeriodEnd,
+            current_period_end: stripePeriodEnd,
             updated_at: new Date().toISOString(),
         }, {
             onConflict: 'user_id'
@@ -202,8 +202,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     }
 
     // Update project expiry based on new subscription status
-    const isNowPro = newStatus === 'active' || newStatus === 'trialing';
-    const wasPro = oldStatus === 'active' || oldStatus === 'trialing';
+    const isNowPro = newStatus === 'active' || newStatus === 'trialing' || newStatus === 'past_due';
+    const wasPro = oldStatus === 'active' || oldStatus === 'trialing' || oldStatus === 'past_due';
     if (isNowPro && !wasPro) {
         // Regained Pro — clear expiry on all projects
         await supabase.rpc('set_project_expiry', { p_user_id: userId, p_expires_at: null });

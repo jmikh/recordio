@@ -67,7 +67,6 @@ BEGIN
             mux_asset_id = NULL,
             mux_playback_id = NULL,
             render_storage_path = NULL,
-            is_deleted = FALSE,
             updated_at = NOW()
         WHERE id = v_existing_id;
 

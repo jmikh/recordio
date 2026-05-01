@@ -16,7 +16,7 @@ interface UpgradeModalProps {
     autoCheckout?: boolean;
 }
 
-type BillingInterval = 'monthly' | 'yearly' | 'lifetime';
+type BillingInterval = 'monthly' | 'yearly';
 
 export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality, initialInterval, autoCheckout }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
@@ -50,7 +50,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 const { setSubscription } = useUserStore.getState();
                 setSubscription({
                     status: 'active',
-                    planId: data.plan_id || '',
                     currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : new Date(),
                     cancelAtPeriodEnd: data.cancel_at_period_end || false,
                     stripeCustomerId: data.stripe_customer_id || null,
@@ -131,8 +130,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const yearlyPrice = 48;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
-    const isLifetimeSubscriber = isPro && subscription.billingInterval === 'lifetime';
-
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
         return (
@@ -161,12 +158,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
 
                 {/* Subscription Info */}
-                {isLifetimeSubscriber ? (
-                    <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
-                        <p className="text-xs text-text-muted">Plan</p>
-                        <p className="text-sm text-text-highlighted font-medium mt-0.5">Lifetime access — no renewal needed</p>
-                    </div>
-                ) : subscription.currentPeriodEnd && (
+                {subscription.currentPeriodEnd && (
                     <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
                         <p className="text-xs text-text-muted">
                             {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}

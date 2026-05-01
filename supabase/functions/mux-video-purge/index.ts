@@ -7,14 +7,14 @@ const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+const BUCKET = 'project-media';
+
 /**
  * Mux Video Purge — cron cleanup (hourly via pg_cron -> pg_net)
  *
- * Cleans up soft-deleted mux_videos:
- *   1. Delete Mux asset via API (idempotent — 404 is success)
- *   2. Delete the mux_videos row
- *
- * Storage cleanup (old render MP4s) deferred to a later phase.
+ * Finds mux_videos older than the highest completed version per project,
+ * deletes their Mux assets and storage files, then deletes the rows.
+ * Only deletes a row when both external resources are confirmed gone.
  *
  * Auth: service role key (from pg_net cron)
  */
@@ -32,23 +32,21 @@ serve(async (req: Request) => {
         const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
         const muxAuth = btoa(`${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}`);
 
-        // 1. Fetch soft-deleted rows
+        // Fetch old version rows via DB function
         const { data: rows, error: fetchError } = await adminSupabase
-            .from('mux_videos')
-            .select('id, mux_asset_id')
-            .eq('is_deleted', true)
-            .limit(50);
+            .rpc('mux_video_purge_candidates')
+            .select();
 
         if (fetchError || !rows) {
-            console.error('[mux-video-purge] Failed to fetch deleted rows:', fetchError);
-            return errorResponse('Failed to fetch rows', 500);
+            console.error('[mux-video-purge] Failed to fetch candidates:', fetchError);
+            return errorResponse('Failed to fetch candidates', 500);
         }
 
         let purged = 0;
 
         for (const row of rows) {
             try {
-                // 2. Delete Mux asset (if exists)
+                // 1. Delete Mux asset (if exists)
                 if (row.mux_asset_id) {
                     const resp = await fetch(`https://api.mux.com/video/v1/assets/${row.mux_asset_id}`, {
                         method: 'DELETE',
@@ -57,6 +55,18 @@ serve(async (req: Request) => {
                     // 204 = deleted, 404 = already gone — both are success
                     if (!resp.ok && resp.status !== 404) {
                         console.warn(`[mux-video-purge] Mux delete failed for ${row.mux_asset_id}: ${resp.status}`);
+                        continue; // leave for next run
+                    }
+                }
+
+                // 2. Delete render file from storage (if exists)
+                if (row.render_storage_path) {
+                    const { error: removeError } = await adminSupabase
+                        .storage.from(BUCKET)
+                        .remove([row.render_storage_path]);
+
+                    if (removeError) {
+                        console.warn(`[mux-video-purge] Storage delete failed for ${row.render_storage_path}:`, removeError);
                         continue; // leave for next run
                     }
                 }

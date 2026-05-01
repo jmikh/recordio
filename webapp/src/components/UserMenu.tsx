@@ -11,10 +11,10 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
-    const { email, name, picture, isPro, subscription } = useUserStore();
+    const { email, name, picture, isPro, subscription, hasFreeTrial, trialEndsAt } = useUserStore();
 
-    // Trial state comes from subscriptions table
-    const isTrialing = subscription.status === 'trialing';
+    // Trial state comes from user_profiles table
+    const isTrialing = hasFreeTrial();
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -103,15 +103,12 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
                                 ) : (
                                     <ProBadge variant="free" />
                                 )}
-                                {subscription.billingInterval === 'lifetime' && isPro && (
-                                    <span className="text-[11px] text-text-muted">Lifetime</span>
-                                )}
-                                {isTrialing && subscription.currentPeriodEnd && (
+                                {isTrialing && trialEndsAt && (
                                     <span className="text-[11px] text-text-muted">
-                                        Trial ends {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        Trial ends {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 )}
-                                {isPro && !isTrialing && subscription.billingInterval !== 'lifetime' && subscription.currentPeriodEnd && (
+                                {isPro && !isTrialing && subscription.currentPeriodEnd && (
                                     <span className="text-[11px] text-text-muted">
                                         Expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>

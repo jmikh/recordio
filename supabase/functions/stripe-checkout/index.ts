@@ -10,7 +10,6 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const PRICE_IDS: Record<string, string> = {
     monthly: Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
     yearly: Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
-    lifetime: Deno.env.get('STRIPE_PRICE_ID_LIFETIME') || '',
 };
 
 serve(withAuth(async (req, { user }) => {
@@ -28,13 +27,11 @@ serve(withAuth(async (req, { user }) => {
         return errorResponse('No price configured for the selected plan', 400);
     }
 
-    const isLifetime = interval === 'lifetime';
-
     const session = await stripe.checkout.sessions.create({
         customer_email: userEmail,
         client_reference_id: userId,
         line_items: [{ price: priceId, quantity: 1 }],
-        mode: isLifetime ? 'payment' : 'subscription',
+        mode: 'subscription',
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata: { userId, interval: interval || 'yearly' },

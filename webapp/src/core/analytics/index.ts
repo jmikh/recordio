@@ -326,7 +326,7 @@ export function trackUpgradeModalDismissed() {
     trackEvent('upgrade_modal_dismissed');
 }
 
-export function trackGetProClicked(billingInterval: 'monthly' | 'yearly' | 'lifetime') {
+export function trackGetProClicked(billingInterval: 'monthly' | 'yearly') {
     trackEvent('get_pro_clicked', { billing_interval: billingInterval });
 }
 

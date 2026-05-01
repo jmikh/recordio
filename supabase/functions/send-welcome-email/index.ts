@@ -104,13 +104,13 @@ serve(async (req) => {
         }
 
         // Check if user has unsubscribed (future-proofing for re-signups)
-        const { data: unsub } = await supabase
-            .from('email_unsubscribes')
-            .select('user_id')
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('email_subscribed')
             .eq('user_id', userId)
             .maybeSingle();
 
-        if (unsub) {
+        if (profile && !profile.email_subscribed) {
             console.log('[WelcomeEmail] User unsubscribed, skipping:', userId);
             return new Response(JSON.stringify({ skipped: true, reason: 'unsubscribed' }), { status: 200 });
         }

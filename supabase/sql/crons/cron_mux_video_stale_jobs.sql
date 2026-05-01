@@ -1,9 +1,15 @@
 -- cron_mux_video_stale_jobs
 --
--- Every-minute cron that marks pending mux_videos as failed if no Mux webhook
--- received within 10 minutes (after mux_asset_id has been set, meaning upload started).
--- Pending mux_videos without mux_asset_id are waiting for render — handled by
--- the render stale jobs cron via cascade through render_job_complete.
+-- Every-minute cron that marks pending mux_videos as failed based on their
+-- corresponding render_job status:
+--
+--   1. Render failed/canceled + mux pending for 5s:
+--      render_job_complete should have cascaded the failure. If the mux_video
+--      is still pending after 5 seconds, the cascade didn't fire — clean up.
+--
+--   2. Render completed + mux pending for 5min:
+--      The Mux upload should have started (via render-hook or mux-video-create).
+--      If 5 minutes passed, the upload or webhook silently failed.
 --
 -- Schedule: every minute
 -- Pattern:  A (pure SQL, no edge function needed)
@@ -17,12 +23,21 @@ SELECT cron.schedule(
     'mux-video-stale-jobs',
     '* * * * *',
     $$
-    UPDATE public.mux_videos
+    UPDATE public.mux_videos mv
     SET status = 'failed',
-        error = 'Mux webhook timeout',
+        error = CASE
+            WHEN rj.status IN ('failed', 'canceled') THEN 'Render ' || rj.status
+            ELSE 'Mux upload/webhook timeout'
+        END,
         updated_at = now()
-    WHERE status = 'pending'
-      AND mux_asset_id IS NOT NULL
-      AND updated_at < now() - interval '15 minutes';
+    FROM public.render_jobs rj
+    WHERE mv.status = 'pending'
+      AND rj.project_id = mv.project_id
+      AND rj.cloud_version = mv.cloud_version
+      AND (
+        (rj.status IN ('failed', 'canceled') AND mv.updated_at < now() - interval '5 seconds')
+        OR
+        (rj.status = 'completed' AND mv.updated_at < now() - interval '5 minutes')
+      );
     $$
 );

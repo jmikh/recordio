@@ -80,7 +80,6 @@ serve(async (req: Request) => {
             .select('mux_playback_id, cloud_version')
             .eq('project_id', projectId)
             .eq('status', 'completed')
-            .eq('is_deleted', false)
             .order('cloud_version', { ascending: false })
             .limit(1)
             .maybeSingle();

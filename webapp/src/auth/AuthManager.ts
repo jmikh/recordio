@@ -49,8 +49,23 @@ async function syncUserToStore(session: Session) {
     setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
 }
 
-/** Fetch subscription via RPC and sync to store (once per user) */
-async function fetchSubscription(userId: string) {
+/** Fetch user profile (trial info) via RPC and sync to store */
+async function fetchProfile() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase.rpc('user_profile_get');
+        if (!error && data) {
+            useUserStore.getState().setTrialEndsAt(
+                data.trial_ends_at ? new Date(data.trial_ends_at) : null
+            );
+        }
+    } catch {
+        // Profile table not configured yet
+    }
+}
+
+/** Fetch Stripe subscription via RPC and sync to store */
+async function fetchSubscription() {
     if (!supabase) return;
     try {
         const { data, error } = await supabase.rpc('subscription_get');
@@ -58,8 +73,7 @@ async function fetchSubscription(userId: string) {
         if (!error && data) {
             useUserStore.getState().setSubscription({
                 status: data.status,
-                planId: data.plan_id,
-                currentPeriodEnd: new Date(data.current_period_end),
+                currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
                 cancelAtPeriodEnd: data.cancel_at_period_end,
                 stripeCustomerId: data.stripe_customer_id,
                 billingInterval: data.billing_interval || null
@@ -123,7 +137,7 @@ export class AuthManager {
 
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
                 AuthManager.subscriptionFetchedForUserId = session.user.id;
-                await fetchSubscription(session.user.id);
+                await Promise.all([fetchProfile(), fetchSubscription()]);
             }
         } else {
             AuthManager.subscriptionFetchedForUserId = null;
@@ -137,7 +151,7 @@ export class AuthManager {
     static async refreshSubscription() {
         const userId = useUserStore.getState().userId;
         if (userId) {
-            await fetchSubscription(userId);
+            await fetchSubscription();
         }
     }
 

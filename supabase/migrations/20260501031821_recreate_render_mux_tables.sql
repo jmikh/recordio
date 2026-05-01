@@ -92,7 +92,6 @@ CREATE TABLE public.mux_videos (
         CHECK (status IN ('pending', 'completed', 'failed', 'canceled')),
     error TEXT,
     render_storage_path TEXT,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -101,20 +100,10 @@ CREATE TABLE public.mux_videos (
 CREATE UNIQUE INDEX idx_mux_videos_project_version
     ON public.mux_videos (project_id, cloud_version);
 
--- One active completed video per project
-CREATE UNIQUE INDEX idx_mux_videos_one_active_completed
-    ON public.mux_videos (project_id)
-    WHERE is_deleted = FALSE AND status = 'completed';
-
 -- Webhook lookup by mux_asset_id
 CREATE INDEX idx_mux_videos_asset_id
     ON public.mux_videos (mux_asset_id)
     WHERE mux_asset_id IS NOT NULL;
-
--- Cron cleanup of deleted videos
-CREATE INDEX idx_mux_videos_deleted
-    ON public.mux_videos (is_deleted)
-    WHERE is_deleted = TRUE;
 
 ALTER TABLE public.mux_videos ENABLE ROW LEVEL SECURITY;
 

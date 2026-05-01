@@ -9,7 +9,7 @@ export class StripeService {
      *
      * In the browser: opens Stripe checkout in a popup window.
      */
-    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' | 'lifetime' = 'yearly'): Promise<{ error?: Error }> {
+    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly'): Promise<{ error?: Error }> {
         if (!supabase) {
             return { error: new Error('Supabase not configured') };
         }

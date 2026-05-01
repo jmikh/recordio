@@ -60,7 +60,8 @@ export class CloudProjectService {
      * Skips no-op writes to avoid unnecessary cloud_version bumps.
      */
     private static async projectDataHash(project: Project): Promise<string> {
-        const json = JSON.stringify(project);
+        const { userEvents, ...rest } = project as any;
+        const json = JSON.stringify(rest);
         const buffer = new TextEncoder().encode(json);
         const hash = await crypto.subtle.digest('SHA-256', buffer);
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
