@@ -4,7 +4,6 @@ import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 
 import { MdOutlineBugReport } from 'react-icons/md';
-import { TbFolder } from 'react-icons/tb';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -16,7 +15,7 @@ import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 
 import { TbCloudUpload } from 'react-icons/tb';
-import { LogoLink, Dropdown, Button, ProBadge, ThemeToggle, Tooltip, type DropdownOption } from '@shared/components';
+import { Dropdown, Button, ThemeToggle, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
 import { useToast } from '../Toast';
 
@@ -44,7 +43,7 @@ export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const { isAuthenticated, hasProAccess } = useUserStore();
+    const { isAuthenticated } = useUserStore();
 
     const { addToast } = useToast();
 
@@ -104,10 +103,13 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-12 flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <LogoLink className="mr-2" imgClassName="h-7" onClick={(e) => { e.preventDefault(); handleGoToDashboard(); }} />
-                    {hasProAccess() && (
-                        <ProBadge className="-ml-3" />
-                    )}
+                    <button onClick={handleGoToDashboard} className="cursor-pointer opacity-90 hover:opacity-100 transition-opacity duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 628 628">
+                            <path d="M305.5024 628H322.4976C412.1471 628 465.9367 628 501.7965 613.029 553.4915 594.2136 594.2136 553.4915 613.029 501.7965 628 465.9367 628 412.1471 628 322.4976V305.5024C628 215.8529 628 162.0633 613.029 126.2035 594.2136 74.50852 553.4915 33.78641 501.7965 14.97098 465.9367 0 412.1471 0 322.4976 0H305.5024C215.8529 0 162.0633 0 126.2035 14.97098 74.50852 33.78641 33.78641 74.50852 14.97098 126.2035 0 162.0633 0 215.8529 0 305.5024V322.4976C0 412.1471 0 465.9367 14.97098 501.7965 33.78641 553.4915 74.50852 594.2136 126.2035 613.029 162.0633 628 215.8529 628 305.5024 628Z" fill="#7d5ee0"/>
+                            <path transform="matrix(1,0,0,-1,0,628)" d="M130.1325 536 205.0049 461.8536H156.5268C153.8046 461.8639 151.0693 461.6751 148.3698 461.3226 119.8525 457.5993 97.08818 435.6359 92.66317 407.223 92.2433 404.5269 92.04774 401.8528 92 399.1246V239.6137H218.0031C220.0154 239.665 222.0323 240.004 223.9716 240.543 231.5277 242.643 237.6641 248.0974 240.0868 255.4785 240.6015 257.0476 240.9533 258.6775 241.0815 260.3242V388.3711H365.1614C368.0465 388.4573 370.9029 389.0265 373.5837 390.0969 379.863 392.6044 384.7985 397.4691 387.3777 403.5721 388.2811 405.7098 388.9062 407.9703 389.1683 410.2764V536H130.1325Z" fill="#f8f6eb"/>
+                            <path transform="matrix(1,0,0,-1,0,628)" d="M497.8675 92 422.9951 166.1464H471.4732C474.1954 166.1361 476.9307 166.325 479.6302 166.6774 508.1475 170.4007 530.9118 192.3641 535.3368 220.777 535.7567 223.4731 535.9523 226.1472 536 228.8754V388.3863H409.9969C407.9846 388.335 405.9677 387.996 404.0284 387.457 396.4723 385.357 390.3359 379.9026 387.9132 372.5215 387.3985 370.9524 387.0467 369.3225 386.9185 367.6758V239.6289H262.8386C259.9535 239.5427 257.0971 238.9735 254.4163 237.9031 248.137 235.3956 243.2015 230.5309 240.6223 224.4279 239.7189 222.2902 239.0938 220.0297 238.8317 217.7236V92H497.8675Z" fill="#f8f6eb"/>
+                        </svg>
+                    </button>
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
@@ -179,8 +181,7 @@ export const Header = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <Button variant="icon" icon={TbFolder} onClick={handleGoToDashboard} title="Dashboard" />
-                        <Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
+<Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
                         <ThemeToggle />
                     </div>
                     {isAuthenticated ? (

@@ -450,7 +450,7 @@ export const SettingsPanel = () => {
                                 ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                         >
-                            {isSharing ? 'Sharing...' : 'Share'}
+                            {isSharing ? 'Publishing...' : 'Publish'}
                         </button>
                         <button
                             onClick={() => shareSlug && copyShareLink(shareSlug)}

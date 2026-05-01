@@ -2,6 +2,7 @@
 export { AiAudioIcon } from './AiAudioIcon';
 export { Button } from './Button';
 export { Checkbox } from './Checkbox';
+export { CopyLinkButton } from './CopyLinkButton';
 export { CollapsibleCard } from './CollapsibleCard';
 export type { PreviewItem } from './CollapsibleCard';
 export { InfoTooltip, type TooltipPlacement } from './InfoTooltip';

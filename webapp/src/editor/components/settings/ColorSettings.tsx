@@ -180,7 +180,7 @@ export const ColorSettings = ({
                             onClick={() => handlePaletteClick(index)}
                             className={`w-6 h-6 rounded-full border transition-all
                                 ${selectedPaletteIndex === index
-                                    ? 'border-ring ring-2 ring-ring/40 scale-110'
+                                    ? 'border-border-selected ring-2 ring-border-selected/40 scale-110'
                                     : 'border-border hover:border-border-hover hover:scale-110'
                                 }
                                 focus:outline-none`}

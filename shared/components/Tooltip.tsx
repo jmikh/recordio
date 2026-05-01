@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-type TooltipPosition = 'top' | 'bottom-start' | 'top-start';
+type TooltipPosition = 'top' | 'bottom-start' | 'top-start' | 'right';
 
 interface TooltipProps {
     /** Text to display in the tooltip */
@@ -30,7 +30,13 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, className, pos
     useEffect(() => {
         if (isHovered && ref.current) {
             const rect = ref.current.getBoundingClientRect();
-            if (placement === 'bottom-start') {
+            if (placement === 'right') {
+                setPosition({
+                    left: rect.right + 8,
+                    top: rect.top + rect.height / 2,
+                    flipped: false,
+                });
+            } else if (placement === 'bottom-start') {
                 setPosition({
                     left: rect.left,
                     top: rect.bottom + 6,
@@ -72,6 +78,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, className, pos
     if (!text) return <>{children}</>;
 
     const getTransform = () => {
+        if (placement === 'right') return 'translate(0, -50%)';
         if (placement === 'bottom-start') return 'none';
         if (placement === 'top-start') return 'translate(0, -100%)';
         return position.flipped ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';

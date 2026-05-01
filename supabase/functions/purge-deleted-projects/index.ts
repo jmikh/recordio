@@ -32,16 +32,16 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
         );
 
-        // Fetch projects soft-deleted more than 3 days ago that haven't been
+        // Fetch projects soft-deleted more than 30 days ago that haven't been
         // partially processed yet (permanently_deleted = false means fresh).
         // Also pick up permanently_deleted = true from a previous failed run.
-        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
         const { data: projects, error: fetchError } = await supabase
             .from('projects')
             .select('id, user_id, permanently_deleted')
             .not('deleted_at', 'is', null)
-            .lt('deleted_at', threeDaysAgo)
+            .lt('deleted_at', thirtyDaysAgo)
             .limit(20);
 
         if (fetchError) {

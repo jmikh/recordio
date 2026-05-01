@@ -1,7 +1,7 @@
 import type { Project, ID } from '../types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
-import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary } from './cloudStorage';
+import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from '../editor/stores/useMediaUrlStore';
@@ -18,14 +18,23 @@ export interface ProjectListItem {
     id: string;
     name: string;
     thumbnail: string | null;
+    thumbnailStoragePath: string | null;
     updatedAt: string;
     createdAt: string;
     lastAccessedAt: string | null;
     expiresAt: string | null;
+    /** ISO date when the project was soft-deleted (null = active) */
+    deletedAt: string | null;
     isShared: boolean;
     cloudVersion: number | null;
     /** Duration in milliseconds (from output windows) */
     durationMs: number | null;
+    /** Share slug for public video link (null if not shared) */
+    shareSlug: string | null;
+    /** Folder this project belongs to (null = unfiled) */
+    folderId: string | null;
+    /** Whether the project is starred/favorited */
+    isStarred: boolean;
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -327,34 +336,43 @@ export class CloudProjectService {
      * List projects from cloud. Thumbnails are loaded from cache
      * or downloaded in the background.
      */
-    static async listProjects(
-        onThumbnailLoaded?: (projectId: string, thumbnailUrl: string) => void,
-    ): Promise<ProjectListItem[]> {
+    static async listProjects(): Promise<ProjectListItem[]> {
         const summaries = await CloudStorage.listProjectsSummary();
 
-        const items: ProjectListItem[] = summaries.map((s: CloudProjectSummary) => ({
+        return summaries.map((s: CloudProjectSummary) => ({
             id: s.id,
             name: s.name,
             thumbnail: null,
+            thumbnailStoragePath: s.thumbnail_storage_path,
             updatedAt: s.updated_at,
             createdAt: s.created_at,
             lastAccessedAt: s.last_accessed_at,
             expiresAt: s.expires_at,
+            deletedAt: s.deleted_at,
             isShared: s.is_shared,
             cloudVersion: s.cloud_version,
             durationMs: s.duration_ms,
+            shareSlug: s.slug,
+            folderId: s.folder_id,
+            isStarred: s.is_starred,
         }));
+    }
 
-        // Load thumbnails in background (non-blocking)
-        for (const summary of summaries) {
-            if (summary.thumbnail_storage_path && summary.thumbnail_storage_path !== 'pending') {
-                BlobCache.getBlobUrl(summary.thumbnail_storage_path)
-                    .then(url => onThumbnailLoaded?.(summary.id, url))
-                    .catch(err => console.warn(`[CloudProjectService] Thumbnail load failed for ${summary.id}:`, err));
+    /**
+     * Load thumbnails for a list of projects in the background.
+     * Call this AFTER setting the projects in state to avoid race conditions.
+     */
+    static loadThumbnails(
+        items: ProjectListItem[],
+        onThumbnailLoaded: (projectId: string, thumbnailUrl: string) => void,
+    ): void {
+        for (const item of items) {
+            if (item.thumbnailStoragePath && item.thumbnailStoragePath !== 'pending') {
+                BlobCache.getBlobUrl(item.thumbnailStoragePath)
+                    .then(url => onThumbnailLoaded(item.id, url))
+                    .catch(err => console.warn(`[CloudProjectService] Thumbnail load failed for ${item.id}:`, err));
             }
         }
-
-        return items;
     }
 
     // ─── Delete ──────────────────────────────────────────────
@@ -369,6 +387,18 @@ export class CloudProjectService {
 
         this.cloudVersions.delete(projectId);
         this.projectHashes.delete(projectId);
+    }
+
+    // ─── Restore ─────────────────────────────────────────────
+
+    static async restoreProject(projectId: string): Promise<boolean> {
+        try {
+            return await CloudStorage.restoreProject(projectId);
+        } catch (err) {
+            console.error('[CloudProjectService] Restore failed:', err);
+            Sentry.captureException(err, { extra: { phase: 'restore_project', projectId } });
+            return false;
+        }
     }
 
     // ─── Conflict Resolution ─────────────────────────────────
@@ -425,5 +455,39 @@ export class CloudProjectService {
         CloudStorage.uploadThumbnail(projectId, blob)
             .then(() => { this.thumbnailHashes.set(projectId, hash); })
             .catch(err => console.warn('[CloudProjectService] Thumbnail upload failed:', err));
+    }
+
+    // ─── Folders ─────────────────────────────────────────────
+
+    static async listFolders(): Promise<CloudFolder[]> {
+        return CloudStorage.listFolders();
+    }
+
+    static async createFolder(name: string, description = ''): Promise<CloudFolder> {
+        return CloudStorage.createFolder(name, description);
+    }
+
+    static async updateFolder(folderId: string, name: string, description: string): Promise<CloudFolder | null> {
+        return CloudStorage.updateFolder(folderId, name, description);
+    }
+
+    static async deleteFolder(folderId: string): Promise<boolean> {
+        return CloudStorage.deleteFolder(folderId);
+    }
+
+    static async moveProjectToFolder(projectId: string, folderId: string | null): Promise<boolean> {
+        return CloudStorage.moveProjectToFolder(projectId, folderId);
+    }
+
+    // ─── Star ────────────────────────────────────────────────────
+
+    static async starProject(projectId: string, starred: boolean): Promise<void> {
+        await CloudStorage.starProject(projectId, starred);
+    }
+
+    // ─── Rename ──────────────────────────────────────────────────
+
+    static async renameProject(projectId: string, name: string): Promise<void> {
+        await CloudStorage.renameProject(projectId, name);
     }
 }
