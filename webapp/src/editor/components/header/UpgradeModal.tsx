@@ -16,7 +16,7 @@ interface UpgradeModalProps {
     autoCheckout?: boolean;
 }
 
-type BillingInterval = 'monthly' | 'yearly' | 'lifetime';
+type BillingInterval = 'monthly' | 'yearly';
 
 export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality, initialInterval, autoCheckout }: UpgradeModalProps) {
     const [loading, setLoading] = useState(false);
@@ -50,7 +50,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 const { setSubscription } = useUserStore.getState();
                 setSubscription({
                     status: 'active',
-                    planId: data.plan_id || '',
                     currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : new Date(),
                     cancelAtPeriodEnd: data.cancel_at_period_end || false,
                     stripeCustomerId: data.stripe_customer_id || null,
@@ -116,7 +115,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
 
         setLoading(true);
-        const { url, error } = await StripeService.createPortalSession(subscription.stripeCustomerId);
+        const { url, error } = await StripeService.createPortalSession();
         setLoading(false);
 
         if (error || !url) {
@@ -131,8 +130,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const yearlyPrice = 48;
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
     const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
-    const isLifetimeSubscriber = isPro && subscription.billingInterval === 'lifetime';
-
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
         return (
@@ -161,12 +158,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
 
                 {/* Subscription Info */}
-                {isLifetimeSubscriber ? (
-                    <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
-                        <p className="text-xs text-text-muted">Plan</p>
-                        <p className="text-sm text-text-highlighted font-medium mt-0.5">Lifetime access — no renewal needed</p>
-                    </div>
-                ) : subscription.currentPeriodEnd && (
+                {subscription.currentPeriodEnd && (
                     <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
                         <p className="text-xs text-text-muted">
                             {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
@@ -264,8 +256,19 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Two-Card Layout */}
-            <div className="flex gap-4">
+            {/* Temporarily unavailable notice */}
+            <div className="flex flex-col items-center gap-4 py-8 px-4">
+                <BiCrown className="text-primary" size={40} />
+                <p className="text-base font-semibold text-text-highlighted text-center">
+                    Upgrades temporarily unavailable
+                </p>
+                <p className="text-sm text-text-muted text-center max-w-[360px] leading-relaxed">
+                    We're restructuring our product and pricing. Upgrades will be back soon — check back in a few days!
+                </p>
+            </div>
+
+            {/* Two-Card Layout — hidden during product restructuring */}
+            {false && <div className="flex gap-4">
                 {/* ── Pro Card ── */}
                 <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
                     <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Pro</h3>
@@ -338,11 +341,11 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                         {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
                     </Button>
                 </div>
-            </div>
+            </div>}
 
-            <p className="text-center text-xs text-text-muted mt-4">
+            {false && <p className="text-center text-xs text-text-muted mt-4">
                 Secure payment processed by Stripe
-            </p>
+            </p>}
         </Modal>
     );
 }

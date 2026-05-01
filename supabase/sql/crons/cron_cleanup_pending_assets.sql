@@ -12,11 +12,11 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
-SELECT cron.unschedule('cleanup-pending-assets')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cleanup-pending-assets');
+SELECT cron.unschedule('assets-stale-cleanup')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'assets-stale-cleanup');
 
 SELECT cron.schedule(
-    'cleanup-pending-assets',
+    'assets-stale-cleanup',
     '0 0 * * *',
     $$
     DELETE FROM public.user_assets

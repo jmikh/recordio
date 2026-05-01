@@ -28,14 +28,13 @@ BEGIN
         'project_data', p.project_data,
         'cloud_version', p.cloud_version,
         'upload_status', p.upload_status,
-        'cf_video_uid', p.cf_video_uid,
-        'published_at', p.published_at,
-        'share_description', p.share_description,
         'last_accessed_at', p.last_accessed_at,
         'updated_at', p.updated_at,
         'created_at', p.created_at,
         'expires_at', p.expires_at,
-        'thumbnail_storage_path', p.thumbnail_storage_path
+        'thumbnail_storage_path', p.thumbnail_storage_path,
+        'is_shared', p.slug IS NOT NULL,
+        'share_slug', p.slug
     ) INTO result
     FROM public.projects p
     WHERE p.id = p_project_id

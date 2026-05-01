@@ -56,9 +56,6 @@ export interface UIState {
     timelineContainerRef: React.RefObject<HTMLDivElement | null> | null;
     setTimelineContainerRef: (ref: React.RefObject<HTMLDivElement | null> | null) => void;
 
-    // Export Modal State
-    isExportModalOpen: boolean;
-    setExportModalOpen: (isOpen: boolean) => void;
     pixelsPerSec: number;
     setPixelsPerSec: (pps: number) => void;
 
@@ -152,10 +149,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedOverlaySegmentId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
-    isExportModalOpen: false,
     isResizingWindow: false,
-
-    setExportModalOpen: (isExportModalOpen) => set({ isExportModalOpen }),
 
     setIsResizingWindow: (isResizingWindow) => set({ isResizingWindow }),
 
@@ -382,7 +376,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 
-    videoDecodePreference: LocalPreferences.getPreferSoftwareDecode() ? 'cpu' : 'gpu',
+    videoDecodePreference: 'cpu', // Always default to CPU during product restructuring
     setVideoDecodePreference: (pref) => {
         LocalPreferences.setPreferSoftwareDecode(pref === 'cpu');
         set({ videoDecodePreference: pref });

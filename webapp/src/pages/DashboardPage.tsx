@@ -68,7 +68,7 @@ export function DashboardPage() {
         });
     };
 
-    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | 'lifetime' | undefined>();
+    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | undefined>();
 
     useEffect(() => {
         // Check for error message in URL
@@ -80,7 +80,7 @@ export function DashboardPage() {
 
         // Check for checkout intent from marketing site (e.g. ?checkout=yearly)
         const checkout = params.get('checkout');
-        if (checkout === 'monthly' || checkout === 'yearly' || checkout === 'lifetime') {
+        if (checkout === 'monthly' || checkout === 'yearly') {
             setCheckoutInterval(checkout);
             setIsUpgradeModalOpen(true);
         }
@@ -274,7 +274,7 @@ export function DashboardPage() {
                                     selectMode={selectMode}
                                     selected={selectedIds.has(item.id)}
                                     onSelect={() => toggleSelect(item.id)}
-                                    isShared={!!item.cfVideoUid}
+                                    isShared={item.isShared}
                                 />
                             ))}
                         </div>

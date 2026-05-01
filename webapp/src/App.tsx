@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
-import { WatchPage } from './pages/WatchPage';
+import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { ToastProvider } from './editor/components/Toast';
 import { AuthManager } from './auth/AuthManager';
@@ -38,8 +38,8 @@ export function App() {
             return <EditorPage />;
         }
 
-        if (path.startsWith('/watch/')) {
-            return <WatchPage />;
+        if (path.startsWith('/video/')) {
+            return <VideoPage />;
         }
 
         // Default to dashboard

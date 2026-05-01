@@ -22,7 +22,7 @@ export interface ProjectListItem {
     createdAt: string;
     lastAccessedAt: string | null;
     expiresAt: string | null;
-    cfVideoUid: string | null;
+    isShared: boolean;
     cloudVersion: number | null;
     /** Duration in milliseconds (from output windows) */
     durationMs: number | null;
@@ -41,6 +41,11 @@ export interface ProjectListItem {
 export class CloudProjectService {
     /** In-memory cloud version tracking (replaces IndexedDB syncMeta). */
     private static cloudVersions = new Map<string, number>();
+
+    /** Get the last-known cloud version for a project. */
+    static getCloudVersion(projectId: string): number | undefined {
+        return this.cloudVersions.get(projectId);
+    }
     /** In-memory project data hash — skip no-op cloud writes. */
     private static projectHashes = new Map<string, string>();
     /** Guard against concurrent saves for the same project. */
@@ -55,7 +60,8 @@ export class CloudProjectService {
      * Skips no-op writes to avoid unnecessary cloud_version bumps.
      */
     private static async projectDataHash(project: Project): Promise<string> {
-        const json = JSON.stringify(project);
+        const { userEvents, ...rest } = project as any;
+        const json = JSON.stringify(rest);
         const buffer = new TextEncoder().encode(json);
         const hash = await crypto.subtle.digest('SHA-256', buffer);
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -334,7 +340,7 @@ export class CloudProjectService {
             createdAt: s.created_at,
             lastAccessedAt: s.last_accessed_at,
             expiresAt: s.expires_at,
-            cfVideoUid: s.cf_video_uid,
+            isShared: s.is_shared,
             cloudVersion: s.cloud_version,
             durationMs: s.duration_ms,
         }));

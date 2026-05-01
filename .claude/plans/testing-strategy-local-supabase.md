@@ -14,23 +14,20 @@ Recordio is going enterprise but has almost zero tests (4 test files covering ma
 Currently there's no vitest config. The root `package.json` already has `"test": "vitest"` and vitest v4.0.16 installed.
 
 ### Create `vitest.workspace.ts` at repo root
-Define 3 workspace projects so `vitest` runs everything with one command:
+Define 2 workspace projects so `vitest` runs everything with one command:
 
 | Project | Environment | Scope |
 |---------|------------|-------|
 | `shared` | `node` | Pure logic: mappers, animators, utils, export helpers |
-| `backend` | `node` | Fastify routes, rate limiting, transcription (mock OpenAI) |
 | `webapp` | `node` | Cloud sync, project model, migrations (mock Supabase client) |
 
 ### Create per-workspace vitest configs
 - `shared/vitest.config.ts` — `include: ['**/*.test.ts']`
-- `backend/vitest.config.ts` — `include: ['src/**/*.test.ts']`, setupFiles for mocks
 - `webapp/vitest.config.ts` — `include: ['src/**/*.test.ts']`
 
 ### Add npm scripts to root `package.json`
 ```
 "test:unit": "vitest --project shared"
-"test:backend": "vitest --project backend"  
 "test:webapp": "vitest --project webapp"
 "test:ci": "vitest run --reporter=verbose"
 ```
@@ -38,7 +35,6 @@ Define 3 workspace projects so `vitest` runs everything with one command:
 **Files to create/modify:**
 - `vitest.workspace.ts` (new)
 - `shared/vitest.config.ts` (new)
-- `backend/vitest.config.ts` (new)
 - `webapp/vitest.config.ts` (new)
 - `package.json` (add scripts)
 

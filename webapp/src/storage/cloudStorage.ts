@@ -13,9 +13,9 @@ export interface CloudProjectSummary {
     updated_at: string;
     created_at: string;
     expires_at: string | null;
-    cf_video_uid: string | null;
     cloud_version: number;
     duration_ms: number | null;
+    is_shared: boolean;
 }
 
 /**
@@ -28,9 +28,6 @@ export interface CloudProject {
     project_data: any;
     cloud_version: number;
     upload_status: string;
-    cf_video_uid: string | null;
-    published_at: string | null;
-    share_description: string;
     last_accessed_at: string;
     updated_at: string;
     created_at: string;

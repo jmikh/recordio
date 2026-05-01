@@ -22,9 +22,9 @@ AS $$
             'updated_at', p.updated_at,
             'created_at', p.created_at,
             'expires_at', p.expires_at,
-            'cf_video_uid', p.cf_video_uid,
             'cloud_version', p.cloud_version,
-            'duration_ms', p.duration_ms
+            'duration_ms', p.duration_ms,
+            'is_shared', p.slug IS NOT NULL
         ) AS row_data
         FROM public.projects p
         WHERE p.user_id = auth.uid()

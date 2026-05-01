@@ -114,10 +114,11 @@ serve(async (req) => {
 
         const userId = payload.sub as string;
 
-        // Upsert (idempotent — clicking twice is fine)
+        // Mark as unsubscribed (idempotent — clicking twice is fine)
         const { error } = await supabase
-            .from('email_unsubscribes')
-            .upsert({ user_id: userId }, { onConflict: 'user_id' });
+            .from('user_profiles')
+            .update({ email_subscribed: false, updated_at: new Date().toISOString() })
+            .eq('user_id', userId);
 
         if (error) {
             console.error('[Unsubscribe] DB error:', error);

@@ -7,12 +7,11 @@ export type ExportQuality = '480p' | '720p' | '1080p' | '2K' | '4K';
 const DEV_PRO_UID = import.meta.env.VITE_DEV_PRO_UID as string | undefined;
 
 export interface Subscription {
-    status: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
-    planId: string | null;
+    status: 'active' | 'canceled' | 'past_due' | null;
     currentPeriodEnd: Date | null;
     cancelAtPeriodEnd: boolean;
     stripeCustomerId: string | null;
-    billingInterval: 'monthly' | 'yearly' | 'lifetime' | null;
+    billingInterval: 'monthly' | 'yearly' | null;
 }
 
 export interface UserState {
@@ -24,13 +23,17 @@ export interface UserState {
     pictureSourceUrl: string | null; // Original remote URL that was cached into `picture`
     isAuthenticated: boolean;
 
-    // Subscription state (includes free trial — status: 'trialing')
+    // Trial state (from user_profiles table)
+    trialEndsAt: Date | null;
+
+    // Subscription state (from subscriptions table — Stripe only)
     subscription: Subscription;
     isPro: boolean; // Computed from subscription.status
 
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null, pictureSourceUrl?: string | null) => void;
     setSubscription: (subscription: Subscription) => void;
+    setTrialEndsAt: (trialEndsAt: Date | null) => void;
     clearUser: () => void;
 
     // Helper methods
@@ -49,9 +52,9 @@ export const useUserStore = create<UserState>()(
             picture: null,
             pictureSourceUrl: null,
             isAuthenticated: false,
+            trialEndsAt: null,
             subscription: {
                 status: null,
-                planId: null,
                 currentPeriodEnd: null,
                 cancelAtPeriodEnd: false,
                 stripeCustomerId: null,
@@ -83,8 +86,12 @@ export const useUserStore = create<UserState>()(
                 const isDevPro = DEV_PRO_UID ? state.userId === DEV_PRO_UID : false;
                 set({
                     subscription,
-                    isPro: isDevPro || subscription.status === 'active' || subscription.status === 'trialing'
+                    isPro: isDevPro || subscription.status === 'active' || subscription.status === 'past_due'
                 });
+            },
+
+            setTrialEndsAt: (trialEndsAt) => {
+                set({ trialEndsAt });
             },
 
             clearUser: () => {
@@ -96,9 +103,9 @@ export const useUserStore = create<UserState>()(
                     picture: null,
                     pictureSourceUrl: null,
                     isAuthenticated: false,
+                    trialEndsAt: null,
                     subscription: {
                         status: null,
-                        planId: null,
                         currentPeriodEnd: null,
                         cancelAtPeriodEnd: false,
                         stripeCustomerId: null,
@@ -108,14 +115,12 @@ export const useUserStore = create<UserState>()(
                 });
             },
 
-            // Helper to check if user has an active free trial (now via subscriptions table)
+            // Helper to check if user has an active free trial (from user_profiles.trial_ends_at)
             hasFreeTrial: () => {
-                const { isAuthenticated, subscription } = get();
+                const { isAuthenticated, trialEndsAt } = get();
                 if (!isAuthenticated) return false;
-                if (subscription.status !== 'trialing') return false;
-                // Check if trial hasn't expired (defense-in-depth — cron handles expiry server-side)
-                if (subscription.currentPeriodEnd && new Date(subscription.currentPeriodEnd).getTime() < Date.now()) return false;
-                return true;
+                if (!trialEndsAt) return false;
+                return new Date(trialEndsAt).getTime() > Date.now();
             },
 
             // Helper to check if user has pro access (subscription OR active trial)
@@ -147,6 +152,7 @@ export const useUserStore = create<UserState>()(
                 picture: state.picture,
                 pictureSourceUrl: state.pictureSourceUrl,
                 isAuthenticated: state.isAuthenticated,
+                trialEndsAt: state.trialEndsAt,
                 subscription: state.subscription
             }),
             onRehydrateStorage: () => (state) => {
@@ -158,7 +164,7 @@ export const useUserStore = create<UserState>()(
                     // Re-derive isPro from persisted subscription (isPro itself is not persisted)
                     const isDevPro = DEV_PRO_UID ? state.userId === DEV_PRO_UID : false;
                     const status = state.subscription?.status;
-                    if (isDevPro || status === 'active' || status === 'trialing') {
+                    if (isDevPro || status === 'active' || status === 'past_due') {
                         useUserStore.setState({ isPro: true });
                     }
                 }
