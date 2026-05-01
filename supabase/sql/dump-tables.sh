@@ -3,8 +3,7 @@
 # These files are reference snapshots — not used for migrations.
 #
 # Usage:
-#   ./dump-tables.sh              # dumps from local Supabase (must be running)
-#   ./dump-tables.sh --linked     # dumps from the linked remote project
+#   ./dump-tables.sh              # dumps from the linked remote project
 
 set -euo pipefail
 
@@ -13,16 +12,10 @@ SUPABASE_DIR="$SCRIPT_DIR/.."
 TABLES_DIR="$SCRIPT_DIR/tables"
 mkdir -p "$TABLES_DIR"
 
-DB_FLAG=""
-if [[ "${1:-}" == "--linked" ]]; then
-    DB_FLAG="--linked"
-fi
-
-# Run from supabase/ dir so the CLI can find the project config
-cd "$SUPABASE_DIR"
+DB_FLAGS="--linked --workdir $SUPABASE_DIR"
 
 # Get list of public tables
-TABLES=$(npx supabase db query $DB_FLAG --csv \
+TABLES=$(npx supabase db query $DB_FLAGS -o csv \
     "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename" \
     | tail -n +2)
 

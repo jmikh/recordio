@@ -352,27 +352,27 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     // Collapsible Card Visibility
     // -- Effects Settings
-    showCollapsibleEffects: false,
-    showCollapsibleMouse: false,
+    showCollapsibleEffects: true,
+    showCollapsibleMouse: true,
     // -- Background Settings
-    showCollapsibleBackground: true, // Default expanded
+    showCollapsibleBackground: true,
     // -- Screen Settings
-    showCollapsibleSize: false,
-    showCollapsibleToolbar: false,
-    showCollapsibleFrame: false,
+    showCollapsibleSize: true,
+    showCollapsibleToolbar: true,
+    showCollapsibleFrame: true,
     // -- Camera Settings
-    showCollapsibleCameraShape: true, // Default expanded
-    showCollapsibleShape: true, // Default expanded
-    showCollapsibleBorder: false,
+    showCollapsibleCameraShape: true,
+    showCollapsibleShape: true,
+    showCollapsibleBorder: true,
     // -- Captions Settings
-    showCollapsibleCaptionAI: true, // Default expanded
-    showCollapsibleCaptionStyle: true, // Default expanded
-    showCollapsibleCaptionPosition: false,
+    showCollapsibleCaptionAI: true,
+    showCollapsibleCaptionStyle: true,
+    showCollapsibleCaptionPosition: true,
     // -- Audio Settings
-    showCollapsibleAudioToggles: true, // Default expanded
-    showCollapsibleMusic: true, // Default expanded
+    showCollapsibleAudioToggles: true,
+    showCollapsibleMusic: true,
     // -- Export Advanced
-    showCollapsibleAdvancedExport: false,
+    showCollapsibleAdvancedExport: true,
 
     setCollapsibleVisibility: (key, value) => set({ [key]: value } as Partial<UIState>),
 

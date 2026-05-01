@@ -427,7 +427,7 @@ export function DashboardPage() {
                                                 <span className="text-xs text-text-muted">{group.count}</span>
                                             </div>
                                         )}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                                             {group.items.map((item: ProjectListItem) => (
                                                 <ProjectCard
                                                     key={item.id}
@@ -479,7 +479,7 @@ export function DashboardPage() {
                                 <p className="text-sm text-text-muted">Trash is empty</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                                 {trashProjects.map(item => (
                                     <ProjectCard
                                         key={item.id}

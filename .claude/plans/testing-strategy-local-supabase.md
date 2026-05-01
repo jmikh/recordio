@@ -2,41 +2,75 @@
 
 ## Context
 
-Recordio is going enterprise but has almost zero tests (4 test files covering mappers only). All testing is manual against production, which is risky — regressions like broken transcription slip through. This plan establishes:
-1. A local Supabase environment with realistic test data
-2. A layered testing strategy (unit → integration → e2e) that's mostly programmatic and deterministic
-3. An incremental adoption path starting with the highest-ROI tests
+Recordio is going enterprise but has almost zero tests (4 test files covering mappers only). All testing is manual against production. The architecture is:
+- **Supabase** — auth, database (RPC functions), storage, edge functions (transcription, rendering orchestration, Stripe, Mux)
+- **Render worker** — Cloud Run with GPU, stateless, no Supabase credentials (uses signed URLs + shared secret)
+- **Webapp** — React SPA, cloud sync, project editing
+- **Shared** — pure logic: mappers, animators, painters, export pipeline
+- **Extension** — Chrome extension for recording
+
+This plan establishes local Supabase, a layered testing strategy, and an incremental adoption path.
 
 ---
 
-## Phase 1: Vitest Configuration (Foundation)
+## Test File Organization
 
-Currently there's no vitest config. The root `package.json` already has `"test": "vitest"` and vitest v4.0.16 installed.
+**Unit tests live next to their source files:**
+```
+shared/mappers/timeMapper.ts
+shared/mappers/timeMapper.test.ts        ← co-located
 
-### Create `vitest.workspace.ts` at repo root
-Define 2 workspace projects so `vitest` runs everything with one command:
+webapp/src/core/migrateProject.ts
+webapp/src/core/migrateProject.test.ts   ← co-located
+```
 
-| Project | Environment | Scope |
-|---------|------------|-------|
-| `shared` | `node` | Pure logic: mappers, animators, utils, export helpers |
-| `webapp` | `node` | Cloud sync, project model, migrations (mock Supabase client) |
+**Integration/cross-cutting tests live in root `test/` directory:**
+```
+test/
+  integration/
+    supabase-rpc.test.ts          ← tests SQL functions against local Supabase
+    edge-functions.test.ts        ← tests edge functions via HTTP
+    render-worker.test.ts         ← tests render worker API
+  fixtures/
+    projects/                     ← project JSONs at each schema version
+    media/                        ← small synthetic recordings
+  helpers/
+    createProject.ts              ← factory for test Project objects
+    mockCrypto.ts                 ← deterministic UUID stub
+    supabaseClient.ts             ← local Supabase test client
+```
 
-### Create per-workspace vitest configs
-- `shared/vitest.config.ts` — `include: ['**/*.test.ts']`
-- `webapp/vitest.config.ts` — `include: ['src/**/*.test.ts']`
+---
+
+## Phase 1: Vitest Configuration
+
+Root `package.json` already has `"test": "vitest"` and vitest v4.0.16.
+
+### Create `vitest.config.ts` at repo root
+Single config that picks up all `*.test.ts` files across `shared/`, `webapp/src/`, and `test/`:
+
+```ts
+export default defineConfig({
+  test: {
+    include: [
+      'shared/**/*.test.ts',
+      'webapp/src/**/*.test.ts',
+      'test/**/*.test.ts',
+    ],
+    environment: 'node',
+  },
+})
+```
 
 ### Add npm scripts to root `package.json`
 ```
-"test:unit": "vitest --project shared"
-"test:webapp": "vitest --project webapp"
+"test": "vitest"
 "test:ci": "vitest run --reporter=verbose"
 ```
 
 **Files to create/modify:**
-- `vitest.workspace.ts` (new)
-- `shared/vitest.config.ts` (new)
-- `webapp/vitest.config.ts` (new)
-- `package.json` (add scripts)
+- `vitest.config.ts` (new)
+- `package.json` (update test scripts)
 
 ---
 
@@ -63,17 +97,21 @@ ffmpeg -f lavfi -i sine=frequency=440:duration=3 test-mic.wav
 ### `test/helpers/mockCrypto.ts`
 Deterministic `crypto.randomUUID()` stub for tests that hit `textToWords` or project creation.
 
+### `test/helpers/supabaseClient.ts`
+Helper that creates a Supabase client pointed at local instance (`http://localhost:54321`) with the local service-role key. Used by integration tests.
+
 **Files to create:**
 - `test/helpers/createProject.ts`
 - `test/helpers/mockCrypto.ts`
+- `test/helpers/supabaseClient.ts`
 - `test/fixtures/projects/*.json` (4 files)
 - `test/fixtures/media/` (3 files, generated)
 
 ---
 
-## Phase 3: Tier 1 — Pure Unit Tests (shared/)
+## Phase 3: Pure Unit Tests (co-located with source)
 
-These are the highest ROI: zero infrastructure, fast, deterministic, and they protect the core logic that produces correct videos.
+Highest ROI: zero infrastructure, fast, deterministic. Protects the core logic that produces correct videos.
 
 ### 3a. TimeMapper — expand from 3 → 50+ cases
 **File:** `shared/mappers/timeMapper.test.ts` (existing, extend)
@@ -91,18 +129,18 @@ Add test groups:
 
 Add: edge cases for extreme aspect ratios, zero-size inputs, device frame with crop, letterboxing calculations.
 
-### 3c. New test files for untested pure modules
+### 3c. New test files (co-located next to source)
 
-| File to test | Test file | Cases | Priority |
-|-------------|-----------|-------|----------|
-| `shared/animators/zoomAnimator.ts` | `zoomAnimator.test.ts` | 10+ (gap interpolation, easing, partial gaps) | HIGH |
-| `shared/animators/spotlightAnimator.ts` | `spotlightAnimator.test.ts` | 8+ | MEDIUM |
-| `shared/animators/cameraAnimator.ts` | `cameraAnimator.test.ts` | 8+ | MEDIUM |
-| `shared/animators/easing.ts` | `easing.test.ts` | 8+ (monotonicity, bounds) | MEDIUM |
-| `webapp/src/core/migrateProject.ts` | `migrateProject.test.ts` | 15+ (full chain v1→v5, each step, idempotency) | HIGH |
+| Source file | Test file (co-located) | Cases | Priority |
+|------------|------------------------|-------|----------|
+| `shared/animators/zoomAnimator.ts` | `shared/animators/zoomAnimator.test.ts` | 10+ | HIGH |
+| `shared/animators/spotlightAnimator.ts` | `shared/animators/spotlightAnimator.test.ts` | 8+ | MEDIUM |
+| `shared/animators/cameraAnimator.ts` | `shared/animators/cameraAnimator.test.ts` | 8+ | MEDIUM |
+| `shared/animators/easing.ts` | `shared/animators/easing.test.ts` | 8+ | MEDIUM |
+| `webapp/src/core/migrateProject.ts` | `webapp/src/core/migrateProject.test.ts` | 15+ | HIGH |
 
 ### 3d. Migration tests detail
-Use fixture-driven approach: load JSON from `test/fixtures/projects/legacy-v1.json`, run `migrateProject()`, assert output matches expected schema v5 shape. Key cases:
+Use fixture-driven approach: load JSON from `test/fixtures/projects/legacy-v1.json`, run `migrateProject()`, assert output matches expected v5 shape. Key cases:
 - v1→v2: `cameraLayoutSegments` renamed to `cameraMoveSegments`
 - v2→v3: `captionSegments[].text` → generates `words[]` via `textToWords`
 - v3→v4: relative background URLs → CDN URLs
@@ -112,42 +150,10 @@ Use fixture-driven approach: load JSON from `test/fixtures/projects/legacy-v1.js
 
 ---
 
-## Phase 4: Tier 2 — Backend Integration Tests
+## Phase 4: Webapp Logic Tests (co-located, mock Supabase client)
 
-### 4a. Rate limit pure logic (no Supabase needed)
-**File:** `backend/src/transcription/rateLimit.test.ts` (new)
-
-`computeCycleResetDate` is already exported and pure — takes an `AuthenticatedUser`, returns a `Date`. Use `vi.useFakeTimers()` to control "now".
-
-Cases:
-- Trialing → returns `currentPeriodEnd`
-- Monthly → returns `currentPeriodEnd`
-- Yearly, anniversary day in future this month → this month's date
-- Yearly, anniversary day already passed → next month
-- Yearly, anniversary day = today → next month
-- Yearly, day=31 and next month has 30 days → Date overflow handling
-- Yearly, computed reset > `currentPeriodEnd` → clamps
-
-### 4b. Backend route tests (Fastify injection + mocked deps)
-**File:** `backend/src/transcription/route.test.ts` (new)
-
-Use Fastify's `app.inject()` for HTTP-level tests without starting a server. Mock:
-- Supabase client (vi.mock the auth middleware module)
-- OpenAI API (vi.mock openai)
-
-Test cases:
-- Valid request → 200 + transcription segments returned
-- Missing auth → 401
-- Rate limit exceeded → 429 with usage info
-- OpenAI failure → 500 + usage rolled back
-- Invalid audio format → 400
-
----
-
-## Phase 5: Tier 3 — Webapp Logic Tests (mock Supabase client)
-
-### 5a. CloudProjectService
-**File:** `webapp/src/storage/cloudProjectService.test.ts` (new)
+### 4a. CloudProjectService
+**File:** `webapp/src/storage/cloudProjectService.test.ts`
 
 Mock at module boundary: `vi.mock('./cloudStorage')`, `vi.mock('./blobCache')`, mock zustand stores.
 
@@ -158,99 +164,124 @@ Cases:
 - Concurrent save guard → second save returns immediately
 - Load project → migrateProject runs on result
 
-### 5b. Project factory
-**File:** `webapp/src/core/Project.test.ts` (new)
+### 4b. Project factory
+**File:** `webapp/src/core/Project.test.ts`
 
 Test `createDefaultProject` and related factories produce valid, complete project objects.
 
 ---
 
-## Phase 6: Local Supabase Setup
+## Phase 5: Local Supabase Setup
 
-### 6a. Initialize local Supabase
+### 5a. Initialize local Supabase
 ```bash
-cd webapp
-npx supabase init  # creates supabase/config.toml
+npx supabase init  # creates supabase/config.toml (if missing)
 npx supabase start # starts Postgres, Auth, Storage, Edge Functions in Docker
 ```
 
-The 31 existing migration files in `webapp/supabase/migrations/` will auto-apply. This gives you a fully-schema'd local database matching production.
+The existing migration files in `supabase/migrations/` auto-apply, giving a fully-schema'd local database matching production.
 
-### 6b. Create seed file
-**File:** `webapp/supabase/seed.sql` (new)
+### 5b. Create seed file
+**File:** `supabase/seed.sql` (new)
 
 Insert test data:
 - 2 test users (via `auth.users` — local Supabase allows direct inserts)
 - Subscriptions: one active pro, one trialing
 - 3-4 projects with real `project_data` JSONB (captured from production, anonymized)
-- `user_quotas` rows
-- `transcription_usage` rows
+- `user_quotas`, `transcription_usage`, `user_profiles` rows
 
-### 6c. Seed storage bucket
-**File:** `test/helpers/seedStorage.ts` (new)
-
-Script that uses local Supabase service-role key to:
-1. Create `project-media` bucket
-2. Upload test media files to expected storage paths
-
-### 6d. Environment config
-**File:** `webapp/.env.local.test` (new) — points to local Supabase:
+### 5c. Environment config
+**File:** `.env.test` (new) — points to local Supabase:
 ```
 VITE_SUPABASE_URL=http://localhost:54321
 VITE_SUPABASE_ANON_KEY=<local-anon-key-from-supabase-start>
 ```
 
-### 6e. Integration tests against local Supabase
-Once local Supabase is running, write integration tests that exercise the real database:
-- Edge function tests via `fetch('http://localhost:54321/functions/v1/...')`
-- RPC tests (project_update, subscription_get, upsert_transcription_usage)
-- Storage signed URL generation + upload/download
+---
 
-These are **optional stretch goals** — the unit tests in Phases 3-5 give 80%+ of the reliability win. Local Supabase integration tests add the remaining 20%.
+## Phase 6: Integration Tests (root `test/` directory)
+
+These run against local Supabase and/or the render worker. Require `supabase start`.
+
+### 6a. Supabase RPC tests
+**File:** `test/integration/supabase-rpc.test.ts`
+
+Test the SQL functions that contain critical business logic, using the local Supabase client:
+
+| RPC function | What to test |
+|-------------|-------------|
+| `project_update()` | Optimistic concurrency — version bump on change, skip on identical data (MD5), reject stale version |
+| `render_job_get_or_create()` | Cache hit (completed job returns path), dedup (pending job returns existing), retry (failed → pending), new job creation |
+| `mux_video_get_or_create()` | Same dedup/cache/retry pattern |
+| `render_job_complete()` | Status transition, cascade failure to mux_videos |
+| `set_project_expiry()` | Cascade expiry across all user projects |
+| `subscription_get()` | Returns correct subscription shape |
+
+### 6b. Edge function tests
+**File:** `test/integration/edge-functions.test.ts`
+
+Test edge functions via HTTP against locally-served functions (`supabase functions serve`):
+
+| Edge function | What to test |
+|--------------|-------------|
+| `transcribe` | Rate limiting cycle reset logic (monthly, yearly, trial), usage tracking, 429 when exceeded |
+| `project-create` | Storage path generation, signed URL return, expiry logic (free vs pro) |
+| `render-job-create` | Dedup behavior, signed URL generation, pro access check |
+| `stripe-webhooks` | Subscription state transitions (checkout → active, cancel → expiry cascade) |
+| `asset-create` | Validation (size limits, type checks, library limit of 10) |
+
+Mock external APIs (OpenAI, Stripe, Mux) at the fetch level or via env var overrides.
+
+### 6c. Render worker API tests
+**File:** `test/integration/render-worker.test.ts`
+
+Start render worker locally (without GPU — it falls back to software rendering), test the HTTP API:
+
+- `POST /render` with valid secret → 200 + `{ ok: true, jobId }`
+- `POST /render` with bad secret → 401
+- Media serving: downloaded files accessible via `GET /{jobId}/{filename}`
+- Progress callback: verify heartbeat POSTs are sent to statusCallbackUrl (use a mock HTTP server)
+- Result: verify output file is PUT to uploadUrl (mock endpoint)
+
+Note: actual rendering needs a browser with WebCodecs. For CI, test the API contract only; for local smoke tests, let it render a 3-second test project.
 
 ---
 
-## Phase 7: Playwright (Last Resort, Future)
+## Phase 7: Playwright (Future, Last Resort)
 
-**Not in initial implementation.** Start with zero Playwright tests. Add later only for flows that can't be tested any other way:
+**Not in initial implementation.** Add later only for flows that can't be tested any other way:
 
-1. **Export flow smoke test** — Open editor with test project, trigger export, verify blob is produced. This is the best Playwright candidate since it exercises WebCodecs which don't exist in Node.
-2. **Auth flow** — Only if auth regressions become a recurring issue.
-
-When ready:
-- `npx playwright init` at root
-- Single `tests/export-smoke.spec.ts` that loads a project and exports
-- Run against `npm run dev:webapp` with local Supabase
+1. **Export flow smoke test** — Open editor with test project, trigger export, verify blob is produced (exercises WebCodecs which don't exist in Node)
+2. **Auth flow** — Only if auth regressions recur
 
 ---
 
-## Implementation Order (Start Here)
+## Implementation Order
 
 | Step | What | Effort | Impact |
 |------|------|--------|--------|
-| 1 | Vitest workspace config (Phase 1) | 30 min | Enables everything |
+| 1 | Vitest config (Phase 1) | 30 min | Enables everything |
 | 2 | Test helpers + fixtures (Phase 2) | 1-2 hr | Reused everywhere |
 | 3 | TimeMapper 50+ tests (Phase 3a) | 2-3 hr | Protects core video timing |
 | 4 | migrateProject 15+ tests (Phase 3d) | 2 hr | Protects data integrity |
-| 5 | computeCycleResetDate tests (Phase 4a) | 1 hr | Protects billing logic |
-| 6 | Animator tests (Phase 3c) | 2-3 hr | Protects visual effects |
-| 7 | CloudProjectService tests (Phase 5a) | 2-3 hr | Protects cloud sync |
-| 8 | Local Supabase setup (Phase 6) | 2-3 hr | Enables DB integration tests |
-| 9 | Backend route tests (Phase 4b) | 2-3 hr | Protects API reliability |
+| 5 | Animator tests (Phase 3c) | 2-3 hr | Protects visual effects |
+| 6 | CloudProjectService tests (Phase 4a) | 2-3 hr | Protects cloud sync |
+| 7 | Local Supabase setup (Phase 5) | 2-3 hr | Enables integration tests |
+| 8 | Supabase RPC tests (Phase 6a) | 2-3 hr | Protects DB business logic |
+| 9 | Edge function tests (Phase 6b) | 3-4 hr | Protects API layer (transcription rate limits, render orchestration) |
+| 10 | Render worker API tests (Phase 6c) | 2-3 hr | Protects render pipeline |
 
-Steps 1-5 give you the most reliability for the least effort. Steps 6-9 add the database layer.
+Steps 1-6 give the most reliability for the least effort (pure logic, no infrastructure). Steps 7-10 add the database and service layer.
 
 ---
 
 ## Verification
 
-After implementation, verify by running:
 ```bash
 npm test              # all tests in watch mode
-npm run test:ci       # single run, verbose output  
-npm run test:unit     # shared/ only (should be <2s)
-npm run test:backend  # backend/ only
-npm run test:webapp   # webapp/ only
+npm run test:ci       # single run, verbose output
 ```
 
-All pure unit tests (Phase 3) should pass with zero infrastructure. Backend/webapp tests should pass with mocked dependencies. Local Supabase integration tests (Phase 6e) require `supabase start` running.
+Pure unit tests (Phases 3-4) pass with zero infrastructure.
+Integration tests (Phase 6) require `supabase start` running locally.
+Render worker tests (Phase 6c) require the render worker running locally.
