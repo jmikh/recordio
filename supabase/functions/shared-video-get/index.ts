@@ -34,28 +34,11 @@ serve(async (req: Request) => {
 
         const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-        // 1. Resolve slug → shared_videos row
-        const { data: share, error: shareError } = await adminSupabase
-            .from('shared_videos')
-            .select('project_id, user_id, policy')
-            .eq('slug', slug)
-            .maybeSingle();
-
-        if (shareError || !share) {
-            return errorResponse('not_found', 404);
-        }
-
-        if (share.policy !== 'public') {
-            return errorResponse('not_found', 404);
-        }
-
-        const projectId = share.project_id;
-
-        // 2. Get project name
+        // 1. Resolve slug → project
         const { data: project, error: projectError } = await adminSupabase
             .from('projects')
-            .select('name')
-            .eq('id', projectId)
+            .select('id, name, user_id, share_policy')
+            .eq('slug', slug)
             .is('deleted_at', null)
             .maybeSingle();
 
@@ -63,8 +46,14 @@ serve(async (req: Request) => {
             return errorResponse('not_found', 404);
         }
 
-        // 3. Get user display name
-        const { data: { user: authUser } } = await adminSupabase.auth.admin.getUserById(share.user_id);
+        if (project.share_policy !== 'public') {
+            return errorResponse('not_found', 404);
+        }
+
+        const projectId = project.id;
+
+        // 2. Get user display name
+        const { data: { user: authUser } } = await adminSupabase.auth.admin.getUserById(project.user_id);
         const userName = authUser?.user_metadata?.full_name
             ?? authUser?.user_metadata?.name
             ?? authUser?.email

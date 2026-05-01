@@ -274,7 +274,7 @@ export function DashboardPage() {
                                     selectMode={selectMode}
                                     selected={selectedIds.has(item.id)}
                                     onSelect={() => toggleSelect(item.id)}
-                                    isShared={!!item.cfVideoUid}
+                                    isShared={item.isShared}
                                 />
                             ))}
                         </div>

@@ -8,7 +8,7 @@
 --      is still pending after 5 seconds, the cascade didn't fire — clean up.
 --
 --   2. Render completed + mux pending for 5min:
---      The Mux upload should have started (via render-hook or mux-video-create).
+--      The Mux upload should have started (via render-job-hook or mux-video-create).
 --      If 5 minutes passed, the upload or webhook silently failed.
 --
 -- Schedule: every minute
@@ -16,11 +16,11 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
-SELECT cron.unschedule('mux-video-stale-jobs')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'mux-video-stale-jobs');
+SELECT cron.unschedule('mux-videos-stale-cleanup')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'mux-videos-stale-cleanup');
 
 SELECT cron.schedule(
-    'mux-video-stale-jobs',
+    'mux-videos-stale-cleanup',
     '* * * * *',
     $$
     UPDATE public.mux_videos mv

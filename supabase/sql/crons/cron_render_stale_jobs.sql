@@ -9,11 +9,11 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
-SELECT cron.unschedule('render-stale-jobs')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'render-stale-jobs');
+SELECT cron.unschedule('render-jobs-stale-cleanup')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'render-jobs-stale-cleanup');
 
 SELECT cron.schedule(
-    'render-stale-jobs',
+    'render-jobs-stale-cleanup',
     '* * * * *',
     $$
     SELECT public.render_job_complete(rj.id, 'failed', 'Worker unresponsive')

@@ -3,7 +3,6 @@ import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
 import { VideoPage } from './pages/VideoPage';
-import { WatchPage } from './pages/WatchPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { ToastProvider } from './editor/components/Toast';
 import { AuthManager } from './auth/AuthManager';
@@ -41,10 +40,6 @@ export function App() {
 
         if (path.startsWith('/video/')) {
             return <VideoPage />;
-        }
-
-        if (path.startsWith('/watch/')) {
-            return <WatchPage />;
         }
 
         // Default to dashboard

@@ -14,7 +14,7 @@
 --   is_new              BOOL   — true when the caller should dispatch the render worker
 --   render_storage_path TEXT   — storage path for the rendered mp4 (null for dedup pending)
 --
--- Called by: edge function render-start
+-- Called by: edge function render-job-create
 -- Tables:   render_jobs
 
 DROP FUNCTION IF EXISTS public.render_job_start(UUID, UUID);

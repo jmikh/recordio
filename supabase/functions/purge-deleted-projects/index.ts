@@ -10,11 +10,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  * Pipeline per project:
  *   1. Set permanently_deleted = true  (user can no longer restore)
  *   2. Delete all files from storage   (user_id/project_id/*)
- *   3. Queue CF Stream video into deleted_cf_streams for async cleanup
- *   4. Hard-delete the project row
+ *   3. Hard-delete the project row
  *
- * If any step before (4) fails, we skip the row delete so we don't create
- * orphaned storage/CF resources. The project will be retried next run.
+ * If any step before (3) fails, we skip the row delete so we don't create
+ * orphaned storage. The project will be retried next run.
  *
  * Authenticated via service role key (set by the cron job).
  */
@@ -40,7 +39,7 @@ serve(async (req) => {
 
         const { data: projects, error: fetchError } = await supabase
             .from('projects')
-            .select('id, user_id, cf_video_uid, permanently_deleted')
+            .select('id, user_id, permanently_deleted')
             .not('deleted_at', 'is', null)
             .lt('deleted_at', threeDaysAgo)
             .limit(20);
@@ -103,20 +102,7 @@ serve(async (req) => {
                     }
                 }
 
-                // 3. Queue CF Stream video for async deletion (if published)
-                if (project.cf_video_uid) {
-                    const { error: queueError } = await supabase
-                        .from('deleted_cf_streams')
-                        .insert({ cf_video_uid: project.cf_video_uid, source: 'project_purge' });
-
-                    if (queueError) {
-                        console.error(`[purge-projects] Failed to queue CF deletion for ${project.id}:`, queueError);
-                        failed++;
-                        continue;
-                    }
-                }
-
-                // 4. Hard-delete the project row (only if all above succeeded)
+                // 3. Hard-delete the project row (only if all above succeeded)
                 const { error: deleteError } = await supabase
                     .from('projects')
                     .delete()

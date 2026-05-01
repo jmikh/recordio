@@ -3,10 +3,10 @@
 -- Sets a render job to a terminal state (completed, failed, canceled)
 -- and cascades failures to mux_videos by (project_id, cloud_version).
 --
--- On completed: NO cascade — render-hook handles Mux upload directly
+-- On completed: NO cascade — render-job-hook handles Mux upload directly
 -- On failed/canceled: mark pending mux_videos for same (project_id, cloud_version) as failed
 --
--- Called by: render-hook, stale job cron
+-- Called by: render-job-hook, stale job cron
 -- Tables:   render_jobs, mux_videos
 
 DROP FUNCTION IF EXISTS public.render_job_complete(UUID, TEXT, TEXT);

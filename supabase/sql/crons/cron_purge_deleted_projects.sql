@@ -11,11 +11,11 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
-SELECT cron.unschedule('purge-deleted-projects')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-deleted-projects');
+SELECT cron.unschedule('projects-purge-deleted')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'projects-purge-deleted');
 
 SELECT cron.schedule(
-    'purge-deleted-projects',
+    'projects-purge-deleted',
     '0 3 * * *',
     $$
     SELECT net.http_post(

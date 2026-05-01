@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import OpenAI from 'https://esm.sh/openai@4';
-import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { withAuth, jsonResponse, errorResponse, hasProAccess } from '../_shared/auth.ts';
 import { getProjectMicPath } from '../_shared/projectMedia.ts';
 
 const BUCKET = 'project-media';
@@ -24,16 +24,13 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Missing projectId', 400);
     }
 
-    // --- Check pro subscription ---
-    const { data: subscription, error: subError } = await supabase.rpc('subscription_get');
-
-    if (subError) {
-        console.error('[transcribe] subscription_get failed:', subError);
-        return errorResponse('Failed to verify subscription', 500);
-    }
-    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trialing')) {
+    // --- Check pro access (Stripe subscription OR active trial) ---
+    if (!await hasProAccess(user.id)) {
         return errorResponse('Pro subscription required', 403);
     }
+
+    // Load subscription for billing cycle (may be null for trial-only users)
+    const { data: subscription } = await supabase.rpc('subscription_get');
 
     // --- Get project data and extract mic path ---
     const { data: project, error: projectError } = await supabase
@@ -70,11 +67,14 @@ serve(withAuth(async (req, { user, supabase }) => {
     }
 
     // --- Compute billing cycle + check usage ---
-    const cycleResetDate = computeCycleResetDate(
-        new Date(subscription.current_period_end),
-        subscription.billing_interval,
-        subscription.status,
-    );
+    // Trial-only users (no Stripe sub) get a 30-day rolling cycle
+    const cycleResetDate = subscription
+        ? computeCycleResetDate(
+            new Date(subscription.current_period_end),
+            subscription.billing_interval,
+            subscription.status,
+        )
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     // Estimate duration from file size (precision isn't critical for rate limiting)
     const ext = micPath.split('.').pop() ?? 'wav';

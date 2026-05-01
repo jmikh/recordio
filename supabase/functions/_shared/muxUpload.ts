@@ -10,7 +10,7 @@ const BUCKET = 'project-media';
  * On success: stores mux_asset_id + render_storage_path (status stays 'pending' — Mux webhook completes it).
  * On failure: marks the mux_video as 'failed'.
  *
- * Used by: mux-video-create (when render is already done) and render-hook (on render completion).
+ * Used by: mux-video-create (when render is already done) and render-job-hook (on render completion).
  */
 export async function uploadToMux(params: {
     adminSupabase: SupabaseClient;

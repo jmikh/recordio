@@ -73,18 +73,6 @@ serve(async (req: Request) => {
 
             userId = user.id;
 
-            // Check Pro subscription
-            const { data: subscription } = await userSupabase
-                .from('subscriptions')
-                .select('status')
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-            const hasAccess = subscription?.status === 'active' || subscription?.status === 'trialing';
-            if (!hasAccess) {
-                return jsonResponse({ error: 'pro_required', message: 'Pro subscription required for server rendering.' }, 403);
-            }
-
             // Verify project belongs to user (RLS check)
             const { data: rlsCheck } = await userSupabase
                 .from('projects')
@@ -122,15 +110,15 @@ serve(async (req: Request) => {
             .single();
 
         if (rpcError || !jobResult) {
-            console.error('[render-start] render_job_get_or_create failed:', rpcError);
+            console.error('[render-job-create] render_job_get_or_create failed:', rpcError);
             return errorResponse('Failed to create render job', 500);
         }
 
-        console.log(`[render-start] Resolved: status=${jobResult.status}, is_new=${jobResult.is_new}, job_id=${jobResult.job_id}`);
+        console.log(`[render-job-create] Resolved: status=${jobResult.status}, is_new=${jobResult.is_new}, job_id=${jobResult.job_id}`);
 
         // Cache hit or dedup — return without dispatching to worker
         if (!jobResult.is_new) {
-            console.log(`[render-start] Skipping dispatch: ${jobResult.status === 'completed' ? 'render already done' : 'job already in progress'}`);
+            console.log(`[render-job-create] Skipping dispatch: ${jobResult.status === 'completed' ? 'render already done' : 'job already in progress'}`);
             return jsonResponse({
                 jobId: jobResult.job_id,
                 status: jobResult.status,
@@ -139,7 +127,7 @@ serve(async (req: Request) => {
         }
 
         // Generate signed download URLs for media (1h expiry)
-        console.log(`[render-start] New job ${jobResult.job_id}, signing media URLs`);
+        console.log(`[render-job-create] New job ${jobResult.job_id}, signing media URLs`);
         const mediaEntries = getProjectMediaPaths(project.project_data);
         const mediaUrls: Record<string, string> = {};
 
@@ -148,7 +136,7 @@ serve(async (req: Request) => {
                 .storage.from(BUCKET)
                 .createSignedUrl(entry.storagePath, 3600);
             if (error || !data) {
-                console.error(`[render-start] Failed to sign ${entry.storagePath}:`, error);
+                console.error(`[render-job-create] Failed to sign ${entry.storagePath}:`, error);
                 return errorResponse(`Failed to create signed URL for ${entry.type}`, 500);
             }
             mediaUrls[entry.storagePath] = data.signedUrl;
@@ -160,13 +148,13 @@ serve(async (req: Request) => {
             .createSignedUploadUrl(jobResult.render_storage_path, { upsert: true });
 
         if (uploadError || !uploadData) {
-            console.error('[render-start] Failed to create upload URL:', uploadError);
+            console.error('[render-job-create] Failed to create upload URL:', uploadError);
             return errorResponse('Failed to create upload URL', 500);
         }
 
         // Dispatch to worker (fire-and-forget)
-        const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/render-hook`;
-        console.log(`[render-start] Dispatching job ${jobResult.job_id} to worker, upload path: ${jobResult.render_storage_path}`);
+        const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/render-job-hook`;
+        console.log(`[render-job-create] Dispatching job ${jobResult.job_id} to worker, upload path: ${jobResult.render_storage_path}`);
 
         fetch(`${RENDER_WORKER_URL}/render`, {
             method: 'POST',
@@ -184,7 +172,7 @@ serve(async (req: Request) => {
                 statusCallbackUrl,
             }),
         }).catch(err => {
-            console.error('[render-start] Worker dispatch failed:', err);
+            console.error('[render-job-create] Worker dispatch failed:', err);
         });
 
         return jsonResponse({
@@ -193,7 +181,7 @@ serve(async (req: Request) => {
             renderStoragePath: jobResult.render_storage_path,
         });
     } catch (err) {
-        console.error('[render-start] Unexpected error:', err);
+        console.error('[render-job-create] Unexpected error:', err);
         return errorResponse('Internal server error', 500);
     }
 });

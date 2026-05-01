@@ -22,14 +22,11 @@ AS $$
             'updated_at', p.updated_at,
             'created_at', p.created_at,
             'expires_at', p.expires_at,
-            'cf_video_uid', p.cf_video_uid,
             'cloud_version', p.cloud_version,
             'duration_ms', p.duration_ms,
-            'is_shared', sv.id IS NOT NULL
+            'is_shared', p.slug IS NOT NULL
         ) AS row_data
         FROM public.projects p
-        LEFT JOIN public.shared_videos sv
-            ON sv.project_id = p.id AND sv.policy = 'public'
         WHERE p.user_id = auth.uid()
           AND p.deleted_at IS NULL
           AND p.upload_status = 'ready'

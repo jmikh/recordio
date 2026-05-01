@@ -22,7 +22,7 @@ export interface ProjectListItem {
     createdAt: string;
     lastAccessedAt: string | null;
     expiresAt: string | null;
-    cfVideoUid: string | null;
+    isShared: boolean;
     cloudVersion: number | null;
     /** Duration in milliseconds (from output windows) */
     durationMs: number | null;
@@ -340,7 +340,7 @@ export class CloudProjectService {
             createdAt: s.created_at,
             lastAccessedAt: s.last_accessed_at,
             expiresAt: s.expires_at,
-            cfVideoUid: s.cf_video_uid,
+            isShared: s.is_shared,
             cloudVersion: s.cloud_version,
             durationMs: s.duration_ms,
         }));

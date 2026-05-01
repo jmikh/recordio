@@ -1,15 +1,15 @@
--- shared_video_create(p_project_id)
+-- project_share(p_project_id)
 --
--- Creates a shared_videos row for the project if none exists.
+-- Generates a share slug for the project if none exists.
 -- Returns the slug (existing or newly created).
--- Generates a 12-char slug from a random UUID.
 --
 -- Called by: webapp SettingsPanel share button
--- Tables:   shared_videos, projects
+-- Tables:   projects
 
 DROP FUNCTION IF EXISTS public.shared_video_create(UUID);
+DROP FUNCTION IF EXISTS public.project_share(UUID);
 
-CREATE OR REPLACE FUNCTION public.shared_video_create(
+CREATE OR REPLACE FUNCTION public.project_share(
     p_project_id UUID
 )
 RETURNS TABLE(slug TEXT, is_new BOOLEAN)
@@ -17,12 +17,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_user_id UUID;
     v_existing_slug TEXT;
     v_new_slug TEXT;
 BEGIN
     -- Verify project belongs to caller
-    SELECT p.user_id INTO v_user_id
+    SELECT p.slug INTO v_existing_slug
     FROM public.projects p
     WHERE p.id = p_project_id
       AND p.user_id = auth.uid()
@@ -32,22 +31,20 @@ BEGIN
         RAISE EXCEPTION 'Project not found or not owned by user';
     END IF;
 
-    -- Check if share already exists
-    SELECT sv.slug INTO v_existing_slug
-    FROM public.shared_videos sv
-    WHERE sv.project_id = p_project_id;
-
+    -- Already shared — return existing slug
     IF v_existing_slug IS NOT NULL THEN
         RETURN QUERY SELECT v_existing_slug, FALSE;
         RETURN;
     END IF;
 
-    -- Create new share with random slug
-    v_new_slug := replace(gen_random_uuid()::text, '-', '');
-    v_new_slug := left(v_new_slug, 12);
+    -- Generate new slug
+    v_new_slug := left(replace(gen_random_uuid()::text, '-', ''), 12);
 
-    INSERT INTO public.shared_videos (project_id, user_id, slug)
-    VALUES (p_project_id, v_user_id, v_new_slug);
+    UPDATE public.projects
+    SET slug = v_new_slug
+    WHERE id = p_project_id
+      AND user_id = auth.uid()
+      AND deleted_at IS NULL;
 
     RETURN QUERY SELECT v_new_slug, TRUE;
 END;

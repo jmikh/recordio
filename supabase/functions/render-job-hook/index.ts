@@ -59,7 +59,7 @@ serve(async (req: Request) => {
 
         // 4. If job is not pending, signal cancel
         if (job.status !== 'pending') {
-            console.log(`[render-hook] Job ${jobId} already ${job.status}, signaling cancel`);
+            console.log(`[render-job-hook] Job ${jobId} already ${job.status}, signaling cancel`);
             return jsonResponse({ ok: true, cancel: true });
         }
 
@@ -90,7 +90,7 @@ serve(async (req: Request) => {
 
         // 6. Terminal state — use render_job_complete to cascade failures to mux_videos
         if (status === 'completed' || status === 'failed') {
-            console.log(`[render-hook] Job ${jobId} terminal: ${status}${errorMsg ? ` — ${errorMsg}` : ''}`);
+            console.log(`[render-job-hook] Job ${jobId} terminal: ${status}${errorMsg ? ` — ${errorMsg}` : ''}`);
             await adminSupabase.rpc('render_job_complete', {
                 p_job_id: jobId,
                 p_status: status,
@@ -108,7 +108,7 @@ serve(async (req: Request) => {
                     .maybeSingle();
 
                 if (pendingMux) {
-                    console.log(`[render-hook] Found pending mux_video ${pendingMux.id}, uploading to Mux`);
+                    console.log(`[render-job-hook] Found pending mux_video ${pendingMux.id}, uploading to Mux`);
                     const result = await uploadToMux({
                         adminSupabase,
                         muxVideoId: pendingMux.id,
@@ -117,7 +117,7 @@ serve(async (req: Request) => {
                         muxTokenSecret: MUX_TOKEN_SECRET,
                     });
                     if (!result.success) {
-                        console.error(`[render-hook] Mux upload failed for mux_video ${pendingMux.id}:`, result.error);
+                        console.error(`[render-job-hook] Mux upload failed for mux_video ${pendingMux.id}:`, result.error);
                     }
                 }
             }
@@ -125,7 +125,7 @@ serve(async (req: Request) => {
 
         return jsonResponse({ ok: true, cancel: false });
     } catch (err) {
-        console.error('[render-hook] Unexpected error:', err);
+        console.error('[render-job-hook] Unexpected error:', err);
         return errorResponse('Internal server error', 500);
     }
 });

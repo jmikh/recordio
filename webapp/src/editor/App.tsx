@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CanvasContainer } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
-import { ExportModal } from './components/settings/ExportModal';
-import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from './stores/useProjectStore';
+
+import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
 import { Timeline } from './components/timeline/Timeline';
 import { TimelineToolbar } from './components/timeline/TimelineToolbar';
 import { useUIStore } from './stores/useUIStore';
@@ -12,8 +12,7 @@ import { getTimeMapper } from './hooks/useTimeMapper';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { useMediaUrlStore } from './stores/useMediaUrlStore';
 import { useAssetLibraryStore } from './stores/useAssetLibraryStore';
-import { ProgressModal, Modal } from '@shared/components';
-import { formatTimeCode } from './utils';
+import { Modal } from '@shared/components';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
@@ -22,7 +21,6 @@ import { SyncFailedModal } from './components/SyncFailedModal';
 
 
 import { useUserStore } from './stores/useUserStore';
-import { ShareService } from './services/ShareService';
 import { trackEditorLoaded } from '../core/analytics';
 import { navigate } from '../navigate';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
@@ -34,20 +32,11 @@ function Editor() {
 
     // -- Project State --
     const project = useProjectData();
-    const projectName = useProjectName();
     const loadProject = useProjectStore(s => s.loadProject);
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const showDebugBar = useUIStore(s => s.showDebugBar);
 
-
-
-    // Export state (must be at top level - Rules of Hooks)
-    const isExporting = useProjectStore(s => s.exportState.isExporting);
-    const exportProgress = useProjectStore(s => s.exportState.progress);
-    const timeRemainingSeconds = useProjectStore(s => s.exportState.timeRemainingSeconds);
-    const exportPhase = useProjectStore(s => s.exportState.phase);
-    const decodeFallback = useProjectStore(s => s.exportState.decodeFallback);
 
 
     // Initialization State
@@ -112,8 +101,6 @@ function Editor() {
                 // Load asset library in background (non-blocking)
                 useAssetLibraryStore.getState().load().catch(console.error);
 
-                // Warm the share cache eagerly so Header/ExportSettings don't hit the DB on mount
-                ShareService.getShareForProject(projectId);
 
             } catch (err) {
                 console.error('[Editor] Project init failed:', err);
@@ -263,7 +250,6 @@ function Editor() {
 
             <div id="editor-body" className="flex-1 flex overflow-hidden">
                 <SettingsPanel />
-                <ExportModal />
                 <div
                     id="video-player-container"
                     className="flex-1 flex overflow-hidden relative items-center justify-center"
@@ -298,32 +284,6 @@ function Editor() {
 
             <ConflictModal />
             <SyncFailedModal onRetry={retryUpload} />
-            <ProgressModal
-                isOpen={isExporting}
-                title={
-                    exportPhase === 'uploading' ? 'Publishing Video'
-                        : exportPhase === 'preparing' ? 'Preparing Export'
-                            : 'Exporting Project'
-                }
-                projectName={projectName}
-                progress={exportProgress}
-                statusText={
-                    exportPhase === 'uploading'
-                        ? `Uploading... ${Math.round(exportProgress * 100)}%`
-                        : exportPhase === 'preparing'
-                            ? 'Analyzing video...'
-                            : timeRemainingSeconds !== null
-                                ? `~${formatTimeCode(timeRemainingSeconds * 1000)} remaining`
-                                : 'Estimating time...'
-                }
-                decodeFallback={!!decodeFallback}
-                onCancel={() => {
-                    const manager = (window as any).__activeExportManager;
-                    if (manager) {
-                        manager.cancel();
-                    }
-                }}
-            />
         </div>
     );
 }

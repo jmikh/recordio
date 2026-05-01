@@ -3,7 +3,7 @@
  *
  * Deployed on Google Cloud Run. Receives render jobs from the render-sync
  * edge function with signed URLs for media download/upload. Has zero Supabase
- * credentials — reports status via HTTP callback to render-hook.
+ * credentials — reports status via HTTP callback to render-job-hook.
  */
 
 import Fastify from 'fastify';
