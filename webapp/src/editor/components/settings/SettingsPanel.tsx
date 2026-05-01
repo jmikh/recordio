@@ -10,6 +10,7 @@ import { DEVICE_FRAMES } from '../../../core/deviceFrames';
 import { Scrollbar, Button, Tooltip } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useUserStore } from '../../stores/useUserStore';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
@@ -17,9 +18,12 @@ import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
-import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick } from 'react-icons/tb';
+import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick, TbLink } from 'react-icons/tb';
 import { PiWebcamBold } from 'react-icons/pi';
 import { LuChevronRight } from 'react-icons/lu';
+import { supabase } from '../../../auth/AuthManager';
+import { useToast } from '../Toast';
+import { CloudProjectService } from '../../../storage/cloudProjectService';
 
 
 
@@ -60,7 +64,12 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
     );
 };
 
+const VIDEO_BASE_URL = import.meta.env.PROD
+    ? 'https://app.recordio.cc/video'
+    : 'http://localhost:3001/video';
+
 export const SettingsPanel = () => {
+    const { addToast } = useToast();
     const activeTab = useUIStore(s => s.settingsPanelActiveTab);
     const setActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
@@ -77,6 +86,67 @@ export const SettingsPanel = () => {
     const hasCameraSource = !!project.cameraSource;
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hasMicrophone = !!project.microphoneSource;
+    const { isAuthenticated } = useUserStore();
+
+    // Share state
+    const [shareSlug, setShareSlug] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
+
+    // Load existing share slug from project_get data (comes via share_slug field)
+    useEffect(() => {
+        if (!isAuthenticated || !project?.id || !supabase) return;
+        supabase
+            .rpc('project_get', { p_project_id: project.id })
+            .then(({ data }) => {
+                if (data?.share_slug) setShareSlug(data.share_slug);
+            });
+    }, [isAuthenticated, project?.id]);
+
+    const handleShare = async () => {
+        if (!supabase || !project?.id || isSharing) return;
+
+        setIsSharing(true);
+        try {
+            // 1. Create share link if needed (URL available immediately)
+            let slug = shareSlug;
+            if (!slug) {
+                const { data, error } = await supabase
+                    .rpc('shared_video_create', { p_project_id: project.id })
+                    .single() as { data: { slug: string; is_new: boolean } | null; error: any };
+
+                if (error || !data) throw error;
+                slug = data.slug;
+                setShareSlug(slug);
+            }
+
+            await copyShareLink(slug);
+
+            // 2. Get cloudVersion and kick off mux-video-create pipeline
+            const cloudVersion = CloudProjectService.getCloudVersion(project.id);
+            if (cloudVersion !== undefined) {
+                supabase.functions.invoke('mux-video-create', {
+                    body: { projectId: project.id, cloudVersion },
+                }).catch(err => {
+                    console.error('[Share] mux-video-create failed:', err);
+                });
+            }
+        } catch (e: any) {
+            console.error('[Share] Failed:', e);
+            addToast({ type: 'error', title: 'Share failed', message: e?.message || 'Unknown error' });
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const copyShareLink = async (slug: string) => {
+        const url = `${VIDEO_BASE_URL}/${slug}`;
+        try {
+            await navigator.clipboard.writeText(url);
+            addToast({ type: 'success', title: 'Link copied to clipboard' });
+        } catch {
+            addToast({ type: 'error', title: 'Failed to copy link' });
+        }
+    };
 
     const handleTabChange = (tab: SettingsPanelTab) => {
         deselectAllSegments();
@@ -204,7 +274,7 @@ export const SettingsPanel = () => {
                     );
                 })}
 
-                <div className="mt-2 mx-3">
+                <div className="mt-2 mx-3 flex flex-col gap-2">
                     <Tooltip text={isSyncingMedia ? "Syncing to cloud..." : ""}>
                         <Button
                             variant="primary"
@@ -216,6 +286,31 @@ export const SettingsPanel = () => {
                             Export
                         </Button>
                     </Tooltip>
+
+                    {/* Share split button */}
+                    <div className="flex rounded-lg overflow-hidden">
+                        <button
+                            onClick={handleShare}
+                            disabled={isSharing || isSyncingMedia}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-medium border-none cursor-pointer transition-colors
+                                bg-primary text-white hover:bg-primary-highlighted
+                                ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                        >
+                            {isSharing ? 'Sharing...' : shareSlug ? 'Update video' : 'Share'}
+                        </button>
+                        <button
+                            onClick={() => shareSlug && copyShareLink(shareSlug)}
+                            disabled={!shareSlug}
+                            className={`flex items-center justify-center px-3 py-2 border-none cursor-pointer transition-colors border-l border-white/20
+                                ${shareSlug
+                                    ? 'bg-primary/80 text-white hover:bg-primary'
+                                    : 'bg-primary/40 text-white/50 cursor-not-allowed'}
+                            `}
+                        >
+                            <TbLink className="icon-md" />
+                        </button>
+                    </div>
                 </div>
                 </div>
             </nav>

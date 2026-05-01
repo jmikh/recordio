@@ -5,7 +5,7 @@
 --   2. Set status = 'completed', mux_playback_id
 --   3. Mark old completed (non-deleted) mux_videos for same project as is_deleted = true
 --
--- Called by: edge function mux-video-webhook on video.asset.ready
+-- Called by: edge function mux-video-hook on video.asset.ready
 -- Tables:   mux_videos
 
 DROP FUNCTION IF EXISTS public.mux_video_complete(TEXT, TEXT);
@@ -41,13 +41,13 @@ BEGIN
     WHERE id = v_id;
 
     -- 3. Mark old completed versions for same project as deleted
-    UPDATE public.mux_videos
+    UPDATE public.mux_videos mv2
     SET is_deleted = TRUE,
         updated_at = NOW()
-    WHERE project_id = v_project_id
-      AND status = 'completed'
-      AND is_deleted = FALSE
-      AND id != v_id;
+    WHERE mv2.project_id = v_project_id
+      AND mv2.status = 'completed'
+      AND mv2.is_deleted = FALSE
+      AND mv2.id != v_id;
 
     RETURN QUERY SELECT v_id, v_project_id, TRUE;
 END;

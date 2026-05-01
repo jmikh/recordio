@@ -193,6 +193,9 @@ export class AuthManager {
                 provider,
                 options: {
                     redirectTo,
+                    queryParams: {
+                        prompt: 'select_account',
+                    },
                 },
             });
 

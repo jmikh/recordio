@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.0",
+    "@mux/mux-player-react": "^3.13.0",
     "@ricky0123/vad-web": "^0.0.30",
     "@sentry/react": "^10.34.0",
     "@stripe/stripe-js": "^8.6.3",

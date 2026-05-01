@@ -176,7 +176,7 @@ export function ExportModal() {
             }
 
             // 2. Start render job
-            const { data, error } = await supabase!.functions.invoke('render-start-job', {
+            const { data, error } = await supabase!.functions.invoke('render-sync', {
                 body: { projectId: project.id },
             });
 

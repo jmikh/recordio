@@ -41,6 +41,11 @@ export interface ProjectListItem {
 export class CloudProjectService {
     /** In-memory cloud version tracking (replaces IndexedDB syncMeta). */
     private static cloudVersions = new Map<string, number>();
+
+    /** Get the last-known cloud version for a project. */
+    static getCloudVersion(projectId: string): number | undefined {
+        return this.cloudVersions.get(projectId);
+    }
     /** In-memory project data hash — skip no-op cloud writes. */
     private static projectHashes = new Map<string, string>();
     /** Guard against concurrent saves for the same project. */

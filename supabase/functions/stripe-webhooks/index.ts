@@ -14,103 +14,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 
 // ============================================================================
-// Mixpanel Server-Side Tracking (HTTP API — no SDK needed)
-// ============================================================================
-
-const MIXPANEL_TOKEN = Deno.env.get('MIXPANEL_TOKEN') || '';
-
-type PlanType = 'basic' | 'pro_trial' | 'pro';
-
-function derivePlanType(status: string | null): PlanType {
-    if (status === 'active') return 'pro';
-    if (status === 'trialing') return 'pro_trial';
-    return 'basic';
-}
-
-/** Track an event in Mixpanel via the /track HTTP API */
-async function mpTrack(distinctId: string, event: string, properties: Record<string, any> = {}) {
-    if (!MIXPANEL_TOKEN) return;
-    try {
-        await fetch('https://api.mixpanel.com/track', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
-            body: JSON.stringify([{
-                event,
-                properties: { token: MIXPANEL_TOKEN, distinct_id: distinctId, time: Date.now(), ...properties },
-            }]),
-        });
-    } catch (err) {
-        console.error('[Mixpanel] track error:', err);
-    }
-}
-
-/** Set profile properties in Mixpanel via the /engage HTTP API */
-async function mpPeopleSet(distinctId: string, properties: Record<string, any>) {
-    if (!MIXPANEL_TOKEN) return;
-    try {
-        await fetch('https://api.mixpanel.com/engage#profile-set', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
-            body: JSON.stringify([{
-                $token: MIXPANEL_TOKEN,
-                $distinct_id: distinctId,
-                $set: properties,
-            }]),
-        });
-    } catch (err) {
-        console.error('[Mixpanel] people.set error:', err);
-    }
-}
-
-/** Set profile properties only if not already set (idempotent) */
-async function mpPeopleSetOnce(distinctId: string, properties: Record<string, any>) {
-    if (!MIXPANEL_TOKEN) return;
-    try {
-        await fetch('https://api.mixpanel.com/engage#profile-set-once', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
-            body: JSON.stringify([{
-                $token: MIXPANEL_TOKEN,
-                $distinct_id: distinctId,
-                $set_once: properties,
-            }]),
-        });
-    } catch (err) {
-        console.error('[Mixpanel] people.set_once error:', err);
-    }
-}
-
-/** Record a revenue transaction in Mixpanel via the /engage HTTP API */
-async function mpTrackCharge(distinctId: string, amount: number, properties: Record<string, any> = {}) {
-    if (!MIXPANEL_TOKEN) return;
-    try {
-        await fetch('https://api.mixpanel.com/engage#profile-append', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
-            body: JSON.stringify([{
-                $token: MIXPANEL_TOKEN,
-                $distinct_id: distinctId,
-                $append: {
-                    $transactions: { $amount: amount, $time: new Date().toISOString(), ...properties },
-                },
-            }]),
-        });
-    } catch (err) {
-        console.error('[Mixpanel] track_charge error:', err);
-    }
-}
-
-/** Look up user email from Supabase auth */
-async function getUserEmail(userId: string): Promise<string | null> {
-    try {
-        const { data } = await supabase.auth.admin.getUserById(userId);
-        return data?.user?.email ?? null;
-    } catch {
-        return null;
-    }
-}
-
-// ============================================================================
 // Webhook Handler
 // ============================================================================
 
@@ -194,21 +97,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     console.log('[Webhook] Checkout completed for user:', userId, isLifetime ? '(lifetime)' : '');
 
-    // Read old status before upserting
-    const { data: oldSub } = await supabase
-        .from('subscriptions')
-        .select('status')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-    const previousPlanType = derivePlanType(oldSub?.status ?? null);
-
     // For recurring plans, fetch authoritative data from Stripe BEFORE the upsert
     // so we write the correct current_period_end, status, and billing_interval.
     // Without this, the stale trial current_period_end from the auth trigger persists.
     let billingInterval: string | null = isLifetime ? 'lifetime' : null;
-    let priceAmount = 0;
-    let currency = 'usd';
     let stripeStatus: string = 'active';
     let stripePeriodEnd: string | null = null;
 
@@ -217,8 +109,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
             const priceItem = stripeSub.items?.data?.[0]?.price;
             billingInterval = priceItem?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-            priceAmount = priceItem?.unit_amount ?? 0;
-            currency = priceItem?.currency ?? 'usd';
             stripeStatus = stripeSub.status;
             // Post 2025-03-31.basil: current_period_end moved to items.data[]
             const rawEnd = stripeSub.items?.data?.[0]?.current_period_end ?? stripeSub.current_period_end;
@@ -228,9 +118,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         } catch (err) {
             console.error('[Webhook] Error fetching Stripe subscription details:', err);
         }
-    } else if (isLifetime) {
-        priceAmount = session.amount_total ?? 0;
-        currency = session.currency ?? 'usd';
     }
 
     // Create or update subscription record
@@ -261,32 +148,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         p_user_id: userId,
         p_expires_at: null, // New checkout = active Pro = no expiry
     });
-
-    // --- Mixpanel Tracking ---
-    const email = await getUserEmail(userId);
-
-    await mpPeopleSet(userId, {
-        ...(email ? { $email: email } : {}),
-        current_plan_type: 'pro',
-        billing_interval: billingInterval,
-        cancel_at_period_end: false,
-        current_period_end: stripePeriodEnd,
-    });
-
-    // Set first_pro_date only once (preserved across churn/reactivation)
-    await mpPeopleSetOnce(userId, { first_pro_date: new Date().toISOString() });
-
-    // Track subscription created
-    await mpTrack(userId, 'subscription_created', {
-        plan_type: billingInterval,
-        price: priceAmount,
-        currency,
-    });
-
-    // Track revenue
-    if (priceAmount > 0) {
-        await mpTrackCharge(userId, priceAmount / 100, { plan_type: billingInterval });
-    }
 }
 
 // ============================================================================
@@ -299,7 +160,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     // Find user by customer ID and get old state
     const { data: existingSub } = await supabase
         .from('subscriptions')
-        .select('user_id, status, current_period_end, cancel_at_period_end')
+        .select('user_id, status')
         .eq('stripe_customer_id', customerId)
         .single();
 
@@ -310,8 +171,6 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
     const userId = existingSub.user_id;
     const oldStatus = existingSub.status;
-    const oldCancelAtPeriodEnd = existingSub.cancel_at_period_end;
-    const oldPeriodEnd = existingSub.current_period_end;
 
     const newStatus = subscription.status;
     // Post 2025-03-31.basil: current_period_end moved to items.data[]
@@ -355,73 +214,6 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
             p_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
     }
-
-    // --- Mixpanel Tracking ---
-    const newPlanType = derivePlanType(newStatus);
-    const oldPlanType = derivePlanType(oldStatus);
-
-    // Get billing interval from Stripe subscription
-    let billingInterval: string | null = null;
-    try {
-        const priceItem = subscription.items?.data?.[0]?.price;
-        billingInterval = priceItem?.recurring
-            ? (priceItem.recurring.interval === 'year' ? 'yearly' : 'monthly')
-            : 'lifetime';
-    } catch { /* ignore */ }
-
-    // Update profile
-    const profileUpdate: Record<string, any> = {
-        current_plan_type: newPlanType,
-        cancel_at_period_end: cancelAtPeriodEnd,
-        billing_interval: billingInterval,
-        current_period_end: currentPeriodEnd.toISOString(),
-    };
-
-    // Preserve last active plan when transitioning to basic
-    if (newPlanType === 'basic' && oldPlanType !== 'basic') {
-        profileUpdate.last_active_plan_type = oldPlanType;
-        profileUpdate.last_active_plan_end_date = new Date().toISOString();
-    }
-
-    await mpPeopleSet(userId, profileUpdate);
-
-    // Cancel scheduled? (cancel_at_period_end flipped to true)
-    if (cancelAtPeriodEnd && !oldCancelAtPeriodEnd) {
-        const remainingMs = currentPeriodEnd.getTime() - Date.now();
-        const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
-        await mpTrack(userId, 'subscription_cancel_scheduled', {
-            plan_type: billingInterval,
-            remaining_days: remainingDays,
-            cancel_at: currentPeriodEnd.toISOString(),
-        });
-    }
-
-    // Reactivated? (cancel_at_period_end flipped to false)
-    if (!cancelAtPeriodEnd && oldCancelAtPeriodEnd) {
-        await mpTrack(userId, 'subscription_reactivated', {
-            plan_type: billingInterval,
-        });
-    }
-
-    // Renewal? (status stayed active, period end moved forward)
-    const isRenewal = oldStatus === 'active' && newStatus === 'active'
-        && oldPeriodEnd && currentPeriodEnd.toISOString() > oldPeriodEnd;
-    if (isRenewal) {
-        let renewalAmount = 0;
-        try {
-            const priceItem = subscription.items?.data?.[0]?.price;
-            renewalAmount = (priceItem?.unit_amount ?? 0) / 100;
-        } catch { /* ignore */ }
-
-        await mpTrack(userId, 'subscription_renewed', {
-            plan_type: billingInterval,
-            price: renewalAmount,
-        });
-
-        if (renewalAmount > 0) {
-            await mpTrackCharge(userId, renewalAmount, { plan_type: billingInterval });
-        }
-    }
 }
 
 // ============================================================================
@@ -431,10 +223,10 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
 
-    // Get old state before updating
+    // Get user_id before updating
     const { data: existingSub } = await supabase
         .from('subscriptions')
-        .select('user_id, status')
+        .select('user_id')
         .eq('stripe_customer_id', customerId)
         .maybeSingle();
 
@@ -459,34 +251,5 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
             p_user_id: existingSub.user_id,
             p_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
-    }
-
-    // --- Mixpanel Tracking ---
-    if (existingSub) {
-        const previousPlanType = derivePlanType(existingSub.status);
-
-        // Get billing interval
-        let billingInterval: string | null = null;
-        try {
-            const priceItem = subscription.items?.data?.[0]?.price;
-            billingInterval = priceItem?.recurring
-                ? (priceItem.recurring.interval === 'year' ? 'yearly' : 'monthly')
-                : 'lifetime';
-        } catch { /* ignore */ }
-
-        await mpPeopleSet(existingSub.user_id, {
-            current_plan_type: 'basic',
-            cancel_at_period_end: false,
-            billing_interval: null,
-            current_period_end: null,
-            last_active_plan_type: previousPlanType,
-            last_active_plan_end_date: new Date().toISOString(),
-        });
-
-        if (previousPlanType !== 'basic') {
-            await mpTrack(existingSub.user_id, 'subscription_canceled', {
-                plan_type: billingInterval,
-            });
-        }
     }
 }

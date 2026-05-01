@@ -42,12 +42,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
     };
 
     const handleManageSubscription = async () => {
-        if (!subscription.stripeCustomerId) {
-            console.error('[UserMenu] No Stripe customer ID found');
-            return;
-        }
-
-        const { url, error } = await StripeService.createPortalSession(subscription.stripeCustomerId);
+        const { url, error } = await StripeService.createPortalSession();
 
         if (error || !url) {
             console.error('[UserMenu] Failed to create portal session:', error);

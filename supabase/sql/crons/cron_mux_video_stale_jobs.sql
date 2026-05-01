@@ -1,7 +1,9 @@
 -- cron_mux_video_stale_jobs
 --
--- Every-minute cron that marks pending mux_videos as failed if no webhook
--- received within 10 minutes.
+-- Every-minute cron that marks pending mux_videos as failed if no Mux webhook
+-- received within 10 minutes (after mux_asset_id has been set, meaning upload started).
+-- Pending mux_videos without mux_asset_id are waiting for render — handled by
+-- the render stale jobs cron via cascade through render_job_complete.
 --
 -- Schedule: every minute
 -- Pattern:  A (pure SQL, no edge function needed)
@@ -20,6 +22,7 @@ SELECT cron.schedule(
         error = 'Mux webhook timeout',
         updated_at = now()
     WHERE status = 'pending'
-      AND updated_at < now() - interval '10 minutes';
+      AND mux_asset_id IS NOT NULL
+      AND updated_at < now() - interval '15 minutes';
     $$
 );

@@ -13,7 +13,7 @@ Headless browser video render service. Receives render jobs via HTTP, runs the s
 ## Architecture
 
 ```
-Edge function (render-start-job)
+Edge function (render-sync)
   → POST /render with signed URLs + project JSON
   → Worker responds immediately, renders in background
   → Reports progress via statusCallbackUrl

@@ -22,7 +22,7 @@ export class StripeService {
             const redirectUrl = `${window.location.origin}/?subscription-success`;
             const cancelUrl = redirectUrl;
 
-            const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+            const { data, error } = await supabase.functions.invoke('stripe-checkout', {
                 body: {
                     userId,
                     userEmail,
@@ -64,7 +64,7 @@ export class StripeService {
      * In the Mac app: opens portal in the default browser via navigation interception.
      * In the browser: opens portal in a new tab.
      */
-    static async createPortalSession(customerId: string): Promise<{ url?: string; error?: Error }> {
+    static async createPortalSession(): Promise<{ url?: string; error?: Error }> {
         if (!supabase) {
             return { error: new Error('Supabase not configured') };
         }
@@ -72,9 +72,8 @@ export class StripeService {
         try {
             const returnUrl = window.location.href;
 
-            const { data, error } = await supabase.functions.invoke('create-portal-session', {
+            const { data, error } = await supabase.functions.invoke('stripe-portal', {
                 body: {
-                    customerId,
                     returnUrl,
                 },
             });

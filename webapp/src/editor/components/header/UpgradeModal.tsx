@@ -116,7 +116,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
 
         setLoading(true);
-        const { url, error } = await StripeService.createPortalSession(subscription.stripeCustomerId);
+        const { url, error } = await StripeService.createPortalSession();
         setLoading(false);
 
         if (error || !url) {

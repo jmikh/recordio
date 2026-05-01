@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
+import { VideoPage } from './pages/VideoPage';
 import { WatchPage } from './pages/WatchPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { ToastProvider } from './editor/components/Toast';
@@ -36,6 +37,10 @@ export function App() {
 
         if (path === '/editor' || path.startsWith('/editor')) {
             return <EditorPage />;
+        }
+
+        if (path.startsWith('/video/')) {
+            return <VideoPage />;
         }
 
         if (path.startsWith('/watch/')) {

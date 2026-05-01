@@ -8,5 +8,8 @@ Skills serve as living knowledge/memory for this codebase. Whenever you load a s
 # Plans
 use actualy meaningful names for plans md files rather than randomly generated names.
 
+# Data Access
+No direct table access from the client. All database operations go through RPC (DB functions) or edge functions depending on the need. This keeps the API surface clean and avoids leaking table structure to the frontend.
+
 # Debugging
 If the cause of a problem is not obvious, suggest to add logs or reproduce the problem before directly trying to make a fix based on a guess. Once the root cause is confirmed we can fix it. 
