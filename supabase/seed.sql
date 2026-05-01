@@ -9,7 +9,11 @@
 INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at,
-    raw_app_meta_data, raw_user_meta_data, confirmation_token
+    raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, recovery_token, email_change_token_new,
+    email_change_token_current, email_change, phone_change,
+    phone_change_token, reauthentication_token,
+    is_sso_user, is_anonymous
 ) VALUES
 -- Pro user (active subscription)
 (
@@ -17,11 +21,12 @@ INSERT INTO auth.users (
     '11111111-1111-1111-1111-111111111111',
     'authenticated', 'authenticated',
     'pro@test.local',
-    '$2a$10$PznXBkOER1JzWuFmSKjnzuPRzBG5VKZMnCBbhO9MQhPOA5t4v8JGe',
+    '$2a$10$e7ea8qYnRKTYrIDNLTMKfuVdH4sy1D9ni.7nT2dFizeB35QOygDgm',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"name":"Pro User"}'::jsonb,
-    ''
+    '', '', '', '', '', '', '', '',
+    false, false
 ),
 -- Free/trial user
 (
@@ -29,11 +34,12 @@ INSERT INTO auth.users (
     '22222222-2222-2222-2222-222222222222',
     'authenticated', 'authenticated',
     'trial@test.local',
-    '$2a$10$PznXBkOER1JzWuFmSKjnzuPRzBG5VKZMnCBbhO9MQhPOA5t4v8JGe',
+    '$2a$10$e7ea8qYnRKTYrIDNLTMKfuVdH4sy1D9ni.7nT2dFizeB35QOygDgm',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"name":"Trial User"}'::jsonb,
-    ''
+    '', '', '', '', '', '', '', '',
+    false, false
 )
 ON CONFLICT (id) DO NOTHING;
 

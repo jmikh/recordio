@@ -164,7 +164,7 @@ describe('CloudProjectService.saveProject', () => {
     it('sets conflict state on CloudVersionConflictError', async () => {
         const project = makeProject();
         vi.mocked(CloudStorage.saveProjectMetadata).mockRejectedValue(
-            new CloudVersionConflictError('proj-1')
+            new CloudVersionConflictError('proj-1', 1)
         );
 
         await CloudProjectService.saveProject(project, 'user-1', true);
@@ -228,7 +228,7 @@ describe('CloudProjectService.listProjects', () => {
             thumbnail_storage_path: 'path/thumb.webp',
             updated_at: '2024-01-01',
             created_at: '2024-01-01',
-            last_accessed_at: null,
+            last_accessed_at: '2024-01-01',
             expires_at: null,
             deleted_at: null,
             is_shared: false,
