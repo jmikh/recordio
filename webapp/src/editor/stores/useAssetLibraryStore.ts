@@ -41,10 +41,12 @@ export const useAssetLibraryStore = create<AssetLibraryState>()((set, get) => ({
             ]);
             set({ backgrounds, music, isLoaded: true });
 
-            // Pre-resolve blob URLs for all assets in background
-            const allAssets = [...backgrounds, ...music];
-            for (const asset of allAssets) {
-                get().resolveBlobUrl(asset.storagePath).catch(() => {});
+            // Pre-resolve blob URLs for all assets in a single batch
+            const allPaths = [...backgrounds, ...music].map(a => a.storagePath);
+            if (allPaths.length > 0) {
+                BlobCache.getBlobUrls(allPaths)
+                    .then(urls => set(state => ({ blobUrls: { ...state.blobUrls, ...urls } })))
+                    .catch(() => {});
             }
         } catch (err) {
             console.error('Failed to load asset library:', err);

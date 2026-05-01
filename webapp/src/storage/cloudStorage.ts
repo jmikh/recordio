@@ -445,16 +445,25 @@ export class CloudStorage {
      * Request a signed download URL for a storage path.
      */
     static async requestDownloadUrl(storagePath: string): Promise<string> {
+        const urls = await this.requestDownloadUrls([storagePath]);
+        return urls[storagePath];
+    }
+
+    /**
+     * Request signed download URLs for multiple storage paths in a single call.
+     * Returns a map of storagePath → signedUrl.
+     */
+    static async requestDownloadUrls(storagePaths: string[]): Promise<Record<string, string>> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.functions.invoke('storage-download-url', {
-            body: { storagePath },
+        const { data, error } = await supabase.functions.invoke('storage-download-urls', {
+            body: { storagePaths },
         });
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
-        return data.signedUrl;
+        return data.signedUrls;
     }
 
     /**
@@ -497,7 +506,10 @@ export class CloudStorage {
         storagePath: string,
         onProgress?: (fraction: number) => void,
     ): Promise<Blob> {
+        const tag = storagePath.split('/').pop() ?? storagePath;
+        const t0 = performance.now();
         const signedUrl = await this.requestDownloadUrl(storagePath);
+        console.log(`[CloudStorage] ${tag}: signed URL obtained in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
         return this.downloadBlob(signedUrl, onProgress);
     }
 

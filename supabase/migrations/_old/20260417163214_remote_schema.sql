@@ -727,10 +727,11 @@ CREATE TRIGGER "on-user-created-mixpanel" AFTER INSERT ON auth.users FOR EACH RO
 
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-CREATE TRIGGER "send-welcome-email" AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rzbyqcdtjuclioingiaf.supabase.co/functions/v1/send-welcome-email', 'POST', '{"Content-type":"application/json"}', '{}', '5000');
+-- Skipped for local dev: remote webhook URL not available locally
+-- CREATE TRIGGER "send-welcome-email" AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://rzbyqcdtjuclioingiaf.supabase.co/functions/v1/send-welcome-email', 'POST', '{"Content-type":"application/json"}', '{}', '5000');
 
-CREATE TRIGGER protect_buckets_delete BEFORE DELETE ON storage.buckets FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
-
-CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
+-- Skipped for local dev: storage.protect_delete() is built into hosted Supabase only
+-- CREATE TRIGGER protect_buckets_delete BEFORE DELETE ON storage.buckets FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
+-- CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
 
 

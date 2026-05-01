@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
+    "test:ci": "vitest run --reporter=verbose",
     "generate-icons": "node scripts/generateIcons.js"
   },
   "dependencies": {
@@ -51,6 +52,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.23",
+    "dotenv": "^17.4.2",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

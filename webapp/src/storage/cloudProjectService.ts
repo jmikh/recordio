@@ -361,18 +361,27 @@ export class CloudProjectService {
     /**
      * Load thumbnails for a list of projects in the background.
      * Call this AFTER setting the projects in state to avoid race conditions.
+     * Batches all signed URL requests into a single edge function call.
      */
     static loadThumbnails(
         items: ProjectListItem[],
         onThumbnailLoaded: (projectId: string, thumbnailUrl: string) => void,
     ): void {
-        for (const item of items) {
-            if (item.thumbnailStoragePath && item.thumbnailStoragePath !== 'pending') {
-                BlobCache.getBlobUrl(item.thumbnailStoragePath)
-                    .then(url => onThumbnailLoaded(item.id, url))
-                    .catch(err => console.warn(`[CloudProjectService] Thumbnail load failed for ${item.id}:`, err));
-            }
-        }
+        const withThumbnails = items.filter(
+            (item) => item.thumbnailStoragePath && item.thumbnailStoragePath !== 'pending',
+        );
+        if (withThumbnails.length === 0) return;
+
+        const paths = withThumbnails.map((item) => item.thumbnailStoragePath!);
+
+        BlobCache.getBlobUrls(paths)
+            .then((blobUrls) => {
+                for (const item of withThumbnails) {
+                    const url = blobUrls[item.thumbnailStoragePath!];
+                    if (url) onThumbnailLoaded(item.id, url);
+                }
+            })
+            .catch(err => console.warn('[CloudProjectService] Thumbnail batch load failed:', err));
     }
 
     // ─── Delete ──────────────────────────────────────────────

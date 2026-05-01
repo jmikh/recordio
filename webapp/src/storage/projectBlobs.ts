@@ -16,16 +16,25 @@ const STATUS_LABELS: Record<string, string> = {
 
 /**
  * Hydrate all media blob URLs into the provided setUrl callback.
- * Downloads from cloud on cache miss via BlobCache.
+ * Downloads all media in parallel from cloud on cache miss via BlobCache.
  */
 export async function hydrateMediaUrls(
     project: Project,
     setUrl: (storagePath: string, url: string) => void,
     onStatus?: (status: string) => void,
 ): Promise<void> {
-    for (const entry of getProjectMediaPaths(project)) {
-        onStatus?.(STATUS_LABELS[entry.type] ?? 'Loading media...');
-        const blobUrl = await BlobCache.getBlobUrl(entry.storagePath);
-        setUrl(entry.storagePath, blobUrl);
+    const entries = getProjectMediaPaths(project);
+    const labels = entries.map((e) => STATUS_LABELS[e.type] ?? 'Loading media...');
+    onStatus?.(labels.join(' · '));
+
+    console.log(`[hydrate] loading ${entries.length} media files…`);
+    const t0 = performance.now();
+
+    const blobUrls = await BlobCache.getBlobUrls(entries.map((e) => e.storagePath));
+
+    for (const [storagePath, blobUrl] of Object.entries(blobUrls)) {
+        setUrl(storagePath, blobUrl);
     }
+
+    console.log(`[hydrate] all media loaded in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
 }
