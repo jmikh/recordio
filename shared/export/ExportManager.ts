@@ -135,6 +135,11 @@ export class ExportManager {
         const videoCodec = await resolveVideoCodec(quality, width, height);
         const audioCodec = await resolveAudioCodec();
 
+        console.log(`[Export] Video codec: ${videoCodec.muxerCodec} (${videoCodec.config.codec}), ` +
+            `fallback=${videoCodec.fallback}, tried=[${videoCodec.tried.join(', ')}], ` +
+            `hwAccel=${videoCodec.config.hardwareAcceleration ?? 'default'}, ` +
+            `${width}x${height} @ ${videoCodec.config.bitrate! / 1_000_000}Mbps`);
+
         // Stream muxer output into a growable chunk list
         const muxedChunks: { data: Uint8Array; position: number }[] = [];
         const muxer = new Mp4Muxer.Muxer({
@@ -284,8 +289,9 @@ export class ExportManager {
             const startTime = performance.now();
             framesProcessed = 0;
 
-            // Timing accumulators (reset every 30 frames for logging)
+            // Timing accumulators (reset every 150 frames for logging)
             let accDecode = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
+            let accChunksFed = 0, maxQueueSize = 0;
 
             for (let i = 0; i < totalFrames; i++) {
                 if (signal.aborted) throw new Error("Export cancelled");
@@ -294,9 +300,9 @@ export class ExportManager {
                 const currentTimeMs = i * frameInterval;
                 const timestampMicros = i * (1000000 / fps);
 
-                // Update Progress (every 30 frames)
+                // Update Progress (every 150 frames)
                 framesProcessed++;
-                if (framesProcessed % 30 === 0 || framesProcessed === totalFrames) {
+                if (framesProcessed % 150 === 0 || framesProcessed === totalFrames) {
                     const elapsedTime = (performance.now() - startTime) / 1000;
                     const fpsRate = framesProcessed / elapsedTime;
                     const remainingFrames = totalFrames - framesProcessed;
@@ -317,6 +323,9 @@ export class ExportManager {
                     currentFrameRefs[id] = await ext.getFrameAtTime(sourceTimeMs / 1000);
                 }));
                 const t1 = performance.now();
+                for (const ext of Object.values(frameExtractors)) {
+                    accChunksFed += ext.lastChunksFed;
+                }
 
                 // Render Frame
                 ctx.clearRect(0, 0, width, height);
@@ -365,6 +374,7 @@ export class ExportManager {
                 Object.values(currentFrameRefs).forEach(f => f.close());
 
                 // Backpressure
+                maxQueueSize = Math.max(maxQueueSize, videoEncoder.encodeQueueSize);
                 const bpStart = performance.now();
                 while ((videoEncoder.state as string) !== 'closed' && videoEncoder.encodeQueueSize > 15) {
                     if (performance.now() - bpStart > BACKPRESSURE_TIMEOUT_MS) {
@@ -382,15 +392,17 @@ export class ExportManager {
                 accBackpressure += t4 - t3;
                 accTotal += t4 - frameStart;
 
-                // Per-frame timing breakdown (every 30 frames)
-                if (framesProcessed % 30 === 0) {
-                    console.log(`[Export] Frames ${framesProcessed - 29}-${framesProcessed}/${totalFrames}: ` +
+                // Per-frame timing breakdown (every 150 frames)
+                if (framesProcessed % 150 === 0) {
+                    console.log(`[Export] Frames ${framesProcessed - 149}-${framesProcessed}/${totalFrames}: ` +
                         `decode=${accDecode.toFixed(0)}ms render=${accRender.toFixed(0)}ms ` +
                         `encode=${accEncode.toFixed(0)}ms backpressure=${accBackpressure.toFixed(0)}ms ` +
-                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 30).toFixed(0)}ms/frame)`);
-                    const profile = PlaybackRenderer.flushProfile(30);
+                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 150).toFixed(0)}ms/frame) ` +
+                        `chunksFed=${accChunksFed} maxQueue=${maxQueueSize}`);
+                    const profile = PlaybackRenderer.flushProfile(150);
                     if (profile) console.log(profile);
                     accDecode = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
+                    accChunksFed = 0; maxQueueSize = 0;
                 }
 
                 // Periodic yield for UI responsiveness

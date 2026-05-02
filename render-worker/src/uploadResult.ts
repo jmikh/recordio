@@ -22,7 +22,6 @@ export async function uploadResult(
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'video/mp4',
-                    'x-upsert': 'true',
                 },
                 body: fileBuffer,
             });

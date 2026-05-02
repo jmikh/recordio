@@ -49,6 +49,17 @@ export async function resolveVideoCodec(
             const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30 };
             const result = await VideoEncoder.isConfigSupported(config);
             if (result.supported) {
+                // Probe hardware acceleration
+                try {
+                    const hwConfig: VideoEncoderConfig = { ...config, hardwareAcceleration: 'prefer-hardware' };
+                    const hwResult = await VideoEncoder.isConfigSupported(hwConfig);
+                    console.log(`[Export] Encoder HW accel for ${codec}: ${hwResult.supported}`);
+                    if (hwResult.supported) {
+                        return { config: hwConfig, muxerCodec: 'avc', fallback: false, tried };
+                    }
+                } catch {
+                    console.log(`[Export] Encoder HW accel probe threw for ${codec}`);
+                }
                 return { config, muxerCodec: 'avc', fallback: false, tried };
             }
         } catch {
@@ -64,6 +75,17 @@ export async function resolveVideoCodec(
         const result = await VideoEncoder.isConfigSupported(config);
         if (result.supported) {
             console.warn('[Export] H.264 not supported — falling back to VP9');
+            // Probe hardware acceleration for VP9 too
+            try {
+                const hwConfig: VideoEncoderConfig = { ...config, hardwareAcceleration: 'prefer-hardware' };
+                const hwResult = await VideoEncoder.isConfigSupported(hwConfig);
+                console.log(`[Export] Encoder HW accel for VP9: ${hwResult.supported}`);
+                if (hwResult.supported) {
+                    return { config: hwConfig, muxerCodec: 'vp9', fallback: true, tried };
+                }
+            } catch {
+                console.log(`[Export] Encoder HW accel probe threw for VP9`);
+            }
             return { config, muxerCodec: 'vp9', fallback: true, tried };
         }
     } catch {

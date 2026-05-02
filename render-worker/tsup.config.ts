@@ -14,7 +14,6 @@ export default defineConfig({
         'playwright',
         'fastify',
         '@supabase/supabase-js',
-        'tus-js-client',
         'zod',
         'pino',
         'pino-pretty',

@@ -1,5 +1,5 @@
 import { supabase } from '../auth/AuthManager';
-import * as tus from 'tus-js-client';
+
 import type { Project } from '../types';
 
 /**
@@ -325,7 +325,6 @@ export class CloudStorage {
 
     /**
      * Upload a blob to the signed URL. Uses XMLHttpRequest for progress tracking.
-     * Only used for small files (thumbnails). Large media uses TUS resumable upload.
      */
     static async uploadBlob(
         signedUrl: string,
@@ -357,63 +356,6 @@ export class CloudStorage {
             xhr.onerror = () => reject(new Error('Upload failed: network error'));
             xhr.onabort = () => reject(new Error('Upload aborted'));
             xhr.send(blob);
-        });
-    }
-
-    /**
-     * Upload a blob via TUS resumable upload protocol.
-     * Supports large files (screen/camera/mic recordings) that exceed the
-     * single-request body size limit. Uploads in 6 MB chunks with automatic retries.
-     */
-    static async uploadBlobTus(
-        storagePath: string,
-        blob: Blob,
-        contentType: string,
-        onProgress?: (fraction: number) => void,
-    ): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        if (!supabaseUrl) throw new Error('VITE_SUPABASE_URL not configured');
-
-        return new Promise((resolve, reject) => {
-            const upload = new tus.Upload(blob, {
-                endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
-                retryDelays: [0, 3000, 5000, 10000, 20000],
-                chunkSize: 6 * 1024 * 1024, // 6 MB
-                headers: {
-                    authorization: `Bearer ${session.access_token}`,
-                    'x-upsert': 'true',
-                },
-                uploadDataDuringCreation: true,
-                removeFingerprintOnSuccess: true,
-                metadata: {
-                    bucketName: 'project-media',
-                    objectName: storagePath,
-                    contentType,
-                    cacheControl: '3600',
-                },
-                onError: (error) => {
-                    reject(new Error(`TUS upload failed: ${error.message}`));
-                },
-                onProgress: (bytesUploaded, bytesTotal) => {
-                    onProgress?.(bytesUploaded / bytesTotal);
-                },
-                onSuccess: () => {
-                    resolve();
-                },
-            });
-
-            // Check for previous incomplete uploads and resume if found
-            upload.findPreviousUploads().then((previousUploads) => {
-                if (previousUploads.length > 0) {
-                    upload.resumeFromPreviousUpload(previousUploads[0]);
-                }
-                upload.start();
-            });
         });
     }
 

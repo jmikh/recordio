@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { S3Client, GetObjectCommand, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
+import { getSignedUrl as getS3SignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
 import { getProjectMediaPaths } from '../_shared/projectMedia.ts';
 
@@ -9,6 +11,16 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const BUCKET = 'project-media';
+
+const s3 = new S3Client({
+    forcePathStyle: true,
+    region: Deno.env.get('S3_REGION') ?? '',
+    endpoint: Deno.env.get('S3_ENDPOINT') ?? '',
+    credentials: {
+        accessKeyId: Deno.env.get('S3_ACCESS_KEY') ?? '',
+        secretAccessKey: Deno.env.get('S3_SECRET_KEY') ?? '',
+    },
+});
 
 /**
  * Render Start Edge Function
@@ -126,29 +138,28 @@ serve(async (req: Request) => {
             });
         }
 
-        // Generate signed download URLs for media (1h expiry)
-        console.log(`[render-job-create] New job ${jobResult.job_id}, signing media URLs`);
+        // Generate signed download URLs for media (1h expiry) via S3 presigner
+        console.log(`[render-job-create] New job ${jobResult.job_id}, signing media URLs via S3`);
         const mediaEntries = getProjectMediaPaths(project.project_data);
         const mediaUrls: Record<string, string> = {};
 
-        for (const entry of mediaEntries) {
-            const { data, error } = await adminSupabase
-                .storage.from(BUCKET)
-                .createSignedUrl(entry.storagePath, 3600);
-            if (error || !data) {
-                console.error(`[render-job-create] Failed to sign ${entry.storagePath}:`, error);
-                return errorResponse(`Failed to create signed URL for ${entry.type}`, 500);
+        await Promise.all(mediaEntries.map(async (entry) => {
+            try {
+                const command = new GetObjectCommand({ Bucket: BUCKET, Key: entry.storagePath });
+                mediaUrls[entry.storagePath] = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
+            } catch (err) {
+                console.error(`[render-job-create] Failed to sign ${entry.storagePath}:`, err);
+                throw new Error(`Failed to create signed URL for ${entry.type}`);
             }
-            mediaUrls[entry.storagePath] = data.signedUrl;
-        }
+        }));
 
-        // Generate signed upload URL for output
-        const { data: uploadData, error: uploadError } = await adminSupabase
-            .storage.from(BUCKET)
-            .createSignedUploadUrl(jobResult.render_storage_path, { upsert: true });
-
-        if (uploadError || !uploadData) {
-            console.error('[render-job-create] Failed to create upload URL:', uploadError);
+        // Generate S3 presigned upload URL for output
+        let uploadUrl: string;
+        try {
+            const putCmd = new PutObjectCommand({ Bucket: BUCKET, Key: jobResult.render_storage_path });
+            uploadUrl = await getS3SignedUrl(s3, putCmd, { expiresIn: 3600 });
+        } catch (err) {
+            console.error('[render-job-create] Failed to create upload URL:', err);
             return errorResponse('Failed to create upload URL', 500);
         }
 
@@ -168,7 +179,7 @@ serve(async (req: Request) => {
                 projectName: project.name,
                 quality: '1080p',
                 mediaUrls,
-                uploadUrl: uploadData.signedUrl,
+                uploadUrl,
                 statusCallbackUrl,
             }),
         }).catch(err => {

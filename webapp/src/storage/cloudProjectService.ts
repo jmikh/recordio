@@ -179,7 +179,7 @@ export class CloudProjectService {
             let lastError: Error | null = null;
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    await CloudStorage.uploadBlobTus(uploadInfo.storagePath, blob, MIME_MAP[fileType] ?? 'application/octet-stream', (frac) => {
+                    await CloudStorage.uploadBlob(uploadInfo.signedUrl, blob, MIME_MAP[fileType] ?? 'application/octet-stream', (frac) => {
                         store.setCurrentUpload({ projectId, type: fileType, progress: frac });
                         onProgress?.(fileType, frac);
                     });

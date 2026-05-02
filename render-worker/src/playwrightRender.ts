@@ -345,7 +345,6 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                 body: ab,
                 headers: {
                     'Content-Type': 'video/mp4',
-                    'x-upsert': 'true',
                 },
             });
             if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);

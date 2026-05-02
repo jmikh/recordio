@@ -25,6 +25,7 @@ import { supabase } from '../../../auth/AuthManager';
 import { useToast } from '../Toast';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { AuthModal } from '../header/AuthModal';
+import { LocalRenderControls } from './LocalRenderControls';
 
 
 
@@ -464,6 +465,9 @@ export const SettingsPanel = () => {
                             <TbLink className="icon-md" />
                         </button>
                     </div>
+
+                    {/* Dev: local render with GPU/CPU toggle */}
+                    {!import.meta.env.PROD && <LocalRenderControls />}
                 </div>
                 </div>
             </nav>

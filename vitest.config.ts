@@ -5,6 +5,7 @@ export default defineConfig({
         include: [
             'shared/**/*.test.ts',
             'webapp/src/**/*.test.ts',
+            'render-worker/src/**/*.test.ts',
             'test/**/*.test.ts',
         ],
         environment: 'node',

@@ -48,8 +48,8 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSli
     updateProjectName: (name: string) => void;
 
     // Export Actions
-    exportState: import('../export/ExportManager').ExportProgress & { isExporting: boolean };
-    setExportState: (state: Partial<import('../export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
+    exportState: import('@shared/export/ExportManager').ExportProgress & { isExporting: boolean };
+    setExportState: (state: Partial<import('@shared/export/ExportManager').ExportProgress & { isExporting: boolean }>) => void;
 
 
 }

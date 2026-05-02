@@ -79,6 +79,9 @@ export class FrameExtractor {
     private chunks: CachedChunk[] = [];
     private nextChunkIndex = 0;
 
+    /** Number of chunks fed to the decoder in the last `getFrameAtTime` call. */
+    public lastChunksFed = 0;
+
     /** Video dimensions — available after {@link initialize}. */
     width = 0;
     height = 0;
@@ -524,6 +527,7 @@ export class FrameExtractor {
         // 7. Release memory for consumed chunks (safe for rebuilds)
         this.releaseConsumedChunks();
 
+        this.lastChunksFed = fed;
         return this.decodedFrames[0].clone();
     }
 
