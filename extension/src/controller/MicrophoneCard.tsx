@@ -7,6 +7,7 @@ export function MicrophoneCard({
     activeTab, setActiveTab,
     isEnabled, selectedDeviceId,
     onEnabledChange, onDeviceChange, onPermissionError,
+    onDeviceError,
 }: {
     activeTab: ControllerTab;
     setActiveTab: (tab: ControllerTab) => void;
@@ -15,11 +16,18 @@ export function MicrophoneCard({
     onEnabledChange: (enabled: boolean) => void;
     onDeviceChange: (deviceId: string) => void;
     onPermissionError: () => void;
+    onDeviceError: (hasError: boolean) => void;
 }) {
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
     const [stream, setStream] = useState<MediaStream | null>(null);
+    const [deviceError, setDeviceError] = useState<string | null>(null);
     const [audioLevel, setAudioLevel] = useState(0);
     const streamRef = useRef<MediaStream | null>(null);
+
+    // Notify parent of device error state
+    useEffect(() => {
+        onDeviceError(!!deviceError);
+    }, [deviceError]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Enumerate devices on mount
     useEffect(() => {
@@ -44,6 +52,7 @@ export function MicrophoneCard({
                 });
                 streamRef.current = s;
                 setStream(s);
+                setDeviceError(null);
                 await refreshDevices();
             } catch (err: any) {
                 console.error("Audio permission failed:", err);
@@ -52,12 +61,15 @@ export function MicrophoneCard({
                 if (err.name === 'NotAllowedError') {
                     onEnabledChange(false);
                     onPermissionError();
+                } else if (err instanceof OverconstrainedError) {
+                    setDeviceError('Device not found');
                 }
             }
         } else {
             streamRef.current?.getTracks().forEach(t => t.stop());
             streamRef.current = null;
             setStream(null);
+            setDeviceError(null);
         }
     };
 
@@ -78,6 +90,8 @@ export function MicrophoneCard({
                 if (err.name === 'NotAllowedError') {
                     onEnabledChange(false);
                     onPermissionError();
+                } else if (err instanceof OverconstrainedError) {
+                    setDeviceError('Device not found');
                 }
             });
         }
@@ -88,8 +102,13 @@ export function MicrophoneCard({
         if (isEnabled && selectedDeviceId && streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
             navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } })
-                .then(s => { streamRef.current = s; setStream(s); })
-                .catch(e => console.error("Failed to switch audio", e));
+                .then(s => { streamRef.current = s; setStream(s); setDeviceError(null); })
+                .catch(e => {
+                    console.error("Failed to switch audio", e);
+                    streamRef.current = null;
+                    setStream(null);
+                    if (e instanceof OverconstrainedError) setDeviceError('Device not found');
+                });
         }
     }, [selectedDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -185,14 +204,22 @@ export function MicrophoneCard({
                 <div className="px-4 pb-4 border-t border-border">
                     <div className="pt-3">
                         {isEnabled ? (
-                            <Dropdown
-                                options={devices.map(d => ({
-                                    value: d.deviceId,
-                                    label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
-                                }))}
-                                value={selectedDeviceId}
-                                onChange={onDeviceChange}
-                            />
+                            <div className="flex flex-col gap-2">
+                                {deviceError && (
+                                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                                        <BiMicrophoneOff size={14} />
+                                        <span>{deviceError} — select a different microphone</span>
+                                    </div>
+                                )}
+                                <Dropdown
+                                    options={devices.map(d => ({
+                                        value: d.deviceId,
+                                        label: d.label || `Microphone ${d.deviceId.slice(0, 4)}...`,
+                                    }))}
+                                    value={selectedDeviceId}
+                                    onChange={onDeviceChange}
+                                />
+                            </div>
                         ) : (
                             <div className="flex items-center justify-center gap-2 text-text-disabled py-2">
                                 <BiMicrophoneOff size={16} />

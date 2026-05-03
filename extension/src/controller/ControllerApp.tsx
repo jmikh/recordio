@@ -73,6 +73,8 @@ export function ControllerApp() {
     const isRecordingRef = useRef(false);
     const [error, setError] = useState<string | null>(null);
     const [isChoosing, setIsChoosing] = useState(false);
+    const [cameraDeviceError, setCameraDeviceError] = useState(false);
+    const [micDeviceError, setMicDeviceError] = useState(false);
 
     // --- Pinning ---
     const [isPinned, setIsPinned] = useState(true);
@@ -177,6 +179,8 @@ export function ControllerApp() {
                 });
             });
 
+            console.log("[chooseSource] capturedSourceId:", capturedSourceId, "length:", capturedSourceId.length);
+
             let displayStream: MediaStream;
             try {
                 displayStream = await navigator.mediaDevices.getUserMedia({
@@ -226,7 +230,11 @@ export function ControllerApp() {
             setPreviewStream(screenStream);
         } catch (err: any) {
             if (err.message !== 'Cancelled') {
-                console.error("Error choosing source:", err);
+                if (err instanceof OverconstrainedError) {
+                    console.error("Error choosing source: OverconstrainedError constraint=", err.constraint, "message=", err.message, err);
+                } else {
+                    console.error("Error choosing source:", err);
+                }
                 setError(err.message || 'Failed to choose source');
             }
         } finally {
@@ -426,6 +434,7 @@ export function ControllerApp() {
                                         onEnabledChange={setIsAudioEnabled}
                                         onDeviceChange={setSelectedAudioId}
                                         onPermissionError={() => setShowPermissionModal(true)}
+                                        onDeviceError={setMicDeviceError}
                                     />
 
                                     <CameraCard
@@ -436,6 +445,7 @@ export function ControllerApp() {
                                         onEnabledChange={setIsVideoEnabled}
                                         onDeviceChange={setSelectedVideoId}
                                         onPermissionError={() => setShowPermissionModal(true)}
+                                        onDeviceError={setCameraDeviceError}
                                         stopRecording={stopRecording}
                                     />
 
@@ -478,7 +488,7 @@ export function ControllerApp() {
                                             <Button
                                                 variant="primary"
                                                 onClick={startRecording}
-                                                disabled={!hasSource}
+                                                disabled={!hasSource || cameraDeviceError || micDeviceError}
                                                 className="w-full text-base py-3"
                                                 style={!hasSource ? { pointerEvents: 'none' } : undefined}
                                             >

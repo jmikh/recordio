@@ -18,7 +18,6 @@ import { AuthModal } from '../editor/components/header/AuthModal';
 import { UpgradeModal } from '../editor/components/header/UpgradeModal';
 import { useToast } from '../editor/components/Toast';
 import { trackProjectOpened } from '../core/analytics';
-import { groupByTime } from '../utils/groupByTime';
 
 import { navigate } from '../navigate';
 
@@ -48,7 +47,7 @@ export function DashboardPage() {
     const [loginError, setLoginError] = useState<string | null>(null);
 
     // Sort, filter, search state
-    const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('last_created');
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -166,26 +165,21 @@ export function DashboardPage() {
     const sortedProjects = useMemo(() => {
         const sorted = [...tabFiltered];
         switch (sortOrder) {
-            case 'newest':
+            case 'last_created':
                 sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 break;
-            case 'oldest':
-                sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            case 'last_updated':
+                sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
                 break;
-            case 'name':
-                sorted.sort((a, b) => a.name.localeCompare(b.name));
+            case 'longest':
+                sorted.sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0));
+                break;
+            case 'shortest':
+                sorted.sort((a, b) => (a.durationMs ?? 0) - (b.durationMs ?? 0));
                 break;
         }
         return sorted;
     }, [tabFiltered, sortOrder]);
-
-    // Time groups only for date-based sorts
-    const timeGroups = useMemo(() => {
-        if (sortOrder === 'name') {
-            return [{ label: '', count: `${sortedProjects.length} recording${sortedProjects.length !== 1 ? 's' : ''}`, items: sortedProjects }];
-        }
-        return groupByTime(sortedProjects, p => p.createdAt);
-    }, [sortedProjects, sortOrder]);
 
     // Counts for header
     const under1MinCount = useMemo(() => {
@@ -419,44 +413,36 @@ export function DashboardPage() {
                                     </p>
                                 </div>
                             ) : (
-                                timeGroups.map(group => (
-                                    <section key={group.label || 'all'} className="mb-8">
-                                        {group.label && (
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h2 className="text-sm font-medium text-text-muted">{group.label}</h2>
-                                                <span className="text-xs text-text-muted">{group.count}</span>
-                                            </div>
-                                        )}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                                            {group.items.map((item: ProjectListItem) => (
-                                                <ProjectCard
-                                                    key={item.id}
-                                                    variant="grid"
-                                                    project={{
-                                                        id: item.id,
-                                                        name: item.name,
-                                                        thumbnail: item.thumbnail,
-                                                        createdAt: item.createdAt,
-                                                        durationMs: item.durationMs,
-                                                        expiresAt: item.expiresAt,
-                                                        shareSlug: item.shareSlug,
-                                                        isStarred: item.isStarred,
-                                                        folderId: item.folderId,
-                                                    }}
-                                                    onOpen={() => handleOpen(item)}
-                                                    selectMode={selectMode}
-                                                    selected={selectedIds.has(item.id)}
-                                                    onSelect={() => toggleSelect(item.id)}
-                                                    onRename={handleRename}
-                                                    onStar={handleStar}
-                                                    onMoveToFolder={handleMoveToFolder}
-                                                    onDelete={handleDelete}
-                                                    folders={folders}
-                                                />
-                                            ))}
-                                        </div>
-                                    </section>
-                                ))
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                    {sortedProjects.map((item: ProjectListItem) => (
+                                        <ProjectCard
+                                            key={item.id}
+                                            variant="grid"
+                                            project={{
+                                                id: item.id,
+                                                name: item.name,
+                                                thumbnail: item.thumbnail,
+                                                createdAt: item.createdAt,
+                                                updatedAt: item.updatedAt,
+                                                durationMs: item.durationMs,
+                                                expiresAt: item.expiresAt,
+                                                shareSlug: item.shareSlug,
+                                                isStarred: item.isStarred,
+                                                folderId: item.folderId,
+                                            }}
+                                            onOpen={() => handleOpen(item)}
+                                            selectMode={selectMode}
+                                            selected={selectedIds.has(item.id)}
+                                            onSelect={() => toggleSelect(item.id)}
+                                            onRename={handleRename}
+                                            onStar={handleStar}
+                                            onMoveToFolder={handleMoveToFolder}
+                                            onDelete={handleDelete}
+                                            folders={folders}
+                                            showUpdatedAt={sortOrder === 'last_updated'}
+                                        />
+                                    ))}
+                                </div>
                             )}
                         </main>
                     </>

@@ -2,12 +2,13 @@ import { LuSearch } from 'react-icons/lu';
 import { Dropdown } from '@shared/components/Dropdown';
 
 export type FilterTab = 'all' | 'under_1min';
-export type SortOrder = 'newest' | 'oldest' | 'name';
+export type SortOrder = 'last_created' | 'last_updated' | 'longest' | 'shortest';
 
 export const SORT_OPTIONS = [
-    { value: 'newest' as SortOrder, label: 'Newest first' },
-    { value: 'oldest' as SortOrder, label: 'Oldest first' },
-    { value: 'name' as SortOrder, label: 'Name A\u2013Z' },
+    { value: 'last_created' as SortOrder, label: 'Last created' },
+    { value: 'last_updated' as SortOrder, label: 'Last updated' },
+    { value: 'longest' as SortOrder, label: 'Longest' },
+    { value: 'shortest' as SortOrder, label: 'Shortest' },
 ];
 
 interface FilterTabItem {

@@ -27,7 +27,7 @@ fi
 COUNT=0
 for TABLE in $TABLES; do
     OUT="$TABLES_DIR/$TABLE.sql"
-    npx supabase db query $DB_FLAG "
+    npx supabase db query $DB_FLAGS "
         SELECT
             'CREATE TABLE IF NOT EXISTS public.$TABLE (' || E'\n' ||
             string_agg(

@@ -333,8 +333,20 @@ export class VideoRecorder {
                 // @ts-ignore — Chrome-specific, not yet in TS types
                 voiceIsolation: true,
             };
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-            this.activeStreams.push(micStream);
+            try {
+                micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+            } catch (e) {
+                // If the exact deviceId is unavailable (e.g. external mic disconnected), fall back to default mic
+                if (config.audioDeviceId && e instanceof OverconstrainedError) {
+                    console.warn('[VideoRecorder] Mic getUserMedia failed with exact deviceId, falling back to default:', e);
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true }
+                    });
+                } else {
+                    throw e;
+                }
+            }
+            if (micStream) this.activeStreams.push(micStream);
         }
 
         // 4. Get Camera Stream
@@ -349,8 +361,20 @@ export class VideoRecorder {
                 cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
                 this.activeStreams.push(cameraStream);
             } catch (e) {
-                console.warn('[VideoRecorder] Camera getUserMedia failed:', e);
-                captureException(e instanceof Error ? e : new Error(String(e)));
+                // If the exact deviceId is unavailable (e.g. external camera disconnected), fall back to default camera
+                if (config.videoDeviceId && e instanceof OverconstrainedError) {
+                    console.warn('[VideoRecorder] Camera getUserMedia failed with exact deviceId, falling back to default:', e);
+                    try {
+                        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } } });
+                        this.activeStreams.push(cameraStream);
+                    } catch (e2) {
+                        console.warn('[VideoRecorder] Default camera also failed:', e2);
+                        captureException(e2 instanceof Error ? e2 : new Error(String(e2)));
+                    }
+                } else {
+                    console.warn('[VideoRecorder] Camera getUserMedia failed:', e);
+                    captureException(e instanceof Error ? e : new Error(String(e)));
+                }
             }
         }
 

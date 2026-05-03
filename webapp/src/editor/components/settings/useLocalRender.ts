@@ -74,7 +74,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             );
 
             // Download the blob
-            const url = URL.createObjectURL(result.blob);
+            const url = URL.createObjectURL(result.blob!);
             const a = document.createElement('a');
             a.href = url;
             a.download = `${projectName || 'render'}_local.mp4`;

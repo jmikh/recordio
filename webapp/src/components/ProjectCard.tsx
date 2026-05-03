@@ -29,6 +29,8 @@ export interface ProjectCardData {
     isStarred?: boolean;
     /** Current folder ID */
     folderId?: string | null;
+    /** Last updated timestamp */
+    updatedAt?: Date | string | null;
 }
 
 interface ProjectCardProps {
@@ -45,6 +47,7 @@ interface ProjectCardProps {
     onMoveToFolder?: (id: string, folderId: string | null) => void;
     onDelete?: (id: string) => void;
     folders?: CloudFolder[];
+    showUpdatedAt?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -78,6 +81,7 @@ export const ProjectCard = ({
     onMoveToFolder,
     onDelete,
     folders,
+    showUpdatedAt = false,
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
     const isTrashed = !!project.deletedAt;
@@ -265,7 +269,12 @@ export const ProjectCard = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-text-muted">Created {timeAgo(project.createdAt)}</span>
+                    <span className="text-xs text-text-muted">
+                        {showUpdatedAt && project.updatedAt
+                            ? `Updated ${timeAgo(project.updatedAt)}`
+                            : `Created ${timeAgo(project.createdAt)}`
+                        }
+                    </span>
                     {isTrashed && purgedays !== null ? (
                         <span className="flex items-center gap-1 text-xs text-destructive/70 ml-auto">
                             <MdOutlineAutoDelete className="w-3.5 h-3.5" />

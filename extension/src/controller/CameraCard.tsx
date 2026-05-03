@@ -8,6 +8,7 @@ export function CameraCard({
     activeTab, setActiveTab,
     isEnabled, selectedDeviceId,
     onEnabledChange, onDeviceChange, onPermissionError,
+    onDeviceError,
     stopRecording,
 }: {
     activeTab: ControllerTab;
@@ -17,13 +18,20 @@ export function CameraCard({
     onEnabledChange: (enabled: boolean) => void;
     onDeviceChange: (deviceId: string) => void;
     onPermissionError: () => void;
+    onDeviceError: (hasError: boolean) => void;
     stopRecording: () => void;
 }) {
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
     const [stream, setStream] = useState<MediaStream | null>(null);
+    const [deviceError, setDeviceError] = useState<string | null>(null);
     const [pipWindow, setPipWindow] = useState<Window | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const cameraVideoRef = useRef<HTMLVideoElement>(null);
+
+    // Notify parent of device error state
+    useEffect(() => {
+        onDeviceError(!!deviceError);
+    }, [deviceError]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Enumerate devices on mount
     useEffect(() => {
@@ -48,6 +56,7 @@ export function CameraCard({
                 });
                 streamRef.current = s;
                 setStream(s);
+                setDeviceError(null);
                 await refreshDevices();
             } catch (err: any) {
                 console.error("Camera permission failed:", err);
@@ -56,12 +65,15 @@ export function CameraCard({
                 if (err.name === 'NotAllowedError') {
                     onEnabledChange(false);
                     onPermissionError();
+                } else if (err instanceof OverconstrainedError) {
+                    setDeviceError('Device not found');
                 }
             }
         } else {
             streamRef.current?.getTracks().forEach(t => t.stop());
             streamRef.current = null;
             setStream(null);
+            setDeviceError(null);
         }
     };
 
@@ -82,6 +94,8 @@ export function CameraCard({
                 if (err.name === 'NotAllowedError') {
                     onEnabledChange(false);
                     onPermissionError();
+                } else if (err instanceof OverconstrainedError) {
+                    setDeviceError('Device not found');
                 }
             });
         }
@@ -92,8 +106,13 @@ export function CameraCard({
         if (isEnabled && selectedDeviceId && streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
             navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDeviceId } } })
-                .then(s => { streamRef.current = s; setStream(s); })
-                .catch(e => console.error("Failed to switch video", e));
+                .then(s => { streamRef.current = s; setStream(s); setDeviceError(null); })
+                .catch(e => {
+                    console.error("Failed to switch video", e);
+                    streamRef.current = null;
+                    setStream(null);
+                    if (e instanceof OverconstrainedError) setDeviceError('Device not found');
+                });
         }
     }, [selectedDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -213,14 +232,22 @@ export function CameraCard({
                     <div className="flex flex-col items-center justify-center h-[320px] pt-3 overflow-y-auto scrollbar-hide">
                         {isEnabled ? (
                             <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                <div className="relative w-full aspect-video bg-surface rounded-lg overflow-hidden border border-border flex justify-center">
-                                    <video
-                                        ref={cameraVideoRef}
-                                        autoPlay
-                                        muted
-                                        playsInline
-                                        className="w-full h-auto block transform -scale-x-100"
-                                    />
+                                <div className="relative w-full aspect-video bg-surface rounded-lg overflow-hidden border border-border flex justify-center items-center">
+                                    {deviceError ? (
+                                        <div className="flex flex-col items-center gap-2 text-red-400">
+                                            <PiWebcamSlashBold size={32} />
+                                            <span className="text-sm font-medium">{deviceError}</span>
+                                            <span className="text-xs text-text-muted">Select a different camera below</span>
+                                        </div>
+                                    ) : (
+                                        <video
+                                            ref={cameraVideoRef}
+                                            autoPlay
+                                            muted
+                                            playsInline
+                                            className="w-full h-auto block transform -scale-x-100"
+                                        />
+                                    )}
                                 </div>
                                 <div className="w-full relative z-10 mt-auto flex flex-col gap-2">
                                     <Dropdown
