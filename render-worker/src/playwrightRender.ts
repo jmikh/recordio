@@ -265,14 +265,6 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             timeout: 30_000,
         });
 
-        // Render page assets are loaded — disable CDP network monitoring.
-        // Route interception (for serving files on :9999) enables CDP's Fetch domain,
-        // which makes Chrome serialize ALL request bodies as CDP events. Disabling it
-        // now prevents ERR_STRING_TOO_LONG when the browser uploads the large MP4.
-        const cdpSession = await page.context().newCDPSession(page);
-        await cdpSession.send('Network.disable');
-        await cdpSession.send('Fetch.disable');
-
         // --- GPU diagnostic ---
         const gpuInfo = await page.evaluate(() => {
             const canvas = document.createElement('canvas');
@@ -353,7 +345,18 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page error: ${error}`);
         }
 
-        log('finalize', 0.8, 'Uploading MP4 to storage...');
+        // Render complete — remove route interception before upload.
+        // Route interception enables CDP's Fetch domain, which makes Chrome
+        // serialize ALL request/response bodies as CDP JSON messages. For large
+        // MP4 uploads this exceeds V8's string limit (~512MB) and crashes with
+        // ERR_STRING_TOO_LONG. Unrouting removes Playwright's Fetch handlers,
+        // and then we explicitly disable the CDP domains to be safe.
+        await page.unroute('http://localhost:9999/**');
+        const cdpSession = await page.context().newCDPSession(page);
+        await cdpSession.send('Fetch.disable');
+        await cdpSession.send('Network.disable');
+
+        log('finalize', 1, 'Uploading MP4 to storage...');
         const uploadStart = Date.now();
         const sizeBytes = await page.evaluate(async (url: string) => {
             const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;

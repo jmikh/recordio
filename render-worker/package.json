@@ -10,6 +10,7 @@
     "build:render-page": "cd render-page && npx vite build"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
     "fastify": "^5.3.0",
     "playwright": "^1.59.1",
     "zod": "^3.25.0"

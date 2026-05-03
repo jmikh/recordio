@@ -25,7 +25,11 @@ COPY render-worker/tsconfig.json render-worker/
 COPY render-worker/src/ render-worker/src/
 COPY shared/ shared/
 
-RUN cd render-worker && npm ci && npx tsup
+# npm ci may skip optional native bindings under QEMU emulation (cross-platform build).
+# Explicitly install the linux-x64-gnu binding to ensure it's present.
+RUN cd render-worker && npm ci \
+    && npm install @napi-rs/canvas-linux-x64-gnu --no-save \
+    && npx tsup
 
 # ── Stage 3: Production runtime ───────────────────────────────
 FROM mcr.microsoft.com/playwright:v1.59.1-noble
@@ -57,8 +61,9 @@ RUN mkdir -p /usr/share/glvnd/egl_vendor.d /usr/share/vulkan/icd.d \
        > /usr/share/vulkan/icd.d/nvidia_icd.json
 
 # Ensure NVIDIA EGL vendor is discoverable (Cloud Run mounts drivers at /usr/local/nvidia)
-ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute,video
 ENV NVIDIA_VISIBLE_DEVICES=all
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 ENV NODE_ENV=production
 ENV PORT=8080
 

@@ -155,63 +155,18 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
     });
     log('prepare', 0.9, 'Audio mixed');
 
-    // --- Start FFmpeg encoder ---
+    // --- Detect encoder ---
+    const useNvenc = await detectNvenc();
+    log('prepare', 0.95, `NVENC available: ${useNvenc}`);
+
+    // --- Phase 1: Render all frames to a raw file ---
+    // Synchronous file writes avoid event-loop contention between the
+    // WriteStream drain and FFmpeg decode-pipe data events that caused
+    // hangs on Cloud Run. On tmpfs each writeSync is essentially memcpy.
+    const rawFramesPath = path.join(mediaDir, 'frames.raw');
     const outputPath = path.join(mediaDir, 'output.mp4');
-    const ffmpegArgs = [
-        // Video input: raw RGBA from stdin
-        '-f', 'rawvideo',
-        '-pix_fmt', 'rgba',
-        '-s', `${width}x${height}`,
-        '-r', String(fps),
-        '-i', 'pipe:0',
-    ];
+    const rawFd = fs.openSync(rawFramesPath, 'w');
 
-    // Audio input (if audio file exists and has content)
-    if (fs.existsSync(audioPath) && fs.statSync(audioPath).size > 0) {
-        const audioSize = fs.statSync(audioPath).size;
-        console.log(`[Render] Audio file exists: ${audioPath} (${(audioSize / 1024).toFixed(1)} KB)`);
-        if (audioSize > 4096) {
-            ffmpegArgs.push('-i', audioPath, '-c:a', 'copy');
-        } else {
-            console.log(`[Render] Audio file too small (${audioSize} bytes) — skipping, likely corrupt`);
-        }
-    } else {
-        console.log(`[Render] No audio file or empty: ${audioPath}`);
-    }
-
-    ffmpegArgs.push(
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-pix_fmt', 'yuv420p',
-        // '-movflags', '+faststart',  // disabled: causes FFmpeg to buffer entire output
-        '-v', 'error',
-        '-y',
-        outputPath,
-    );
-
-    console.log(`[Render] FFmpeg command: ffmpeg ${ffmpegArgs.join(' ')}`);
-    const ffmpeg = spawn('ffmpeg', ffmpegArgs, {
-        stdio: ['pipe', 'ignore', 'pipe'],
-    });
-
-    console.log(`[Render] FFmpeg spawned, pid=${ffmpeg.pid}`);
-    console.log(`[Render] FFmpeg stdin: writable=${ffmpeg.stdin!.writable}, highWaterMark=${(ffmpeg.stdin! as any).writableHighWaterMark}`);
-
-    let ffmpegExited = false;
-    let ffmpegStderr = '';
-    ffmpeg.stderr!.on('data', (data: Buffer) => {
-        const msg = data.toString();
-        ffmpegStderr += msg;
-        console.log(`[Render] FFmpeg stderr: ${msg.trim()}`);
-    });
-    ffmpeg.on('error', (err: Error) => { console.log(`[Render] FFmpeg spawn error: ${err.message}`); });
-    ffmpeg.on('close', (code: number | null) => {
-        ffmpegExited = true;
-        console.log(`[Render] FFmpeg encoder exited with code ${code}`);
-    });
-
-    // --- Frame render loop ---
     log('render', 0, `Starting frame loop: ${totalFrames} frames at ${fps}fps`);
     const startTime = Date.now();
 
@@ -231,8 +186,6 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
 
         // Create output canvas
         const { canvas, ctx } = nodeRenderContext.createCanvas(width, height);
-
-        // Clear
         ctx.clearRect(0, 0, width, height);
 
         // 1. Background
@@ -240,46 +193,35 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
         drawBackground(ctx, renderProject.settings.background, renderProject.settings.background.backgroundBlurPx, { width, height }, bgImage);
         const bgMs = Date.now() - t1;
 
-        // 2-7. Painter stack (replicating PlaybackRenderer.render)
+        // 2-7. Painter stack
         const t2 = Date.now();
         renderFrame(ctx, nodeRenderContext, renderProject, userEvents, videoRefs, deviceFrameImg, canvas, currentTimeMs, timeMapper, projectName);
         const paintMs = Date.now() - t2;
 
-        // Get raw RGBA buffer and pipe to FFmpeg
+        // Get raw RGBA buffer
         const t3 = Date.now();
         const rawCanvas = canvas as any;
         let rgbaBuffer: Buffer;
         if (typeof rawCanvas.data === 'function') {
-            // @napi-rs/canvas Canvas.data() returns raw pixel data
             rgbaBuffer = Buffer.from(rawCanvas.data());
         } else if (typeof rawCanvas.toBuffer === 'function') {
             rgbaBuffer = rawCanvas.toBuffer('raw');
         } else {
-            // Fallback: get ImageData from context
             const imageData = ctx.getImageData(0, 0, width, height);
             rgbaBuffer = Buffer.from(imageData.data.buffer);
         }
         const bufferMs = Date.now() - t3;
 
-        // Write to FFmpeg stdin with backpressure handling
+        // Synchronous write to raw file (tmpfs = RAM, ~0ms)
         const t4 = Date.now();
-        const stdin = ffmpeg.stdin!;
-        if (i < 5) {
-            console.log(`[Render] Frame ${i} pre-write: bufferSize=${rgbaBuffer.length}, stdinWritable=${stdin.writable}, stdinDestroyed=${stdin.destroyed}, ffmpegExited=${ffmpegExited}, writableLength=${(stdin as any).writableLength}, writableHighWaterMark=${(stdin as any).writableHighWaterMark}`);
-        }
-        const canWrite = stdin.write(rgbaBuffer);
-        if (i < 5) {
-            console.log(`[Render] Frame ${i} post-write: canWrite=${canWrite}, writableLength=${(stdin as any).writableLength}`);
-        }
-        if (!canWrite) {
-            if (i < 5) console.log(`[Render] Frame ${i}: waiting for drain...`);
-            await new Promise<void>(resolve => stdin.once('drain', resolve));
-            if (i < 5) console.log(`[Render] Frame ${i}: drain received after ${Date.now() - t4}ms`);
-        }
+        fs.writeSync(rawFd, rgbaBuffer);
         const writeMs = Date.now() - t4;
 
-        // Log timing for first 5 frames and every 30th
-        if (i < 5 || (i + 1) % 30 === 0) {
+        // Yield to event loop every frame so FFmpeg decode data events fire
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        // Log timing every 30 frames
+        if (i < 3 || (i + 1) % 30 === 0) {
             console.log(`[Render] Frame ${i}: extract=${extractMs}ms bg=${bgMs}ms paint=${paintMs}ms buffer=${bufferMs}ms write=${writeMs}ms total=${Date.now() - frameStart}ms`);
         }
 
@@ -293,18 +235,74 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
         }
     }
 
-    // Close FFmpeg stdin and wait for it to finish
-    log('render', 1, 'All frames sent, waiting for FFmpeg to finish encoding...');
-    await new Promise<void>((resolve, reject) => {
-        ffmpeg.stdin!.end();
+    // Close raw frames file
+    fs.closeSync(rawFd);
+    const renderElapsed = (Date.now() - startTime) / 1000;
+    const rawSize = fs.statSync(rawFramesPath).size;
+    log('render', 1, `All ${totalFrames} frames rendered in ${renderElapsed.toFixed(1)}s (${(rawSize / 1024 / 1024).toFixed(0)} MB raw)`);
+
+    // --- Phase 2: Encode raw frames with FFmpeg ---
+    log('encode', 0, `Encoding with ${useNvenc ? 'h264_nvenc (GPU)' : 'libx264 (CPU)'}...`);
+    const encodeStart = Date.now();
+
+    const ffmpegArgs = [
+        '-f', 'rawvideo',
+        '-pix_fmt', 'rgba',
+        '-s', `${width}x${height}`,
+        '-r', String(fps),
+        '-i', rawFramesPath,
+    ];
+
+    // Audio input
+    if (fs.existsSync(audioPath) && fs.statSync(audioPath).size > 4096) {
+        ffmpegArgs.push('-i', audioPath, '-c:a', 'copy');
+    }
+
+    if (useNvenc) {
+        ffmpegArgs.push(
+            '-c:v', 'h264_nvenc',
+            '-preset', 'p4',
+            '-rc', 'vbr',
+            '-cq', '23',
+            '-pix_fmt', 'yuv420p',
+        );
+    } else {
+        ffmpegArgs.push(
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '23',
+            '-pix_fmt', 'yuv420p',
+        );
+    }
+
+    ffmpegArgs.push('-v', 'error', '-nostats', '-y', outputPath);
+
+    console.log(`[Render] FFmpeg encode command: ffmpeg ${ffmpegArgs.join(' ')}`);
+    const ffmpegStderr = await new Promise<string>((resolve, reject) => {
+        const ffmpeg = spawn('ffmpeg', ffmpegArgs, {
+            stdio: ['ignore', 'ignore', 'pipe'],
+        });
+        let stderr = '';
+        ffmpeg.stderr!.on('data', (d: Buffer) => { stderr += d.toString(); });
         ffmpeg.on('close', (code) => {
             if (code !== 0) {
-                reject(new Error(`FFmpeg encoder exited with code ${code}:\n${ffmpegStderr.slice(-2000)}`));
+                reject(new Error(`FFmpeg exited with code ${code}:\n${stderr.slice(-2000)}`));
             } else {
-                resolve();
+                resolve(stderr);
             }
         });
+        ffmpeg.on('error', (err) => reject(err));
     });
+
+    if (ffmpegStderr.trim()) {
+        console.log(`[Render] FFmpeg stderr: ${ffmpegStderr.trim().slice(-1000)}`);
+    }
+
+    // Cleanup raw frames
+    fs.unlinkSync(rawFramesPath);
+
+    const encodeElapsed = (Date.now() - startTime) / 1000;
+    log('encode', 1, `Encoded in ${((Date.now() - encodeStart) / 1000).toFixed(1)}s`);
 
     // Cleanup extractors
     for (const ext of Object.values(frameExtractors)) {
@@ -312,7 +310,8 @@ export async function renderProject(config: RenderJobConfig): Promise<RenderResu
     }
 
     const totalElapsed = (Date.now() - startTime) / 1000;
-    log('complete', 1, `Done! ${totalFrames} frames in ${totalElapsed.toFixed(1)}s (${(totalFrames / totalElapsed).toFixed(1)} fps avg)`);
+    const encoder = useNvenc ? 'h264_nvenc' : 'libx264';
+    log('complete', 1, `Done! ${totalFrames} frames in ${totalElapsed.toFixed(1)}s (${(totalFrames / totalElapsed).toFixed(1)} fps avg, encoder=${encoder})`);
     log('complete', 1, `Output: ${outputPath}`);
 
     return {
@@ -444,6 +443,48 @@ function renderFrame(
     if (project.settings.captions.enabled ?? true) {
         drawCaptions(ctx, timeline.captionSegments, project.settings.captions, currentTimeMs, outputSize);
     }
+}
+
+/**
+ * Check if FFmpeg h264_nvenc actually works by encoding a single test frame.
+ * Just checking `-encoders` isn't enough — NVENC can be compiled in but fail
+ * at runtime if the GPU driver doesn't expose encoding capabilities.
+ */
+async function detectNvenc(): Promise<boolean> {
+    return new Promise((resolve) => {
+        const startMs = Date.now();
+        // Encode a single 320x240 black frame with NVENC (larger than 64x64 to
+        // avoid minimum resolution issues, -v verbose for detailed error output)
+        const proc = spawn('ffmpeg', [
+            '-v', 'verbose',
+            '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '320x240', '-r', '30',
+            '-i', 'pipe:0',
+            '-frames:v', '1',
+            '-c:v', 'h264_nvenc', '-preset', 'p1', '-pix_fmt', 'yuv420p',
+            '-f', 'null', '-',
+        ], {
+            stdio: ['pipe', 'ignore', 'pipe'],
+        });
+        let stderr = '';
+        proc.stderr!.on('data', (d: Buffer) => { stderr += d.toString(); });
+        // Feed one 320x240 RGBA frame then close stdin
+        const frame = Buffer.alloc(320 * 240 * 4);
+        proc.stdin!.write(frame);
+        proc.stdin!.end();
+        proc.on('close', (code) => {
+            const elapsed = Date.now() - startMs;
+            const ok = code === 0;
+            // Log full stderr to see NVENC init details
+            console.log(`[Render] NVENC probe: code=${code}, ${elapsed}ms`);
+            for (const line of stderr.split('\n').filter(l => l.trim())) {
+                console.log(`[Render] NVENC probe stderr: ${line.trim()}`);
+            }
+            resolve(ok);
+        });
+        proc.on('error', () => { resolve(false); });
+        // Timeout after 10s
+        setTimeout(() => { proc.kill('SIGTERM'); }, 10_000);
+    });
 }
 
 /**

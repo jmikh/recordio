@@ -95,6 +95,7 @@ export class ServerFrameExtractor {
 
   /**
    * Read the next raw RGBA frame from the FFmpeg pipe.
+   * Times out after 30s to avoid hanging forever if FFmpeg stalls.
    */
   private readNextFrame(): Promise<Buffer> {
     // If we already have a full frame buffered, return it immediately
@@ -110,9 +111,22 @@ export class ServerFrameExtractor {
       );
     }
 
-    // Wait for more data
+    // Wait for more data with timeout
     return new Promise((resolve, reject) => {
-      this.frameQueue.push({ resolve, reject });
+      const timeout = setTimeout(() => {
+        // Remove this waiter from queue
+        const idx = this.frameQueue.findIndex(w => w.resolve === resolve);
+        if (idx >= 0) this.frameQueue.splice(idx, 1);
+        const buffered = this.frameBuffer.length;
+        const alive = this.ffmpeg && !this.ffmpeg.killed;
+        reject(new Error(
+          `Frame read timed out after 30s (buffered=${buffered}/${this.frameSize}, ffmpeg alive=${alive})`
+        ));
+      }, 30_000);
+      this.frameQueue.push({
+        resolve: (data) => { clearTimeout(timeout); resolve(data); },
+        reject: (err) => { clearTimeout(timeout); reject(err); },
+      });
     });
   }
 

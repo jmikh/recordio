@@ -11,9 +11,13 @@ import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
 import { renderViaPlaywright, warmBrowser } from './playwrightRender.js';
+import { renderProject } from './ServerExportPipeline.js';
+import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { Project } from '@shared/types';
 
 
 // ── Media file server (port 9998) ────────────────────────────
@@ -207,35 +211,65 @@ async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // 2. Render via Playwright (progress tracks export: 0–1)
-        console.log(`[Render] Job ${jobId}: rendering`);
-        const result = await renderViaPlaywright({
-            jobId,
-            project: projectData,
-            projectName,
-            quality,
-            mediaFileNames,
-            uploadUrl,
-            onProgress: (phase, progress, message) => {
-                console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
-                currentProgress = progress;
-            },
-        });
+        const usePlaywright = process.env.RENDER_MODE === 'playwright';
+        console.log(`[Render] Job ${jobId}: rendering (mode=${usePlaywright ? 'playwright' : 'server'})`);
 
-        // Upload happened inside renderViaPlaywright — subtract it from render time
-        const totalPhaseMs = Date.now() - phaseStart;
-        durations.render_duration_s = (totalPhaseMs - result.uploadDurationMs) / 1000;
-        durations.upload_duration_s = result.uploadDurationMs / 1000;
+        if (usePlaywright) {
+            // Legacy path: Playwright + WebCodecs (upload happens inside)
+            const result = await renderViaPlaywright({
+                jobId,
+                project: projectData,
+                projectName,
+                quality,
+                mediaFileNames,
+                uploadUrl,
+                onProgress: (phase, progress, message) => {
+                    console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
+                    currentProgress = progress;
+                },
+            });
+
+            const totalPhaseMs = Date.now() - phaseStart;
+            durations.render_duration_s = (totalPhaseMs - result.uploadDurationMs) / 1000;
+            durations.upload_duration_s = result.uploadDurationMs / 1000;
+        } else {
+            // Server path: FFmpeg encoding (NVENC if available)
+            const result = await renderProject({
+                project: projectData as Project,
+                projectName,
+                quality: quality as ExportQuality,
+                mediaDir: tmpDir,
+                onProgress: (phase, progress, message) => {
+                    console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
+                    currentProgress = progress;
+                },
+            });
+            endPhase('render_duration_s');
+
+            // Upload the output file
+            console.log(`[Render] Job ${jobId}: uploading ${result.outputPath}`);
+            const outputBuffer = fs.readFileSync(result.outputPath);
+            const uploadResp = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: outputBuffer,
+                headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' },
+            });
+            if (!uploadResp.ok) {
+                throw new Error(`Upload failed: ${uploadResp.status} ${await uploadResp.text()}`);
+            }
+            endPhase('upload_duration_s');
+            console.log(`[Render] Job ${jobId}: uploaded ${(outputBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+        }
 
         if (canceled) throw new CancelError();
 
-        // 4. Done
+        // Done
         clearInterval(heartbeatInterval);
         await updateJob(statusCallbackUrl, jobId, {
             status: 'completed',
             ...durations,
         });
-        console.log(`[Render] Job ${jobId}: completed in ${(result.durationMs / 1000).toFixed(1)}s`);
+        console.log(`[Render] Job ${jobId}: completed (durations: ${JSON.stringify(durations)})`);
 
     } catch (err) {
         clearInterval(heartbeatInterval);
@@ -290,12 +324,39 @@ async function updateJob(
 // ── Start server ──────────────────────────────────────────────
 
 try {
+    // Log FFmpeg NVENC availability
+    const renderMode = process.env.RENDER_MODE === 'playwright' ? 'playwright' : 'server';
+    console.log(`[Render] Render mode: ${renderMode}`);
+    try {
+        const encoders = execSync('ffmpeg -hide_banner -encoders 2>/dev/null | grep nvenc || true', { timeout: 5000 }).toString().trim();
+        console.log(`[Render] FFmpeg NVENC encoders: ${encoders || '(none found)'}`);
+    } catch {
+        console.log('[Render] FFmpeg NVENC: probe failed');
+    }
+
+    // Check NVIDIA encode library availability
+    console.log(`[Render] LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH ?? '(unset)'}`);
+    try {
+        const nvLibs = execSync('ls /usr/local/nvidia/lib64/libnvidia-encode* 2>/dev/null || echo "(not found)"', { timeout: 5000 }).toString().trim();
+        console.log(`[Render] libnvidia-encode: ${nvLibs}`);
+        const ldconfig = execSync('ldconfig -p 2>/dev/null | grep -i nvenc || echo "(not in ldconfig)"', { timeout: 5000 }).toString().trim();
+        console.log(`[Render] ldconfig nvenc: ${ldconfig}`);
+    } catch {
+        console.log('[Render] NVIDIA encode lib check failed');
+    }
+
     // Start media file server on port 9998 (serves large files via real HTTP, not CDP)
     mediaServer.listen(9998, '127.0.0.1', () => {
         console.log('[Media] Media file server listening on port 9998');
     });
-    // Pre-launch Chromium so the ~26s cold start is paid once at boot
-    await warmBrowser();
+
+    if (renderMode === 'playwright') {
+        // Pre-launch Chromium so the ~26s cold start is paid once at boot
+        await warmBrowser();
+    } else {
+        console.log('[Render] Server mode — skipping Chromium pre-launch');
+    }
+
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info(`Render worker listening on port ${config.PORT}`);
 } catch (err) {

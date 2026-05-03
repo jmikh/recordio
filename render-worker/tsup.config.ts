@@ -13,6 +13,7 @@ export default defineConfig({
     external: [
         'playwright',
         'fastify',
+        '@napi-rs/canvas',
         '@supabase/supabase-js',
         'zod',
         'pino',
