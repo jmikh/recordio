@@ -26,7 +26,8 @@ export interface ExportCodecInfo {
 }
 
 export interface ExportResult {
-    blob: Blob;
+    /** Null when onMuxedData was provided (chunks were streamed externally). */
+    blob: Blob | null;
     codecs: ExportCodecInfo;
     videoDecodeMode: 'hardware' | 'software';
     videoDecodeFallback: boolean;
@@ -49,6 +50,12 @@ export interface ExportEnvironment {
     soundEffects?: SoundEffectBuffers;
     /** Media URLs keyed by source ID. Used for video decoding and audio fetch. */
     mediaUrls?: Record<string, string>;
+    /**
+     * Optional sink for muxed MP4 chunks. If provided, chunks are streamed
+     * here instead of buffered in memory, and result.blob will be null.
+     * Used by the render worker to avoid holding the full MP4 in browser memory.
+     */
+    onMuxedData?: (data: Uint8Array, position: number) => void;
 }
 
 /** Maximum number of full export retries on codec reclaim errors. */
@@ -140,13 +147,14 @@ export class ExportManager {
             `hwAccel=${videoCodec.config.hardwareAcceleration ?? 'default'}, ` +
             `${width}x${height} @ ${videoCodec.config.bitrate! / 1_000_000}Mbps`);
 
-        // Stream muxer output into a growable chunk list
+        // Stream muxer output — either to an external sink or to an in-memory buffer
+        const streaming = !!env?.onMuxedData;
         const muxedChunks: { data: Uint8Array; position: number }[] = [];
         const muxer = new Mp4Muxer.Muxer({
             target: new Mp4Muxer.StreamTarget({
-                onData: (data, position) => {
-                    muxedChunks.push({ data, position });
-                },
+                onData: streaming
+                    ? (data, position) => env!.onMuxedData!(data, position)
+                    : (data, position) => muxedChunks.push({ data, position }),
                 chunked: true,
                 chunkSize: 16 * 1024 * 1024,
             }),
@@ -289,9 +297,15 @@ export class ExportManager {
             const startTime = performance.now();
             framesProcessed = 0;
 
-            // Timing accumulators (reset every 150 frames for logging)
+            // Timing accumulators (reset every 30 frames for logging)
             let accDecode = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
             let accChunksFed = 0, maxQueueSize = 0;
+            let accUnchangedFrames = 0;
+
+            // Track frames with unchanged decoded timestamps
+            const prevTimestamps: Record<string, number> = {};
+            let unchangedStreakCount = 0;
+            let totalUnchangedFrames = 0;
 
             for (let i = 0; i < totalFrames; i++) {
                 if (signal.aborted) throw new Error("Export cancelled");
@@ -325,6 +339,23 @@ export class ExportManager {
                 const t1 = performance.now();
                 for (const ext of Object.values(frameExtractors)) {
                     accChunksFed += ext.lastChunksFed;
+                }
+
+                // Check if all decoded frame timestamps are unchanged from previous frame
+                let allUnchanged = i > 0;
+                for (const [id, frame] of Object.entries(currentFrameRefs)) {
+                    if (prevTimestamps[id] !== frame.timestamp) {
+                        allUnchanged = false;
+                        prevTimestamps[id] = frame.timestamp;
+                    }
+                }
+
+                if (allUnchanged) {
+                    unchangedStreakCount++;
+                    totalUnchangedFrames++;
+                    accUnchangedFrames++;
+                } else {
+                    unchangedStreakCount = 0;
                 }
 
                 // Render Frame
@@ -392,17 +423,22 @@ export class ExportManager {
                 accBackpressure += t4 - t3;
                 accTotal += t4 - frameStart;
 
-                // Per-frame timing breakdown (every 150 frames)
-                if (framesProcessed % 150 === 0) {
-                    console.log(`[Export] Frames ${framesProcessed - 149}-${framesProcessed}/${totalFrames}: ` +
+                // Per-frame timing breakdown (every 30 frames)
+                if (framesProcessed % 30 === 0) {
+                    const mem = (performance as any).memory;
+                    const memStr = mem
+                        ? ` heap=${(mem.usedJSHeapSize / 1024 / 1024).toFixed(0)}/${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(0)}MB`
+                        : '';
+                    const newFrames = 30 - accUnchangedFrames;
+                    console.log(`[Export] Frames ${framesProcessed - 29}-${framesProcessed}/${totalFrames}: ` +
                         `decode=${accDecode.toFixed(0)}ms render=${accRender.toFixed(0)}ms ` +
                         `encode=${accEncode.toFixed(0)}ms backpressure=${accBackpressure.toFixed(0)}ms ` +
-                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 150).toFixed(0)}ms/frame) ` +
-                        `chunksFed=${accChunksFed} maxQueue=${maxQueueSize}`);
-                    const profile = PlaybackRenderer.flushProfile(150);
+                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 30).toFixed(0)}ms/frame) ` +
+                        `decoded=${newFrames}/30 chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
+                    const profile = PlaybackRenderer.flushProfile(30);
                     if (profile) console.log(profile);
                     accDecode = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
-                    accChunksFed = 0; maxQueueSize = 0;
+                    accChunksFed = 0; maxQueueSize = 0; accUnchangedFrames = 0;
                 }
 
                 // Periodic yield for UI responsiveness
@@ -410,6 +446,8 @@ export class ExportManager {
                     await new Promise(r => setTimeout(r, 0));
                 }
             }
+
+
 
             if ((videoEncoder.state as string) !== 'closed') {
                 await videoEncoder.flush();
@@ -424,14 +462,17 @@ export class ExportManager {
             }
             muxer.finalize();
 
-            // Assemble final MP4 from streamed chunks
-            const totalSize = muxedChunks.reduce((max, c) => Math.max(max, c.position + c.data.byteLength), 0);
-            const finalBuffer = new Uint8Array(totalSize);
-            for (const chunk of muxedChunks) {
-                finalBuffer.set(chunk.data, chunk.position);
+            // Assemble final MP4 blob only if we buffered in memory
+            let blob: Blob | null = null;
+            if (!streaming) {
+                const totalSize = muxedChunks.reduce((max, c) => Math.max(max, c.position + c.data.byteLength), 0);
+                const finalBuffer = new Uint8Array(totalSize);
+                for (const chunk of muxedChunks) {
+                    finalBuffer.set(chunk.data, chunk.position);
+                }
+                muxedChunks.length = 0;
+                blob = new Blob([finalBuffer], { type: 'video/mp4' });
             }
-            muxedChunks.length = 0;
-            const blob = new Blob([finalBuffer], { type: 'video/mp4' });
 
             const usedSoftwareDecode = Object.values(frameExtractors).some(ext => ext.isSoftwareDecode);
 

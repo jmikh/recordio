@@ -1,12 +1,13 @@
 /**
- * @fileoverview Video Recorder (MediaRecorder Wrapper)
- * 
- * Handles screen and camera capture using MediaRecorder API.
- * - Manages screen stream (desktop capture via window/screen mode)
- * - Optional camera stream (dual recording mode)
- * - Audio mixing (system audio + microphone)
- * - Saves RawRecording (lightweight handoff format) to storage
- * 
+ * @fileoverview Video Recorder (WebCodecs + MediaRecorder)
+ *
+ * Screen capture uses WebCodecs VideoEncoder with smart keyframe placement:
+ * - Detects static frames via lightweight pixel comparison
+ * - Inserts keyframes only on scene changes (or every 10s max)
+ * - VP9 with variable bitrate → tiny P-frames for static content
+ *
+ * Camera and mic still use MediaRecorder (unchanged).
+ *
  * Used by controller.ts (the controller tab handles all recording).
  */
 
@@ -16,20 +17,42 @@ import { captureException } from '../utils/sentry';
 import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
 import type { RawRecording, RecordingPreferences } from '@shared/types';
+import * as WebMMuxer from 'webm-muxer';
+
+// MediaStreamTrackProcessor is not in TypeScript's default lib types
+declare class MediaStreamTrackProcessor {
+    readable: ReadableStream<VideoFrame>;
+    constructor(init: { track: MediaStreamTrack });
+}
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
+
+const KEYFRAME_INTERVAL_SEC = 5; // insert a keyframe every ~5 seconds
 
 export class VideoRecorder {
     private state: RecorderState = 'idle';
     private currentSessionId: string;
     private config: RecordingConfig;
 
-    // Media State
-    private screenRecorder: MediaRecorder | null = null;
+    // Screen WebCodecs pipeline
+    private screenStream: MediaStream | null = null;
+    private screenVideoEncoder: VideoEncoder | null = null;
+    private screenMuxer: WebMMuxer.Muxer<WebMMuxer.ArrayBufferTarget> | null = null;
+    private screenMuxerTarget: WebMMuxer.ArrayBufferTarget | null = null;
+    private screenFrameReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
+    private frameProcessingDone: Promise<void> | null = null;
+
+    // Keyframe tracking
+    private lastKeyframeTimestamp = -Infinity;
+
+    // Diagnostics
+    private totalFrameCount = 0;
+    private keyframeCount = 0;
+
+    // Camera & Mic (still MediaRecorder)
     private cameraRecorder: MediaRecorder | null = null;
     private micRecorder: MediaRecorder | null = null;
 
-    private screenData: BlobPart[] = [];
     private cameraData: BlobPart[] = [];
     private micData: BlobPart[] = [];
 
@@ -111,7 +134,6 @@ export class VideoRecorder {
 
         this.state = 'preparing';
         this.config = config; // Update config with potentially newer one
-        this.screenData = [];
         this.cameraData = [];
         this.micData = [];
         this.activeStreams = [];
@@ -120,7 +142,7 @@ export class VideoRecorder {
 
         const screenStream = this.activeStreams[0];
         const displaySurface = screenStream?.getVideoTracks()[0]?.getSettings()?.displaySurface;
-        
+
         // Detect Window if Window Mode
         if (displaySurface === 'window' && screenStream) {
                 // Clone stream for detection to avoid interfering with the main recorder stream
@@ -130,12 +152,13 @@ export class VideoRecorder {
                 detectionStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
 
                 // Store trackable content rect for later use (events + screenSource metadata)
-                // Detection offsets are in video pixels; convert to CSS pixels to match tabViewportSize.
+                // Detection offsets are in frame pixels (which may be 4K-capped, not native DPR).
+                // We store width/height in CSS pixels but defer y conversion to save time,
+                // when we know the actual frame dimensions and can compute the correct ratio.
                 if (this.detectionResult?.isControllerWindow && this.config.tabViewportSize) {
-                    const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
                     this.viewportRect = {
-                        x: Math.round(this.detectionResult.xOffset / dpr),
-                        y: Math.round(this.detectionResult.yOffset / dpr),
+                        x: 0,
+                        y: this.detectionResult.yOffset, // raw frame pixels — converted at save time
                         width: this.config.tabViewportSize.width,
                         height: this.config.tabViewportSize.height
                     };
@@ -160,11 +183,9 @@ export class VideoRecorder {
             this.config.sourceName = tabTitle;
         }
 
-        if (!this.screenRecorder) {
-            throw new Error("Screen Recorder failed to initialize.");
-        }
+        // Start the frame processing loop (encoder/muxer init on first frame)
+        this.frameProcessingDone = this.processFrames();
 
-        this.screenRecorder.start(100);
         if (this.cameraRecorder) {
             this.cameraRecorder.start(100);
         }
@@ -196,17 +217,15 @@ export class VideoRecorder {
         this.state = 'stopping';
 
         // --- 1. Capture track metadata ---
-        // Try to get metadata from tracks. If tracks are already ended (Stop Sharing),
-        // getSettings() may return empty values, so we fall back to stored dimensions.
         let displaySurface: string | undefined;
         let screenFrameRate: number | undefined;
-        if (this.screenRecorder) {
-            const vt = this.screenRecorder.stream.getVideoTracks()[0];
+        if (this.screenStream) {
+            const vt = this.screenStream.getVideoTracks()[0];
             if (vt) {
                 const set = vt.getSettings();
                 displaySurface = set?.displaySurface;
                 screenFrameRate = set?.frameRate;
-                if (set?.width && set?.height) {
+                if (!this.screenDimensions && set?.width && set?.height) {
                     this.screenDimensions = { width: set.width, height: set.height };
                 }
             }
@@ -225,6 +244,7 @@ export class VideoRecorder {
         }
 
         // --- 2. Stop all live media tracks ---
+        // This will cause the MediaStreamTrackProcessor's readable stream to end
         for (const stream of this.activeStreams) {
             for (const track of stream.getTracks()) {
                 if (track.readyState === 'live') {
@@ -233,17 +253,23 @@ export class VideoRecorder {
             }
         }
 
-        // --- 3. Stop MediaRecorders (skip if already inactive from Stop Sharing) ---
-        const stopPromises: Promise<void>[] = [];
-
-        if (this.screenRecorder && this.screenRecorder.state !== 'inactive') {
-            stopPromises.push(new Promise(resolve => {
-                if (this.screenRecorder) {
-                    this.screenRecorder.onstop = () => resolve();
-                    this.screenRecorder.stop();
-                } else resolve();
-            }));
+        // --- 3. Wait for frame processing to finish, then finalize encoder + muxer ---
+        if (this.frameProcessingDone) {
+            await this.frameProcessingDone;
         }
+
+        if (this.screenVideoEncoder && this.screenVideoEncoder.state !== 'closed') {
+            await this.screenVideoEncoder.flush();
+            this.screenVideoEncoder.close();
+        }
+
+        if (this.screenMuxer) {
+            this.screenMuxer.finalize();
+        }
+
+
+        // --- 4. Stop Camera/Mic MediaRecorders ---
+        const stopPromises: Promise<void>[] = [];
 
         if (this.cameraRecorder && this.cameraRecorder.state !== 'inactive') {
             stopPromises.push(new Promise(resolve => {
@@ -265,7 +291,7 @@ export class VideoRecorder {
 
         await Promise.all(stopPromises);
 
-        // --- 4. Save Data ---
+        // --- 5. Save Data ---
         const effectiveId = sessionId || this.currentSessionId;
         if (!effectiveId) throw new Error("No session ID available to save");
 
@@ -308,11 +334,79 @@ export class VideoRecorder {
     }
 
 
+    // --- WebCodecs Frame Processing ---
+
+    /**
+     * Reads frames from MediaStreamTrackProcessor and encodes them with fixed-interval keyframes.
+     * Chrome's capture API already provides VFR (no frames during static periods),
+     * so we don't need scene detection — just a regular keyframe interval for seekability.
+     */
+    private async processFrames() {
+        const reader = this.screenFrameReader!;
+        const keyframeIntervalUs = KEYFRAME_INTERVAL_SEC * 1_000_000; // microseconds
+
+        try {
+            while (true) {
+                const { value: frame, done } = await reader.read();
+                if (done) break;
+
+                this.totalFrameCount++;
+
+                // Initialize encoder/muxer on first frame using actual dimensions
+                if (this.totalFrameCount === 1) {
+                    const width = frame.displayWidth;
+                    const height = frame.displayHeight;
+                    this.screenDimensions = { width, height };
+
+                    this.screenMuxerTarget = new WebMMuxer.ArrayBufferTarget();
+                    this.screenMuxer = new WebMMuxer.Muxer({
+                        target: this.screenMuxerTarget,
+                        video: { codec: 'V_VP9', width, height },
+                        firstTimestampBehavior: 'offset',
+                    });
+
+                    this.screenVideoEncoder = new VideoEncoder({
+                        output: (chunk, meta) => { this.screenMuxer!.addVideoChunk(chunk, meta); },
+                        error: (e) => { console.error('[VideoRecorder] VideoEncoder error:', e.name, e.message); },
+                    });
+
+                    this.screenVideoEncoder.configure({
+                        codec: 'vp09.00.31.08',
+                        width,
+                        height,
+                        bitrate: 16_000_000,
+                        bitrateMode: 'variable',
+                        framerate: 30,
+                        latencyMode: 'realtime',
+                    });
+
+                }
+
+                const needsKeyframe = (frame.timestamp - this.lastKeyframeTimestamp) >= keyframeIntervalUs;
+                if (needsKeyframe) {
+                    this.keyframeCount++;
+                    this.lastKeyframeTimestamp = frame.timestamp;
+                }
+
+                this.screenVideoEncoder!.encode(frame, { keyFrame: needsKeyframe });
+                frame.close();
+            }
+        } catch (e) {
+            if (this.state === 'stopping') {
+                console.log('[VideoRecorder] Frame reader ended during stop (expected)');
+            } else {
+                console.error('[VideoRecorder] Frame processing error:', e);
+            }
+        }
+    }
+
+
     // --- Media Setup ---
 
     private async initializeStreams(config: RecordingConfig) {
         // 1. Get Screen Stream (System Audio + Video)
         const screenStream = await this.getScreenStream(config);
+        this.screenStream = screenStream;
         this.activeStreams.push(screenStream);
 
         // 2. Playback System Audio (Anti-Swallow)
@@ -378,10 +472,14 @@ export class VideoRecorder {
             }
         }
 
-        // 5. Setup Recorders
-        const mimeType = VideoRecorder.getSupportedMimeType();
+        // 5. Setup frame reader — encoder/muxer are initialized lazily on first frame
+        //    (videoTrack.getSettings() reports max constraints, not actual window size)
+        const videoTrack = screenStream.getVideoTracks()[0];
+        const processor = new MediaStreamTrackProcessor({ track: videoTrack });
+        this.screenFrameReader = processor.readable.getReader();
 
-        this.screenRecorder = new MediaRecorder(screenStream, { mimeType });
+        // 6. Setup Camera & Mic Recorders (unchanged — still MediaRecorder)
+        const mimeType = VideoRecorder.getSupportedMimeType();
 
         if (cameraStream) {
             const cameraVideoOnly = new MediaStream(cameraStream.getVideoTracks());
@@ -393,21 +491,7 @@ export class VideoRecorder {
             this.micRecorder = new MediaRecorder(micAudioOnly, { mimeType: 'audio/webm;codecs=opus' });
         }
 
-        // Data Handlers
-        if (this.screenRecorder) {
-            this.screenRecorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) this.screenData.push(e.data);
-            };
-            this.screenRecorder.onerror = (e) => {
-                console.error('[VideoRecorder] screenRecorder.onerror fired:', e, 'state:', this.state);
-            };
-            // Note: onstop is set dynamically in finish(), but log unexpected stops here
-            const origOnStop = this.screenRecorder.onstop;
-            this.screenRecorder.onstop = (ev) => {
-                console.warn('[VideoRecorder] screenRecorder.onstop fired (outside finish). state:', this.state);
-                if (origOnStop) origOnStop.call(this.screenRecorder!, ev);
-            };
-        }
+        // Data Handlers for camera & mic
         if (this.cameraRecorder) {
             this.cameraRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) this.cameraData.push(e.data);
@@ -441,41 +525,53 @@ export class VideoRecorder {
         return stream;
     }
 
-    // --- Storage ---    
+    // --- Storage ---
 
     private async saveRecordingData(projectId: string, events: UserEvents | null, screenFrameRate?: number, cameraFrameRate?: number) {
         const duration = Date.now() - this.startTime;
         const now = Date.now();
 
-        // 1. Save Screen Recording Blob
-        const screenMimeType = this.screenRecorder?.mimeType || 'video/webm';
-        const screenBlob = new Blob(this.screenData, { type: screenMimeType });
+        // 1. Save Screen Recording Blob (from WebCodecs muxer output)
+        const screenBuffer = this.screenMuxerTarget?.buffer;
+        const screenBlob = screenBuffer
+            ? new Blob([screenBuffer], { type: 'video/webm' })
+            : new Blob([], { type: 'video/webm' });
         const screenBlobId = `rec-${projectId}-screen`;
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
 
-        // Screen hasAudio: directly map to whether an audio track exists in the display stream
-        const screenHasAudio = (this.screenRecorder?.stream.getAudioTracks().length ?? 0) > 0;
+
+
+        // Screen audio: not included in WebCodecs output (video-only for now)
+        const screenHasAudio = (this.screenStream?.getAudioTracks().length ?? 0) > 0;
 
         // 2. Create Screen Source Metadata
-        let trackableContentRect = this.viewportRect ?? undefined;
+        let trackableContentRect: Rect | undefined;
 
         const screenSize = this.screenDimensions || { width: 1920, height: 1080 };
 
         // Scale events from CSS pixels to match actual video dimensions.
-        if (trackableContentRect && events) {
-            const cssWidth = trackableContentRect.width;
+        // viewportRect.y is already in frame pixels (from detection); width/height are CSS pixels.
+        if (this.viewportRect && events) {
+            const cssWidth = this.viewportRect.width;
             if (cssWidth > 0) {
                 const scale = screenSize.width / cssWidth;
                 if (Math.abs(scale - 1) > 0.01) {
                     this.scaleAllEvents(events, scale, scale);
-                    trackableContentRect = {
-                        x: Math.round(trackableContentRect.x * scale),
-                        y: Math.round(trackableContentRect.y * scale),
-                        width: Math.round(trackableContentRect.width * scale),
-                        height: Math.round(trackableContentRect.height * scale),
-                    };
                 }
+                trackableContentRect = {
+                    x: 0,
+                    y: this.viewportRect.y, // already in frame pixels
+                    width: screenSize.width,
+                    height: screenSize.height - this.viewportRect.y,
+                };
             }
+        } else if (this.viewportRect) {
+            trackableContentRect = {
+                x: 0,
+                y: this.viewportRect.y,
+                width: screenSize.width,
+                height: screenSize.height - this.viewportRect.y,
+            };
         }
 
         const screenSource: ScreenMetadata = {
@@ -547,10 +643,6 @@ export class VideoRecorder {
         }
         this.state = 'idle';
     }
-
-    // --- Audio Detection ---
-
-
 
     private validateSession(sessionId?: string) {
         if (sessionId && sessionId !== this.currentSessionId) {

@@ -182,11 +182,14 @@ export class FrameExtractor {
         }
 
         const keyframes = this.chunks.filter(c => c.type === 'key').length;
+        const totalChunkBytes = this.chunks.reduce((sum, c) => sum + (c.data?.byteLength ?? 0), 0);
         const first = this.chunks[0];
         const last = this.chunks[this.chunks.length - 1];
-        console.log(`[FrameExtractor] Pre-read ${this.chunks.length} chunks (${keyframes} keyframes) in ${(performance.now() - readStart).toFixed(0)}ms, ` +
+        const mem = (performance as any).memory;
+        const memStr = mem ? `, heap=${(mem.usedJSHeapSize / 1024 / 1024).toFixed(0)}/${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(0)}MB` : '';
+        console.log(`[FrameExtractor] Pre-read ${this.chunks.length} chunks (${keyframes} keyframes, ${(totalChunkBytes / 1024 / 1024).toFixed(1)}MB) in ${(performance.now() - readStart).toFixed(0)}ms, ` +
             `first.ts=${first.timestamp}µs last.ts=${last.timestamp}µs, ` +
-            `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}`);
+            `init total=${(performance.now() - initStart).toFixed(0)}ms, ${this.width}x${this.height}${memStr}`);
 
         // Check if software decode was previously required
         if (this.decodePrefs.getPreferSoftwareDecode()) {

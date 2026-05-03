@@ -90,6 +90,10 @@ serve(withAuth(async (req, { user, supabase }) => {
     }
 
     // 3. Save project to DB with upload_status='pending'
+    const durationMs = project.timeline?.durationMs
+        ? Math.round(project.timeline.durationMs)
+        : null;
+
     const { error: upsertError } = await adminSupabase
         .from('projects')
         .upsert({
@@ -98,6 +102,7 @@ serve(withAuth(async (req, { user, supabase }) => {
             name: name ?? 'Untitled',
             project_data: project,
             upload_status: 'pending',
+            duration_ms: durationMs,
             expires_at: isPro ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
 

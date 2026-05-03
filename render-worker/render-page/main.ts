@@ -126,11 +126,11 @@ async function run() {
             }
         }, { skipDownload: true }, env, projectName);
 
-        log(`Export complete! Blob size: ${(result.blob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+        log(`Export complete! Blob size: ${(result.blob!.size / 1024 / 1024).toFixed(2)} MB`, 'success');
         log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`, 'success');
 
         // Store result for Playwright to extract
-        window.__RENDER_RESULT__ = await result.blob.arrayBuffer();
+        window.__RENDER_RESULT__ = await result.blob!.arrayBuffer();
         window.__RENDER_DONE__ = true;
         setStatus('Done!');
         setProgress(1);

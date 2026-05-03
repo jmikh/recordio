@@ -65,6 +65,36 @@ const mediaServer = http.createServer((req, res) => {
         return;
     }
 
+    // PATCH = write mux chunks at specific byte positions (used for mux streaming)
+    // Batch format: [position (u32 LE), length (u32 LE), data bytes, ...] repeated
+    if (req.method === 'PATCH') {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+            const buf = Buffer.concat(chunks);
+            const fd = fs.openSync(filePath, 'a+');
+            try {
+                let offset = 0;
+                while (offset + 8 <= buf.byteLength) {
+                    const position = buf.readUInt32LE(offset);
+                    const length = buf.readUInt32LE(offset + 4);
+                    if (offset + 8 + length > buf.byteLength) break;
+                    fs.writeSync(fd, buf, offset + 8, length, position);
+                    offset += 8 + length;
+                }
+                res.writeHead(200);
+                res.end('ok');
+            } catch (err: any) {
+                console.error(`[Media] Batch write error: ${err.message}`);
+                res.writeHead(500);
+                res.end('Write failed');
+            } finally {
+                fs.closeSync(fd);
+            }
+        });
+        return;
+    }
+
     if (!fs.existsSync(filePath)) {
         res.writeHead(404);
         res.end('Not found');

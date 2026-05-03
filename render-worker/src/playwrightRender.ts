@@ -237,13 +237,17 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             console.error(`[Render][browser] Page error:`, err.message);
         });
 
+        let pageDead: Error | null = null;
+
         page.on('crash', () => {
             console.error(`[Render][browser] PAGE CRASHED`);
+            pageDead = new Error('Browser page crashed (likely OOM)');
         });
 
         page.on('close', () => {
             if (!intentionalClose) {
                 console.error(`[Render][browser] Page closed unexpectedly`);
+                pageDead = new Error('Browser page closed unexpectedly');
             }
         });
 
@@ -257,9 +261,17 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
 
         log('prepare', 0.3, 'Navigating to render page...');
         await page.goto('http://localhost:9999/', {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'networkidle',
             timeout: 30_000,
         });
+
+        // Render page assets are loaded — disable CDP network monitoring.
+        // Route interception (for serving files on :9999) enables CDP's Fetch domain,
+        // which makes Chrome serialize ALL request bodies as CDP events. Disabling it
+        // now prevents ERR_STRING_TOO_LONG when the browser uploads the large MP4.
+        const cdpSession = await page.context().newCDPSession(page);
+        await cdpSession.send('Network.disable');
+        await cdpSession.send('Fetch.disable');
 
         // --- GPU diagnostic ---
         const gpuInfo = await page.evaluate(() => {
@@ -294,6 +306,12 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
 
         await new Promise<void>((resolve, reject) => {
             const pollInterval = setInterval(async () => {
+                if (pageDead) {
+                    clearInterval(pollInterval);
+                    reject(pageDead);
+                    return;
+                }
+
                 try {
                     const state = await page.evaluate(() => ({
                         done: (window as any).__RENDER_DONE__ === true,
@@ -324,7 +342,7 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                         ));
                     }
                 } catch {
-                    // page may be navigating or crashed — stale timer still ticking
+                    // page.evaluate throws on dead page — pageDead will be set next tick
                 }
             }, 2000);
         });
@@ -335,9 +353,8 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page error: ${error}`);
         }
 
-        // --- Upload result directly from browser ---
+        log('finalize', 0.8, 'Uploading MP4 to storage...');
         const uploadStart = Date.now();
-        log('finalize', 0.8, 'Uploading MP4 directly from browser...');
         const sizeBytes = await page.evaluate(async (url: string) => {
             const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
             const resp = await fetch(url, {
@@ -345,13 +362,14 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                 body: ab,
                 headers: {
                     'Content-Type': 'video/mp4',
+                    'x-upsert': 'true',
                 },
             });
             if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
             return ab.byteLength;
         }, uploadUrl);
-
         const uploadDurationMs = Date.now() - uploadStart;
+
         const durationMs = Date.now() - startTime;
         const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
         log('finalize', 1, `Done! ${sizeMB} MB uploaded in ${(durationMs / 1000).toFixed(1)}s`);
