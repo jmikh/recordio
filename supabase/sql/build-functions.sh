@@ -15,6 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FUNCTIONS_DIR="$SCRIPT_DIR/functions"
 CRONS_DIR="$SCRIPT_DIR/crons"
+TRIGGERS_DIR="$SCRIPT_DIR/triggers"
 MIGRATIONS_DIR="$SCRIPT_DIR/../migrations"
 COUNTER=0
 
@@ -90,3 +91,4 @@ MODE="${1:-}"
 
 build_migration "$FUNCTIONS_DIR" "functions" "$MODE"
 build_migration "$CRONS_DIR" "crons" "$MODE"
+build_migration "$TRIGGERS_DIR" "triggers" "$MODE"

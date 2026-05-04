@@ -1,18 +1,15 @@
--- handle_new_user()
+-- user_profile_create()
 --
 -- Bootstraps a new user's account by creating a profile with a 7-day free trial.
--- Attached as an AFTER INSERT trigger on auth.users.
---
--- Trigger: auth.users INSERT trigger
--- Tables:  user_profiles
+-- Called by: on_user_signup_profile trigger (auth.users INSERT)
+-- Tables:   user_profiles
 
-CREATE OR REPLACE FUNCTION public.handle_new_user()
+CREATE OR REPLACE FUNCTION public.user_profile_create()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-    -- Create user profile with 7-day free trial
     INSERT INTO public.user_profiles (user_id, name, trial_ends_at, updated_at)
     VALUES (
         new.id,

@@ -64,7 +64,7 @@ VALUES
 )
 ON CONFLICT DO NOTHING;
 
--- 2. User profiles (handle_new_user trigger doesn't fire in seed context)
+-- 2. User profiles (on_user_signup_create_user_profile trigger doesn't fire in seed context)
 
 INSERT INTO public.user_profiles (user_id, name, trial_ends_at)
 VALUES

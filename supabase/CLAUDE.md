@@ -22,7 +22,8 @@
 | `tables/` | Per-table documentation |
 | `sql/functions/` | Database function source (one `.sql` per function) |
 | `sql/crons/` | Cron job source (one `.sql` per cron, `cron_` prefix) |
-| `sql/build-functions.sh` | Generates `migrations/*_functions.sql` and `migrations/*_crons.sql` |
+| `sql/triggers/` | Database trigger source (one `.sql` per trigger) |
+| `sql/build-functions.sh` | Generates `migrations/*_functions.sql`, `*_crons.sql`, and `*_triggers.sql` |
 
 ---
 
@@ -43,6 +44,13 @@ Two cron patterns exist:
 
 Always `cron.unschedule` before `cron.schedule` for idempotency.
 
+## Adding Triggers
+
+1. Create `sql/triggers/<table>_<event>.sql` (e.g. `users_after_insert.sql`)
+2. Include `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER` for idempotency
+3. If the trigger calls a function, define the function in the same file
+4. Run `sql/build-functions.sh` — writes a timestamped migration into `migrations/`
+
 ---
 
 ## Naming Conventions
@@ -54,6 +62,7 @@ Use `{asset}_{verb}` for all named items that way  related functions are visuall
 | Edge functions | `render_start`, `project_delete` |
 | DB functions | `subscription_check`, `usage_reset` |
 | Cron jobs | `cron_subscription_check`, `cron_usage_reset` |
+| Triggers | `on_user_signup_create_user_profile`, `on_project_deleted_cleanup_storage` |
 
 ---
 
