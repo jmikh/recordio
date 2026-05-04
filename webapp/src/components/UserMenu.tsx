@@ -5,6 +5,7 @@ import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
 import { StripeService } from '../editor/stripe/StripeService';
+import { navigate } from '../navigate';
 
 interface UserMenuProps {
     onOpenUpgradeModal: () => void;
@@ -39,6 +40,8 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
         await AuthManager.signOut();
         useUserStore.getState().clearUser();
         setIsOpen(false);
+        // Redirect to dashboard so user doesn't see the project page while signed out
+        navigate('/');
     };
 
     const handleManageSubscription = async () => {

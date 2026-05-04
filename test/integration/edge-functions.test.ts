@@ -1,10 +1,16 @@
 /**
  * Integration tests for Supabase Edge Functions.
- * Requires local Supabase running (`supabase start`) + `supabase functions serve`.
+ *
+ * Requires:
+ *   - Local Supabase running (`supabase start`)
+ *   - `supabase functions serve --env-file supabase/.env.local`
+ *   - MinIO running (`docker compose up -d minio`) with `project-media` bucket
+ *   - Mock render worker (`startMockWorker()` — handled by beforeAll below)
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getProClient, getTrialClient, adminClient, TEST_IDS } from '../helpers/supabaseClient';
+import { startMockWorker, stopMockWorker, getRenderRequests, clearRenderRequests } from '../helpers/mockRenderWorker';
 
 const FUNCTIONS_URL = 'http://127.0.0.1:54321/functions/v1';
 const ANON_KEY = process.env.SUPABASE_ANON_KEY!;
@@ -14,6 +20,8 @@ let trialToken: string;
 let proClient: SupabaseClient;
 
 beforeAll(async () => {
+    await startMockWorker();
+
     proClient = await getProClient();
     const proSession = await proClient.auth.getSession();
     proToken = proSession.data.session!.access_token;
@@ -22,6 +30,9 @@ beforeAll(async () => {
     const trialSession = await trialClient.auth.getSession();
     trialToken = trialSession.data.session!.access_token;
 });
+
+afterAll(() => stopMockWorker());
+afterEach(() => clearRenderRequests());
 
 /** Helper to call an edge function with auth. */
 async function callFunction(name: string, body: unknown, token?: string) {
@@ -81,9 +92,7 @@ describe('storage-download-url', () => {
 
 // ==========================================
 // storage-download-urls (batch) — uses S3 client
-// These tests verify auth + validation. The S3 presigning may fail
-// locally if S3 env vars aren't configured, so we accept 500 for
-// requests that pass auth/validation but fail at the S3 layer.
+// Requires MinIO running with S3 env vars in .env.local
 // ==========================================
 
 describe('storage-download-urls', () => {
@@ -91,8 +100,7 @@ describe('storage-download-urls', () => {
         const res = await callFunction('storage-download-urls', {
             storagePaths: [`${TEST_IDS.proUserId}/test/screen.webm`],
         });
-        // withAuth returns 401, but S3 client init may crash first (500)
-        expect([401, 500]).toContain(res.status);
+        expect(res.status).toBe(401);
     });
 
     it('rejects when any path belongs to another user', async () => {
@@ -102,19 +110,33 @@ describe('storage-download-urls', () => {
                 `${TEST_IDS.proUserId}/test/screen.webm`,   // not yours
             ],
         }, trialToken);
-        expect([403, 500]).toContain(res.status);
+        expect(res.status).toBe(403);
     });
 
     it('rejects empty storagePaths array', async () => {
         const res = await callFunction('storage-download-urls', {
             storagePaths: [],
         }, proToken);
-        expect([400, 500]).toContain(res.status);
+        expect(res.status).toBe(400);
     });
 
     it('rejects missing storagePaths', async () => {
         const res = await callFunction('storage-download-urls', {}, proToken);
-        expect([400, 500]).toContain(res.status);
+        expect(res.status).toBe(400);
+    });
+
+    it('returns presigned URLs for owned files', async () => {
+        const storagePaths = [
+            `${TEST_IDS.proUserId}/${TEST_IDS.minimalProjectId}/screen.webm`,
+        ];
+        const res = await callFunction('storage-download-urls', { storagePaths }, proToken);
+        expect(res.status).toBe(200);
+
+        const data = await res.json();
+        expect(data.signedUrls).toBeDefined();
+        expect(typeof data.signedUrls[storagePaths[0]]).toBe('string');
+        // MinIO presigned URL should point at localhost:9000
+        expect(data.signedUrls[storagePaths[0]]).toContain('9000');
     });
 });
 
@@ -240,10 +262,9 @@ describe('shared-video-get', () => {
 });
 
 // ==========================================
-// render-job-create — depends on RENDER_WORKER_URL env var
-// These tests validate auth/input checking. The function uses
-// its own auth (not withAuth) and reads RENDER_WORKER_URL at
-// module scope, so it may 500 if that env isn't set locally.
+// render-job-create — dispatches to mock render worker
+// Requires RENDER_WORKER_URL=http://127.0.0.1:8090 in .env.local
+// and MinIO for S3 presigned URLs
 // ==========================================
 
 describe('render-job-create', () => {
@@ -252,22 +273,21 @@ describe('render-job-create', () => {
             projectId: TEST_IDS.fullProjectId,
             cloudVersion: 3,
         });
-        // Should be 401 but may 500 if RENDER_WORKER_URL missing
-        expect([401, 500]).toContain(res.status);
+        expect(res.status).toBe(401);
     });
 
     it('rejects missing projectId', async () => {
         const res = await callFunction('render-job-create', {
             cloudVersion: 3,
         }, proToken);
-        expect([400, 500]).toContain(res.status);
+        expect(res.status).toBe(400);
     });
 
     it('rejects missing cloudVersion', async () => {
         const res = await callFunction('render-job-create', {
             projectId: TEST_IDS.fullProjectId,
         }, proToken);
-        expect([400, 500]).toContain(res.status);
+        expect(res.status).toBe(400);
     });
 
     it('returns 404 for non-existent project', async () => {
@@ -275,7 +295,7 @@ describe('render-job-create', () => {
             projectId: '99999999-9999-9999-9999-999999999999',
             cloudVersion: 1,
         }, proToken);
-        expect([404, 500]).toContain(res.status);
+        expect(res.status).toBe(404);
     });
 
     it('returns 404 when user does not own the project', async () => {
@@ -283,6 +303,37 @@ describe('render-job-create', () => {
             projectId: TEST_IDS.fullProjectId,
             cloudVersion: 3,
         }, trialToken);
-        expect([404, 500]).toContain(res.status);
+        expect(res.status).toBe(404);
     });
+
+    it('dispatches render job to worker with correct payload', async () => {
+        // Use a unique cloudVersion to force a new job (not a cache hit)
+        const cloudVersion = Date.now();
+        const res = await callFunction('render-job-create', {
+            projectId: TEST_IDS.fullProjectId,
+            cloudVersion,
+        }, proToken);
+
+        const data = await res.json();
+        expect(res.status).toBe(200);
+        expect(data.jobId).toBeDefined();
+        expect(data.status).toBe('pending');
+        expect(data.renderStoragePath).toBeDefined();
+
+        // The edge function dispatches fire-and-forget, give it a moment
+        await new Promise((r) => setTimeout(r, 500));
+
+        const reqs = getRenderRequests();
+        expect(reqs.length).toBeGreaterThanOrEqual(1);
+
+        const renderReq = reqs.find((r) => r.body.jobId === data.jobId);
+        expect(renderReq).toBeDefined();
+        expect(renderReq!.body.quality).toBe('1080p');
+        expect(renderReq!.body.uploadUrl).toBeDefined();
+        expect(renderReq!.body.statusCallbackUrl).toContain('render-job-hook');
+        expect(renderReq!.body.projectData).toBeDefined();
+
+        // Clean up the render job
+        await adminClient.from('render_jobs').delete().eq('id', data.jobId);
+    }, 10000);
 });

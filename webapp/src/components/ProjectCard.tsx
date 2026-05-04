@@ -6,9 +6,10 @@ import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
 import { timeAgo } from '../utils/timeAgo';
 import type { CloudFolder } from '../storage/cloudStorage';
+import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 const VIDEO_BASE_URL = import.meta.env.PROD
-    ? 'https://app.recordio.cc/video'
+    ? `${EDITOR_ORIGIN_PROD}/video`
     : 'http://localhost:3001/video';
 
 /** Minimal project info needed for the card — works with both Project and ProjectListItem */

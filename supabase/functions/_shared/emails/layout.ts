@@ -31,7 +31,7 @@ export function emailLayout({ body, unsubscribeUrl }: EmailLayoutOptions): strin
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding-bottom: 32px;">
-                            <a href="https://recordio.cc" style="text-decoration: none;"><img src="https://app.recordio.cc/assets/images/fulllogo-light.png" alt="Recordio" height="36" style="height: 36px; width: auto;" /></a>
+                            <a href="https://recordio.io" style="text-decoration: none;"><img src="https://app.recordio.io/assets/images/fulllogo-light.png" alt="Recordio" height="36" style="height: 36px; width: auto;" /></a>
                         </td>
                     </tr>
 

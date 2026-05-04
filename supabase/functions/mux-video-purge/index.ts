@@ -8,6 +8,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const BUCKET = 'project-media';
+const MUX_API_URL = Deno.env.get('MUX_API_URL') ?? 'https://api.mux.com';
 
 /**
  * Mux Video Purge — cron cleanup (hourly via pg_cron -> pg_net)
@@ -48,7 +49,7 @@ serve(async (req: Request) => {
             try {
                 // 1. Delete Mux asset (if exists)
                 if (row.mux_asset_id) {
-                    const resp = await fetch(`https://api.mux.com/video/v1/assets/${row.mux_asset_id}`, {
+                    const resp = await fetch(`${MUX_API_URL}/video/v1/assets/${row.mux_asset_id}`, {
                         method: 'DELETE',
                         headers: { 'Authorization': `Basic ${muxAuth}` },
                     });

@@ -1,4 +1,5 @@
 import { Toggle, InfoTooltip } from '@shared/components';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 import { TbZoomIn } from 'react-icons/tb';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { CgToolbarTop } from 'react-icons/cg';
@@ -65,7 +66,7 @@ export function EffectsCard({
                                         <InfoTooltip
                                             placement="top-right"
                                             description="Recordio doesn't just follow the cursor. It understands the layout of all elements you are interacting with, producing meaningful zooms."
-                                            videoSrc="https://cdn.recordio.cc/demos/zoom.webm"
+                                            videoSrc={`${CDN_ORIGIN}/demos/zoom.webm`}
                                         />
                                     </div>
                                     <Toggle value={applyAutoZoom} onChange={setApplyAutoZoom} />
@@ -76,7 +77,7 @@ export function EffectsCard({
                                         <InfoTooltip
                                             placement="top-right"
                                             description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
-                                            videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
+                                            videoSrc={`${CDN_ORIGIN}/demos/spotlight.webm`}
                                         />
                                     </div>
                                     <Toggle value={applySpotlight} onChange={setApplySpotlight} />
@@ -87,7 +88,7 @@ export function EffectsCard({
                                         <InfoTooltip
                                             placement="top-right"
                                             description="Replace messy browser toolbars with a clean, unified macOS-style window header in your final video."
-                                            videoSrc="https://cdn.recordio.cc/demos/toolbar.webm"
+                                            videoSrc={`${CDN_ORIGIN}/demos/toolbar.webm`}
                                         />
                                     </div>
                                     <Toggle value={simplifyToolbar} onChange={setSimplifyToolbar} />

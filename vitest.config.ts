@@ -1,4 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import { config } from 'dotenv';
+
+// Load .env.test before any test code runs (needed by render-worker config.ts etc.)
+config({ path: '.env.test' });
 
 export default defineConfig({
     test: {

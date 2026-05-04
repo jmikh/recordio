@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 type SupabaseClient = ReturnType<typeof createClient>;
 
 const BUCKET = 'project-media';
+const MUX_API_URL = Deno.env.get('MUX_API_URL') ?? 'https://api.mux.com';
 
 /**
  * Upload a rendered MP4 to Mux and update the mux_video row.
@@ -41,7 +42,7 @@ export async function uploadToMux(params: {
 
     let muxResp: Response;
     try {
-        muxResp = await fetch('https://api.mux.com/video/v1/assets', {
+        muxResp = await fetch(`${MUX_API_URL}/video/v1/assets`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -13,10 +13,12 @@ import { CloudProjectService } from '../storage/cloudProjectService';
 import { useMediaUrlStore } from './stores/useMediaUrlStore';
 import { useAssetLibraryStore } from './stores/useAssetLibraryStore';
 import { Modal } from '@shared/components';
+import { SUPPORT_EMAIL } from '@shared/types/bridge';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
 import { SyncFailedModal } from './components/SyncFailedModal';
+import { AuthModal } from './components/header/AuthModal';
 
 
 
@@ -43,6 +45,9 @@ function Editor() {
     const [isLoading, setIsLoading] = useState(true);
     const [loadingStatus, setLoadingStatus] = useState('Loading project...');
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [needsAuth, setNeedsAuth] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const isAuthenticated = useUserStore(s => s.isAuthenticated);
 
     // Background upload: kicks off media upload for freshly imported projects
     const projectId = new URLSearchParams(window.location.search).get('projectId');
@@ -52,6 +57,19 @@ function Editor() {
         saveProject();
     });
 
+
+    // Once user signs in after being prompted, reload the project
+    useEffect(() => {
+        if (needsAuth && isAuthenticated) {
+            setNeedsAuth(false);
+            setIsLoading(true);
+            setLoadingStatus('Loading project...');
+            // Re-run init by triggering a re-mount via navigate
+            const url = window.location.pathname + window.location.search + window.location.hash;
+            navigate(url, { replace: true });
+            window.location.reload();
+        }
+    }, [needsAuth, isAuthenticated]);
 
     // Clean up OAuth callback hash if present
     useEffect(() => {
@@ -75,7 +93,8 @@ function Editor() {
 
             const isAuthed = useUserStore.getState().isAuthenticated;
             if (!isAuthed) {
-                navigate('/', { replace: true });
+                setNeedsAuth(true);
+                setIsLoading(false);
                 return;
             }
 
@@ -199,9 +218,41 @@ function Editor() {
     }
 
     // No project loaded and not loading — redirect to dashboard
-    if (!isLoading && !loadError && !hasActiveProject) {
+    if (!isLoading && !loadError && !needsAuth && !hasActiveProject) {
         navigate('/');
         return null;
+    }
+
+    // Auth required — show sign-in prompt instead of redirecting
+    if (needsAuth) {
+        return (
+            <div id="editor-root" className="w-full h-screen bg-surface-body flex flex-col items-center justify-center" style={{ minWidth: '800px' }}>
+                <Modal isOpen={true} maxWidth="max-w-sm">
+                    <div className="flex flex-col items-center gap-4 text-center py-2">
+                        <div className="text-text-highlighted font-semibold text-lg">Sign In Required</div>
+                        <p className="text-text-main text-sm">You need to sign in to edit this project.</p>
+                        <div className="flex gap-3 mt-2">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-highlighted text-sm rounded-lg border border-border transition-colors"
+                            >
+                                Back to Dashboard
+                            </button>
+                            <button
+                                onClick={() => setIsAuthModalOpen(true)}
+                                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg transition-colors"
+                            >
+                                Sign In
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+                <AuthModal
+                    isOpen={isAuthModalOpen}
+                    onClose={() => setIsAuthModalOpen(false)}
+                />
+            </div>
+        );
     }
 
     return (
@@ -222,7 +273,7 @@ function Editor() {
                                     Back to Dashboard
                                 </button>
                                 <a
-                                    href="mailto:support@recordio.cc"
+                                    href={`mailto:${SUPPORT_EMAIL}`}
                                     className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg transition-colors"
                                 >
                                     Contact Support

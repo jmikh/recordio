@@ -15,8 +15,9 @@
 import type { UrlChangeEvent, Rect } from '../types';
 import type { ToolbarSettings } from '../types/settings';
 import type { RenderContext } from '../utils/renderContext';
-const logoUrl = 'https://cdn.recordio.cc/toolbar/logo.svg';
-const puzzleUrl = 'https://cdn.recordio.cc/toolbar/puzzle_icon.svg';
+import { CDN_ORIGIN } from '../types/bridge';
+const logoUrl = `${CDN_ORIGIN}/toolbar/logo.svg`;
+const puzzleUrl = `${CDN_ORIGIN}/toolbar/puzzle_icon.svg`;
 import { roundRectPath } from './utils/roundRect';
 
 // ══════════════════════════════════════════

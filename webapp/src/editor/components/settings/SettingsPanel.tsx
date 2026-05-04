@@ -13,6 +13,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
+import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
@@ -67,7 +68,7 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
 };
 
 const VIDEO_BASE_URL = import.meta.env.PROD
-    ? 'https://app.recordio.cc/video'
+    ? `${EDITOR_ORIGIN_PROD}/video`
     : 'http://localhost:3001/video';
 
 export const SettingsPanel = () => {

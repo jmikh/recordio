@@ -24,8 +24,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
         to,
         subject,
         html,
-        from = 'Recordio Team <john@recordio.cc>',
-        replyTo = 'john@recordio.cc',
+        from = 'Recordio Team <john@recordio.io>',
+        replyTo = 'john@recordio.io',
     } = options;
 
     try {

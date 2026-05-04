@@ -21,12 +21,10 @@ import {
 } from '@shared/types/bridge';
 import type { RawRecording } from '@shared/types';
 
-// TODO: Chrome is caching the extension ID based on the folder path, ignoring the manifest key.
-// For now, use the dev-cached ID locally and the correct Plasma ITRO ID in production.
-// Investigate: Clear Chrome's extension cache or load from a fresh folder path to fix.
-const EXTENSION_ID = import.meta.env.DEV
-    ? 'lpponocoanighhephabalkejmdbjlhmi'   // Cached dev ID (Chrome bug)
-    : 'bbcdpipjplklaneplfmlhhibnllhinii';  // Production extension ID
+/** Extension ID — read from the `ext` query param (set by the extension when opening
+ *  the import page), with a fallback to the Web Store production ID. */
+const EXTENSION_ID = new URLSearchParams(window.location.search).get('ext')
+    || 'bbcdpipjplklaneplfmlhhibnllhinii';
 
 // ============================================
 // Types

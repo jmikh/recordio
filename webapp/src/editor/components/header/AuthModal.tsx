@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { AuthManager } from '../../../auth/AuthManager';
 import { XButton, Modal } from '@shared/components';
+import { MARKETING_ORIGIN } from '@shared/types/bridge';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -75,7 +76,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                 </button>
 
                 <p className="text-center text-[10px] text-text-muted px-4">
-                    By continuing, you agree to our <a href="https://recordio.cc/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms of Service</a> and <a href="https://recordio.cc/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
+                    By continuing, you agree to our <a href={`${MARKETING_ORIGIN}/terms`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms of Service</a> and <a href={`${MARKETING_ORIGIN}/privacy`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
                 </p>
             </div>
         </Modal>

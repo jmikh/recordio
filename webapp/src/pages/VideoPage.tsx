@@ -3,7 +3,7 @@ import MuxPlayer from '@mux/mux-player-react';
 import { LogoLink } from '@shared/components/LogoLink';
 import { Button, ThemeToggle } from '@shared/components';
 import { TbCopy } from 'react-icons/tb';
-import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
+import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
 import { supabase } from '../auth/AuthManager';
 import { navigate } from '../navigate';
 
@@ -96,7 +96,7 @@ export function VideoPage() {
                         This video may have been removed or the link may be incorrect.
                     </p>
                     <a
-                        href="https://recordio.cc"
+                        href={MARKETING_ORIGIN}
                         className="text-sm text-primary hover:text-primary-highlighted transition-colors"
                     >
                         Go to Recordio
@@ -111,7 +111,7 @@ export function VideoPage() {
             {/* Header */}
             <header className="border-b border-border bg-surface">
                 <div style={{ maxWidth: 1400 }} className="mx-auto flex items-center justify-between px-6 py-4">
-                    <LogoLink href="https://recordio.cc" target="_blank" rel="noopener noreferrer" />
+                    <LogoLink href={MARKETING_ORIGIN} target="_blank" rel="noopener noreferrer" />
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
                         <Button

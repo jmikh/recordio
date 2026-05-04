@@ -6,15 +6,16 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { UserAssetService } from '../../../storage/userAssetService';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
 
 // CDN preset music tracks
 const PRESET_MUSIC = [
-    { name: 'Ambient', url: 'https://cdn.recordio.cc/music/ambient.mp3' },
-    { name: 'Bassy', url: 'https://cdn.recordio.cc/music/bassy.mp3' },
-    { name: 'Energetic', url: 'https://cdn.recordio.cc/music/energetic.mp3' },
-    { name: 'Lo-Fi 1', url: 'https://cdn.recordio.cc/music/lofi 1.mp3' },
-    { name: 'Lo-Fi 2', url: 'https://cdn.recordio.cc/music/lofi 2.mp3' },
+    { name: 'Ambient', url: `${CDN_ORIGIN}/music/ambient.mp3` },
+    { name: 'Bassy', url: `${CDN_ORIGIN}/music/bassy.mp3` },
+    { name: 'Energetic', url: `${CDN_ORIGIN}/music/energetic.mp3` },
+    { name: 'Lo-Fi 1', url: `${CDN_ORIGIN}/music/lofi 1.mp3` },
+    { name: 'Lo-Fi 2', url: `${CDN_ORIGIN}/music/lofi 2.mp3` },
 ];
 
 export const AudioSettingsPanel = () => {

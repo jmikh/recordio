@@ -124,28 +124,25 @@ export const IMPORT_PATH = '/import';
 /** Timeout for handoff to complete (ms) */
 export const HANDOFF_TIMEOUT_MS = 30000;
 
-/** Chrome Web Store URL for the Recordio extension */
-export const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/recordio-smart-screen-rec/bbcdpipjplklaneplfmlhhibnllhinii';
+import { EDITOR_ORIGIN_PROD, EDITOR_ORIGIN_DEV } from '../urls';
+export { CDN_ORIGIN, MARKETING_ORIGIN, SUPPORT_EMAIL, CHROME_EXTENSION_URL, EDITOR_ORIGIN_PROD, EDITOR_ORIGIN_DEV } from '../urls';
 
-/** Origin of the editor website (production) */
-export const EDITOR_ORIGIN_PROD = 'https://app.recordio.cc';
-
-/** Origin of the editor website (development) */
-export const EDITOR_ORIGIN_DEV = 'http://localhost:3001';
-
-/** Get the appropriate editor origin based on environment */
+/** Get the appropriate editor origin based on environment.
+ *  - `npm run build:extension` → production origin
+ *  - `npm run build:extension:dev` → localhost (unless USE_PROD_ORIGIN=true)
+ *  - `npm run dev` → localhost (unless USE_PROD_ORIGIN=true)
+ */
 export function getEditorOrigin(): string {
-    // __DEV_MODE__ is defined in vite.config.ts based on build mode:
-    // - `npm run dev` or `npm run build:extension:dev` → __DEV_MODE__ = true
-    // - `npm run build:extension` → __DEV_MODE__ = false
     // @ts-expect-error __DEV_MODE__ is defined by Vite at build time
     if (__DEV_MODE__) {
-        return EDITOR_ORIGIN_DEV;
+        // @ts-expect-error __USE_PROD_ORIGIN__ is defined by Vite at build time
+        return __USE_PROD_ORIGIN__ ? EDITOR_ORIGIN_PROD : EDITOR_ORIGIN_DEV;
     }
     return EDITOR_ORIGIN_PROD;
 }
 
-/** Build URL for import page */
-export function buildImportUrl(recordingId: string): string {
-    return `${getEditorOrigin()}${IMPORT_PATH}?id=${recordingId}`;
+/** Build URL for import page. Includes the extension's own ID so the webapp
+ *  can connect back without hardcoding it. */
+export function buildImportUrl(recordingId: string, extensionId: string): string {
+    return `${getEditorOrigin()}${IMPORT_PATH}?id=${recordingId}&ext=${extensionId}`;
 }

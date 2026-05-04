@@ -30,99 +30,88 @@ const MIME_TYPES: Record<string, string> = {
 
 export const mediaJobDirs = new Map<string, string>();
 
-const mediaServer = http.createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    // URL format: /{jobId}/{filename}
-    const parts = url.pathname.slice(1).split('/');
-    if (parts.length < 2) {
-        res.writeHead(400);
-        res.end('Bad request');
-        return;
-    }
-    const [jobId, ...rest] = parts;
-    const fileName = rest.join('/');
-    const dir = mediaJobDirs.get(jobId);
-    if (!dir) {
-        res.writeHead(404);
-        res.end('Unknown job');
-        return;
-    }
-    const filePath = path.join(dir, fileName);
+export function createMediaServer() {
+    return http.createServer((req, res) => {
+        const url = new URL(req.url ?? '/', 'http://localhost');
+        // URL format: /{jobId}/{filename}
+        const parts = url.pathname.slice(1).split('/');
+        if (parts.length < 2) {
+            res.writeHead(400);
+            res.end('Bad request');
+            return;
+        }
+        const [jobId, ...rest] = parts;
+        const fileName = rest.join('/');
+        const dir = mediaJobDirs.get(jobId);
+        if (!dir) {
+            res.writeHead(404);
+            res.end('Unknown job');
+            return;
+        }
+        const filePath = path.join(dir, fileName);
 
-    // PUT = upload file from browser (used for MP4 result extraction)
-    if (req.method === 'PUT') {
-        const writeStream = fs.createWriteStream(filePath);
-        req.pipe(writeStream);
-        writeStream.on('finish', () => {
-            res.writeHead(200);
-            res.end('ok');
-        });
-        writeStream.on('error', (err) => {
-            console.error(`[Media] Write error: ${err.message}`);
-            res.writeHead(500);
-            res.end('Write failed');
-        });
-        return;
-    }
-
-    // PATCH = write mux chunks at specific byte positions (used for mux streaming)
-    // Batch format: [position (u32 LE), length (u32 LE), data bytes, ...] repeated
-    if (req.method === 'PATCH') {
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk: Buffer) => chunks.push(chunk));
-        req.on('end', () => {
-            const buf = Buffer.concat(chunks);
-            const fd = fs.openSync(filePath, 'a+');
-            try {
-                let offset = 0;
-                while (offset + 8 <= buf.byteLength) {
-                    const position = buf.readUInt32LE(offset);
-                    const length = buf.readUInt32LE(offset + 4);
-                    if (offset + 8 + length > buf.byteLength) break;
-                    fs.writeSync(fd, buf, offset + 8, length, position);
-                    offset += 8 + length;
-                }
+        // PUT = upload file from browser (used for MP4 result extraction)
+        if (req.method === 'PUT') {
+            const writeStream = fs.createWriteStream(filePath);
+            req.pipe(writeStream);
+            writeStream.on('finish', () => {
                 res.writeHead(200);
                 res.end('ok');
-            } catch (err: any) {
-                console.error(`[Media] Batch write error: ${err.message}`);
+            });
+            writeStream.on('error', (err) => {
+                console.error(`[Media] Write error: ${err.message}`);
                 res.writeHead(500);
                 res.end('Write failed');
-            } finally {
-                fs.closeSync(fd);
-            }
-        });
-        return;
-    }
+            });
+            return;
+        }
 
-    if (!fs.existsSync(filePath)) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-    }
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
-    const stat = fs.statSync(filePath);
-    res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': stat.size });
-    fs.createReadStream(filePath).pipe(res);
-});
+        // PATCH = write mux chunks at specific byte positions (used for mux streaming)
+        // Batch format: [position (u32 LE), length (u32 LE), data bytes, ...] repeated
+        if (req.method === 'PATCH') {
+            const chunks: Buffer[] = [];
+            req.on('data', (chunk: Buffer) => chunks.push(chunk));
+            req.on('end', () => {
+                const buf = Buffer.concat(chunks);
+                const fd = fs.openSync(filePath, 'a+');
+                try {
+                    let offset = 0;
+                    while (offset + 8 <= buf.byteLength) {
+                        const position = buf.readUInt32LE(offset);
+                        const length = buf.readUInt32LE(offset + 4);
+                        if (offset + 8 + length > buf.byteLength) break;
+                        fs.writeSync(fd, buf, offset + 8, length, position);
+                        offset += 8 + length;
+                    }
+                    res.writeHead(200);
+                    res.end('ok');
+                } catch (err: any) {
+                    console.error(`[Media] Batch write error: ${err.message}`);
+                    res.writeHead(500);
+                    res.end('Write failed');
+                } finally {
+                    fs.closeSync(fd);
+                }
+            });
+            return;
+        }
 
-const app = Fastify({
-    logger: {
-        level: 'info',
-        transport: process.env.NODE_ENV !== 'production'
-            ? { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } }
-            : undefined,
-    },
-});
+        if (!fs.existsSync(filePath)) {
+            res.writeHead(404);
+            res.end('Not found');
+            return;
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
+        const stat = fs.statSync(filePath);
+        res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': stat.size });
+        fs.createReadStream(filePath).pipe(res);
+    });
+}
 
-// ── Health check ──────────────────────────────────────────────
+// ── Render body interface ────────────────────────────────────
 
-app.get('/health', async () => ({ status: 'ok' }));
-
-// ── Render endpoint ───────────────────────────────────────────
-
-interface RenderBody {
+export interface RenderBody {
     jobId: string;
     projectData: unknown;
     projectName?: string;
@@ -132,30 +121,52 @@ interface RenderBody {
     statusCallbackUrl: string;
 }
 
-app.post('/render', async (request, reply) => {
-    // Validate shared secret
-    const authHeader = request.headers.authorization;
-    if (authHeader !== `Bearer ${config.RENDER_SECRET}`) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-    }
+// ── Fastify app factory ──────────────────────────────────────
+// Extracted so tests can create an app without booting Playwright.
 
-    const body = request.body as RenderBody;
-    const { jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl } = body;
+export function createApp() {
+    const app = Fastify({
+        logger: {
+            level: 'info',
+            transport: process.env.NODE_ENV !== 'production'
+                ? { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } }
+                : undefined,
+        },
+    });
 
-    if (!jobId || !projectData || !quality || !uploadUrl || !statusCallbackUrl) {
-        return reply.code(400).send({ error: 'Missing required fields' });
-    }
+    // ── Health check ──────────────────────────────────────────────
 
-    // Render synchronously — with Cloud Run --concurrency=1, no second
-    // job lands on this instance while we're busy.
-    await runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+    app.get('/health', async () => ({ status: 'ok' }));
 
-    return reply.send({ ok: true, jobId });
-});
+    // ── Render endpoint ───────────────────────────────────────────
+
+    app.post('/render', async (request, reply) => {
+        // Validate shared secret
+        const authHeader = request.headers.authorization;
+        if (authHeader !== `Bearer ${config.RENDER_SECRET}`) {
+            return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const body = request.body as RenderBody;
+        const { jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl } = body;
+
+        if (!jobId || !projectData || !quality || !uploadUrl || !statusCallbackUrl) {
+            return reply.code(400).send({ error: 'Missing required fields' });
+        }
+
+        // Render synchronously — with Cloud Run --concurrency=1, no second
+        // job lands on this instance while we're busy.
+        await runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+
+        return reply.send({ ok: true, jobId });
+    });
+
+    return app;
+}
 
 // ── Background render logic ───────────────────────────────────
 
-async function runRender(
+export async function runRender(
     jobId: string,
     projectData: unknown,
     projectName: string | undefined,
@@ -264,7 +275,7 @@ class CancelError extends Error {
 
 // ── Job update helper ─────────────────────────────────────────
 
-async function updateJob(
+export async function updateJob(
     statusCallbackUrl: string,
     jobId: string,
     fields: { status?: string; progress?: number; error?: string },
@@ -287,18 +298,23 @@ async function updateJob(
     return data.cancel;
 }
 
-// ── Start server ──────────────────────────────────────────────
+// ── Start server (only when run directly, not imported by tests) ─
 
-try {
-    // Start media file server on port 9998 (serves large files via real HTTP, not CDP)
-    mediaServer.listen(9998, '127.0.0.1', () => {
-        console.log('[Media] Media file server listening on port 9998');
-    });
-    // Pre-launch Chromium so the ~26s cold start is paid once at boot
-    await warmBrowser();
-    await app.listen({ port: config.PORT, host: '0.0.0.0' });
-    app.log.info(`Render worker listening on port ${config.PORT}`);
-} catch (err) {
-    app.log.error(err);
-    process.exit(1);
+const isDirectRun = process.argv[1]?.endsWith('server.ts') ||
+    process.argv[1]?.endsWith('server.js');
+
+if (isDirectRun) {
+    const mediaServer = createMediaServer();
+    const app = createApp();
+    try {
+        mediaServer.listen(9998, '127.0.0.1', () => {
+            console.log('[Media] Media file server listening on port 9998');
+        });
+        await warmBrowser();
+        await app.listen({ port: config.PORT, host: '0.0.0.0' });
+        app.log.info(`Render worker listening on port ${config.PORT}`);
+    } catch (err) {
+        app.log.error(err);
+        process.exit(1);
+    }
 }

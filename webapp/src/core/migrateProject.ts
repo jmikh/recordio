@@ -1,5 +1,6 @@
 import { CURRENT_SCHEMA_VERSION } from './Project';
 import { textToWords } from './captionUtils';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 
 /** Weight per word: letter count + base value. Matches textToWords(). */
 const WORD_BASE_VALUE = 3;
@@ -80,7 +81,7 @@ export function migrateProject(raw: any): any {
         if (typeof bgUrl === 'string' && bgUrl.startsWith('/assets/backgrounds/')) {
             raw.settings.background.imageUrl = bgUrl.replace(
                 '/assets/backgrounds/',
-                'https://cdn.recordio.cc/backgrounds/'
+                `${CDN_ORIGIN}/backgrounds/`
             );
         }
     }

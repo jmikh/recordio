@@ -237,7 +237,7 @@ async function handleStopSession(sendResponse: Function) {
 async function handleRecordingFinished(sessionId: string | null, controllerTabId: number | null) {
     // Open website import page
     if (sessionId) {
-        const importUrl = buildImportUrl(sessionId);
+        const importUrl = buildImportUrl(sessionId, chrome.runtime.id);
         chrome.tabs.create({ url: importUrl });
     }
 

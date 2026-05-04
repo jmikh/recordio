@@ -8,7 +8,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const PHOTO_URL = 'https://app.recordio.cc/assets/images/john.webp';
+const PHOTO_URL = 'https://app.recordio.io/assets/images/john.webp';
 
 /**
  * Generate a signed unsubscribe token (JWT) for a user.

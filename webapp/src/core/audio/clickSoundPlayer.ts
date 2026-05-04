@@ -1,10 +1,11 @@
 import type { BaseEvent, DragEvent } from '@shared/types';
 import type { TimeMapper } from '../mappers/timeMapper';
 import { useUIStore } from '../../editor/stores/useUIStore';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 
-const CLICK_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-click.mp3';
-const MOUSE_DOWN_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-down.mp3';
-const MOUSE_UP_SOUND_URL = 'https://cdn.recordio.cc/sounds/mouse-up.mp3';
+const CLICK_SOUND_URL = `${CDN_ORIGIN}/sounds/mouse-click.mp3`;
+const MOUSE_DOWN_SOUND_URL = `${CDN_ORIGIN}/sounds/mouse-down.mp3`;
+const MOUSE_UP_SOUND_URL = `${CDN_ORIGIN}/sounds/mouse-up.mp3`;
 
 let audioContext: AudioContext | null = null;
 let audioBuffer: AudioBuffer | null = null;

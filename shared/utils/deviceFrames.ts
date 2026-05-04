@@ -1,4 +1,5 @@
 import type { DeviceFrame, FrameScalingConfig } from '../types';
+import { CDN_ORIGIN } from '../types/bridge';
 
 /** Standard 9-slice config applied to all device frames */
 const STANDARD_SCALING: FrameScalingConfig = {
@@ -37,7 +38,7 @@ function defineFrame(
 export const MACBOOK_FRAME = defineFrame(
     'macbook-pro',
     'MacBook Pro',
-    'https://cdn.recordio.cc/devices/macbook.webp',
+    `${CDN_ORIGIN}/devices/macbook.webp`,
     { width: 3131, height: 1932 },
     { x: 288, y: 101, width: 2548, height: 1600 }
 );
@@ -45,7 +46,7 @@ export const MACBOOK_FRAME = defineFrame(
 export const STUDIO_DISPLAY_FRAME = defineFrame(
     'studio-display',
     'Studio Display',
-    'https://cdn.recordio.cc/devices/studio-display.webp',
+    `${CDN_ORIGIN}/devices/studio-display.webp`,
     { width: 1228, height: 944 },
     { x: 26, y: 26, width: 1176, height: 662 }
 );
@@ -53,7 +54,7 @@ export const STUDIO_DISPLAY_FRAME = defineFrame(
 export const MACBOOK_DARK_FRAME = defineFrame(
     'macbook-air-dark',
     'MacBook Air',
-    'https://cdn.recordio.cc/devices/macbook-dark.webp',
+    `${CDN_ORIGIN}/devices/macbook-dark.webp`,
     { width: 3220, height: 1962 },
     { x: 329, y: 137, width: 2562, height: 1608 }
 );
@@ -61,7 +62,7 @@ export const MACBOOK_DARK_FRAME = defineFrame(
 export const IPAD_PRO_FRAME = defineFrame(
     'ipad-pro',
     'iPad Pro',
-    'https://cdn.recordio.cc/devices/ipad.webp',
+    `${CDN_ORIGIN}/devices/ipad.webp`,
     { width: 2960, height: 2290 },
     { x: 113, y: 120, width: 2734, height: 2050 }
 );

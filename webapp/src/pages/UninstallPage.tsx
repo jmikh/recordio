@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { trackExtensionUninstalled } from '../core/analytics';
 import logoBackground from '@shared/assets/logo.svg';
+import { SUPPORT_EMAIL } from '@shared/types/bridge';
 
 export function UninstallPage() {
     useEffect(() => {
@@ -20,10 +21,10 @@ export function UninstallPage() {
                     We appreciate you trying Recordio. If there's anything we could
                     have done better, we'd love to hear from you at{' '}
                     <a
-                        href="mailto:support@recordio.cc"
+                        href={`mailto:${SUPPORT_EMAIL}`}
                         className="text-primary hover:text-primary-highlighted underline cursor-pointer"
                     >
-                        support@recordio.cc
+                        {SUPPORT_EMAIL}
                     </a>.
                 </p>
 

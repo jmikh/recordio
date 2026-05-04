@@ -12,10 +12,11 @@ import { CiImageOn } from "react-icons/ci";
 import { XButton, Slider, CollapsibleCard } from '@shared/components';
 import { TbBackground } from 'react-icons/tb';
 import type { PreviewItem } from '@shared/components';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 
 
 
-const CDN = 'https://cdn.recordio.cc/backgrounds';
+const CDN = `${CDN_ORIGIN}/backgrounds`;
 
 const BACKGROUND_IMAGES = [
     { name: 'Dark Glass', url: `${CDN}/bg4.avif`, thumbnail: `${CDN}/bg4-small.avif` },

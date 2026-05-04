@@ -1,5 +1,6 @@
 import React from 'react';
 import { InfoTooltip, type TooltipPlacement } from '@shared/components';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 
 interface MediaTooltipProps {
     /** Tooltip placement relative to trigger */
@@ -12,7 +13,7 @@ interface MediaTooltipProps {
 export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
         description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
-        videoSrc="https://cdn.recordio.cc/demos/spotlight.webm"
+        videoSrc={`${CDN_ORIGIN}/demos/spotlight.webm`}
         placement={placement}
         trigger={trigger}
     />
@@ -22,7 +23,7 @@ export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigg
 export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
         description="Automatically shrinks the camera when screen zoom is active."
-        videoSrc="https://cdn.recordio.cc/demos/autoshrink-demo.mp4"
+        videoSrc={`${CDN_ORIGIN}/demos/autoshrink-demo.mp4`}
         placement={placement}
         trigger={trigger}
     />
@@ -32,7 +33,7 @@ export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trig
 export const CameraMoveTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
         description={"Change the camera layout for any section of the video.\nGreat for full-screen intros, outros, and transitions."}
-        videoSrc="https://cdn.recordio.cc/demos/camera-layout-demo.mp4"
+        videoSrc={`${CDN_ORIGIN}/demos/camera-layout-demo.mp4`}
         placement={placement}
         trigger={trigger}
     />

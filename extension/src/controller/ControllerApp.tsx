@@ -21,7 +21,7 @@ import viewPermissionsImage from '../assets/view-permissions.png';
 import permissionsImage from '../assets/permissions.png';
 import { MdFiberManualRecord } from 'react-icons/md';
 import { FiFolder } from 'react-icons/fi';
-import { getEditorOrigin } from '@shared/types/bridge';
+import { getEditorOrigin, MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
 import logoDark from '@shared/assets/fulllogo-dark.png';
 import logoLight from '@shared/assets/fulllogo-light.png';
 import logoSquare from '@shared/assets/logo.svg';
@@ -559,7 +559,7 @@ export function ControllerApp() {
                         <footer className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                             <div className="flex flex-col md:flex-row items-center justify-between pb-8">
                                 <div className="flex flex-col items-center md:items-start mb-6 md:mb-0">
-                                    <a href="https://recordio.cc" target="_blank" rel="noopener noreferrer" className="inline-block mb-3 transition-opacity hover:opacity-80">
+                                    <a href={MARKETING_ORIGIN} target="_blank" rel="noopener noreferrer" className="inline-block mb-3 transition-opacity hover:opacity-80">
                                         <img src={logoLight} alt="Recordio" className="logo-for-light h-[22px]" />
                                         <img src={logoDark} alt="Recordio" className="logo-for-dark h-[22px]" />
                                     </a>
@@ -570,9 +570,9 @@ export function ControllerApp() {
                             <div className="pt-6 border-t border-border flex flex-col md:flex-row items-center justify-between text-xs text-text-disabled">
                                 <p>&copy; 2026 Recordio. All rights reserved.</p>
                                 <div className="flex items-center gap-4 lg:gap-6 mt-4 md:mt-0 font-medium tracking-wide">
-                                    <a href="https://recordio.cc/privacy/" target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Privacy Policy</a>
-                                    <a href="https://recordio.cc/terms/" target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Terms of Service</a>
-                                    <a href="mailto:support@recordio.cc" target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Contact</a>
+                                    <a href={`${MARKETING_ORIGIN}/privacy/`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Privacy Policy</a>
+                                    <a href={`${MARKETING_ORIGIN}/terms/`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Terms of Service</a>
+                                    <a href={`mailto:${SUPPORT_EMAIL}`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Contact</a>
                                 </div>
                             </div>
                         </footer>

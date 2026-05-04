@@ -4,6 +4,7 @@ import { TimeMapper } from './mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
 import { getDeviceFrame } from './deviceFrames';
 import { scaleProject } from '@shared/utils/projectScale';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 
 export const CURRENT_SCHEMA_VERSION = 5;
 
@@ -103,7 +104,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         gradientDirection: 135,
         colorMode: 'gradient',
         backgroundBlurPx: 0,
-        imageUrl: 'https://cdn.recordio.cc/backgrounds/bg10.avif'
+        imageUrl: `${CDN_ORIGIN}/backgrounds/bg10.avif`
     },
 
     captions: {

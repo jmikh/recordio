@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { migrateProject } from './migrateProject';
 import { CURRENT_SCHEMA_VERSION } from './Project';
+import { CDN_ORIGIN } from '@shared/urls';
 
 // Deterministic UUIDs for word generation
 let uuidCounter = 0;
@@ -218,7 +219,7 @@ describe('v3 → v4: background URL rewrite', () => {
 
         const result = migrateProject(proj);
         expect(result.settings.background.imageUrl).toBe(
-            'https://cdn.recordio.cc/backgrounds/gradient-blue.webp'
+            `${CDN_ORIGIN}/backgrounds/gradient-blue.webp`
         );
     });
 
@@ -372,7 +373,7 @@ describe('full migration chain v1 → current', () => {
         expect(result.settings.captions.baselineCaptions).toBeUndefined();
 
         // v3→v4: background URL rewritten
-        expect(result.settings.background.imageUrl).toBe('https://cdn.recordio.cc/backgrounds/dark-mesh.webp');
+        expect(result.settings.background.imageUrl).toBe(`${CDN_ORIGIN}/backgrounds/dark-mesh.webp`);
 
         // Common: version stamped, metadata stripped
         expect(result.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);

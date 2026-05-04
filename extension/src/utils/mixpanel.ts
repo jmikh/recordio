@@ -5,8 +5,10 @@
  * Fire-and-forget — errors are logged but never block recording flow.
  */
 
+import { EDITOR_ORIGIN_PROD } from '@shared/urls';
+
 const MIXPANEL_TOKEN = '773bc18d036f7f77ec70ec94e7eec508';
-const MIXPANEL_API_URL = 'https://app.recordio.cc/mp/track';
+const MIXPANEL_API_URL = `${EDITOR_ORIGIN_PROD}/mp/track`;
 const DISTINCT_ID_KEY = 'mixpanel_distinct_id';
 
 const IS_PRODUCTION = import.meta.env.MODE === 'production';

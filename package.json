@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "npm run dev:extension",
     "dev:extension": "cd extension && vite",
-    "dev:webapp": "cd webapp && vite",
+    "dev:webapp": "cd webapp && vite --port 3001",
+    "dev:webapp:prod": "cd webapp && vite --mode production --port 3001",
     "build": "npm run build:extension",
     "build:extension": "cd extension && tsc -b && vite build && node -e \"const f='dist/manifest.json';const m=JSON.parse(require('fs').readFileSync(f));delete m.key;require('fs').writeFileSync(f,JSON.stringify(m,null,2))\" && cd dist && zip -r ../extension.zip . -x '*.DS_Store' '.vite/*'",
     "build:extension:dev": "cd extension && tsc -b && vite build --mode development",
@@ -42,6 +43,8 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1041.0",
+    "@aws-sdk/s3-request-presigner": "^3.1041.0",
     "@crxjs/vite-plugin": "^2.0.0-beta.33",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/postcss": "^4.1.18",
