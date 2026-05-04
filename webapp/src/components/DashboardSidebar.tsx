@@ -267,7 +267,7 @@ export function DashboardSidebar({
                 <ThemeToggle />
                 <div className="flex-1" />
                 {isAuthenticated ? (
-                    <UserMenu onOpenUpgradeModal={onOpenUpgradeModal} />
+                    <UserMenu onOpenUpgradeModal={onOpenUpgradeModal} openDirection="up" />
                 ) : (
                     <Button variant="ghost" size="sm" onClick={onOpenAuthModal}>
                         Sign In

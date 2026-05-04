@@ -9,9 +9,10 @@ import { navigate } from '../navigate';
 
 interface UserMenuProps {
     onOpenUpgradeModal: () => void;
+    openDirection?: 'up' | 'down';
 }
 
-export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
+export function UserMenu({ onOpenUpgradeModal, openDirection = 'down' }: UserMenuProps) {
     const { email, name, picture, isPro, subscription, hasFreeTrial, trialEndsAt } = useUserStore();
 
     // Trial state comes from user_profiles table
@@ -80,7 +81,7 @@ export function UserMenu({ onOpenUpgradeModal }: UserMenuProps) {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-surface-raised border border-border rounded-lg shadow-xl z-[var(--z-index-dropdown)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                <div className={`absolute right-0 w-64 bg-surface-raised border border-border rounded-lg shadow-xl z-[var(--z-index-dropdown)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${openDirection === 'up' ? 'bottom-full mb-2 origin-bottom-right' : 'top-full mt-2 origin-top-right'}`}>
                     <div className="p-4 border-b border-border bg-surface-elevated/50">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">
