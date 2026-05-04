@@ -81,7 +81,7 @@ export function UserMenu({ onOpenUpgradeModal, openDirection = 'down' }: UserMen
             </button>
 
             {isOpen && (
-                <div className={`absolute right-0 w-64 bg-surface-raised border border-border rounded-lg shadow-xl z-[var(--z-index-dropdown)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${openDirection === 'up' ? 'bottom-full mb-2 origin-bottom-right' : 'top-full mt-2 origin-top-right'}`}>
+                <div className={`absolute w-64 bg-surface-raised border border-border rounded-lg shadow-xl z-[var(--z-index-dropdown)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${openDirection === 'up' ? 'bottom-full left-0 mb-2 origin-bottom-left' : 'top-full right-0 mt-2 origin-top-right'}`}>
                     <div className="p-4 border-b border-border bg-surface-elevated/50">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">
