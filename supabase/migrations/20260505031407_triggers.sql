@@ -1,3 +1,10 @@
+-- Auto-generated from sql/triggers/*.sql
+-- Run sql/build-functions.sh to regenerate
+-- 2026-05-05 03:14:06 UTC
+
+-- ============================================================
+-- Source: on_user_signup_send_welcome_email.sql
+-- ============================================================
 -- on_user_signup_send_welcome_email
 --
 -- Fires after a new user signs up (INSERT on auth.users).
@@ -32,3 +39,4 @@ CREATE TRIGGER on_user_signup_send_welcome_email
     AFTER INSERT ON auth.users
     FOR EACH ROW
     EXECUTE FUNCTION public.trigger_send_welcome_email();
+

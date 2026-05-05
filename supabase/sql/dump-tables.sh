@@ -12,10 +12,10 @@ SUPABASE_DIR="$SCRIPT_DIR/.."
 TABLES_DIR="$SCRIPT_DIR/tables"
 mkdir -p "$TABLES_DIR"
 
-DB_FLAGS="--linked --workdir $SUPABASE_DIR"
+DB_FLAGS="--linked"
 
 # Get list of public tables
-TABLES=$(npx supabase db query $DB_FLAGS -o csv \
+TABLES=$(supabase db query $DB_FLAGS -o csv \
     "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename" \
     | tail -n +2)
 
@@ -27,7 +27,7 @@ fi
 COUNT=0
 for TABLE in $TABLES; do
     OUT="$TABLES_DIR/$TABLE.sql"
-    npx supabase db query $DB_FLAGS "
+    supabase db query $DB_FLAGS "
         SELECT
             'CREATE TABLE IF NOT EXISTS public.$TABLE (' || E'\n' ||
             string_agg(

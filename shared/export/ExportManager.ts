@@ -298,7 +298,7 @@ export class ExportManager {
             framesProcessed = 0;
 
             // Timing accumulators (reset every 30 frames for logging)
-            let accDecode = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
+            let accDecode = 0, accBackground = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
             let accChunksFed = 0, maxQueueSize = 0;
             let accUnchangedFrames = 0;
 
@@ -361,6 +361,7 @@ export class ExportManager {
                 // Render Frame
                 ctx.clearRect(0, 0, width, height);
 
+                const tBg0 = performance.now();
                 drawBackground(
                     ctx,
                     renderProject.settings.background,
@@ -368,6 +369,7 @@ export class ExportManager {
                     { width, height },
                     imageElements.bg
                 );
+                accBackground += performance.now() - tBg0;
 
                 PlaybackRenderer.render({
                     ctx,
@@ -436,8 +438,8 @@ export class ExportManager {
                         `total=${accTotal.toFixed(0)}ms (${(accTotal / 30).toFixed(0)}ms/frame) ` +
                         `decoded=${newFrames}/30 chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
                     const profile = PlaybackRenderer.flushProfile(30);
-                    if (profile) console.log(profile);
-                    accDecode = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
+                    if (profile) console.log(`${profile} background=${accBackground.toFixed(0)}ms`);
+                    accDecode = 0; accBackground = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
                     accChunksFed = 0; maxQueueSize = 0; accUnchangedFrames = 0;
                 }
 

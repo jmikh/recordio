@@ -53,8 +53,12 @@ function Editor() {
     const projectId = new URLSearchParams(window.location.search).get('projectId');
     const saveProject = useProjectStore(s => s.saveProject);
     const { retry: retryUpload } = useBackgroundUpload(projectId, () => {
-        // Upload complete — flush any buffered edits
-        saveProject();
+        // Upload complete — flush any buffered edits.
+        // Guard: only save if the real project is loaded in the store
+        // (upload can finish before loadProject completes on fast local S3).
+        if (useProjectStore.getState().project.id === projectId) {
+            saveProject();
+        }
     });
 
 
@@ -82,6 +86,7 @@ function Editor() {
 
     // Load Project ID from URL
     useEffect(() => {
+        let cancelled = false;
         const params = new URLSearchParams(window.location.search);
         const projectId = params.get('projectId');
 
@@ -108,6 +113,8 @@ function Editor() {
 
                 const result = await CloudProjectService.loadProject(projectId, setLoadingStatus);
 
+                if (cancelled) return;
+
                 if (!result) {
                     navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
                     return;
@@ -122,17 +129,21 @@ function Editor() {
 
 
             } catch (err) {
+                if (cancelled) return;
                 console.error('[Editor] Project init failed:', err);
+                console.error('[Editor] loadingStatus at catch time:', loadingStatus);
                 if (loadingStatus.includes('media') || loadingStatus.includes('Loading screen') || loadingStatus.includes('Loading camera') || loadingStatus.includes('Loading audio')) {
                     setLoadError('Could not load project media. Please contact support.');
                     setIsLoading(false);
                 } else {
+                    console.error('[Editor] Treating as "project not found" because loadingStatus does not indicate media phase');
                     navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
                 }
             }
         }
 
         init();
+        return () => { cancelled = true; };
     }, []);
 
     // Global Key Listener for Undo/Redo & Play/Pause

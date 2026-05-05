@@ -46,21 +46,18 @@ export async function resolveVideoCodec(
     for (const codec of h264Candidates) {
         tried.push(codec);
         try {
-            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30 };
+            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30, hardwareAcceleration: 'prefer-hardware' };
             const result = await VideoEncoder.isConfigSupported(config);
+            console.log(`[Export] Encoder HW accel for ${codec}: ${result.supported}`);
             if (result.supported) {
-                // Probe hardware acceleration
-                try {
-                    const hwConfig: VideoEncoderConfig = { ...config, hardwareAcceleration: 'prefer-hardware' };
-                    const hwResult = await VideoEncoder.isConfigSupported(hwConfig);
-                    console.log(`[Export] Encoder HW accel for ${codec}: ${hwResult.supported}`);
-                    if (hwResult.supported) {
-                        return { config: hwConfig, muxerCodec: 'avc', fallback: false, tried };
-                    }
-                } catch {
-                    console.log(`[Export] Encoder HW accel probe threw for ${codec}`);
-                }
                 return { config, muxerCodec: 'avc', fallback: false, tried };
+            }
+            // If prefer-hardware not supported, try without (Chrome may still use VA-API via default)
+            const swConfig: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30 };
+            const swResult = await VideoEncoder.isConfigSupported(swConfig);
+            if (swResult.supported) {
+                console.log(`[Export] Encoder HW accel probe returned false for ${codec}, using default (may still use VA-API)`);
+                return { config: swConfig, muxerCodec: 'avc', fallback: false, tried };
             }
         } catch {
             // isConfigSupported can throw on some browsers
@@ -155,10 +152,10 @@ export { getHeightForQuality } from '../utils/exportQuality';
 
 export function getBitrate(q: ExportQuality): number {
     switch (q) {
-        case '480p': return 2_000_000;  // 2 Mbps
-        case '720p': return 5_000_000;  // 5 Mbps
-        case '1080p': return 8_000_000; // 8 Mbps
-        case '2K': return 15_000_000;   // 15 Mbps
-        case '4K': return 25_000_000;   // 25 Mbps
+        case '480p': return 5_000_000;   // 5 Mbps
+        case '720p': return 10_000_000; // 10 Mbps
+        case '1080p': return 16_000_000; // 16 Mbps
+        case '2K': return 24_000_000;   // 24 Mbps
+        case '4K': return 40_000_000;   // 40 Mbps
     }
 }

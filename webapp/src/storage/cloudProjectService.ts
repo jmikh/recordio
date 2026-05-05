@@ -231,16 +231,26 @@ export class CloudProjectService {
         onStatus?: (status: string) => void,
     ): Promise<{ project: Project; name: string } | null> {
         onStatus?.('Loading project...');
+        console.log('[CloudProjectService.loadProject] Loading project:', projectId);
         const cloudProject = await CloudStorage.loadProjectMetadata(projectId);
-        if (!cloudProject) return null;
+        if (!cloudProject) {
+            console.error('[CloudProjectService.loadProject] loadProjectMetadata returned null — project_get returned NULL. Possible auth.uid() mismatch.');
+            return null;
+        }
+        console.log('[CloudProjectService.loadProject] Got metadata:', { upload_status: cloudProject.upload_status, cloud_version: cloudProject.cloud_version, user_id: cloudProject.user_id });
 
         // Reject projects that haven't finished uploading media — unless
-        // this is a freshly imported project with blobs still in memory
-        // (pendingUploadStore handles that case in the editor).
+        // blobs are available locally (cached by importRecordingLocal or
+        // a previous download). BlobCache is the durable signal; the
+        // ephemeral pendingUploadStore can be cleared by concurrent ops.
         if (cloudProject.upload_status !== 'ready') {
+            const rawProject = cloudProject.project_data as Project;
+            const screenPath = rawProject.screenSource?.storagePath;
+            const hasCachedMedia = screenPath ? await BlobCache.has(screenPath) : false;
             const { usePendingUploadStore } = await import('./pendingUploadStore');
             const hasPendingUpload = usePendingUploadStore.getState().pending?.projectId === projectId;
-            if (!hasPendingUpload) {
+            if (!hasCachedMedia && !hasPendingUpload) {
+                console.log('[CloudProjectService.loadProject] Rejecting pending project: no cached media and no pending upload');
                 return null;
             }
         }
@@ -308,16 +318,19 @@ export class CloudProjectService {
 
         try {
             const expectedVersion = this.cloudVersions.get(projectId);
+            console.log('[CloudProjectService.saveProject] Saving project:', projectId, 'expectedVersion:', expectedVersion);
             const result = await CloudStorage.saveProjectMetadata(
                 project, userId, expectedVersion, isPro,
             );
 
+            console.log('[CloudProjectService.saveProject] Save success, new cloudVersion:', result.cloudVersion);
             this.cloudVersions.set(projectId, result.cloudVersion);
             this.projectHashes.set(projectId, hash);
             store.setLastSyncedAt(new Date());
             store.setIdle();
         } catch (err) {
             if (err instanceof CloudVersionConflictError) {
+                console.error('[CloudProjectService.saveProject] VERSION CONFLICT! projectId:', err.projectId, 'expectedVersion:', err.expectedVersion);
                 store.setConflict({ projectId: err.projectId });
                 store.setIdle();
             } else {

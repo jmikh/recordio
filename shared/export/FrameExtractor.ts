@@ -24,15 +24,6 @@ import { WebDemuxer } from 'web-demuxer';
 /** How far ahead (ms) to feed packets beyond the requested time. */
 const FEED_AHEAD_MS = 2000;
 
-/**
- * Decoder drain timeout = max(DRAIN_TIMEOUT_MIN_MS, fedCount × perChunkMs).
- * perChunkMs scales with pixel count: 25ms baseline at 1080p, proportionally
- * more for larger resolutions (e.g. ~150ms/chunk at 4K+ in software mode).
- */
-const DRAIN_TIMEOUT_MIN_MS = 5_000;
-const DRAIN_TIMEOUT_BASE_PER_CHUNK_MS = 25;
-const DRAIN_TIMEOUT_BASELINE_PIXELS = 1920 * 1080;
-
 /** Maximum number of automatic decoder rebuilds per export. */
 const MAX_REBUILDS = 25;
 
@@ -440,23 +431,17 @@ export class FrameExtractor {
                 fed++;
             }
 
-            // 3. Wait for decoder drain
+            // 3. Wait only until a frame covering the target time is available
+            //    (non-blocking — the decoder continues processing remaining chunks async)
             if (fed > 0) {
-                const feedStart = performance.now();
-                if (fed >= 10) {
-                    console.log(`[FrameExtractor] Fed ${fed} chunks (nextIdx=${this.nextChunkIndex}/${this.chunks.length}), queueSize=${this.decoder!.decodeQueueSize}, waiting for drain...`);
-                }
                 try {
-                    await this.awaitDecoderDrain(fed);
+                    await this.awaitFrameCovering(targetMicros);
                 } catch {
                     if (this.rebuildCount >= MAX_REBUILDS) {
-                        throw new Error('[FrameExtractor] Decoder drain stalled — max rebuilds exceeded');
+                        throw new Error('[FrameExtractor] Decoder stalled — max rebuilds exceeded');
                     }
                     await this.rebuildDecoder(timeMs);
                     return this.getFrameAtTime(timeSec);
-                }
-                if (fed >= 10) {
-                    console.log(`[FrameExtractor] Drain complete: ${fed} chunks in ${(performance.now() - feedStart).toFixed(0)}ms, decodedFrames=${this.decodedFrames.length}`);
                 }
             }
 
@@ -535,63 +520,39 @@ export class FrameExtractor {
     }
 
     /**
-     * Wait for the decoder to process all queued chunks.
-     *
-     * Handles a Brave/Linux quirk where `decodeQueueSize` may stay stuck at 1
-     * even after the frame has been decoded and delivered via the output callback.
+     * Wait until the decoded frame buffer contains a frame at or before the
+     * target timestamp. The decoder runs asynchronously — frames arrive via
+     * the output callback as the decoder processes its queue. We only need
+     * to block until the frame we actually need is ready.
      */
-    private async awaitDecoderDrain(fedCount: number): Promise<void> {
+    private async awaitFrameCovering(targetMicros: number): Promise<void> {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
 
-        const pixels = (this.width || 1920) * (this.height || 1080);
-        const resolutionScale = Math.max(1, pixels / DRAIN_TIMEOUT_BASELINE_PIXELS);
-        const perChunkMs = DRAIN_TIMEOUT_BASE_PER_CHUNK_MS * resolutionScale;
-        const drainTimeoutMs = Math.max(DRAIN_TIMEOUT_MIN_MS, fedCount * perChunkMs);
-        const drainStart = performance.now();
-        const frameCountBefore = this.decodedFrames.length;
-        let lastQueueSize = this.decoder.decodeQueueSize;
-        let lastChangeTime = drainStart;
-        let stallWarned = false;
+        const TIMEOUT_MS = 10_000;
+        const start = performance.now();
 
-        while (this.decoder.decodeQueueSize > 0) {
-            const now = performance.now();
-
-            // If we've received at least as many new frames as we fed,
-            // the decoder has done its job — break even if queueSize is stuck.
-            const newFrames = this.decodedFrames.length - frameCountBefore;
-            if (newFrames >= fedCount) {
-                if (this.decoder.decodeQueueSize > 0) {
-                    console.warn(`[FrameExtractor] Drain: queueSize stuck at ${this.decoder.decodeQueueSize} but ${newFrames} frames received — proceeding`);
-                }
-                break;
+        while (!this.hasFrameCovering(targetMicros)) {
+            if ((this.decoder!.state as string) === 'closed') {
+                throw new Error('[FrameExtractor] Decoder closed while waiting for frame');
             }
 
-            if (this.decoder.decodeQueueSize !== lastQueueSize) {
-                lastQueueSize = this.decoder.decodeQueueSize;
-                lastChangeTime = now;
-                stallWarned = false;
-            } else if (now - lastChangeTime > 2000 && !stallWarned) {
-                stallWarned = true;
-                console.warn(`[FrameExtractor] Decoder queue stuck at ${this.decoder.decodeQueueSize} for 2s`);
+            if (performance.now() - start > TIMEOUT_MS) {
+                const latestTs = this.decodedFrames.length > 0
+                    ? this.decodedFrames[this.decodedFrames.length - 1].timestamp
+                    : -1;
+                throw new Error(
+                    `[FrameExtractor] Timed out waiting for frame at ${(targetMicros / 1000).toFixed(0)}ms ` +
+                    `(decoded=${this.decodedFrames.length}, latestTs=${latestTs}µs, queueSize=${this.decoder!.decodeQueueSize})`
+                );
             }
-
-            if (now - drainStart > drainTimeoutMs) {
-                const errorMsg = `Decoder drain timed out after ${drainTimeoutMs}ms (queueSize=${this.decoder.decodeQueueSize})`;
-                console.error(`[FrameExtractor] ${errorMsg}`);
-                throw new Error(errorMsg);
-            }
-
-            if ((this.decoder.state as string) === 'closed') return;
 
             await new Promise(r => setTimeout(r, 1));
         }
+    }
 
-        // Wait for output callback to deliver decoded frames
-        let postDrainWait = 0;
-        while (this.decodedFrames.length === frameCountBefore && postDrainWait < 500) {
-            await new Promise(r => setTimeout(r, 1));
-            postDrainWait++;
-        }
+    /** Check if decodedFrames contains a frame at or before the target time. */
+    private hasFrameCovering(targetMicros: number): boolean {
+        return this.decodedFrames.some(f => f.timestamp <= targetMicros);
     }
 
     dispose(): void {

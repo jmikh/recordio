@@ -6,12 +6,12 @@ import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 const BUCKET = 'project-media';
 
 // Server-side uploads from edge functions run inside Docker, so they need
-// S3_ENDPOINT_INTERNAL (e.g. http://host.docker.internal:9000) to reach MinIO.
+// S3_ENDPOINT_DEV (e.g. http://host.docker.internal:9000) to reach MinIO.
 // Falls back to S3_ENDPOINT for production where there's no Docker split.
 const s3 = new S3Client({
     forcePathStyle: true,
     region: Deno.env.get('S3_REGION') ?? '',
-    endpoint: Deno.env.get('S3_ENDPOINT_INTERNAL') ?? Deno.env.get('S3_ENDPOINT') ?? '',
+    endpoint: Deno.env.get('S3_ENDPOINT_DEV') ?? Deno.env.get('S3_ENDPOINT') ?? '',
     credentials: {
         accessKeyId: Deno.env.get('S3_ACCESS_KEY') ?? '',
         secretAccessKey: Deno.env.get('S3_SECRET_KEY') ?? '',

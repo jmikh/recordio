@@ -23,33 +23,32 @@
 | `sql/functions/` | Database function source (one `.sql` per function) |
 | `sql/crons/` | Cron job source (one `.sql` per cron, `cron_` prefix) |
 | `sql/triggers/` | Database trigger source (one `.sql` per trigger) |
-| `sql/build-functions.sh` | Generates `migrations/*_functions.sql`, `*_crons.sql`, and `*_triggers.sql` |
+| `sql/graveyard.sql` | `DROP` statements for removed functions/crons/triggers |
+| `sql/deploy.sh` | Deploys all `sql/` code to local or remote DB |
 
 ---
 
-## Adding Database Functions
+## Deploying SQL Code (Functions, Crons, Triggers)
 
-1. Create `sql/functions/<name>.sql` with `CREATE OR REPLACE FUNCTION`
-2. Run `sql/build-functions.sh` — writes a timestamped migration into `migrations/`
+All SQL in `sql/` is idempotent — deployed directly via `sql/deploy.sh`, **not** through migrations.
 
-## Adding Cron Jobs
+```
+sql/deploy.sh              # local
+sql/deploy.sh --remote     # production (uses supabase db url --linked)
+```
 
-1. Create `sql/crons/cron_<name>.sql`
-2. Run `sql/build-functions.sh` — writes a timestamped migration into `migrations/`
+| Action | What to do |
+|---|---|
+| Add function | Create `sql/functions/<name>.sql` with `CREATE OR REPLACE FUNCTION` |
+| Add cron | Create `sql/crons/cron_<name>.sql`. Always `cron.unschedule` before `cron.schedule` |
+| Add trigger | Create `sql/triggers/<name>.sql`. `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER` |
+| Remove any of the above | Delete the source file, add `DROP` statement to `sql/graveyard.sql` |
 
-Two cron patterns exist:
+Two cron patterns:
+- **Pattern A — pure SQL**: function + `cron.schedule()`, for DB-only work
+- **Pattern B — cron → edge function**: `cron.schedule` calls `net.http_post`, for external APIs
 
-- **Pattern A — pure SQL** (DB-only work, `SECURITY DEFINER`): create function + schedule with `cron.schedule()`
-- **Pattern B — cron → edge function** (needs external APIs): `cron.schedule` calls `net.http_post` to the edge function
-
-Always `cron.unschedule` before `cron.schedule` for idempotency.
-
-## Adding Triggers
-
-1. Create `sql/triggers/<table>_<event>.sql` (e.g. `users_after_insert.sql`)
-2. Include `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER` for idempotency
-3. If the trigger calls a function, define the function in the same file
-4. Run `sql/build-functions.sh` — writes a timestamped migration into `migrations/`
+Migrations (`migrations/`) are only for schema changes (tables, columns, RLS). Never put functions/crons/triggers in migrations.
 
 ---
 
@@ -71,3 +70,14 @@ Use `{asset}_{verb}` for all named items that way  related functions are visuall
 - **User-facing**: forward caller's JWT via `Authorization` header, use anon key, RLS applies
 - **Internal/cron**: use `SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS
 - **External webhook (Stripe)**: no JWT — validate webhook signature instead
+
+---
+
+## Vault for Environment-Specific Config
+
+Crons and triggers that make HTTP calls (Pattern B) resolve `SUPABASE_URL` and `SUPABASE_SECRET_KEY` from [Supabase Vault](https://supabase.com/docs/guides/database/vault) at runtime — never hardcode URLs or keys. This keeps one source of truth for local and production.
+
+- **Production**: add secrets via Dashboard (Settings → Vault)
+- **Local**: seeded in `seed.sql` via `vault.create_secret()`
+- **Access pattern**: `SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = '...'`
+- **Do not** use `supabase_functions.http_request` — it only accepts hardcoded args. Use `net.http_post` in a custom `plpgsql` function instead.

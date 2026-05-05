@@ -116,9 +116,9 @@ Only `PORT` and `RENDER_SECRET`. No Supabase vars.
 | MODIFY | `render-worker/src/config.ts` |
 | MODIFY | `render-worker/package.json` |
 | MODIFY | `render-worker/.env.example` |
-| MODIFY | `webapp/supabase/functions/storage-download-url/index.ts` (add enum mode) |
+| MODIFY | `webapp/supabase/functions/storage-download-urls/index.ts` (add enum mode) |
 
-## Modify `storage-download-url`
+## Modify `storage-download-urls`
 
 Add enum-based mode alongside existing `storagePath` mode (backwards compat):
 ```
@@ -137,9 +137,9 @@ Later: add `screen`, `camera`, `mic`, `thumbnail` to eliminate raw paths from cl
 ## Client Flow (not implementing yet)
 1. Flush pending project saves (ensure cloud_version is current)
 2. Call `render-start-job({ projectId })` → `{ jobId, status }`
-3. If `completed` → call `storage-download-url({ projectId, fileType: 'render' })`
+3. If `completed` → call `storage-download-urls({ projectId, fileType: 'render' })`
 4. If `pending` → subscribe Realtime to `render_jobs` row, show progress bar
-5. On `completed` → call `storage-download-url({ projectId, fileType: 'render' })`
+5. On `completed` → call `storage-download-urls({ projectId, fileType: 'render' })`
 6. On `failed`/`canceled` → show error
 
 ## Verification

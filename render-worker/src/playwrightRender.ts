@@ -115,6 +115,14 @@ export async function warmBrowser(): Promise<void> {
         console.warn(`[Render] vulkaninfo failed: ${e}`);
     }
 
+    // Check VA-API availability (nvidia-vaapi-driver bridges VA-API → NVENC)
+    try {
+        const vaInfo = execSync('vainfo 2>&1 | head -30', { timeout: 10000 }).toString().trim();
+        console.log(`[Render] vainfo:\n${vaInfo}`);
+    } catch (e) {
+        console.warn(`[Render] vainfo failed: ${e}`);
+    }
+
     // Check DRM render nodes — Chrome needs /dev/dri/renderD* for GPU access
     try {
         const driPath = '/dev/dri';
@@ -152,22 +160,32 @@ export async function warmBrowser(): Promise<void> {
 }
 
 async function launchBrowser(): Promise<Browser> {
-    return chromium.launch({
-        headless: false,
-        args: [
-            '--headless=new',
+    const isLinux = process.platform === 'linux';
+    const gpuArgs = isLinux
+        ? [
             '--use-angle=vulkan',
-            '--enable-features=Vulkan',
+            '--enable-features=Vulkan,VaapiVideoEncoder,VaapiVideoEncodeAcceleration,VaapiIgnoreDriverChecks',
             '--disable-vulkan-surface',
             '--enable-gpu-rasterization',
             '--ignore-gpu-blocklist',
             '--disable-gpu-sandbox',
             '--in-process-gpu',
+            '--enable-logging=stderr',
+            '--vmodule=gpu*=1,*angle*=1,*vulkan*=1,*vaapi*=1,*video_encode*=1',
+        ]
+        : [
+            '--use-angle=metal',
+            '--enable-gpu-rasterization',
+        ];
+
+    return chromium.launch({
+        headless: false,
+        args: [
+            '--headless=new',
+            ...gpuArgs,
             '--disable-web-security',
             '--autoplay-policy=no-user-gesture-required',
             '--no-sandbox',
-            '--enable-logging=stderr',
-            '--vmodule=gpu*=1,*angle*=1,*vulkan*=1',
         ],
     });
 }

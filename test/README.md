@@ -102,7 +102,7 @@ npx vitest run
 If you want to trigger a real render from the webapp (click Export), start the render worker on port 8090 (the port edge functions are configured to call):
 
 ```bash
-PORT=8090 npx tsx render-worker/src/server.ts
+PORT=8090 npx tsx --env-file=render-worker/.env.local render-worker/src/server.ts
 ```
 
 This uses the same port as the mock render worker used by tests. They won't conflict — the mock only lives for the few seconds a test runs. Just don't run edge function tests while the real worker is up.
@@ -137,7 +137,43 @@ This uses the same port as the mock render worker used by tests. They won't conf
 
 Edge functions run inside Docker (via `supabase functions serve`). They can't reach your Mac via `localhost` — they use `host.docker.internal` instead. That's why `supabase/.env.local` has URLs like `http://host.docker.internal:9000` (MinIO) and `http://host.docker.internal:8090` (render worker), while tests running on your Mac use `http://127.0.0.1:*`.
 
+## Stripe webhooks locally
+
+To test Stripe webhook events against local edge functions:
+
+1. **Install & login to Stripe CLI:**
+
+   ```bash
+   brew install stripe/stripe-cli/stripe
+   stripe login
+   ```
+
+2. **Forward webhooks to your local function:**
+
+   ```bash
+   stripe listen --forward-to http://127.0.0.1:54321/functions/v1/stripe-webhooks
+   ```
+
+   This outputs a webhook signing secret (`whsec_...`).
+
+3. **Set keys in `supabase/.env.local`:**
+
+   | Key | Source |
+   |---|---|
+   | `STRIPE_SECRET_KEY` | Stripe Dashboard (sandbox) — `sk_test_...` |
+   | `STRIPE_WEBHOOK_SECRET` | From `stripe listen` output — `whsec_...` |
+
+   The `STRIPE_SECRET_KEY` is your normal sandbox key. The `STRIPE_WEBHOOK_SECRET` is unique to the local CLI session (changes each restart) and is different from the one in your Stripe Dashboard.
+
+4. **Trigger test events (optional):**
+
+   ```bash
+   stripe trigger payment_intent.succeeded
+   ```
+
+Note: Price IDs, Product IDs, and all other Stripe objects are the same as your sandbox dashboard — the CLI just forwards real sandbox events to your local endpoint.
+
 ## Environment files
 
 - `.env.test` — Loaded by vitest before tests run. Contains local Supabase keys, test user credentials, and render secret.
-- `supabase/.env.local` — Loaded by `supabase functions serve`. Contains S3/MinIO config, mock Mux config, render worker URL.
+- `supabase/.env.local` — Loaded by `supabase functions serve`. Contains S3/MinIO config, mock Mux config, render worker URL, and Stripe keys for local development.

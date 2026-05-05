@@ -38,13 +38,17 @@ COPY --from=worker-builder /build/render-worker/node_modules/ ./node_modules/
 COPY --from=render-page-builder /build/render-worker/render-page/dist/ ./render-page/dist/
 COPY render-worker/package.json ./
 
-# Install ffmpeg, EGL/Vulkan libs for GPU support, and Chromium
+# Install ffmpeg, EGL/Vulkan libs for GPU support, VA-API NVENC bridge, and Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libegl1 \
     libgles2 \
     libvulkan1 \
     vulkan-tools \
+    libva2 \
+    libva-drm2 \
+    vainfo \
+    nvidia-vaapi-driver \
     && rm -rf /var/lib/apt/lists/*
 RUN npx playwright install chromium
 
@@ -57,8 +61,9 @@ RUN mkdir -p /usr/share/glvnd/egl_vendor.d /usr/share/vulkan/icd.d \
        > /usr/share/vulkan/icd.d/nvidia_icd.json
 
 # Ensure NVIDIA EGL vendor is discoverable (Cloud Run mounts drivers at /usr/local/nvidia)
-ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute,video
 ENV NVIDIA_VISIBLE_DEVICES=all
+ENV LIBVA_DRIVER_NAME=nvidia
 ENV NODE_ENV=production
 ENV PORT=8080
 

@@ -48,50 +48,7 @@ async function callFunction(name: string, body: unknown, token?: string) {
 }
 
 // ==========================================
-// storage-download-url
-// ==========================================
-
-describe('storage-download-url', () => {
-    it('rejects unauthenticated requests', async () => {
-        const res = await callFunction('storage-download-url', {
-            storagePath: `${TEST_IDS.proUserId}/test/screen.webm`,
-        });
-        expect(res.status).toBe(401);
-    });
-
-    it('rejects requests for other users\' files (ownership check)', async () => {
-        // Trial user tries to access pro user's storage path
-        const res = await callFunction('storage-download-url', {
-            storagePath: `${TEST_IDS.proUserId}/test/screen.webm`,
-        }, trialToken);
-        expect(res.status).toBe(403);
-    });
-
-    it('rejects missing storagePath', async () => {
-        const res = await callFunction('storage-download-url', {}, proToken);
-        expect(res.status).toBe(400);
-    });
-
-    it('returns signed URL for owned file', async () => {
-        const res = await callFunction('storage-download-url', {
-            storagePath: `${TEST_IDS.proUserId}/${TEST_IDS.minimalProjectId}/screen.webm`,
-        }, proToken);
-        // The file doesn't actually exist in storage, but the function
-        // should still generate a signed URL (or return 500 if storage errors).
-        // We're testing the auth + ownership logic, not actual file existence.
-        const data = await res.json();
-        if (res.status === 200) {
-            expect(data.signedUrl).toBeDefined();
-            expect(typeof data.signedUrl).toBe('string');
-        } else {
-            // If storage fails because file doesn't exist, that's acceptable
-            expect(res.status).toBe(500);
-        }
-    });
-});
-
-// ==========================================
-// storage-download-urls (batch) — uses S3 client
+// storage-download-urls — uses S3 client
 // Requires MinIO running with S3 env vars in .env.local
 // ==========================================
 

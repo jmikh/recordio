@@ -1,10 +1,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { S3Client, GetObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 import OpenAI from 'https://esm.sh/openai@4';
 import { withAuth, jsonResponse, errorResponse, hasProAccess } from '../_shared/auth.ts';
 import { getProjectMicPath } from '../_shared/projectMedia.ts';
 
 const BUCKET = 'project-media';
+
+const s3 = new S3Client({
+    forcePathStyle: true,
+    region: Deno.env.get('S3_REGION') ?? '',
+    endpoint: Deno.env.get('S3_ENDPOINT_DEV') ?? Deno.env.get('S3_ENDPOINT') ?? '',
+    credentials: {
+        accessKeyId: Deno.env.get('S3_ACCESS_KEY') ?? '',
+        secretAccessKey: Deno.env.get('S3_SECRET_KEY') ?? '',
+    },
+});
 const DEFAULT_MINUTES_LIMIT = 60;
 
 /**
@@ -55,14 +66,14 @@ serve(withAuth(async (req, { user, supabase }) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // --- Download audio from storage ---
-    const { data: fileData, error: downloadError } = await adminSupabase
-        .storage
-        .from(BUCKET)
-        .download(micPath);
-
-    if (downloadError || !fileData) {
-        console.error('[transcribe] Storage download failed:', downloadError);
+    // --- Download audio from S3 ---
+    let fileData: Blob;
+    try {
+        const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: micPath }));
+        const bytes = await res.Body!.transformToByteArray();
+        fileData = new Blob([bytes]);
+    } catch (err) {
+        console.error('[transcribe] S3 download failed:', err);
         return errorResponse('Failed to download audio from storage', 500);
     }
 

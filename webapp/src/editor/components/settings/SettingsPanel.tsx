@@ -114,14 +114,14 @@ export const SettingsPanel = () => {
         setIsRendering(false);
         setIsDownloading(true);
         try {
-            const { data, error } = await supabase!.functions.invoke('storage-download-url', {
-                body: { storagePath },
+            const { data, error } = await supabase!.functions.invoke('storage-download-urls', {
+                body: { storagePaths: [storagePath] },
             });
             if (error || data?.error) {
                 addToast({ type: 'error', title: 'Download failed', message: data?.error || error?.message });
                 return;
             }
-            const resp = await fetch(data.signedUrl);
+            const resp = await fetch(data.signedUrls[storagePath]);
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

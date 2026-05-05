@@ -19,10 +19,10 @@ SELECT cron.schedule(
     '25 * * * *',
     $$
     SELECT net.http_post(
-        url := '<SUPABASE_URL>/functions/v1/render-purge',
+        url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_URL') || '/functions/v1/render-purge',
         headers := jsonb_build_object(
             'Content-Type', 'application/json',
-            'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SECRET_KEY')
         ),
         body := '{}'::jsonb
     );

@@ -164,7 +164,8 @@ serve(async (req: Request) => {
         }
 
         // Dispatch to worker (fire-and-forget)
-        const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/render-job-hook`;
+        const callbackBase = Deno.env.get('RENDER_CALLBACK_URL_DEV') || SUPABASE_URL;
+        const statusCallbackUrl = `${callbackBase}/functions/v1/render-job-hook`;
         console.log(`[render-job-create] Dispatching job ${jobResult.job_id} to worker, upload path: ${jobResult.render_storage_path}`);
 
         fetch(`${RENDER_WORKER_URL}/render`, {
