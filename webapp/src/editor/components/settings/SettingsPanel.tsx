@@ -26,7 +26,9 @@ import { supabase } from '../../../auth/AuthManager';
 import { useToast } from '../Toast';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { AuthModal } from '../header/AuthModal';
-import { LocalRenderControls } from './LocalRenderControls';
+import { UpgradeModal } from '../header/UpgradeModal';
+import { useCloudRender } from './useCloudRender';
+import { DownloadModal } from './DownloadModal';
 
 
 
@@ -90,133 +92,39 @@ export const SettingsPanel = () => {
     const hasCameraSource = !!project.cameraSource;
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hasMicrophone = !!project.microphoneSource;
-    const { isAuthenticated, isPro } = useUserStore();
+    const { isAuthenticated, isPro, hasProAccess } = useUserStore();
 
     // Auth modal for download gating
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-    // ─── Cloud render download ─────────────────────────────────
-    const [isRendering, setIsRendering] = useState(false);
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [renderProgress, setRenderProgress] = useState(0);
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // Download modal
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
-    const cleanupRender = useCallback(() => {
-        if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
+    // Cloud render hook (lives here so state persists across modal close/reopen)
+    const cloudRender = useCloudRender({ onToast: addToast });
+
+    const handleDownload = () => {
+        if (cloudRender.isActive) {
+            // Re-open modal to show current progress
+            setIsDownloadModalOpen(true);
+            return;
         }
-        setIsRendering(false);
-        setRenderProgress(0);
-    }, []);
-
-    const downloadRender = async (storagePath: string) => {
-        setIsRendering(false);
-        setIsDownloading(true);
-        try {
-            const { data, error } = await supabase!.functions.invoke('storage-download-urls', {
-                body: { storagePaths: [storagePath] },
-            });
-            if (error || data?.error) {
-                addToast({ type: 'error', title: 'Download failed', message: data?.error || error?.message });
-                return;
-            }
-            const resp = await fetch(data.signedUrls[storagePath]);
-            const blob = await resp.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${projectName || 'render'}.mp4`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (e: any) {
-            addToast({ type: 'error', title: 'Download failed', message: e?.message || 'Unknown error' });
-        } finally {
-            setIsDownloading(false);
-        }
-    };
-
-    const handleDownload = async () => {
-        if (isRendering || isDownloading) return;
 
         if (!isAuthenticated) {
             setIsAuthModalOpen(true);
             return;
         }
 
-        setIsRendering(true);
-        setRenderProgress(0);
-
-        try {
-            // Save to cloud so cloud_version is current
-            const userId = useUserStore.getState().userId;
-            if (userId) {
-                const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
-                await CloudProjectService.saveProject(fullProject, userId, isPro);
-            }
-
-            const cloudVersion = CloudProjectService.getCloudVersion(project.id);
-            if (cloudVersion === undefined) {
-                addToast({ type: 'error', title: 'Download failed', message: 'Project must be saved to the cloud first.' });
-                cleanupRender();
-                return;
-            }
-
-            // Start render job
-            const { data, error } = await supabase!.functions.invoke('render-job-create', {
-                body: { projectId: project.id, cloudVersion },
-            });
-
-            if (error || data?.error) {
-                const msg = data?.message || data?.error || error?.message || 'Failed to start render';
-                addToast({ type: 'error', title: 'Render failed', message: msg, duration: 0 });
-                cleanupRender();
-                return;
-            }
-
-            const { jobId, status, renderStoragePath } = data;
-
-            // Cache hit — download immediately
-            if (status === 'completed' && renderStoragePath) {
-                await downloadRender(renderStoragePath);
-                cleanupRender();
-                return;
-            }
-
-            // Pending — poll for progress
-            addToast({ type: 'info', title: 'Rendering video in the cloud' });
-
-            pollRef.current = setInterval(async () => {
-                const { data: job } = await supabase!
-                    .from('render_jobs')
-                    .select('status, progress, error, render_storage_path')
-                    .eq('id', jobId)
-                    .maybeSingle();
-
-                if (!job) return;
-                setRenderProgress(job.progress ?? 0);
-
-                if (job.status === 'completed') {
-                    cleanupRender();
-                    await downloadRender(job.render_storage_path);
-                } else if (job.status === 'failed' || job.status === 'canceled') {
-                    cleanupRender();
-                    addToast({
-                        type: 'error',
-                        title: 'Render failed',
-                        message: job.error || `Render ${job.status}`,
-                        duration: 0,
-                    });
-                }
-            }, 3000);
-        } catch (e: any) {
-            addToast({ type: 'error', title: 'Render error', message: e?.message || 'Connection failed', duration: 0 });
-            cleanupRender();
-        }
+        setIsDownloadModalOpen(true);
     };
 
-    const downloadBusy = isRendering || isDownloading || isSyncingMedia;
-    const progressPct = Math.round(renderProgress * 100);
+    const handleStartCloudRender = useCallback(() => {
+        cloudRender.startCloudRender(project.id, projectName, isPro);
+    }, [cloudRender.startCloudRender, project.id, projectName, isPro]);
+
+    const downloadBusy = cloudRender.isActive || isSyncingMedia;
+    const progressPct = Math.round(cloudRender.progress * 100);
 
     // Share state
     const [shareSlug, setShareSlug] = useState<string | null>(null);
@@ -414,12 +322,12 @@ export const SettingsPanel = () => {
                                 className="text-sm"
                                 disabled={downloadBusy}
                             >
-                                {isRendering ? (
+                                {cloudRender.phase === 'rendering' || cloudRender.phase === 'queued' || cloudRender.phase === 'saving' ? (
                                     <>
                                         <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
                                         Rendering...
                                     </>
-                                ) : isDownloading ? (
+                                ) : cloudRender.phase === 'downloading' ? (
                                     <>
                                         <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
                                         Downloading...
@@ -431,7 +339,7 @@ export const SettingsPanel = () => {
                                     </>
                                 )}
                             </Button>
-                            {isRendering && (
+                            {cloudRender.isActive && (
                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-border-default rounded-b overflow-hidden">
                                     <div
                                         className="h-full bg-primary transition-all duration-300"
@@ -452,7 +360,7 @@ export const SettingsPanel = () => {
                                 ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                         >
-                            {isSharing ? 'Publishing...' : 'Publish'}
+                            {isSharing ? 'Publishing...' : shareSlug ? 'Republish' : 'Publish'}
                         </button>
                         <button
                             onClick={() => shareSlug && copyShareLink(shareSlug)}
@@ -467,8 +375,6 @@ export const SettingsPanel = () => {
                         </button>
                     </div>
 
-                    {/* Dev: local render with GPU/CPU toggle */}
-                    {!import.meta.env.PROD && <LocalRenderControls />}
                 </div>
                 </div>
             </nav>
@@ -519,6 +425,27 @@ export const SettingsPanel = () => {
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
                 onAuthSuccess={() => { }}
+            />
+
+            <DownloadModal
+                isOpen={isDownloadModalOpen}
+                onClose={() => setIsDownloadModalOpen(false)}
+                hasProAccess={hasProAccess()}
+                cloudPhase={cloudRender.phase}
+                cloudProgress={cloudRender.progress}
+                onStartCloudRender={handleStartCloudRender}
+                onUpgrade={() => {
+                    setIsUpgradeModalOpen(true);
+                }}
+            />
+
+            <UpgradeModal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                onSignInRequest={() => {
+                    setIsUpgradeModalOpen(false);
+                    setIsAuthModalOpen(true);
+                }}
             />
 
             {/* Disabled tab tooltip - rendered via portal */}

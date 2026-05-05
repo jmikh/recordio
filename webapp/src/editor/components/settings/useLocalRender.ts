@@ -1,7 +1,3 @@
-/**
- * Dev-only hook for local browser rendering via the shared ExportManager.
- * Easy to delete when no longer needed — just remove this file and LocalRenderControls.tsx.
- */
 import { useState, useRef, useCallback } from 'react';
 import { ExportManager, type ExportProgress, type ExportEnvironment } from '@shared/export/ExportManager';
 import { browserRenderContext } from '../../../core/renderContext';
