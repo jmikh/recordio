@@ -125,17 +125,22 @@ export class BlobCache {
         const signedUrls = await CloudStorage.requestDownloadUrls(misses);
         console.log(`[BlobCache] signed URLs obtained in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
 
-        // Download all misses in parallel
+        // Download all misses in parallel — skip individual failures
+        // so one missing thumbnail doesn't block the rest
         await Promise.all(
             misses.map(async (storagePath) => {
-                const tag = storagePath.split('/').pop() ?? storagePath;
-                const t1 = performance.now();
-                console.log(`[BlobCache] ${tag}: downloading…`);
-                const blob = await CloudStorage.downloadBlob(signedUrls[storagePath]);
-                console.log(`[BlobCache] ${tag}: downloaded ${(blob.size / 1e6).toFixed(1)}MB in ${((performance.now() - t1) / 1000).toFixed(1)}s`);
+                try {
+                    const tag = storagePath.split('/').pop() ?? storagePath;
+                    const t1 = performance.now();
+                    console.log(`[BlobCache] ${tag}: downloading…`);
+                    const blob = await CloudStorage.downloadBlob(signedUrls[storagePath]);
+                    console.log(`[BlobCache] ${tag}: downloaded ${(blob.size / 1e6).toFixed(1)}MB in ${((performance.now() - t1) / 1000).toFixed(1)}s`);
 
-                await cache.put(this.cacheKey(storagePath), new Response(blob));
-                result[storagePath] = URL.createObjectURL(blob);
+                    await cache.put(this.cacheKey(storagePath), new Response(blob));
+                    result[storagePath] = URL.createObjectURL(blob);
+                } catch (err) {
+                    console.warn(`[BlobCache] ${storagePath.split('/').pop()}: download failed, skipping`, err);
+                }
             }),
         );
 

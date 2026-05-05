@@ -1,13 +1,27 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 
 const BUCKET = 'project-media';
 
+// Server-side uploads from edge functions run inside Docker, so they need
+// S3_ENDPOINT_INTERNAL (e.g. http://host.docker.internal:9000) to reach MinIO.
+// Falls back to S3_ENDPOINT for production where there's no Docker split.
+const s3 = new S3Client({
+    forcePathStyle: true,
+    region: Deno.env.get('S3_REGION') ?? '',
+    endpoint: Deno.env.get('S3_ENDPOINT_INTERNAL') ?? Deno.env.get('S3_ENDPOINT') ?? '',
+    credentials: {
+        accessKeyId: Deno.env.get('S3_ACCESS_KEY') ?? '',
+        secretAccessKey: Deno.env.get('S3_SECRET_KEY') ?? '',
+    },
+});
+
 /**
  * Project Update Thumbnail Edge Function
  *
- * Accepts a thumbnail blob (image/webp), uploads it to storage,
+ * Accepts a thumbnail blob (image/webp), uploads it to S3 storage,
  * and updates the project's thumbnail_storage_path column.
  *
  * Request:  multipart/form-data with fields: projectId, file (blob)
@@ -47,19 +61,19 @@ serve(withAuth(async (req, { user }) => {
         return errorResponse('Forbidden', 403);
     }
 
-    // Upload thumbnail to storage
+    // Upload thumbnail to S3 storage
     const storagePath = `${user.id}/${projectId}/thumbnail.webp`;
+    const fileBuffer = await file.arrayBuffer();
 
-    const { error: uploadError } = await adminSupabase
-        .storage
-        .from(BUCKET)
-        .upload(storagePath, file, {
-            contentType: 'image/webp',
-            upsert: true,
-        });
-
-    if (uploadError) {
-        console.error('[project-update-thumbnail] Upload failed:', uploadError);
+    try {
+        await s3.send(new PutObjectCommand({
+            Bucket: BUCKET,
+            Key: storagePath,
+            Body: new Uint8Array(fileBuffer),
+            ContentType: 'image/webp',
+        }));
+    } catch (err) {
+        console.error('[project-update-thumbnail] S3 upload failed:', err);
         return errorResponse('Failed to upload thumbnail', 500);
     }
 
