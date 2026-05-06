@@ -1,5 +1,5 @@
-import type { CaptionSegment } from '../../types';
-import { textToWords } from '../captionUtils';
+import type { CaptionSegment } from '@shared/types';
+import { textToWords } from '@shared/utils/captionUtils';
 
 const SAMPLE_RATE = 16000;
 

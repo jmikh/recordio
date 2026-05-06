@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID } from '../../../types';
-import type { OverlaySegment, OverlayItem } from '../../../types/overlay';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import type { ID } from '@shared/types';
+import type { OverlaySegment, OverlayItem } from '@shared/types/overlay';
+import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 export interface OverlaySlice {

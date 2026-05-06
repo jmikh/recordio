@@ -1,7 +1,7 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, UserEvents } from '../../types';
+import type { Project, ID, UserEvents } from '@shared/types';
 import { ProjectImpl } from '../../core/Project';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { CloudStorage } from '../../storage/cloudStorage';

@@ -1,5 +1,5 @@
-import type { Rect, FocusArea } from '../../types';
-import type { ViewMapper } from '../mappers/viewMapper';
+import type { Rect, FocusArea } from '@shared/types';
+import type { ViewMapper } from '@shared/mappers/viewMapper';
 
 /**
  * DEBUG PAINTER - Throwaway code for visualizing FocusAreas

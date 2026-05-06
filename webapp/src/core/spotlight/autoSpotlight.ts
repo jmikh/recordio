@@ -5,10 +5,10 @@
  * Spotlights highlight UI elements that the user hovered over for extended periods.
  */
 
-import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, SpotlightSettings, Rect, Size, ZoomSettings } from '../../types';
-import { ViewMapper } from '../mappers/viewMapper';
+import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, SpotlightSettings, Rect, Size, ZoomSettings } from '@shared/types';
+import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getViewportStateAtTime } from '../zoom';
-import { TimeMapper } from '../mappers/timeMapper';
+import { TimeMapper } from '@shared/mappers/timeMapper';
 
 // ============================================================================
 // Constants

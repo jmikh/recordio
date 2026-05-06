@@ -6,7 +6,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { HotkeyTooltip } from '../shared/MediaTooltips';
 import { ColorButton } from './ColorButton';
-import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '../../../types/settings';
+import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '@shared/types/settings';
 import { TbPlayerPlay } from 'react-icons/tb';
 import { MdOutlineKeyboardCommandKey, MdAdsClick } from 'react-icons/md';
 import { previewClickSound } from '../../../core/audio/clickSoundPlayer';

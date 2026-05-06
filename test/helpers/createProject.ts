@@ -99,7 +99,6 @@ export function createTestProject(overrides?: Partial<Project>): Project {
             displaySettings: {
                 showZoom: true,
                 showSpotlight: true,
-                showCaptions: true,
                 showCameraMove: true,
                 showOverlays: true,
             },

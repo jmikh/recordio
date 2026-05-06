@@ -1,11 +1,11 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import type { Rect, Project } from '../../../types';
+import type { Rect, Project } from '@shared/types';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import type { RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
+import type { RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { ViewMapper } from '../../../core/mappers/viewMapper';
+import { ViewMapper } from '@shared/mappers/viewMapper';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 

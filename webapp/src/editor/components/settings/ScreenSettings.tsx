@@ -1,7 +1,7 @@
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
-import { DEVICE_FRAMES } from '../../../core/deviceFrames';
+import { DEVICE_FRAMES } from '@shared/utils/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { IoCropSharp } from 'react-icons/io5';

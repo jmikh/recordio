@@ -1,4 +1,4 @@
-import type { TimeSegment, ZoomSegment, SpotlightSegment, CaptionSegment } from '../../../../../types';
+import type { TimeSegment, ZoomSegment, SpotlightSegment, CaptionSegment } from '@shared/types';
 
 // ============================================================================
 // SHARED TIMELINE TRACK UTILITIES

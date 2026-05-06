@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { useProjectStore } from '../../../../stores/useProjectStore';
-import type { DisplaySettings } from '../../../../../types/timeline';
+import type { DisplaySettings } from '@shared/types/timeline';
 
 // ============================================================================
 // TRACK SIZING HOOK
@@ -59,7 +59,7 @@ export interface TrackSizingResult {
 
 export function useTrackSizing(): TrackSizingResult {
     const displaySettings = useProjectStore(s => s.project.timeline.displaySettings) ?? {
-        showZoom: true, showSpotlight: true, showCaptions: false, showCameraMove: false, showOverlay: true, collapsed: false,
+        showZoom: true, showSpotlight: true, showCameraMove: true, showOverlay: true, collapsed: false,
     };
     const hoveredTrack = useUIStore(s => s.hoveredTrack);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);

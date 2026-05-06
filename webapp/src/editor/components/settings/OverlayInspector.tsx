@@ -7,9 +7,9 @@ import { ColorButton } from './ColorButton';
 import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
 import { LuLayers3 } from 'react-icons/lu';
 import { RiArrowRightUpFill } from 'react-icons/ri';
-import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../../../types/overlay';
-import type { OverlaySettings } from '../../../types/settings';
-import type { Size } from '../../../types';
+import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '@shared/types/overlay';
+import type { OverlaySettings } from '@shared/types/settings';
+import type { Size } from '@shared/types';
 
 const OVERLAY_TYPE_LABELS: Record<OverlayItemType, string> = {
     blur: 'Blur',

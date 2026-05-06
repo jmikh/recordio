@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EasingStyle } from '../../../core/easing';
+import type { EasingStyle } from '@shared/animators/easing';
 
 // SVG easing curve paths (displayed in a 32x32 viewBox)
 const EASING_CURVES: Record<EasingStyle, string> = {

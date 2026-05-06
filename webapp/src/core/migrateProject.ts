@@ -1,5 +1,5 @@
 import { CURRENT_SCHEMA_VERSION } from './Project';
-import { textToWords } from './captionUtils';
+import { textToWords } from '@shared/utils/captionUtils';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
 /** Weight per word: letter count + base value. Matches textToWords(). */
@@ -99,8 +99,7 @@ export function migrateProject(raw: any): any {
         raw.timeline.displaySettings = {
             showZoom: true,
             showSpotlight: true,
-            showCaptions: false,
-            showCameraMove: false,
+            showCameraMove: true,
             collapsed: false,
         };
     }

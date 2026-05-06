@@ -129,7 +129,7 @@ VALUES (
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCaptions": false, "showCameraMove": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
         }
     }'::jsonb,
     'ready',
@@ -221,7 +221,7 @@ VALUES (
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCaptions": true, "showCameraMove": true}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
         }
     }'::jsonb,
     'ready',
@@ -268,7 +268,7 @@ VALUES (
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCaptions": false, "showCameraMove": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
         }
     }'::jsonb,
     'ready',

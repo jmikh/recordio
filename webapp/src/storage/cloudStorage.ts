@@ -1,6 +1,6 @@
 import { supabase } from '../auth/AuthManager';
 
-import type { Project } from '../types';
+import type { Project } from '@shared/types';
 
 /**
  * Summary row returned by listProjectsSummary — lightweight for dashboard display.

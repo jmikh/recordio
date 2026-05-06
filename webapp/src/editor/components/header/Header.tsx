@@ -16,7 +16,7 @@ import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 
 import { TbCloudUpload } from 'react-icons/tb';
 import { Dropdown, Button, ThemeToggle, Tooltip, type DropdownOption } from '@shared/components';
-import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '../../../core/aspectRatio';
+import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import { useToast } from '../Toast';
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({

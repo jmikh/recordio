@@ -1,4 +1,4 @@
-import type { Project, ID } from '../types';
+import type { Project, ID } from '@shared/types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';

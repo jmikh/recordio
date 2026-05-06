@@ -2,7 +2,7 @@ import React from 'react';
 import { LuLayers3 } from 'react-icons/lu';
 import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
 import { RiArrowRightUpFill } from 'react-icons/ri';
-import type { OverlayItemType } from '../../../../../types/overlay';
+import type { OverlayItemType } from '@shared/types/overlay';
 import {
     holdSegment,
     blockContainer,

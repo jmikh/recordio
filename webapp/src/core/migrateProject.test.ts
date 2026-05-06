@@ -39,7 +39,6 @@ function makeV1Project(overrides: Record<string, any> = {}): any {
                 showZoom: true,
                 showSpotlight: true,
                 showCameraLayout: true,
-                showCaptions: false,
             },
         },
         ...overrides,
@@ -284,8 +283,7 @@ describe('common migration behaviors', () => {
         expect(result.timeline.displaySettings).toEqual({
             showZoom: true,
             showSpotlight: true,
-            showCaptions: false,
-            showCameraMove: false,
+            showCameraMove: true,
             collapsed: false,
         });
     });
@@ -349,7 +347,6 @@ describe('full migration chain v1 → current', () => {
                     showZoom: true,
                     showSpotlight: true,
                     showCameraLayout: true,
-                    showCaptions: true,
                 },
             },
         };

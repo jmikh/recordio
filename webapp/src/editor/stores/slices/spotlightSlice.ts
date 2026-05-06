@@ -1,11 +1,11 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, SpotlightSegment } from '../../../types';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import type { ID, SpotlightSegment } from '@shared/types';
+import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { calculateAutoSpotlights } from '../../../core/spotlight/autoSpotlight';
 import { ViewMapper } from '../../../core/zoom';
-import { getDeviceFrame } from '../../../core/deviceFrames';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;

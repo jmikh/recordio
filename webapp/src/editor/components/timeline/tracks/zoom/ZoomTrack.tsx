@@ -15,7 +15,7 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
-import type { ZoomSegment } from '../../../../../types';
+import type { ZoomSegment } from '@shared/types';
 
 interface ZoomTrackProps {
     height: number;

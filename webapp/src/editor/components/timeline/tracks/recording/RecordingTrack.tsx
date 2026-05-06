@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import type { Timeline as TimelineType } from '../../../../../types';
+import type { Timeline as TimelineType } from '@shared/types';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../../../stores/useMediaUrlStore';
 import { useAudioAnalysis } from '../../../../hooks/useAudioAnalysis';

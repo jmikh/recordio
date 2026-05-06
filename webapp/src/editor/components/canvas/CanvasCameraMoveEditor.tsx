@@ -1,14 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import type { CameraSettings, CameraMoveSegment, Rect, Project } from '../../../types';
+import type { CameraSettings, CameraMoveSegment, Rect, Project } from '@shared/types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
-import { type RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawCamera } from '../../../core/painters/cameraPainter';
+import { type RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
+import { drawCamera } from '@shared/painters/cameraPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 
 // ------------------------------------------------------------------

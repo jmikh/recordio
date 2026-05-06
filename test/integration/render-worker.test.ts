@@ -77,7 +77,7 @@ const testProjectData = {
         cameraMoveSegments: [],
         overlaySegments: [],
         focusAreas: [],
-        displaySettings: { showZoom: true, showSpotlight: true, showCaptions: false, showCameraMove: false, showOverlay: true, collapsed: false },
+        displaySettings: { showZoom: true, showSpotlight: true, showCameraMove: true, showOverlay: true, collapsed: false },
     },
 };
 

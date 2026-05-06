@@ -2,6 +2,7 @@ import type { Project, Rect } from '../types';
 import type { UrlChangeEvent } from '../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import type { TimeMapper } from '../mappers/timeMapper';
+import type { RenderContext } from '../utils/renderContext';
 import { getDeviceFrame } from '../utils/deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
 import { drawToolbar, getUrlAtTime } from './toolbarPainter';
@@ -39,6 +40,7 @@ export function drawScreen(
     timeMapper?: TimeMapper, // For converting output time → source time
     urlChanges?: UrlChangeEvent[], // URL change events (passed explicitly; project.userEvents separated from project at runtime)
     projectName?: string, // Project name for toolbar fallback (stored as DB column, not in project)
+    renderCtx?: RenderContext, // For loading images (toolbar icons, etc.)
 ): { viewMapper: ViewMapper } {
     const screenConfig = project.settings.screen || {
         mode: 'device',
@@ -130,7 +132,7 @@ export function drawScreen(
                     ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
                     : projectName ?? '';
 
-                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
+                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings, renderCtx);
             }
 
             // Draw video content (positioned by ViewMapper's contentRect)
@@ -226,7 +228,7 @@ export function drawScreen(
                     ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
                     : projectName ?? '';
 
-                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings);
+                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings, renderCtx);
             }
 
             // Draw video content (destRect is already positioned below toolbar by ViewMapper)

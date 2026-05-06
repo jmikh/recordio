@@ -6,7 +6,7 @@ import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
-import { PlaybackRenderer, type RenderResources } from './PlaybackRenderer';
+import { PlaybackRenderer, type RenderResources } from '@shared/export/PlaybackRenderer';
 import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
 import { browserRenderContext } from '../../../core/renderContext';
 import { ZoomEditor, renderZoomEditor } from './CanvasZoomEditor';
@@ -16,13 +16,13 @@ import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEditor';
 import { OverlayEditor, renderOverlayEditor } from './CanvasOverlayEditor';
 import { CanvasHoverLayer } from './CanvasHoverLayer';
-import { drawBackground } from '../../../core/painters/backgroundPainter';
+import { drawBackground } from '@shared/painters/backgroundPainter';
 
-import { getDeviceFrame } from '../../../core/deviceFrames';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 
-import type { BackgroundSettings, CameraSettings, Rect, SourceMetadata } from '../../../types';
-import type { OverlayItem } from '../../../types/overlay';
+import type { BackgroundSettings, CameraSettings, Rect, SourceMetadata } from '@shared/types';
+import type { OverlayItem } from '@shared/types/overlay';
 
 export const CanvasContainer = () => {
     const project = useProjectData();

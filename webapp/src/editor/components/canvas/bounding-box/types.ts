@@ -1,5 +1,5 @@
-import type { Rect } from '../../../../types';
-import type { CornerRadii } from '../../../../core/mappers/displayMapper';
+import type { Rect } from '@shared/types';
+import type { CornerRadii } from '@shared/mappers/displayMapper';
 
 // ------------------------------------------------------------------
 // INTERACTION TYPES

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import type { Rect } from '../../../types';
+import type { Rect } from '@shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -7,10 +7,10 @@ import { BoundingBox } from './bounding-box';
 import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
-import { type RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawOverlays } from '../../../core/painters/overlayPainter';
-import type { Project } from '../../../types';
+import { type RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
+import { drawOverlays } from '@shared/painters/overlayPainter';
+import type { Project } from '@shared/types';
 
 // Maximum zoom bounding box size as a fraction of the output
 const MAX_ZOOM_RATIO = 0.9;

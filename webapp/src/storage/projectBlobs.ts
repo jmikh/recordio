@@ -1,18 +1,10 @@
-import type { Project } from '../types';
+import type { Project } from '@shared/types';
 import { BlobCache } from './blobCache';
 import { getProjectMediaPaths } from '@shared/utils/projectMedia';
 
 // Re-export shared utilities so existing imports don't break
 export { cloudStoragePath, getProjectMediaPaths } from '@shared/utils/projectMedia';
 export type { MediaEntry } from '@shared/utils/projectMedia';
-
-const STATUS_LABELS: Record<string, string> = {
-    screen: 'Loading screen recording...',
-    camera: 'Loading camera...',
-    mic: 'Loading audio...',
-    background: 'Loading background...',
-    music: 'Loading music...',
-};
 
 /**
  * Hydrate all media blob URLs into the provided setUrl callback.
@@ -24,8 +16,7 @@ export async function hydrateMediaUrls(
     onStatus?: (status: string) => void,
 ): Promise<void> {
     const entries = getProjectMediaPaths(project);
-    const labels = entries.map((e) => STATUS_LABELS[e.type] ?? 'Loading media...');
-    onStatus?.(labels.join(' · '));
+    onStatus?.('Loading Project');
 
     console.log(`[hydrate] loading ${entries.length} media files…`);
     const t0 = performance.now();

@@ -111,7 +111,7 @@ export function VideoPage() {
             {/* Header */}
             <header className="border-b border-border bg-surface">
                 <div style={{ maxWidth: 1400 }} className="mx-auto flex items-center justify-between px-6 py-4">
-                    <LogoLink href={MARKETING_ORIGIN} target="_blank" rel="noopener noreferrer" />
+                    <LogoLink />
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
                         <Button

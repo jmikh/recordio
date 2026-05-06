@@ -1,5 +1,5 @@
-import { DisplayMapper } from '../../core/mappers/displayMapper';
-import type { Size } from '../../types';
+import { DisplayMapper } from '@shared/mappers/displayMapper';
+import type { Size } from '@shared/types';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 

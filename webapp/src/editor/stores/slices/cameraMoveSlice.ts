@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, CameraMoveSegment, CameraMoveSettings } from '../../../types';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import type { ID, CameraMoveSegment, CameraMoveSettings } from '@shared/types';
+import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 export interface CameraMoveSlice {

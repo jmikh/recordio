@@ -8,7 +8,6 @@ import { DashboardSidebar, type DashboardView } from '../components/DashboardSid
 import { DashboardHeader, type FilterTab, type SortOrder } from '../components/DashboardHeader';
 import { XButton, Modal, Button } from '@shared/components';
 import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
-import { FcGoogle } from 'react-icons/fc';
 
 import { useUserStore } from '../editor/stores/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
@@ -43,8 +42,6 @@ export function DashboardPage() {
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
-    const [loginLoading, setLoginLoading] = useState(false);
-    const [loginError, setLoginError] = useState<string | null>(null);
 
     // Sort, filter, search state
     const [sortOrder, setSortOrder] = useState<SortOrder>('last_created');
@@ -601,42 +598,7 @@ export function DashboardPage() {
             </Modal>
 
             {/* Mandatory login modal — non-dismissable when not authenticated */}
-            <Modal isOpen={!isAuthenticated} maxWidth="max-w-[400px]">
-                <h2 className="text-lg font-semibold text-text-highlighted mb-2">
-                    Sign In to Recordio
-                </h2>
-                <p className="text-sm text-text-main mb-6">
-                    Sign in to manage your projects.
-                </p>
-
-                {loginError && (
-                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs mb-4">
-                        {loginError}
-                    </div>
-                )}
-
-                <button
-                    type="button"
-                    onClick={async () => {
-                        setLoginLoading(true);
-                        setLoginError(null);
-                        const result = await AuthManager.signInWithProvider('google');
-                        if (result.error) {
-                            setLoginError(result.error.message);
-                            setLoginLoading(false);
-                        }
-                    }}
-                    disabled={loginLoading}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50"
-                >
-                    {loginLoading ? (
-                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
-                    ) : (
-                        <FcGoogle className="icon-lg" />
-                    )}
-                    <span>{loginLoading ? 'Connecting...' : 'Continue with Google'}</span>
-                </button>
-            </Modal>
+            <AuthModal isOpen={!isAuthenticated} onClose={() => {}} />
         </div>
     );
 }

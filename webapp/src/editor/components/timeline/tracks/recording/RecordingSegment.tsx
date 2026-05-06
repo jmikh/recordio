@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import type { OutputWindow } from '../../../../../types';
+import type { OutputWindow } from '@shared/types';
 import { StaticAudioWave } from './StaticAudioWave';
 import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator, SEGMENT_RADIUS } from '../shared/TimelineBlockStyles';
 import type { DragState } from './useWindowDrag';

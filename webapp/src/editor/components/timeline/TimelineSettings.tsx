@@ -4,7 +4,7 @@ import { MdKeyboardArrowUp } from 'react-icons/md';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { Checkbox, Toggle } from '@shared/components';
-import type { DisplaySettings } from '../../../types/timeline';
+import type { DisplaySettings } from '@shared/types/timeline';
 
 interface TrackConfig {
     showKey: keyof DisplaySettings;

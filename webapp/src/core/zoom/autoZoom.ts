@@ -1,9 +1,9 @@
-import { type ZoomSegment, type Rect, type ZoomSettings, type FocusArea } from '../../types';
-import { ViewMapper } from '../mappers/viewMapper';
-import { TimeMapper } from '../mappers/timeMapper';
-import { rectContainsRect, clampViewportToBounds, unionRects } from '../geometry';
+import { type ZoomSegment, type Rect, type ZoomSettings, type FocusArea } from '@shared/types';
+import { ViewMapper } from '@shared/mappers/viewMapper';
+import { TimeMapper } from '@shared/mappers/timeMapper';
+import { rectContainsRect, clampViewportToBounds, unionRects } from '@shared/utils/geometry';
 
-export * from '../mappers/viewMapper';
+export * from '@shared/mappers/viewMapper';
 
 // ============================================================================
 // Internal Types

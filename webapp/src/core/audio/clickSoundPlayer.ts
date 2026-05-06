@@ -1,5 +1,5 @@
 import type { BaseEvent, DragEvent } from '@shared/types';
-import type { TimeMapper } from '../mappers/timeMapper';
+import type { TimeMapper } from '@shared/mappers/timeMapper';
 import { useUIStore } from '../../editor/stores/useUIStore';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 

@@ -15,7 +15,7 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
-import type { CameraMoveSegment } from '../../../../../types';
+import type { CameraMoveSegment } from '@shared/types';
 
 interface CameraMoveTrackProps {
     height: number;

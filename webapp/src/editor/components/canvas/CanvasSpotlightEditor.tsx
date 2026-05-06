@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import type { Rect } from '../../../types';
+import type { Rect } from '@shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -8,14 +8,14 @@ import { DimmedOverlay } from '../../../components/DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
-import { ViewMapper } from '../../../core/mappers/viewMapper';
-import { getDeviceFrame } from '../../../core/deviceFrames';
+import { ViewMapper } from '@shared/mappers/viewMapper';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { getZoomBoundsForRange } from '../../../core/zoom/zoomBounds';
 
-import { type RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawOverlays } from '../../../core/painters/overlayPainter';
-import type { Project } from '../../../types';
+import { type RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
+import { drawOverlays } from '@shared/painters/overlayPainter';
+import type { Project } from '@shared/types';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy (for SpotlightEdit mode)

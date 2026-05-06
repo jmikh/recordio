@@ -6,7 +6,7 @@ import { EffectsSettings } from './EffectsSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
-import { DEVICE_FRAMES } from '../../../core/deviceFrames';
+import { DEVICE_FRAMES } from '@shared/utils/deviceFrames';
 import { Scrollbar, Button, Tooltip } from '@shared/components';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';

@@ -3,8 +3,8 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Tooltip, Button, type DropdownOption } from '@shared/components';
-import type { EasingStyle } from '../../../core/easing';
-import type { ZoomSegment } from '../../../types';
+import type { EasingStyle } from '@shared/animators/easing';
+import type { ZoomSegment } from '@shared/types';
 import { TbZoomIn } from 'react-icons/tb';
 import { EasingTooltipContent } from './EasingTooltipContent';
 

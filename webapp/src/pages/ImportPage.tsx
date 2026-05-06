@@ -5,9 +5,8 @@ import { usePendingUploadStore } from '../storage/pendingUploadStore';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
-import { AuthManager } from '../auth/AuthManager';
-import { FcGoogle } from 'react-icons/fc';
-import { LogoLink, Modal, Button } from '@shared/components';
+import { LogoLink, Button } from '@shared/components';
+import { AuthModal } from '../editor/components/header/AuthModal';
 import { navigate } from '../navigate';
 
 type ImportStatus =
@@ -36,8 +35,6 @@ export function ImportPage() {
 
     // Auth modal state
     const [showAuthModal, setShowAuthModal] = useState(false);
-    const [isSigningIn, setIsSigningIn] = useState(false);
-    const [signInError, setSignInError] = useState<string | null>(null);
 
     const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
 
@@ -242,18 +239,6 @@ export function ImportPage() {
         } catch { /* analytics should never break the app */ }
     }
 
-    const handleSignIn = async () => {
-        setIsSigningIn(true);
-        setSignInError(null);
-        const result = await AuthManager.signInWithProvider('google');
-        if (result.error) {
-            setSignInError(result.error.message);
-            setIsSigningIn(false);
-        }
-        // If no error, browser redirects to Google — on return, useAuthListener
-        // picks up the session and the useEffect above triggers upload
-    };
-
     const getStatusMessage = () => {
         switch (status) {
             case 'init':
@@ -332,34 +317,7 @@ export function ImportPage() {
             </div>
 
             {/* Auth modal — shown when blobs are received but user is not logged in */}
-            <Modal isOpen={showAuthModal} maxWidth="max-w-[400px]">
-                <h2 className="text-lg font-semibold text-text-highlighted mb-2">
-                    Sign In Required
-                </h2>
-                <p className="text-sm text-text-main mb-6">
-                    Sign in to save your recording to the cloud.
-                </p>
-
-                {signInError && (
-                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs mb-4">
-                        {signInError}
-                    </div>
-                )}
-
-                <button
-                    type="button"
-                    onClick={handleSignIn}
-                    disabled={isSigningIn}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50"
-                >
-                    {isSigningIn ? (
-                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
-                    ) : (
-                        <FcGoogle className="icon-lg" />
-                    )}
-                    <span>{isSigningIn ? 'Connecting...' : 'Continue with Google'}</span>
-                </button>
-            </Modal>
+            <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
         </div>
     );
 }

@@ -172,7 +172,6 @@ export interface CameraMoveSegment extends TimeSegment {
 export interface DisplaySettings {
     showZoom: boolean;
     showSpotlight: boolean;
-    showCaptions: boolean;
     showCameraMove: boolean;
     showOverlay: boolean;
     /** Whether hover-to-expand collapse is active */

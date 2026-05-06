@@ -22,6 +22,8 @@ export function UninstallPage() {
                     have done better, we'd love to hear from you at{' '}
                     <a
                         href={`mailto:${SUPPORT_EMAIL}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-primary hover:text-primary-highlighted underline cursor-pointer"
                     >
                         {SUPPORT_EMAIL}

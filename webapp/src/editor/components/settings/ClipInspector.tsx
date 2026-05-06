@@ -3,7 +3,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useToast } from '../Toast';
 import { Slider, Tooltip, CollapsibleCard, Checkbox, Button } from '@shared/components';
-import type { OutputWindow } from '../../../types';
+import type { OutputWindow } from '@shared/types';
 import { PiVideoBold } from 'react-icons/pi';
 
 export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win }) => {

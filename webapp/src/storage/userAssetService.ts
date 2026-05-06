@@ -12,6 +12,7 @@ export interface UserAsset {
 }
 
 const LIBRARY_LIMIT = 10; // per asset type
+const MAX_DIMENSION = 1920; // 1080p cap
 
 /** MIME type for the signed URL upload based on file extension */
 function mimeFromExt(fileName: string): string {
@@ -23,6 +24,28 @@ function mimeFromExt(fileName: string): string {
         m4a: 'audio/mp4', ogg: 'audio/ogg',
     };
     return map[ext] ?? 'application/octet-stream';
+}
+
+/** Compress an image file to WebP, capping at 4K while maintaining aspect ratio. */
+async function compressImageToWebP(file: File): Promise<{ blob: Blob; fileName: string }> {
+    const img = await createImageBitmap(file);
+    let { width, height } = img;
+
+    // Downscale to fit within 4K while maintaining aspect ratio
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+    }
+
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0, width, height);
+    img.close();
+
+    const webpBlob = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
+    const fileName = file.name.replace(/\.\w+$/, '.webp');
+    return { blob: webpBlob, fileName };
 }
 
 export class UserAssetService {
@@ -40,12 +63,21 @@ export class UserAssetService {
     ): Promise<UserAsset> {
         if (!supabase) throw new Error('Supabase not configured');
 
+        // Compress background images to WebP before upload
+        let uploadBlob: Blob = file;
+        let uploadFileName = file.name;
+        if (type === 'background') {
+            const compressed = await compressImageToWebP(file);
+            uploadBlob = compressed.blob;
+            uploadFileName = compressed.fileName;
+        }
+
         // 1. Create asset record + get signed URL
         const { data, error } = await supabase.functions.invoke('asset-create', {
             body: {
                 assetType: type,
-                sizeBytes: file.size,
-                fileName: file.name,
+                sizeBytes: uploadBlob.size,
+                fileName: uploadFileName,
             },
         });
 
@@ -62,8 +94,8 @@ export class UserAssetService {
         // 2. Upload blob
         await CloudStorage.uploadBlob(
             signedUrl,
-            file,
-            mimeFromExt(file.name),
+            uploadBlob,
+            mimeFromExt(uploadFileName),
             onProgress,
         );
 
@@ -75,14 +107,14 @@ export class UserAssetService {
         if (!confirmed) throw new Error('Failed to confirm asset upload');
 
         // 4. Cache locally so we don't re-download immediately
-        await BlobCache.put(storagePath, file);
+        await BlobCache.put(storagePath, uploadBlob);
 
         return {
             id: assetId,
             assetType: type,
             storagePath,
-            name: file.name,
-            sizeBytes: file.size,
+            name: uploadFileName,
+            sizeBytes: uploadBlob.size,
             createdAt: new Date().toISOString(),
         };
     }

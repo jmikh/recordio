@@ -105,7 +105,8 @@ export class PlaybackRenderer {
                     currentTimeMs,
                     state.timeMapper,
                     userEvents?.urlChanges,
-                    projectName
+                    projectName,
+                    renderCtx
                 );
                 viewMapper = result.viewMapper;
             });

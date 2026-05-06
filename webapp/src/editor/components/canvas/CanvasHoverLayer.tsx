@@ -14,9 +14,9 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 import { getViewportStateAtTime } from '../../../core/zoom';
-import { getResolvedCameraStateAtTime } from '../../../core/zoom/cameraAnimator';
-import type { OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '../../../types/overlay';
-import type { Rect } from '../../../types';
+import { getResolvedCameraStateAtTime } from '@shared/animators/cameraAnimator';
+import type { OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '@shared/types/overlay';
+import type { Rect } from '@shared/types';
 
 // ─────────────────────────────────────────────────────────────
 // Root component

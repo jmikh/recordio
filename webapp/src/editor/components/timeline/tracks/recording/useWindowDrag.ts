@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { OutputWindow, Timeline as TimelineType } from '../../../../../types';
+import type { OutputWindow, Timeline as TimelineType } from '@shared/types';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { useHistoryBatcher } from '../../../../hooks/useHistoryBatcher';

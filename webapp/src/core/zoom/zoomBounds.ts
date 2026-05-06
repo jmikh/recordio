@@ -9,9 +9,9 @@
  * All rectangles are in OUTPUT coordinates.
  */
 
-import type { ZoomSegment, Size, Rect, ZoomSettings } from '../../types';
-import { getViewportStateAtTime } from './zoomAnimator';
-import { getIntersection } from '../geometry';
+import type { ZoomSegment, Size, Rect, ZoomSettings } from '@shared/types';
+import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
+import { getIntersection } from '@shared/utils/geometry';
 
 /**
  * Returns the intersection of all zoom viewports during [outputStartMs, outputEndMs].

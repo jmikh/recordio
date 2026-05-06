@@ -1,16 +1,16 @@
 import React, { useMemo, useEffect } from 'react';
-import type { Rect } from '../../../types';
+import type { Rect } from '@shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useOverlayEditorStore } from './useOverlayEditorStore';
 
-import type { RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawOverlays, TEXT_REF_HEIGHT, TEXT_REF_PADDING, TEXT_REF_RADIUS } from '../../../core/painters/overlayPainter';
-import type { Project, Size } from '../../../types';
-import type { OverlayItem, OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '../../../types/overlay';
+import type { RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
+import { drawOverlays, TEXT_REF_HEIGHT, TEXT_REF_PADDING, TEXT_REF_RADIUS } from '@shared/painters/overlayPainter';
+import type { Project, Size } from '@shared/types';
+import type { OverlayItem, OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '@shared/types/overlay';
 import { BoundingBox } from './bounding-box';
 
 // ------------------------------------------------------------------

@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
-import type { OverlaySegment } from '../../../../../types/overlay';
+import type { OverlaySegment } from '@shared/types/overlay';
 import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
-import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
+import type { TimeMapper } from '@shared/mappers/timeMapper';
 
 export interface OverlayHoverInfo {
     x: number;

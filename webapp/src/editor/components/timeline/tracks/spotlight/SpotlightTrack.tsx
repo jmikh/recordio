@@ -7,7 +7,7 @@ import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useTimelineSegmentDrag } from '../shared/useTimelineSegmentDrag';
 import { useSpotlightHover } from './useSpotlightHover';
 import { SpotlightBlock } from './SpotlightBlock';
-import type { SpotlightSegment } from '../../../../../types';
+import type { SpotlightSegment } from '@shared/types';
 
 import {
     ghostSpotlight,

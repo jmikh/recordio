@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { AuthManager } from '../../../auth/AuthManager';
-import { XButton, Modal } from '@shared/components';
-import { MARKETING_ORIGIN } from '@shared/types/bridge';
+import { Modal, LogoLink } from '@shared/components';
+import { MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -36,48 +36,53 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[400px]">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h2 className="text-lg font-semibold text-text-highlighted">
-                        Sign In to Recordio
-                    </h2>
-                    <p className="text-xs text-text-muted mt-1">
-                        Unlock Pro features
-                    </p>
-                </div>
-                <XButton
-                    onClick={onClose}
-                    title="Close"
-                />
-            </div>
+        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[460px]">
+            <div className="flex flex-col items-center text-center py-6 px-4">
+                <LogoLink imgClassName="h-8" className="mb-12" />
 
-            <div className="space-y-4">
-                {/* Error Message */}
+                <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
+                    Welcome back
+                </p>
+                <h2 className="text-2xl font-bold text-text-highlighted mb-2">
+                    Sign in to keep recording
+                </h2>
+                <p className="text-sm text-text-muted mb-10">
+                    Pick up where you left off — your projects are waiting.
+                </p>
+
                 {error && (
-                    <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-sm text-xs">
+                    <div className="w-full bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-md text-xs mb-4">
                         {error}
                     </div>
                 )}
 
-                {/* Google Sign In */}
                 <button
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted font-medium rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50 group"
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-surface hover:bg-state-hover text-text-highlighted font-medium rounded-lg border border-border shadow-sm transition-colors disabled:opacity-50 group"
                 >
                     {loading ? (
-                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
+                        <div className="h-5 w-5 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
                     ) : (
-                        <FcGoogle className="icon-lg group-hover:scale-110 transition-transform" />
+                        <FcGoogle size={20} className="group-hover:scale-110 transition-transform" />
                     )}
                     <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
                 </button>
 
-                <p className="text-center text-[10px] text-text-muted px-4">
-                    By continuing, you agree to our <a href={`${MARKETING_ORIGIN}/terms`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms of Service</a> and <a href={`${MARKETING_ORIGIN}/privacy`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
+                <p className="text-[11px] text-text-muted mt-6 px-4">
+                    By continuing, you agree to our{' '}
+                    <a href={`${MARKETING_ORIGIN}/terms`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms</a>
+                    {' '}and{' '}
+                    <a href={`${MARKETING_ORIGIN}/privacy`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Privacy Policy</a>.
                 </p>
+
+                <div className="mt-12 text-xs text-text-muted">
+                    Need help?{' '}
+                    <a href={`mailto:${SUPPORT_EMAIL}`} target="_blank" rel="noopener noreferrer" className="text-text-highlighted font-medium hover:underline">
+                        Contact support
+                    </a>
+                </div>
             </div>
         </Modal>
     );

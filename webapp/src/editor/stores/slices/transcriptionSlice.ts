@@ -1,13 +1,13 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { CaptionSegment, Word } from '../../../types';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import type { CaptionSegment, Word } from '@shared/types';
+import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 
 /** Recomputes output times for caption segments AND their nested words. */
 function recomputeCaptionOutputTimes(
     segments: CaptionSegment[],
-    timeMapper: InstanceType<typeof import('../../../core/mappers/timeMapper').TimeMapper>
+    timeMapper: InstanceType<typeof import('@shared/mappers/timeMapper').TimeMapper>
 ): CaptionSegment[] {
     return recomputeOutputTimes(segments, timeMapper).map(segment => ({
         ...segment,

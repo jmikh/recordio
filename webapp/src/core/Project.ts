@@ -1,8 +1,8 @@
-import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ProjectSettings, type Timeline } from '../types';
+import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ProjectSettings, type Timeline } from '@shared/types';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
-import { TimeMapper } from './mappers/timeMapper';
+import { TimeMapper } from '@shared/mappers/timeMapper';
 import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
-import { getDeviceFrame } from './deviceFrames';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { scaleProject } from '@shared/utils/projectScale';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
@@ -12,8 +12,7 @@ export const CURRENT_SCHEMA_VERSION = 5;
 const DEFAULT_DISPLAY_SETTINGS = {
     showZoom: true,
     showSpotlight: true,
-    showCaptions: false,
-    showCameraMove: false,
+    showCameraMove: true,
     showOverlay: true,
     collapsed: false,
 };

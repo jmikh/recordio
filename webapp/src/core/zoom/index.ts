@@ -6,4 +6,4 @@ export {
     calculateAutoZooms,
     ViewMapper
 } from './autoZoom';
-export { getViewportStateAtTime } from './zoomAnimator';
+export { getViewportStateAtTime } from '@shared/animators/zoomAnimator';

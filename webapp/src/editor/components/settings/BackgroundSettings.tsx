@@ -11,6 +11,7 @@ import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
 import { XButton, Slider, CollapsibleCard } from '@shared/components';
 import { TbBackground } from 'react-icons/tb';
+import { useToast } from '../Toast';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
@@ -55,6 +56,7 @@ export const BackgroundSettings = () => {
     const removeAsset = useAssetLibraryStore(s => s.removeAsset);
     const [isUploading, setIsUploading] = useState(false);
     const canUpload = canUploadBg();
+    const { addToast } = useToast();
 
     // Defensive check
     if (!project) return null;
@@ -152,8 +154,10 @@ export const BackgroundSettings = () => {
             const asset = await UserAssetService.uploadAsset(file, 'background');
             addAsset(asset);
             await selectBackground(asset.storagePath);
+            addToast({ type: 'success', title: 'Background saved in your library' });
         } catch (err) {
             console.error('Failed to upload background', err);
+            addToast({ type: 'error', title: 'Failed to upload background' });
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

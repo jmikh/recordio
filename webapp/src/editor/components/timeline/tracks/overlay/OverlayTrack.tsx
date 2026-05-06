@@ -17,7 +17,7 @@ import {
     holdShapeBase,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
-import type { OverlaySegment } from '../../../../../types/overlay';
+import type { OverlaySegment } from '@shared/types/overlay';
 
 interface OverlayTrackProps {
     height: number;

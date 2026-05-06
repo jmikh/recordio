@@ -1,10 +1,10 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, ZoomSegment } from '../../../types';
-import { recomputeOutputTimes } from '../../../core/mappers/timeMapper';
+import type { ID, ZoomSegment } from '@shared/types';
+import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
-import { getDeviceFrame } from '../../../core/deviceFrames';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 export interface ZoomSegmentSlice {
     updateZoomSegment: (id: ID, action: Partial<ZoomSegment>) => void;

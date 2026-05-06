@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import type { ID, TimeMs, Size } from '../../types';
+import type { ID, TimeMs, Size } from '@shared/types';
 
 import { useProjectStore } from './useProjectStore';
-import type { DisplaySettings } from '../../types/timeline';
+import type { DisplaySettings } from '@shared/types/timeline';
 import { LocalPreferences } from '../../storage/localPreferences';
 
 export const CanvasMode = {

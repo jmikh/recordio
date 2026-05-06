@@ -1,10 +1,10 @@
 
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ProjectSettings, CameraSettings, CameraMoveSegment } from '../../../types';
+import type { ProjectSettings, CameraSettings, CameraMoveSegment } from '@shared/types';
 import type { Size } from '@shared/types';
 import { isSubset } from '../../utils/subsetMatcher';
-import { getCameraAnchor, type CameraAnchor } from '../../../core/zoom/cameraAnimator';
+import { getCameraAnchor, type CameraAnchor } from '@shared/animators/cameraAnimator';
 
 type DeepPartial<T> = {
     [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];

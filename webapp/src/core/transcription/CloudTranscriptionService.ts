@@ -1,5 +1,5 @@
 import { supabase } from '../../auth/AuthManager';
-import type { CaptionSegment } from '../../types';
+import type { CaptionSegment } from '@shared/types';
 
 export class RateLimitError extends Error {
     cycleMinutesUsed: number;

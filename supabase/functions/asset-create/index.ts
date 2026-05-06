@@ -1,9 +1,24 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
+import { getSignedUrl as getS3SignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 
 const BUCKET = 'project-media';
 const LIBRARY_LIMIT = 10; // per asset type per user
+
+// Presigned URLs are consumed by the client browser, so use S3_ENDPOINT
+// (localhost:9000 in dev). S3_ENDPOINT_DEV (host.docker.internal:9000) is only
+// for when the edge function itself needs to reach S3 from inside Docker.
+const s3 = new S3Client({
+    forcePathStyle: true,
+    region: Deno.env.get('S3_REGION') ?? '',
+    endpoint: Deno.env.get('S3_ENDPOINT') ?? '',
+    credentials: {
+        accessKeyId: Deno.env.get('S3_ACCESS_KEY') ?? '',
+        secretAccessKey: Deno.env.get('S3_SECRET_KEY') ?? '',
+    },
+});
 
 const VALID_TYPES = ['background', 'music'] as const;
 
@@ -23,11 +38,11 @@ const ALLOWED_EXT: Record<string, string[]> = {
  * Asset Create Edge Function
  *
  * Creates a pending user_assets row and returns a signed upload URL.
- * The client uploads directly to Supabase Storage, then calls the
+ * The client uploads directly to S3 via presigned URL, then calls the
  * confirm_asset_upload RPC to flip status to 'ready'.
  *
  * Request:  { assetType: 'background' | 'music', sizeBytes: number, fileName: string }
- * Response: { signedUrl, token, storagePath, assetId }
+ * Response: { signedUrl, storagePath, assetId }
  */
 serve(withAuth(async (req, { user, supabase }) => {
     const { assetType, sizeBytes, fileName } = await req.json();
@@ -106,23 +121,20 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Failed to create asset record', 500);
     }
 
-    // 5. Create signed upload URL
-    const { data: signedData, error: signError } = await adminSupabase
-        .storage
-        .from(BUCKET)
-        .createSignedUploadUrl(storagePath, { upsert: true });
+    // 5. Create S3 presigned upload URL
+    try {
+        const command = new PutObjectCommand({ Bucket: BUCKET, Key: storagePath });
+        const signedUrl = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
 
-    if (signError || !signedData) {
-        console.error('[asset-create] Signed URL creation failed:', signError);
+        return jsonResponse({
+            signedUrl,
+            storagePath,
+            assetId,
+        });
+    } catch (err) {
+        console.error('[asset-create] S3 presign failed:', err);
         // Clean up the pending row
         await adminSupabase.from('user_assets').delete().eq('id', assetId);
         return errorResponse('Failed to create upload URL', 500);
     }
-
-    return jsonResponse({
-        signedUrl: signedData.signedUrl,
-        token: signedData.token,
-        storagePath,
-        assetId,
-    });
 }));

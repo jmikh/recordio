@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
-import type { CameraMoveSegment } from '../../../../../types';
+import type { CameraMoveSegment } from '@shared/types';
 import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
-import type { TimeMapper } from '../../../../../core/mappers/timeMapper';
+import type { TimeMapper } from '@shared/mappers/timeMapper';
 
 export interface CameraMoveHoverInfo {
     x: number;

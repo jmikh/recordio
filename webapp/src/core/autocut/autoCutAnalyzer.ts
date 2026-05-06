@@ -6,7 +6,7 @@
  */
 
 import type { UserEvents, BaseEvent } from '@shared/types';
-import type { OutputWindow } from '../../types';
+import type { OutputWindow } from '@shared/types';
 import type { SpeechSegment } from './vadService';
 
 // ============================================================================

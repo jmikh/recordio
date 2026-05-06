@@ -1,9 +1,9 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, OutputWindow, Project } from '../../../types';
+import type { ID, OutputWindow, Project } from '@shared/types';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { recomputeOutputTimes, TimeMapper } from '../../../core/mappers/timeMapper';
-import type { CaptionSegment } from '../../../types';
+import { recomputeOutputTimes, TimeMapper } from '@shared/mappers/timeMapper';
+import type { CaptionSegment } from '@shared/types';
 
 /** Recomputes output times for caption segments AND their nested words. */
 export function recomputeCaptionOutputTimes(

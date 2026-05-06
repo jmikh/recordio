@@ -1,15 +1,15 @@
 import React, { useRef, useEffect } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import type { CameraSettings, Rect, Project } from '../../../types';
+import type { CameraSettings, Rect, Project } from '@shared/types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
-import { type RenderResources } from './PlaybackRenderer';
-import { drawScreen } from '../../../core/painters/screenPainter';
-import { drawCamera } from '../../../core/painters/cameraPainter';
-import { drawOverlays } from '../../../core/painters/overlayPainter';
+import { type RenderResources } from '@shared/export/PlaybackRenderer';
+import { drawScreen } from '@shared/painters/screenPainter';
+import { drawCamera } from '@shared/painters/cameraPainter';
+import { drawOverlays } from '@shared/painters/overlayPainter';
 import { getViewportStateAtTime } from '../../../core/zoom';
 
 // ------------------------------------------------------------------
