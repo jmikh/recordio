@@ -103,8 +103,8 @@ export function CameraCard({
 
     // Switch device
     useEffect(() => {
-        if (isEnabled && selectedDeviceId && streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
+        if (isEnabled && selectedDeviceId) {
+            streamRef.current?.getTracks().forEach(t => t.stop());
             navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDeviceId } } })
                 .then(s => { streamRef.current = s; setStream(s); setDeviceError(null); })
                 .catch(e => {
@@ -210,13 +210,17 @@ export function CameraCard({
                     {isEnabled ? <PiWebcamBold size={16} /> : <PiWebcamSlashBold size={16} />}
                     Camera
                 </span>
-                {activeTab !== 'camera' && isEnabled && (() => {
-                    const device = devices.find(d => d.deviceId === selectedDeviceId);
-                    const name = device?.label?.replace(/\s*\(.*?\)\s*/g, '').trim();
-                    return name ? (
-                        <span className="text-xs font-normal text-text-muted truncate max-w-[120px]">{name}</span>
-                    ) : null;
-                })()}
+                {isEnabled && (
+                    deviceError ? (
+                        <span className="flex-1 text-xs text-destructive truncate mx-4">{deviceError}</span>
+                    ) : activeTab !== 'camera' ? (() => {
+                        const device = devices.find(d => d.deviceId === selectedDeviceId);
+                        const name = device?.label?.replace(/\s*\(.*?\)\s*/g, '').trim();
+                        return name ? (
+                            <span className="text-xs font-normal text-text-muted truncate max-w-[120px]">{name}</span>
+                        ) : null;
+                    })() : null
+                )}
                 <div onClick={e => e.stopPropagation()}>
                     <Toggle value={isEnabled} onChange={(enabled) => {
                         handleToggle(enabled);

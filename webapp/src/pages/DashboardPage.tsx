@@ -43,8 +43,14 @@ export function DashboardPage() {
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
 
-    // Sort, filter, search state
-    const [sortOrder, setSortOrder] = useState<SortOrder>('last_created');
+    // Sort, filter, search state (persisted to localStorage)
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        const saved = localStorage.getItem('dashboard_sort_order');
+        if (saved === 'last_created' || saved === 'last_updated' || saved === 'longest' || saved === 'shortest') {
+            return saved;
+        }
+        return 'last_created';
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -356,6 +362,7 @@ export function DashboardPage() {
                 activeView={activeView}
                 onViewChange={setActiveView}
                 projectCount={projects.length}
+                hasProAccess={hasProAccess()}
                 starredCount={starredCount}
                 trashCount={trashProjects.length}
                 publishedCount={sharedCount}

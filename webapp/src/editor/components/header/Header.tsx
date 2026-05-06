@@ -299,7 +299,7 @@ export const Header = () => {
 
                     <div className="flex rounded-[var(--radius-interactive)] overflow-hidden">
                         <button
-                            onClick={handleShare}
+                            onClick={hasProAccess() ? handleShare : () => setIsUpgradeModalOpen(true)}
                             disabled={isSharing || isSyncingMedia}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm font-medium border-none cursor-pointer transition-colors
                                 bg-primary text-white hover:bg-primary-highlighted
@@ -309,8 +309,8 @@ export const Header = () => {
                             {isSharing ? 'Publishing...' : shareSlug ? 'Republish' : 'Publish'}
                         </button>
                         <button
-                            onClick={() => shareSlug && copyShareLink(shareSlug)}
-                            disabled={!shareSlug}
+                            onClick={() => hasProAccess() ? (shareSlug && copyShareLink(shareSlug)) : setIsUpgradeModalOpen(true)}
+                            disabled={hasProAccess() && !shareSlug}
                             className={`flex items-center justify-center px-2 py-1.5 border-none cursor-pointer transition-colors border-l border-white/20
                                 ${shareSlug
                                     ? 'bg-primary/80 text-white hover:bg-primary'

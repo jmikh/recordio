@@ -100,15 +100,11 @@ export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection
 
             <div className="flex flex-col gap-1 mt-1">
                 <span className="text-xs text-text-muted">Status</span>
-                <div className="flex items-center justify-between">
-                    {isPro ? (
-                        <ProBadge />
-                    ) : (
-                        <ProBadge variant="free" />
-                    )}
+                <div className="flex flex-col gap-1 items-start">
+                    <ProBadge variant={isTrialing ? 'trial' : isPro ? 'pro' : 'free'} />
                     {isTrialing && trialEndsAt && (
                         <span className="text-[11px] text-text-muted">
-                            Trial ends {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            Expires {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
                     )}
                     {isPro && !isTrialing && subscription.currentPeriodEnd && (

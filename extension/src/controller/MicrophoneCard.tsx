@@ -99,8 +99,8 @@ export function MicrophoneCard({
 
     // Switch device
     useEffect(() => {
-        if (isEnabled && selectedDeviceId && streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
+        if (isEnabled && selectedDeviceId) {
+            streamRef.current?.getTracks().forEach(t => t.stop());
             navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } })
                 .then(s => { streamRef.current = s; setStream(s); setDeviceError(null); })
                 .catch(e => {
@@ -188,7 +188,11 @@ export function MicrophoneCard({
                     Microphone
                 </span>
                 {isEnabled && (
-                    <AudioWaveformLine level={audioLevel} />
+                    deviceError ? (
+                        <span className="flex-1 text-xs text-destructive truncate mx-4">{deviceError}</span>
+                    ) : (
+                        <AudioWaveformLine level={audioLevel} />
+                    )
                 )}
                 <div onClick={e => e.stopPropagation()}>
                     <Toggle value={isEnabled} onChange={(enabled) => {

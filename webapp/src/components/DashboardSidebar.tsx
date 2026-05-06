@@ -2,16 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuLayoutGrid, LuStar, LuShare2, LuTrash2, LuFolder, LuPlus, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
-import { LogoLink, Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
+import { Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
+import logoSvg from '@shared/assets/logo.svg';
 import { UserMenu } from './UserMenu';
 import type { CloudFolder } from '../storage/cloudStorage';
 
 export type DashboardView = 'all' | 'starred' | 'published' | 'trash' | { folder: string };
 
+const FREE_PROJECT_LIMIT = 5;
+
 interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
     projectCount: number;
+    hasProAccess: boolean;
     starredCount: number;
     trashCount: number;
     publishedCount: number;
@@ -37,6 +41,7 @@ export function DashboardSidebar({
     activeView,
     onViewChange,
     projectCount,
+    hasProAccess,
     starredCount,
     trashCount,
     publishedCount,
@@ -141,14 +146,10 @@ export function DashboardSidebar({
 
     return (
         <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
-            {/* Logo */}
-            <div className="px-4 pt-4 pb-2 flex justify-center">
-                <LogoLink imgClassName="h-8" />
-            </div>
-
-            {/* New Recording */}
-            <div className="px-3 py-3">
-                <Button variant="primary" fullWidth icon={LuPlus} onClick={onRecord}>
+            {/* Logo + New Recording */}
+            <div className="px-4 pt-4 pb-2 flex items-center gap-3">
+                <img src={logoSvg} alt="Recordio" className="w-7 h-7 shrink-0" />
+                <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="flex-1">
                     New recording
                 </Button>
             </div>
@@ -189,6 +190,30 @@ export function DashboardSidebar({
                     })}
                 </nav>
             </div>
+
+            {/* Free plan usage */}
+            {!hasProAccess && (
+                <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-text-main">
+                            {projectCount} of {FREE_PROJECT_LIMIT} projects used
+                        </span>
+                    </div>
+                    <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all ${
+                                projectCount >= FREE_PROJECT_LIMIT ? 'bg-destructive' : 'bg-primary'
+                            }`}
+                            style={{ width: `${Math.min((projectCount / FREE_PROJECT_LIMIT) * 100, 100)}%` }}
+                        />
+                    </div>
+                    {projectCount >= FREE_PROJECT_LIMIT && (
+                        <p className="text-[11px] text-text-muted mt-1.5">
+                            Upgrade to Pro for unlimited projects
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Folders */}
             <div className="pl-0 pr-3 mt-6">

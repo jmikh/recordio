@@ -46,14 +46,14 @@ export async function resolveVideoCodec(
     for (const codec of h264Candidates) {
         tried.push(codec);
         try {
-            const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30, hardwareAcceleration: 'prefer-hardware' };
+            const config: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30, hardwareAcceleration: 'prefer-hardware' };
             const result = await VideoEncoder.isConfigSupported(config);
             console.log(`[Export] Encoder HW accel for ${codec}: ${result.supported}`);
             if (result.supported) {
                 return { config, muxerCodec: 'avc', fallback: false, tried };
             }
             // If prefer-hardware not supported, try without (Chrome may still use VA-API via default)
-            const swConfig: VideoEncoderConfig = { codec, width, height, bitrate, framerate: 30 };
+            const swConfig: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30 };
             const swResult = await VideoEncoder.isConfigSupported(swConfig);
             if (swResult.supported) {
                 console.log(`[Export] Encoder HW accel probe returned false for ${codec}, using default (may still use VA-API)`);
@@ -68,7 +68,7 @@ export async function resolveVideoCodec(
     const vp9Codec = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
     tried.push(vp9Codec);
     try {
-        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, framerate: 30 };
+        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30 };
         const result = await VideoEncoder.isConfigSupported(config);
         if (result.supported) {
             console.warn('[Export] H.264 not supported — falling back to VP9');

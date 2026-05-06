@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { LuCheck, LuSettings } from 'react-icons/lu';
+import { LuCheck, LuSettings, LuShieldCheck } from 'react-icons/lu';
 import { BiCrown } from 'react-icons/bi';
-import { XButton, Modal, Button } from '@shared/components';
+import { XButton, Modal, Button, LogoLink } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
 import { supabase } from '../../../auth/AuthManager';
@@ -22,9 +22,10 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const [loading, setLoading] = useState(false);
     const [checkingStatus, setCheckingStatus] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [trialSuccess, setTrialSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [billingInterval, setBillingInterval] = useState<BillingInterval>(initialInterval ?? 'yearly');
-    const { userId, email, isAuthenticated, isPro, subscription } = useUserStore();
+    const { userId, email, isAuthenticated, isPro, subscription, hasFreeTrial } = useUserStore();
 
     // Active paid subscriber (not trialing)
     const isActiveSubscriber = isPro && subscription.status === 'active';
@@ -72,6 +73,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             setLoading(false);
             setCheckingStatus(false);
             setSuccess(false);
+            setTrialSuccess(false);
             setError(null);
         } else {
             trackUpgradeModalViewed();
@@ -83,29 +85,6 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const handleClose = () => {
         trackUpgradeModalDismissed();
         onClose();
-    };
-
-    const handleUpgrade = async () => {
-        if (!userId || !email) {
-            onClose();
-            onSignInRequest();
-            return;
-        }
-
-        trackGetProClicked(billingInterval);
-        setLoading(true);
-        setError(null);
-
-        const { error: checkoutError } = await StripeService.createCheckoutSession(userId, email, billingInterval);
-
-        if (checkoutError) {
-            setError(checkoutError.message || 'Failed to start checkout. Please try again.');
-            setLoading(false);
-        } else {
-            // Checkout opened successfully, start polling
-            setLoading(false);
-            setCheckingStatus(true);
-        }
     };
 
     const handleManageSubscription = async () => {
@@ -126,10 +105,40 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         window.open(url, '_blank');
     };
 
+    const handleStartTrial = async () => {
+        if (!isAuthenticated) {
+            onClose();
+            onSignInRequest();
+            return;
+        }
+        if (!supabase) return;
+
+        setLoading(true);
+        setError(null);
+
+        const { error: rpcError } = await supabase.rpc('trial_start');
+
+        setLoading(false);
+
+        if (rpcError) {
+            setError(rpcError.message || 'Failed to start trial. Please try again.');
+            return;
+        }
+
+        // Reload trial state in user store
+        const { setTrialEndsAt } = useUserStore.getState();
+        setTrialEndsAt(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        setTrialSuccess(true);
+
+        setTimeout(() => {
+            onClose();
+        }, 2000);
+    };
+
     const monthlyPrice = 15;
-    const yearlyPrice = 48;
-    const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12);
-    const savingsPercent = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
+    const yearlyMonthlyPrice = 12;
+    const yearlyPrice = yearlyMonthlyPrice * 12;
+    const savingsPercent = Math.round((1 - yearlyMonthlyPrice / monthlyPrice) * 100);
     // ── Already-Pro View ──
     if (isActiveSubscriber) {
         return (
@@ -217,22 +226,44 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
         }
     };
 
+    const displayPrice = billingInterval === 'monthly' ? monthlyPrice : yearlyMonthlyPrice;
+
+    const freeFeatures = [
+        'Auto-zooms, auto cut silences & more',
+        'Up to 5 recordings',
+        'Video expires after 7 days',
+        'Transcription via small local model',
+        'Rendering in the browser (tab must stay in focus)',
+    ];
+
+    const proFeatures = [
+        'Everything in Free',
+        'Cloud rendering',
+        'Unlimited recordings',
+        'Transcription via top OpenAI model',
+        'No video expiration',
+        'Restore deleted videos within 30 days',
+    ];
+
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[740px]" className="!bg-surface !shadow-[0_0_30px_-5px_var(--color-primary)]">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-[700px]" className="!bg-surface !shadow-[0_0_30px_-5px_var(--color-primary)]">
             {/* Header */}
             <div className="flex justify-end mb-2">
                 <XButton onClick={handleClose} title="Close" />
             </div>
 
             {/* Success Message */}
-            {success && (
-                <div className="mb-6 bg-success/10 border border-success/30 rounded-sm p-4 text-center">
-                    <LuCheck className="text-success mx-auto mb-2" size={32} />
-                    <p className="text-lg font-semibold text-success mb-1">
-                        🎉 Welcome to Pro!
+            {(success || trialSuccess) && (
+                <div className="mb-6 bg-primary/10 border border-primary/30 rounded-sm p-4 text-center">
+                    <LuCheck className="text-primary mx-auto mb-2" size={32} />
+                    <p className="text-lg font-semibold text-text-highlighted mb-1">
+                        {trialSuccess ? 'Welcome to your Pro trial!' : 'Welcome to Pro!'}
                     </p>
                     <p className="text-sm text-text-muted">
-                        Your subscription is now active. Enjoy unlimited exports!
+                        {trialSuccess
+                            ? 'Your 7-day trial is now active. Enjoy all Pro features!'
+                            : 'Your subscription is now active. Enjoy all Pro features!'
+                        }
                     </p>
                 </div>
             )}
@@ -241,7 +272,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
             {checkingStatus && !success && (
                 <div className="mb-6 bg-primary/10 border border-primary/30 rounded-sm p-3 text-center">
                     <p className="text-sm text-text-highlighted">
-                        ⏳ Waiting for payment completion...
+                        Waiting for payment completion...
                     </p>
                     <p className="text-xs text-text-muted mt-1">
                         Complete payment in the checkout tab, then return here
@@ -256,96 +287,131 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
             )}
 
-            {/* Temporarily unavailable notice */}
-            <div className="flex flex-col items-center gap-4 py-8 px-4">
-                <BiCrown className="text-primary" size={40} />
-                <p className="text-base font-semibold text-text-highlighted text-center">
-                    Upgrades temporarily unavailable
-                </p>
-                <p className="text-sm text-text-muted text-center max-w-[360px] leading-relaxed">
-                    We're restructuring our product and pricing. Upgrades will be back soon — check back in a few days!
-                </p>
+            {/* Logo */}
+            <div className="flex justify-center mb-5">
+                <LogoLink imgClassName="h-8" />
             </div>
 
-            {/* Two-Card Layout — hidden during product restructuring */}
-            {false && <div className="flex gap-4">
-                {/* ── Pro Card ── */}
-                <div className="flex-1 border border-border rounded-xl p-6 flex flex-col bg-surface-raised shadow-lg">
-                    <h3 className="text-xl font-bold text-text-highlighted text-center mb-5">Pro</h3>
+            {/* Monthly / Annual Toggle */}
+            <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
+                <button
+                    onClick={() => setBillingInterval('monthly')}
+                    className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all ${billingInterval === 'monthly'
+                        ? 'bg-primary text-text-on-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Monthly
+                </button>
+                <button
+                    onClick={() => setBillingInterval('yearly')}
+                    className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${billingInterval === 'yearly'
+                        ? 'bg-primary text-text-on-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-main'
+                        }`}
+                >
+                    Annual
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${billingInterval === 'yearly'
+                        ? 'bg-text-on-primary/20 text-text-on-primary'
+                        : 'bg-primary/15 text-primary'
+                        }`}>
+                        SAVE {savingsPercent}%
+                    </span>
+                </button>
+            </div>
 
-                    {/* Price */}
-                    <div className="text-center mb-1">
-                        <span className="text-4xl font-bold text-primary">
-                            ${billingInterval === 'monthly' ? monthlyPrice : yearlyPrice}
-                        </span>
-                        {billingInterval === 'yearly' && (
-                            <span className="text-sm text-text-muted ml-1">/ year</span>
-                        )}
-                        {billingInterval === 'monthly' && (
-                            <span className="text-sm text-text-muted ml-1">/ month</span>
-                        )}
+            {/* Two-Column Comparison */}
+            <div className="flex gap-4">
+                {/* ── Free Column ── */}
+                <div className="flex-1 border border-border rounded-xl p-5 flex flex-col">
+                    <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wide mb-4">Free</h3>
+
+                    <div className="mb-1">
+                        <span className="text-3xl font-bold text-text-highlighted">$0</span>
+                        <span className="text-sm text-text-muted ml-1">/ forever</span>
                     </div>
-                    <p className="text-xs text-text-muted text-center mb-5">
+                    <p className="text-xs text-text-muted mb-4">No card needed</p>
+
+                    <div className="bg-state-inactive text-text-muted text-xs font-medium px-3 py-1.5 rounded-full w-fit mb-5">
+                        Your current plan
+                    </div>
+
+                    <ul className="space-y-3 flex-1">
+                        {freeFeatures.map((feature) => (
+                            <li key={feature} className="flex items-start gap-2.5 text-sm">
+                                <LuCheck className="icon-sm text-text-muted shrink-0 mt-0.5" />
+                                <span className="text-text-main">{feature}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                {/* ── Pro Column ── */}
+                <div className="flex-1 border-2 border-primary rounded-xl p-5 flex flex-col relative">
+                    <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                        Recommended
+                    </span>
+
+                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-4">Pro</h3>
+
+                    <div className="mb-1">
+                        <span className="text-3xl font-bold text-primary">${displayPrice}</span>
+                        <span className="text-sm text-text-muted ml-1">/ month</span>
+                    </div>
+                    <p className="text-xs text-text-muted mb-4">
                         {billingInterval === 'yearly'
-                            ? `Just $${yearlyMonthlyEquivalent}/month`
-                            : `$${yearlyPrice}/year with annual billing`
+                            ? 'Billed annually'
+                            : 'Billed monthly'
                         }
                     </p>
 
-                    {/* Monthly / Annual Toggle */}
-                    <div className="flex items-center justify-center gap-1 mb-6 bg-surface rounded-full p-1 mx-auto w-fit">
-                        <button
-                            onClick={() => setBillingInterval('monthly')}
-                            className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all ${billingInterval === 'monthly'
-                                ? 'bg-primary text-text-on-primary shadow-sm'
-                                : 'text-text-muted hover:text-text-main'
-                                }`}
-                        >
-                            Monthly
-                        </button>
-                        <button
-                            onClick={() => setBillingInterval('yearly')}
-                            className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all ${billingInterval === 'yearly'
-                                ? 'bg-primary text-text-on-primary shadow-sm'
-                                : 'text-text-muted hover:text-text-main'
-                                }`}
-                        >
-                            Annual -{savingsPercent}%
-                        </button>
-                    </div>
+                    {/* Spacer to align with Free column's "Your current plan" badge */}
+                    <div className="h-[30px] mb-5" />
 
-                    {/* Feature List */}
-                    <ul className="space-y-3 mb-6 flex-1">
-                        <li className="flex items-center gap-3 text-sm">
-                            <LuCheck className="icon-sm text-primary shrink-0" />
-                            <span className="text-text-highlighted font-medium">Everything in Free, plus:</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <LuCheck className="icon-sm text-primary shrink-0" />
-                            <span className="text-text-highlighted">Unlimited 4K exports</span>
-                        </li>
-                        <li className="flex items-center gap-3 text-sm">
-                            <LuCheck className="icon-sm text-primary shrink-0" />
-                            <span className="text-text-highlighted">Shareable links</span>
-                        </li>
+                    <ul className="space-y-3 flex-1">
+                        {proFeatures.map((feature) => (
+                            <li key={feature} className="flex items-start gap-2.5 text-sm">
+                                <LuCheck className="icon-sm text-primary shrink-0 mt-0.5" />
+                                <span className="text-text-highlighted">{feature}</span>
+                            </li>
+                        ))}
                     </ul>
+                </div>
+            </div>
 
-                    {/* Get Pro Button */}
+            {/* CTA */}
+            <div className="mt-6 flex flex-col gap-2">
+                <Button
+                    variant="primary"
+                    onClick={() => handleUpgradeWithInterval(billingInterval)}
+                    fullWidth
+                    className="py-3 text-sm font-semibold rounded-lg"
+                    disabled={loading}
+                >
+                    {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Upgrade to Pro' : 'Upgrade to Pro'}
+                </Button>
+
+                {!hasFreeTrial() && (
                     <Button
-                        variant="primary"
-                        onClick={() => handleUpgradeWithInterval(billingInterval === 'monthly' ? 'monthly' : 'yearly')}
+                        variant="ghost"
+                        onClick={handleStartTrial}
                         fullWidth
                         className="py-3 text-sm font-semibold rounded-lg"
                         disabled={loading}
                     >
-                        {loading ? 'Loading...' : !isAuthenticated ? 'Sign in & Get Pro' : 'Get Pro'}
+                        Or start a 7-day free trial
                     </Button>
-                </div>
-            </div>}
+                )}
+            </div>
 
-            {false && <p className="text-center text-xs text-text-muted mt-4">
-                Secure payment processed by Stripe
-            </p>}
+            {/* Trust Badges */}
+            <div className="flex items-center justify-center gap-4 mt-2 text-xs text-text-muted">
+                <span className="flex items-center gap-1">
+                    <LuShieldCheck className="icon-sm" />
+                    Secure with Stripe
+                </span>
+                <span>Cancel anytime</span>
+            </div>
         </Modal>
     );
 }
