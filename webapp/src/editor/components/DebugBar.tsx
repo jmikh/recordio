@@ -40,6 +40,14 @@ export const DebugBar = () => {
 
             <button
                 className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
+                onClick={() => console.log('User Events:', useProjectStore.getState().userEvents)}
+                title="Log user events from store"
+            >
+                Log User Events
+            </button>
+
+            <button
+                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
                 onClick={() => {
                     const s = useProjectStore.getState();
                     const areas = getAllFocusAreas(s.userEvents, s.project.screenSource.size, s.project.screenSource.durationMs);

@@ -37,3 +37,4 @@ extension.zip
 *.tsbuildinfo
 
 diagnostics/*
+.claude/worktrees/*

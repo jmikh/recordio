@@ -1,20 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuUser, LuLogOut, LuSettings } from 'react-icons/lu';
+import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
 import { BiCrown } from 'react-icons/bi';
 import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { useThemeStore } from '../stores/useThemeStore';
 import { AuthManager } from '../auth/AuthManager';
 import { StripeService } from '../editor/stripe/StripeService';
 import { navigate } from '../navigate';
 
 interface UserMenuProps {
     onOpenUpgradeModal: () => void;
+    onOpenSupportModal?: () => void;
     openDirection?: 'up' | 'down';
 }
 
-export function UserMenu({ onOpenUpgradeModal, openDirection = 'down' }: UserMenuProps) {
+export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
     const { email, name, picture, isPro, subscription, hasFreeTrial, trialEndsAt } = useUserStore();
+    const { theme, setTheme } = useThemeStore();
+    const isDark = theme === 'dark';
 
     // Trial state comes from user_profiles table
     const isTrialing = hasFreeTrial();
@@ -135,6 +140,29 @@ export function UserMenu({ onOpenUpgradeModal, openDirection = 'down' }: UserMen
                 >
                     <BiCrown className="icon-sm group-hover:scale-110 transition-transform" />
                     Upgrade to Pro
+                </button>
+            )}
+
+            <div className="h-px bg-border mx-2 my-1" />
+
+            <button
+                onClick={() => { setTheme(isDark ? 'light' : 'dark'); }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
+            >
+                {isDark
+                    ? <MdLightMode className="icon-sm text-text-muted" />
+                    : <MdDarkMode className="icon-sm text-text-muted" />
+                }
+                {isDark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+
+            {onOpenSupportModal && (
+                <button
+                    onClick={() => { setIsOpen(false); onOpenSupportModal(); }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
+                >
+                    <MdOutlineBugReport className="icon-sm text-text-muted" />
+                    Report a Bug
                 </button>
             )}
 

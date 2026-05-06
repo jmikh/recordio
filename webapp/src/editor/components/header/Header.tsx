@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2 } from 'react-icons/lu';
-
-import { MdOutlineBugReport } from 'react-icons/md';
 
 import { AuthModal } from './AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -13,11 +11,15 @@ import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
+import { useCloudRender } from '../settings/useCloudRender';
+import { DownloadModal } from '../settings/DownloadModal';
 
-import { TbCloudUpload } from 'react-icons/tb';
-import { Dropdown, Button, ThemeToggle, Tooltip, type DropdownOption } from '@shared/components';
+import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
+import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import { useToast } from '../Toast';
+import { supabase } from '../../../auth/AuthManager';
+import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
     value: preset,
@@ -39,16 +41,95 @@ function SyncIndicator() {
     );
 }
 
+const VIDEO_BASE_URL = import.meta.env.PROD
+    ? `${EDITOR_ORIGIN_PROD}/video`
+    : 'http://localhost:3001/video';
+
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const { isAuthenticated } = useUserStore();
+    const { isAuthenticated, isPro, hasProAccess } = useUserStore();
+    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
 
     const { addToast } = useToast();
 
     const project = useProjectData();
     const projectName = useProjectName();
+
+    // Cloud render hook
+    const cloudRender = useCloudRender({ onToast: addToast });
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+    const handleDownload = () => {
+        if (cloudRender.isActive) {
+            setIsDownloadModalOpen(true);
+            return;
+        }
+        if (!isAuthenticated) {
+            setIsAuthModalOpen(true);
+            return;
+        }
+        setIsDownloadModalOpen(true);
+    };
+
+    const handleStartCloudRender = useCallback(() => {
+        cloudRender.startCloudRender(project.id, projectName, isPro);
+    }, [cloudRender.startCloudRender, project.id, projectName, isPro]);
+
+    const downloadBusy = cloudRender.isActive || isSyncingMedia;
+    const progressPct = Math.round(cloudRender.progress * 100);
+
+    // Share/publish state
+    const [shareSlug, setShareSlug] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
+
+    useEffect(() => {
+        if (!isAuthenticated || !project?.id || !supabase) return;
+        supabase
+            .rpc('project_get', { p_project_id: project.id })
+            .then(({ data }) => {
+                if (data?.share_slug) setShareSlug(data.share_slug);
+            });
+    }, [isAuthenticated, project?.id]);
+
+    const copyShareLink = async (slug: string) => {
+        const url = `${VIDEO_BASE_URL}/${slug}`;
+        try {
+            await navigator.clipboard.writeText(url);
+            addToast({ type: 'success', title: 'Link copied to clipboard' });
+        } catch {
+            addToast({ type: 'error', title: 'Failed to copy link' });
+        }
+    };
+
+    const handleShare = async () => {
+        if (!supabase || !project?.id || isSharing) return;
+        setIsSharing(true);
+        try {
+            let slug = shareSlug;
+            if (!slug) {
+                const { data, error } = await supabase
+                    .rpc('project_share', { p_project_id: project.id })
+                    .single() as { data: { slug: string; is_new: boolean } | null; error: any };
+                if (error || !data) throw error;
+                slug = data.slug;
+                setShareSlug(slug);
+            }
+            await copyShareLink(slug);
+            const cloudVersion = CloudProjectService.getCloudVersion(project.id);
+            if (cloudVersion !== undefined) {
+                supabase.functions.invoke('mux-video-create', {
+                    body: { projectId: project.id, cloudVersion },
+                }).catch(err => console.error('[Share] mux-video-create failed:', err));
+            }
+        } catch (e: any) {
+            console.error('[Share] Failed:', e);
+            addToast({ type: 'error', title: 'Share failed', message: e?.message || 'Unknown error' });
+        } finally {
+            setIsSharing(false);
+        }
+    };
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const [localName, setLocalName] = useState(projectName);
     const localNameRef = useRef(localName);
@@ -180,12 +261,73 @@ export const Header = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-<Button variant="icon" icon={MdOutlineBugReport} onClick={() => setIsSupportModalOpen(true)} title="Report a Bug" />
-                        <ThemeToggle />
+                    <Tooltip text={isSyncingMedia ? "Syncing to cloud..." : ""}>
+                        <div className="relative">
+                            <Button
+                                variant="base"
+                                onClick={handleDownload}
+                                disabled={downloadBusy}
+                                className="text-sm px-3"
+                            >
+                                {cloudRender.phase === 'rendering' || cloudRender.phase === 'queued' || cloudRender.phase === 'saving' ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
+                                        Rendering...
+                                    </>
+                                ) : cloudRender.phase === 'downloading' ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
+                                        Downloading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <TbDownload className="icon-sm" />
+                                        Download
+                                    </>
+                                )}
+                            </Button>
+                            {cloudRender.isActive && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-border-default rounded-b overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-300"
+                                        style={{ width: `${progressPct}%` }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </Tooltip>
+
+                    <div className="flex rounded-[var(--radius-interactive)] overflow-hidden">
+                        <button
+                            onClick={handleShare}
+                            disabled={isSharing || isSyncingMedia}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm font-medium border-none cursor-pointer transition-colors
+                                bg-primary text-white hover:bg-primary-highlighted
+                                ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                        >
+                            {isSharing ? 'Publishing...' : shareSlug ? 'Republish' : 'Publish'}
+                        </button>
+                        <button
+                            onClick={() => shareSlug && copyShareLink(shareSlug)}
+                            disabled={!shareSlug}
+                            className={`flex items-center justify-center px-2 py-1.5 border-none cursor-pointer transition-colors border-l border-white/20
+                                ${shareSlug
+                                    ? 'bg-primary/80 text-white hover:bg-primary'
+                                    : 'bg-primary/40 text-white/50 cursor-not-allowed'}
+                            `}
+                        >
+                            <TbLink className="icon-sm" />
+                        </button>
                     </div>
+
                     {isAuthenticated ? (
-                        <UserMenu onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)} />
+                        <div className="ml-1">
+                            <UserMenu
+                                onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)}
+                                onOpenSupportModal={() => setIsSupportModalOpen(true)}
+                            />
+                        </div>
                     ) : (
                         <Button variant="ghost" onClick={() => setIsAuthModalOpen(true)} title="Sign in to unlock Pro features">
                             Sign In
@@ -205,6 +347,16 @@ export const Header = () => {
                 onSignInRequest={() => setIsAuthModalOpen(true)}
             />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+
+            <DownloadModal
+                isOpen={isDownloadModalOpen}
+                onClose={() => setIsDownloadModalOpen(false)}
+                hasProAccess={hasProAccess()}
+                cloudPhase={cloudRender.phase}
+                cloudProgress={cloudRender.progress}
+                onStartCloudRender={handleStartCloudRender}
+                onUpgrade={() => setIsUpgradeModalOpen(true)}
+            />
         </div>
     );
 };
