@@ -88,10 +88,13 @@ async function run() {
         return;
     }
 
-    const { project, projectName, quality, mediaBaseUrl, mediaFileNames } = job;
+    const { project, projectName, quality, mediaBaseUrl, mediaFileNames: rawMediaFileNames } = job;
+    // CDP serialization via addInitScript can produce objects where Object.entries()
+    // doesn't iterate. Force a clean plain object via JSON round-trip.
+    const mediaFileNames: Record<string, string> = JSON.parse(JSON.stringify(rawMediaFileNames ?? {}));
     log(`Render job received: "${projectName ?? project.id}" @ ${quality}`);
     log(`Media base URL: ${mediaBaseUrl}`);
-    log(`Media files: ${JSON.stringify(mediaFileNames)}`);
+    log(`Media files (${Object.keys(mediaFileNames).length}): ${JSON.stringify(mediaFileNames)}`);
 
     // Build mediaUrls map for the export pipeline (storagePath → local HTTP URL)
     const mediaUrls: Record<string, string> = {};

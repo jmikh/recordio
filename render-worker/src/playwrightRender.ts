@@ -26,6 +26,8 @@ export interface PlaywrightRenderConfig {
     quality: string;
     /** storagePath → local filename */
     mediaFileNames: MediaFileNames;
+    /** Directory containing downloaded media files */
+    mediaDir: string;
     /** Signed URL for direct upload from browser. */
     uploadUrl: string;
     onProgress?: (phase: string, progress: number, message: string) => void;
@@ -206,7 +208,7 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { jobId, project, projectName, quality, mediaFileNames, uploadUrl, onProgress } = config;
+    const { project, projectName, quality, mediaFileNames, mediaDir, uploadUrl, onProgress } = config;
     const log = onProgress ?? ((phase: string, _p: number, msg: string) => console.log(`[Render] [${phase}] ${msg}`));
     const startTime = Date.now();
 
@@ -237,8 +239,24 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             }
         });
 
-        // Media files are served by the real HTTP server on port 9998 (see server.ts)
-        // This avoids CDP base64 overhead that kills the browser for large files.
+        // Serve media files at http://localhost:9999/media/*
+        await page.route('http://localhost:9999/media/**', async (route) => {
+            const url = new URL(route.request().url());
+            const fileName = url.pathname.replace('/media/', '');
+            const fullPath = path.join(mediaDir, fileName);
+
+            if (fs.existsSync(fullPath)) {
+                const body = fs.readFileSync(fullPath);
+                await route.fulfill({
+                    status: 200,
+                    contentType: getMimeType(fullPath),
+                    body,
+                });
+            } else {
+                console.warn(`[Render] Media 404: ${fullPath}`);
+                await route.fulfill({ status: 404, body: 'Not found' });
+            }
+        });
 
         // Forward browser console to worker console
         page.on('console', msg => {
@@ -270,7 +288,7 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         });
 
         // --- Inject job config before page loads ---
-        const mediaBaseUrl = `http://localhost:9998/${jobId}/`;
+        const mediaBaseUrl = `http://localhost:9999/media/`;
         const renderJob = { project, projectName, quality, mediaBaseUrl, mediaFileNames };
 
         await page.addInitScript((job: any) => {

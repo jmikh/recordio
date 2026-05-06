@@ -35,7 +35,7 @@ The worker has **zero Supabase credentials**. All auth is via `RENDER_SECRET` sh
 
 1. Media files downloaded to temp dir
 2. Playwright opens `render-page/` (served via route interception at `localhost:9999`)
-3. Media files served via route interception at `localhost:9998`
+3. Media files served via Playwright route interception at `localhost:9999/media/`
 4. render-page runs `ExportManager` (from `shared/export/`) using WebCodecs
 5. Result ArrayBuffer transferred back via binary POST to intercepted route
 6. MP4 written to disk, uploaded, temp dir cleaned up

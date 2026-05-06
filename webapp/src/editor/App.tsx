@@ -269,34 +269,25 @@ function Editor() {
     return (
         <div id="editor-root" className="w-full h-screen bg-surface-body flex flex-col overflow-auto" style={{ minWidth: '800px' }}>
 
-            {/* Project loading / error modal — blocks editor until ready */}
-            <Modal isOpen={isLoading || !!loadError} maxWidth="max-w-sm">
+            {/* Error modal — only shown on load failure */}
+            <Modal isOpen={!!loadError} maxWidth="max-w-sm">
                 <div className="flex flex-col items-center gap-4 text-center py-2">
-                    {loadError ? (
-                        <>
-                            <div className="text-text-highlighted font-semibold text-lg">Failed to Load Project</div>
-                            <p className="text-text-main text-sm">{loadError}</p>
-                            <div className="flex gap-3 mt-2">
-                                <button
-                                    onClick={() => navigate('/')}
-                                    className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-highlighted text-sm rounded-lg border border-border transition-colors"
-                                >
-                                    Back to Dashboard
-                                </button>
-                                <a
-                                    href={`mailto:${SUPPORT_EMAIL}`}
-                                    className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg transition-colors"
-                                >
-                                    Contact Support
-                                </a>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            <div className="text-text-main text-sm">{loadingStatus}</div>
-                        </>
-                    )}
+                    <div className="text-text-highlighted font-semibold text-lg">Failed to Load Project</div>
+                    <p className="text-text-main text-sm">{loadError}</p>
+                    <div className="flex gap-3 mt-2">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-highlighted text-sm rounded-lg border border-border transition-colors"
+                        >
+                            Back to Dashboard
+                        </button>
+                        <a
+                            href={`mailto:${SUPPORT_EMAIL}`}
+                            className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm rounded-lg transition-colors"
+                        >
+                            Contact Support
+                        </a>
+                    </div>
                 </div>
             </Modal>
 
@@ -327,14 +318,19 @@ function Editor() {
                         }}
                     >
 
-                        {hasActiveProject && (
+                        {isLoading ? (
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                <div className="text-text-main text-sm">{loadingStatus}</div>
+                            </div>
+                        ) : hasActiveProject ? (
                             <div
                                 id="canvas-rendered-wrapper"
                                 style={{ position: 'relative', ...renderedStyle }}
                             >
                                 <CanvasContainer />
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </div>

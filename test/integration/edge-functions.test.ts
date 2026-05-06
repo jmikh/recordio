@@ -151,9 +151,6 @@ describe('project-create', () => {
 
             // Clean up — delete the created project
             await adminClient.from('projects').delete().eq('id', projectId);
-        } else if (res.status === 413) {
-            // Quota exceeded — acceptable if get_user_storage_bytes or user_quotas doesn't exist
-            expect(data.error).toBe('quota_exceeded');
         } else {
             // Log for debugging but don't fail — edge function deps may not be fully set up
             console.warn(`project-create returned ${res.status}:`, data);

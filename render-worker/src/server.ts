@@ -4,10 +4,14 @@
  * Deployed on Google Cloud Run. Receives render jobs from the render-sync
  * edge function with signed URLs for media download/upload. Has zero Supabase
  * credentials — reports status via HTTP callback to render-job-hook.
+ *
+ * Concurrency model:
+ *  - POST /render returns 200 immediately (job accepted)
+ *  - Media downloads run in parallel across jobs
+ *  - Playwright renders are serialized via a queue (one at a time on the GPU)
  */
 
 import Fastify from 'fastify';
-import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -15,99 +19,32 @@ import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
 import { renderViaPlaywright, warmBrowser } from './playwrightRender.js';
 
+// ── Render queue (serialize Playwright renders) ─────────────
+// Downloads happen in parallel, but only one Playwright render
+// runs at a time to avoid GPU contention.
 
-// ── Media file server (port 9998) ────────────────────────────
-// Serves media files over real HTTP to avoid CDP base64 overhead
-// that kills the browser for large files (100MB+).
-// Each job registers its temp dir under /jobId/filename.
+const renderQueue: Array<() => void> = [];
+let renderRunning = false;
 
-const MIME_TYPES: Record<string, string> = {
-    '.webm': 'video/webm', '.mp4': 'video/mp4', '.wav': 'audio/wav',
-    '.mp3': 'audio/mpeg', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
-    '.avif': 'image/avif', '.webp': 'image/webp', '.png': 'image/png',
-    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
-};
-
-export const mediaJobDirs = new Map<string, string>();
-
-export function createMediaServer() {
-    return http.createServer((req, res) => {
-        const url = new URL(req.url ?? '/', 'http://localhost');
-        // URL format: /{jobId}/{filename}
-        const parts = url.pathname.slice(1).split('/');
-        if (parts.length < 2) {
-            res.writeHead(400);
-            res.end('Bad request');
-            return;
-        }
-        const [jobId, ...rest] = parts;
-        const fileName = rest.join('/');
-        const dir = mediaJobDirs.get(jobId);
-        if (!dir) {
-            res.writeHead(404);
-            res.end('Unknown job');
-            return;
-        }
-        const filePath = path.join(dir, fileName);
-
-        // PUT = upload file from browser (used for MP4 result extraction)
-        if (req.method === 'PUT') {
-            const writeStream = fs.createWriteStream(filePath);
-            req.pipe(writeStream);
-            writeStream.on('finish', () => {
-                res.writeHead(200);
-                res.end('ok');
-            });
-            writeStream.on('error', (err) => {
-                console.error(`[Media] Write error: ${err.message}`);
-                res.writeHead(500);
-                res.end('Write failed');
-            });
-            return;
-        }
-
-        // PATCH = write mux chunks at specific byte positions (used for mux streaming)
-        // Batch format: [position (u32 LE), length (u32 LE), data bytes, ...] repeated
-        if (req.method === 'PATCH') {
-            const chunks: Buffer[] = [];
-            req.on('data', (chunk: Buffer) => chunks.push(chunk));
-            req.on('end', () => {
-                const buf = Buffer.concat(chunks);
-                const fd = fs.openSync(filePath, 'a+');
-                try {
-                    let offset = 0;
-                    while (offset + 8 <= buf.byteLength) {
-                        const position = buf.readUInt32LE(offset);
-                        const length = buf.readUInt32LE(offset + 4);
-                        if (offset + 8 + length > buf.byteLength) break;
-                        fs.writeSync(fd, buf, offset + 8, length, position);
-                        offset += 8 + length;
-                    }
-                    res.writeHead(200);
-                    res.end('ok');
-                } catch (err: any) {
-                    console.error(`[Media] Batch write error: ${err.message}`);
-                    res.writeHead(500);
-                    res.end('Write failed');
-                } finally {
-                    fs.closeSync(fd);
-                }
-            });
-            return;
-        }
-
-        if (!fs.existsSync(filePath)) {
-            res.writeHead(404);
-            res.end('Not found');
-            return;
-        }
-        const ext = path.extname(filePath).toLowerCase();
-        const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
-        const stat = fs.statSync(filePath);
-        res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': stat.size });
-        fs.createReadStream(filePath).pipe(res);
+function acquireRenderSlot(): Promise<void> {
+    if (!renderRunning) {
+        renderRunning = true;
+        return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+        renderQueue.push(resolve);
     });
 }
+
+function releaseRenderSlot(): void {
+    const next = renderQueue.shift();
+    if (next) {
+        next(); // hand the slot to the next waiter
+    } else {
+        renderRunning = false;
+    }
+}
+
 
 // ── Render body interface ────────────────────────────────────
 
@@ -154,9 +91,9 @@ export function createApp() {
             return reply.code(400).send({ error: 'Missing required fields' });
         }
 
-        // Render synchronously — with Cloud Run --concurrency=1, no second
-        // job lands on this instance while we're busy.
-        await runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+        // Accept immediately — render runs in the background.
+        // Downloads overlap across jobs; Playwright renders are serialized.
+        runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
 
         return reply.send({ ok: true, jobId });
     });
@@ -176,7 +113,6 @@ export async function runRender(
     statusCallbackUrl: string,
 ) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
-    mediaJobDirs.set(jobId, tmpDir);
     console.log(`[Render] Job ${jobId}: starting in ${tmpDir}`);
 
     // Heartbeat — reports progress + durations every 15s, checks for cancel.
@@ -185,20 +121,17 @@ export async function runRender(
     const durations: Record<string, number> = {};
     let phaseStart = Date.now();
 
-    const heartbeatInterval = setInterval(async () => {
-        try {
-            const shouldCancel = await updateJob(statusCallbackUrl, jobId, {
-                progress: currentProgress,
-                ...durations,
-            });
+    const heartbeatInterval = setInterval(() => {
+        updateJob(statusCallbackUrl, jobId, {
+            progress: currentProgress,
+            ...durations,
+        }).then((shouldCancel) => {
             if (shouldCancel) {
                 canceled = true;
                 console.log(`[Render] Job ${jobId}: cancel signal received`);
             }
-        } catch (err) {
-            console.warn(`[Render] Heartbeat failed for ${jobId}:`, err);
-        }
-    }, 15_000);
+        }).catch(() => {});
+    }, 5_000);
 
     function endPhase(durationKey: string) {
         durations[durationKey] = (Date.now() - phaseStart) / 1000;
@@ -218,25 +151,34 @@ export async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // 2. Render via Playwright (progress tracks export: 0–1)
+        // 2. Wait for render slot (only one Playwright render at a time)
+        console.log(`[Render] Job ${jobId}: waiting for render slot (queue: ${renderQueue.length})`);
+        await acquireRenderSlot();
         console.log(`[Render] Job ${jobId}: rendering`);
-        const result = await renderViaPlaywright({
-            jobId,
-            project: projectData,
-            projectName,
-            quality,
-            mediaFileNames,
-            uploadUrl,
-            onProgress: (phase, progress, message) => {
-                console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
-                currentProgress = progress;
-            },
-        });
+        let renderDurationMs: number;
+        try {
+            const result = await renderViaPlaywright({
+                jobId,
+                project: projectData,
+                projectName,
+                quality,
+                mediaFileNames,
+                mediaDir: tmpDir,
+                uploadUrl,
+                onProgress: (phase, progress, message) => {
+                    console.log(`[Render] [${phase}] ${(progress * 100).toFixed(1)}% — ${message}`);
+                    currentProgress = progress;
+                },
+            });
 
-        // Upload happened inside renderViaPlaywright — subtract it from render time
-        const totalPhaseMs = Date.now() - phaseStart;
-        durations.render_duration_s = (totalPhaseMs - result.uploadDurationMs) / 1000;
-        durations.upload_duration_s = result.uploadDurationMs / 1000;
+            // Upload happened inside renderViaPlaywright — subtract it from render time
+            const totalPhaseMs = Date.now() - phaseStart;
+            durations.render_duration_s = (totalPhaseMs - result.uploadDurationMs) / 1000;
+            durations.upload_duration_s = result.uploadDurationMs / 1000;
+            renderDurationMs = result.durationMs;
+        } finally {
+            releaseRenderSlot();
+        }
 
         if (canceled) throw new CancelError();
 
@@ -246,7 +188,7 @@ export async function runRender(
             status: 'completed',
             ...durations,
         });
-        console.log(`[Render] Job ${jobId}: completed in ${(result.durationMs / 1000).toFixed(1)}s`);
+        console.log(`[Render] Job ${jobId}: completed in ${(renderDurationMs / 1000).toFixed(1)}s`);
 
     } catch (err) {
         clearInterval(heartbeatInterval);
@@ -259,7 +201,6 @@ export async function runRender(
         }
     } finally {
         clearInterval(heartbeatInterval);
-        mediaJobDirs.delete(jobId);
         // Clean up temp directory
         try {
             fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -304,12 +245,8 @@ const isDirectRun = process.argv[1]?.endsWith('server.ts') ||
     process.argv[1]?.endsWith('server.js');
 
 if (isDirectRun) {
-    const mediaServer = createMediaServer();
     const app = createApp();
     try {
-        mediaServer.listen(9998, '127.0.0.1', () => {
-            console.log('[Media] Media file server listening on port 9998');
-        });
         await warmBrowser();
         await app.listen({ port: config.PORT, host: '0.0.0.0' });
         app.log.info(`Render worker listening on port ${config.PORT}`);

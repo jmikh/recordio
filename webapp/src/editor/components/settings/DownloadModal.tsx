@@ -2,11 +2,37 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal, XButton, Button } from '@shared/components';
 import { HiOutlineBolt } from 'react-icons/hi2';
 import { TbDeviceDesktop, TbCloud } from 'react-icons/tb';
+import { PiWarningFill } from 'react-icons/pi';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../Toast';
 import { useLocalRender } from './useLocalRender';
 import type { CloudRenderPhase } from './useCloudRender';
+
+function formatDurationLabel(ms: number): string {
+    const totalSeconds = Math.round(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    if (m === 0) return `${s} sec`;
+    if (s === 0) return `${m} min`;
+    return `${m} min ${s} sec`;
+}
+
+function formatResolution(height: number): string {
+    if (height >= 2160) return '4K';
+    if (height >= 1440) return '1440p';
+    if (height >= 1080) return '1080p';
+    if (height >= 720) return '720p';
+    if (height >= 480) return '480p';
+    return `${height}p`;
+}
+
+/** Rough estimate for local render time based on video duration */
+function estimateLocalTime(durationMs: number): string {
+    const minutes = Math.max(1, Math.ceil(durationMs / 1000 / 60 * 3));
+    if (minutes === 1) return '~1 min';
+    return `~${minutes} min on this device`;
+}
 
 type ModalView = 'choose' | 'local' | 'cloud';
 
@@ -32,6 +58,8 @@ export function DownloadModal({
     // If cloud render is already in progress, skip choice screen
     const cloudActive = cloudPhase !== 'idle' && cloudPhase !== 'completed' && cloudPhase !== 'failed';
     const [view, setView] = useState<ModalView>(cloudActive ? 'cloud' : 'choose');
+
+    const project = useProjectStore(s => s.project);
 
     // Reset view when modal reopens
     useEffect(() => {
@@ -66,61 +94,89 @@ export function DownloadModal({
 
     // ─── Choice Screen ───────────────────────────────────────
 
+    const durationMs = project.timeline.durationMs;
+    const outputHeight = project.settings.outputSize.height;
+    const durationLabel = formatDurationLabel(durationMs);
+    const resolutionLabel = formatResolution(outputHeight);
+    const localEstimate = estimateLocalTime(durationMs);
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-lg">
             <div className="flex flex-col gap-5">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-text-highlighted font-semibold text-lg">Export Video</h2>
+                    <div>
+                        <h2 className="text-text-highlighted font-semibold text-lg">Download video</h2>
+                        <p className="text-sm text-text-muted mt-0.5">
+                            {durationLabel} · {resolutionLabel} · MP4
+                        </p>
+                    </div>
                     <XButton onClick={onClose} title="Close" />
                 </div>
 
-                <div className="flex gap-3">
-                    {/* Local card */}
-                    <button
-                        onClick={() => setView('local')}
-                        className="flex-1 flex flex-col items-center gap-3 p-5 rounded-lg border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 transition-all cursor-pointer text-center"
-                    >
-                        <TbDeviceDesktop className="text-primary" size={28} />
-                        <div>
-                            <p className="text-sm font-semibold text-text-highlighted">Local</p>
-                            <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                                Can be faster on high-end devices. Must keep tab in focus.
-                            </p>
-                        </div>
-                    </button>
-
+                <div className="flex flex-col gap-3">
                     {/* Cloud card */}
-                    {hasProAccess ? (
-                        <button
-                            onClick={() => setView('cloud')}
-                            className="flex-1 flex flex-col items-center gap-3 p-5 rounded-lg border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 transition-all cursor-pointer text-center"
-                        >
-                            <TbCloud className="text-primary" size={28} />
-                            <div>
-                                <p className="text-sm font-semibold text-text-highlighted">Cloud</p>
-                                <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                                    Runs in the background. We'll notify you when it's done.
-                                </p>
+                    <div className="relative rounded-lg border-2 border-primary p-5">
+                        <span className="absolute -top-2.5 left-4 bg-primary text-text-on-primary text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            Recommended
+                        </span>
+
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                                <TbCloud className="text-primary" size={22} />
                             </div>
-                        </button>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center gap-3 p-5 rounded-lg border border-border bg-surface text-center">
-                            <TbCloud className="text-text-disabled" size={28} />
-                            <div>
-                                <p className="text-sm font-semibold text-text-muted">Cloud</p>
-                                <p className="text-xs text-text-disabled mt-1 leading-relaxed">
-                                    Runs in the background. We'll notify you when it's done.
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-text-highlighted">Cloud render</p>
+                                </div>
+                                <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                                    Renders in the background. Continue your work, get notified when it's ready.
                                 </p>
+
+                                {hasProAccess ? (
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => setView('cloud')}
+                                        className="w-full mt-4"
+                                    >
+                                        Render in cloud
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="primary"
+                                        onClick={onUpgrade}
+                                        className="w-full mt-4"
+                                    >
+                                        Upgrade
+                                    </Button>
+                                )}
                             </div>
-                            <Button
-                                variant="primary"
-                                onClick={onUpgrade}
-                                className="text-xs px-4 py-1.5 mt-1"
-                            >
-                                Upgrade
-                            </Button>
                         </div>
-                    )}
+                    </div>
+
+                    {/* Local card */}
+                    <div className="rounded-lg border border-border p-5">
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-md bg-state-inactive flex items-center justify-center shrink-0">
+                                <TbDeviceDesktop className="text-text-muted" size={22} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-text-highlighted">Local render</p>
+                                </div>
+                                <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                                    Renders right here. Free, but you'll need to keep this tab in focus.
+                                </p>
+
+                                <Button
+                                    variant="base"
+                                    onClick={() => setView('local')}
+                                    className="w-full mt-4"
+                                >
+                                    Render locally
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </Modal>
@@ -213,7 +269,7 @@ function CloudRenderView({
 
                 {(isQueued || isRendering) && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-muted">
-                        <HiOutlineBolt className="icon-lg text-primary flex-shrink-0" />
+                        <HiOutlineBolt className="icon-lg text-primary shrink-0" />
                         <span>You can close this dialog. We'll notify you when your file is ready.</span>
                     </div>
                 )}
@@ -311,7 +367,7 @@ function LocalRenderView({
                     )}
 
                     <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-main">
-                        <HiOutlineBolt className="icon-lg text-primary flex-shrink-0" />
+                        <HiOutlineBolt className="icon-lg text-primary shrink-0" />
                         <span>Do not switch tabs during export for best performance</span>
                     </div>
                 </div>

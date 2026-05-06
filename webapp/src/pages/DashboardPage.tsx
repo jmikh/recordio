@@ -479,7 +479,7 @@ export function DashboardPage() {
                                             deletedAt: item.deletedAt,
                                         }}
                                         onOpen={() => {}}
-                                        onRestore={hasProAccess() ? () => handleRestore(item.id) : undefined}
+                                        onRestore={() => hasProAccess() ? handleRestore(item.id) : setIsUpgradeModalOpen(true)}
                                     />
                                 ))}
                             </div>

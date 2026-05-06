@@ -215,6 +215,18 @@ export const ProjectCard = ({
                     </div>
                 )}
 
+                {/* Restore overlay for trashed projects */}
+                {isTrashed && onRestore && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRestore(); }}
+                        className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
+                    >
+                        <LuRotateCcw className="w-4 h-4 text-white" />
+                        <span className="text-white text-sm font-medium">Restore</span>
+                    </button>
+                )}
+
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-[10px] px-1.5 py-0.5 rounded">
                     {formatDuration(project.durationMs ?? 0)}
@@ -244,17 +256,7 @@ export const ProjectCard = ({
                         </h3>
                     )}
                     <div className="flex items-center gap-1 shrink-0">
-                        {isTrashed ? (
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); onRestore?.(); }}
-                                disabled={!onRestore}
-                                title={onRestore ? 'Restore project' : 'Upgrade to Pro to restore'}
-                                className="interactive-icon disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                <LuRotateCcw className="icon-sm" />
-                            </button>
-                        ) : (
+                        {!isTrashed && (
                             <>
                                 {project.isStarred && (
                                     <LuStar className="w-3.5 h-3.5 text-text-muted" />

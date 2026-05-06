@@ -43,33 +43,12 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Missing project or project.id', 400);
     }
 
-    // 1. Check quota — just current usage vs limit, no file size math
     const adminSupabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { data: usedBytes } = await adminSupabase
-        .rpc('get_user_storage_bytes', { p_user_id: user.id });
-
-    const { data: quota } = await adminSupabase
-        .from('user_quotas')
-        .select('storage_limit_bytes')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-    const limitBytes = quota?.storage_limit_bytes ?? 26843545600; // 25 GB default
-
-    if ((usedBytes ?? 0) >= limitBytes) {
-        return jsonResponse({
-            error: 'quota_exceeded',
-            message: 'Storage quota exceeded',
-            usedBytes: usedBytes ?? 0,
-            limitBytes,
-        }, 413);
-    }
-
-    // 2. Determine which media files exist and generate storage paths
+    // 1. Determine which media files exist and generate storage paths
     const projectId = project.id;
     const mediaFiles: { fileType: string; storagePath: string }[] = [];
 
@@ -89,7 +68,7 @@ serve(withAuth(async (req, { user, supabase }) => {
         mediaFiles.push({ fileType: 'mic', storagePath: sp });
     }
 
-    // 3. Save project to DB with upload_status='pending'
+    // 2. Save project to DB with upload_status='pending'
     const durationMs = project.timeline?.durationMs
         ? Math.round(project.timeline.durationMs)
         : null;
@@ -111,7 +90,7 @@ serve(withAuth(async (req, { user, supabase }) => {
         return errorResponse('Failed to save project', 500);
     }
 
-    // 4. Create S3 presigned upload URLs for each media file
+    // 3. Create S3 presigned upload URLs for each media file
     const uploads: { fileType: string; storagePath: string; signedUrl: string }[] = [];
 
     try {

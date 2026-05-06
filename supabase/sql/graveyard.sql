@@ -17,3 +17,6 @@ DROP FUNCTION IF EXISTS public.cron_expire_trials();
 
 -- No local source file, not referenced
 DROP FUNCTION IF EXISTS public.render_job_start();
+
+-- Quota check removed from project-create
+DROP FUNCTION IF EXISTS public.get_user_storage_bytes(uuid);
