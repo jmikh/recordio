@@ -29,11 +29,15 @@ const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRE
 
 function SyncIndicator() {
     const pendingMediaUploads = useSyncStatusStore(s => s.pendingMediaUploads);
+    const uploadProgress = useSyncStatusStore(s => s.currentUpload?.progress);
 
     if (pendingMediaUploads <= 0) return null;
 
+    const pct = uploadProgress != null ? `${Math.round(uploadProgress * 100)}%` : '';
+    const tooltipText = pct ? `Syncing to cloud... ${pct}` : 'Syncing to cloud...';
+
     return (
-        <Tooltip text="Syncing to cloud...">
+        <Tooltip text={tooltipText}>
             <div className="flex items-center">
                 <TbCloudUpload className="icon-md text-primary animate-pulse" />
             </div>

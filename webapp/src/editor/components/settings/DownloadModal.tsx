@@ -61,10 +61,12 @@ export function DownloadModal({
 
     const project = useProjectStore(s => s.project);
 
-    // Reset view when modal reopens
+    // Reset view when modal reopens, and clear stale view on close
     useEffect(() => {
         if (isOpen) {
             setView(cloudActive ? 'cloud' : 'choose');
+        } else {
+            setView('choose');
         }
     }, [isOpen, cloudActive]);
 
@@ -211,8 +213,8 @@ function CloudRenderView({
     }, [isOpen, phase, onStartRender]);
 
     const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
-    const isQueued = phase === 'saving' || phase === 'queued' || (phase === 'rendering' && progress === 0);
-    const isRendering = phase === 'rendering' && progress > 0;
+    const isQueued = phase === 'saving' || phase === 'queued';
+    const isRendering = phase === 'rendering';
     const isDownloading = phase === 'downloading';
     const isCompleted = phase === 'completed';
 

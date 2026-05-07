@@ -170,24 +170,35 @@ export class CloudProjectService {
             mic: 'audio/wav',
         };
 
+        // Track per-file progress for parallel uploads
+        const progressMap = new Map<string, number>();
+        const updateAggregateProgress = () => {
+            const values = [...progressMap.values()];
+            const minProgress = Math.min(...values);
+            store.setCurrentUpload({ projectId, type: 'media', progress: minProgress });
+        };
+
         const uploadAndCache = async (fileType: string, blob: Blob) => {
             const uploadInfo = uploadMap.get(fileType);
             if (!uploadInfo) throw new Error(`No upload URL for ${fileType}`);
 
-            store.setCurrentUpload({ projectId, type: fileType, progress: 0 });
+            progressMap.set(fileType, 0);
+            updateAggregateProgress();
 
             let lastError: Error | null = null;
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
                     await CloudStorage.uploadBlob(uploadInfo.signedUrl, blob, MIME_MAP[fileType] ?? 'application/octet-stream', (frac) => {
-                        store.setCurrentUpload({ projectId, type: fileType, progress: frac });
+                        progressMap.set(fileType, frac);
+                        updateAggregateProgress();
                         onProgress?.(fileType, frac);
                     });
 
                     await BlobCache.put(uploadInfo.storagePath, blob);
+                    progressMap.set(fileType, 1);
+                    updateAggregateProgress();
                     const current = useSyncStatusStore.getState();
                     current.setPendingMediaUploads(current.pendingMediaUploads - 1);
-                    current.setCurrentUpload(null);
                     return;
                 } catch (e) {
                     lastError = e instanceof Error ? e : new Error(String(e));
@@ -198,9 +209,7 @@ export class CloudProjectService {
         };
 
         try {
-            for (const { fileType, blob } of blobs) {
-                await uploadAndCache(fileType, blob);
-            }
+            await Promise.all(blobs.map(({ fileType, blob }) => uploadAndCache(fileType, blob)));
 
             // All uploads complete — confirm via RPC
             await CloudStorage.confirmProjectUpload(projectId);

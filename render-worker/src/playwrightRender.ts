@@ -18,7 +18,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { MediaFileNames } from './downloadMedia.js';
-import { logGpuDiagnostics, logBrowserGpuInfo } from './gpuDiagnostics.js';
+// GPU diagnostics available but not called at startup — enable for debugging:
+// import { logGpuDiagnostics, logBrowserGpuInfo } from './gpuDiagnostics.js';
 
 export interface PlaywrightRenderConfig {
     jobId: string;
@@ -29,14 +30,18 @@ export interface PlaywrightRenderConfig {
     mediaFileNames: MediaFileNames;
     /** Base URL for media files served by Fastify (e.g. http://localhost:8080/media/jobId/) */
     mediaBaseUrl: string;
+    /** URL for the render page served by Fastify (e.g. http://localhost:8080/render-page/) */
+    renderPageUrl: string;
     /** URL where the render page POSTs the result MP4 (Fastify endpoint, bypasses CDP) */
     resultUrl: string;
     /** Signed URL for upload to storage (Node uploads from disk after receiving result) */
     uploadUrl: string;
     /** Promise that resolves with the result file path once the render page POSTs it */
     resultReady: Promise<string>;
-    /** Called with monotonic progress 0→1: download=0→0.1, export=0.1→0.9, upload=0.9→1.0 */
+    /** Called with monotonic progress 0→1: download=0→0.05, export=0.10→0.95, upload=0.95→1.0 */
     onProgress?: (progress: number) => void;
+    /** Called when the render is complete (before upload). Used to release the HTTP connection. */
+    onRenderDone?: () => void;
 }
 
 export interface RenderResult {
@@ -47,7 +52,7 @@ export interface RenderResult {
 
 // In production (Docker): render-page/dist is at ../render-page/dist relative to dist/
 // In dev (tsx): render-page/dist is at ./render-page/dist relative to src/
-const RENDER_PAGE_DIST = process.env.RENDER_PAGE_DIST
+export const RENDER_PAGE_DIST = process.env.RENDER_PAGE_DIST
     ?? path.resolve(import.meta.dirname, '../render-page/dist');
 
 // Only types needed for render-page static assets (media served by Fastify)
@@ -61,7 +66,7 @@ const MIME_TYPES: Record<string, string> = {
     '.json': 'application/json',
 };
 
-function getMimeType(filePath: string): string {
+export function getMimeType(filePath: string): string {
     return MIME_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
 }
 
@@ -73,23 +78,12 @@ let _browserLaunching: Promise<Browser> | null = null;
 /**
  * Pre-launch Chromium at server startup. Call this once from server.ts.
  * The browser stays alive for the lifetime of the process.
- * Logs GPU diagnostics (OS-level + browser-level) once here so per-job renders skip them.
  */
 export async function warmBrowser(): Promise<void> {
-    logGpuDiagnostics();
-
     const start = Date.now();
     console.log('[Render] Pre-launching Chromium...');
     _browser = await launchBrowser();
     console.log(`[Render] Chromium ready in ${((Date.now() - start) / 1000).toFixed(1)}s`);
-
-    // Log browser-level GPU info once using a temp page
-    const tempPage = await _browser.newPage();
-    try {
-        await logBrowserGpuInfo(tempPage);
-    } finally {
-        await tempPage.close();
-    }
 }
 
 async function launchBrowser(): Promise<Browser> {
@@ -139,7 +133,7 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { project, projectName, quality, mediaFileNames, mediaBaseUrl, resultUrl, uploadUrl, resultReady, onProgress } = config;
+    const { project, projectName, quality, mediaFileNames, mediaBaseUrl, renderPageUrl, resultUrl, uploadUrl, resultReady, onProgress, onRenderDone } = config;
     const reportProgress = onProgress ?? (() => {});
     const startTime = Date.now();
 
@@ -148,30 +142,27 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
     let intentionalClose = false;
 
     try {
-        // --- Intercept requests to serve files locally ---
-        // localhost URLs = secure context (required for crypto.randomUUID, WebCodecs)
+        // Render-page static files and media are both served by Fastify.
+        // No Playwright route interception — this keeps CDP Fetch disabled,
+        // so the large result MP4 POST doesn't get serialized through the pipe.
 
-        // Serve render page files at http://localhost:9999/*
-        await page.route('http://localhost:9999/**', async (route) => {
-            const url = new URL(route.request().url());
-            const filePath = url.pathname === '/' ? '/index.html' : url.pathname;
-            const fullPath = path.join(RENDER_PAGE_DIST, filePath);
+        // Track failed requests so broken assets fail the job
+        const failedRequests: string[] = [];
 
-            if (fs.existsSync(fullPath)) {
-                const body = fs.readFileSync(fullPath);
-                await route.fulfill({
-                    status: 200,
-                    contentType: getMimeType(fullPath),
-                    body,
-                });
-            } else {
-                console.warn(`[Render] 404: ${fullPath}`);
-                await route.fulfill({ status: 404, body: 'Not found' });
-            }
+        page.on('requestfailed', request => {
+            const url = request.url();
+            const failure = request.failure()?.errorText ?? 'unknown';
+            console.error(`[Render][browser] Request failed: ${url} (${failure})`);
+            failedRequests.push(`${url} (${failure})`);
         });
 
-        // Media files are served directly by Fastify at mediaBaseUrl
-        // (bypasses CDP serialization which crashes on large files)
+        page.on('response', response => {
+            if (response.status() >= 400) {
+                const url = response.url();
+                console.error(`[Render][browser] HTTP ${response.status()}: ${url}`);
+                failedRequests.push(`${url} (HTTP ${response.status()})`);
+            }
+        });
 
         // Forward browser console to worker console
         page.on('console', msg => {
@@ -209,17 +200,20 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             (window as any).__RENDER_JOB__ = job;
         }, renderJob);
 
-        reportProgress(0);
         console.log('[Render] Navigating to render page...');
-        await page.goto('http://localhost:9999/', {
+        await page.goto(renderPageUrl, {
             waitUntil: 'networkidle',
             timeout: 30_000,
         });
 
+        if (failedRequests.length > 0) {
+            throw new Error(`Render page failed to load resources:\n${failedRequests.join('\n')}`);
+        }
+
         console.log('[Render] Render page loaded, waiting for export...');
 
         // --- Wait for render to finish with stale progress detection ---
-        // Progress is computed from frame counts: 0.1 + (framesDone/framesTotal) * 0.8
+        // Progress: 10% (first frame) → 95% (all frames done)
         // Stall = no frame count change for 30s once exporting has started.
         const STALE_TIMEOUT_MS = 30_000;
         let lastFramesDone = -1;
@@ -253,9 +247,9 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                         return;
                     }
 
-                    // Compute and report progress from frame counts
+                    // Compute and report progress from frame counts (10% → 95%)
                     if (state.framesDone != null && state.framesTotal != null && state.framesTotal > 0) {
-                        const progress = 0.1 + (state.framesDone / state.framesTotal) * 0.8;
+                        const progress = 0.10 + (state.framesDone / state.framesTotal) * 0.85;
                         reportProgress(progress);
                         console.log(`[Render] Exporting: ${state.framesDone}/${state.framesTotal} frames (${(progress * 100).toFixed(1)}%)`);
 
@@ -280,24 +274,28 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         // --- Upload ---
         // Wait for the render page to POST the result MP4 to Fastify.
         // This bypasses CDP entirely — the browser sends directly to localhost.
-        reportProgress(0.9);
+        reportProgress(0.95);
         console.log('[Render] Waiting for result from browser...');
         const resultFilePath = await resultReady;
         const stat = fs.statSync(resultFilePath);
         console.log(`[Render] Result received: ${(stat.size / 1024 / 1024).toFixed(1)} MB`);
+
+        // Render done — signal before upload so the HTTP connection can close
+        onRenderDone?.();
 
         // Upload from disk to signed storage URL (Node-side, no CDP)
         console.log('[Render] Uploading MP4 to storage...');
         const uploadStart = Date.now();
         const resp = await fetch(uploadUrl, {
             method: 'PUT',
-            body: fs.readFileSync(resultFilePath),
+            body: fs.createReadStream(resultFilePath),
             headers: {
                 'Content-Type': 'video/mp4',
                 'Content-Length': String(stat.size),
                 'x-upsert': 'true',
             },
-        });
+            duplex: 'half',
+        } as RequestInit);
         if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
         const sizeBytes = stat.size;
         const uploadDurationMs = Date.now() - uploadStart;

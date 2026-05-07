@@ -17,7 +17,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
-import { renderViaPlaywright, warmBrowser } from './playwrightRender.js';
+import { renderViaPlaywright, warmBrowser, RENDER_PAGE_DIST, getMimeType } from './playwrightRender.js';
 
 // ── Per-job media directories (for direct HTTP serving) ──────
 // Registered when a job starts, removed on cleanup. Keyed by jobId.
@@ -92,6 +92,30 @@ export function createApp() {
 
     app.get('/health', async () => ({ status: 'ok' }));
 
+    // ── Serve render-page static files as fallback ──────────────────
+    // Replaces Playwright route interception — serving via Fastify avoids
+    // enabling CDP Fetch, which would serialize ALL network traffic through
+    // the pipe and crash on large payloads (>512MB).
+    // Registered as the not-found handler so explicit routes take priority.
+
+    app.setNotFoundHandler(async (request, reply) => {
+        if (request.method !== 'GET') {
+            return reply.code(404).send({ error: 'Not found' });
+        }
+
+        const urlPath = new URL(request.url, 'http://localhost').pathname;
+        const filePath = urlPath === '/' ? '/index.html' : urlPath;
+        const safePath = path.normalize(filePath).replace(/^(\.\.(\/|\\|$))+/, '');
+        const fullPath = path.join(RENDER_PAGE_DIST, safePath);
+
+        if (!fs.existsSync(fullPath) || fs.statSync(fullPath).isDirectory()) {
+            return reply.code(404).send({ error: 'Not found' });
+        }
+
+        reply.header('Content-Type', getMimeType(fullPath));
+        return reply.send(fs.createReadStream(fullPath));
+    });
+
     // ── Serve media files directly (bypasses CDP serialization) ──
 
     const MEDIA_MIME_TYPES: Record<string, string> = {
@@ -127,9 +151,12 @@ export function createApp() {
     });
 
     // ── Receive rendered MP4 from browser (bypasses CDP pipe) ─────
+    // Stream directly to disk — skip Fastify body parsing to avoid
+    // buffering the entire file in memory (crashes on >512MB).
 
-    app.addContentTypeParser('video/mp4', { parseAs: 'buffer' }, (_req, body, done) => {
-        done(null, body);
+    app.addContentTypeParser('video/mp4', (_req, _body, done) => {
+        // Tell Fastify we handled it — body stays as the raw stream
+        done(null, undefined);
     });
 
     app.put('/result/:jobId', async (request, reply) => {
@@ -145,8 +172,13 @@ export function createApp() {
         }
 
         const filePath = path.join(mediaDir, 'result.mp4');
-        fs.writeFileSync(filePath, request.body as Buffer);
-        console.log(`[Render] Job ${jobId}: received result (${((request.body as Buffer).length / 1024 / 1024).toFixed(1)} MB)`);
+
+        // Stream the raw request body to disk
+        const { pipeline } = await import('node:stream/promises');
+        await pipeline(request.raw, fs.createWriteStream(filePath));
+
+        const stat = fs.statSync(filePath);
+        console.log(`[Render] Job ${jobId}: received result (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
 
         pending.resolve(filePath);
         pendingResults.delete(jobId);
@@ -169,9 +201,17 @@ export function createApp() {
             return reply.code(400).send({ error: 'Missing required fields' });
         }
 
-        // Accept immediately — render runs in the background.
-        // Downloads overlap across jobs; Playwright renders are serialized.
-        runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+        // Hold the connection open until the render is done (before upload).
+        // This lets Cloud Run see the instance as busy and scale out for
+        // concurrent requests instead of routing them to the same instance.
+        const { renderDone } = runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+
+        try {
+            await renderDone;
+        } catch {
+            // Render failed — error is reported via status callback, not HTTP response.
+            // Still return 200 so the edge function doesn't retry.
+        }
 
         return reply.send({ ok: true, jobId });
     });
@@ -199,7 +239,7 @@ process.on('uncaughtException', async (err) => {
 
 // ── Background render logic ───────────────────────────────────
 
-export async function runRender(
+export function runRender(
     jobId: string,
     projectData: unknown,
     projectName: string | undefined,
@@ -207,18 +247,42 @@ export async function runRender(
     mediaUrls: MediaUrls,
     uploadUrl: string,
     statusCallbackUrl: string,
+): { renderDone: Promise<void> } {
+    let resolveRenderDone!: () => void;
+    let rejectRenderDone!: (err: Error) => void;
+    const renderDone = new Promise<void>((resolve, reject) => {
+        resolveRenderDone = resolve;
+        rejectRenderDone = reject;
+    });
+
+    _runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl, resolveRenderDone, rejectRenderDone);
+
+    return { renderDone };
+}
+
+async function _runRender(
+    jobId: string,
+    projectData: unknown,
+    projectName: string | undefined,
+    quality: string,
+    mediaUrls: MediaUrls,
+    uploadUrl: string,
+    statusCallbackUrl: string,
+    resolveRenderDone: () => void,
+    rejectRenderDone: (err: Error) => void,
 ) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
     console.log(`[Render] Job ${jobId}: starting in ${tmpDir}`);
     activeJob = { jobId, statusCallbackUrl };
 
-    // Heartbeat — reports progress + durations every 15s, checks for cancel.
+    // Heartbeat — sends progress immediately on milestones, plus every 5s.
     let canceled = false;
     let currentProgress = 0;
     const durations: Record<string, number> = {};
     let phaseStart = Date.now();
+    let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const heartbeatInterval = setInterval(() => {
+    function sendHeartbeat() {
         updateJob(statusCallbackUrl, jobId, {
             progress: currentProgress,
             ...durations,
@@ -228,7 +292,22 @@ export async function runRender(
                 console.log(`[Render] Job ${jobId}: cancel signal received`);
             }
         }).catch(() => {});
-    }, 5_000);
+    }
+
+    function scheduleHeartbeat() {
+        clearTimeout(heartbeatTimer);
+        heartbeatTimer = setTimeout(() => {
+            sendHeartbeat();
+            scheduleHeartbeat();
+        }, 5_000);
+    }
+
+    /** Send a heartbeat immediately and restart the 5s timer. */
+    function milestone(progress: number) {
+        currentProgress = progress;
+        sendHeartbeat();
+        scheduleHeartbeat();
+    }
 
     function endPhase(durationKey: string) {
         durations[durationKey] = (Date.now() - phaseStart) / 1000;
@@ -236,6 +315,9 @@ export async function runRender(
     }
 
     try {
+        // 0% — job started
+        milestone(0);
+
         // 1. Download media
         console.log(`[Render] Job ${jobId}: downloading`);
         const mediaFileNames = await downloadMedia(
@@ -248,8 +330,8 @@ export async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // Download complete → 0.1
-        currentProgress = 0.1;
+        // Download complete → 5%
+        milestone(0.05);
 
         // Register media dir so Fastify can serve files directly to the browser
         // (bypasses Playwright CDP serialization which crashes on large files)
@@ -269,12 +351,16 @@ export async function runRender(
                 quality,
                 mediaFileNames,
                 mediaBaseUrl: `http://localhost:${config.PORT}/media/${jobId}/`,
+                renderPageUrl: `http://localhost:${config.PORT}/`,
                 resultUrl: `http://localhost:${config.PORT}/result/${jobId}`,
                 uploadUrl,
                 resultReady: resultPromise,
                 onProgress: (progress) => {
-                    currentProgress = progress;
+                    if (progress !== currentProgress) {
+                        milestone(progress);
+                    }
                 },
+                onRenderDone: () => resolveRenderDone(),
             });
 
             // Upload happened inside renderViaPlaywright — subtract it from render time
@@ -288,16 +374,18 @@ export async function runRender(
 
         if (canceled) throw new CancelError();
 
-        // 3. Done
-        clearInterval(heartbeatInterval);
+        // 3. Done — 100%
+        clearTimeout(heartbeatTimer);
         await updateJob(statusCallbackUrl, jobId, {
             status: 'completed',
+            progress: 1.0,
             ...durations,
         });
         console.log(`[Render] Job ${jobId}: completed in ${(renderDurationMs / 1000).toFixed(1)}s`);
 
     } catch (err) {
-        clearInterval(heartbeatInterval);
+        clearTimeout(heartbeatTimer);
+        rejectRenderDone(err instanceof Error ? err : new Error(String(err)));
         if (err instanceof CancelError) {
             console.log(`[Render] Job ${jobId}: aborted (canceled)`);
         } else {
@@ -306,7 +394,7 @@ export async function runRender(
             await updateJob(statusCallbackUrl, jobId, { status: 'failed', error: message }).catch(() => {});
         }
     } finally {
-        clearInterval(heartbeatInterval);
+        clearTimeout(heartbeatTimer);
         activeJob = null;
         activeMediaDirs.delete(jobId);
         // Clean up temp directory

@@ -119,9 +119,8 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
 
                 if (!job) return;
 
-                const jobProgress = job.progress ?? 0;
-                setProgress(jobProgress);
-                if (jobProgress > 0) {
+                if (job.progress !== null) {
+                    setProgress(job.progress);
                     setPhase('rendering');
                 }
 

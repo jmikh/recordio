@@ -57,13 +57,13 @@ BEGIN
             RETURN;
         END IF;
 
-        -- Retry: failed/canceled → reset to pending
+        -- Retry: failed/canceled → reset to pending (keep error for history, bump attempt)
         v_render_storage_path := p_user_id || '/' || p_project_id || '/renders/v' || p_cloud_version || '.mp4';
 
         UPDATE public.render_jobs
         SET status = 'pending',
-            progress = 0,
-            error = NULL,
+            progress = NULL,
+            attempt_count = attempt_count + 1,
             render_storage_path = v_render_storage_path,
             start_duration_s = NULL,
             download_duration_s = NULL,

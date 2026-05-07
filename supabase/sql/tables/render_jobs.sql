@@ -6,7 +6,8 @@
 │     "user_id" UUID NOT NULL,                                      │
 │     "cloud_version" INTEGER NOT NULL,                             │
 │     "status" TEXT NOT NULL DEFAULT 'pending'::text,               │
-│     "progress" REAL DEFAULT 0,                                    │
+│     "progress" REAL DEFAULT NULL,                                  │
+│     "attempt_count" INTEGER NOT NULL DEFAULT 1,                   │
 │     "render_storage_path" TEXT,                                   │
 │     "error" TEXT,                                                 │
 │     "video_duration_s" REAL,                                      │

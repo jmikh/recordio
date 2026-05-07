@@ -33,22 +33,35 @@ The worker has **zero Supabase credentials**. All auth is via `RENDER_SECRET` sh
 ## How rendering works
 
 1. Media files downloaded to temp dir
-2. Playwright opens `render-page/` (served via route interception at `localhost:9999`)
-3. Media files served by Fastify at `localhost:8080/media/{jobId}/` (NOT route interception)
-4. Route interception removed after page load (`page.unrouteAll()`)
-5. render-page runs `ExportManager` (from `shared/export/`) using WebCodecs
-6. Browser POSTs MP4 to Fastify (`/result/{jobId}`), Node uploads to storage from disk, temp dir cleaned up
+2. Playwright opens `render-page/` served by Fastify at `localhost:8080/` (NOT route interception)
+3. Media files served by Fastify at `localhost:8080/media/{jobId}/`
+4. render-page runs `ExportManager` (from `shared/export/`) using WebCodecs
+5. Browser POSTs MP4 to Fastify (`/result/{jobId}`), streamed to disk, Node streams upload to storage, temp dir cleaned up
+
+## Progress reporting
+
+| Progress | Milestone |
+|----------|-----------|
+| 0% | Job received |
+| 5% | Media downloaded |
+| 10% | First frame processed |
+| 10–95% | Frame encoding (linear by frame count) |
+| 95% | All frames done, uploading |
+| 100% | Upload complete, status `completed` |
+
+Heartbeats send progress immediately on each milestone and every 5s in between. The 5s timer resets on each milestone.
 
 ## CDP size limit — critical constraint
 
 Playwright communicates with Chrome via a CDP pipe. Large payloads crash with `ERR_STRING_TOO_LONG` (~500MB limit). This affects ALL data flowing through Playwright:
 - **Route interception** enables CDP Fetch domain which serializes ALL request/response bodies through the pipe — even requests that don't match any route pattern
-- **`page.evaluate`** serializes arguments and return values through the pipe. A `fetch()` inside evaluate still triggers CDP network monitoring if routes are active
-- **`page.unrouteAll()`** disables CDP Fetch, but `page.evaluate` itself still uses the pipe for its own protocol messages
+- **`page.evaluate`** serializes arguments and return values through the pipe
 
-The fix is to never let large binaries touch CDP at all:
-- **Serving large files to the browser** → Fastify HTTP at `localhost:8080/media/{jobId}/`
-- **Getting large files out of the browser** → browser POSTs to Fastify at `localhost:8080/result/{jobId}`, Node uploads from disk
+**Nothing must be served via Playwright route interception.** All HTTP serving goes through Fastify:
+- Render-page static files → Fastify `setNotFoundHandler` (serves from dist at root `/`)
+- Media files → Fastify at `/media/{jobId}/`
+- Result MP4 from browser → Fastify at `/result/{jobId}`, streamed to disk
+- Upload to storage → `fs.createReadStream` (not `readFileSync`)
 
 ## Build & Deploy
 
@@ -76,3 +89,12 @@ Docker context is the monorepo root (needs `shared/`, `webapp/public/`).
 |-----|----------|-------------|
 | `RENDER_SECRET` | Yes | Shared secret for auth between edge functions and worker |
 | `PORT` | No | Server port (default 8080) |
+
+
+## Knowledge
+update this claude.md file concisely if we are making changes to the render pipeline. Previous implementations that had problems that we had to revert so don't reattempt them. Only things that are not super trival.
+
+- **Do NOT use Playwright route interception** — even for render-page static files. It enables CDP Fetch globally which crashes on large payloads. Serve everything via Fastify instead.
+- **Do NOT use `page.unrouteAll()` after page load** as a workaround — the render page lazy-loads WASM/JS at runtime that would 404 after routes are removed.
+- **Do NOT serve render-page under a subpath** (e.g. `/render-page/`) — WASM files loaded at runtime use absolute paths from root. Serve at `/` via `setNotFoundHandler`.
+- **Do NOT use `readFileSync` for large files** — use streaming (`createReadStream`/`pipeline`) for both receiving and uploading MP4s to avoid V8 string length limit.
