@@ -399,6 +399,24 @@ export class FrameExtractor {
             // 2. Feed chunks up to target + margin
             const feedAheadMicros = (timeMs + FEED_AHEAD_MS) * 1000;
 
+            // Always seek to the latest keyframe before the target if one exists
+            // ahead of our current feed position. During sequential playback this
+            // is a no-op (no keyframe between nextChunkIndex and target). On cold
+            // start or after a trim it jumps directly to the right decode point.
+            {
+                let bestKeyframe = -1;
+                for (let i = this.nextChunkIndex; i < this.chunks.length; i++) {
+                    if (this.chunks[i].timestamp > targetMicros) break;
+                    if (this.chunks[i].type === 'key' && this.chunks[i].data !== null) {
+                        bestKeyframe = i;
+                    }
+                }
+                if (bestKeyframe > this.nextChunkIndex) {
+                    console.log(`[FrameExtractor] Seeking: chunk ${this.nextChunkIndex} (${(this.chunks[this.nextChunkIndex].timestamp / 1000).toFixed(0)}ms) → ${bestKeyframe} (${(this.chunks[bestKeyframe].timestamp / 1000).toFixed(0)}ms) for target ${timeMs.toFixed(0)}ms`);
+                    this.nextChunkIndex = bestKeyframe;
+                }
+            }
+
             // In Safari flush mode, if we need new frames, the decoder was reset by
             // the previous flush. We must start from a keyframe.
             if (this.safariFlushMode && this.nextChunkIndex < this.chunks.length &&
@@ -431,8 +449,7 @@ export class FrameExtractor {
                 fed++;
             }
 
-            // 3. Wait only until a frame covering the target time is available
-            //    (non-blocking — the decoder continues processing remaining chunks async)
+            // 3. Wait until we're certain the best frame for this target is decoded
             if (fed > 0) {
                 try {
                     await this.awaitFrameCovering(targetMicros);
@@ -520,10 +537,11 @@ export class FrameExtractor {
     }
 
     /**
-     * Wait until the decoded frame buffer contains a frame at or before the
-     * target timestamp. The decoder runs asynchronously — frames arrive via
-     * the output callback as the decoder processes its queue. We only need
-     * to block until the frame we actually need is ready.
+     * Wait until we can be certain the best frame ≤ target is in the buffer.
+     * That's true when either:
+     *   - a decoded frame with timestamp > target exists (so the best frame
+     *     before it is already decoded), OR
+     *   - the decoder queue is fully drained (nothing more coming)
      */
     private async awaitFrameCovering(targetMicros: number): Promise<void> {
         if (!this.decoder || (this.decoder.state as string) === 'closed') return;
@@ -531,7 +549,7 @@ export class FrameExtractor {
         const TIMEOUT_MS = 10_000;
         const start = performance.now();
 
-        while (!this.hasFrameCovering(targetMicros)) {
+        while (!this.hasBestFrameForTarget(targetMicros)) {
             if ((this.decoder!.state as string) === 'closed') {
                 throw new Error('[FrameExtractor] Decoder closed while waiting for frame');
             }
@@ -550,9 +568,18 @@ export class FrameExtractor {
         }
     }
 
-    /** Check if decodedFrames contains a frame at or before the target time. */
-    private hasFrameCovering(targetMicros: number): boolean {
-        return this.decodedFrames.some(f => f.timestamp <= targetMicros);
+    /**
+     * Returns true when we're certain the best frame ≤ target is in the buffer:
+     * either a frame past the target has been decoded (proving everything before
+     * it is available), or the decoder queue is empty (nothing more to decode).
+     */
+    private hasBestFrameForTarget(targetMicros: number): boolean {
+        if (this.decodedFrames.length === 0) return false;
+        // A frame past the target means the best frame ≤ target is already here
+        if (this.decodedFrames.some(f => f.timestamp > targetMicros)) return true;
+        // Queue empty — everything we fed has been decoded, this is the best we have
+        if (this.decoder && this.decoder.decodeQueueSize === 0) return true;
+        return false;
     }
 
     dispose(): void {
