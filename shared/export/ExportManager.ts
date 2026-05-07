@@ -297,7 +297,8 @@ export class ExportManager {
             const startTime = performance.now();
             framesProcessed = 0;
 
-            // Timing accumulators (reset every 30 frames for logging)
+            // Timing accumulators — log every 30 frames for short videos, 150 for long ones
+            const logInterval = totalDurationMs > 15_000 ? 150 : 30;
             let accDecode = 0, accBackground = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
             let accChunksFed = 0, maxQueueSize = 0;
             let accUnchangedFrames = 0;
@@ -425,26 +426,26 @@ export class ExportManager {
                 accBackpressure += t4 - t3;
                 accTotal += t4 - frameStart;
 
-                // Per-frame timing breakdown (every 30 frames)
-                if (framesProcessed % 30 === 0) {
+                // Per-frame timing breakdown
+                if (framesProcessed % logInterval === 0) {
                     const mem = (performance as any).memory;
                     const memStr = mem
                         ? ` heap=${(mem.usedJSHeapSize / 1024 / 1024).toFixed(0)}/${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(0)}MB`
                         : '';
-                    const newFrames = 30 - accUnchangedFrames;
-                    console.log(`[Export] Frames ${framesProcessed - 29}-${framesProcessed}/${totalFrames}: ` +
+                    const newFrames = logInterval - accUnchangedFrames;
+                    console.log(`[Export] Frames ${framesProcessed - logInterval + 1}-${framesProcessed}/${totalFrames}: ` +
                         `decode=${accDecode.toFixed(0)}ms render=${accRender.toFixed(0)}ms ` +
                         `encode=${accEncode.toFixed(0)}ms backpressure=${accBackpressure.toFixed(0)}ms ` +
-                        `total=${accTotal.toFixed(0)}ms (${(accTotal / 30).toFixed(0)}ms/frame) ` +
-                        `decoded=${newFrames}/30 chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
-                    const profile = PlaybackRenderer.flushProfile(30);
+                        `total=${accTotal.toFixed(0)}ms (${(accTotal / logInterval).toFixed(0)}ms/frame) ` +
+                        `decoded=${newFrames}/${logInterval} chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
+                    const profile = PlaybackRenderer.flushProfile(logInterval);
                     if (profile) console.log(`${profile} background=${accBackground.toFixed(0)}ms`);
                     accDecode = 0; accBackground = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
                     accChunksFed = 0; maxQueueSize = 0; accUnchangedFrames = 0;
                 }
 
                 // Periodic yield for UI responsiveness
-                if (framesProcessed % 30 === 0) {
+                if (framesProcessed % logInterval === 0) {
                     await new Promise(r => setTimeout(r, 0));
                 }
             }

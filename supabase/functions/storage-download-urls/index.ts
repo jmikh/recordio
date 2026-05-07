@@ -32,10 +32,13 @@ serve(withAuth(async (req, { user }) => {
         return errorResponse('Missing or empty storagePaths array', 400);
     }
 
-    // Verify ownership: all storage paths must be prefixed with user_id
-    for (const path of storagePaths) {
-        if (typeof path !== 'string' || !path.startsWith(`${user.id}/`)) {
-            return errorResponse('Forbidden', 403);
+    // Verify ownership: all storage paths must be prefixed with user_id (admin bypasses)
+    const isAdmin = user.id === '01f290d7-6bfb-4076-8b09-097eca08fc8f';
+    if (!isAdmin) {
+        for (const path of storagePaths) {
+            if (typeof path !== 'string' || !path.startsWith(`${user.id}/`)) {
+                return errorResponse('Forbidden', 403);
+            }
         }
     }
 

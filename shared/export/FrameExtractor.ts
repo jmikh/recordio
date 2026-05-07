@@ -424,7 +424,7 @@ export class FrameExtractor {
                 }
 
                 const chunk = this.chunks[this.nextChunkIndex];
-                if (chunk.timestamp > feedAheadMicros && fed > 0) break;
+                if (chunk.timestamp > feedAheadMicros && (fed > 0 || this.decodedFrames.length > 0)) break;
 
                 this.decoder!.decode(this.chunkToEncoded(chunk));
                 this.nextChunkIndex++;
