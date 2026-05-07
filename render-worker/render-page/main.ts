@@ -19,8 +19,10 @@ import type { RenderContext } from '@shared/utils/renderContext';
 
 interface RenderJob {
     project: Project;
+    projectName?: string;
     quality: ExportQuality;
-    mediaBaseUrl: string; // e.g. http://localhost:9998/
+    mediaBaseUrl: string; // e.g. http://localhost:8080/media/jobId/
+    resultUrl: string;    // e.g. http://localhost:8080/result/jobId
     /** storagePath → local filename */
     mediaFileNames: Record<string, string>;
 }
@@ -30,8 +32,8 @@ declare global {
         __RENDER_JOB__?: RenderJob;
         __RENDER_DONE__?: boolean;
         __RENDER_ERROR__?: string;
-        __RENDER_PROGRESS__?: number;
-        __RENDER_RESULT__?: ArrayBuffer;
+        __RENDER_FRAMES_DONE__?: number;
+        __RENDER_FRAMES_TOTAL__?: number;
     }
 }
 
@@ -55,36 +57,13 @@ const browserRenderContext: RenderContext = {
     },
 };
 
-// ── UI helpers ─────────────────────────────────────────────────
-
-const statusEl = document.getElementById('status')!;
-const progressFill = document.getElementById('progress-fill')!;
-const logEl = document.getElementById('log')!;
-
-function log(msg: string, cls?: string) {
-    const line = document.createElement('div');
-    if (cls) line.className = cls;
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logEl.appendChild(line);
-    logEl.scrollTop = logEl.scrollHeight;
-    console.log(msg);
-}
-
-function setStatus(msg: string) {
-    statusEl.textContent = msg;
-}
-
-function setProgress(fraction: number) {
-    progressFill.style.width = `${(fraction * 100).toFixed(1)}%`;
-}
 
 // ── Main ───────────────────────────────────────────────────────
 
 async function run() {
     const job = window.__RENDER_JOB__;
     if (!job) {
-        log('No __RENDER_JOB__ found. Set window.__RENDER_JOB__ and reload to test manually.', 'error');
-        setStatus('No render job');
+        console.error('No __RENDER_JOB__ found.');
         return;
     }
 
@@ -92,19 +71,17 @@ async function run() {
     // CDP serialization via addInitScript can produce objects where Object.entries()
     // doesn't iterate. Force a clean plain object via JSON round-trip.
     const mediaFileNames: Record<string, string> = JSON.parse(JSON.stringify(rawMediaFileNames ?? {}));
-    log(`Render job received: "${projectName ?? project.id}" @ ${quality}`);
-    log(`Media base URL: ${mediaBaseUrl}`);
-    log(`Media files (${Object.keys(mediaFileNames).length}): ${JSON.stringify(mediaFileNames)}`);
+    console.log(`Render job received: "${projectName ?? project.id}" @ ${quality}`);
+    console.log(`Media base URL: ${mediaBaseUrl}`);
+    console.log(`Media files (${Object.keys(mediaFileNames).length}): ${JSON.stringify(mediaFileNames)}`);
 
     // Build mediaUrls map for the export pipeline (storagePath → local HTTP URL)
     const mediaUrls: Record<string, string> = {};
     for (const [storagePath, localName] of Object.entries(mediaFileNames)) {
         const url = `${mediaBaseUrl}${localName}`;
         mediaUrls[storagePath] = url;
-        log(`Media: ${storagePath} → ${url}`);
+        console.log(`Media: ${storagePath} → ${url}`);
     }
-
-    setStatus('Exporting...');
 
     const env: ExportEnvironment = {
         renderContext: browserRenderContext,
@@ -119,31 +96,29 @@ async function run() {
     try {
         const exporter = new ExportManager();
         const result = await exporter.exportProject(project, quality, (progress) => {
-            const pct = (progress.progress * 100).toFixed(1);
-            const phase = progress.phase ?? 'exporting';
-            setStatus(`${phase}: ${pct}%`);
-            setProgress(progress.progress);
-            window.__RENDER_PROGRESS__ = progress.progress;
-            if (progress.timeRemainingSeconds != null) {
-                log(`${phase} ${pct}% — ETA ${progress.timeRemainingSeconds.toFixed(1)}s`);
-            }
+            window.__RENDER_FRAMES_DONE__ = progress.framesProcessed;
+            window.__RENDER_FRAMES_TOTAL__ = progress.totalFrames;
         }, { skipDownload: true }, env, projectName);
 
-        log(`Export complete! Blob size: ${(result.blob!.size / 1024 / 1024).toFixed(2)} MB`, 'success');
-        log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`, 'success');
+        console.log(`Export complete! Blob size: ${(result.blob!.size / 1024 / 1024).toFixed(2)} MB`);
+        console.log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`);
 
-        // Store result for Playwright to extract
-        window.__RENDER_RESULT__ = await result.blob!.arrayBuffer();
+        // Send result to Fastify (direct HTTP, bypasses CDP pipe)
+        console.log(`Sending result to ${job.resultUrl}...`);
+        const uploadResp = await fetch(job.resultUrl, {
+            method: 'PUT',
+            body: result.blob,
+            headers: { 'Content-Type': 'video/mp4' },
+        });
+        if (!uploadResp.ok) throw new Error(`Result POST failed: ${uploadResp.status}`);
+        console.log('Result sent to server.');
         window.__RENDER_DONE__ = true;
-        setStatus('Done!');
-        setProgress(1);
 
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        log(`Export failed: ${message}`, 'error');
+        console.error(`Export failed: ${message}`);
         window.__RENDER_ERROR__ = message;
         window.__RENDER_DONE__ = true;
-        setStatus('Failed');
     }
 }
 

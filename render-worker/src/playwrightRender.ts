@@ -8,16 +8,17 @@
  * The render page runs the exact same ExportManager pipeline as the browser,
  * using WebCodecs for fast hardware/software video encoding.
  *
- * File serving is done via Playwright route interception — no need for a
- * separate HTTP server.
+ * Only the render-page static assets (html/js/css/wasm) are served via Playwright
+ * route interception. Media files and result MP4s go through Fastify HTTP to
+ * bypass CDP serialization limits (see CLAUDE.md).
  */
 
 import { chromium, type Browser, type Page } from 'playwright';
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { MediaFileNames } from './downloadMedia.js';
+import { logGpuDiagnostics, logBrowserGpuInfo } from './gpuDiagnostics.js';
 
 export interface PlaywrightRenderConfig {
     jobId: string;
@@ -26,11 +27,16 @@ export interface PlaywrightRenderConfig {
     quality: string;
     /** storagePath → local filename */
     mediaFileNames: MediaFileNames;
-    /** Directory containing downloaded media files */
-    mediaDir: string;
-    /** Signed URL for direct upload from browser. */
+    /** Base URL for media files served by Fastify (e.g. http://localhost:8080/media/jobId/) */
+    mediaBaseUrl: string;
+    /** URL where the render page POSTs the result MP4 (Fastify endpoint, bypasses CDP) */
+    resultUrl: string;
+    /** Signed URL for upload to storage (Node uploads from disk after receiving result) */
     uploadUrl: string;
-    onProgress?: (phase: string, progress: number, message: string) => void;
+    /** Promise that resolves with the result file path once the render page POSTs it */
+    resultReady: Promise<string>;
+    /** Called with monotonic progress 0→1: download=0→0.1, export=0.1→0.9, upload=0.9→1.0 */
+    onProgress?: (progress: number) => void;
 }
 
 export interface RenderResult {
@@ -44,21 +50,14 @@ export interface RenderResult {
 const RENDER_PAGE_DIST = process.env.RENDER_PAGE_DIST
     ?? path.resolve(import.meta.dirname, '../render-page/dist');
 
+// Only types needed for render-page static assets (media served by Fastify)
 const MIME_TYPES: Record<string, string> = {
     '.html': 'text/html',
     '.js': 'application/javascript',
     '.css': 'text/css',
     '.wasm': 'application/wasm',
-    '.webm': 'video/webm',
-    '.mp4': 'video/mp4',
-    '.wav': 'audio/wav',
-    '.mp3': 'audio/mpeg',
-    '.aac': 'audio/aac',
     '.svg': 'image/svg+xml',
     '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
     '.json': 'application/json',
 };
 
@@ -74,90 +73,22 @@ let _browserLaunching: Promise<Browser> | null = null;
 /**
  * Pre-launch Chromium at server startup. Call this once from server.ts.
  * The browser stays alive for the lifetime of the process.
+ * Logs GPU diagnostics (OS-level + browser-level) once here so per-job renders skip them.
  */
 export async function warmBrowser(): Promise<void> {
-    // Log GPU driver visibility
-    const nvidiaPath = '/usr/local/nvidia/lib64';
-    console.log(`[Render] NVIDIA driver path exists: ${fs.existsSync(nvidiaPath)}`);
-    if (fs.existsSync(nvidiaPath)) {
-        const allLibs = fs.readdirSync(nvidiaPath);
-        console.log(`[Render] NVIDIA libs (${allLibs.length} files): ${allLibs.filter(f => f.includes('vulkan') || f.includes('EGL') || f.includes('nvidia')).join(', ')}`);
-    }
-    console.log(`[Render] LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH ?? '(unset)'}`);
-
-    // Log ICD discovery files
-    const eglVendorDir = '/usr/share/glvnd/egl_vendor.d';
-    const vulkanIcdDir = '/usr/share/vulkan/icd.d';
-    console.log(`[Render] EGL vendor configs: ${fs.existsSync(eglVendorDir) ? fs.readdirSync(eglVendorDir).join(', ') : '(dir missing)'}`);
-    console.log(`[Render] Vulkan ICD configs: ${fs.existsSync(vulkanIcdDir) ? fs.readdirSync(vulkanIcdDir).join(', ') : '(dir missing)'}`);
+    logGpuDiagnostics();
 
     const start = Date.now();
     console.log('[Render] Pre-launching Chromium...');
     _browser = await launchBrowser();
     console.log(`[Render] Chromium ready in ${((Date.now() - start) / 1000).toFixed(1)}s`);
 
-    // Run nvidia-smi to check GPU visibility at OS level
+    // Log browser-level GPU info once using a temp page
+    const tempPage = await _browser.newPage();
     try {
-        const smi = execSync('nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader', { timeout: 5000 }).toString().trim();
-        console.log(`[Render] nvidia-smi: ${smi}`);
-    } catch (e) {
-        console.warn(`[Render] nvidia-smi failed (GPU not visible at OS level): ${e}`);
-    }
-
-    // Check NVIDIA device nodes
-    for (const dev of ['/dev/nvidia0', '/dev/nvidiactl', '/dev/nvidia-uvm']) {
-        console.log(`[Render] ${dev}: ${fs.existsSync(dev) ? 'EXISTS' : 'MISSING'}`);
-    }
-
-    // Check Vulkan device visibility with loader debug
-    try {
-        const vkInfo = execSync('VK_LOADER_DEBUG=error vulkaninfo --summary 2>&1 | head -50', { timeout: 10000 }).toString().trim();
-        console.log(`[Render] vulkaninfo: ${vkInfo}`);
-    } catch (e) {
-        console.warn(`[Render] vulkaninfo failed: ${e}`);
-    }
-
-    // Check VA-API availability (nvidia-vaapi-driver bridges VA-API → NVENC)
-    try {
-        const vaInfo = execSync('vainfo 2>&1 | head -30', { timeout: 10000 }).toString().trim();
-        console.log(`[Render] vainfo:\n${vaInfo}`);
-    } catch (e) {
-        console.warn(`[Render] vainfo failed: ${e}`);
-    }
-
-    // Check DRM render nodes — Chrome needs /dev/dri/renderD* for GPU access
-    try {
-        const driPath = '/dev/dri';
-        if (fs.existsSync(driPath)) {
-            const devices = fs.readdirSync(driPath);
-            console.log(`[Render] /dev/dri/ devices: ${devices.join(', ')}`);
-        } else {
-            console.warn(`[Render] /dev/dri/ missing — attempting to create render node...`);
-            // Try loading nvidia-drm module and creating device nodes
-            try {
-                execSync('modprobe nvidia-drm 2>&1 || true', { timeout: 5000 });
-                console.log(`[Render] modprobe nvidia-drm attempted`);
-            } catch { /* may not have permission */ }
-            try {
-                // nvidia-smi can trigger device node creation
-                execSync('nvidia-smi -q -d DISPLAY 2>&1 | head -5', { timeout: 5000 });
-            } catch { /* ignore */ }
-            try {
-                // Try mknod as fallback — renderD128 is major 226, minor 128
-                execSync('mkdir -p /dev/dri && mknod /dev/dri/renderD128 c 226 128 && chmod 666 /dev/dri/renderD128', { timeout: 5000 });
-                console.log(`[Render] Created /dev/dri/renderD128 manually`);
-            } catch (e2) {
-                console.warn(`[Render] Failed to create DRM device: ${e2}`);
-            }
-            // Check again
-            if (fs.existsSync(driPath)) {
-                console.log(`[Render] /dev/dri/ now has: ${fs.readdirSync(driPath).join(', ')}`);
-            } else {
-                console.error(`[Render] /dev/dri/ STILL missing — GPU rendering unavailable`);
-            }
-        }
-    } catch (e) {
-        console.warn(`[Render] DRM device check failed: ${e}`);
+        await logBrowserGpuInfo(tempPage);
+    } finally {
+        await tempPage.close();
     }
 }
 
@@ -208,8 +139,8 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { project, projectName, quality, mediaFileNames, mediaDir, uploadUrl, onProgress } = config;
-    const log = onProgress ?? ((phase: string, _p: number, msg: string) => console.log(`[Render] [${phase}] ${msg}`));
+    const { project, projectName, quality, mediaFileNames, mediaBaseUrl, resultUrl, uploadUrl, resultReady, onProgress } = config;
+    const reportProgress = onProgress ?? (() => {});
     const startTime = Date.now();
 
     const browser = await getBrowser();
@@ -239,24 +170,8 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             }
         });
 
-        // Serve media files at http://localhost:9999/media/*
-        await page.route('http://localhost:9999/media/**', async (route) => {
-            const url = new URL(route.request().url());
-            const fileName = url.pathname.replace('/media/', '');
-            const fullPath = path.join(mediaDir, fileName);
-
-            if (fs.existsSync(fullPath)) {
-                const body = fs.readFileSync(fullPath);
-                await route.fulfill({
-                    status: 200,
-                    contentType: getMimeType(fullPath),
-                    body,
-                });
-            } else {
-                console.warn(`[Render] Media 404: ${fullPath}`);
-                await route.fulfill({ status: 404, body: 'Not found' });
-            }
-        });
+        // Media files are served directly by Fastify at mediaBaseUrl
+        // (bypasses CDP serialization which crashes on large files)
 
         // Forward browser console to worker console
         page.on('console', msg => {
@@ -288,57 +203,27 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         });
 
         // --- Inject job config before page loads ---
-        const mediaBaseUrl = `http://localhost:9999/media/`;
-        const renderJob = { project, projectName, quality, mediaBaseUrl, mediaFileNames };
+        const renderJob = { project, projectName, quality, mediaBaseUrl, mediaFileNames, resultUrl };
 
         await page.addInitScript((job: any) => {
             (window as any).__RENDER_JOB__ = job;
         }, renderJob);
 
-        log('prepare', 0.3, 'Navigating to render page...');
+        reportProgress(0);
+        console.log('[Render] Navigating to render page...');
         await page.goto('http://localhost:9999/', {
             waitUntil: 'networkidle',
             timeout: 30_000,
         });
 
-        // Render page assets are loaded — disable CDP network monitoring.
-        // Route interception (for serving files on :9999) enables CDP's Fetch domain,
-        // which makes Chrome serialize ALL request bodies as CDP events. Disabling it
-        // now prevents ERR_STRING_TOO_LONG when the browser uploads the large MP4.
-        const cdpSession = await page.context().newCDPSession(page);
-        await cdpSession.send('Network.disable');
-        await cdpSession.send('Fetch.disable');
-
-        // --- GPU diagnostic ---
-        const gpuInfo = await page.evaluate(() => {
-            const canvas = document.createElement('canvas');
-            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-            const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
-            const renderer = debugInfo ? gl!.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'unknown';
-            const vendor = debugInfo ? gl!.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'unknown';
-
-            // Check if 2D canvas is accelerated
-            const c2d = document.createElement('canvas');
-            const ctx = c2d.getContext('2d');
-            const attrs = (ctx as any)?.getContextAttributes?.();
-
-            return {
-                renderer,
-                vendor,
-                canvas2dAccelerated: attrs?.willReadFrequently === false,
-                canvas2dAttrs: JSON.stringify(attrs ?? {}),
-                hardwareConcurrency: navigator.hardwareConcurrency,
-            };
-        });
-        console.log(`[Render] GPU info:`, JSON.stringify(gpuInfo));
-
-        log('render', 0, 'Render page loaded, waiting for export to complete...');
+        console.log('[Render] Render page loaded, waiting for export...');
 
         // --- Wait for render to finish with stale progress detection ---
-        // Instead of a fixed timeout, we check if progress has stalled for 30s.
+        // Progress is computed from frame counts: 0.1 + (framesDone/framesTotal) * 0.8
+        // Stall = no frame count change for 30s once exporting has started.
         const STALE_TIMEOUT_MS = 30_000;
-        let lastProgress = -1;
-        let lastProgressTime = Date.now();
+        let lastFramesDone = -1;
+        let lastFrameChangeTime = Date.now();
 
         await new Promise<void>((resolve, reject) => {
             const pollInterval = setInterval(async () => {
@@ -351,9 +236,16 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                 try {
                     const state = await page.evaluate(() => ({
                         done: (window as any).__RENDER_DONE__ === true,
-                        progress: (window as any).__RENDER_PROGRESS__ as number | undefined,
-                        status: document.getElementById('status')?.textContent ?? '',
+                        error: (window as any).__RENDER_ERROR__ as string | undefined,
+                        framesDone: (window as any).__RENDER_FRAMES_DONE__ as number | undefined,
+                        framesTotal: (window as any).__RENDER_FRAMES_TOTAL__ as number | undefined,
                     }));
+
+                    if (state.error) {
+                        clearInterval(pollInterval);
+                        reject(new Error(`Render page error: ${state.error}`));
+                        return;
+                    }
 
                     if (state.done) {
                         clearInterval(pollInterval);
@@ -361,21 +253,23 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
                         return;
                     }
 
-                    if (state.status) {
-                        log('render', state.progress ?? 0, `Page status: ${state.status}`);
-                    }
+                    // Compute and report progress from frame counts
+                    if (state.framesDone != null && state.framesTotal != null && state.framesTotal > 0) {
+                        const progress = 0.1 + (state.framesDone / state.framesTotal) * 0.8;
+                        reportProgress(progress);
+                        console.log(`[Render] Exporting: ${state.framesDone}/${state.framesTotal} frames (${(progress * 100).toFixed(1)}%)`);
 
-                    // Check for stale progress
-                    const currentProgress = state.progress ?? 0;
-                    if (currentProgress > lastProgress) {
-                        lastProgress = currentProgress;
-                        lastProgressTime = Date.now();
-                    } else if (Date.now() - lastProgressTime > STALE_TIMEOUT_MS) {
-                        clearInterval(pollInterval);
-                        reject(new Error(
-                            `Export stalled — no progress for ${STALE_TIMEOUT_MS / 1000}s ` +
-                            `(last progress: ${(lastProgress * 100).toFixed(1)}%, status: "${state.status}")`
-                        ));
+                        // Stall detection — only once exporting has started
+                        if (state.framesDone > lastFramesDone) {
+                            lastFramesDone = state.framesDone;
+                            lastFrameChangeTime = Date.now();
+                        } else if (Date.now() - lastFrameChangeTime > STALE_TIMEOUT_MS) {
+                            clearInterval(pollInterval);
+                            reject(new Error(
+                                `Export stalled — no frame progress for ${STALE_TIMEOUT_MS / 1000}s ` +
+                                `(frames: ${state.framesDone}/${state.framesTotal})`
+                            ));
+                        }
                     }
                 } catch {
                     // page.evaluate throws on dead page — pageDead will be set next tick
@@ -383,32 +277,35 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             }, 2000);
         });
 
-        // --- Check for errors ---
-        const error = await page.evaluate(() => (window as any).__RENDER_ERROR__);
-        if (error) {
-            throw new Error(`Render page error: ${error}`);
-        }
+        // --- Upload ---
+        // Wait for the render page to POST the result MP4 to Fastify.
+        // This bypasses CDP entirely — the browser sends directly to localhost.
+        reportProgress(0.9);
+        console.log('[Render] Waiting for result from browser...');
+        const resultFilePath = await resultReady;
+        const stat = fs.statSync(resultFilePath);
+        console.log(`[Render] Result received: ${(stat.size / 1024 / 1024).toFixed(1)} MB`);
 
-        log('finalize', 0.8, 'Uploading MP4 to storage...');
+        // Upload from disk to signed storage URL (Node-side, no CDP)
+        console.log('[Render] Uploading MP4 to storage...');
         const uploadStart = Date.now();
-        const sizeBytes = await page.evaluate(async (url: string) => {
-            const ab = (globalThis as any).__RENDER_RESULT__ as ArrayBuffer;
-            const resp = await fetch(url, {
-                method: 'PUT',
-                body: ab,
-                headers: {
-                    'Content-Type': 'video/mp4',
-                    'x-upsert': 'true',
-                },
-            });
-            if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
-            return ab.byteLength;
-        }, uploadUrl);
+        const resp = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: fs.readFileSync(resultFilePath),
+            headers: {
+                'Content-Type': 'video/mp4',
+                'Content-Length': String(stat.size),
+                'x-upsert': 'true',
+            },
+        });
+        if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${await resp.text()}`);
+        const sizeBytes = stat.size;
         const uploadDurationMs = Date.now() - uploadStart;
 
+        reportProgress(1.0);
         const durationMs = Date.now() - startTime;
         const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
-        log('finalize', 1, `Done! ${sizeMB} MB uploaded in ${(durationMs / 1000).toFixed(1)}s`);
+        console.log(`[Render] Done! ${sizeMB} MB uploaded in ${(durationMs / 1000).toFixed(1)}s`);
 
         return { durationMs, sizeBytes, uploadDurationMs };
 

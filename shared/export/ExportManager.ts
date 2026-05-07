@@ -18,6 +18,8 @@ export interface ExportProgress {
     timeRemainingSeconds: number | null;
     phase?: 'preparing' | 'exporting' | 'uploading';
     decodeFallback?: boolean;
+    framesProcessed?: number;
+    totalFrames?: number;
 }
 
 export interface ExportCodecInfo {
@@ -325,7 +327,9 @@ export class ExportManager {
 
                     onProgress({
                         progress: framesProcessed / totalFrames,
-                        timeRemainingSeconds: timeRemaining
+                        timeRemainingSeconds: timeRemaining,
+                        framesProcessed,
+                        totalFrames,
                     });
                 }
 

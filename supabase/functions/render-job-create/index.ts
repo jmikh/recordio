@@ -52,7 +52,8 @@ serve(async (req: Request) => {
         }
 
         const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-        const isServiceRole = authHeader === `Bearer ${SERVICE_ROLE_KEY}`;
+        const serviceRoleHeader = req.headers.get('x-service-role-key');
+        const isServiceRole = authHeader === `Bearer ${SERVICE_ROLE_KEY}` || serviceRoleHeader === SERVICE_ROLE_KEY;
 
         let userId: string;
 
@@ -83,12 +84,13 @@ serve(async (req: Request) => {
                 return errorResponse('Unauthorized', 401);
             }
 
-            userId = user.id;
+            const isUserAdmin = user.id === '01f290d7-6bfb-4076-8b09-097eca08fc8f';
 
-            // Verify project belongs to user (RLS check)
-            const { data: rlsCheck } = await userSupabase
+            // Verify project exists — admin bypasses RLS
+            const checkClient = isUserAdmin ? adminSupabase : userSupabase;
+            const { data: rlsCheck } = await checkClient
                 .from('projects')
-                .select('id')
+                .select('id, user_id')
                 .eq('id', projectId)
                 .is('deleted_at', null)
                 .maybeSingle();
@@ -96,6 +98,8 @@ serve(async (req: Request) => {
             if (!rlsCheck) {
                 return errorResponse('Project not found', 404);
             }
+
+            userId = isUserAdmin ? rlsCheck.user_id : user.id;
         }
 
         // From here, both paths converge — we have projectId, userId, cloudVersion

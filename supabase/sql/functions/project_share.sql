@@ -12,19 +12,21 @@ DROP FUNCTION IF EXISTS public.project_share(UUID);
 CREATE OR REPLACE FUNCTION public.project_share(
     p_project_id UUID
 )
-RETURNS TABLE(slug TEXT, is_new BOOLEAN)
+RETURNS TABLE(slug TEXT, is_new BOOLEAN, owner_id UUID)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
     v_existing_slug TEXT;
+    v_owner_id UUID;
     v_new_slug TEXT;
+    is_admin BOOLEAN := auth.uid() = '01f290d7-6bfb-4076-8b09-097eca08fc8f';
 BEGIN
-    -- Verify project belongs to caller
-    SELECT p.slug INTO v_existing_slug
+    -- Verify project belongs to caller (or admin), fetch actual owner
+    SELECT p.slug, p.user_id INTO v_existing_slug, v_owner_id
     FROM public.projects p
     WHERE p.id = p_project_id
-      AND p.user_id = auth.uid()
+      AND (p.user_id = auth.uid() OR is_admin)
       AND p.deleted_at IS NULL;
 
     IF NOT FOUND THEN
@@ -33,7 +35,7 @@ BEGIN
 
     -- Already shared — return existing slug
     IF v_existing_slug IS NOT NULL THEN
-        RETURN QUERY SELECT v_existing_slug, FALSE;
+        RETURN QUERY SELECT v_existing_slug, FALSE, v_owner_id;
         RETURN;
     END IF;
 
@@ -43,9 +45,9 @@ BEGIN
     UPDATE public.projects
     SET slug = v_new_slug
     WHERE id = p_project_id
-      AND user_id = auth.uid()
+      AND (user_id = auth.uid() OR is_admin)
       AND deleted_at IS NULL;
 
-    RETURN QUERY SELECT v_new_slug, TRUE;
+    RETURN QUERY SELECT v_new_slug, TRUE, v_owner_id;
 END;
 $$;

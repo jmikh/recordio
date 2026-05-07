@@ -25,9 +25,8 @@ The worker has **zero Supabase credentials**. All auth is via `RENDER_SECRET` sh
 ## Key files
 
 - `src/server.ts` — Fastify HTTP server, `/render` endpoint, background job orchestration
-- `src/playwrightRender.ts` — Playwright browser management, route interception for local file serving, GPU config
+- `src/playwrightRender.ts` — Playwright browser management, route interception for render page, GPU config
 - `src/downloadMedia.ts` — Downloads screen/camera/mic from signed URLs to temp dir
-- `src/uploadResult.ts` — Uploads rendered MP4 via signed PUT URL
 - `src/config.ts` — Env validation (PORT, RENDER_SECRET)
 - `render-page/` — Vite app loaded inside Playwright that runs ExportManager (shared/ pipeline)
 
@@ -35,10 +34,21 @@ The worker has **zero Supabase credentials**. All auth is via `RENDER_SECRET` sh
 
 1. Media files downloaded to temp dir
 2. Playwright opens `render-page/` (served via route interception at `localhost:9999`)
-3. Media files served via Playwright route interception at `localhost:9999/media/`
-4. render-page runs `ExportManager` (from `shared/export/`) using WebCodecs
-5. Result ArrayBuffer transferred back via binary POST to intercepted route
-6. MP4 written to disk, uploaded, temp dir cleaned up
+3. Media files served by Fastify at `localhost:8080/media/{jobId}/` (NOT route interception)
+4. Route interception removed after page load (`page.unrouteAll()`)
+5. render-page runs `ExportManager` (from `shared/export/`) using WebCodecs
+6. Browser POSTs MP4 to Fastify (`/result/{jobId}`), Node uploads to storage from disk, temp dir cleaned up
+
+## CDP size limit — critical constraint
+
+Playwright communicates with Chrome via a CDP pipe. Large payloads crash with `ERR_STRING_TOO_LONG` (~500MB limit). This affects ALL data flowing through Playwright:
+- **Route interception** enables CDP Fetch domain which serializes ALL request/response bodies through the pipe — even requests that don't match any route pattern
+- **`page.evaluate`** serializes arguments and return values through the pipe. A `fetch()` inside evaluate still triggers CDP network monitoring if routes are active
+- **`page.unrouteAll()`** disables CDP Fetch, but `page.evaluate` itself still uses the pipe for its own protocol messages
+
+The fix is to never let large binaries touch CDP at all:
+- **Serving large files to the browser** → Fastify HTTP at `localhost:8080/media/{jobId}/`
+- **Getting large files out of the browser** → browser POSTs to Fastify at `localhost:8080/result/{jobId}`, Node uploads from disk
 
 ## Build & Deploy
 

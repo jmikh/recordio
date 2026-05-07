@@ -27,10 +27,14 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
         return errorResponse('Missing cloudVersion', 400);
     }
 
-    // Verify project belongs to user and is shared (RLS)
-    const { data: rlsCheck } = await userSupabase
+    const isAdmin = user.id === '01f290d7-6bfb-4076-8b09-097eca08fc8f';
+    const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    // Verify project exists and is shared — admin bypasses RLS
+    const client = isAdmin ? adminSupabase : userSupabase;
+    const { data: rlsCheck } = await client
         .from('projects')
-        .select('id, slug')
+        .select('id, slug, user_id')
         .eq('id', projectId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -43,13 +47,13 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
         return errorResponse('Project not shared. Create a share link first.', 400);
     }
 
-    const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const ownerId = isAdmin ? rlsCheck.user_id : user.id;
 
     // 2. Get or create mux_video row
     const { data: result, error: rpcError } = await adminSupabase
         .rpc('mux_video_get_or_create', {
             p_project_id: projectId,
-            p_user_id: user.id,
+            p_user_id: ownerId,
             p_cloud_version: cloudVersion,
         })
         .single();
@@ -116,6 +120,7 @@ async function callRenderStart(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+                'x-service-role-key': SERVICE_ROLE_KEY,
             },
             body: JSON.stringify({ projectId, cloudVersion }),
         });
