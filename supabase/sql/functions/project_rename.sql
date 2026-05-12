@@ -1,6 +1,7 @@
 -- project_rename(p_project_id, p_name)
 --
 -- Renames a project.
+-- Caller must be a project editor (owner or explicit editor).
 --
 -- Called by: webapp CloudStorage.renameProject
 -- Tables:   projects
@@ -11,10 +12,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+    PERFORM public.assert_project_editor(p_project_id);
+
     UPDATE public.projects
-    SET name = p_name,
-        updated_at = now()
+    SET name = p_name, updated_at = now()
     WHERE id = p_project_id
-      AND user_id = auth.uid();
+      AND deleted_at IS NULL;
 END;
 $$;

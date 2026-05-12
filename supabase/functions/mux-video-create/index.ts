@@ -1,7 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { getProjectIfEditor } from '../_shared/projectAccess.ts';
 import { uploadToMux } from '../_shared/muxUpload.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -18,7 +20,7 @@ const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!;
  * Request body: { projectId, cloudVersion }
  * Response:     { status, muxVideoId? }
  */
-serve(withAuth(async (req, { user, supabase: userSupabase }) => {
+serve(withAuth(async (req, { user }) => {
     const { projectId, cloudVersion } = await req.json();
     if (!projectId) {
         return errorResponse('Missing projectId', 400);
@@ -27,27 +29,19 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
         return errorResponse('Missing cloudVersion', 400);
     }
 
-    const isAdmin = user.id === '01f290d7-6bfb-4076-8b09-097eca08fc8f';
     const adminSupabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // Verify project exists and is shared — admin bypasses RLS
-    const client = isAdmin ? adminSupabase : userSupabase;
-    const { data: rlsCheck } = await client
-        .from('projects')
-        .select('id, slug, user_id')
-        .eq('id', projectId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
+    // Verify caller has editor access (owner or explicit editor)
+    const rlsCheck = await getProjectIfEditor(adminSupabase, projectId, user.id, ['slug', 'owner_id']);
     if (!rlsCheck) {
-        return errorResponse('Project not found', 404);
+        return errorResponse('Project not found or access denied', 404);
     }
 
     if (!rlsCheck.slug) {
         return errorResponse('Project not shared. Create a share link first.', 400);
     }
 
-    const ownerId = isAdmin ? rlsCheck.user_id : user.id;
+    const ownerId = rlsCheck.owner_id;
 
     // 2. Get or create mux_video row
     const { data: result, error: rpcError } = await adminSupabase
@@ -60,6 +54,10 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
 
     if (rpcError || !result) {
         console.error('[mux-video-create] mux_video_get_or_create failed:', rpcError);
+        await captureException(rpcError ?? new Error('mux_video_get_or_create returned null'), {
+            function: 'mux-video-create',
+            projectId,
+        });
         return errorResponse('Failed to resolve mux video', 500);
     }
 
@@ -77,6 +75,11 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
 
     if (!renderResult) {
         console.error('[mux-video-create] render-job-create call failed, marking mux_video failed');
+        await captureException(new Error('render-job-create call failed'), {
+            function: 'mux-video-create',
+            projectId,
+            muxVideoId,
+        });
         await adminSupabase
             .from('mux_videos')
             .update({ status: 'failed', error: 'Render dispatch failed', updated_at: new Date().toISOString() })
@@ -98,6 +101,12 @@ serve(withAuth(async (req, { user, supabase: userSupabase }) => {
         });
 
         if (!uploadResult.success) {
+            await captureException(new Error(uploadResult.error || 'Mux upload failed'), {
+                function: 'mux-video-create',
+                projectId,
+                muxVideoId,
+                step: 'mux-upload',
+            });
             return errorResponse(uploadResult.error || 'Mux upload failed', 500);
         }
 
@@ -131,6 +140,7 @@ async function callRenderStart(
         return await resp.json();
     } catch (err) {
         console.error('[mux-video-create] render-job-create dispatch failed:', err);
+        await captureException(err, { function: 'mux-video-create', step: 'call-render-start', projectId, cloudVersion });
         return null;
     }
 }

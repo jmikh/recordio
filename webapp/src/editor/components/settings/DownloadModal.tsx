@@ -39,7 +39,7 @@ type ModalView = 'choose' | 'local' | 'cloud';
 interface DownloadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    hasProAccess: boolean;
+    hasNonFreeAccess: boolean;
     cloudPhase: CloudRenderPhase;
     cloudProgress: number;
     onStartCloudRender: () => void;
@@ -49,7 +49,7 @@ interface DownloadModalProps {
 export function DownloadModal({
     isOpen,
     onClose,
-    hasProAccess,
+    hasNonFreeAccess,
     cloudPhase,
     cloudProgress,
     onStartCloudRender,
@@ -134,7 +134,7 @@ export function DownloadModal({
                                     Renders in the background. Continue your work, get notified when it's ready.
                                 </p>
 
-                                {hasProAccess ? (
+                                {hasNonFreeAccess ? (
                                     <Button
                                         variant="primary"
                                         onClick={() => setView('cloud')}

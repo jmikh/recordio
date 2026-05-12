@@ -90,7 +90,7 @@ export class CloudProjectService {
     static async importRecordingLocal(
         recording: RawRecording,
         screenBlob: Blob,
-        isPro: boolean,
+        workspaceId: string,
         cameraBlob?: Blob,
         micBlob?: Blob,
     ): Promise<{ project: Project; name: string; uploads: { fileType: string; storagePath: string; signedUrl: string; token: string }[] }> {
@@ -115,7 +115,7 @@ export class CloudProjectService {
         if (name.length > 40) name = name.substring(0, 37) + '...';
 
         // 2. Send to server — stamps storagePaths, saves with upload_status='pending', returns signed URLs
-        const { uploads } = await CloudStorage.createProject(project, name, isPro);
+        const { uploads } = await CloudStorage.createProject(project, name, workspaceId);
 
         // 3. Update local project struct with server-generated storagePaths
         const pathMap = new Map(uploads.map(u => [u.fileType, u.storagePath]));
@@ -306,7 +306,7 @@ export class CloudProjectService {
      * Skipping unchanged saves prevents unnecessary cloud_version bumps
      * which are used downstream to avoid redundant re-renders.
      */
-    static async saveProject(project: Project, userId: string, isPro: boolean): Promise<void> {
+    static async saveProject(project: Project, userId: string): Promise<void> {
         const projectId = project.id;
 
         // Hold saves while media is still uploading — edits buffer locally
@@ -329,7 +329,7 @@ export class CloudProjectService {
             const expectedVersion = this.cloudVersions.get(projectId);
             console.log('[CloudProjectService.saveProject] Saving project:', projectId, 'expectedVersion:', expectedVersion);
             const result = await CloudStorage.saveProjectMetadata(
-                project, userId, expectedVersion, isPro,
+                project, userId, expectedVersion,
             );
 
             console.log('[CloudProjectService.saveProject] Save success, new cloudVersion:', result.cloudVersion);
@@ -358,8 +358,8 @@ export class CloudProjectService {
      * List projects from cloud. Thumbnails are loaded from cache
      * or downloaded in the background.
      */
-    static async listProjects(): Promise<ProjectListItem[]> {
-        const summaries = await CloudStorage.listProjectsSummary();
+    static async listProjects(workspaceId: string): Promise<ProjectListItem[]> {
+        const summaries = await CloudStorage.listProjectsSummary(workspaceId);
 
         return summaries.map((s: CloudProjectSummary) => ({
             id: s.id,
@@ -449,13 +449,12 @@ export class CloudProjectService {
     static async resolveConflictForce(
         project: Project,
         userId: string,
-        isPro: boolean,
     ): Promise<void> {
         const cloudVersion = await CloudStorage.getCloudVersion(project.id);
         if (cloudVersion === null) return;
 
         const result = await CloudStorage.saveProjectMetadata(
-            project, userId, cloudVersion, isPro,
+            project, userId, cloudVersion,
         );
 
         const hash = await this.projectDataHash(project);
@@ -490,8 +489,8 @@ export class CloudProjectService {
 
     // ─── Folders ─────────────────────────────────────────────
 
-    static async listFolders(): Promise<CloudFolder[]> {
-        return CloudStorage.listFolders();
+    static async listFolders(workspaceId: string): Promise<CloudFolder[]> {
+        return CloudStorage.listFolders(workspaceId);
     }
 
     static async createFolder(name: string, description = ''): Promise<CloudFolder> {

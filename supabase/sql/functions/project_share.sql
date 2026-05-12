@@ -1,53 +1,62 @@
--- project_share(p_project_id)
+-- project_share(p_project_id, p_share_policy)
 --
--- Generates a share slug for the project if none exists.
--- Returns the slug (existing or newly created).
+-- Generates a share slug for the project if none exists, and sets/updates
+-- the share_policy. Can be called on drafts (creates slug) or published
+-- projects (updates policy only if slug already exists).
+-- Caller must be the project owner.
+-- Returns the slug and whether it was newly created.
 --
--- Called by: webapp SettingsPanel share button
+-- Called by: webapp share/publish flow, SettingsPanel
 -- Tables:   projects
 
 DROP FUNCTION IF EXISTS public.shared_video_create(UUID);
 DROP FUNCTION IF EXISTS public.project_share(UUID);
 
 CREATE OR REPLACE FUNCTION public.project_share(
-    p_project_id UUID
+    p_project_id   UUID,
+    p_share_policy TEXT DEFAULT 'public'
 )
-RETURNS TABLE(slug TEXT, is_new BOOLEAN, owner_id UUID)
+RETURNS TABLE(slug TEXT, is_new BOOLEAN)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_existing_slug TEXT;
-    v_owner_id UUID;
-    v_new_slug TEXT;
-    is_admin BOOLEAN := auth.uid() = '01f290d7-6bfb-4076-8b09-097eca08fc8f';
+    _caller_id     UUID := auth.uid();
+    _existing_slug TEXT;
+    _owner_id      UUID;
+    _new_slug      TEXT;
+    _is_new        BOOLEAN := FALSE;
 BEGIN
-    -- Verify project belongs to caller (or admin), fetch actual owner
-    SELECT p.slug, p.user_id INTO v_existing_slug, v_owner_id
+    IF p_share_policy NOT IN ('public', 'workspace', 'private') THEN
+        RAISE EXCEPTION 'Invalid share_policy: %', p_share_policy;
+    END IF;
+
+    SELECT p.slug, p.owner_id INTO _existing_slug, _owner_id
     FROM public.projects p
     WHERE p.id = p_project_id
-      AND (p.user_id = auth.uid() OR is_admin)
       AND p.deleted_at IS NULL;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Project not found or not owned by user';
+        RAISE EXCEPTION 'Project not found';
     END IF;
 
-    -- Already shared — return existing slug
-    IF v_existing_slug IS NOT NULL THEN
-        RETURN QUERY SELECT v_existing_slug, FALSE, v_owner_id;
-        RETURN;
+    IF _owner_id <> _caller_id THEN
+        RAISE EXCEPTION 'Only the project owner can share a project';
     END IF;
 
-    -- Generate new slug
-    v_new_slug := left(replace(gen_random_uuid()::text, '-', ''), 12);
+    IF _existing_slug IS NULL THEN
+        _new_slug := left(replace(gen_random_uuid()::text, '-', ''), 12);
+        _is_new := TRUE;
+    ELSE
+        _new_slug := _existing_slug;
+    END IF;
 
     UPDATE public.projects
-    SET slug = v_new_slug
-    WHERE id = p_project_id
-      AND (user_id = auth.uid() OR is_admin)
-      AND deleted_at IS NULL;
+    SET slug         = _new_slug,
+        share_policy = p_share_policy,
+        updated_at   = now()
+    WHERE id = p_project_id;
 
-    RETURN QUERY SELECT v_new_slug, TRUE, v_owner_id;
+    RETURN QUERY SELECT _new_slug, _is_new;
 END;
 $$;

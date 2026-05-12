@@ -3,7 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { S3Client, GetObjectCommand, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 import { getSignedUrl as getS3SignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { getProjectIfEditor } from '../_shared/projectAccess.ts';
 import { getProjectMediaPaths } from '../_shared/projectMedia.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const RENDER_WORKER_URL = Deno.env.get('RENDER_WORKER_URL')!;
 const RENDER_SECRET = Deno.env.get('RENDER_SECRET')!;
@@ -59,9 +61,10 @@ serve(async (req: Request) => {
 
         if (isServiceRole) {
             // Service role path: called internally by mux-video-create
+            // No authenticated user — attribute the render job to the project owner
             const { data: proj } = await adminSupabase
                 .from('projects')
-                .select('user_id')
+                .select('owner_id')
                 .eq('id', projectId)
                 .is('deleted_at', null)
                 .maybeSingle();
@@ -70,9 +73,9 @@ serve(async (req: Request) => {
                 return errorResponse('Project not found', 404);
             }
 
-            userId = proj.user_id;
+            userId = proj.owner_id;
         } else {
-            // User JWT path: authenticate, check Pro subscription
+            // User JWT path: any project editor (owner or explicit editor) can start a render
             const userSupabase = createClient(
                 SUPABASE_URL,
                 Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -84,22 +87,12 @@ serve(async (req: Request) => {
                 return errorResponse('Unauthorized', 401);
             }
 
-            const isUserAdmin = user.id === '01f290d7-6bfb-4076-8b09-097eca08fc8f';
-
-            // Verify project exists — admin bypasses RLS
-            const checkClient = isUserAdmin ? adminSupabase : userSupabase;
-            const { data: rlsCheck } = await checkClient
-                .from('projects')
-                .select('id, user_id')
-                .eq('id', projectId)
-                .is('deleted_at', null)
-                .maybeSingle();
-
-            if (!rlsCheck) {
-                return errorResponse('Project not found', 404);
+            const project = await getProjectIfEditor(adminSupabase, projectId, user.id);
+            if (!project) {
+                return errorResponse('Project not found or access denied', 404);
             }
 
-            userId = isUserAdmin ? rlsCheck.user_id : user.id;
+            userId = user.id;
         }
 
         // From here, both paths converge — we have projectId, userId, cloudVersion
@@ -127,6 +120,10 @@ serve(async (req: Request) => {
 
         if (rpcError || !jobResult) {
             console.error('[render-job-create] render_job_get_or_create failed:', rpcError);
+            await captureException(rpcError ?? new Error('render_job_get_or_create returned null'), {
+                function: 'render-job-create',
+                projectId,
+            });
             return errorResponse('Failed to create render job', 500);
         }
 
@@ -153,6 +150,7 @@ serve(async (req: Request) => {
                 mediaUrls[entry.storagePath] = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
             } catch (err) {
                 console.error(`[render-job-create] Failed to sign ${entry.storagePath}:`, err);
+                await captureException(err, { function: 'render-job-create', step: 'sign-media-url', storagePath: entry.storagePath });
                 throw new Error(`Failed to create signed URL for ${entry.type}`);
             }
         }));
@@ -164,6 +162,7 @@ serve(async (req: Request) => {
             uploadUrl = await getS3SignedUrl(s3, putCmd, { expiresIn: 3600 });
         } catch (err) {
             console.error('[render-job-create] Failed to create upload URL:', err);
+            await captureException(err, { function: 'render-job-create', step: 'sign-upload-url', jobId: jobResult.job_id });
             return errorResponse('Failed to create upload URL', 500);
         }
 
@@ -198,6 +197,7 @@ serve(async (req: Request) => {
         });
     } catch (err) {
         console.error('[render-job-create] Unexpected error:', err);
+        await captureException(err, { function: 'render-job-create' });
         return errorResponse('Internal server error', 500);
     }
 });

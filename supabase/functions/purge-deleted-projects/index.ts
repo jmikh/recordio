@@ -39,7 +39,7 @@ serve(async (req) => {
 
         const { data: projects, error: fetchError } = await supabase
             .from('projects')
-            .select('id, user_id, permanently_deleted')
+            .select('id, created_by, permanently_deleted')
             .not('deleted_at', 'is', null)
             .lt('deleted_at', thirtyDaysAgo)
             .limit(20);
@@ -78,8 +78,8 @@ serve(async (req) => {
                     }
                 }
 
-                // 2. Delete all files from storage (user_id/project_id/*)
-                const prefix = `${project.user_id}/${project.id}`;
+                // 2. Delete all files from storage (created_by/project_id/*)
+                const prefix = `${project.created_by}/${project.id}`;
                 const { data: files, error: listError } = await supabase.storage
                     .from('project-media')
                     .list(prefix);

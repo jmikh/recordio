@@ -5,6 +5,7 @@ import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
 import { BiCrown } from 'react-icons/bi';
 import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useThemeStore } from '../stores/useThemeStore';
 import { AuthManager } from '../auth/AuthManager';
 import { StripeService } from '../editor/stripe/StripeService';
@@ -17,7 +18,8 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
-    const { email, name, picture, isPro, subscription, hasFreeTrial, trialEndsAt } = useUserStore();
+    const { email, name, picture, hasFreeTrial, trialEndsAt } = useUserStore();
+    const { hasActivePlan, subscription } = useWorkspaceStore();
     const { theme, setTheme } = useThemeStore();
     const isDark = theme === 'dark';
 
@@ -101,13 +103,13 @@ export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection
             <div className="flex flex-col gap-1 mt-1">
                 <span className="text-xs text-text-muted">Status</span>
                 <div className="flex flex-col gap-1 items-start">
-                    <ProBadge variant={isTrialing ? 'trial' : isPro ? 'pro' : 'free'} />
+                    <ProBadge variant={isTrialing ? 'trial' : hasActivePlan ? 'pro' : 'free'} />
                     {isTrialing && trialEndsAt && (
                         <span className="text-[11px] text-text-muted">
                             Expires {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
                     )}
-                    {isPro && !isTrialing && subscription.currentPeriodEnd && (
+                    {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
                         <span className="text-[11px] text-text-muted">
                             Expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
@@ -119,8 +121,8 @@ export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection
 
     const menuActions = (
         <div className="p-1.5 space-y-0.5">
-            {isPro && !isTrialing ? (
-                subscription.stripeCustomerId && (
+            {hasActivePlan && !isTrialing ? (
+                subscription?.stripeCustomerId && (
                     <button
                         onClick={handleManageSubscription}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"

@@ -104,12 +104,14 @@ async function run() {
         console.log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`);
 
         // Send result to Fastify (direct HTTP, bypasses CDP pipe)
+        console.log(`[debug] resultUrl=${job.resultUrl} blob=${result.blob?.size}b`);
         console.log(`Sending result to ${job.resultUrl}...`);
         const uploadResp = await fetch(job.resultUrl, {
             method: 'PUT',
             body: result.blob,
             headers: { 'Content-Type': 'video/mp4' },
         });
+        console.log(`[debug] PUT response: ${uploadResp.status}`);
         if (!uploadResp.ok) throw new Error(`Result POST failed: ${uploadResp.status}`);
         console.log('Result sent to server.');
         window.__RENDER_DONE__ = true;

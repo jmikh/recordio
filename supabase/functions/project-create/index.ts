@@ -32,12 +32,16 @@ const EXT_MAP: Record<string, string> = {
  * The client uploads blobs directly to Storage, then calls the
  * project_confirm_upload RPC to flip status to 'ready'.
  *
- * Request:  { project, isPro? }
+ * Request:  { project, name?, workspaceId }
  * Response: { projectId, uploads: [{ fileType, storagePath, signedUrl }] }
  */
-serve(withAuth(async (req, { user, supabase }) => {
+serve(withAuth(async (req, { user }) => {
     // deno-lint-ignore no-explicit-any
-    const { project, name, isPro } = await req.json() as { project: any; name?: string; isPro?: boolean };
+    const { project, name, workspaceId } = await req.json() as { project: any; name?: string; workspaceId?: string };
+
+    if (!workspaceId) {
+        return errorResponse('Missing workspaceId', 400);
+    }
 
     if (!project || !project.id) {
         return errorResponse('Missing project or project.id', 400);
@@ -68,41 +72,56 @@ serve(withAuth(async (req, { user, supabase }) => {
         mediaFiles.push({ fileType: 'mic', storagePath: sp });
     }
 
-    // 2. Save project to DB with upload_status='pending'
+    // 2. Check workspace subscription to determine if project should expire
+    const { data: sub } = await adminSupabase
+        .from('subscriptions')
+        .select('status')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+    const hasActiveSub = sub?.status === 'active' || sub?.status === 'past_due';
+
+    // 3. Save project to DB with upload_status='pending'
     const durationMs = project.timeline?.durationMs
         ? Math.round(project.timeline.durationMs)
         : null;
 
+    console.log(`[project-create] Upserting project ${projectId} into workspace ${workspaceId}`);
     const { error: upsertError } = await adminSupabase
         .from('projects')
         .upsert({
             id: projectId,
-            user_id: user.id,
+            workspace_id: workspaceId,
+            created_by: user.id,
+            owner_id: user.id,
             name: name ?? 'Untitled',
             project_data: project,
             upload_status: 'pending',
             duration_ms: durationMs,
-            expires_at: isPro ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: hasActiveSub ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
     if (upsertError) {
-        console.error('[project-upload] Upsert failed:', upsertError);
+        console.error('[project-create] Upsert failed:', upsertError);
         return errorResponse('Failed to save project', 500);
     }
+    console.log(`[project-create] Upsert done, generating S3 presigned URLs for ${mediaFiles.length} files`);
 
-    // 3. Create S3 presigned upload URLs for each media file
+    // 4. Create S3 presigned upload URLs for each media file
     const uploads: { fileType: string; storagePath: string; signedUrl: string }[] = [];
 
     try {
         await Promise.all(mediaFiles.map(async (mf) => {
+            console.log(`[project-create] Presigning ${mf.fileType}: ${mf.storagePath}`);
             const command = new PutObjectCommand({ Bucket: BUCKET, Key: mf.storagePath });
             const signedUrl = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
+            console.log(`[project-create] Presigned ${mf.fileType} OK`);
             uploads.push({ fileType: mf.fileType, storagePath: mf.storagePath, signedUrl });
         }));
     } catch (err) {
-        console.error('[project-upload] S3 presign failed:', err);
+        console.error('[project-create] S3 presign failed:', err);
         return errorResponse('Failed to create upload URLs', 500);
     }
 
+    console.log(`[project-create] Done, returning ${uploads.length} upload URLs`);
     return jsonResponse({ projectId, uploads });
 }));

@@ -8,6 +8,7 @@ import { CloudStorage } from '../../storage/cloudStorage';
 import { BlobCache } from '../../storage/blobCache';
 import { useMediaUrlStore } from './useMediaUrlStore';
 import { useUserStore } from './useUserStore';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
 import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActionSlice';
@@ -106,6 +107,84 @@ export const useProjectStore = create<ProjectState>()(
                     const { userEvents, ...projectWithoutEvents } = project;
 
                     // Backfill fields added after initial schema for older projects
+
+                    // Backfill settings sub-objects that were added when settings were restructured
+                    // from a flat format to nested sub-objects. Projects saved before this change
+                    // won't have these keys at all.
+                    if (!(projectWithoutEvents.settings as any).screen) {
+                        (projectWithoutEvents.settings as any).screen = {
+                            mode: 'border',
+                            toolbar: { enabled: true, theme: 'light', urlMode: 'short' },
+                            padding: 0.02,
+                            borderRadiusPx: 12,
+                            borderWidthPx: 1,
+                            borderColor: '#667eea',
+                            deviceFrameId: 'macbook-air-dark',
+                            hasShadow: true,
+                            hasGlow: false,
+                            hasFeather: false,
+                            mute: false,
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).background) {
+                        (projectWithoutEvents.settings as any).background = {
+                            type: 'preset',
+                            color: '#6078c4ff',
+                            gradientColors: ['#95a6f2ff', '#83689dff'],
+                            gradientDirection: 135,
+                            colorMode: 'gradient',
+                            backgroundBlurPx: 0,
+                            imageUrl: 'https://cdn.recordio.io/backgrounds/bg10.avif',
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).zoom) {
+                        (projectWithoutEvents.settings as any).zoom = {
+                            enabled: true,
+                            maxZoom: 2,
+                            transitionDurationMs: 750,
+                            easing: 'ease-in-out',
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).spotlight) {
+                        (projectWithoutEvents.settings as any).spotlight = {
+                            enabled: true,
+                            dimOpacity: 0.5,
+                            enlargeScale: 1.25,
+                            transitionDurationMs: 750,
+                            minHoldDurationMs: 200,
+                            defaultHoldDurationMs: 1000,
+                            easing: 'ease-in-out',
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).mouse) {
+                        (projectWithoutEvents.settings as any).mouse = {
+                            mouseClickEnabled: true,
+                            mouseDragEnabled: true,
+                            effectType: 'ring',
+                            color: '#8b5cf6',
+                            size: 1.0,
+                            soundEnabled: false,
+                            soundVolume: 0.5,
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).keyboard) {
+                        (projectWithoutEvents.settings as any).keyboard = {
+                            showHotkeys: true,
+                            hotkeysSize: 1.0,
+                            hotkeysPlacement: 'top',
+                            hotkeysMargin: 4,
+                        };
+                    }
+                    if (!(projectWithoutEvents.settings as any).audio) {
+                        (projectWithoutEvents.settings as any).audio = {
+                            muteMicrophone: false,
+                            muteScreenAudio: false,
+                            screenVolume: 1,
+                            microphoneVolume: 1,
+                            music: { enabled: false, source: 'preset', volume: 0.3, fadeOutDurationMs: 3000 },
+                        };
+                    }
+
                     if (!projectWithoutEvents.timeline.overlaySegments) {
                         projectWithoutEvents.timeline.overlaySegments = [];
                     }
@@ -139,11 +218,11 @@ export const useProjectStore = create<ProjectState>()(
                 saveProject: async () => {
                     set({ isSaving: true });
                     try {
-                        const { userId, isPro } = useUserStore.getState();
+                        const { userId } = useUserStore.getState();
                         if (userId) {
                             const userEvents = get().userEvents;
                             const fullProject = { ...get().project, userEvents };
-                            await CloudProjectService.saveProject(fullProject, userId, isPro);
+                            await CloudProjectService.saveProject(fullProject, userId);
                         }
                     } catch (e) {
                         console.error("Failed to save project:", e);
@@ -241,11 +320,11 @@ useProjectStore.subscribe(
     (project) => {
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            const { userId, isPro } = useUserStore.getState();
+            const { userId } = useUserStore.getState();
             if (!userId) return;
             const userEvents = useProjectStore.getState().userEvents;
             const fullProject = { ...project, userEvents };
-            CloudProjectService.saveProject(fullProject, userId, isPro).catch(console.error);
+            CloudProjectService.saveProject(fullProject, userId).catch(console.error);
         }, 2000);
     }
 );

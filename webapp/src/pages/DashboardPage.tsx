@@ -10,7 +10,9 @@ import { XButton, Modal, Button } from '@shared/components';
 import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
 import { useUserStore } from '../editor/stores/useUserStore';
-import { AuthManager } from '../auth/AuthManager';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useNonFreeAccess } from '../hooks/useNonFreeAccess';
+import { AuthManager, supabase } from '../auth/AuthManager';
 
 import { SupportModal } from '../components/SupportModal';
 import { AuthModal } from '../editor/components/header/AuthModal';
@@ -30,7 +32,14 @@ export function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
-    const { userId, hasProAccess } = useUserStore();
+    const { userId } = useUserStore();
+    const hasNonFreeAccess = useNonFreeAccess();
+    const {
+        workspaceId, workspaceName, workspaceRole,
+        workspaceList, setWorkspace, setWorkspaceList,
+    } = useWorkspaceStore();
+    const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+    const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
     // Split into active and trashed
     const projects = useMemo(() => allProjects.filter(p => !p.deletedAt), [allProjects]);
@@ -100,20 +109,18 @@ export function DashboardPage() {
         }
     }, []);
 
-    // Load projects once auth is ready
+    // Load projects once auth is ready and workspace is resolved
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated || !workspaceId) return;
 
         const ctrl = { cancelled: false };
-        console.log('[Dashboard] effect fired, isAuthenticated=', isAuthenticated);
         (async () => {
             try {
                 await AuthManager.ready;
-                console.log('[Dashboard] ready resolved, cancelled=', ctrl.cancelled);
                 if (ctrl.cancelled) return;
                 const [loaded, loadedFolders] = await Promise.all([
-                    CloudProjectService.listProjects(),
-                    CloudProjectService.listFolders(),
+                    CloudProjectService.listProjects(workspaceId),
+                    CloudProjectService.listFolders(workspaceId),
                 ]);
                 if (!ctrl.cancelled) {
                     setAllProjects(loaded);
@@ -135,7 +142,7 @@ export function DashboardPage() {
         })();
 
         return () => { ctrl.cancelled = true; };
-    }, [isAuthenticated]);
+    }, [isAuthenticated, workspaceId]);
 
     // View-filtered base list
     const viewProjects = useMemo(() => {
@@ -202,6 +209,45 @@ export function DashboardPage() {
         }
         return null;
     }, [activeView, folders]);
+
+    // Load the full workspace list once authenticated
+    useEffect(() => {
+        if (!isAuthenticated || !supabase) return;
+        supabase.rpc('workspace_list').then(({ data, error }) => {
+            if (!error && Array.isArray(data)) setWorkspaceList(data);
+        });
+    }, [isAuthenticated]);
+
+    const handleSwitchWorkspace = async (newWorkspaceId: string) => {
+        const ws = workspaceList.find(w => w.id === newWorkspaceId);
+        if (!ws) return;
+        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.is_personal, ws.seats);
+        // Projects reload automatically via the workspaceId effect
+    };
+
+    const handleCreateWorkspace = async () => {
+        setShowCreateWorkspace(true);
+    };
+
+    const handleCreateWorkspaceConfirm = async () => {
+        const name = newWorkspaceName.trim();
+        if (!name || !supabase) return;
+        try {
+            const { data, error } = await supabase.rpc('workspace_create', { p_name: name });
+            if (error) throw error;
+            const created = data as { id: string; name: string; owner_id: string; role: string; is_personal: boolean };
+            // Add to list and switch
+            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, is_personal: false, role: created.role as 'admin', seats: null };
+            setWorkspaceList([...workspaceList, newItem]);
+            setWorkspace(created.id, created.name, created.owner_id, created.role, false, null);
+            setNewWorkspaceName('');
+            setShowCreateWorkspace(false);
+            addToast({ type: 'success', title: `Workspace "${created.name}" created` });
+        } catch (err) {
+            console.error('Failed to create workspace:', err);
+            addToast({ type: 'error', title: 'Failed to create workspace' });
+        }
+    };
 
     const handleCreateFolder = async (name: string, description: string) => {
         try {
@@ -362,7 +408,7 @@ export function DashboardPage() {
                 activeView={activeView}
                 onViewChange={setActiveView}
                 projectCount={projects.length}
-                hasProAccess={hasProAccess()}
+                hasNonFreeAccess={hasNonFreeAccess}
                 starredCount={starredCount}
                 trashCount={trashProjects.length}
                 publishedCount={sharedCount}
@@ -375,6 +421,13 @@ export function DashboardPage() {
                 onOpenSupport={() => setIsSupportModalOpen(true)}
                 onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)}
                 onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                workspaceList={workspaceList}
+                currentWorkspaceId={workspaceId}
+                currentWorkspaceName={workspaceName}
+                currentWorkspaceRole={workspaceRole}
+                onSwitchWorkspace={handleSwitchWorkspace}
+                onCreateWorkspace={handleCreateWorkspace}
+                onOpenWorkspaceSettings={() => navigate('/workspace/settings')}
             />
 
             {/* Main Content */}
@@ -483,7 +536,7 @@ export function DashboardPage() {
                                             deletedAt: item.deletedAt,
                                         }}
                                         onOpen={() => {}}
-                                        onRestore={() => hasProAccess() ? handleRestore(item.id) : setIsUpgradeModalOpen(true)}
+                                        onRestore={() => hasNonFreeAccess ? handleRestore(item.id) : setIsUpgradeModalOpen(true)}
                                     />
                                 ))}
                             </div>
@@ -606,6 +659,30 @@ export function DashboardPage() {
 
             {/* Mandatory login modal — non-dismissable when not authenticated */}
             <AuthModal isOpen={!isAuthenticated} onClose={() => {}} />
+
+            {/* Create Workspace Modal */}
+            <Modal isOpen={showCreateWorkspace} onClose={() => { setShowCreateWorkspace(false); setNewWorkspaceName(''); }} maxWidth="max-w-[400px]">
+                <h2 className="text-lg font-semibold text-text-highlighted mb-4">New Workspace</h2>
+                <div className="flex flex-col gap-4">
+                    <div>
+                        <label className="text-sm text-text-main block mb-1">Workspace Name</label>
+                        <input
+                            type="text"
+                            value={newWorkspaceName}
+                            onChange={e => setNewWorkspaceName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && newWorkspaceName.trim()) handleCreateWorkspaceConfirm(); }}
+                            placeholder="e.g. Acme Team"
+                            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors"
+                            autoFocus
+                            maxLength={60}
+                        />
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <Button onClick={() => { setShowCreateWorkspace(false); setNewWorkspaceName(''); }}>Cancel</Button>
+                        <Button variant="primary" onClick={handleCreateWorkspaceConfirm} disabled={!newWorkspaceName.trim()}>Create</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

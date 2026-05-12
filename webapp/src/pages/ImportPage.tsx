@@ -5,9 +5,11 @@ import { usePendingUploadStore } from '../storage/pendingUploadStore';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { navigate } from '../navigate';
+import { supabase } from '../auth/AuthManager';
 
 type ImportStatus =
     | 'init'
@@ -64,7 +66,7 @@ export function ImportPage() {
 
         if (state.status === 'success' && state.recording && state.screenVideo) {
             // Blobs received — now upload to cloud
-            const { userId, isPro } = useUserStore.getState();
+            const { userId } = useUserStore.getState();
 
             if (!userId) {
                 // Must be logged in to upload
@@ -72,7 +74,7 @@ export function ImportPage() {
                 return;
             }
 
-            performUpload(userId, isPro);
+            performUpload();
         }
 
         if (state.status === 'error') {
@@ -103,12 +105,11 @@ export function ImportPage() {
     useEffect(() => {
         if (showAuthModal && userId && state.status === 'success' && state.recording && state.screenVideo) {
             setShowAuthModal(false);
-            const { isPro } = useUserStore.getState();
-            performUpload(userId, isPro);
+            performUpload();
         }
     }, [userId, showAuthModal, state.status]);
 
-    async function performUpload(uid: string, isPro: boolean) {
+    async function performUpload() {
         if (!state.recording || !state.screenVideo) return;
 
         setStatus('uploading');
@@ -119,12 +120,27 @@ export function ImportPage() {
             identifyExtensionUser(state.extensionDistinctId);
         }
 
+        let { workspaceId } = useWorkspaceStore.getState();
+        if (!workspaceId && supabase) {
+            // Workspace fetch may not have completed yet — resolve it now
+            const { data } = await supabase.rpc('workspace_get_default');
+            if (data?.id) {
+                useWorkspaceStore.getState().setWorkspace(data.id, data.name, data.owner_id);
+                workspaceId = data.id;
+            }
+        }
+        if (!workspaceId) {
+            console.error('[ImportPage] No workspace ID available');
+            setStatus('error-upload');
+            return;
+        }
+
         try {
             // Fast local import: create project on server, get signed URLs + blob URLs
             const { project, uploads } = await CloudProjectService.importRecordingLocal(
                 state.recording,
                 state.screenVideo,
-                isPro,
+                workspaceId,
                 state.cameraVideo || undefined,
                 state.micAudio || undefined,
             );

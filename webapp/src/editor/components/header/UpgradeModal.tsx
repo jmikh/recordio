@@ -4,7 +4,8 @@ import { BiCrown } from 'react-icons/bi';
 import { XButton, Modal, Button, LogoLink } from '@shared/components';
 import { StripeService } from '../../stripe/StripeService';
 import { useUserStore } from '../../stores/useUserStore';
-import { supabase } from '../../../auth/AuthManager';
+import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
+import { supabase, AuthManager } from '../../../auth/AuthManager';
 import { trackUpgradeModalViewed, trackUpgradeModalDismissed, trackGetProClicked } from '../../../core/analytics';
 
 interface UpgradeModalProps {
@@ -25,10 +26,11 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     const [trialSuccess, setTrialSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [billingInterval, setBillingInterval] = useState<BillingInterval>(initialInterval ?? 'yearly');
-    const { userId, email, isAuthenticated, isPro, subscription, hasFreeTrial } = useUserStore();
+    const { userId, email, isAuthenticated, hasFreeTrial } = useUserStore();
+    const { hasActivePlan, subscription } = useWorkspaceStore();
 
     // Active paid subscriber (not trialing)
-    const isActiveSubscriber = isPro && subscription.status === 'active';
+    const isActiveSubscriber = hasActivePlan && subscription?.status === 'active';
 
     // Poll for subscription status after checkout opens
     useEffect(() => {
@@ -47,15 +49,8 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 setSuccess(true);
                 setCheckingStatus(false);
 
-                // Reload user store to pick up Pro status
-                const { setSubscription } = useUserStore.getState();
-                setSubscription({
-                    status: 'active',
-                    currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : new Date(),
-                    cancelAtPeriodEnd: data.cancel_at_period_end || false,
-                    stripeCustomerId: data.stripe_customer_id || null,
-                    billingInterval: data.billing_interval || null
-                });
+                // Reload workspace store to pick up subscription + Pro status
+                await AuthManager.refreshSubscription();
 
                 // Auto-close after showing success message
                 setTimeout(() => {
@@ -88,7 +83,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
     };
 
     const handleManageSubscription = async () => {
-        if (!subscription.stripeCustomerId) {
+        if (!subscription?.stripeCustomerId) {
             console.error('[UpgradeModal] No Stripe customer ID found');
             return;
         }
@@ -167,7 +162,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 </div>
 
                 {/* Subscription Info */}
-                {subscription.currentPeriodEnd && (
+                {subscription?.currentPeriodEnd && (
                     <div className="bg-surface rounded-lg px-4 py-3 mb-6 text-center">
                         <p className="text-xs text-text-muted">
                             {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
@@ -179,7 +174,7 @@ export function UpgradeModal({ isOpen, onClose, onSignInRequest, selectedQuality
                 )}
 
                 {/* Manage Subscription */}
-                {subscription.stripeCustomerId && (
+                {subscription?.stripeCustomerId && (
                     <Button
                         variant="primary"
                         onClick={handleManageSubscription}

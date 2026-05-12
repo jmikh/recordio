@@ -70,7 +70,6 @@ export class CloudStorage {
         project: Project,
         userId: string,
         expectedVersion?: number,
-        isPro?: boolean,
     ): Promise<{ cloudVersion: number }> {
         if (!supabase) throw new Error('Supabase not configured');
 
@@ -140,10 +139,12 @@ export class CloudStorage {
     /**
      * List project summaries for the dashboard (lightweight — no project_data).
      */
-    static async listProjectsSummary(): Promise<CloudProjectSummary[]> {
+    static async listProjectsSummary(workspaceId: string): Promise<CloudProjectSummary[]> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.rpc('project_list');
+        const { data, error } = await supabase.rpc('project_list', {
+            p_workspace_id: workspaceId,
+        });
 
         if (error) throw error;
         return data ?? [];
@@ -181,10 +182,12 @@ export class CloudStorage {
     /**
      * List all folders for the current user.
      */
-    static async listFolders(): Promise<CloudFolder[]> {
+    static async listFolders(workspaceId: string): Promise<CloudFolder[]> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.rpc('folder_list');
+        const { data, error } = await supabase.rpc('folder_list', {
+            p_workspace_id: workspaceId,
+        });
 
         if (error) throw error;
         return data ?? [];
@@ -288,12 +291,12 @@ export class CloudStorage {
     static async createProject(
         project: Project,
         name: string,
-        isPro?: boolean,
+        workspaceId: string,
     ): Promise<{ projectId: string; uploads: { fileType: string; storagePath: string; signedUrl: string; token: string }[] }> {
         if (!supabase) throw new Error('Supabase not configured');
 
         const { data, error } = await supabase.functions.invoke('project-create', {
-            body: { project, name, isPro },
+            body: { project, name, workspaceId },
         });
 
         if (error) throw error;

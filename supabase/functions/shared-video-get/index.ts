@@ -37,7 +37,7 @@ serve(async (req: Request) => {
         // 1. Resolve slug → project
         const { data: project, error: projectError } = await adminSupabase
             .from('projects')
-            .select('id, name, user_id, share_policy')
+            .select('id, name, owner_id, share_policy')
             .eq('slug', slug)
             .is('deleted_at', null)
             .maybeSingle();
@@ -52,8 +52,8 @@ serve(async (req: Request) => {
 
         const projectId = project.id;
 
-        // 2. Get user display name
-        const { data: { user: authUser } } = await adminSupabase.auth.admin.getUserById(project.user_id);
+        // 2. Get user display name from project owner
+        const { data: { user: authUser } } = await adminSupabase.auth.admin.getUserById(project.owner_id);
         const userName = authUser?.user_metadata?.full_name
             ?? authUser?.user_metadata?.name
             ?? authUser?.email

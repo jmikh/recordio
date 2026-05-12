@@ -21,6 +21,10 @@ DROP FUNCTION IF EXISTS public.render_job_start();
 -- Quota check removed from project-create
 DROP FUNCTION IF EXISTS public.get_user_storage_bytes(uuid);
 
+-- Old no-arg overloads replaced by workspace-scoped versions
+DROP FUNCTION IF EXISTS public.project_list();
+DROP FUNCTION IF EXISTS public.folder_list();
+
 -- Welcome email moved from signup trigger to trial_start RPC
 DROP TRIGGER IF EXISTS on_user_signup_send_welcome_email ON auth.users;
 DROP FUNCTION IF EXISTS public.trigger_send_welcome_email();

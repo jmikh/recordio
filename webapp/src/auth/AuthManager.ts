@@ -1,5 +1,6 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { useUserStore } from '../editor/stores/useUserStore';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 
 // These will be set via environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -64,20 +65,34 @@ async function fetchProfile() {
     }
 }
 
-/** Fetch Stripe subscription via RPC and sync to store */
-async function fetchSubscription() {
+/** Load default workspace + its subscription and sync both to the workspace store */
+async function loadDefaultWorkspace(userId: string) {
     if (!supabase) return;
     try {
-        const { data, error } = await supabase.rpc('subscription_get');
-
+        const { data, error } = await supabase.rpc('workspace_get_default');
         if (!error && data) {
-            useUserStore.getState().setSubscription({
+            useWorkspaceStore.getState().setWorkspace(
+                data.id, data.name, data.owner_id,
+                data.role, data.is_personal, data.seats ?? null,
+            );
+        }
+    } catch {
+        // Workspace table not configured yet
+        return;
+    }
+
+    try {
+        const { data, error } = await supabase.rpc('subscription_get');
+        if (!error && data) {
+            useWorkspaceStore.getState().setSubscription({
                 status: data.status,
+                plan: data.plan ?? 'pro',
                 currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
-                cancelAtPeriodEnd: data.cancel_at_period_end,
-                stripeCustomerId: data.stripe_customer_id,
-                billingInterval: data.billing_interval || null
-            });
+                cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
+                billingInterval: data.billing_interval || null,
+                seats: data.seats ?? null,
+                stripeCustomerId: data.stripe_customer_id ?? null,
+            }, userId);
         }
     } catch {
         // Subscription table not configured yet
@@ -137,21 +152,22 @@ export class AuthManager {
 
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
                 AuthManager.subscriptionFetchedForUserId = session.user.id;
-                await Promise.all([fetchProfile(), fetchSubscription()]);
+                await Promise.all([fetchProfile(), loadDefaultWorkspace(session.user.id)]);
             }
         } else {
             AuthManager.subscriptionFetchedForUserId = null;
             useUserStore.getState().clearUser();
+            useWorkspaceStore.getState().clearWorkspace();
         }
     }
 
     /**
-     * Force re-fetch subscription from DB (e.g. after Stripe checkout).
+     * Force re-fetch workspace + subscription from DB (e.g. after Stripe checkout).
      */
     static async refreshSubscription() {
         const userId = useUserStore.getState().userId;
         if (userId) {
-            await fetchSubscription();
+            await loadDefaultWorkspace(userId);
         }
     }
 
@@ -188,6 +204,32 @@ export class AuthManager {
 
         const { data: { user } } = await supabase.auth.getUser();
         return user;
+    }
+
+    /**
+     * Email/password sign in or sign up (dev/local only).
+     * Automatically creates the account if it doesn't exist yet.
+     */
+    static async signInWithEmail(email: string, password: string): Promise<{ error: Error | null }> {
+        if (!supabase) return { error: new Error('Supabase not configured') };
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (!signInError) return { error: null };
+
+        const msg = signInError.message.toLowerCase();
+        const notFound = msg.includes('invalid login credentials') || msg.includes('user not found');
+        if (!notFound) return { error: signInError as Error };
+
+        // Account doesn't exist yet — try to create it
+        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+        if (!signUpError) return { error: null };
+
+        // signUp said "already registered" → account exists but password is wrong
+        if (signUpError.message.toLowerCase().includes('already registered')) {
+            return { error: new Error('Incorrect password.') };
+        }
+
+        return { error: signUpError as Error };
     }
 
     /**

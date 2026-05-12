@@ -4,6 +4,7 @@ import { useSyncStatusStore } from '../../storage/syncStatusStore';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useUserStore } from '../stores/useUserStore';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { navigate } from '../../navigate';
 import { TbCloudDown, TbCloudUp } from 'react-icons/tb';
 
@@ -45,9 +46,9 @@ export function ConflictModal() {
         try {
             const { project, userEvents } = useProjectStore.getState();
             const fullProject = { ...project, userEvents };
-            const { userId, isPro } = useUserStore.getState();
+            const { userId } = useUserStore.getState();
             if (userId) {
-                await CloudProjectService.resolveConflictForce(fullProject, userId, isPro);
+                await CloudProjectService.resolveConflictForce(fullProject, userId);
             }
             afterResolve();
         } catch (err) {

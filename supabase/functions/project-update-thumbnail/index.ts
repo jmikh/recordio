@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { getProjectIfEditor } from '../_shared/projectAccess.ts';
 
 const BUCKET = 'project-media';
 
@@ -47,18 +48,10 @@ serve(withAuth(async (req, { user }) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Verify the caller owns this project
-    const { data: project, error: fetchError } = await adminSupabase
-        .from('projects')
-        .select('user_id')
-        .eq('id', projectId)
-        .maybeSingle();
-
-    if (fetchError || !project) {
-        return errorResponse('Project not found', 404);
-    }
-    if (project.user_id !== user.id) {
-        return errorResponse('Forbidden', 403);
+    // Verify the caller has editor access to this project
+    const project = await getProjectIfEditor(adminSupabase, projectId, user.id);
+    if (!project) {
+        return errorResponse('Project not found or access denied', 404);
     }
 
     // Upload thumbnail to S3 storage

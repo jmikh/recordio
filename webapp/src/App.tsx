@@ -4,6 +4,7 @@ import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/ImportPage';
 import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
+import { WorkspaceSettingsPage } from './pages/WorkspaceSettingsPage';
 import { ToastProvider } from './editor/components/Toast';
 import { AuthManager } from './auth/AuthManager';
 
@@ -28,6 +29,10 @@ export function App() {
     const getPage = () => {
         if (path === '/uninstall') {
             return <UninstallPage />;
+        }
+
+        if (path === '/workspace/settings') {
+            return <WorkspaceSettingsPage />;
         }
 
         if (path === '/import' || path.startsWith('/import')) {

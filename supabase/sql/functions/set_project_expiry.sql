@@ -1,6 +1,6 @@
 -- set_project_expiry(p_user_id, p_expires_at)
 --
--- Sets expires_at on all non-deleted projects for a user.
+-- Sets expires_at on all non-deleted projects created by a user.
 -- Called from Stripe webhook when subscription status changes:
 --   - User loses Pro: p_expires_at = NOW() + 14 days
 --   - User becomes Pro: p_expires_at = NULL (clears countdown)
@@ -15,5 +15,5 @@ SECURITY DEFINER
 AS $$
     UPDATE public.projects
     SET expires_at = p_expires_at
-    WHERE user_id = p_user_id AND deleted_at IS NULL;
+    WHERE created_by = p_user_id AND deleted_at IS NULL;
 $$;

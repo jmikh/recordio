@@ -8,33 +8,60 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 });
 
 const PRICE_IDS: Record<string, string> = {
-    monthly: Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
-    yearly: Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
+    pro_monthly:      Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
+    pro_yearly:       Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
+    business_monthly: Deno.env.get('STRIPE_BUSINESS_PRICE_ID_MONTHLY') || '',
+    business_yearly:  Deno.env.get('STRIPE_BUSINESS_PRICE_ID_YEARLY') || '',
 };
 
+/**
+ * Stripe Checkout Edge Function
+ *
+ * Creates a Stripe checkout session for Pro or Business subscriptions.
+ *
+ * Request body:
+ *   { userId, userEmail, plan, interval, workspaceId, seats?, successUrl, cancelUrl }
+ *
+ * - plan: 'pro' | 'business'
+ * - interval: 'monthly' | 'yearly'
+ * - seats: number (Business only, defaults to 5)
+ * - workspaceId: UUID of the workspace being upgraded
+ */
 serve(withAuth(async (req, { user }) => {
-    const { userId, userEmail, interval, successUrl, cancelUrl } = await req.json();
+    const { userId, userEmail, plan = 'pro', interval = 'yearly', workspaceId, seats = 5, successUrl, cancelUrl } = await req.json();
 
     if (userId !== user.id) {
-        console.error('[Checkout] User ID mismatch:', userId, 'vs', user.id);
         return errorResponse('Unauthorized: User ID mismatch', 403);
     }
 
-    const priceId = PRICE_IDS[interval || 'yearly'];
+    if (!workspaceId) {
+        return errorResponse('Missing workspaceId', 400);
+    }
+
+    const priceKey = `${plan}_${interval}`;
+    const priceId = PRICE_IDS[priceKey];
 
     if (!priceId) {
-        console.error('[Checkout] No price ID configured for interval:', interval);
+        console.error('[Checkout] No price ID configured for:', priceKey);
         return errorResponse('No price configured for the selected plan', 400);
     }
+
+    const quantity = plan === 'business' ? Math.max(1, seats) : 1;
 
     const session = await stripe.checkout.sessions.create({
         customer_email: userEmail,
         client_reference_id: userId,
-        line_items: [{ price: priceId, quantity: 1 }],
+        line_items: [{ price: priceId, quantity }],
         mode: 'subscription',
         success_url: successUrl,
         cancel_url: cancelUrl,
-        metadata: { userId, interval: interval || 'yearly' },
+        metadata: {
+            userId,
+            workspaceId,
+            plan,
+            interval: interval || 'yearly',
+            seats: String(quantity),
+        },
     });
 
     return jsonResponse({ url: session.url });

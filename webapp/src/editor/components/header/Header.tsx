@@ -9,6 +9,8 @@ import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { UpgradeModal } from './UpgradeModal';
 import { useUserStore } from '../../stores/useUserStore';
+
+import { useNonFreeAccess } from '../../../hooks/useNonFreeAccess';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
@@ -53,7 +55,8 @@ export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const { isAuthenticated, isPro, hasProAccess } = useUserStore();
+    const { isAuthenticated } = useUserStore();
+    const hasNonFreeAccess = useNonFreeAccess();
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
 
     const { addToast } = useToast();
@@ -78,8 +81,8 @@ export const Header = () => {
     };
 
     const handleStartCloudRender = useCallback(() => {
-        cloudRender.startCloudRender(project.id, projectName, isPro);
-    }, [cloudRender.startCloudRender, project.id, projectName, isPro]);
+        cloudRender.startCloudRender(project.id, projectName);
+    }, [cloudRender.startCloudRender, project.id, projectName]);
 
     const downloadBusy = cloudRender.isActive || isSyncingMedia;
     const progressPct = Math.round(cloudRender.progress * 100);
@@ -167,11 +170,11 @@ export const Header = () => {
     const futureStates = useProjectHistory(state => state.futureStates);
 
     const handleGoToDashboard = async () => {
-        const { userId, isPro } = useUserStore.getState();
+        const { userId } = useUserStore.getState();
         if (userId) {
             const { project: proj, userEvents } = useProjectStore.getState();
             const fullProject = { ...proj, userEvents };
-            await CloudProjectService.saveProject(fullProject, userId, isPro);
+            await CloudProjectService.saveProject(fullProject, userId);
 
             if (useSyncStatusStore.getState().conflict) {
                 useSyncStatusStore.getState().setPendingNavigation('/');
@@ -303,7 +306,7 @@ export const Header = () => {
 
                     <div className="flex rounded-[var(--radius-interactive)] overflow-hidden">
                         <button
-                            onClick={hasProAccess() ? handleShare : () => setIsUpgradeModalOpen(true)}
+                            onClick={hasNonFreeAccess ? handleShare : () => setIsUpgradeModalOpen(true)}
                             disabled={isSharing || isSyncingMedia}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm font-medium border-none cursor-pointer transition-colors
                                 bg-primary text-white hover:bg-primary-highlighted
@@ -313,8 +316,8 @@ export const Header = () => {
                             {isSharing ? 'Publishing...' : shareSlug ? 'Republish' : 'Publish'}
                         </button>
                         <button
-                            onClick={() => hasProAccess() ? (shareSlug && copyShareLink(shareSlug)) : setIsUpgradeModalOpen(true)}
-                            disabled={hasProAccess() && !shareSlug}
+                            onClick={() => hasNonFreeAccess ? (shareSlug && copyShareLink(shareSlug)) : setIsUpgradeModalOpen(true)}
+                            disabled={hasNonFreeAccess && !shareSlug}
                             className={`flex items-center justify-center px-2 py-1.5 border-none cursor-pointer transition-colors border-l border-white/20
                                 ${shareSlug
                                     ? 'bg-primary/80 text-white hover:bg-primary'
@@ -355,7 +358,7 @@ export const Header = () => {
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={() => setIsDownloadModalOpen(false)}
-                hasProAccess={hasProAccess()}
+                hasNonFreeAccess={hasNonFreeAccess}
                 cloudPhase={cloudRender.phase}
                 cloudProgress={cloudRender.progress}
                 onStartCloudRender={handleStartCloudRender}

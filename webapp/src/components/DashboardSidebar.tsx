@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { LuLayoutGrid, LuStar, LuShare2, LuTrash2, LuFolder, LuPlus, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
 import { Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
-import logoSvg from '@shared/assets/logo.svg';
 import { UserMenu } from './UserMenu';
+import { WorkspaceDropdown } from './WorkspaceDropdown';
+import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
 import type { CloudFolder } from '../storage/cloudStorage';
 
 export type DashboardView = 'all' | 'starred' | 'published' | 'trash' | { folder: string };
@@ -15,7 +16,7 @@ interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
     projectCount: number;
-    hasProAccess: boolean;
+    hasNonFreeAccess: boolean;
     starredCount: number;
     trashCount: number;
     publishedCount: number;
@@ -28,6 +29,14 @@ interface DashboardSidebarProps {
     onOpenSupport: () => void;
     onOpenUpgradeModal: () => void;
     onOpenAuthModal: () => void;
+    // Workspace
+    workspaceList: WorkspaceListItem[];
+    currentWorkspaceId: string | null;
+    currentWorkspaceName: string | null;
+    currentWorkspaceRole: 'viewer' | 'creator' | 'admin' | null;
+    onSwitchWorkspace: (workspaceId: string) => void;
+    onCreateWorkspace: () => void;
+    onOpenWorkspaceSettings: () => void;
 }
 
 interface NavItem {
@@ -41,7 +50,7 @@ export function DashboardSidebar({
     activeView,
     onViewChange,
     projectCount,
-    hasProAccess,
+    hasNonFreeAccess,
     starredCount,
     trashCount,
     publishedCount,
@@ -54,6 +63,13 @@ export function DashboardSidebar({
     onOpenSupport,
     onOpenUpgradeModal,
     onOpenAuthModal,
+    workspaceList,
+    currentWorkspaceId,
+    currentWorkspaceName,
+    currentWorkspaceRole,
+    onSwitchWorkspace,
+    onCreateWorkspace,
+    onOpenWorkspaceSettings,
 }: DashboardSidebarProps) {
 
     // Create folder modal
@@ -146,10 +162,18 @@ export function DashboardSidebar({
 
     return (
         <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
-            {/* Logo + New Recording */}
-            <div className="px-4 pt-4 pb-2 flex items-center gap-3">
-                <img src={logoSvg} alt="Recordio" className="w-7 h-7 shrink-0" />
-                <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="flex-1">
+            {/* Workspace switcher + New Recording */}
+            <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
+                <WorkspaceDropdown
+                    workspaces={workspaceList}
+                    currentWorkspaceId={currentWorkspaceId}
+                    currentWorkspaceName={currentWorkspaceName}
+                    currentRole={currentWorkspaceRole}
+                    onSwitch={onSwitchWorkspace}
+                    onCreate={onCreateWorkspace}
+                    onOpenSettings={onOpenWorkspaceSettings}
+                />
+                <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="w-full">
                     New recording
                 </Button>
             </div>
@@ -192,7 +216,7 @@ export function DashboardSidebar({
             </div>
 
             {/* Free plan usage */}
-            {!hasProAccess && (
+            {!hasNonFreeAccess && (
                 <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
                     <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-medium text-text-main">

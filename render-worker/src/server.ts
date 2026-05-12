@@ -161,6 +161,7 @@ export function createApp() {
 
     app.put('/result/:jobId', async (request, reply) => {
         const { jobId } = request.params as { jobId: string };
+        console.log(`[Render] PUT /result/${jobId} — pending=${pendingResults.has(jobId)} mediaDir=${activeMediaDirs.has(jobId)}`);
         const pending = pendingResults.get(jobId);
         if (!pending) {
             return reply.code(404).send({ error: 'No pending result for job' });
@@ -174,8 +175,10 @@ export function createApp() {
         const filePath = path.join(mediaDir, 'result.mp4');
 
         // Stream the raw request body to disk
+        console.log(`[Render] Job ${jobId}: streaming result to disk...`);
         const { pipeline } = await import('node:stream/promises');
         await pipeline(request.raw, fs.createWriteStream(filePath));
+        console.log(`[Render] Job ${jobId}: pipeline complete`);
 
         const stat = fs.statSync(filePath);
         console.log(`[Render] Job ${jobId}: received result (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);

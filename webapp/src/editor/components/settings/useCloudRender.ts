@@ -62,7 +62,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
         }
     }, [onToast]);
 
-    const startCloudRender = useCallback(async (projectId: string, projectName: string, isPro: boolean) => {
+    const startCloudRender = useCallback(async (projectId: string, projectName: string) => {
         if (phase !== 'idle' && phase !== 'failed') return;
 
         // Request notification permission early
@@ -78,7 +78,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
             if (userId) {
                 const project = useProjectStore.getState().project;
                 const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
-                await CloudProjectService.saveProject(fullProject, userId, isPro);
+                await CloudProjectService.saveProject(fullProject, userId);
             }
 
             const cloudVersion = CloudProjectService.getCloudVersion(projectId);

@@ -1,6 +1,7 @@
 -- folder_update(p_folder_id, p_name, p_description)
 --
 -- Updates a folder's name and description.
+-- Caller must be at least a creator in the folder's workspace.
 -- Returns the updated folder as JSONB, or NULL if not found.
 --
 -- Called by: webapp CloudStorage.updateFolder
@@ -12,22 +13,33 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_folder JSONB;
+    _workspace_id UUID;
+    _result       JSONB;
 BEGIN
-    UPDATE public.folders
-    SET name = p_name,
-        description = p_description,
-        updated_at = NOW()
-    WHERE id = p_folder_id
-      AND user_id = auth.uid()
-    RETURNING jsonb_build_object(
-        'id', id,
-        'name', name,
-        'description', description,
-        'created_at', created_at,
-        'updated_at', updated_at
-    ) INTO v_folder;
+    SELECT workspace_id INTO _workspace_id
+    FROM public.folders
+    WHERE id = p_folder_id;
 
-    RETURN v_folder;
+    IF NOT FOUND THEN
+        RETURN NULL;
+    END IF;
+
+    PERFORM public.assert_workspace_creator(_workspace_id);
+
+    UPDATE public.folders
+    SET name        = p_name,
+        description = p_description,
+        updated_at  = NOW()
+    WHERE id = p_folder_id
+    RETURNING jsonb_build_object(
+        'id',           id,
+        'workspace_id', workspace_id,
+        'name',         name,
+        'description',  description,
+        'created_at',   created_at,
+        'updated_at',   updated_at
+    ) INTO _result;
+
+    RETURN _result;
 END;
 $$;

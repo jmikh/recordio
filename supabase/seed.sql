@@ -1,14 +1,33 @@
 -- ============================================================================
 -- Seed data for local Supabase testing
 -- ============================================================================
--- Run after `supabase start` applies migrations.
--- Creates test users, subscriptions, and sample projects.
+-- Run after `supabase db reset` applies migrations.
+-- Password for all users: admin123
+--
+-- Users
+--   user1@gmail.com  — 4 workspaces (personal + 3 team with varied subscriptions)
+--   user2@gmail.com  — 1 personal workspace, no subscription
+--   user3@gmail.com  — member of user1's Business workspace
+--
+-- Workspaces (user1)
+--   Personal          eeeeeeee-0001-...  free (no subscription row)
+--   Business Team     eeeeeeee-0002-...  active subscription, seats = 5
+--   Pro Team          eeeeeeee-0003-...  active subscription, no seats
+--   Unpaid Team       eeeeeeee-0004-...  no subscription row
 
--- 0. Vault secrets (so crons and triggers can resolve URLs locally)
+-- ============================================================================
+-- 0. Vault secrets (needed for crons/triggers locally)
+-- ============================================================================
+
 SELECT vault.create_secret('http://host.docker.internal:54321', 'SUPABASE_URL', 'Local Supabase API URL');
-SELECT vault.create_secret('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU', 'SUPABASE_SECRET_KEY', 'Local Supabase service role key');
+SELECT vault.create_secret(
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+    'SUPABASE_SECRET_KEY', 'Local Supabase service role key'
+);
 
--- 1. Test users (local Supabase allows direct inserts into auth.users)
+-- ============================================================================
+-- 1. Auth users  (password: password123)
+-- ============================================================================
 
 INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password,
@@ -19,79 +38,175 @@ INSERT INTO auth.users (
     phone_change_token, reauthentication_token,
     is_sso_user, is_anonymous
 ) VALUES
--- Pro user (active subscription)
 (
     '00000000-0000-0000-0000-000000000000',
     '11111111-1111-1111-1111-111111111111',
     'authenticated', 'authenticated',
-    'pro@test.local',
-    '$2a$10$e7ea8qYnRKTYrIDNLTMKfuVdH4sy1D9ni.7nT2dFizeB35QOygDgm',
+    'user1@gmail.com',
+    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Pro User"}'::jsonb,
-    '', '', '', '', '', '', '', '',
-    false, false
+    '{"name":"User One"}'::jsonb,
+    '', '', '', '', '', '', '', '', false, false
 ),
--- Free/trial user
 (
     '00000000-0000-0000-0000-000000000000',
     '22222222-2222-2222-2222-222222222222',
     'authenticated', 'authenticated',
-    'trial@test.local',
-    '$2a$10$e7ea8qYnRKTYrIDNLTMKfuVdH4sy1D9ni.7nT2dFizeB35QOygDgm',
+    'user2@gmail.com',
+    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Trial User"}'::jsonb,
-    '', '', '', '', '', '', '', '',
-    false, false
+    '{"name":"User Two"}'::jsonb,
+    '', '', '', '', '', '', '', '', false, false
+),
+(
+    '00000000-0000-0000-0000-000000000000',
+    '33333333-3333-3333-3333-333333333333',
+    'authenticated', 'authenticated',
+    'user3@gmail.com',
+    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
+    NOW(), NOW(), NOW(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"name":"User Three"}'::jsonb,
+    '', '', '', '', '', '', '', '', false, false
 )
 ON CONFLICT (id) DO NOTHING;
 
--- auth.identities (required for email login to work)
+-- ============================================================================
+-- 2. Auth identities (required for email/password login)
+-- ============================================================================
+
 INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
 VALUES
 (
     gen_random_uuid(),
     '11111111-1111-1111-1111-111111111111',
     '11111111-1111-1111-1111-111111111111',
-    '{"sub":"11111111-1111-1111-1111-111111111111","email":"pro@test.local"}'::jsonb,
-    'email',
-    NOW(), NOW(), NOW()
+    '{"sub":"11111111-1111-1111-1111-111111111111","email":"user1@gmail.com"}'::jsonb,
+    'email', NOW(), NOW(), NOW()
 ),
 (
     gen_random_uuid(),
     '22222222-2222-2222-2222-222222222222',
     '22222222-2222-2222-2222-222222222222',
-    '{"sub":"22222222-2222-2222-2222-222222222222","email":"trial@test.local"}'::jsonb,
-    'email',
-    NOW(), NOW(), NOW()
+    '{"sub":"22222222-2222-2222-2222-222222222222","email":"user2@gmail.com"}'::jsonb,
+    'email', NOW(), NOW(), NOW()
+),
+(
+    gen_random_uuid(),
+    '33333333-3333-3333-3333-333333333333',
+    '33333333-3333-3333-3333-333333333333',
+    '{"sub":"33333333-3333-3333-3333-333333333333","email":"user3@gmail.com"}'::jsonb,
+    'email', NOW(), NOW(), NOW()
 )
 ON CONFLICT DO NOTHING;
 
--- 2. User profiles (on_user_signup_create_user_profile trigger doesn't fire in seed context)
+-- ============================================================================
+-- 3. Workspaces
+-- ============================================================================
 
-INSERT INTO public.user_profiles (user_id, name, trial_ends_at)
-VALUES
-('11111111-1111-1111-1111-111111111111', 'Pro User', NOW() - INTERVAL '30 days'),
-('22222222-2222-2222-2222-222222222222', 'Trial User', NOW() + INTERVAL '5 days')
+INSERT INTO public.workspaces (id, name, owner_id, is_personal) VALUES
+-- user1
+('eeeeeeee-0000-0000-0000-000000000001', 'My Workspace',    '11111111-1111-1111-1111-111111111111', TRUE),
+('eeeeeeee-0000-0000-0000-000000000002', 'Business Team',   '11111111-1111-1111-1111-111111111111', FALSE),
+('eeeeeeee-0000-0000-0000-000000000003', 'Pro Team',        '11111111-1111-1111-1111-111111111111', FALSE),
+('eeeeeeee-0000-0000-0000-000000000004', 'Unpaid Team',     '11111111-1111-1111-1111-111111111111', FALSE),
+-- user2
+('eeeeeeee-0000-0000-0000-000000000005', 'My Workspace',    '22222222-2222-2222-2222-222222222222', TRUE),
+-- user3
+('eeeeeeee-0000-0000-0000-000000000006', 'My Workspace',    '33333333-3333-3333-3333-333333333333', TRUE)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- 4. Workspace members
+-- ============================================================================
+
+INSERT INTO public.workspace_members (workspace_id, user_id, role) VALUES
+-- user1 is admin of all their workspaces
+('eeeeeeee-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'admin'),
+('eeeeeeee-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'admin'),
+('eeeeeeee-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'admin'),
+('eeeeeeee-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'admin'),
+-- user2 is admin of their own workspace
+('eeeeeeee-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'admin'),
+-- user3 is admin of their own workspace + creator in user1's Business Team
+('eeeeeeee-0000-0000-0000-000000000006', '33333333-3333-3333-3333-333333333333', 'admin'),
+('eeeeeeee-0000-0000-0000-000000000002', '33333333-3333-3333-3333-333333333333', 'creator')
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- 5. User profiles
+-- ============================================================================
+
+INSERT INTO public.user_profiles (user_id, name, trial_ends_at, default_workspace_id) VALUES
+('11111111-1111-1111-1111-111111111111', 'User One',   NOW() - INTERVAL '30 days', 'eeeeeeee-0000-0000-0000-000000000001'),
+('22222222-2222-2222-2222-222222222222', 'User Two',   NOW() + INTERVAL '7 days',  'eeeeeeee-0000-0000-0000-000000000005'),
+('33333333-3333-3333-3333-333333333333', 'User Three', NULL,                        'eeeeeeee-0000-0000-0000-000000000006')
 ON CONFLICT (user_id) DO NOTHING;
 
--- 3. Subscriptions
+-- ============================================================================
+-- 6. Subscriptions (workspace-scoped, workspace_id is now PK)
+--
+--   Business Team  → active, seats = 5  (business tier)
+--   Pro Team       → active, no seats   (pro tier)
+--   Personal user2 → trialing
+--   (personal workspaces for user1/user3 and Unpaid Team have no subscription row)
+-- ============================================================================
 
-INSERT INTO public.subscriptions (user_id, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at_period_end)
+INSERT INTO public.subscriptions
+    (workspace_id, user_id, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at_period_end, seats)
 VALUES
-('11111111-1111-1111-1111-111111111111', 'active', 'cus_test_pro', 'sub_test_pro', 'monthly', NOW() + INTERVAL '15 days', false),
-('22222222-2222-2222-2222-222222222222', 'trialing', NULL, NULL, NULL, NOW() + INTERVAL '5 days', true)
-ON CONFLICT (user_id) DO NOTHING;
+-- user1 · Business Team: active subscription with 5 seats
+(
+    'eeeeeeee-0000-0000-0000-000000000002',
+    '11111111-1111-1111-1111-111111111111',
+    'active',
+    'cus_test_business',
+    'sub_test_business',
+    'yearly',
+    NOW() + INTERVAL '300 days',
+    false,
+    5
+),
+-- user1 · Pro Team: active subscription, no seats
+(
+    'eeeeeeee-0000-0000-0000-000000000003',
+    '11111111-1111-1111-1111-111111111111',
+    'active',
+    'cus_test_pro',
+    'sub_test_pro',
+    'monthly',
+    NOW() + INTERVAL '20 days',
+    false,
+    NULL
+),
+-- user2 · personal workspace: trialing
+(
+    'eeeeeeee-0000-0000-0000-000000000005',
+    '22222222-2222-2222-2222-222222222222',
+    'trialing',
+    NULL,
+    NULL,
+    NULL,
+    NOW() + INTERVAL '7 days',
+    true,
+    NULL
+)
+ON CONFLICT (workspace_id) DO NOTHING;
 
--- 4. Sample projects
+-- ============================================================================
+-- 7. Sample projects
+-- ============================================================================
 
--- Minimal project (screen only, no effects)
-INSERT INTO public.projects (id, user_id, name, project_data, upload_status, cloud_version, duration_ms)
+-- user1 · personal workspace
+INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms)
 VALUES (
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'eeeeeeee-0000-0000-0000-000000000001',
     '11111111-1111-1111-1111-111111111111',
-    'Minimal Test Project',
+    '11111111-1111-1111-1111-111111111111',
+    'Personal Project',
     '{
         "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "schemaVersion": 5,
@@ -104,23 +219,54 @@ VALUES (
         "userEvents": {"mouseClicks":[],"mousePositions":[],"keyboardEvents":[],"drags":[],"scrolls":[],"typingEvents":[],"urlChanges":[],"hoveredCards":[]},
         "settings": {
             "outputSize": {"width": 1920, "height": 1080},
-            "frameRate": 30,
-            "backgroundType": "gradient",
-            "backgroundGradient": {"colorA": "#1a1a2e", "colorB": "#16213e", "angle": 135},
-            "backgroundPaddingPx": 64,
-            "borderRadiusPx": 12,
-            "shadowIntensity": 0.5,
-            "cameraEnabled": false,
-            "captionsEnabled": false,
-            "mouseClickEffectEnabled": true,
-            "mouseClickEffectStyle": "ripple",
-            "deviceFrameEnabled": false,
-            "cursorEnabled": true,
-            "cursorSizeMultiplier": 1.0,
-            "backgroundMusicEnabled": false
+            "frameRate": 60,
+            "zoom": {"enabled": true, "maxZoom": 2, "transitionDurationMs": 750, "easing": "ease-in-out"},
+            "spotlight": {"enabled": true, "dimOpacity": 0.5, "enlargeScale": 1.25, "transitionDurationMs": 750, "minHoldDurationMs": 200, "defaultHoldDurationMs": 1000, "easing": "ease-in-out"},
+            "mouse": {"mouseClickEnabled": true, "mouseDragEnabled": true, "effectType": "ring", "color": "#8b5cf6", "size": 1.0, "soundEnabled": false, "soundVolume": 0.5},
+            "keyboard": {"showHotkeys": true, "hotkeysSize": 1.0, "hotkeysPlacement": "top", "hotkeysMargin": 4},
+            "screen": {
+                "mode": "border",
+                "toolbar": {"enabled": true, "theme": "light", "urlMode": "short"},
+                "padding": 0.02,
+                "borderRadiusPx": 12,
+                "borderWidthPx": 1,
+                "borderColor": "#667eea",
+                "deviceFrameId": "macbook-air-dark",
+                "hasShadow": true,
+                "hasGlow": false,
+                "hasFeather": false,
+                "mute": false
+            },
+            "background": {
+                "type": "preset",
+                "color": "#6078c4ff",
+                "gradientColors": ["#1a1a2eff", "#16213eff"],
+                "gradientDirection": 135,
+                "colorMode": "gradient",
+                "backgroundBlurPx": 0,
+                "imageUrl": "https://cdn.recordio.io/backgrounds/bg10.avif"
+            },
+            "captions": {"enabled": true, "captionSize": 1.0, "width": 75, "textColor": "#ffffff", "backgroundColor": "#000000cc", "wordHighlight": true},
+            "audio": {
+                "muteMicrophone": false,
+                "muteScreenAudio": false,
+                "screenVolume": 1,
+                "microphoneVolume": 1,
+                "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
+            },
+            "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
+            "overlay": {
+                "enabled": true,
+                "defaultDurationMs": 3000,
+                "blurDefaults": {"blurRadiusPx": 20},
+                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
+                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
+                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
+            },
+            "autoCutApplied": false
         },
         "timeline": {
-            "id": "t-minimal",
+            "id": "t1",
             "durationMs": 5000,
             "outputWindows": [{"id": "ow1", "startMs": 0, "endMs": 5000, "speed": 1}],
             "zoomSegments": [],
@@ -129,117 +275,187 @@ VALUES (
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
         }
     }'::jsonb,
-    'ready',
-    1,
-    5000
+    'ready', 1, 5000
 ) ON CONFLICT (id) DO NOTHING;
 
--- Full project (screen + camera + mic, zoom segments, captions)
-INSERT INTO public.projects (id, user_id, name, project_data, upload_status, cloud_version, duration_ms)
+-- user1 · Business Team
+INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms)
 VALUES (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'eeeeeeee-0000-0000-0000-000000000002',
     '11111111-1111-1111-1111-111111111111',
-    'Full Test Project',
+    '11111111-1111-1111-1111-111111111111',
+    'Business Team Project',
     '{
         "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
         "schemaVersion": 5,
         "screenSource": {
             "storagePath": "11111111-1111-1111-1111-111111111111/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/screen.webm",
-            "durationMs": 10000,
+            "durationMs": 8000,
             "size": {"width": 1920, "height": 1080},
             "hasAudio": true
-        },
-        "cameraSource": {
-            "storagePath": "11111111-1111-1111-1111-111111111111/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/camera.webm",
-            "durationMs": 10000,
-            "size": {"width": 640, "height": 480}
-        },
-        "microphoneSource": {
-            "storagePath": "11111111-1111-1111-1111-111111111111/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/mic.wav",
-            "durationMs": 10000
         },
         "userEvents": {"mouseClicks":[],"mousePositions":[],"keyboardEvents":[],"drags":[],"scrolls":[],"typingEvents":[],"urlChanges":[],"hoveredCards":[]},
         "settings": {
             "outputSize": {"width": 1920, "height": 1080},
-            "frameRate": 30,
-            "backgroundType": "gradient",
-            "backgroundGradient": {"colorA": "#0f0f23", "colorB": "#1a1a3e", "angle": 180},
-            "backgroundPaddingPx": 48,
-            "borderRadiusPx": 16,
-            "shadowIntensity": 0.6,
-            "cameraEnabled": true,
-            "cameraShape": "circle",
-            "cameraSizePx": 200,
-            "cameraPosition": "bottom-right",
-            "captionsEnabled": true,
-            "captionPosition": "bottom",
-            "captionFontFamily": "Inter",
-            "captionSize": 1.0,
-            "mouseClickEffectEnabled": true,
-            "mouseClickEffectStyle": "ripple",
-            "deviceFrameEnabled": false,
-            "cursorEnabled": true,
-            "cursorSizeMultiplier": 1.0,
-            "backgroundMusicEnabled": false
+            "frameRate": 60,
+            "zoom": {"enabled": true, "maxZoom": 2, "transitionDurationMs": 750, "easing": "ease-in-out"},
+            "spotlight": {"enabled": true, "dimOpacity": 0.5, "enlargeScale": 1.25, "transitionDurationMs": 750, "minHoldDurationMs": 200, "defaultHoldDurationMs": 1000, "easing": "ease-in-out"},
+            "mouse": {"mouseClickEnabled": true, "mouseDragEnabled": true, "effectType": "ring", "color": "#8b5cf6", "size": 1.0, "soundEnabled": false, "soundVolume": 0.5},
+            "keyboard": {"showHotkeys": true, "hotkeysSize": 1.0, "hotkeysPlacement": "top", "hotkeysMargin": 4},
+            "screen": {
+                "mode": "border",
+                "toolbar": {"enabled": true, "theme": "dark", "urlMode": "short"},
+                "padding": 0.02,
+                "borderRadiusPx": 16,
+                "borderWidthPx": 1,
+                "borderColor": "#302b63",
+                "deviceFrameId": "macbook-air-dark",
+                "hasShadow": true,
+                "hasGlow": false,
+                "hasFeather": false,
+                "mute": false
+            },
+            "background": {
+                "type": "color",
+                "color": "#0f0c29ff",
+                "gradientColors": ["#0f0c29ff", "#302b63ff"],
+                "gradientDirection": 135,
+                "colorMode": "gradient",
+                "backgroundBlurPx": 0
+            },
+            "captions": {"enabled": true, "captionSize": 1.0, "width": 75, "textColor": "#ffffff", "backgroundColor": "#000000cc", "wordHighlight": true},
+            "audio": {
+                "muteMicrophone": false,
+                "muteScreenAudio": false,
+                "screenVolume": 1,
+                "microphoneVolume": 1,
+                "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
+            },
+            "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
+            "overlay": {
+                "enabled": true,
+                "defaultDurationMs": 3000,
+                "blurDefaults": {"blurRadiusPx": 20},
+                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
+                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
+                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
+            },
+            "autoCutApplied": false
         },
         "timeline": {
-            "id": "t-full",
-            "durationMs": 10000,
-            "outputWindows": [
-                {"id": "ow1", "startMs": 0, "endMs": 4000, "speed": 1},
-                {"id": "ow2", "startMs": 5000, "endMs": 10000, "speed": 1.5}
-            ],
-            "zoomSegments": [
-                {
-                    "id": "z1",
-                    "sourceStartTimeMs": 1000, "sourceEndTimeMs": 3000,
-                    "outputStartTimeMs": 1000, "outputEndTimeMs": 3000,
-                    "visible": true,
-                    "rectPx": {"x": 400, "y": 200, "width": 1120, "height": 630},
-                    "reason": "test zoom",
-                    "type": "manual",
-                    "transitionDurationMs": 300,
-                    "easing": "ease-out"
-                }
-            ],
+            "id": "t2",
+            "durationMs": 8000,
+            "outputWindows": [{"id": "ow1", "startMs": 0, "endMs": 8000, "speed": 1}],
+            "zoomSegments": [],
             "spotlightSegments": [],
-            "captionSegments": [
-                {
-                    "id": "cap1",
-                    "sourceStartTimeMs": 500, "sourceEndTimeMs": 2500,
-                    "outputStartTimeMs": 500, "outputEndTimeMs": 2500,
-                    "visible": true,
-                    "words": [
-                        {"id": "w1", "word": "Hello", "sourceStartTimeMs": 500, "sourceEndTimeMs": 1200, "outputStartTimeMs": 500, "outputEndTimeMs": 1200, "visible": true},
-                        {"id": "w2", "word": "world", "sourceStartTimeMs": 1200, "sourceEndTimeMs": 2500, "outputStartTimeMs": 1200, "outputEndTimeMs": 2500, "visible": true}
-                    ]
-                }
-            ],
+            "captionSegments": [],
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
         }
     }'::jsonb,
-    'ready',
-    3,
-    10000
+    'ready', 1, 8000
 ) ON CONFLICT (id) DO NOTHING;
 
--- Trial user's project (with expiry)
-INSERT INTO public.projects (id, user_id, name, project_data, upload_status, cloud_version, duration_ms, expires_at)
+-- user1 · Pro Team
+INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms)
 VALUES (
     'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    '22222222-2222-2222-2222-222222222222',
-    'Trial User Project',
+    'eeeeeeee-0000-0000-0000-000000000003',
+    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111',
+    'Pro Team Project',
     '{
         "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
         "schemaVersion": 5,
         "screenSource": {
-            "storagePath": "22222222-2222-2222-2222-222222222222/cccccccc-cccc-cccc-cccc-cccccccccccc/screen.webm",
+            "storagePath": "11111111-1111-1111-1111-111111111111/cccccccc-cccc-cccc-cccc-cccccccccccc/screen.webm",
+            "durationMs": 6000,
+            "size": {"width": 1920, "height": 1080},
+            "hasAudio": true
+        },
+        "userEvents": {"mouseClicks":[],"mousePositions":[],"keyboardEvents":[],"drags":[],"scrolls":[],"typingEvents":[],"urlChanges":[],"hoveredCards":[]},
+        "settings": {
+            "outputSize": {"width": 1920, "height": 1080},
+            "frameRate": 60,
+            "zoom": {"enabled": true, "maxZoom": 2, "transitionDurationMs": 750, "easing": "ease-in-out"},
+            "spotlight": {"enabled": true, "dimOpacity": 0.5, "enlargeScale": 1.25, "transitionDurationMs": 750, "minHoldDurationMs": 200, "defaultHoldDurationMs": 1000, "easing": "ease-in-out"},
+            "mouse": {"mouseClickEnabled": false, "mouseDragEnabled": false, "effectType": "ring", "color": "#8b5cf6", "size": 1.0, "soundEnabled": false, "soundVolume": 0.5},
+            "keyboard": {"showHotkeys": true, "hotkeysSize": 1.0, "hotkeysPlacement": "top", "hotkeysMargin": 4},
+            "screen": {
+                "mode": "border",
+                "toolbar": {"enabled": true, "theme": "light", "urlMode": "short"},
+                "padding": 0.02,
+                "borderRadiusPx": 10,
+                "borderWidthPx": 0,
+                "borderColor": "#667eea",
+                "deviceFrameId": "macbook-air-dark",
+                "hasShadow": true,
+                "hasGlow": false,
+                "hasFeather": false,
+                "mute": false
+            },
+            "background": {
+                "type": "color",
+                "color": "#1a1a2eff",
+                "gradientColors": ["#1a1a2eff", "#1a1a2eff"],
+                "gradientDirection": 135,
+                "colorMode": "solid",
+                "backgroundBlurPx": 0
+            },
+            "captions": {"enabled": true, "captionSize": 1.0, "width": 75, "textColor": "#ffffff", "backgroundColor": "#000000cc", "wordHighlight": true},
+            "audio": {
+                "muteMicrophone": false,
+                "muteScreenAudio": false,
+                "screenVolume": 1,
+                "microphoneVolume": 1,
+                "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
+            },
+            "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
+            "overlay": {
+                "enabled": true,
+                "defaultDurationMs": 3000,
+                "blurDefaults": {"blurRadiusPx": 20},
+                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
+                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
+                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
+            },
+            "autoCutApplied": false
+        },
+        "timeline": {
+            "id": "t3",
+            "durationMs": 6000,
+            "outputWindows": [{"id": "ow1", "startMs": 0, "endMs": 6000, "speed": 1}],
+            "zoomSegments": [],
+            "spotlightSegments": [],
+            "captionSegments": [],
+            "cameraMoveSegments": [],
+            "overlaySegments": [],
+            "focusAreas": [],
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
+        }
+    }'::jsonb,
+    'ready', 1, 6000
+) ON CONFLICT (id) DO NOTHING;
+
+-- user2 · personal workspace
+INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms, expires_at)
+VALUES (
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'eeeeeeee-0000-0000-0000-000000000005',
+    '22222222-2222-2222-2222-222222222222',
+    '22222222-2222-2222-2222-222222222222',
+    'User Two Project',
+    '{
+        "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        "schemaVersion": 5,
+        "screenSource": {
+            "storagePath": "22222222-2222-2222-2222-222222222222/dddddddd-dddd-dddd-dddd-dddddddddddd/screen.webm",
             "durationMs": 3000,
             "size": {"width": 1920, "height": 1080},
             "hasAudio": false
@@ -247,19 +463,53 @@ VALUES (
         "userEvents": {"mouseClicks":[],"mousePositions":[],"keyboardEvents":[],"drags":[],"scrolls":[],"typingEvents":[],"urlChanges":[],"hoveredCards":[]},
         "settings": {
             "outputSize": {"width": 1920, "height": 1080},
-            "frameRate": 30,
-            "backgroundType": "solid",
-            "backgroundPaddingPx": 32,
-            "borderRadiusPx": 8,
-            "cameraEnabled": false,
-            "captionsEnabled": false,
-            "mouseClickEffectEnabled": false,
-            "deviceFrameEnabled": false,
-            "cursorEnabled": true,
-            "backgroundMusicEnabled": false
+            "frameRate": 60,
+            "zoom": {"enabled": true, "maxZoom": 2, "transitionDurationMs": 750, "easing": "ease-in-out"},
+            "spotlight": {"enabled": true, "dimOpacity": 0.5, "enlargeScale": 1.25, "transitionDurationMs": 750, "minHoldDurationMs": 200, "defaultHoldDurationMs": 1000, "easing": "ease-in-out"},
+            "mouse": {"mouseClickEnabled": false, "mouseDragEnabled": false, "effectType": "ring", "color": "#8b5cf6", "size": 1.0, "soundEnabled": false, "soundVolume": 0.5},
+            "keyboard": {"showHotkeys": true, "hotkeysSize": 1.0, "hotkeysPlacement": "top", "hotkeysMargin": 4},
+            "screen": {
+                "mode": "border",
+                "toolbar": {"enabled": true, "theme": "light", "urlMode": "short"},
+                "padding": 0.02,
+                "borderRadiusPx": 8,
+                "borderWidthPx": 0,
+                "borderColor": "#667eea",
+                "deviceFrameId": "macbook-air-dark",
+                "hasShadow": false,
+                "hasGlow": false,
+                "hasFeather": false,
+                "mute": false
+            },
+            "background": {
+                "type": "color",
+                "color": "#2d2d2dff",
+                "gradientColors": ["#2d2d2dff", "#2d2d2dff"],
+                "gradientDirection": 135,
+                "colorMode": "solid",
+                "backgroundBlurPx": 0
+            },
+            "captions": {"enabled": true, "captionSize": 1.0, "width": 75, "textColor": "#ffffff", "backgroundColor": "#000000cc", "wordHighlight": true},
+            "audio": {
+                "muteMicrophone": false,
+                "muteScreenAudio": false,
+                "screenVolume": 1,
+                "microphoneVolume": 1,
+                "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
+            },
+            "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
+            "overlay": {
+                "enabled": true,
+                "defaultDurationMs": 3000,
+                "blurDefaults": {"blurRadiusPx": 20},
+                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
+                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
+                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
+            },
+            "autoCutApplied": false
         },
         "timeline": {
-            "id": "t-trial",
+            "id": "t4",
             "durationMs": 3000,
             "outputWindows": [{"id": "ow1", "startMs": 0, "endMs": 3000, "speed": 1}],
             "zoomSegments": [],
@@ -268,18 +518,19 @@ VALUES (
             "cameraMoveSegments": [],
             "overlaySegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
         }
     }'::jsonb,
-    'ready',
-    1,
-    3000,
-    NOW() + INTERVAL '12 days'
+    'ready', 1, 3000,
+    NOW() + INTERVAL '7 days'
 ) ON CONFLICT (id) DO NOTHING;
 
--- 5. Transcription usage
-INSERT INTO public.transcription_usage (user_id, minutes_used, minutes_limit, reset_date)
-VALUES
-('11111111-1111-1111-1111-111111111111', 15.5, 60, NOW() + INTERVAL '15 days'),
-('22222222-2222-2222-2222-222222222222', 0, 60, NOW() + INTERVAL '5 days')
+-- ============================================================================
+-- 8. Transcription usage
+-- ============================================================================
+
+INSERT INTO public.transcription_usage (user_id, minutes_used, minutes_limit, reset_date) VALUES
+('11111111-1111-1111-1111-111111111111', 15.5, 60, NOW() + INTERVAL '20 days'),
+('22222222-2222-2222-2222-222222222222', 0,    60, NOW() + INTERVAL '7 days'),
+('33333333-3333-3333-3333-333333333333', 0,    60, NOW() + INTERVAL '30 days')
 ON CONFLICT (user_id) DO NOTHING;

@@ -9,6 +9,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
+import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
@@ -191,12 +192,13 @@ export function CaptionsSettings() {
 
         // Pro gate for OpenAI engine
         if (engine === 'openai') {
-            const { isAuthenticated, hasProAccess } = useUserStore.getState();
+            const { isAuthenticated, hasFreeTrial } = useUserStore.getState();
             if (!isAuthenticated) {
                 setIsAuthModalOpen(true);
                 return;
             }
-            if (!hasProAccess()) {
+            const hasNonFreeAccess = useWorkspaceStore.getState().hasActivePlan || hasFreeTrial();
+            if (!hasNonFreeAccess) {
                 setIsUpgradeModalOpen(true);
                 return;
             }
