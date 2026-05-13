@@ -1,20 +1,6 @@
 import { supabase } from '../../auth/AuthManager';
 import type { CaptionSegment } from '@shared/types';
 
-export class RateLimitError extends Error {
-    cycleMinutesUsed: number;
-    cycleMinutesLimit: number;
-    resetsAt: string;
-
-    constructor(data: { cycleMinutesUsed: number; cycleMinutesLimit: number; resetsAt: string }) {
-        super('Monthly transcription limit reached');
-        this.name = 'RateLimitError';
-        this.cycleMinutesUsed = data.cycleMinutesUsed;
-        this.cycleMinutesLimit = data.cycleMinutesLimit;
-        this.resetsAt = data.resetsAt;
-    }
-}
-
 /**
  * Cloud transcription service using the transcribe edge function + OpenAI Whisper API.
  * Returns CaptionSegment[] with word-level timestamps.
@@ -35,17 +21,7 @@ export class CloudTranscriptionService {
         });
 
         if (error) {
-            // supabase-js wraps non-2xx responses in FunctionsHttpError
             const body = typeof data === 'object' ? data : {};
-
-            if (body?.error === 'rate_limit_exceeded') {
-                throw new RateLimitError({
-                    cycleMinutesUsed: body.cycleMinutesUsed ?? 0,
-                    cycleMinutesLimit: body.cycleMinutesLimit ?? 0,
-                    resetsAt: body.resetsAt ?? '',
-                });
-            }
-
             throw new Error(body?.message || body?.error || error.message || 'Transcription failed');
         }
 

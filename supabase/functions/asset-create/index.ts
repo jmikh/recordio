@@ -44,7 +44,12 @@ const ALLOWED_EXT: Record<string, string[]> = {
  * Request:  { assetType: 'background' | 'music', sizeBytes: number, fileName: string }
  * Response: { signedUrl, storagePath, assetId }
  */
-serve(withAuth(async (req, { user, supabase }) => {
+const adminSupabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+);
+
+serve(withAuth(async (req, { user }) => {
     const { assetType, sizeBytes, fileName } = await req.json();
 
     // 1. Validate inputs
@@ -72,7 +77,7 @@ serve(withAuth(async (req, { user, supabase }) => {
     }
 
     // 2. Check library limit
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await adminSupabase
         .from('user_assets')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
@@ -99,11 +104,6 @@ serve(withAuth(async (req, { user, supabase }) => {
     const storagePath = `${user.id}/assets/${assetId}.${ext}`;
 
     // 4. Insert pending row
-    const adminSupabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
     const { error: insertError } = await adminSupabase
         .from('user_assets')
         .insert({

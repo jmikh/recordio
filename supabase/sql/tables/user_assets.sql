@@ -12,3 +12,10 @@
 │     "status" TEXT NOT NULL DEFAULT 'ready'::text                  │
 │ );                                                                │
 └───────────────────────────────────────────────────────────────────┘
+│                   rls_info                   │
+├──────────────────────────────────────────────┤
+│                                              │
+│ -- RLS: ENABLED                              │
+│ -- Policy: Users can manage own assets (ALL) │
+│ --   USING:      (auth.uid() = user_id)      │
+└──────────────────────────────────────────────┘

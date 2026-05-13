@@ -25,6 +25,9 @@ DROP FUNCTION IF EXISTS public.get_user_storage_bytes(uuid);
 DROP FUNCTION IF EXISTS public.project_list();
 DROP FUNCTION IF EXISTS public.folder_list();
 
+-- Old no-arg overload; replaced by subscription_get(p_workspace_id UUID DEFAULT NULL)
+DROP FUNCTION IF EXISTS public.subscription_get();
+
 -- Welcome email moved from signup trigger to trial_start RPC
 DROP TRIGGER IF EXISTS on_user_signup_send_welcome_email ON auth.users;
 DROP FUNCTION IF EXISTS public.trigger_send_welcome_email();

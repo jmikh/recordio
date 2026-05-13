@@ -9,6 +9,19 @@
 │     "cancel_at_period_end" BOOLEAN DEFAULT false,        │
 │     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(), │
 │     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(), │
-│     "billing_interval" TEXT                              │
+│     "billing_interval" TEXT,                             │
+│     "workspace_id" UUID NOT NULL,                        │
+│     "seats" INTEGER,                                     │
+│     "plan" TEXT NOT NULL DEFAULT 'pro'::text,            │
+│     "stripe_event_at" TIMESTAMP WITH TIME ZONE           │
 │ );                                                       │
 └──────────────────────────────────────────────────────────┘
+│                                                        rls_info                                                         │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                                                         │
+│ -- RLS: ENABLED                                                                                                         │
+│ -- Policy: subscriptions_select (SELECT)                                                                                │
+│ --   USING:      ((user_id = auth.uid()) OR (EXISTS ( SELECT 1                                                          │
+│    FROM workspace_members                                                                                               │
+│   WHERE ((workspace_members.workspace_id = subscriptions.workspace_id) AND (workspace_members.user_id = auth.uid()))))) │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

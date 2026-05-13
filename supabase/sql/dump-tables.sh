@@ -27,6 +27,8 @@ fi
 COUNT=0
 for TABLE in $TABLES; do
     OUT="$TABLES_DIR/$TABLE.sql"
+
+    # Table DDL
     supabase db query $DB_FLAGS "
         SELECT
             'CREATE TABLE IF NOT EXISTS public.$TABLE (' || E'\n' ||
@@ -49,6 +51,28 @@ for TABLE in $TABLES; do
         FROM information_schema.columns c
         WHERE c.table_schema = 'public' AND c.table_name = '$TABLE';
     " | sed '1d' > "$OUT"
+
+    # RLS status + policies (built entirely in SQL to avoid shell CSV parsing issues)
+    supabase db query $DB_FLAGS "
+        SELECT
+            E'\n-- RLS: ' ||
+            CASE WHEN t.relrowsecurity THEN 'ENABLED' ELSE 'DISABLED' END ||
+            COALESCE(
+                (SELECT E'\n' || string_agg(
+                    E'\n-- Policy: ' || p.policyname || ' (' || p.cmd || ')' ||
+                    CASE WHEN p.qual       IS NOT NULL THEN E'\n--   USING:      ' || p.qual       ELSE '' END ||
+                    CASE WHEN p.with_check IS NOT NULL THEN E'\n--   WITH CHECK: ' || p.with_check ELSE '' END,
+                    ''
+                    ORDER BY p.policyname
+                )
+                FROM pg_policies p
+                WHERE p.schemaname = 'public' AND p.tablename = '$TABLE'),
+                ''
+            ) AS rls_info
+        FROM pg_class t
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'public' AND t.relname = '$TABLE';
+    " | sed '1d' >> "$OUT"
 
     echo "  $TABLE -> sql/tables/$TABLE.sql"
     COUNT=$((COUNT + 1))

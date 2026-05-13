@@ -13,7 +13,7 @@ import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, InfoTooltip, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
-import { CloudTranscriptionService, RateLimitError } from '../../../core/transcription/CloudTranscriptionService';
+import { CloudTranscriptionService } from '../../../core/transcription/CloudTranscriptionService';
 
 import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
 import { AuthModal } from '../header/AuthModal';
@@ -281,18 +281,6 @@ export function CaptionsSettings() {
 
         } catch (error: any) {
             if (error.message === 'Aborted') return;
-
-            // Handle rate limit errors from cloud transcription
-            if (error instanceof RateLimitError) {
-                const resetDate = new Date(error.resetsAt);
-                const resetStr = resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                addToast({
-                    type: 'error',
-                    title: 'Transcription Limit Reached',
-                    message: `${error.cycleMinutesUsed.toFixed(0)} of ${error.cycleMinutesLimit} minutes used. Resets ${resetStr}.`
-                });
-                return;
-            }
 
             console.error('[CaptionsSettings] Failed to generate transcription:', error);
 
