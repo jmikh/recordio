@@ -107,7 +107,7 @@ describe('CloudProjectService.saveProject', () => {
         const project = makeProject();
         vi.mocked(CloudStorage.saveProjectMetadata).mockResolvedValue({ cloudVersion: 2 });
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledOnce();
         expect(CloudProjectService.getCloudVersion('proj-1')).toBe(2);
@@ -118,7 +118,7 @@ describe('CloudProjectService.saveProject', () => {
         vi.mocked(CloudStorage.saveProjectMetadata).mockResolvedValue({ cloudVersion: 1 });
 
         // First save: stores hash
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledOnce();
 
         // Second save with same hash: skipped
@@ -132,7 +132,7 @@ describe('CloudProjectService.saveProject', () => {
             new Uint8Array(savedHash.match(/.{2}/g)!.map((b: string) => parseInt(b, 16))).buffer
         );
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
         // Still only called once (from first save)
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledOnce();
     });
@@ -141,7 +141,7 @@ describe('CloudProjectService.saveProject', () => {
         const project = makeProject();
         useSyncStatusStore.getState().setPendingMediaUploads(2);
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         expect(CloudStorage.saveProjectMetadata).not.toHaveBeenCalled();
     });
@@ -152,7 +152,7 @@ describe('CloudProjectService.saveProject', () => {
         // Simulate a save already in flight
         (CloudProjectService as any).saveInFlight.add('proj-1');
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         // Should not have called CloudStorage because save was in flight
         expect(CloudStorage.saveProjectMetadata).not.toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe('CloudProjectService.saveProject', () => {
             new CloudVersionConflictError('proj-1', 1)
         );
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         const state = useSyncStatusStore.getState();
         expect(state.conflict).toEqual({ projectId: 'proj-1' });
@@ -179,7 +179,7 @@ describe('CloudProjectService.saveProject', () => {
         (CloudProjectService as any).cloudVersions.set('proj-1', 5);
         vi.mocked(CloudStorage.saveProjectMetadata).mockResolvedValue({ cloudVersion: 6 });
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledWith(
             project, 'user-1', 5, true
@@ -190,12 +190,12 @@ describe('CloudProjectService.saveProject', () => {
         const project = makeProject();
         vi.mocked(CloudStorage.saveProjectMetadata).mockRejectedValue(new Error('network'));
 
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
 
         // Should be able to save again (in-flight guard cleared)
         vi.mocked(CloudStorage.saveProjectMetadata).mockResolvedValue({ cloudVersion: 1 });
         hashCounter = 100; // different hash
-        await CloudProjectService.saveProject(project, 'user-1', true);
+        await CloudProjectService.saveProject(project, 'user-1');
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledTimes(2);
     });
 });
@@ -239,7 +239,7 @@ describe('CloudProjectService.listProjects', () => {
             is_starred: false,
         }]);
 
-        const items = await CloudProjectService.listProjects();
+        const items = await CloudProjectService.listProjects('workspace-1');
 
         expect(items).toHaveLength(1);
         expect(items[0].id).toBe('p1');

@@ -482,6 +482,8 @@ export function DashboardPage() {
                                 </div>
                             )}
                             <DashboardHeader
+                                searchQuery={searchQuery}
+                                onSearchChange={setSearchQuery}
                                 activeFilter={activeFilter}
                                 onFilterChange={setActiveFilter}
                                 totalCount={searchFiltered.length}
