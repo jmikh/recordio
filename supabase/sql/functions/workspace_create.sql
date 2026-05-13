@@ -23,6 +23,11 @@ BEGIN
     INSERT INTO public.workspace_members (workspace_id, user_id, role)
     VALUES (_wid, _uid, 'admin');
 
+    UPDATE public.user_profiles
+    SET default_workspace_id = _wid,
+        updated_at = now()
+    WHERE user_id = _uid;
+
     SELECT jsonb_build_object(
         'id',          w.id,
         'name',        w.name,

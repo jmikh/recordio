@@ -32,11 +32,14 @@ const PRICE_IDS: Record<string, string> = {
  *   - Seat reductions: credit applied to next invoice
  */
 serve(withAuth(async (req, { supabase }) => {
-    const { workspaceId, newPlan, newSeats, dryRun } = await req.json();
+    const { workspaceId, newPlan, newSeats, newInterval, dryRun } = await req.json();
 
     if (!workspaceId)                              return errorResponse('Missing workspaceId', 400);
     if (newPlan !== 'teams')                       return errorResponse('Only upgrades to Teams are supported', 400);
     if (typeof newSeats !== 'number' || newSeats < 1) return errorResponse('newSeats must be >= 1', 400);
+    if (newInterval && newInterval !== 'monthly' && newInterval !== 'yearly') {
+        return errorResponse('newInterval must be monthly or yearly', 400);
+    }
 
     // ── 1. Verify admin + fetch current subscription ─────────────────────────
     // subscription_workspace_get asserts admin role internally (SECURITY DEFINER).
@@ -52,15 +55,20 @@ serve(withAuth(async (req, { supabase }) => {
         return errorResponse('Subscription is not active', 400);
     }
 
-    // Downgrade not supported
+    // Plan downgrade not supported
     if (currentSub.plan === 'teams' && newPlan === 'pro') {
         return errorResponse('Downgrade to Pro is not supported', 400);
     }
 
+    // Interval downgrade not supported (yearly → monthly)
+    if (newInterval && currentSub.billing_interval === 'yearly' && newInterval === 'monthly') {
+        return errorResponse('Downgrade from yearly to monthly billing is not supported', 400);
+    }
 
-    // No-op guard
-    if (currentSub.plan === 'teams' && currentSub.seats === newSeats) {
-        return errorResponse('No change in seats', 400);
+    // No-op guard — same plan, same seats, same interval
+    const targetInterval = (newInterval ?? currentSub.billing_interval ?? 'monthly') as 'monthly' | 'yearly';
+    if (currentSub.plan === 'teams' && currentSub.seats === newSeats && currentSub.billing_interval === targetInterval) {
+        return errorResponse('No change in plan, seats, or billing interval', 400);
     }
 
     // ── 2. Get Stripe IDs (service role — not exposed via user-facing RPC) ────
@@ -100,11 +108,13 @@ serve(withAuth(async (req, { supabase }) => {
     const item = stripeSub.items.data[0];
     if (!item) return errorResponse('No subscription item found on Stripe subscription', 500);
 
-    const billingInterval = (currentSub.billing_interval ?? 'monthly') as 'monthly' | 'yearly';
-    const isPlanChange    = currentSub.plan !== newPlan;
-    const newPriceId      = isPlanChange ? PRICE_IDS[`${newPlan}_${billingInterval}`] : null;
+    const billingInterval  = (currentSub.billing_interval ?? 'monthly') as 'monthly' | 'yearly';
+    const isPlanChange     = currentSub.plan !== newPlan;
+    const isIntervalChange = targetInterval !== billingInterval;
+    const needsPriceChange = isPlanChange || isIntervalChange;
+    const newPriceId       = needsPriceChange ? PRICE_IDS[`${newPlan}_${targetInterval}`] : null;
 
-    if (isPlanChange && !newPriceId) {
+    if (needsPriceChange && !newPriceId) {
         return errorResponse('No price configured for the target plan + interval', 500);
     }
 
@@ -138,6 +148,18 @@ serve(withAuth(async (req, { supabase }) => {
             console.error('[subscription-change] createPreview error:', upcoming.error.message);
             return errorResponse(upcoming.error.message, 400);
         }
+
+        // DEBUG: log full line items to understand what Stripe is returning
+        console.log('[subscription-change] Preview line items:', JSON.stringify(
+            (upcoming.lines?.data ?? []).map((l: any) => ({
+                amount: l.amount,
+                description: l.description,
+                proration: l.proration,
+                period: l.period,
+            })),
+            null, 2
+        ));
+        console.log('[subscription-change] amount_due:', upcoming.amount_due, 'subtotal:', upcoming.subtotal, 'total:', upcoming.total);
 
         // amount_due is the net immediate charge for this proration invoice.
         // Filtering by l.proration is unreliable for flexible-billing subscriptions.
@@ -176,12 +198,13 @@ serve(withAuth(async (req, { supabase }) => {
     await adminSupabase
         .from('subscriptions')
         .update({
-            plan:       newPlan,
-            seats:      newSeats,
-            updated_at: new Date().toISOString(),
+            plan:             newPlan,
+            seats:            newSeats,
+            billing_interval: targetInterval,
+            updated_at:       new Date().toISOString(),
         })
         .eq('workspace_id', workspaceId);
 
-    console.log('[subscription-change] Applied — plan:', newPlan, 'seats:', newSeats);
-    return jsonResponse({ success: true, plan: newPlan, seats: newSeats });
+    console.log('[subscription-change] Applied — plan:', newPlan, 'seats:', newSeats, 'interval:', targetInterval);
+    return jsonResponse({ success: true, plan: newPlan, seats: newSeats, billingInterval: targetInterval });
 }));

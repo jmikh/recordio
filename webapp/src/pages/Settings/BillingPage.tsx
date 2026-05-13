@@ -371,7 +371,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                             Next renewal · {new Date(preview.nextRenewalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </span>
                                         <span className="font-semibold text-text-highlighted">
-                                            {formatCurrency(preview.nextRenewalAmount, preview.currency)}/mo
+                                            {formatCurrency(preview.nextRenewalAmount, preview.currency)}/{preview.billingInterval === 'yearly' ? 'yr' : 'mo'}
                                         </span>
                                     </div>
                                 </div>

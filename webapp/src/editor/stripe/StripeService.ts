@@ -28,7 +28,7 @@ export class StripeService {
             // to prevent mobile Safari and other browsers from blocking it.
             const popup = window.open('about:blank', '_blank');
 
-            const redirectUrl = `${window.location.origin}/?subscription-success`;
+            const redirectUrl = `${window.location.origin}/workspace/settings/billing`;
             const cancelUrl = redirectUrl;
 
             const { data, error } = await supabase.functions.invoke('stripe-checkout', {
@@ -80,6 +80,7 @@ export class StripeService {
         workspaceId: string;
         newPlan: 'teams';
         newSeats: number;
+        newInterval?: 'monthly' | 'yearly';
         dryRun: boolean;
     }): Promise<{ preview?: SubscriptionChangePreview; success?: boolean; error?: Error }> {
         if (!supabase) return { error: new Error('Supabase not configured') };
@@ -114,7 +115,7 @@ export class StripeService {
         }
 
         try {
-            const returnUrl = window.location.href;
+            const returnUrl = `${window.location.origin}/workspace/settings/billing`;
             const { workspaceId } = useWorkspaceStore.getState();
 
             const { data, error } = await supabase.functions.invoke('stripe-portal', {
