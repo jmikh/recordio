@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js';
+import * as Sentry from '@sentry/react';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 
@@ -6,9 +7,25 @@ import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+/** Intercepts Supabase fetch calls and reports RPC failures to Sentry. */
+const sentryFetch: typeof fetch = async (url, options) => {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const rpcMatch = url.toString().match(/\/rpc\/([^?]+)/);
+        if (rpcMatch) {
+            const rpcName = rpcMatch[1];
+            const body = await response.clone().json().catch(() => ({}));
+            Sentry.captureException(new Error(`RPC failed: ${rpcName}`), {
+                extra: { rpcName, status: response.status, body },
+            });
+        }
+    }
+    return response;
+};
+
 // Create Supabase client (only if env vars are set)
 export const supabase = supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
+    ? createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: sentryFetch } })
     : null;
 
 /** Cache a remote avatar URL as a data URL to avoid CORS issues on reload */
@@ -165,6 +182,7 @@ export class AuthManager {
 
     private static async handleSession(session: Session | null) {
         if (session) {
+            Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined });
             await syncUserToStore(session);
 
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
@@ -178,6 +196,7 @@ export class AuthManager {
                 }
             }
         } else {
+            Sentry.setUser(null);
             AuthManager.subscriptionFetchedForUserId = null;
             useUserStore.getState().clearUser();
             useWorkspaceStore.getState().clearWorkspace();

@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION public.assert_workspace_creator(p_workspace_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
     IF NOT EXISTS (
@@ -22,7 +23,7 @@ BEGIN
           AND wm.role IN ('creator', 'admin')
           AND w.deleted_at IS NULL
     ) THEN
-        RAISE EXCEPTION 'Requires creator or admin role in this workspace';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Requires creator or admin role in this workspace';
     END IF;
 END;
 $$;

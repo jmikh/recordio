@@ -26,11 +26,11 @@ BEGIN
     WHERE id = p_project_id AND deleted_at IS NULL;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Project not found';
+        RAISE SQLSTATE 'PT404' USING MESSAGE = 'Project not found';
     END IF;
 
     IF _owner_id <> _caller_id THEN
-        RAISE EXCEPTION 'Only the project owner can move a project';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Only the project owner can move a project';
     END IF;
 
     -- Caller must be at least creator in the target workspace

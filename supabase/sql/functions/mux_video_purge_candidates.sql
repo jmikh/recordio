@@ -30,3 +30,8 @@ AS $$
       AND mv.status != 'pending'
     LIMIT 50;
 $$;
+
+-- Service-role only — called by mux-video-purge edge function
+REVOKE ALL ON FUNCTION public.mux_video_purge_candidates() FROM public;
+REVOKE ALL ON FUNCTION public.mux_video_purge_candidates() FROM anon;
+REVOKE ALL ON FUNCTION public.mux_video_purge_candidates() FROM authenticated;

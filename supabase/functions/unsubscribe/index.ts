@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verify } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -137,6 +138,7 @@ serve(async (req) => {
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('[Unsubscribe] Error:', message);
+        await captureException(err, { function: 'unsubscribe' });
         return new Response(
             confirmationPage(false, 'Something unexpected happened. Please try again.'),
             { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } },

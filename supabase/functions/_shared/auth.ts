@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { captureException } from './sentry.ts';
 
 export const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -37,6 +38,8 @@ export function withAuth(handler: AuthHandler): (req: Request) => Promise<Respon
             return new Response('ok', { headers: corsHeaders });
         }
 
+        let userId: string | undefined;
+
         try {
             const authHeader = req.headers.get('Authorization');
             if (!authHeader) {
@@ -56,9 +59,11 @@ export function withAuth(handler: AuthHandler): (req: Request) => Promise<Respon
                 return errorResponse('Unauthorized', 401);
             }
 
+            userId = user.id;
             return await handler(req, { user, supabase });
         } catch (err) {
             console.error('Unexpected error:', err);
+            await captureException(err, userId ? { userId } : undefined);
             return errorResponse('Internal server error', 500);
         }
     };

@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
 import { uploadToMux } from '../_shared/muxUpload.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const RENDER_SECRET = Deno.env.get('RENDER_SECRET')!;
 const MUX_TOKEN_ID = Deno.env.get('MUX_TOKEN_ID')!;
@@ -91,6 +92,9 @@ serve(async (req: Request) => {
         // 6. Terminal state — use render_job_complete to cascade failures to mux_videos
         if (status === 'completed' || status === 'failed') {
             console.log(`[render-job-hook] Job ${jobId} terminal: ${status}${errorMsg ? ` — ${errorMsg}` : ''}`);
+            if (status === 'failed') {
+                await captureException(new Error(errorMsg ?? 'Render job failed'), { function: 'render-job-hook', jobId });
+            }
             await adminSupabase.rpc('render_job_complete', {
                 p_job_id: jobId,
                 p_status: status,

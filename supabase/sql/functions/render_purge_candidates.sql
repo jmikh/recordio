@@ -29,3 +29,8 @@ AS $$
       AND rj.status != 'pending'
     LIMIT 50;
 $$;
+
+-- Service-role only — called by render-purge edge function
+REVOKE ALL ON FUNCTION public.render_purge_candidates() FROM public;
+REVOKE ALL ON FUNCTION public.render_purge_candidates() FROM anon;
+REVOKE ALL ON FUNCTION public.render_purge_candidates() FROM authenticated;

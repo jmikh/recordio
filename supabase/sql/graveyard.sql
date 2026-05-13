@@ -24,6 +24,10 @@ DROP FUNCTION IF EXISTS public.get_user_storage_bytes(uuid);
 -- Old no-arg overloads replaced by workspace-scoped versions
 DROP FUNCTION IF EXISTS public.project_list();
 DROP FUNCTION IF EXISTS public.folder_list();
+DROP FUNCTION IF EXISTS public.folder_create(text, text);
+
+-- Old project_update overload that included p_name; name updates moved to project_update_name
+DROP FUNCTION IF EXISTS public.project_update(uuid, text, jsonb, integer, integer);
 
 -- Old no-arg overload; replaced by subscription_get(p_workspace_id UUID DEFAULT NULL)
 DROP FUNCTION IF EXISTS public.subscription_get();
@@ -31,3 +35,6 @@ DROP FUNCTION IF EXISTS public.subscription_get();
 -- Welcome email moved from signup trigger to trial_start RPC
 DROP TRIGGER IF EXISTS on_user_signup_send_welcome_email ON auth.users;
 DROP FUNCTION IF EXISTS public.trigger_send_welcome_email();
+
+-- Removed: token alone was insufficient auth; decline can be handled client-side
+DROP FUNCTION IF EXISTS public.workspace_invite_decline(UUID);

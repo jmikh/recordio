@@ -45,3 +45,8 @@ BEGIN
     RETURN QUERY SELECT v_id, v_project_id, TRUE;
 END;
 $$;
+
+-- Service-role only — called by mux-video-hook edge function
+REVOKE ALL ON FUNCTION public.mux_video_complete(TEXT, TEXT) FROM public;
+REVOKE ALL ON FUNCTION public.mux_video_complete(TEXT, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.mux_video_complete(TEXT, TEXT) FROM authenticated;

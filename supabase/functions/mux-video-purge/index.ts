@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const MUX_TOKEN_ID = Deno.env.get('MUX_TOKEN_ID')!;
 const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!;
@@ -88,6 +89,7 @@ serve(async (req: Request) => {
         return jsonResponse({ ok: true, purged, total: rows.length });
     } catch (err) {
         console.error('[mux-video-purge] Unexpected error:', err);
+        await captureException(err, { function: 'mux-video-purge' });
         return errorResponse('Internal server error', 500);
     }
 });

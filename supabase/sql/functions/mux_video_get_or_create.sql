@@ -82,3 +82,8 @@ BEGIN
     RETURN QUERY SELECT v_new_id, 'pending'::TEXT, TRUE, p_cloud_version;
 END;
 $$;
+
+-- Service-role only — called by mux-video-create edge function
+REVOKE ALL ON FUNCTION public.mux_video_get_or_create(UUID, UUID, INT) FROM public;
+REVOKE ALL ON FUNCTION public.mux_video_get_or_create(UUID, UUID, INT) FROM anon;
+REVOKE ALL ON FUNCTION public.mux_video_get_or_create(UUID, UUID, INT) FROM authenticated;

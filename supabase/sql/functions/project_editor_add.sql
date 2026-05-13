@@ -26,15 +26,15 @@ BEGIN
     WHERE p.id = p_project_id AND p.deleted_at IS NULL;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Project not found';
+        RAISE SQLSTATE 'PT404' USING MESSAGE = 'Project not found';
     END IF;
 
     IF _project.owner_id <> _caller_id THEN
-        RAISE EXCEPTION 'Only the project owner can add editors';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Only the project owner can add editors';
     END IF;
 
     IF _project.owner_id = p_user_id THEN
-        RAISE EXCEPTION 'Project owner already has implicit editor access';
+        RAISE SQLSTATE 'PT400' USING MESSAGE = 'Project owner already has implicit editor access';
     END IF;
 
     -- Target must be at least creator in the workspace
@@ -43,7 +43,7 @@ BEGIN
     WHERE workspace_id = _project.workspace_id AND user_id = p_user_id;
 
     IF _target_role IS NULL OR _target_role = 'viewer' THEN
-        RAISE EXCEPTION 'Target user must be a creator or admin in the workspace';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Target user must be a creator or admin in the workspace';
     END IF;
 
     INSERT INTO public.project_editors (project_id, user_id)

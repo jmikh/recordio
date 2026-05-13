@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION public.assert_project_editor(p_project_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
     IF NOT EXISTS (
@@ -29,7 +30,7 @@ BEGIN
               )
           )
     ) THEN
-        RAISE EXCEPTION 'Not an editor of this project';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Not an editor of this project';
     END IF;
 END;
 $$;

@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendEmail } from '../_shared/emails/resend.ts';
 import { emailLayout } from '../_shared/emails/layout.ts';
 import { create, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -137,6 +138,7 @@ serve(async (req) => {
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('[WelcomeEmail] Error:', message);
+        await captureException(err, { function: 'send-welcome-email' });
         return new Response(JSON.stringify({ error: message }), { status: 500 });
     }
 });

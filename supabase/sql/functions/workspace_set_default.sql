@@ -14,20 +14,7 @@ AS $$
 DECLARE
     _uid UUID := auth.uid();
 BEGIN
-    IF _uid IS NULL THEN
-        RAISE EXCEPTION 'Not authenticated';
-    END IF;
-
-    -- Verify caller is a member of the workspace
-    IF NOT EXISTS (
-        SELECT 1 FROM public.workspace_members wm
-        JOIN public.workspaces w ON w.id = wm.workspace_id
-        WHERE wm.workspace_id = p_workspace_id
-          AND wm.user_id = _uid
-          AND w.deleted_at IS NULL
-    ) THEN
-        RAISE EXCEPTION 'Not a member of this workspace';
-    END IF;
+    PERFORM public.assert_workspace_viewer(p_workspace_id);
 
     UPDATE public.user_profiles
     SET default_workspace_id = p_workspace_id,

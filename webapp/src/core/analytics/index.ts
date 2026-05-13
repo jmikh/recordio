@@ -50,12 +50,12 @@ async function detectBrowser(): Promise<string> {
 // ============================================================================
 
 /**
- * Identify the user in Mixpanel with their Supabase user ID.
+ * Identify the user in Mixpanel with their email address.
  * Called from useUserStore.setUser on login and session restore.
  * Merges any anonymous events into the identified profile.
  */
-export function identifyUser(userId: string) {
-    mixpanel.identify(userId);
+export function identifyUser(email: string) {
+    mixpanel.identify(email);
 }
 
 // TODO: Move these engage calls to the backend (on-user-created or stripe-webhooks edge function)

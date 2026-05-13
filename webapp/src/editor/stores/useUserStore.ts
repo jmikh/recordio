@@ -46,7 +46,7 @@ export const useUserStore = create<UserState>()(
                     pictureSourceUrl,
                     isAuthenticated: true,
                 });
-                identifyUser(userId);
+                identifyUser(email);
                 if (!wasAuthenticated) {
                     setUserProfileOnce(email);
                 }

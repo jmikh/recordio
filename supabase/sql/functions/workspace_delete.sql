@@ -21,11 +21,11 @@ BEGIN
     WHERE id = p_workspace_id AND deleted_at IS NULL;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Workspace not found';
+        RAISE SQLSTATE 'PT404' USING MESSAGE = 'Workspace not found';
     END IF;
 
     IF _owner_id <> auth.uid() THEN
-        RAISE EXCEPTION 'Only the workspace owner can delete a workspace';
+        RAISE SQLSTATE 'PT403' USING MESSAGE = 'Only the workspace owner can delete a workspace';
     END IF;
 
     -- Count remaining non-deleted workspaces owned by this user
@@ -35,7 +35,7 @@ BEGIN
       AND deleted_at IS NULL;
 
     IF _owner_workspace_count <= 1 THEN
-        RAISE EXCEPTION 'Cannot delete your last workspace';
+        RAISE SQLSTATE 'PT400' USING MESSAGE = 'Cannot delete your last workspace';
     END IF;
 
     UPDATE public.workspaces

@@ -17,3 +17,8 @@ AS $$
     SET expires_at = p_expires_at
     WHERE created_by = p_user_id AND deleted_at IS NULL;
 $$;
+
+-- Service-role only — called by stripe-webhooks edge function
+REVOKE ALL ON FUNCTION public.set_project_expiry(UUID, TIMESTAMPTZ) FROM public;
+REVOKE ALL ON FUNCTION public.set_project_expiry(UUID, TIMESTAMPTZ) FROM anon;
+REVOKE ALL ON FUNCTION public.set_project_expiry(UUID, TIMESTAMPTZ) FROM authenticated;

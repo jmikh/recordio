@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/auth.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -112,6 +113,7 @@ serve(async (req: Request) => {
         return jsonResponse(baseResponse);
     } catch (err) {
         console.error('[shared-video-get] Unexpected error:', err);
+        await captureException(err, { function: 'shared-video-get' });
         return errorResponse('Internal server error', 500);
     }
 });

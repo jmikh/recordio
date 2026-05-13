@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { captureException } from '../_shared/sentry.ts';
 
 /**
  * Purge-Deleted-Projects Edge Function
@@ -128,6 +129,7 @@ serve(async (req) => {
         );
     } catch (err) {
         console.error('[purge-projects] Unexpected error:', err);
+        await captureException(err, { function: 'purge-deleted-projects' });
         return new Response(
             JSON.stringify({ error: 'Internal server error' }),
             { status: 500, headers: { 'Content-Type': 'application/json' } }

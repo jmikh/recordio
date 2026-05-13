@@ -49,3 +49,8 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- Service-role only — called by render-job-hook edge function and stale job cron
+REVOKE ALL ON FUNCTION public.render_job_complete(UUID, TEXT, TEXT) FROM public;
+REVOKE ALL ON FUNCTION public.render_job_complete(UUID, TEXT, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.render_job_complete(UUID, TEXT, TEXT) FROM authenticated;
