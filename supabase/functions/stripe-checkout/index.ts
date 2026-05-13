@@ -8,8 +8,8 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 });
 
 const PRICE_IDS: Record<string, string> = {
-    pro_monthly:      Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
-    pro_yearly:       Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
+    pro_monthly:      Deno.env.get('STRIPE_PRO_PRICE_ID_MONTHLY') || '',
+    pro_yearly:       Deno.env.get('STRIPE_PRO_PRICE_ID_YEARLY') || '',
     teams_monthly: Deno.env.get('STRIPE_TEAMS_PRICE_ID_MONTHLY') || '',
     teams_yearly:  Deno.env.get('STRIPE_TEAMS_PRICE_ID_YEARLY') || '',
 };

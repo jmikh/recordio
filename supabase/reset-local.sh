@@ -148,7 +148,7 @@ stripe_api POST "customers/$PRO_CUSTOMER" \
 
 PRO_SUB=$(stripe_api POST "subscriptions" \
     -d "customer=$PRO_CUSTOMER" \
-    -d "items[0][price]=$STRIPE_PRICE_ID_MONTHLY" \
+    -d "items[0][price]=$STRIPE_PRO_PRICE_ID_MONTHLY" \
     -d "default_payment_method=$PRO_PM" \
     | jq -r '.id')
 echo "  Pro subscription: $PRO_SUB"
