@@ -78,6 +78,7 @@ export function withAuth(handler: AuthHandler): (req: Request) => Promise<Respon
         try {
             const authHeader = req.headers.get('Authorization');
             if (!authHeader) {
+                console.error('[withAuth] No Authorization header');
                 return errorResponse('Unauthorized', 401);
             }
 
@@ -89,6 +90,7 @@ export function withAuth(handler: AuthHandler): (req: Request) => Promise<Respon
 
             const { data: { user }, error: authError } = await supabase.auth.getUser();
             if (authError || !user) {
+                console.error('[withAuth] auth.getUser() failed:', authError?.message ?? 'no user');
                 return errorResponse('Unauthorized', 401);
             }
 

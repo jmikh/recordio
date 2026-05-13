@@ -1,5 +1,4 @@
 import type { CaptionSegment } from '@shared/types';
-import { textToWords } from '@shared/utils/captionUtils';
 
 const SAMPLE_RATE = 16000;
 
@@ -139,7 +138,15 @@ export class TranscriptionService {
 
             segments.push({
                 id: crypto.randomUUID(),
-                words: textToWords(text, sourceStartTimeMs, sourceEndTimeMs),
+                words: [{
+                    id: crypto.randomUUID(),
+                    word: text,
+                    sourceStartTimeMs,
+                    sourceEndTimeMs,
+                    outputStartTimeMs: 0,
+                    outputEndTimeMs: 0,
+                    visible: false,
+                }],
                 sourceStartTimeMs,
                 sourceEndTimeMs,
                 outputStartTimeMs: 0,

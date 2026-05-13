@@ -23,6 +23,7 @@ import { AuthModal } from './components/header/AuthModal';
 
 
 import { useUserStore } from './stores/useUserStore';
+import { AuthManager } from '../auth/AuthManager';
 import { trackEditorLoaded } from '../core/analytics';
 import { navigate } from '../navigate';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
@@ -94,6 +95,9 @@ function Editor() {
                 navigate('/', { replace: true });
                 return;
             }
+
+            await AuthManager.ready;
+            if (cancelled) return;
 
             const isAuthed = useUserStore.getState().isAuthenticated;
             if (!isAuthed) {

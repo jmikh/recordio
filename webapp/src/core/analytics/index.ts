@@ -10,10 +10,13 @@ import mixpanel from 'mixpanel-browser';
 // Mixpanel Initialization
 // ============================================================================
 
+const IS_PRODUCTION = import.meta.env.MODE === 'production';
+
 let mixpanelReady = false;
 
 try {
     mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
+        opt_out_tracking_by_default: !IS_PRODUCTION,
         api_host: '/mp',
         autocapture: false,
         record_sessions_percent: 0,

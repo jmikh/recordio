@@ -178,13 +178,20 @@ function wrapTextWithWordInfo(
     words: string[],
     maxWidth: number
 ): LineInfo[] {
+    // Expand words that contain spaces into tokens, preserving globalIndex for highlighting
+    const tokens: Array<{ word: string; globalIndex: number }> = [];
+    for (let i = 0; i < words.length; i++) {
+        for (const part of words[i].split(/\s+/).filter(p => p.length > 0)) {
+            tokens.push({ word: part, globalIndex: i });
+        }
+    }
+
     const lines: LineInfo[] = [];
     let currentLineWords: Array<{ word: string; globalIndex: number }> = [];
     let currentLineText = '';
 
-    for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        const testLine = currentLineText ? `${currentLineText} ${word}` : word;
+    for (const token of tokens) {
+        const testLine = currentLineText ? `${currentLineText} ${token.word}` : token.word;
         const metrics = ctx.measureText(testLine);
 
         if (metrics.width > maxWidth && currentLineText) {
@@ -193,10 +200,10 @@ function wrapTextWithWordInfo(
                 text: currentLineText,
                 words: [...currentLineWords]
             });
-            currentLineWords = [{ word, globalIndex: i }];
-            currentLineText = word;
+            currentLineWords = [token];
+            currentLineText = token.word;
         } else {
-            currentLineWords.push({ word, globalIndex: i });
+            currentLineWords.push(token);
             currentLineText = testLine;
         }
     }

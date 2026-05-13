@@ -29,7 +29,6 @@ BEGIN
         'id',          w.id,
         'name',        w.name,
         'owner_id',    w.owner_id,
-        'is_personal', w.is_personal,
         'created_at',  w.created_at,
         'updated_at',  w.updated_at
     ) INTO _result

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { LuTrash2 } from 'react-icons/lu';
+import { LuTrash2, LuSearch } from 'react-icons/lu';
+import { WorkspaceDropdown } from '../components/WorkspaceDropdown';
 import { CloudProjectService, type ProjectListItem } from '../storage/cloudProjectService';
 import type { CloudFolder } from '../storage/cloudStorage';
 import { ProjectCard } from '../components/ProjectCard';
@@ -16,7 +17,6 @@ import { AuthManager, supabase } from '../auth/AuthManager';
 
 import { SupportModal } from '../components/SupportModal';
 import { AuthModal } from '../editor/components/header/AuthModal';
-import { UpgradeModal } from '../editor/components/header/UpgradeModal';
 import { useToast } from '../editor/components/Toast';
 import { trackProjectOpened } from '../core/analytics';
 
@@ -36,7 +36,7 @@ export function DashboardPage() {
     const hasNonFreeAccess = useNonFreeAccess();
     const {
         workspaceId, workspaceName, workspaceRole,
-        workspaceList, setWorkspace, setWorkspaceList,
+        workspaceList, workspaceReady, setWorkspace, setWorkspaceList,
     } = useWorkspaceStore();
     const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
     const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -48,7 +48,6 @@ export function DashboardPage() {
     const isAuthenticated = !!userId;
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
 
@@ -81,8 +80,6 @@ export function DashboardPage() {
         });
     };
 
-    const [checkoutInterval, setCheckoutInterval] = useState<'monthly' | 'yearly' | undefined>();
-
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const error = params.get('error');
@@ -92,17 +89,16 @@ export function DashboardPage() {
 
         const checkout = params.get('checkout');
         if (checkout === 'monthly' || checkout === 'yearly') {
-            setCheckoutInterval(checkout);
-            setIsUpgradeModalOpen(true);
+            navigate('/workspace/settings?tab=billing', { replace: true });
+            return;
         }
 
         if (params.has('subscription-success')) {
             setShowSubscriptionSuccess(true);
         }
 
-        if (error || checkout || params.has('subscription-success')) {
+        if (error || params.has('subscription-success')) {
             const url = new URL(window.location.href);
-            url.searchParams.delete('checkout');
             url.searchParams.delete('error');
             url.searchParams.delete('subscription-success');
             window.history.replaceState({}, '', url.pathname + url.search + url.hash);
@@ -221,7 +217,31 @@ export function DashboardPage() {
     const handleSwitchWorkspace = async (newWorkspaceId: string) => {
         const ws = workspaceList.find(w => w.id === newWorkspaceId);
         if (!ws) return;
-        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.is_personal, ws.seats);
+        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.seats);
+        // Persist as default workspace for next login
+        if (supabase) supabase.rpc('workspace_set_default', { p_workspace_id: newWorkspaceId }).then();
+        // Reload subscription for the new workspace
+        if (supabase) {
+            const { data } = await supabase.rpc('subscription_get', { p_workspace_id: newWorkspaceId });
+            const { setSubscription } = useWorkspaceStore.getState();
+            if (data) {
+                setSubscription({
+                    status: data.status,
+                    plan: data.plan ?? 'pro',
+                    currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
+                    cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
+                    billingInterval: data.billing_interval || null,
+                    seats: data.seats ?? null,
+                    stripeCustomerId: data.stripe_customer_id ?? null,
+                }, userId ?? undefined);
+            } else {
+                setSubscription({
+                    status: null, plan: 'pro', currentPeriodEnd: null,
+                    cancelAtPeriodEnd: false, billingInterval: null,
+                    seats: null, stripeCustomerId: null,
+                }, userId ?? undefined);
+            }
+        }
         // Projects reload automatically via the workspaceId effect
     };
 
@@ -235,11 +255,11 @@ export function DashboardPage() {
         try {
             const { data, error } = await supabase.rpc('workspace_create', { p_name: name });
             if (error) throw error;
-            const created = data as { id: string; name: string; owner_id: string; role: string; is_personal: boolean };
+            const created = data as { id: string; name: string; owner_id: string; role: string };
             // Add to list and switch
-            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, is_personal: false, role: created.role as 'admin', seats: null };
+            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, role: created.role as 'admin', seats: null };
             setWorkspaceList([...workspaceList, newItem]);
-            setWorkspace(created.id, created.name, created.owner_id, created.role, false, null);
+            setWorkspace(created.id, created.name, created.owner_id, created.role, null);
             setNewWorkspaceName('');
             setShowCreateWorkspace(false);
             addToast({ type: 'success', title: `Workspace "${created.name}" created` });
@@ -401,54 +421,74 @@ export function DashboardPage() {
         setSelectedIds(new Set());
     };
 
-    return (
-        <div className="min-h-screen bg-surface-body text-text-main flex">
-            {/* Sidebar */}
-            <DashboardSidebar
-                activeView={activeView}
-                onViewChange={setActiveView}
-                projectCount={projects.length}
-                hasNonFreeAccess={hasNonFreeAccess}
-                starredCount={starredCount}
-                trashCount={trashProjects.length}
-                publishedCount={sharedCount}
-                folders={folders}
-                onCreateFolder={handleCreateFolder}
-                onEditFolder={handleEditFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onRecord={handleRecord}
-                isAuthenticated={isAuthenticated}
-                onOpenSupport={() => setIsSupportModalOpen(true)}
-                onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)}
-                onOpenAuthModal={() => setIsAuthModalOpen(true)}
-                workspaceList={workspaceList}
-                currentWorkspaceId={workspaceId}
-                currentWorkspaceName={workspaceName}
-                currentWorkspaceRole={workspaceRole}
-                onSwitchWorkspace={handleSwitchWorkspace}
-                onCreateWorkspace={handleCreateWorkspace}
-                onOpenWorkspaceSettings={() => navigate('/workspace/settings')}
-            />
+    if (isAuthenticated && !workspaceReady) return null;
 
-            {/* Main Content */}
-            <div className="flex-1 min-w-0 flex flex-col">
-                {activeView !== 'trash' ? (
-                    <>
-                        {activeFolderName && (
-                            <div className="px-6 pt-4">
-                                <h1 className="text-lg font-semibold text-text-highlighted">{activeFolderName}</h1>
-                            </div>
-                        )}
-                        <DashboardHeader
-                            searchQuery={searchQuery}
-                            onSearchChange={setSearchQuery}
-                            activeFilter={activeFilter}
-                            onFilterChange={setActiveFilter}
-                            totalCount={searchFiltered.length}
-                            under1MinCount={under1MinCount}
-                            sortOrder={sortOrder}
-                            onSortChange={setSortOrder}
-                        />
+    return (
+        <div className="min-h-screen bg-surface-body text-text-main flex flex-col">
+            {/* Top Header */}
+            <div className="h-header shrink-0 border-b border-border bg-surface flex items-center px-4 relative z-[var(--z-index-navbar)]">
+                <div className="shrink-0">
+                    <WorkspaceDropdown
+                        workspaces={workspaceList}
+                        currentWorkspaceId={workspaceId}
+                        currentWorkspaceName={workspaceName}
+                        currentRole={workspaceRole}
+                        currentUserId={userId}
+                        onSwitch={handleSwitchWorkspace}
+                        onCreate={handleCreateWorkspace}
+                        onOpenSettings={() => navigate('/workspace/settings')}
+                    />
+                </div>
+                <div className="absolute left-1/2 -translate-x-1/2 w-72">
+                    <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 icon-sm text-text-muted pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search recordings..."
+                        className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex flex-1 overflow-hidden">
+                {/* Sidebar */}
+                <DashboardSidebar
+                    activeView={activeView}
+                    onViewChange={setActiveView}
+                    projectCount={projects.length}
+                    hasNonFreeAccess={hasNonFreeAccess}
+                    starredCount={starredCount}
+                    trashCount={trashProjects.length}
+                    publishedCount={sharedCount}
+                    folders={folders}
+                    onCreateFolder={handleCreateFolder}
+                    onEditFolder={handleEditFolder}
+                    onDeleteFolder={handleDeleteFolder}
+                    onRecord={handleRecord}
+                    isAuthenticated={isAuthenticated}
+                    onOpenSupport={() => setIsSupportModalOpen(true)}
+                    onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                />
+
+                {/* Main Content */}
+                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+                    {activeView !== 'trash' ? (
+                        <>
+                            {activeFolderName && (
+                                <div className="px-6 pt-4">
+                                    <h1 className="text-lg font-semibold text-text-highlighted">{activeFolderName}</h1>
+                                </div>
+                            )}
+                            <DashboardHeader
+                                activeFilter={activeFilter}
+                                onFilterChange={setActiveFilter}
+                                totalCount={searchFiltered.length}
+                                under1MinCount={under1MinCount}
+                                sortOrder={sortOrder}
+                                onSortChange={setSortOrder}
+                            />
 
                         {/* Project Grid */}
                         <main className="flex-1 overflow-y-auto p-6">
@@ -536,13 +576,15 @@ export function DashboardPage() {
                                             deletedAt: item.deletedAt,
                                         }}
                                         onOpen={() => {}}
-                                        onRestore={() => hasNonFreeAccess ? handleRestore(item.id) : setIsUpgradeModalOpen(true)}
+                                        onRestore={() => handleRestore(item.id)}
+                                        restoreGated={!hasNonFreeAccess}
                                     />
                                 ))}
                             </div>
                         )}
                     </main>
                 )}
+                </div>
             </div>
 
             {/* Floating Action Bar — Select Mode */}
@@ -592,19 +634,6 @@ export function DashboardPage() {
                 onClose={() => setIsAuthModalOpen(false)}
                 onAuthSuccess={() => { }}
             />
-            <UpgradeModal
-                isOpen={isUpgradeModalOpen}
-                onClose={() => { setIsUpgradeModalOpen(false); setCheckoutInterval(undefined); }}
-                onSignInRequest={() => {
-                    const interval = checkoutInterval || 'yearly';
-                    window.history.replaceState({}, '', `/?checkout=${interval}`);
-                    setIsUpgradeModalOpen(false);
-                    setIsAuthModalOpen(true);
-                }}
-                initialInterval={checkoutInterval}
-                autoCheckout={!!checkoutInterval && isAuthenticated}
-            />
-
             {/* Bulk Delete Confirmation Modal */}
             {showBulkDeleteModal && createPortal(
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
@@ -656,9 +685,6 @@ export function DashboardPage() {
                     Get Started
                 </Button>
             </Modal>
-
-            {/* Mandatory login modal — non-dismissable when not authenticated */}
-            <AuthModal isOpen={!isAuthenticated} onClose={() => {}} />
 
             {/* Create Workspace Modal */}
             <Modal isOpen={showCreateWorkspace} onClose={() => { setShowCreateWorkspace(false); setNewWorkspaceName(''); }} maxWidth="max-w-[400px]">

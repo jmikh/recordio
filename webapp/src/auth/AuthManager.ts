@@ -73,16 +73,21 @@ async function loadDefaultWorkspace(userId: string) {
         if (!error && data) {
             useWorkspaceStore.getState().setWorkspace(
                 data.id, data.name, data.owner_id,
-                data.role, data.is_personal, data.seats ?? null,
+                data.role, data.seats ?? null,
             );
         }
     } catch {
         // Workspace table not configured yet
         return;
+    } finally {
+        useWorkspaceStore.getState().setWorkspaceReady();
     }
 
     try {
-        const { data, error } = await supabase.rpc('subscription_get');
+        const workspaceId = useWorkspaceStore.getState().workspaceId;
+        const { data, error } = await supabase.rpc('subscription_get', {
+            p_workspace_id: workspaceId ?? null,
+        });
         if (!error && data) {
             useWorkspaceStore.getState().setSubscription({
                 status: data.status,
@@ -92,6 +97,17 @@ async function loadDefaultWorkspace(userId: string) {
                 billingInterval: data.billing_interval || null,
                 seats: data.seats ?? null,
                 stripeCustomerId: data.stripe_customer_id ?? null,
+            }, userId);
+        } else if (!data) {
+            // No subscription for this workspace — reset to free
+            useWorkspaceStore.getState().setSubscription({
+                status: null,
+                plan: 'pro',
+                currentPeriodEnd: null,
+                cancelAtPeriodEnd: false,
+                billingInterval: null,
+                seats: null,
+                stripeCustomerId: null,
             }, userId);
         }
     } catch {
@@ -126,22 +142,23 @@ export class AuthManager {
         supabase.auth.onAuthStateChange((event, session) => {
             console.log(`[Auth] onAuthStateChange: ${event}, session: ${session ? session.user.id : 'null'}`);
 
-            // Resolve ready on the first event so components can start querying.
-            // Don't await handleSession — avatar caching and subscription fetch
-            // can finish in the background.
             if (firstEvent) {
                 firstEvent = false;
                 if (session) {
-                    // Sync basic user info synchronously so isAuthenticated is set
+                    // Sync basic user info synchronously so isAuthenticated is set,
+                    // but don't resolve ready yet — wait for workspace to load first.
                     const { setUser } = useUserStore.getState();
                     const { full_name, avatar_url, picture, name } = session.user.user_metadata || {};
                     const userName = full_name || name || session.user.email?.split('@')[0] || 'User';
                     setUser(session.user.id, session.user.email || '', userName, avatar_url || picture || null, avatar_url || picture || null);
+                } else {
+                    // No session — nothing to load, unblock immediately.
+                    AuthManager.readyResolve();
                 }
-                AuthManager.readyResolve();
             }
 
-            // Full sync (avatar caching, subscription fetch) runs in background
+            // Full sync (avatar caching, workspace + subscription fetch) runs in background.
+            // handleSession calls readyResolve() once the workspace is loaded.
             AuthManager.handleSession(session);
         });
     }
@@ -152,7 +169,13 @@ export class AuthManager {
 
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
                 AuthManager.subscriptionFetchedForUserId = session.user.id;
-                await Promise.all([fetchProfile(), loadDefaultWorkspace(session.user.id)]);
+                try {
+                    await Promise.all([fetchProfile(), loadDefaultWorkspace(session.user.id)]);
+                } finally {
+                    // Resolve ready after workspace is loaded (or failed) so the
+                    // dashboard never renders before the correct workspace is set.
+                    AuthManager.readyResolve();
+                }
             }
         } else {
             AuthManager.subscriptionFetchedForUserId = null;
@@ -179,7 +202,16 @@ export class AuthManager {
             return;
         }
 
-        await supabase.auth.signOut();
+        // Try global sign-out to invalidate the server-side session.
+        // Fall back gracefully if the session is already gone (e.g. after db reset).
+        const { error } = await supabase.auth.signOut({ scope: 'global' });
+        if (error) console.warn('[Auth] signOut error (session may already be gone):', error.message);
+
+        // Belt-and-suspenders: wipe all Supabase auth keys from localStorage
+        // in case the SDK missed any (e.g. on version quirks or storage race).
+        Object.keys(localStorage)
+            .filter(k => k.startsWith('sb-'))
+            .forEach(k => localStorage.removeItem(k));
     }
 
     /**

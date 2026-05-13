@@ -10,21 +10,21 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const PRICE_IDS: Record<string, string> = {
     pro_monthly:      Deno.env.get('STRIPE_PRICE_ID_MONTHLY') || '',
     pro_yearly:       Deno.env.get('STRIPE_PRICE_ID_YEARLY') || '',
-    business_monthly: Deno.env.get('STRIPE_BUSINESS_PRICE_ID_MONTHLY') || '',
-    business_yearly:  Deno.env.get('STRIPE_BUSINESS_PRICE_ID_YEARLY') || '',
+    teams_monthly: Deno.env.get('STRIPE_TEAMS_PRICE_ID_MONTHLY') || '',
+    teams_yearly:  Deno.env.get('STRIPE_TEAMS_PRICE_ID_YEARLY') || '',
 };
 
 /**
  * Stripe Checkout Edge Function
  *
- * Creates a Stripe checkout session for Pro or Business subscriptions.
+ * Creates a Stripe checkout session for Pro or Teams subscriptions.
  *
  * Request body:
  *   { userId, userEmail, plan, interval, workspaceId, seats?, successUrl, cancelUrl }
  *
- * - plan: 'pro' | 'business'
+ * - plan: 'pro' | 'teams'
  * - interval: 'monthly' | 'yearly'
- * - seats: number (Business only, defaults to 5)
+ * - seats: number (Teams only, defaults to 5)
  * - workspaceId: UUID of the workspace being upgraded
  */
 serve(withAuth(async (req, { user }) => {
@@ -46,7 +46,7 @@ serve(withAuth(async (req, { user }) => {
         return errorResponse('No price configured for the selected plan', 400);
     }
 
-    const quantity = plan === 'business' ? Math.max(1, seats) : 1;
+    const quantity = plan === 'teams' ? Math.max(1, seats) : 1;
 
     const session = await stripe.checkout.sessions.create({
         customer_email: userEmail,

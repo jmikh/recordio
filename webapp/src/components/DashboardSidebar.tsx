@@ -4,8 +4,6 @@ import { LuLayoutGrid, LuStar, LuShare2, LuTrash2, LuFolder, LuPlus, LuEllipsis,
 import { MdOutlineBugReport } from 'react-icons/md';
 import { Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
 import { UserMenu } from './UserMenu';
-import { WorkspaceDropdown } from './WorkspaceDropdown';
-import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
 import type { CloudFolder } from '../storage/cloudStorage';
 
 export type DashboardView = 'all' | 'starred' | 'published' | 'trash' | { folder: string };
@@ -27,16 +25,7 @@ interface DashboardSidebarProps {
     onRecord: () => void;
     isAuthenticated: boolean;
     onOpenSupport: () => void;
-    onOpenUpgradeModal: () => void;
     onOpenAuthModal: () => void;
-    // Workspace
-    workspaceList: WorkspaceListItem[];
-    currentWorkspaceId: string | null;
-    currentWorkspaceName: string | null;
-    currentWorkspaceRole: 'viewer' | 'creator' | 'admin' | null;
-    onSwitchWorkspace: (workspaceId: string) => void;
-    onCreateWorkspace: () => void;
-    onOpenWorkspaceSettings: () => void;
 }
 
 interface NavItem {
@@ -61,15 +50,7 @@ export function DashboardSidebar({
     onRecord,
     isAuthenticated,
     onOpenSupport,
-    onOpenUpgradeModal,
     onOpenAuthModal,
-    workspaceList,
-    currentWorkspaceId,
-    currentWorkspaceName,
-    currentWorkspaceRole,
-    onSwitchWorkspace,
-    onCreateWorkspace,
-    onOpenWorkspaceSettings,
 }: DashboardSidebarProps) {
 
     // Create folder modal
@@ -161,18 +142,9 @@ export function DashboardSidebar({
     const inputClassName = "w-full px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
     return (
-        <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
-            {/* Workspace switcher + New Recording */}
-            <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
-                <WorkspaceDropdown
-                    workspaces={workspaceList}
-                    currentWorkspaceId={currentWorkspaceId}
-                    currentWorkspaceName={currentWorkspaceName}
-                    currentRole={currentWorkspaceRole}
-                    onSwitch={onSwitchWorkspace}
-                    onCreate={onCreateWorkspace}
-                    onOpenSettings={onOpenWorkspaceSettings}
-                />
+        <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col overflow-y-auto">
+            {/* New Recording */}
+            <div className="px-4 pt-4 pb-2">
                 <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="w-full">
                     New recording
                 </Button>
@@ -316,7 +288,7 @@ export function DashboardSidebar({
                 <ThemeToggle />
                 <div className="flex-1" />
                 {isAuthenticated ? (
-                    <UserMenu onOpenUpgradeModal={onOpenUpgradeModal} openDirection="up" />
+                    <UserMenu openDirection="up" />
                 ) : (
                     <Button variant="ghost" size="sm" onClick={onOpenAuthModal}>
                         Sign In

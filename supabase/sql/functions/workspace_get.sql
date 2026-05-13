@@ -21,13 +21,18 @@ BEGIN
         'id',          w.id,
         'name',        w.name,
         'owner_id',    w.owner_id,
-        'is_personal', w.is_personal,
         'role',        (
             SELECT wm2.role FROM public.workspace_members wm2
             WHERE wm2.workspace_id = w.id AND wm2.user_id = auth.uid()
         ),
         'seats',       (
             SELECT s.seats FROM public.subscriptions s
+            WHERE s.workspace_id = w.id
+            LIMIT 1
+        ),
+        'viewer_seats', (
+            SELECT CASE WHEN s.seats IS NOT NULL THEN s.seats * 10 ELSE NULL END
+            FROM public.subscriptions s
             WHERE s.workspace_id = w.id
             LIMIT 1
         ),

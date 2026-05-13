@@ -2,7 +2,7 @@
 --
 -- Soft-deletes a workspace by setting deleted_at.
 -- Caller must be the workspace owner (owner_id).
--- Blocked on personal workspaces (is_personal = TRUE).
+-- Blocked if this is the owner's last remaining workspace.
 --
 -- Called by: webapp workspace settings (danger zone)
 -- Tables:   workspaces
@@ -13,9 +13,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    _workspace RECORD;
+    _owner_id UUID;
+    _owner_workspace_count INT;
 BEGIN
-    SELECT id, owner_id, is_personal INTO _workspace
+    SELECT owner_id INTO _owner_id
     FROM public.workspaces
     WHERE id = p_workspace_id AND deleted_at IS NULL;
 
@@ -23,12 +24,18 @@ BEGIN
         RAISE EXCEPTION 'Workspace not found';
     END IF;
 
-    IF _workspace.owner_id <> auth.uid() THEN
+    IF _owner_id <> auth.uid() THEN
         RAISE EXCEPTION 'Only the workspace owner can delete a workspace';
     END IF;
 
-    IF _workspace.is_personal THEN
-        RAISE EXCEPTION 'Personal workspaces cannot be deleted';
+    -- Count remaining non-deleted workspaces owned by this user
+    SELECT COUNT(*) INTO _owner_workspace_count
+    FROM public.workspaces
+    WHERE owner_id = auth.uid()
+      AND deleted_at IS NULL;
+
+    IF _owner_workspace_count <= 1 THEN
+        RAISE EXCEPTION 'Cannot delete your last workspace';
     END IF;
 
     UPDATE public.workspaces

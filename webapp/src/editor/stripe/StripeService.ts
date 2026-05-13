@@ -1,4 +1,13 @@
 import { supabase } from '../../auth/AuthManager';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+
+export interface SubscriptionChangePreview {
+    immediateCharge:   number;               // dollars charged today (proration)
+    nextRenewalAmount: number;               // dollars per billing cycle at next renewal
+    billingInterval:   'monthly' | 'yearly'; // cycle length for the renewal amount
+    nextRenewalDate:   string;               // ISO date of next renewal
+    currency:          string;
+}
 
 export class StripeService {
     /**
@@ -9,7 +18,7 @@ export class StripeService {
      *
      * In the browser: opens Stripe checkout in a popup window.
      */
-    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly'): Promise<{ error?: Error }> {
+    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly', plan: 'pro' | 'teams' = 'pro', workspaceId: string | null = null, seats = 5): Promise<{ error?: Error }> {
         if (!supabase) {
             return { error: new Error('Supabase not configured') };
         }
@@ -26,7 +35,10 @@ export class StripeService {
                 body: {
                     userId,
                     userEmail,
+                    plan,
                     interval,
+                    workspaceId,
+                    seats,
                     successUrl: redirectUrl,
                     cancelUrl,
                 },
@@ -59,6 +71,38 @@ export class StripeService {
     }
 
     /**
+     * Preview or apply a subscription plan/seat change.
+     *
+     * dryRun = true  → returns preview with cost breakdown, no side effects
+     * dryRun = false → applies the change; DB is updated immediately + webhook syncs
+     */
+    static async subscriptionChange(params: {
+        workspaceId: string;
+        newPlan: 'teams';
+        newSeats: number;
+        dryRun: boolean;
+    }): Promise<{ preview?: SubscriptionChangePreview; success?: boolean; error?: Error }> {
+        if (!supabase) return { error: new Error('Supabase not configured') };
+
+        try {
+            const { data, error } = await supabase.functions.invoke('subscription-change', {
+                body: params,
+            });
+
+            if (error) {
+                console.error('[Stripe] subscriptionChange error:', error);
+                return { error: error as Error };
+            }
+
+            if (params.dryRun) return { preview: data as SubscriptionChangePreview };
+            return { success: true };
+        } catch (err) {
+            console.error('[Stripe] subscriptionChange unexpected error:', err);
+            return { error: err as Error };
+        }
+    }
+
+    /**
      * Create a Customer Portal session for managing subscription.
      *
      * In the Mac app: opens portal in the default browser via navigation interception.
@@ -71,10 +115,12 @@ export class StripeService {
 
         try {
             const returnUrl = window.location.href;
+            const { workspaceId } = useWorkspaceStore.getState();
 
             const { data, error } = await supabase.functions.invoke('stripe-portal', {
                 body: {
                     returnUrl,
+                    workspaceId,
                 },
             });
 

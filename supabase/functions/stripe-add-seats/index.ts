@@ -14,7 +14,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 /**
  * Stripe Add Seats Edge Function
  *
- * Adds seats to an existing Business subscription.
+ * Adds seats to an existing Teams subscription.
  * Caller must be a workspace admin.
  *
  * Request body: { workspaceId, additionalSeats }
@@ -48,7 +48,7 @@ serve(withAuth(async (req, { user }) => {
         .maybeSingle();
 
     if (!sub?.stripe_subscription_id) return errorResponse('No active subscription found', 404);
-    if (sub.plan !== 'business') return errorResponse('Seat management is only available on the Business plan', 400);
+    if (sub.plan !== 'teams') return errorResponse('Seat management is only available on the Teams plan', 400);
 
     const currentSeats = sub.seats ?? 1;
     const newSeats = currentSeats + additionalSeats;

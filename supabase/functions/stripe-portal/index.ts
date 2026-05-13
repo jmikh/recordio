@@ -7,18 +7,23 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
     httpClient: Stripe.createFetchHttpClient(),
 });
 
-serve(withAuth(async (req, { user, supabase }) => {
-    const { returnUrl } = await req.json();
+serve(withAuth(async (req, { supabase }) => {
+    const { returnUrl, workspaceId } = await req.json();
 
-    // Look up the caller's Stripe customer ID from their subscription
-    const { data: sub } = await supabase
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+    if (!workspaceId) return errorResponse('Missing workspaceId', 400);
+
+    // Use the subscription_get RPC (SECURITY DEFINER) — avoids direct table
+    // access and handles workspace membership checks internally.
+    const { data: sub, error: subError } = await supabase
+        .rpc('subscription_get', { p_workspace_id: workspaceId });
+
+    if (subError) {
+        console.error('[stripe-portal] subscription_get error:', subError.message);
+        return errorResponse('Failed to fetch subscription', 500);
+    }
 
     if (!sub?.stripe_customer_id) {
-        return errorResponse('No subscription found', 404);
+        return errorResponse('No subscription found for this workspace', 404);
     }
 
     const session = await stripe.billingPortal.sessions.create({

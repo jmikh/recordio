@@ -10,12 +10,12 @@ import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../stores/useUserStore';
 import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
-import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, type PreviewItem } from '@shared/components';
+import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, InfoTooltip, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
 import { CloudTranscriptionService, RateLimitError } from '../../../core/transcription/CloudTranscriptionService';
 
-import { UpgradeModal } from '../header/UpgradeModal';
+import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
 import { AuthModal } from '../header/AuthModal';
 
 import { trackGenerateCaptions } from '../../../core/analytics';
@@ -59,8 +59,9 @@ export function CaptionsSettings() {
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hideCloudTranscription = false; // TODO: remove after per-user limits are live
     const [engine, setEngine] = useState<TranscriptionEngine>('local');
-    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const hasNonFreeAccess = useWorkspaceStore.getState().hasActivePlan;
+    const [isProModalOpen, setIsProModalOpen] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const captionsCardRef = useRef<HTMLDivElement>(null);
 
@@ -190,16 +191,11 @@ export function CaptionsSettings() {
             return;
         }
 
-        // Pro gate for OpenAI engine
+        // Auth gate for OpenAI engine
         if (engine === 'openai') {
-            const { isAuthenticated, hasFreeTrial } = useUserStore.getState();
+            const { isAuthenticated } = useUserStore.getState();
             if (!isAuthenticated) {
                 setIsAuthModalOpen(true);
-                return;
-            }
-            const hasNonFreeAccess = useWorkspaceStore.getState().hasActivePlan || hasFreeTrial();
-            if (!hasNonFreeAccess) {
-                setIsUpgradeModalOpen(true);
                 return;
             }
         }
@@ -456,19 +452,32 @@ export function CaptionsSettings() {
                                 />
                             )}
 
-                            <Tooltip text={isSyncingMedia ? 'Syncing to cloud...' : !hasMicrophone ? 'No microphone detected' : ''} className="w-full">
-                                <Button
-                                    variant="primary"
-                                    onClick={handleGenerate}
-                                    disabled={buttonDisabled}
-                                    fullWidth
-                                >
-                                    {isTranscribing && (
-                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    )}
-                                    {buttonLabel}
-                                </Button>
-                            </Tooltip>
+                            {engine === 'openai' && !hasNonFreeAccess ? (
+                                <>
+                                    <Button variant="primary" fullWidth onClick={() => setIsProModalOpen(true)}>
+                                        {buttonLabel}
+                                    </Button>
+                                    <ProUpgradeModal
+                                        isOpen={isProModalOpen}
+                                        onClose={() => setIsProModalOpen(false)}
+                                        feature="OpenAI transcription"
+                                    />
+                                </>
+                            ) : (
+                                <Tooltip text={isSyncingMedia ? 'Syncing to cloud...' : !hasMicrophone ? 'No microphone detected' : ''} className="w-full">
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleGenerate}
+                                        disabled={buttonDisabled}
+                                        fullWidth
+                                    >
+                                        {isTranscribing && (
+                                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        )}
+                                        {buttonLabel}
+                                    </Button>
+                                </Tooltip>
+                            )}
 
                             {/* Model download progress bar */}
                             {isTranscribing && transcriptionPhase === 'downloading' && (
@@ -629,11 +638,25 @@ export function CaptionsSettings() {
                         onChange={(value) => updateSettings({ captions: { ...settings, enabled: !value } })}
                     />
 
-                    <Toggle
-                        label="Word Highlight"
-                        value={settings.wordHighlight ?? true}
-                        onChange={(value) => updateSettings({ captions: { ...settings, wordHighlight: value } })}
-                    />
+                    {(() => {
+                        const isOpenAI = settings.transcriptionSource?.engine === 'openai';
+                        return (
+                            <Toggle
+                                label="Word Highlight"
+                                value={isOpenAI ? (settings.wordHighlight ?? true) : false}
+                                onChange={(value) => updateSettings({ captions: { ...settings, wordHighlight: value } })}
+                                disabled={!isOpenAI}
+                            >
+                                {!isOpenAI && (
+                                    <InfoTooltip
+                                        description="Word-by-word highlighting requires OpenAI transcription."
+                                        size="small"
+                                        placement="bottom-center"
+                                    />
+                                )}
+                            </Toggle>
+                        );
+                    })()}
 
                     <Slider
                         value={settings.captionSize ?? 1.0}
@@ -774,15 +797,6 @@ export function CaptionsSettings() {
 
 
 
-            {/* Modals for OpenAI pro gate */}
-            <UpgradeModal
-                isOpen={isUpgradeModalOpen}
-                onClose={() => setIsUpgradeModalOpen(false)}
-                onSignInRequest={() => {
-                    setIsUpgradeModalOpen(false);
-                    setIsAuthModalOpen(true);
-                }}
-            />
             <AuthModal
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}

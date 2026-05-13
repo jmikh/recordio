@@ -7,11 +7,11 @@
 -- Users
 --   user1@gmail.com  — 4 workspaces (personal + 3 team with varied subscriptions)
 --   user2@gmail.com  — 1 personal workspace, no subscription
---   user3@gmail.com  — member of user1's Business workspace
+--   user3@gmail.com  — member of user1's Teams workspace
 --
 -- Workspaces (user1)
 --   Personal          eeeeeeee-0001-...  free (no subscription row)
---   Business Team     eeeeeeee-0002-...  active subscription, seats = 5
+--   Teams Workspace   eeeeeeee-0002-...  active subscription, seats = 5
 --   Pro Team          eeeeeeee-0003-...  active subscription, no seats
 --   Unpaid Team       eeeeeeee-0004-...  no subscription row
 
@@ -106,16 +106,16 @@ ON CONFLICT DO NOTHING;
 -- 3. Workspaces
 -- ============================================================================
 
-INSERT INTO public.workspaces (id, name, owner_id, is_personal) VALUES
+INSERT INTO public.workspaces (id, name, owner_id) VALUES
 -- user1
-('eeeeeeee-0000-0000-0000-000000000001', 'My Workspace',    '11111111-1111-1111-1111-111111111111', TRUE),
-('eeeeeeee-0000-0000-0000-000000000002', 'Business Team',   '11111111-1111-1111-1111-111111111111', FALSE),
-('eeeeeeee-0000-0000-0000-000000000003', 'Pro Team',        '11111111-1111-1111-1111-111111111111', FALSE),
-('eeeeeeee-0000-0000-0000-000000000004', 'Unpaid Team',     '11111111-1111-1111-1111-111111111111', FALSE),
+('eeeeeeee-0000-0000-0000-000000000001', 'My Workspace',    '11111111-1111-1111-1111-111111111111'),
+('eeeeeeee-0000-0000-0000-000000000002', 'Teams Workspace', '11111111-1111-1111-1111-111111111111'),
+('eeeeeeee-0000-0000-0000-000000000003', 'Pro Team',        '11111111-1111-1111-1111-111111111111'),
+('eeeeeeee-0000-0000-0000-000000000004', 'Unpaid Team',     '11111111-1111-1111-1111-111111111111'),
 -- user2
-('eeeeeeee-0000-0000-0000-000000000005', 'My Workspace',    '22222222-2222-2222-2222-222222222222', TRUE),
+('eeeeeeee-0000-0000-0000-000000000005', 'My Workspace',    '22222222-2222-2222-2222-222222222222'),
 -- user3
-('eeeeeeee-0000-0000-0000-000000000006', 'My Workspace',    '33333333-3333-3333-3333-333333333333', TRUE)
+('eeeeeeee-0000-0000-0000-000000000006', 'My Workspace',    '33333333-3333-3333-3333-333333333333')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================
@@ -130,7 +130,7 @@ INSERT INTO public.workspace_members (workspace_id, user_id, role) VALUES
 ('eeeeeeee-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'admin'),
 -- user2 is admin of their own workspace
 ('eeeeeeee-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'admin'),
--- user3 is admin of their own workspace + creator in user1's Business Team
+-- user3 is admin of their own workspace + creator in user1's Teams Workspace
 ('eeeeeeee-0000-0000-0000-000000000006', '33333333-3333-3333-3333-333333333333', 'admin'),
 ('eeeeeeee-0000-0000-0000-000000000002', '33333333-3333-3333-3333-333333333333', 'creator')
 ON CONFLICT DO NOTHING;
@@ -148,55 +148,75 @@ ON CONFLICT (user_id) DO NOTHING;
 -- ============================================================================
 -- 6. Subscriptions (workspace-scoped, workspace_id is now PK)
 --
---   Business Team  → active, seats = 5  (business tier)
+--   Teams Workspace → active, seats = 5  (teams tier)
 --   Pro Team       → active, no seats   (pro tier)
 --   Personal user2 → trialing
 --   (personal workspaces for user1/user3 and Unpaid Team have no subscription row)
 -- ============================================================================
 
 INSERT INTO public.subscriptions
-    (workspace_id, user_id, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at_period_end, seats)
+    (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at_period_end, seats)
 VALUES
--- user1 · Business Team: active subscription with 5 seats
+-- user1 · Teams Workspace: active teams subscription with 5 seats
 (
     'eeeeeeee-0000-0000-0000-000000000002',
     '11111111-1111-1111-1111-111111111111',
+    'teams',
     'active',
-    'cus_test_business',
-    'sub_test_business',
+    'cus_UVJMoyMoMbn7Q5',
+    'sub_1TWIlRLra3j0q9yKiFz9DIcQ',
     'yearly',
     NOW() + INTERVAL '300 days',
     false,
     5
 ),
--- user1 · Pro Team: active subscription, no seats
+-- user1 · Pro Team: active pro subscription, no seats
 (
     'eeeeeeee-0000-0000-0000-000000000003',
     '11111111-1111-1111-1111-111111111111',
+    'pro',
     'active',
-    'cus_test_pro',
-    'sub_test_pro',
+    'cus_UVJNoCIk5ZOOpW',
+    'sub_1TWIlVLra3j0q9yKCU1U8T6l',
     'monthly',
     NOW() + INTERVAL '20 days',
     false,
     NULL
-),
--- user2 · personal workspace: trialing
-(
-    'eeeeeeee-0000-0000-0000-000000000005',
-    '22222222-2222-2222-2222-222222222222',
-    'trialing',
-    NULL,
-    NULL,
-    NULL,
-    NOW() + INTERVAL '7 days',
-    true,
-    NULL
 )
+-- user2 has no subscription row; their trial is tracked via user_profiles.trial_ends_at
 ON CONFLICT (workspace_id) DO NOTHING;
 
 -- ============================================================================
--- 7. Sample projects
+-- 7. Workspace invitations
+-- ============================================================================
+
+INSERT INTO public.workspace_invitations (id, workspace_id, email, role, invited_by, token, status, expires_at) VALUES
+-- Teams Workspace: pending creator invite
+(
+    'ffffffff-0000-0000-0000-000000000001',
+    'eeeeeeee-0000-0000-0000-000000000002',
+    'newmember@example.com',
+    'creator',
+    '11111111-1111-1111-1111-111111111111',
+    gen_random_uuid(),
+    'pending',
+    NOW() + INTERVAL '7 days'
+),
+-- Teams Workspace: pending viewer invite
+(
+    'ffffffff-0000-0000-0000-000000000002',
+    'eeeeeeee-0000-0000-0000-000000000002',
+    'john@recordio.io',
+    'viewer',
+    '11111111-1111-1111-1111-111111111111',
+    gen_random_uuid(),
+    'pending',
+    NOW() + INTERVAL '7 days'
+)
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- 8. Sample projects
 -- ============================================================================
 
 -- user1 · personal workspace
@@ -281,14 +301,14 @@ VALUES (
     'ready', 1, 5000
 ) ON CONFLICT (id) DO NOTHING;
 
--- user1 · Business Team
+-- user1 · Teams Workspace
 INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms)
 VALUES (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     'eeeeeeee-0000-0000-0000-000000000002',
     '11111111-1111-1111-1111-111111111111',
     '11111111-1111-1111-1111-111111111111',
-    'Business Team Project',
+    'Teams Workspace Project',
     '{
         "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
         "schemaVersion": 5,

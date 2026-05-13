@@ -4,6 +4,7 @@ import { LuRotateCcw, LuEllipsis, LuPencil, LuStar, LuFolder, LuTrash } from 're
 import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
+import { ProGate } from './ProGate';
 import { timeAgo } from '../utils/timeAgo';
 import type { CloudFolder } from '../storage/cloudStorage';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
@@ -43,6 +44,7 @@ interface ProjectCardProps {
     selected?: boolean;
     onSelect?: () => void;
     onRestore?: () => void;
+    restoreGated?: boolean;
     onRename?: (id: string, newName: string) => void;
     onStar?: (id: string, starred: boolean) => void;
     onMoveToFolder?: (id: string, folderId: string | null) => void;
@@ -77,6 +79,7 @@ export const ProjectCard = ({
     selected = false,
     onSelect,
     onRestore,
+    restoreGated = false,
     onRename,
     onStar,
     onMoveToFolder,
@@ -217,14 +220,28 @@ export const ProjectCard = ({
 
                 {/* Restore overlay for trashed projects */}
                 {isTrashed && onRestore && (
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onRestore(); }}
-                        className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
-                    >
-                        <LuRotateCcw className="w-4 h-4 text-white" />
-                        <span className="text-white text-sm font-medium">Restore</span>
-                    </button>
+                    restoreGated ? (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <ProGate feature="restoring deleted videos">
+                                <button
+                                    type="button"
+                                    className="flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-md cursor-pointer"
+                                >
+                                    <LuRotateCcw className="w-4 h-4 text-white" />
+                                    <span className="text-white text-sm font-medium">Restore</span>
+                                </button>
+                            </ProGate>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onRestore(); }}
+                            className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
+                        >
+                            <LuRotateCcw className="w-4 h-4 text-white" />
+                            <span className="text-white text-sm font-medium">Restore</span>
+                        </button>
+                    )
                 )}
 
                 {/* Duration Badge */}

@@ -46,7 +46,7 @@ export function emailLayout({ body, unsubscribeUrl }: EmailLayoutOptions): strin
                     <tr>
                         <td align="center" style="padding-top: 28px;">
                             <p style="margin: 0; font-size: 12px; color: #999999; line-height: 1.6;">
-                                Recordio · Smart Screen Recorder<br>
+                                <a href="https://recordio.io" style="color: #999999; text-decoration: none;">Recordio</a> · Smart Screen Recorder<br>
                                 ${unsubscribeHtml}
                             </p>
                         </td>

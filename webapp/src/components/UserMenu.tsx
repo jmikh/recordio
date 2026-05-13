@@ -12,12 +12,11 @@ import { StripeService } from '../editor/stripe/StripeService';
 import { navigate } from '../navigate';
 
 interface UserMenuProps {
-    onOpenUpgradeModal: () => void;
     onOpenSupportModal?: () => void;
     openDirection?: 'up' | 'down';
 }
 
-export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
+export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
     const { email, name, picture, hasFreeTrial, trialEndsAt } = useUserStore();
     const { hasActivePlan, subscription } = useWorkspaceStore();
     const { theme, setTheme } = useThemeStore();
@@ -51,8 +50,8 @@ export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection
     const handleSignOut = async () => {
         await AuthManager.signOut();
         useUserStore.getState().clearUser();
+        useWorkspaceStore.getState().clearWorkspace();
         setIsOpen(false);
-        // Redirect to dashboard so user doesn't see the project page while signed out
         navigate('/');
     };
 
@@ -71,7 +70,7 @@ export function UserMenu({ onOpenUpgradeModal, onOpenSupportModal, openDirection
 
     const handleUpgrade = () => {
         setIsOpen(false);
-        onOpenUpgradeModal();
+        navigate('/workspace/settings?tab=billing');
     };
 
     const handleToggle = () => {

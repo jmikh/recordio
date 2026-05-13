@@ -2,16 +2,21 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuCheck, LuPlus, LuSettings, LuChevronDown } from 'react-icons/lu';
 import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
-import logoSvg from '@shared/assets/logo.svg';
 
 interface WorkspaceDropdownProps {
     workspaces: WorkspaceListItem[];
     currentWorkspaceId: string | null;
     currentWorkspaceName: string | null;
     currentRole: 'viewer' | 'creator' | 'admin' | null;
+    currentUserId: string | null;
     onSwitch: (workspaceId: string) => void;
     onCreate: () => void;
     onOpenSettings: () => void;
+}
+
+function roleLabel(role: string | null, isOwner: boolean): string {
+    if (isOwner) return 'owner';
+    return role ?? '';
 }
 
 export function WorkspaceDropdown({
@@ -19,6 +24,7 @@ export function WorkspaceDropdown({
     currentWorkspaceId,
     currentWorkspaceName,
     currentRole,
+    currentUserId,
     onSwitch,
     onCreate,
     onOpenSettings,
@@ -49,6 +55,8 @@ export function WorkspaceDropdown({
     }, [open]);
 
     const isAdmin = currentRole === 'admin';
+    const ownedCount = currentUserId ? workspaces.filter(ws => ws.owner_id === currentUserId).length : 0;
+    const canCreateWorkspace = ownedCount < 5;
 
     return (
         <>
@@ -56,12 +64,12 @@ export function WorkspaceDropdown({
                 ref={triggerRef}
                 type="button"
                 onClick={open ? () => setOpen(false) : openMenu}
-                className="flex items-center gap-1.5 flex-1 min-w-0 group rounded-md px-1 py-0.5 -mx-1 hover:bg-state-hover transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 w-44 group rounded-md px-1 py-0.5 -mx-1 hover:bg-state-hover transition-colors cursor-pointer"
             >
-                <img src={logoSvg} alt="" className="w-5 h-5 shrink-0" />
-                <span className="text-sm font-semibold text-text-highlighted truncate flex-1 text-left">
-                    {currentWorkspaceName ?? 'My Workspace'}
-                </span>
+                <div className="flex flex-col flex-1 min-w-0 text-left overflow-hidden leading-tight">
+                    <span className="text-[11px] text-text-muted">Workspace</span>
+                    <span className="text-sm font-semibold text-text-highlighted truncate">{currentWorkspaceName ?? 'My Workspace'}</span>
+                </div>
                 <LuChevronDown className={`icon-sm shrink-0 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
@@ -72,39 +80,45 @@ export function WorkspaceDropdown({
                     style={{ top: menuPos.top, left: menuPos.left, minWidth: Math.max(menuPos.width, 200) }}
                 >
                     {/* Workspace list */}
-                    {workspaces.map(ws => (
-                        <button
-                            key={ws.id}
-                            type="button"
-                            onClick={() => {
-                                setOpen(false);
-                                if (ws.id !== currentWorkspaceId) onSwitch(ws.id);
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                        >
-                            <span className="flex-1 truncate text-left">
-                                {ws.name}
-                                {ws.is_personal && (
-                                    <span className="ml-1.5 text-[10px] text-text-muted">(personal)</span>
+                    {workspaces.map(ws => {
+                        const wsIsOwner = !!currentUserId && currentUserId === ws.owner_id;
+                        const wsRole    = roleLabel(ws.role, wsIsOwner);
+                        return (
+                            <button
+                                key={ws.id}
+                                type="button"
+                                onClick={() => {
+                                    setOpen(false);
+                                    if (ws.id !== currentWorkspaceId) onSwitch(ws.id);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
+                            >
+                                <div className="flex flex-col flex-1 min-w-0 text-left">
+                                    <span className="truncate">{ws.name}</span>
+                                    {wsRole && (
+                                        <span className="text-[10px] text-text-muted capitalize">{wsRole}</span>
+                                    )}
+                                </div>
+                                {ws.id === currentWorkspaceId && (
+                                    <LuCheck className="icon-sm text-primary shrink-0" />
                                 )}
-                            </span>
-                            {ws.id === currentWorkspaceId && (
-                                <LuCheck className="icon-sm text-primary shrink-0" />
-                            )}
-                        </button>
-                    ))}
+                            </button>
+                        );
+                    })}
 
                     <div className="h-px bg-border my-1" />
 
                     {/* Create workspace */}
-                    <button
-                        type="button"
-                        onClick={() => { setOpen(false); onCreate(); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                    >
-                        <LuPlus className="icon-sm shrink-0 text-text-muted" />
-                        Create workspace
-                    </button>
+                    {canCreateWorkspace && (
+                        <button
+                            type="button"
+                            onClick={() => { setOpen(false); onCreate(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
+                        >
+                            <LuPlus className="icon-sm shrink-0 text-text-muted" />
+                            Create workspace
+                        </button>
+                    )}
 
                     {/* Settings — visible for admins */}
                     {isAdmin && (

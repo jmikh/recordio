@@ -1,7 +1,7 @@
 -- workspace_invite_accept(p_token)
 --
 -- Accepts a workspace invitation identified by token.
--- Validates: token exists, status = 'pending', not expired.
+-- Validates: token exists, status = 'pending'.
 -- Inserts the caller into workspace_members with the invitation's role.
 -- Sets invitation status = 'accepted'.
 -- Updates caller's default_workspace_id to the joined workspace.
@@ -27,11 +27,8 @@ BEGIN
         RAISE EXCEPTION 'Invitation not found or already used';
     END IF;
 
-    IF _inv.expires_at < now() THEN
-        UPDATE public.workspace_invitations
-        SET status = 'expired'
-        WHERE id = _inv.id;
-        RAISE EXCEPTION 'Invitation has expired';
+    IF lower(_inv.email) != lower(auth.email()) THEN
+        RAISE EXCEPTION 'This invitation was sent to a different email address';
     END IF;
 
     -- Add to workspace

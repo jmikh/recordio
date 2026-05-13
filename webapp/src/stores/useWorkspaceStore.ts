@@ -6,14 +6,13 @@ export interface WorkspaceListItem {
     id: string;
     name: string;
     owner_id: string;
-    is_personal: boolean;
     role: 'viewer' | 'creator' | 'admin';
     seats: number | null;
 }
 
 export interface WorkspaceSubscription {
     status: 'active' | 'canceled' | 'past_due' | 'inactive' | null;
-    plan: 'pro' | 'business';
+    plan: 'pro' | 'teams';
     currentPeriodEnd: Date | null;
     cancelAtPeriodEnd: boolean;
     billingInterval: 'monthly' | 'yearly' | null;
@@ -27,17 +26,20 @@ export interface WorkspaceState {
     workspaceName: string | null;
     workspaceOwnerId: string | null;
     workspaceRole: 'viewer' | 'creator' | 'admin' | null;
-    workspaceIsPersonal: boolean;
     workspaceSeats: number | null;
     workspaceList: WorkspaceListItem[];
 
+    /** True once the initial workspace_get_default has resolved. Gates authenticated UI. */
+    workspaceReady: boolean;
+
     // Billing — workspace-scoped subscription
     subscription: WorkspaceSubscription | null;
-    hasActivePlan: boolean; // active pro or business subscription
+    hasActivePlan: boolean; // active pro or teams subscription
 
-    setWorkspace: (id: string, name: string, ownerId: string, role?: string | null, isPersonal?: boolean, seats?: number | null) => void;
+    setWorkspace: (id: string, name: string, ownerId: string, role?: string | null, seats?: number | null) => void;
     setWorkspaceList: (list: WorkspaceListItem[]) => void;
     setSubscription: (sub: WorkspaceSubscription, userId?: string) => void;
+    setWorkspaceReady: () => void;
     clearWorkspace: () => void;
 }
 
@@ -46,19 +48,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     workspaceName: null,
     workspaceOwnerId: null,
     workspaceRole: null,
-    workspaceIsPersonal: true,
     workspaceSeats: null,
     workspaceList: [],
+    workspaceReady: false,
     subscription: null,
     hasActivePlan: false,
 
-    setWorkspace: (workspaceId, workspaceName, workspaceOwnerId, role, isPersonal = false, seats = null) => {
+    setWorkspace: (workspaceId, workspaceName, workspaceOwnerId, role, seats = null) => {
         set({
             workspaceId,
             workspaceName,
             workspaceOwnerId,
             workspaceRole: (role as WorkspaceState['workspaceRole']) ?? null,
-            workspaceIsPersonal: isPersonal,
             workspaceSeats: seats ?? null,
         });
     },
@@ -66,6 +67,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     setWorkspaceList: (workspaceList) => {
         set({ workspaceList });
     },
+
+    setWorkspaceReady: () => set({ workspaceReady: true }),
 
     setSubscription: (sub, userId) => {
         const isDevPro = DEV_PRO_UID && userId ? userId === DEV_PRO_UID : false;
@@ -79,9 +82,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             workspaceName: null,
             workspaceOwnerId: null,
             workspaceRole: null,
-            workspaceIsPersonal: true,
             workspaceSeats: null,
             workspaceList: [],
+            workspaceReady: false,
             subscription: null,
             hasActivePlan: false,
         });

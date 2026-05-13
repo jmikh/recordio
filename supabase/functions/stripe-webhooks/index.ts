@@ -17,10 +17,10 @@ const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 // Helpers
 // ============================================================================
 
-/** Read plan_type from Stripe price metadata ('pro' | 'business'). Defaults to 'pro'. */
-function planFromPrice(price: Stripe.Price | null | undefined): 'pro' | 'business' {
+/** Read plan_type from Stripe price metadata ('pro' | 'teams'). Defaults to 'pro'. */
+function planFromPrice(price: Stripe.Price | null | undefined): 'pro' | 'teams' {
     const raw = price?.metadata?.plan_type;
-    if (raw === 'business') return 'business';
+    if (raw === 'teams') return 'teams';
     return 'pro';
 }
 
@@ -90,7 +90,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log('[Webhook] Checkout completed — user:', userId, 'workspace:', workspaceId);
 
     // Fetch authoritative subscription data from Stripe
-    let plan: 'pro' | 'business' = 'pro';
+    let plan: 'pro' | 'teams' = 'pro';
     let billingInterval: string | null = null;
     let stripeStatus = 'active';
     let stripePeriodEnd: string | null = null;
@@ -104,7 +104,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         billingInterval = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
         stripeStatus    = stripeSub.status;
         stripePeriodEnd = periodEndToIso(item?.current_period_end ?? stripeSub.current_period_end);
-        seats           = plan === 'business' ? (item?.quantity ?? null) : null;
+        seats           = plan === 'teams' ? (item?.quantity ?? null) : null;
     } catch (err) {
         console.error('[Webhook] Error fetching Stripe subscription:', err);
     }
@@ -152,7 +152,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     const item  = subscription.items?.data?.[0];
     const price = item?.price;
     const plan  = planFromPrice(price);
-    const seats = plan === 'business' ? (item?.quantity ?? null) : null;
+    const seats = plan === 'teams' ? (item?.quantity ?? null) : null;
 
     const newStatus     = subscription.status;
     const oldStatus     = existingSub.status;

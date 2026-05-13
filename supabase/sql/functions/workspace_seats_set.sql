@@ -2,7 +2,6 @@
 --
 -- Sets the seat count on the workspace's subscription.
 -- Caller must be a workspace admin.
--- Blocked on personal workspaces.
 -- Returns updated seats value.
 --
 -- Called by: workspace settings members tab (upgrade / adjust seats)
@@ -16,18 +15,8 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-    _is_personal BOOLEAN;
 BEGIN
     PERFORM public.assert_workspace_admin(p_workspace_id);
-
-    SELECT is_personal INTO _is_personal
-    FROM public.workspaces
-    WHERE id = p_workspace_id AND deleted_at IS NULL;
-
-    IF _is_personal THEN
-        RAISE EXCEPTION 'Cannot configure seats on a personal workspace';
-    END IF;
 
     IF p_seats IS NULL OR p_seats < 1 THEN
         RAISE EXCEPTION 'seats must be at least 1';
