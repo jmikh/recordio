@@ -17,11 +17,14 @@ const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 // Helpers
 // ============================================================================
 
-/** Read plan_type from Stripe price metadata ('pro' | 'teams'). Defaults to 'pro'. */
-function planFromPrice(price: Stripe.Price | null | undefined): 'pro' | 'teams' {
-    const raw = price?.metadata?.plan_type;
-    if (raw === 'teams') return 'teams';
-    return 'pro';
+/** Read plan from price metadata. Throws if plan_type is missing or invalid. */
+function planFromSubscription(subscription: Stripe.Subscription): 'pro' | 'teams' {
+    const price = subscription.items?.data?.[0]?.price;
+    const planType = price?.metadata?.plan_type;
+    if (planType !== 'pro' && planType !== 'teams') {
+        throw new Error(`Missing or invalid plan_type metadata on price ${price?.id ?? 'unknown'}. Expected 'pro' or 'teams'.`);
+    }
+    return planType;
 }
 
 function periodEndToIso(value: number | string | null | undefined): string | null {
@@ -49,10 +52,10 @@ serve(async (req) => {
                 break;
             case 'customer.subscription.created':
             case 'customer.subscription.updated':
-                await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+                await handleSubscriptionUpdate(event.data.object as Stripe.Subscription, event.created);
                 break;
             case 'customer.subscription.deleted':
-                await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+                await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, event.created);
                 break;
             default:
                 console.log('[Webhook] Unhandled event type:', event.type);
@@ -100,7 +103,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
         const item  = stripeSub.items?.data?.[0];
         const price = item?.price;
-        plan           = planFromPrice(price);
+        plan           = planFromSubscription(stripeSub);
         billingInterval = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
         stripeStatus    = stripeSub.status;
         stripePeriodEnd = periodEndToIso(item?.current_period_end ?? stripeSub.current_period_end);
@@ -135,12 +138,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 // Subscription Updated / Created
 // ============================================================================
 
-async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdate(subscription: Stripe.Subscription, eventCreated: number) {
     const customerId = subscription.customer as string;
 
     const { data: existingSub } = await supabase
         .from('subscriptions')
-        .select('user_id, status, workspace_id')
+        .select('user_id, status, workspace_id, stripe_event_at')
         .eq('stripe_customer_id', customerId)
         .maybeSingle();
 
@@ -149,15 +152,22 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
         return;
     }
 
+    // Discard out-of-order delivery using Stripe's event timestamp.
+    const incomingAt = new Date(eventCreated * 1000);
+    if (existingSub.stripe_event_at && incomingAt <= new Date(existingSub.stripe_event_at)) {
+        console.warn('[Webhook] Ignoring out-of-order event — incoming:', incomingAt.toISOString(), 'stored:', existingSub.stripe_event_at);
+        return;
+    }
+
     const item  = subscription.items?.data?.[0];
-    const price = item?.price;
-    const plan  = planFromPrice(price);
+    const plan  = planFromSubscription(subscription);
     const seats = plan === 'teams' ? (item?.quantity ?? null) : null;
 
-    const newStatus     = subscription.status;
-    const oldStatus     = existingSub.status;
-    const periodEnd     = periodEndToIso(item?.current_period_end ?? subscription.current_period_end);
-    const cancelAtEnd   = subscription.cancel_at_period_end;
+    const newStatus = subscription.status;
+    const oldStatus = existingSub.status;
+
+    const periodEnd   = periodEndToIso(item?.current_period_end ?? subscription.current_period_end);
+    const cancelAtEnd = subscription.cancel_at_period_end;
 
     if (!periodEnd) {
         console.error('[Webhook] Invalid period_end:', item?.current_period_end);
@@ -172,6 +182,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
             current_period_end:   periodEnd,
             cancel_at_period_end: cancelAtEnd,
             seats,
+            stripe_event_at:      incomingAt.toISOString(),
             updated_at:           new Date().toISOString(),
         })
         .eq('stripe_customer_id', customerId);
@@ -196,7 +207,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 // Subscription Deleted
 // ============================================================================
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription, eventCreated: number) {
     const customerId = subscription.customer as string;
 
     const { data: existingSub } = await supabase
@@ -207,7 +218,13 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
     const { error } = await supabase
         .from('subscriptions')
-        .update({ status: 'canceled', plan: 'pro', seats: null, updated_at: new Date().toISOString() })
+        .update({
+            status:          'canceled',
+            plan:            'pro',
+            seats:           null,
+            stripe_event_at: new Date(eventCreated * 1000).toISOString(),
+            updated_at:      new Date().toISOString(),
+        })
         .eq('stripe_customer_id', customerId);
 
     if (error) { console.error('[Webhook] Delete error:', error); return; }
