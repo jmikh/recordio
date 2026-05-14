@@ -113,6 +113,7 @@ export class CloudStorage {
 
         // project_get returns full metadata; we only need cloud_version.
         // A dedicated lightweight RPC could be added later if perf matters.
+        console.log('[CloudStorage] project_get via getCloudVersion', projectId);
         const { data, error } = await supabase.rpc('project_get', {
             p_project_id: projectId,
         });
@@ -128,6 +129,7 @@ export class CloudStorage {
     static async loadProjectMetadata(projectId: string): Promise<CloudProject | null> {
         if (!supabase) throw new Error('Supabase not configured');
 
+        console.log('[CloudStorage] project_get via loadProjectMetadata', projectId);
         const { data, error } = await supabase.rpc('project_get', {
             p_project_id: projectId,
         });
@@ -196,11 +198,12 @@ export class CloudStorage {
     /**
      * Create a new folder. Returns the created folder.
      */
-    static async createFolder(name: string, description = ''): Promise<CloudFolder> {
+    static async createFolder(name: string, workspaceId: string, description = ''): Promise<CloudFolder> {
         if (!supabase) throw new Error('Supabase not configured');
 
         const { data, error } = await supabase.rpc('folder_create', {
             p_name: name,
+            p_workspace_id: workspaceId,
             p_description: description,
         });
 

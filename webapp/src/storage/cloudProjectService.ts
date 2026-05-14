@@ -493,8 +493,8 @@ export class CloudProjectService {
         return CloudStorage.listFolders(workspaceId);
     }
 
-    static async createFolder(name: string, description = ''): Promise<CloudFolder> {
-        return CloudStorage.createFolder(name, description);
+    static async createFolder(name: string, workspaceId: string, description = ''): Promise<CloudFolder> {
+        return CloudStorage.createFolder(name, workspaceId, description);
     }
 
     static async updateFolder(folderId: string, name: string, description: string): Promise<CloudFolder | null> {

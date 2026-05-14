@@ -271,7 +271,7 @@ export function DashboardPage() {
 
     const handleCreateFolder = async (name: string, description: string) => {
         try {
-            const folder = await CloudProjectService.createFolder(name, description);
+            const folder = await CloudProjectService.createFolder(name, workspaceId!, description);
             setFolders(prev => [...prev, folder]);
             addToast({ type: 'success', title: `Folder "${name}" created` });
         } catch (err) {
