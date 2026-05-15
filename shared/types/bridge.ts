@@ -23,6 +23,8 @@ export const BRIDGE_MSG = {
     HANDOFF_COMPLETE: 'HANDOFF_COMPLETE',
     /** Website → Extension: Open the controller tab for a new recording */
     OPEN_CONTROLLER: 'OPEN_CONTROLLER',
+    /** Website → Extension: Identify the logged-in user for Mixpanel */
+    IDENTIFY_USER: 'IDENTIFY_USER',
 } as const;
 
 export type BridgeMessageType = typeof BRIDGE_MSG[keyof typeof BRIDGE_MSG];
@@ -85,6 +87,11 @@ export type HandoffRequestResponse = HandoffMetadataResponse | HandoffErrorRespo
 export interface HandoffCompletePayload {
     recordingId: string;
     projectId: string;
+}
+
+/** Website → Extension: Identify the logged-in user */
+export interface IdentifyUserPayload {
+    email: string;
 }
 
 // ============================================

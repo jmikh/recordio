@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Toggle, Dropdown, InfoTooltip } from '@shared/components';
+import { useState, useEffect, useRef } from 'react';
+import { Toggle, Dropdown } from '@shared/components';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { MdPictureInPicture } from 'react-icons/md';
 import type { ControllerTab } from './ControllerApp';
 
 export function CameraCard({
@@ -9,7 +8,6 @@ export function CameraCard({
     isEnabled, selectedDeviceId,
     onEnabledChange, onDeviceChange, onPermissionError,
     onDeviceError,
-    stopRecording,
 }: {
     activeTab: ControllerTab;
     setActiveTab: (tab: ControllerTab) => void;
@@ -19,12 +17,10 @@ export function CameraCard({
     onDeviceChange: (deviceId: string) => void;
     onPermissionError: () => void;
     onDeviceError: (hasError: boolean) => void;
-    stopRecording: () => void;
 }) {
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [deviceError, setDeviceError] = useState<string | null>(null);
-    const [pipWindow, setPipWindow] = useState<Window | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const cameraVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -127,62 +123,6 @@ export function CameraCard({
         }
     }, [stream]);
 
-    // Close PiP when camera is disabled
-    useEffect(() => {
-        if (!isEnabled && pipWindow) {
-            pipWindow.close();
-        }
-    }, [isEnabled, pipWindow]);
-
-    // Document PiP
-    const openPiP = useCallback(async () => {
-        if (!stream) return;
-
-        try {
-            // @ts-ignore — Document PiP API
-            const pip = await documentPictureInPicture.requestWindow({
-                width: 320,
-                height: 240,
-            });
-
-            const style = pip.document.createElement('style');
-            style.textContent = `
-                body { margin: 0; background: #000; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
-                video { width: 100%; flex: 1; object-fit: cover; transform: scaleX(-1); }
-                .pip-controls { padding: 8px; display: flex; justify-content: center; background: oklch(0.15 0.01 270); }
-                .pip-stop-btn {
-                    background: oklch(0.55 0.2 25); color: white; border: none; padding: 6px 16px;
-                    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
-                    display: flex; align-items: center; gap: 6px;
-                }
-                .pip-stop-btn:hover { filter: brightness(1.1); }
-                .pip-dot { width: 8px; height: 8px; border-radius: 50%; background: white; animation: pulse 1.5s infinite; }
-                @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-            `;
-            pip.document.head.appendChild(style);
-
-            const video = pip.document.createElement('video');
-            video.srcObject = stream;
-            video.autoplay = true;
-            video.muted = true;
-            video.playsInline = true;
-            pip.document.body.appendChild(video);
-
-            const controls = pip.document.createElement('div');
-            controls.className = 'pip-controls';
-            const stopBtn = pip.document.createElement('button');
-            stopBtn.className = 'pip-stop-btn';
-            stopBtn.innerHTML = '<span class="pip-dot"></span> Stop Recording';
-            stopBtn.addEventListener('click', () => stopRecording());
-            controls.appendChild(stopBtn);
-            pip.document.body.appendChild(controls);
-
-            setPipWindow(pip);
-            pip.addEventListener('pagehide', () => setPipWindow(null));
-        } catch (err) {
-            console.error('Failed to open PiP:', err);
-        }
-    }, [stream, stopRecording]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -191,7 +131,7 @@ export function CameraCard({
         };
     }, []);
 
-    const isExpanded = activeTab === 'camera' && isEnabled;
+    const isExpanded = isEnabled;
 
     return (
         <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
@@ -201,8 +141,6 @@ export function CameraCard({
                     if (!isEnabled) {
                         handleToggle(true);
                         setActiveTab('camera');
-                    } else {
-                        setActiveTab(activeTab === 'camera' ? 'screen' : 'camera');
                     }
                 }}
             >
@@ -210,16 +148,8 @@ export function CameraCard({
                     {isEnabled ? <PiWebcamBold size={16} /> : <PiWebcamSlashBold size={16} />}
                     Camera
                 </span>
-                {isEnabled && (
-                    deviceError ? (
-                        <span className="flex-1 text-xs text-destructive truncate mx-4">{deviceError}</span>
-                    ) : activeTab !== 'camera' ? (() => {
-                        const device = devices.find(d => d.deviceId === selectedDeviceId);
-                        const name = device?.label?.replace(/\s*\(.*?\)\s*/g, '').trim();
-                        return name ? (
-                            <span className="text-xs font-normal text-text-muted truncate max-w-[120px]">{name}</span>
-                        ) : null;
-                    })() : null
+                {isEnabled && deviceError && (
+                    <span className="flex-1 text-xs text-destructive truncate mx-4">{deviceError}</span>
                 )}
                 <div onClick={e => e.stopPropagation()}>
                     <Toggle value={isEnabled} onChange={(enabled) => {
@@ -232,55 +162,33 @@ export function CameraCard({
                 className="overflow-hidden transition-all duration-300 ease-in-out"
                 style={{ maxHeight: isExpanded ? '440px' : '0px', opacity: isExpanded ? 1 : 0 }}
             >
-                <div className="px-4 pb-4 border-t border-border">
-                    <div className="flex flex-col items-center justify-center h-[320px] pt-3 overflow-y-auto scrollbar-hide">
-                        {isEnabled ? (
-                            <div className="flex flex-col items-center gap-3 w-full h-full animate-in fade-in duration-200">
-                                <div className="relative w-full aspect-video bg-surface rounded-lg overflow-hidden border border-border flex justify-center items-center">
-                                    {deviceError ? (
-                                        <div className="flex flex-col items-center gap-2 text-red-400">
-                                            <PiWebcamSlashBold size={32} />
-                                            <span className="text-sm font-medium">{deviceError}</span>
-                                            <span className="text-xs text-text-muted">Select a different camera below</span>
-                                        </div>
-                                    ) : (
-                                        <video
-                                            ref={cameraVideoRef}
-                                            autoPlay
-                                            muted
-                                            playsInline
-                                            className="w-full h-auto block transform -scale-x-100"
-                                        />
-                                    )}
+                <div className="px-4 pb-3 border-t border-border">
+                    <div className="flex flex-col gap-2 pt-3 animate-in fade-in duration-200">
+                        <div className="relative w-full aspect-video bg-surface rounded-lg overflow-hidden border border-border flex justify-center items-center">
+                            {deviceError ? (
+                                <div className="flex flex-col items-center gap-2 text-red-400">
+                                    <PiWebcamSlashBold size={32} />
+                                    <span className="text-sm font-medium">{deviceError}</span>
+                                    <span className="text-xs text-text-muted">Select a different camera below</span>
                                 </div>
-                                <div className="w-full relative z-10 mt-auto flex flex-col gap-2">
-                                    <Dropdown
-                                        options={devices.map(d => ({
-                                            value: d.deviceId,
-                                            label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
-                                        }))}
-                                        value={selectedDeviceId}
-                                        onChange={onDeviceChange}
-                                    />
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-text-muted">
-                                            <MdPictureInPicture size={16} />
-                                            <span className="text-sm">Float Camera</span>
-                                            <InfoTooltip
-                                                placement="top-right"
-                                                description="Open the camera in a floating window so you can see yourself during recording."
-                                            />
-                                        </div>
-                                        <Toggle value={!!pipWindow} onChange={() => pipWindow ? pipWindow.close() : openPiP()} />
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-3 text-text-disabled">
-                                <PiWebcamSlashBold size={36} />
-                                <span className="text-sm">Camera off</span>
-                            </div>
-                        )}
+                            ) : (
+                                <video
+                                    ref={cameraVideoRef}
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    className="w-full h-auto block transform -scale-x-100"
+                                />
+                            )}
+                        </div>
+                        <Dropdown
+                            options={devices.map(d => ({
+                                value: d.deviceId,
+                                label: d.label || `Camera ${d.deviceId.slice(0, 4)}...`,
+                            }))}
+                            value={selectedDeviceId}
+                            onChange={onDeviceChange}
+                        />
                     </div>
                 </div>
             </div>

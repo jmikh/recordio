@@ -168,7 +168,7 @@ export function MicrophoneCard({
         };
     }, []);
 
-    const isExpanded = activeTab === 'mic' && isEnabled;
+    const isExpanded = isEnabled;
 
     return (
         <div className={`bg-surface-raised rounded-xl border overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'border-primary/30 shadow-sm' : 'border-border'}`}>
@@ -178,14 +178,12 @@ export function MicrophoneCard({
                     if (!isEnabled) {
                         handleToggle(true);
                         setActiveTab('mic');
-                    } else {
-                        setActiveTab(activeTab === 'mic' ? 'screen' : 'mic');
                     }
                 }}
             >
-                <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'mic' ? 'text-primary' : 'text-text-main'} w-[130px] justify-start`}>
+                <span className={`text-sm font-medium flex items-center gap-2 transition-colors ${activeTab === 'mic' ? 'text-primary' : 'text-text-main'} ${isEnabled ? 'shrink-0' : 'w-[130px]'} justify-start`}>
                     {isEnabled ? <BiMicrophone size={16} /> : <BiMicrophoneOff size={16} />}
-                    Microphone
+                    {!isEnabled && 'Microphone'}
                 </span>
                 {isEnabled && (
                     deviceError ? (
@@ -239,7 +237,7 @@ export function MicrophoneCard({
 
 function AudioWaveformLine({ level }: { level: number }) {
     return (
-        <div className="flex-1 h-[6px] rounded-full overflow-hidden bg-border mx-10">
+        <div className="flex-1 h-[6px] rounded-full overflow-hidden bg-border mx-3">
             <div
                 className="h-full rounded-full"
                 style={{

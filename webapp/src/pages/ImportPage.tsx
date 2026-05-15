@@ -3,7 +3,7 @@ import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
 import { captureImportError } from '../utils/sentry';
-import { trackProjectCreated, identifyExtensionUser } from '../core/analytics';
+import { trackProjectCreated } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
@@ -22,12 +22,6 @@ type ImportStatus =
     | 'error-auth'
     | 'error-upload';
 
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
 
 export function ImportPage() {
     const [status, setStatus] = useState<ImportStatus>('init');
@@ -38,7 +32,7 @@ export function ImportPage() {
     // Auth modal state
     const [showAuthModal, setShowAuthModal] = useState(false);
 
-    const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
+    const { state, requestHandoff, confirmHandoff, sendIdentify } = useExtensionBridge();
 
     // Get recording ID from URL, stripping any legacy "proj-" prefix
     const params = new URLSearchParams(window.location.search);
@@ -115,9 +109,11 @@ export function ImportPage() {
         setStatus('uploading');
         setUploadPhase('Saving project...');
 
-        // Link Mixpanel profiles: extension anonymous ID → webapp
-        if (state.extensionDistinctId) {
-            identifyExtensionUser(state.extensionDistinctId);
+        // Tell extension which user this is so its events share the same Mixpanel distinct_id.
+        // The extension aliases its anonymous UUID to the email and switches going forward.
+        const { email } = useUserStore.getState();
+        if (email) {
+            sendIdentify(email);
         }
 
         let { workspaceId } = useWorkspaceStore.getState();

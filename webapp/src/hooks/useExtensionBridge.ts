@@ -439,5 +439,16 @@ export function useExtensionBridge() {
         }
     }, [state.recordingId]);
 
-    return { state, requestHandoff, confirmHandoff };
+    /**
+     * Send the logged-in user's email to the extension for Mixpanel identity.
+     * Fire-and-forget — analytics should never block the import flow.
+     */
+    const sendIdentify = useCallback((email: string) => {
+        sendToExtension(EXTENSION_ID, {
+            type: BRIDGE_MSG.IDENTIFY_USER,
+            payload: { email },
+        }).catch(e => console.error('[useExtensionBridge] Error sending identify:', e));
+    }, []);
+
+    return { state, requestHandoff, confirmHandoff, sendIdentify };
 }

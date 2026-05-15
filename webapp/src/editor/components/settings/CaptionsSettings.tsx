@@ -58,7 +58,7 @@ export function CaptionsSettings() {
     const { addToast } = useToast();
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
     const hideCloudTranscription = false; // TODO: remove after per-user limits are live
-    const [engine, setEngine] = useState<TranscriptionEngine>('local');
+    const [engine, setEngine] = useState<TranscriptionEngine>('openai');
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const hasNonFreeAccess = useWorkspaceStore.getState().hasActivePlan;
     const [isProModalOpen, setIsProModalOpen] = useState(false);
@@ -261,9 +261,7 @@ export function CaptionsSettings() {
                 addToast({
                     type: 'error',
                     title: 'No Speech Detected',
-                    message: engine === 'local'
-                        ? 'Local models running in the browser need clear speech to work well. Try the OpenAI model for better results.'
-                        : 'Transcription completed but no speech was detected in the audio.',
+                    message: 'Transcription completed but no speech was detected in the audio.',
                 });
             } else {
                 addToast({
@@ -428,19 +426,7 @@ export function CaptionsSettings() {
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionAI', v)}
                     >
                         <div className="flex flex-col gap-3">
-                            {/* Engine Toggle */}
-                            {!hideCloudTranscription && (
-                                <MultiToggle
-                                    options={[
-                                        { value: 'local' as TranscriptionEngine, label: 'Local' },
-                                        { value: 'openai' as TranscriptionEngine, label: 'OpenAI', icon: <ProBadge /> },
-                                    ]}
-                                    value={engine}
-                                    onChange={setEngine}
-                                />
-                            )}
-
-                            {engine === 'openai' && !hasNonFreeAccess ? (
+                            {!hasNonFreeAccess ? (
                                 <>
                                     <Button variant="primary" fullWidth onClick={() => setIsProModalOpen(true)}>
                                         {buttonLabel}
@@ -478,20 +464,15 @@ export function CaptionsSettings() {
                             )}
 
                             <p className="subtext">
-                                {engine === 'openai'
-                                    ? 'Powered by OpenAI Whisper — highest accuracy with multi-language support.'
-                                    : hideCloudTranscription
-                                        ? 'Runs locally in your browser — no data leaves your device.'
-                                        : 'Runs locally in your browser. For better accuracy and faster transcription and multi-language support, use OpenAI.'
-                                }
+                                Powered by OpenAI Whisper — highest accuracy with multi-language support.
                             </p>
                         </div>
                     </CollapsibleCard>
                 );
             })()}
 
-            {/* Captions Card */}
-            <div ref={captionsCardRef}>
+            {/* Captions Card — only show after transcription has run */}
+            {settings.transcriptionSource && <div ref={captionsCardRef}>
             <CollapsibleCard
                 title="Captions"
                 icon={<LuCaptions className="icon-md" />}
@@ -597,7 +578,7 @@ export function CaptionsSettings() {
                     </p>
                 )}
             </CollapsibleCard>
-            </div>
+            </div>}
 
             {/* Style Settings Card - only show when captions exist */}
             {captionSegments && captionSegments.length > 0 && <CollapsibleCard

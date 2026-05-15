@@ -82,20 +82,92 @@ async function track(eventName: string, properties: Record<string, any> = {}) {
 // Public API
 // ============================================================================
 
+/**
+ * Alias the anonymous UUID to the user's email, then switch to email as distinct_id.
+ * The alias merges past anonymous events into the identified user profile in Mixpanel.
+ * Profile setup is the web app's responsibility.
+ */
+export async function identifyUser(email: string): Promise<void> {
+    if (!IS_PRODUCTION) {
+        console.log('[Mixpanel] $create_alias', { distinct_id: cachedDistinctId, alias: email });
+        return;
+    }
+
+    try {
+        const anonymousId = await getDistinctId();
+
+        // Only alias if we're still on the anonymous UUID (don't re-alias if already identified)
+        if (anonymousId === email) return;
+
+        const payload = [{
+            event: '$create_alias',
+            properties: {
+                token: MIXPANEL_TOKEN,
+                distinct_id: anonymousId,
+                alias: email,
+            },
+        }];
+
+        fetch(MIXPANEL_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
+            body: JSON.stringify(payload),
+        }).catch(e => console.error('[Mixpanel] alias fetch failed:', e));
+
+        // Switch to email for all future events
+        cachedDistinctId = email;
+        await chrome.storage.local.set({ [DISTINCT_ID_KEY]: email });
+    } catch (e) {
+        console.error('[Mixpanel] identifyUser error:', e);
+    }
+}
+
+export type CaptureType = 'tab' | 'current_window' | 'another_window' | 'desktop';
+
 export function trackRecordingStarted(props: {
-    recording_current_window: boolean;
+    capture_type: CaptureType;
     hasAudio: boolean;
     hasCamera: boolean;
 }) {
     track('recording_started', props);
 }
 
+export function trackRecordingPaused(props: {
+    capture_type: CaptureType | null;
+    elapsed_ms: number;
+}) {
+    track('recording_paused', props);
+}
+
+export function trackRecordingResumed(props: {
+    capture_type: CaptureType | null;
+    elapsed_ms: number;
+}) {
+    track('recording_resumed', props);
+}
+
 export function trackRecordingFinished(props: {
-    recording_current_window: boolean;
-    duration_ms: number;
+    capture_type: CaptureType | null;
+    elapsed_ms: number;   // wall clock time including pauses
+    duration_ms: number;  // actual video time (pauses excluded)
     hasAudio: boolean;
     hasCamera: boolean;
 }) {
     track('recording_finished', props);
+}
+
+export function trackRecordingCanceled(props: {
+    capture_type: CaptureType | null;
+    elapsed_ms: number;
+}) {
+    track('recording_canceled', props);
+}
+
+export function trackRecordingError(props: {
+    capture_type: CaptureType | null;
+    error: string;
+    mode: string;
+}) {
+    track('recording_error', props);
 }
 

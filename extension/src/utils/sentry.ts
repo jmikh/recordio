@@ -12,10 +12,10 @@ const IS_PRODUCTION = import.meta.env.MODE === "production";
 // Global scope instance for capturing errors
 let sentryScope: Scope | null = null;
 
-export function initSentry(context: "editor" | "background" | "content" | "controller" | "welcome") {
+export function initSentry(context: "editor" | "background" | "content" | "controller" | "welcome" | "popup" | "offscreen") {
     // Isolated contexts (extension pages) can safely use global integrations
     // Content scripts must filter them to avoid conflicts with websites that use Sentry
-    const isIsolatedContext = context === "editor" || context === "controller" || context === "welcome";
+    const isIsolatedContext = context === "editor" || context === "controller" || context === "welcome" || context === "popup" || context === "offscreen";
 
     const integrations = getDefaultIntegrations({}).filter(
         (defaultIntegration) => {
@@ -41,12 +41,13 @@ export function initSentry(context: "editor" | "background" | "content" | "contr
 
     const client = new BrowserClient({
         dsn: SENTRY_DSN,
+        tunnel: "https://app.recordio.io/sentry",
         transport: makeFetchTransport,
         stackParser: defaultStackParser,
         integrations: integrations,
         environment: IS_PRODUCTION ? "production" : "development",
         sendDefaultPii: true,
-        enabled: true,
+        enabled: IS_PRODUCTION,
         release: `recordio@${extensionVersion}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
         beforeSend(event) {

@@ -50,8 +50,12 @@ export class EventRecorder {
     private dragStartPos: { x: number; y: number; timestamp: number } | null = null;
     private suppressNextClick = false;
 
+    // Mouse move throttle state
+    private lastMouseMoveTime = 0;
+
     // Constants
     private readonly DRAG_DISTANCE_THRESHOLD = 40;
+    private readonly MOUSE_SAMPLE_INTERVAL_MS = 30;
     // 3 seconds for scroll session timeout
     private readonly SCROLL_SESSION_TIMEOUT = 3000;
 
@@ -156,7 +160,7 @@ export class EventRecorder {
 
         // Wrap in CAPTURE_USER_EVENT structure
         const message: BaseMessage = {
-            type: MSG_TYPES.CAPTURE_USER_EVENT,
+            type: MSG_TYPES.CONTENT_CAPTURE_USER_EVENT,
             payload: {
                 ...payload,
                 type // Add specific event type to payload as expected by background
@@ -171,6 +175,9 @@ export class EventRecorder {
     private handleMouseMove = (e: MouseEvent) => {
         if (!this.isActive()) return;
         const now = this.getRelativeTime();
+
+        if (now - this.lastMouseMoveTime < this.MOUSE_SAMPLE_INTERVAL_MS) return;
+        this.lastMouseMoveTime = now;
 
         this.lastMousePos = {
             type: EventType.MOUSEPOS,

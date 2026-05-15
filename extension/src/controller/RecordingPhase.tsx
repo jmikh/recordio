@@ -1,30 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Button, Tooltip } from '@shared/components';
+import { useState } from 'react';
+import { Button } from '@shared/components';
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
 import { FiSquare } from 'react-icons/fi';
+import { IoPause, IoPlay } from 'react-icons/io5';
+import { MdCancel } from 'react-icons/md';
 import logoDark from '@shared/assets/fulllogo-dark.png';
 import logoLight from '@shared/assets/fulllogo-light.png';
+import type { RecordingState } from '../shared/messageTypes';
+import { formatTime, useElapsed } from '../shared/recordingTime';
 import '@shared/components/LogoLink.css';
 
-export function RecordingPhase({ hasAudio, hasCamera, onStop }: {
+export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseResume, onFinish, onCancel }: {
     hasAudio: boolean;
     hasCamera: boolean;
-    onStop: () => void;
+    recordingState: RecordingState | null;
+    onPauseResume: () => void;
+    onFinish: () => void;
+    onCancel: () => void;
 }) {
-    const [elapsed, setElapsed] = useState(0);
+    const elapsed = useElapsed(recordingState);
+    const [busy, setBusy] = useState(false);
+    const isPaused = recordingState?.isPaused ?? false;
 
-    useEffect(() => {
-        const start = Date.now();
-        const id = setInterval(() => setElapsed(Date.now() - start), 1000);
-        return () => clearInterval(id);
-    }, []);
-
-    const formatTime = (ms: number) => {
-        const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const handle = async (fn: () => void | Promise<void>) => {
+        setBusy(true);
+        try { await fn(); } finally { setBusy(false); }
     };
 
     return (
@@ -36,37 +37,58 @@ export function RecordingPhase({ hasAudio, hasCamera, onStop }: {
             </div>
 
             {/* Card */}
-            <div className="flex flex-col items-center gap-6 bg-surface-raised border border-border rounded-xl px-10 py-8 shadow-sm">
-                {/* Timer + Recording Indicator */}
+            <div className="flex flex-col items-center gap-6 bg-surface-raised border border-border rounded-xl px-10 py-8 shadow-sm w-full max-w-sm">
+                {/* Timer row */}
                 <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-destructive rounded-full animate-pulse" />
-                    <span className="text-3xl font-semibold tabular-nums tracking-wide">
+                    <div className={`w-3 h-3 bg-destructive rounded-full shrink-0 ${isPaused ? '' : 'animate-pulse'}`} />
+                    <span className="text-3xl font-semibold tabular-nums tracking-wide text-text-highlighted">
                         {formatTime(elapsed)}
                     </span>
+                    <div className="flex items-center gap-2 ml-2">
+                        <span className={hasAudio ? 'text-text-main' : 'text-text-disabled'}>
+                            {hasAudio ? <BiMicrophone className="icon-lg" /> : <BiMicrophoneOff className="icon-lg" />}
+                        </span>
+                        <span className={hasCamera ? 'text-text-main' : 'text-text-disabled'}>
+                            {hasCamera ? <PiWebcamBold className="icon-lg" /> : <PiWebcamSlashBold className="icon-lg" />}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Status Icons */}
-                <div className="flex items-center gap-4">
-                    <Tooltip text={hasAudio ? 'Microphone on' : 'Microphone off'} position="bottom-start">
-                        <div className={`p-2 rounded-lg ${hasAudio ? 'text-text-main bg-surface' : 'text-text-disabled'}`}>
-                            {hasAudio ? <BiMicrophone size={20} /> : <BiMicrophoneOff size={20} />}
-                        </div>
-                    </Tooltip>
-                    <Tooltip text={hasCamera ? 'Camera on' : 'Camera off'} position="bottom-start">
-                        <div className={`p-2 rounded-lg ${hasCamera ? 'text-text-main bg-surface' : 'text-text-disabled'}`}>
-                            {hasCamera ? <PiWebcamBold size={20} /> : <PiWebcamSlashBold size={20} />}
-                        </div>
-                    </Tooltip>
+                {/* Pause / Finish */}
+                <div className="flex gap-2 w-full">
+                    <Button
+                        variant="base"
+                        onClick={() => handle(onPauseResume)}
+                        disabled={busy}
+                        className="w-28 justify-center gap-1.5"
+                    >
+                        {isPaused
+                            ? <><IoPlay className="icon-sm" /> Resume</>
+                            : <><IoPause className="icon-sm" /> Pause</>}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => handle(onFinish)}
+                        disabled={busy}
+                        className="w-28 justify-center gap-1.5"
+                    >
+                        <FiSquare className="icon-sm" />
+                        Finish
+                    </Button>
                 </div>
 
-                {/* Stop Button */}
-                <Button variant="destructive" onClick={onStop} className="px-8 py-2.5 text-base">
-                    <FiSquare size={16} />
-                    Stop Recording
+                {/* Cancel */}
+                <Button
+                    variant="ghost"
+                    onClick={() => handle(onCancel)}
+                    disabled={busy}
+                    className="w-full justify-center text-text-muted hover:text-destructive"
+                >
+                    <MdCancel className="icon-sm" />
+                    Cancel Recording
                 </Button>
             </div>
 
-            {/* Info */}
             <p className="text-text-disabled text-xs text-center max-w-xs">
                 Must keep this tab open while recording.
             </p>

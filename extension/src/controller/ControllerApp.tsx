@@ -14,27 +14,25 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { VideoRecorder } from '../shared/videoRecorder';
-import { MSG_TYPES, type RecordingConfig, STORAGE_KEYS } from '../shared/messageTypes';
+import { MSG_TYPES, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 import type { WindowDetectionResult } from '../shared/windowDetector';
 import { Button, Tooltip, Modal } from '@shared/components';
 import viewPermissionsImage from '../assets/view-permissions.png';
-import permissionsImage from '../assets/permissions.png';
+import permissionsImage from '../assets/permissions-small.png';
 import { MdFiberManualRecord } from 'react-icons/md';
-import { FiFolder } from 'react-icons/fi';
-import { getEditorOrigin, MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
-import logoDark from '@shared/assets/fulllogo-dark.png';
+import { GrProjects } from 'react-icons/gr';
+import { getEditorOrigin } from '@shared/types/bridge';
+import { captureException } from '../utils/sentry';
 import logoLight from '@shared/assets/fulllogo-light.png';
-import logoSquare from '@shared/assets/logo.svg';
-import iconWithTimer from '../assets/icon-with-timer.png';
+import logoDark from '@shared/assets/fulllogo-dark.png';
 import '@shared/components/LogoLink.css';
 
 import { MicrophoneCard } from './MicrophoneCard';
 import { CameraCard } from './CameraCard';
 import { ScreenShareCard, CalibrationMarkers } from './ScreenShareCard';
-import { EffectsCard } from './EffectsCard';
 import { RecordingPhase } from './RecordingPhase';
 
-export type ControllerTab = 'mic' | 'camera' | 'screen' | 'effects';
+export type ControllerTab = 'mic' | 'camera' | 'screen';
 
 type ControllerPhase = 'setup' | 'recording';
 
@@ -43,7 +41,6 @@ export function ControllerApp() {
     const [phase, setPhase] = useState<ControllerPhase>('setup');
 
     // --- Source Selection ---
-    const [sourceId, setSourceId] = useState<string | null>(null);
 
     // --- Preview ---
     const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
@@ -58,27 +55,19 @@ export function ControllerApp() {
     const [prefsLoaded, setPrefsLoaded] = useState(false);
     const [showPermissionModal, setShowPermissionModal] = useState(false);
 
-    // --- Post-Processing Preferences (only for Chrome window recordings) ---
-    const [applyAutoZoom, setApplyAutoZoom] = useState(true);
-    const [applySpotlight, setApplySpotlight] = useState(true);
-    const [simplifyToolbar, setSimplifyToolbar] = useState(false);
-    const [isEffectsExpanded, setIsEffectsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState<ControllerTab>('screen');
-    const [hideTimerHint, setHideTimerHint] = useState(false);
 
     // --- Recording ---
     const recorderRef = useRef<VideoRecorder | null>(null);
     const sessionIdRef = useRef<string>('');
     const [isRecording, setIsRecording] = useState(false);
     const isRecordingRef = useRef(false);
+    const [liveRecordingState, setLiveRecordingState] = useState<RecordingState | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isChoosing, setIsChoosing] = useState(false);
     const [cameraDeviceError, setCameraDeviceError] = useState(false);
     const [micDeviceError, setMicDeviceError] = useState(false);
 
-    // --- Pinning ---
-    const [isPinned, setIsPinned] = useState(true);
-    const [isHoveringPin, setIsHoveringPin] = useState(false);
 
     // --- Original Tab ---
     const originalTabIdRef = useRef<number | null>(null);
@@ -99,50 +88,34 @@ export function ControllerApp() {
         });
     }, []);
 
-    // Check if extension is pinned
-    useEffect(() => {
-        chrome.action?.getUserSettings?.().then(settings => {
-            setIsPinned(settings.isOnToolbar ?? true);
-        }).catch(() => { });
-    }, []);
-
-    // Load saved preferences from chrome.storage.local
+// Load saved preferences from chrome.storage.local
     useEffect(() => {
         chrome.storage.local.get('recordio_prefs').then((result) => {
             const prefs = result.recordio_prefs as any;
             if (prefs) {
-                if (typeof prefs.isAudioEnabled === 'boolean') setIsAudioEnabled(prefs.isAudioEnabled);
-                if (typeof prefs.isVideoEnabled === 'boolean') setIsVideoEnabled(prefs.isVideoEnabled);
-                if (prefs.selectedAudioId) setSelectedAudioId(prefs.selectedAudioId);
-                if (prefs.selectedVideoId) setSelectedVideoId(prefs.selectedVideoId);
-                if (typeof prefs.applyAutoZoom === 'boolean') setApplyAutoZoom(prefs.applyAutoZoom);
-                if (typeof prefs.applySpotlight === 'boolean') setApplySpotlight(prefs.applySpotlight);
-                if (typeof prefs.simplifyToolbar === 'boolean') setSimplifyToolbar(prefs.simplifyToolbar);
-                if (typeof prefs.isEffectsExpanded === 'boolean') setIsEffectsExpanded(prefs.isEffectsExpanded);
-                if (typeof prefs.hideTimerHint === 'boolean') setHideTimerHint(prefs.hideTimerHint);
+                // Field names match the popup's storage format (micEnabled/camEnabled/selectedMicId/selectedCamId)
+                if (typeof prefs.micEnabled === 'boolean') setIsAudioEnabled(prefs.micEnabled);
+                if (typeof prefs.camEnabled === 'boolean') setIsVideoEnabled(prefs.camEnabled);
+                if (prefs.selectedMicId) setSelectedAudioId(prefs.selectedMicId);
+                if (prefs.selectedCamId) setSelectedVideoId(prefs.selectedCamId);
             }
             setPrefsLoaded(true);
-            if (prefs?.isVideoEnabled) setActiveTab('camera');
+            if (prefs?.camEnabled) setActiveTab('camera');
         });
     }, []);
 
-    // Save preferences when they change
+    // Save preferences when they change (field names match popup's storage format)
     useEffect(() => {
         if (!prefsLoaded) return;
         chrome.storage.local.set({
             recordio_prefs: {
-                isAudioEnabled,
-                isVideoEnabled,
-                selectedAudioId,
-                selectedVideoId,
-                applyAutoZoom,
-                applySpotlight,
-                simplifyToolbar,
-                isEffectsExpanded,
-                hideTimerHint,
+                micEnabled: isAudioEnabled,
+                camEnabled: isVideoEnabled,
+                selectedMicId: selectedAudioId,
+                selectedCamId: selectedVideoId,
             }
         });
-    }, [isAudioEnabled, isVideoEnabled, selectedAudioId, selectedVideoId, applyAutoZoom, applySpotlight, simplifyToolbar, isEffectsExpanded, hideTimerHint, prefsLoaded]);
+    }, [isAudioEnabled, isVideoEnabled, selectedAudioId, selectedVideoId, prefsLoaded]);
 
     // Connect preview stream to video element
     useEffect(() => {
@@ -243,7 +216,6 @@ export function ControllerApp() {
     }, [isAudioEnabled, isVideoEnabled, selectedAudioId, selectedVideoId]);
 
     const clearSource = useCallback(() => {
-        setSourceId(null);
         setDetectionResult(null);
         if (previewStream) {
             previewStream.getTracks().forEach(t => t.stop());
@@ -272,9 +244,9 @@ export function ControllerApp() {
 
             if (detectionResult?.isControllerWindow) {
                 recorder.setRecordingPreferences({
-                    applyAutoZoom,
-                    applySpotlight,
-                    simplifyToolbar,
+                    applyAutoZoom: true,
+                    applySpotlight: true,
+                    simplifyToolbar: false,
                 });
             }
 
@@ -289,6 +261,14 @@ export function ControllerApp() {
             setPhase('recording');
 
             const shouldTrackEvents = detectionResult?.isControllerWindow ?? false;
+            const displaySurface = previewStream?.getVideoTracks()[0]?.getSettings()?.displaySurface;
+            const captureType = shouldTrackEvents
+                ? 'current_window'
+                : displaySurface === 'monitor'
+                    ? 'desktop'
+                    : displaySurface === 'browser'
+                        ? 'tab'
+                        : 'another_window';
 
             const syncTimestamp = Date.now();
             chrome.runtime.sendMessage({
@@ -299,6 +279,7 @@ export function ControllerApp() {
                     hasAudio: isAudioEnabled,
                     hasCamera: isVideoEnabled,
                     originalTabId: originalTabIdRef.current,
+                    captureType,
                 }
             });
 
@@ -317,7 +298,7 @@ export function ControllerApp() {
             console.error("Error starting recording:", err);
             setError(err.message || 'Failed to start recording');
         }
-    }, [isAudioEnabled, isVideoEnabled, detectionResult, applyAutoZoom, applySpotlight, simplifyToolbar]);
+    }, [isAudioEnabled, isVideoEnabled, detectionResult]);
 
     // --- Stop Recording ---
     const stopRecording = useCallback(async () => {
@@ -334,6 +315,19 @@ export function ControllerApp() {
             console.log('[Controller] recorder.finish() completed. durationMs:', result.durationMs);
         } catch (e) {
             console.error('[Controller] Error finishing recording:', e);
+            captureException(e instanceof Error ? e : new Error(String(e)));
+            chrome.runtime.sendMessage({
+                type: MSG_TYPES.RECORDING_FAILED,
+                payload: { error: e instanceof Error ? e.message : String(e), mode: 'controller' },
+            }).catch(() => {});
+            const msg = e instanceof Error && e.name === 'QuotaExceededError'
+                ? 'Not enough storage space to save the recording. Free up disk space and try again.'
+                : 'Failed to save recording. Please try again.';
+            setError(msg);
+            setPhase('setup');
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            return;
         }
 
         console.log('[Controller] Sending CONTROLLER_STOPPED_RECORDING to background');
@@ -343,11 +337,65 @@ export function ControllerApp() {
         });
     }, []);
 
-    // Listen for STOP_SESSION from background
+    // Subscribe to storage changes during recording to keep liveRecordingState in sync
+    useEffect(() => {
+        if (phase !== 'recording') return;
+
+        chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE).then((result) => {
+            const state = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState;
+            if (state) setLiveRecordingState(state);
+        });
+
+        const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+            if (changes[STORAGE_KEYS.RECORDING_STATE]) {
+                setLiveRecordingState(changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState);
+            }
+        };
+        chrome.storage.session.onChanged.addListener(listener);
+        return () => chrome.storage.session.onChanged.removeListener(listener);
+    }, [phase]);
+
+    const handlePauseResume = useCallback(() => {
+        const type = liveRecordingState?.isPaused
+            ? MSG_TYPES.POPUP_RESUME_RECORDING
+            : MSG_TYPES.POPUP_PAUSE_RECORDING;
+        chrome.runtime.sendMessage({ type }).catch(() => { });
+    }, [liveRecordingState?.isPaused]);
+
+    const handleCancel = useCallback(() => {
+        const recorder = recorderRef.current;
+        if (recorder) {
+            recorder.cancel(sessionIdRef.current).catch(() => { });
+            recorderRef.current = null;
+        }
+        chrome.runtime.sendMessage({ type: MSG_TYPES.POPUP_CANCEL_RECORDING }).catch(() => { });
+        window.close();
+    }, []);
+
+    // Listen for session control messages from background
+    // (STOP_SESSION = finish, plus new pause/resume/cancel from popup)
     useEffect(() => {
         const listener = (message: any) => {
-            if (message.type === MSG_TYPES.STOP_SESSION) {
-                stopRecording();
+            switch (message.type) {
+                case MSG_TYPES.STOP_SESSION:
+                    stopRecording();
+                    break;
+                case MSG_TYPES.BACKGROUND_CONTROLLER_PAUSE:
+                    recorderRef.current?.pause();
+                    break;
+                case MSG_TYPES.BACKGROUND_CONTROLLER_RESUME:
+                    recorderRef.current?.resume();
+                    break;
+                case MSG_TYPES.BACKGROUND_CONTROLLER_CANCEL: {
+                    // Discard recording and close this tab — background cleans up state via tabs.onRemoved
+                    const recorder = recorderRef.current;
+                    if (recorder) {
+                        recorder.cancel(sessionIdRef.current).catch(() => { });
+                        recorderRef.current = null;
+                    }
+                    window.close();
+                    break;
+                }
             }
         };
         chrome.runtime.onMessage.addListener(listener);
@@ -372,10 +420,10 @@ export function ControllerApp() {
         return () => videoTrack.removeEventListener('ended', onTrackEnded);
     }, [isRecording, stopRecording]);
 
-    // Listen for CAPTURE_USER_EVENT from content scripts
+    // Listen for CONTENT_CAPTURE_USER_EVENT from content scripts
     useEffect(() => {
         const listener = (message: any) => {
-            if (message.type === MSG_TYPES.CAPTURE_USER_EVENT && message.payload) {
+            if (message.type === MSG_TYPES.CONTENT_CAPTURE_USER_EVENT && message.payload) {
                 recorderRef.current?.addEvent(message.payload);
             }
         };
@@ -404,179 +452,113 @@ export function ControllerApp() {
                     <RecordingPhase
                         hasAudio={isAudioEnabled}
                         hasCamera={isVideoEnabled}
-                        onStop={stopRecording}
+                        recordingState={liveRecordingState}
+                        onPauseResume={handlePauseResume}
+                        onFinish={stopRecording}
+                        onCancel={handleCancel}
                     />
                 </main>
             ) : (
                 <div className="flex-1 w-full flex flex-col overflow-y-auto">
                     <div className="w-full flex-1 bg-[rgb(234,231,255)] border-b border-border">
-                        <main className="w-full max-w-xl mx-auto p-4 sm:p-6 lg:p-8 pb-20 flex flex-col items-center justify-start">
+                        <main className="w-full max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 pb-20 flex flex-col items-center justify-start">
                             <div className="animate-in fade-in duration-300 w-full">
 
                                 <div className="flex items-center justify-between w-full mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <img src={logoSquare} alt="Record" className="w-6 h-6" />
-                                        <h1 className="text-xl font-semibold text-text-main">Start a New Recording</h1>
+                                    <div className="flex justify-center">
+                                        <img src={logoLight} alt="Recordio" className="logo-for-light h-7" />
+                                        <img src={logoDark} alt="Recordio" className="logo-for-dark h-7" />
                                     </div>
                                     <Button variant="ghost" onClick={() => window.open(getEditorOrigin(), '_blank')}>
-                                        <FiFolder size={16} />
-                                        My Projects
+                                        <GrProjects className="icon-sm" />
+                                        Dashboard
                                     </Button>
                                 </div>
 
-                                {/* Accordion cards */}
-                                <div className="flex flex-col gap-2">
-                                    <MicrophoneCard
-                                        activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
-                                        isEnabled={isAudioEnabled}
-                                        selectedDeviceId={selectedAudioId}
-                                        onEnabledChange={setIsAudioEnabled}
-                                        onDeviceChange={setSelectedAudioId}
-                                        onPermissionError={() => setShowPermissionModal(true)}
-                                        onDeviceError={setMicDeviceError}
-                                    />
+                                <div className="grid grid-cols-2 gap-4 items-start">
+                                    {/* Left column: mic + camera */}
+                                    <div className="flex flex-col gap-2">
+                                        <MicrophoneCard
+                                            activeTab={activeTab}
+                                            setActiveTab={setActiveTab}
+                                            isEnabled={isAudioEnabled}
+                                            selectedDeviceId={selectedAudioId}
+                                            onEnabledChange={setIsAudioEnabled}
+                                            onDeviceChange={setSelectedAudioId}
+                                            onPermissionError={() => setShowPermissionModal(true)}
+                                            onDeviceError={setMicDeviceError}
+                                        />
 
-                                    <CameraCard
-                                        activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
-                                        isEnabled={isVideoEnabled}
-                                        selectedDeviceId={selectedVideoId}
-                                        onEnabledChange={setIsVideoEnabled}
-                                        onDeviceChange={setSelectedVideoId}
-                                        onPermissionError={() => setShowPermissionModal(true)}
-                                        onDeviceError={setCameraDeviceError}
-                                        stopRecording={stopRecording}
-                                    />
+                                        <CameraCard
+                                            activeTab={activeTab}
+                                            setActiveTab={setActiveTab}
+                                            isEnabled={isVideoEnabled}
+                                            selectedDeviceId={selectedVideoId}
+                                            onEnabledChange={setIsVideoEnabled}
+                                            onDeviceChange={setSelectedVideoId}
+                                            onPermissionError={() => setShowPermissionModal(true)}
+                                            onDeviceError={setCameraDeviceError}
+                                        />
 
-                                    <ScreenShareCard
-                                        activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
-                                        hasSource={hasSource}
-                                        sharingLabel={sharingLabel}
-                                        isChoosing={isChoosing}
-                                        chooseSource={chooseSource}
-                                        previewVideoRef={previewVideoRef}
-                                    />
+                                    </div>
 
-                                    <EffectsCard
-                                        activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
-                                        hasSource={hasSource}
-                                        showPostProcessing={showPostProcessing}
-                                        applyAutoZoom={applyAutoZoom}
-                                        setApplyAutoZoom={setApplyAutoZoom}
-                                        applySpotlight={applySpotlight}
-                                        setApplySpotlight={setApplySpotlight}
-                                        simplifyToolbar={simplifyToolbar}
-                                        setSimplifyToolbar={setSimplifyToolbar}
-                                    />
-                                </div>
+                                    {/* Right column: screen + record button */}
+                                    <div className="flex flex-col gap-2">
+                                        <ScreenShareCard
+                                            activeTab={activeTab}
+                                            setActiveTab={setActiveTab}
+                                            hasSource={hasSource}
+                                            sharingLabel={sharingLabel}
+                                            isChoosing={isChoosing}
+                                            chooseSource={chooseSource}
+                                            previewVideoRef={previewVideoRef}
+                                        />
 
-                                {error && (
-                                    <p className="text-destructive text-sm animate-in fade-in text-center">{error}</p>
-                                )}
+                                        {error && (
+                                            <p className="text-destructive text-sm animate-in fade-in text-center">{error}</p>
+                                        )}
 
-                                {/* ─── Bottom Bar: Recording + Info ─── */}
-                                <div className="flex flex-col gap-2 mt-4">
-                                    <Tooltip
-                                        text={!hasSource ? "Share screen to start recording" : ""}
-                                        position="top"
-                                        className="w-full flex"
-                                    >
-                                        <div className="w-full">
-                                            <Button
-                                                variant="primary"
-                                                onClick={startRecording}
-                                                disabled={!hasSource || cameraDeviceError || micDeviceError}
-                                                className="w-full text-base py-3"
-                                                style={!hasSource ? { pointerEvents: 'none' } : undefined}
-                                            >
-                                                <MdFiberManualRecord size={20} />
-                                                Start Recording
-                                            </Button>
-                                        </div>
-                                    </Tooltip>
-
-                                    {hasSource && showPostProcessing && originalTab && (
-                                        <div className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 mt-2 px-2 text-xs text-text-disabled text-center">
-                                            <span>Will switch to </span>
-                                            <span
-                                                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded font-medium max-w-[180px] shadow-sm"
-                                                style={{ backgroundColor: '#e8f0fe', color: '#1a73e8', border: '1px solid #d2e3fc' }}
-                                            >
-                                                {originalTab.favIconUrl && (
-                                                    <img src={originalTab.favIconUrl} className="w-3.5 h-3.5 rounded-sm shrink-0" alt="" />
-                                                )}
-                                                <span className="truncate">{originalTab.title}</span>
-                                            </span>
-                                            <span>tab on start.</span>
-                                        </div>
-                                    )}
-
-                                    {!hideTimerHint && (
-                                        <div className="flex items-start gap-3 mt-3 px-3 py-3 rounded-lg bg-surface-raised border border-border">
-                                            <img src={iconWithTimer} alt="Extension icon with timer" className="w-[72px] h-auto shrink-0 mt-0.5" />
-                                            <div className="flex flex-col gap-1.5 flex-1">
-                                                <p className="text-xs text-text-muted leading-relaxed">
-                                                    While recording, the extension icon shows elapsed time. Click on it to finish recording.
-                                                    {!isPinned && (
-                                                        <>
-                                                            {' '}Make sure to{' '}
-                                                            <span
-                                                                className="underline decoration-text-muted/50 underline-offset-2 cursor-pointer text-text-highlighted focus:outline-none"
-                                                                onMouseEnter={() => setIsHoveringPin(true)}
-                                                                onMouseLeave={() => setIsHoveringPin(false)}
-                                                            >
-                                                                Pin it
-                                                            </span>.
-
-                                                            {isHoveringPin && (
-                                                                <span className="absolute bottom-full right-0 mb-2 p-1.5 bg-surface border border-border shadow-float rounded-xl z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-                                                                    <img src="/assets/welcome/pin.png" alt="Pin instructions" className="w-[280px] h-auto rounded-lg outline outline-1 outline-black/5 block" />
-                                                                </span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </p>
-                                                <button
-                                                    onClick={() => setHideTimerHint(true)}
-                                                    className="self-start text-[11px] font-medium text-text-disabled hover:text-text-main transition-colors"
+                                        <Tooltip
+                                            text={!hasSource ? "Share screen to start recording" : ""}
+                                            position="top"
+                                            className="w-full flex"
+                                        >
+                                            <div className="w-full">
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={startRecording}
+                                                    disabled={!hasSource || cameraDeviceError || micDeviceError}
+                                                    className="w-full text-base py-3"
+                                                    style={!hasSource ? { pointerEvents: 'none' } : undefined}
                                                 >
-                                                    Don't show again
-                                                </button>
+                                                    <MdFiberManualRecord size={20} />
+                                                    Start Recording
+                                                </Button>
                                             </div>
-                                        </div>
-                                    )}
+                                        </Tooltip>
+
+                                        {hasSource && showPostProcessing && originalTab && (
+                                            <div className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 px-2 text-xs text-text-disabled text-center">
+                                                <span>Will switch to </span>
+                                                <span
+                                                    className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded font-medium max-w-[180px] shadow-sm"
+                                                    style={{ backgroundColor: '#e8f0fe', color: '#1a73e8', border: '1px solid #d2e3fc' }}
+                                                >
+                                                    {originalTab.favIconUrl && (
+                                                        <img src={originalTab.favIconUrl} className="w-3.5 h-3.5 rounded-sm shrink-0" alt="" />
+                                                    )}
+                                                    <span className="truncate">{originalTab.title}</span>
+                                                </span>
+                                                <span>tab on start.</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                             </div>
                         </main>
                     </div>
 
-                    {/* --- Footer --- */}
-                    <div className="w-full bg-surface shrink-0">
-                        <footer className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                            <div className="flex flex-col md:flex-row items-center justify-between pb-8">
-                                <div className="flex flex-col items-center md:items-start mb-6 md:mb-0">
-                                    <a href={MARKETING_ORIGIN} target="_blank" rel="noopener noreferrer" className="inline-block mb-3 transition-opacity hover:opacity-80">
-                                        <img src={logoLight} alt="Recordio" className="logo-for-light h-[22px]" />
-                                        <img src={logoDark} alt="Recordio" className="logo-for-dark h-[22px]" />
-                                    </a>
-                                    <p className="text-text-muted text-[13px]">Beautiful screen recordings in seconds</p>
-                                </div>
-                            </div>
-
-                            <div className="pt-6 border-t border-border flex flex-col md:flex-row items-center justify-between text-xs text-text-disabled">
-                                <p>&copy; 2026 Recordio. All rights reserved.</p>
-                                <div className="flex items-center gap-4 lg:gap-6 mt-4 md:mt-0 font-medium tracking-wide">
-                                    <a href={`${MARKETING_ORIGIN}/privacy/`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Privacy Policy</a>
-                                    <a href={`${MARKETING_ORIGIN}/terms/`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Terms of Service</a>
-                                    <a href={`mailto:${SUPPORT_EMAIL}`} target="_blank" rel="noopener noreferrer" className="hover:text-text-main transition-colors focus:outline-none">Contact</a>
-                                </div>
-                            </div>
-                        </footer>
-                    </div>
                 </div>
             )}
 

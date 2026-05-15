@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => ({
         rollupOptions: {
             input: {
                 controller: resolve(__dirname, 'src/controller/index.html'),
+                popup: resolve(__dirname, 'src/popup/popup.html'),
+                offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
+                welcome: resolve(__dirname, 'src/welcome/index.html'),
             },
             output: {},
         },

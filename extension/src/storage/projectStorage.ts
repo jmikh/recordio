@@ -27,16 +27,6 @@ export class ProjectStorage {
                     db.createObjectStore('projects', { keyPath: 'id' });
                 }
 
-                // 3. Thumbnails Store (Blob storage for project previews)
-                if (!db.objectStoreNames.contains('thumbnails')) {
-                    db.createObjectStore('thumbnails', { keyPath: 'id' });
-                }
-
-                // 4. Custom Backgrounds Store (kept for DB version compat)
-                if (!db.objectStoreNames.contains('customBackgrounds')) {
-                    db.createObjectStore('customBackgrounds', { keyPath: 'id' });
-                }
-
                 // Remove legacy sources store if it exists
                 if (db.objectStoreNames.contains('sources')) {
                     db.deleteObjectStore('sources');
@@ -119,6 +109,21 @@ export class ProjectStorage {
     }
 
     /**
+     * Clears all entries from both the projects and recordings stores.
+     * Called before starting a new recording to remove any orphaned data.
+     */
+    static async clearAll(): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['projects', 'recordings'], 'readwrite');
+            tx.objectStore('projects').clear();
+            tx.objectStore('recordings').clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    /**
      * Deletes a RawRecording and its associated blobs.
      */
     static async deleteRawRecording(recordingId: string): Promise<void> {
@@ -146,32 +151,6 @@ export class ProjectStorage {
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
-        });
-    }
-
-    // ===========================================
-    // THUMBNAILS
-    // ===========================================
-
-    static async saveThumbnail(projectId: ID, blob: Blob): Promise<void> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction('thumbnails', 'readwrite');
-            const store = tx.objectStore('thumbnails');
-            const req = store.put({ id: projectId, blob });
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    static async getThumbnail(id: ID): Promise<Blob | undefined> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(['thumbnails'], 'readonly');
-            const store = tx.objectStore('thumbnails');
-            const req = store.get(id);
-            req.onsuccess = () => resolve(req.result?.blob);
-            req.onerror = () => reject(req.error);
         });
     }
 }

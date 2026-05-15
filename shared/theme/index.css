@@ -146,9 +146,9 @@
       ============================================================ */
 
    /* Surfaces - Subtle primary-tinted off-white */
-   --surface-body: oklch(97% 0.005 var(--hue-secondary));
-   --surface-default: oklch(99% 0.005 var(--hue-secondary));
-   --surface-raised: oklch(100% 0.005 var(--hue-secondary));
+   --surface-body: oklch(100% 0.000 var(--hue-secondary));
+   --surface-default: oklch(99% 0.002 var(--hue-secondary));
+   --surface-raised: oklch(98% 0.002 var(--hue-secondary));
 
    /* Interactive State Overlays - Black transparency */
    --state-inactive: oklch(0 0 0 / 3%);
@@ -354,6 +354,22 @@ body,
 .canvas-editor-glow {
    box-shadow: 0 0 0 2px var(--secondary),
       0 0 12px 2px oklch(from var(--secondary) l c h / 40%);
+}
+
+/* Fade + slide-down entry — used for contextual banners that appear mid-UI */
+@keyframes fadeSlideIn {
+   from {
+      opacity: 0;
+      transform: translateY(-6px);
+   }
+   to {
+      opacity: 1;
+      transform: translateY(0);
+   }
+}
+
+.animate-fade-slide-in {
+   animation: fadeSlideIn 0.2s ease-out forwards;
 }
 
 /* Spin animation for traveling border effects */

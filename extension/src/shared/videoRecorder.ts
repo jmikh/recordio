@@ -37,8 +37,9 @@ export class VideoRecorder {
     // Screen WebCodecs pipeline
     private screenStream: MediaStream | null = null;
     private screenVideoEncoder: VideoEncoder | null = null;
-    private screenMuxer: WebMMuxer.Muxer<WebMMuxer.ArrayBufferTarget> | null = null;
-    private screenMuxerTarget: WebMMuxer.ArrayBufferTarget | null = null;
+    private screenMuxer: WebMMuxer.Muxer<WebMMuxer.FileSystemWritableFileStreamTarget> | null = null;
+    private screenOPFSFileHandle: FileSystemFileHandle | null = null;
+    private screenOPFSWritable: FileSystemWritableFileStream | null = null;
     private screenFrameReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
     private frameProcessingDone: Promise<void> | null = null;
 
@@ -61,6 +62,13 @@ export class VideoRecorder {
     private audioContext: AudioContext | null = null;
 
     private startTime: number = 0;
+
+    // Pause tracking
+    private isPaused: boolean = false;
+    /** Accumulated microseconds paused (for WebCodecs timestamp adjustment) */
+    private totalPausedUs: number = 0;
+    /** Wall-clock ms at which the current pause began (Date.now()); 0 if not paused */
+    private pauseWallClockStartMs: number = 0;
 
     // Metadata
     private screenDimensions: Size | undefined;
@@ -165,6 +173,18 @@ export class VideoRecorder {
                 }
             }
 
+        // Tab capture (via tabCapture API): the entire frame is the content area.
+        // tabCapture streams don't populate displaySurface, so we use the isTabCapture flag.
+        // CSS viewport size enables DPR-correct event scaling and a full-frame trackableContentRect.
+        if (this.config.isTabCapture && this.config.tabViewportSize) {
+            this.viewportRect = {
+                x: 0,
+                y: 0,
+                width: this.config.tabViewportSize.width,
+                height: this.config.tabViewportSize.height,
+            };
+        }
+
 
         return this.detectionResult;
     }
@@ -198,6 +218,39 @@ export class VideoRecorder {
     }
 
     /**
+     * Pauses the recording. Screen frames are skipped (not encoded) until resume().
+     * Camera and mic MediaRecorders are also paused.
+     */
+    public pause(): void {
+        if (this.state !== 'recording' || this.isPaused) return;
+        this.isPaused = true;
+        this.pauseWallClockStartMs = Date.now();
+        console.log('[VideoRecorder] pause() called — wallClock:', this.pauseWallClockStartMs);
+        if (this.cameraRecorder?.state === 'recording') this.cameraRecorder.pause();
+        if (this.micRecorder?.state === 'recording') this.micRecorder.pause();
+    }
+
+    /**
+     * Resumes a paused recording. The pause gap is computed from wall-clock time
+     * (not frame timestamps) so it works even if no frames arrive during the pause
+     * (e.g. static tab with VFR-like capture). The gap is subtracted from all
+     * subsequent frame timestamps so the final video has no freeze or jump.
+     */
+    public resume(): void {
+        if (this.state !== 'recording' || !this.isPaused) return;
+        const gapMs = Date.now() - this.pauseWallClockStartMs;
+        this.totalPausedUs += gapMs * 1000;
+        this.isPaused = false;
+        this.pauseWallClockStartMs = 0;
+        // Force a keyframe at the resume point so the video is seekable from here
+        this.lastKeyframeTimestamp = -Infinity;
+        console.log('[VideoRecorder] resume() — gap:', (gapMs / 1000).toFixed(3), 's | totalPausedUs:', (this.totalPausedUs / 1_000_000).toFixed(3), 's');
+        if (this.cameraRecorder?.state === 'paused') this.cameraRecorder.resume();
+        if (this.micRecorder?.state === 'paused') this.micRecorder.resume();
+    }
+
+
+    /**
      * Finishes the recording session, saves the files, and creates the RawRecording.
      */
     public async finish(sessionId?: string): Promise<{ durationMs: number }> {
@@ -217,13 +270,11 @@ export class VideoRecorder {
         this.state = 'stopping';
 
         // --- 1. Capture track metadata ---
-        let displaySurface: string | undefined;
         let screenFrameRate: number | undefined;
         if (this.screenStream) {
             const vt = this.screenStream.getVideoTracks()[0];
             if (vt) {
                 const set = vt.getSettings();
-                displaySurface = set?.displaySurface;
                 screenFrameRate = set?.frameRate;
                 if (!this.screenDimensions && set?.width && set?.height) {
                     this.screenDimensions = { width: set.width, height: set.height };
@@ -243,10 +294,12 @@ export class VideoRecorder {
             }
         }
 
-        // --- 2. Stop all live media tracks ---
-        // This will cause the MediaStreamTrackProcessor's readable stream to end
-        for (const stream of this.activeStreams) {
-            for (const track of stream.getTracks()) {
+        // --- 2. Stop the screen stream tracks ---
+        // Stopping the screen track signals the MediaStreamTrackProcessor's readable stream to end,
+        // which terminates the frame processing loop. Camera/mic tracks are left live intentionally
+        // so their MediaRecorders can finish cleanly without an abrupt track-ended flicker.
+        if (this.screenStream) {
+            for (const track of this.screenStream.getTracks()) {
                 if (track.readyState === 'live') {
                     track.stop();
                 }
@@ -268,7 +321,9 @@ export class VideoRecorder {
         }
 
 
-        // --- 4. Stop Camera/Mic MediaRecorders ---
+        // --- 4. Stop Camera/Mic MediaRecorders, then stop their underlying tracks ---
+        // Stop the MediaRecorders first (while tracks are still live) to avoid cutting the
+        // camera/mic stream abruptly, which would cause a flicker at the end of the recording.
         const stopPromises: Promise<void>[] = [];
 
         if (this.cameraRecorder && this.cameraRecorder.state !== 'inactive') {
@@ -291,13 +346,32 @@ export class VideoRecorder {
 
         await Promise.all(stopPromises);
 
+        // Now stop camera/mic tracks after their MediaRecorders have finalized cleanly.
+        for (const stream of this.activeStreams) {
+            if (stream === this.screenStream) continue; // already stopped above
+            for (const track of stream.getTracks()) {
+                if (track.readyState === 'live') {
+                    track.stop();
+                }
+            }
+        }
+
         // --- 5. Save Data ---
         const effectiveId = sessionId || this.currentSessionId;
         if (!effectiveId) throw new Error("No session ID available to save");
 
+        // Finalize pause accounting before computing duration or saving metadata.
+        // If finish() is called while paused, add the remaining pause duration now.
+        if (this.isPaused && this.pauseWallClockStartMs > 0) {
+            this.totalPausedUs += (Date.now() - this.pauseWallClockStartMs) * 1000;
+        }
+
         await this.saveRecordingData(effectiveId, this.events, screenFrameRate, cameraFrameRate);
 
-        const durationMs = Date.now() - this.startTime;
+        const totalPausedMs = Math.round(this.totalPausedUs / 1000);
+        const wallClockMs = Date.now() - this.startTime;
+        const durationMs = wallClockMs - totalPausedMs;
+        console.log('[VideoRecorder] finish() — wallClock:', (wallClockMs / 1000).toFixed(1), 's | totalPaused:', (totalPausedMs / 1000).toFixed(1), 's | effectiveDuration:', (durationMs / 1000).toFixed(1), 's | totalFrames:', this.totalFrameCount, '| keyframes:', this.keyframeCount);
 
         this.releaseStreams();
         return { durationMs };
@@ -330,7 +404,27 @@ export class VideoRecorder {
      */
     public async cancel(sessionId: string): Promise<void> {
         this.validateSession(sessionId);
+        await this.cleanupOPFS();
+        // Stop all media tracks so camera/mic indicators go dark
+        for (const stream of this.activeStreams) {
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+        this.activeStreams = [];
         this.releaseStreams();
+    }
+
+    private async cleanupOPFS(): Promise<void> {
+        if (this.screenOPFSWritable) {
+            await this.screenOPFSWritable.abort().catch(() => {});
+            this.screenOPFSWritable = null;
+        }
+        if (this.screenOPFSFileHandle) {
+            const root = await navigator.storage.getDirectory();
+            await root.removeEntry(`rec-${this.currentSessionId}-screen.webm`).catch(() => {});
+            this.screenOPFSFileHandle = null;
+        }
     }
 
 
@@ -350,17 +444,29 @@ export class VideoRecorder {
                 const { value: frame, done } = await reader.read();
                 if (done) break;
 
+                // --- Pause: skip frames (gap already accounted for in resume()) ---
+                if (this.isPaused) {
+                    frame.close();
+                    continue;
+                }
+
+                // Adjust timestamp to remove paused periods
+                const adjustedTimestampUs = frame.timestamp - this.totalPausedUs;
+
                 this.totalFrameCount++;
 
-                // Initialize encoder/muxer on first frame using actual dimensions
+                // Initialize encoder/muxer on first encoded frame using actual dimensions
                 if (this.totalFrameCount === 1) {
                     const width = frame.displayWidth;
                     const height = frame.displayHeight;
                     this.screenDimensions = { width, height };
 
-                    this.screenMuxerTarget = new WebMMuxer.ArrayBufferTarget();
+                    const root = await navigator.storage.getDirectory();
+                    this.screenOPFSFileHandle = await root.getFileHandle(`rec-${this.currentSessionId}-screen.webm`, { create: true });
+                    this.screenOPFSWritable = await this.screenOPFSFileHandle.createWritable();
+
                     this.screenMuxer = new WebMMuxer.Muxer({
-                        target: this.screenMuxerTarget,
+                        target: new WebMMuxer.FileSystemWritableFileStreamTarget(this.screenOPFSWritable),
                         video: { codec: 'V_VP9', width, height },
                         firstTimestampBehavior: 'offset',
                     });
@@ -382,14 +488,17 @@ export class VideoRecorder {
 
                 }
 
-                const needsKeyframe = (frame.timestamp - this.lastKeyframeTimestamp) >= keyframeIntervalUs;
+                const needsKeyframe = (adjustedTimestampUs - this.lastKeyframeTimestamp) >= keyframeIntervalUs;
                 if (needsKeyframe) {
                     this.keyframeCount++;
-                    this.lastKeyframeTimestamp = frame.timestamp;
+                    this.lastKeyframeTimestamp = adjustedTimestampUs;
                 }
 
-                this.screenVideoEncoder!.encode(frame, { keyFrame: needsKeyframe });
+                // Create a new VideoFrame with the adjusted timestamp before encoding
+                const adjustedFrame = new VideoFrame(frame, { timestamp: adjustedTimestampUs });
                 frame.close();
+                this.screenVideoEncoder!.encode(adjustedFrame, { keyFrame: needsKeyframe });
+                adjustedFrame.close();
             }
         } catch (e) {
             if (this.state === 'stopping') {
@@ -416,9 +525,12 @@ export class VideoRecorder {
             sysSource.connect(this.audioContext.destination);
         }
 
-        // 3. Get Mic Stream
-        let micStream: MediaStream | null = null;
-        if (config.hasAudio) {
+        // 3. Get Mic Stream (reuse pre-warmed stream if available)
+        let micStream: MediaStream | null = config.warmMicStream || null;
+        if (micStream) {
+            console.log('[VideoRecorder] Reusing pre-warmed mic stream');
+            this.activeStreams.push(micStream);
+        } else if (config.hasAudio) {
             const audioConstraints: MediaTrackConstraints = {
                 ...(config.audioDeviceId && { deviceId: { exact: config.audioDeviceId } }),
                 noiseSuppression: true,
@@ -443,9 +555,12 @@ export class VideoRecorder {
             if (micStream) this.activeStreams.push(micStream);
         }
 
-        // 4. Get Camera Stream
-        let cameraStream: MediaStream | null = null;
-        if (config.hasCamera) {
+        // 4. Get Camera Stream (reuse pre-warmed stream if available)
+        let cameraStream: MediaStream | null = config.warmCameraStream || null;
+        if (cameraStream) {
+            console.log('[VideoRecorder] Reusing pre-warmed camera stream');
+            this.activeStreams.push(cameraStream);
+        } else if (config.hasCamera) {
             try {
                 const videoConstraints: MediaTrackConstraints = {
                     ...(config.videoDeviceId && { deviceId: { exact: config.videoDeviceId } }),
@@ -528,16 +643,25 @@ export class VideoRecorder {
     // --- Storage ---
 
     private async saveRecordingData(projectId: string, events: UserEvents | null, screenFrameRate?: number, cameraFrameRate?: number) {
-        const duration = Date.now() - this.startTime;
+        const duration = Date.now() - this.startTime - Math.round(this.totalPausedUs / 1000);
         const now = Date.now();
 
-        // 1. Save Screen Recording Blob (from WebCodecs muxer output)
-        const screenBuffer = this.screenMuxerTarget?.buffer;
-        const screenBlob = screenBuffer
-            ? new Blob([screenBuffer], { type: 'video/webm' })
-            : new Blob([], { type: 'video/webm' });
+        // 1. Save Screen Recording Blob (from OPFS file written during encoding)
         const screenBlobId = `rec-${projectId}-screen`;
+        if (this.screenOPFSWritable) {
+            await this.screenOPFSWritable.close();
+            this.screenOPFSWritable = null;
+        }
+        const screenBlob = this.screenOPFSFileHandle
+            ? await this.screenOPFSFileHandle.getFile()
+            : new Blob([], { type: 'video/webm' });
         await ProjectStorage.saveRecordingBlob(screenBlobId, screenBlob);
+        // Clean up OPFS file now that it's in IndexedDB
+        if (this.screenOPFSFileHandle) {
+            const root = await navigator.storage.getDirectory();
+            await root.removeEntry(`rec-${projectId}-screen.webm`).catch(() => {});
+            this.screenOPFSFileHandle = null;
+        }
 
 
 
@@ -648,25 +772,6 @@ export class VideoRecorder {
         if (sessionId && sessionId !== this.currentSessionId) {
             throw new Error(`Session mismatch: Action for ${sessionId} but current is ${this.currentSessionId}`);
         }
-    }
-
-
-
-    private applyOffsetToEvent(e: any, xOff: number, yOff: number) {
-        if (xOff === 0 && yOff === 0) return;
-
-        const offsetPoint = (p: { x: number, y: number }) => {
-            p.x += xOff;
-            p.y += yOff;
-        };
-
-        const offsetRect = (r: { x: number, y: number }) => {
-            r.x += xOff;
-            r.y += yOff;
-        };
-
-        if (e.mousePos) offsetPoint(e.mousePos);
-        if (e.targetRect) offsetRect(e.targetRect);
     }
 
     private scaleAllEvents(events: UserEvents, scaleX: number, scaleY: number) {

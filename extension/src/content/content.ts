@@ -16,6 +16,7 @@
 import { initSentry } from '../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
+import { showCountdown } from './countdownOverlay';
 
 // Initialize Sentry for error tracking
 initSentry('content');
@@ -29,6 +30,10 @@ window.addEventListener('recordio-cleanup', () => {
         eventRecorder.stop();
         eventRecorder = null;
     }
+    if (hideCountdown) {
+        hideCountdown();
+        hideCountdown = null;
+    }
     // Remove listeners
     chrome.runtime.onMessage.removeListener(handleMessage);
 }, { once: true });
@@ -36,7 +41,7 @@ window.addEventListener('recordio-cleanup', () => {
 // --- Initialization ---
 
 chrome.runtime.sendMessage({
-    type: MSG_TYPES.GET_RECORDING_STATE,
+    type: MSG_TYPES.CONTENT_GET_RECORDING_STATE,
     payload: {}
 }, (response) => {
     if (chrome.runtime.lastError) {
@@ -50,6 +55,7 @@ chrome.runtime.sendMessage({
 
 // --- State ---
 let eventRecorder: EventRecorder | null = null;
+let hideCountdown: (() => void) | null = null;
 
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
@@ -60,6 +66,29 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
 
         case MSG_TYPES.STOP_RECORDING_EVENTS:
             handleStopRecording();
+            break;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_SHOW_COUNTDOWN:
+            console.log('[Content] SHOW_COUNTDOWN received');
+            hideCountdown = showCountdown(
+                () => {
+                    console.log('[Content] Countdown complete');
+                    hideCountdown = null;
+                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_COUNTDOWN_COMPLETE }).catch(() => {});
+                },
+                () => {
+                    console.log('[Content] Countdown cancelled');
+                    hideCountdown = null;
+                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_COUNTDOWN_CANCELLED }).catch(() => {});
+                },
+            );
+            break;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_HIDE_COUNTDOWN:
+            if (hideCountdown) {
+                hideCountdown();
+                hideCountdown = null;
+            }
             break;
     }
 };
