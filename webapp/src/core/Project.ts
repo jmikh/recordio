@@ -191,7 +191,7 @@ export class ProjectImpl {
      */
     static create(): Project {
         return {
-            id: crypto.randomUUID(),
+            id: '',
             schemaVersion: CURRENT_SCHEMA_VERSION,
             screenSource: createPlaceholderSource(),
             userEvents: EMPTY_USER_EVENTS,
