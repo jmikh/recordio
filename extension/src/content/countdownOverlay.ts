@@ -247,13 +247,13 @@ export function showCountdown(
     numberEl.textContent = String(count);
     disc.appendChild(numberEl);
 
-    center.appendChild(disc);
-
-    // Label
+    // Label (above disc)
     const label = document.createElement('div');
     label.className = 'recordio-countdown__label';
-    label.textContent = 'Recording starts';
+    label.textContent = 'Recording starts in';
     center.appendChild(label);
+
+    center.appendChild(disc);
 
     // Cancel button
     const cancelBtn = document.createElement('button');

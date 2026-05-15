@@ -9,7 +9,7 @@
  *   elapsed = now - startTime - totalPausedMs - (isPaused ? now - pauseStartTime : 0)
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
@@ -22,6 +22,27 @@ import { formatTime, useElapsed } from '../shared/recordingTime';
 export function RecordingView({ recordingState }: { recordingState: RecordingState }) {
     const elapsed = useElapsed(recordingState);
     const [busy, setBusy] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                let resp: any;
+                if (recordingState.recordingMode === 'controller' && recordingState.controllerTabId) {
+                    resp = await chrome.tabs.sendMessage(recordingState.controllerTabId, {
+                        type: MSG_TYPES.POPUP_REQUEST_PREVIEW_FRAME,
+                    });
+                } else if (recordingState.recordingMode === 'tab') {
+                    resp = await chrome.runtime.sendMessage({
+                        type: MSG_TYPES.POPUP_REQUEST_PREVIEW_FRAME,
+                    });
+                }
+                if (resp?.dataUrl) setPreviewUrl(resp.dataUrl);
+            } catch {
+                // Preview not available — fail silently
+            }
+        })();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const send = async (type: string) => {
         setBusy(true);
@@ -75,6 +96,13 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                     </span>
                 </div>
             </div>
+
+            {/* Preview thumbnail */}
+            {previewUrl && (
+                <div className="rounded-md overflow-hidden bg-black -mt-1">
+                    <img src={previewUrl} alt="Recording preview" className="w-full h-auto object-contain" />
+                </div>
+            )}
 
             {/* Paused banner */}
             {recordingState.isPaused ? (

@@ -672,6 +672,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 break;
             }
 
+            case MSG_TYPES.POPUP_REQUEST_PREVIEW_FRAME: {
+                if (currentState.recordingMode !== 'tab') { sendResponse(null); break; }
+                try {
+                    const resp = await chrome.runtime.sendMessage({ type: MSG_TYPES.BACKGROUND_OFFSCREEN_GET_PREVIEW });
+                    sendResponse(resp ?? null);
+                } catch {
+                    sendResponse(null);
+                }
+                break;
+            }
+
             case MSG_TYPES.CONTROLLER_SOURCE_SELECTED: {
                 // Source picked — start recording immediately, no countdown
                 const config = pendingRecordingConfig;

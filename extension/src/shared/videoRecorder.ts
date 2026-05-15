@@ -429,8 +429,20 @@ export class VideoRecorder {
      */
     public addEvent(event: any) {
         if (this.state !== 'recording') return;
+        if (this.isPaused) return;
 
-        const e = event;
+        // Adjust event timestamps to match the compressed video timeline.
+        // Video frames subtract totalPausedUs from their raw timestamps; we apply
+        // the same correction here (converting µs → ms) so events stay aligned.
+        const pausedMs = this.totalPausedUs / 1000;
+        const e = pausedMs > 0
+            ? {
+                ...event,
+                timestamp: event.timestamp - pausedMs,
+                ...(event.endTime !== undefined && { endTime: event.endTime - pausedMs }),
+            }
+            : event;
+
         switch (e.type) {
             case EventType.CLICK: this.events.mouseClicks.push(e); break;
             case EventType.MOUSEPOS: this.events.mousePositions.push(e); break;

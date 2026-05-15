@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { VideoRecorder } from '../shared/videoRecorder';
 import { MSG_TYPES, type RecordingConfig, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
-import { Button } from '@shared/components';
+import { Button, LogoLink } from '@shared/components';
 import { captureException } from '../utils/sentry';
 import { RecordingPhase } from './RecordingPhase';
 import startSoundUrl from '../assets/countdown-sound.mp3?url';
@@ -275,12 +275,15 @@ export function ControllerApp() {
 
         chrome.storage.session.get(STORAGE_KEYS.RECORDING_STATE).then((result) => {
             const state = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState;
-            if (state) setLiveRecordingState(state);
+            // Only accept state once background has confirmed recording started (isRecording: true
+            // and startTime > 0). Avoids briefly computing elapsed against startTime: 0.
+            if (state?.isRecording && state.startTime) setLiveRecordingState(state);
         });
 
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
             if (changes[STORAGE_KEYS.RECORDING_STATE]) {
-                setLiveRecordingState(changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState);
+                const state = changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState;
+                if (state?.isRecording && state.startTime) setLiveRecordingState(state);
             }
         };
         chrome.storage.session.onChanged.addListener(listener);
@@ -306,7 +309,29 @@ export function ControllerApp() {
 
     // Listen for messages from background
     useEffect(() => {
-        const listener = (message: any) => {
+        const listener = (message: any, _sender: chrome.runtime.MessageSender, sendResponse: (r?: any) => void): boolean | undefined => {
+            if (message.type === MSG_TYPES.POPUP_REQUEST_PREVIEW_FRAME) {
+                const track = displayStreamRef.current?.getVideoTracks()[0];
+                if (!track) { sendResponse(null); return; }
+                (async () => {
+                    try {
+                        const ic = new (window as any).ImageCapture(track);
+                        const bitmap: ImageBitmap = await ic.grabFrame();
+                        const scale = Math.min(1, 640 / bitmap.width);
+                        const w = Math.round(bitmap.width * scale);
+                        const h = Math.round(bitmap.height * scale);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext('2d')?.drawImage(bitmap, 0, 0, w, h);
+                        sendResponse({ dataUrl: canvas.toDataURL('image/jpeg', 0.7) });
+                    } catch {
+                        sendResponse(null);
+                    }
+                })();
+                return true; // keep channel open for async response
+            }
+
             switch (message.type) {
                 case MSG_TYPES.BACKGROUND_CONTROLLER_START_RECORDING:
                     startRecording(message.payload);
@@ -399,9 +424,12 @@ export function ControllerApp() {
                         <Button variant="primary" onClick={chooseSource}>Try again</Button>
                     </div>
                 ) : (
-                    <p className="text-2xl font-semibold text-text-main">
-                        Recording will start as soon as you share a screen
-                    </p>
+                    <>
+                        <LogoLink imgClassName="h-8 mb-4 mx-auto" />
+                        <p className="text-2xl font-semibold text-text-main">
+                            Recording will start as soon as you share a screen
+                        </p>
+                    </>
                 )}
             </div>
         </div>

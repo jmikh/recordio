@@ -165,6 +165,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 break;
             }
 
+            case MSG_TYPES.BACKGROUND_OFFSCREEN_GET_PREVIEW: {
+                const stream = recorder?.getPreviewStream();
+                const track = stream?.getVideoTracks()[0];
+                if (!track) { sendResponse(null); break; }
+                try {
+                    const ic = new (globalThis as any).ImageCapture(track);
+                    const bitmap: ImageBitmap = await ic.grabFrame();
+                    const scale = Math.min(1, 640 / bitmap.width);
+                    const w = Math.round(bitmap.width * scale);
+                    const h = Math.round(bitmap.height * scale);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, w, h);
+                    sendResponse({ dataUrl: canvas.toDataURL('image/jpeg', 0.7) });
+                } catch {
+                    sendResponse(null);
+                }
+                break;
+            }
+
             case MSG_TYPES.BACKGROUND_OFFSCREEN_PAUSE: {
                 if (recorder) recorder.pause();
                 sendResponse({ success: true });

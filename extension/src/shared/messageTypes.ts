@@ -135,6 +135,9 @@ export const MSG_TYPES = {
     BACKGROUND_OFFSCREEN_FINISH: 'BACKGROUND_OFFSCREEN_FINISH',
     /** Background → Offscreen: pre-open camera/mic streams during countdown so they're warm by recording start */
     BACKGROUND_OFFSCREEN_PREPARE: 'BACKGROUND_OFFSCREEN_PREPARE',
+    /** Background → Offscreen: grab a preview JPEG frame from the current recording stream
+     *  response: { dataUrl: string } | null */
+    BACKGROUND_OFFSCREEN_GET_PREVIEW: 'BACKGROUND_OFFSCREEN_GET_PREVIEW',
 
     // ── New: Offscreen → Background ─────────────────────────────────────────
     /** Offscreen → Background: recording done (or cancelled)
