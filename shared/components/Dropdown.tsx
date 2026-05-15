@@ -47,18 +47,31 @@ export function Dropdown<T>({
     const dropdownRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Calculate menu position when opening
+    // Calculate menu position when opening — flip upward if not enough space below
     useEffect(() => {
         if (!isOpen || !dropdownRef.current) return;
 
         const rect = dropdownRef.current.getBoundingClientRect();
-        setMenuStyle({
-            position: 'fixed',
-            top: rect.bottom + 4,
-            left: rect.left,
-            minWidth: rect.width,
-            zIndex: 9999,
-        });
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const estimatedMenuHeight = 150; // conservative estimate
+
+        if (spaceBelow < estimatedMenuHeight) {
+            setMenuStyle({
+                position: 'fixed',
+                bottom: window.innerHeight - rect.top + 4,
+                left: rect.left,
+                minWidth: rect.width,
+                zIndex: 9999,
+            });
+        } else {
+            setMenuStyle({
+                position: 'fixed',
+                top: rect.bottom + 4,
+                left: rect.left,
+                minWidth: rect.width,
+                zIndex: 9999,
+            });
+        }
     }, [isOpen]);
 
     // Handle click outside to close

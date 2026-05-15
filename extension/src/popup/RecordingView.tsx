@@ -44,7 +44,10 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
 
     const handleFinish = () => send(MSG_TYPES.POPUP_FINISH_RECORDING);
 
-    const handleCancel = () => send(MSG_TYPES.POPUP_CANCEL_RECORDING);
+    const handleCancel = async () => {
+        await send(MSG_TYPES.POPUP_CANCEL_RECORDING);
+        window.close();
+    };
 
     const sourceLabel = recordingState.recordingMode === 'tab'
         ? 'Recording current tab'

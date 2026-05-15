@@ -19,7 +19,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button, Toggle, Dropdown } from '@shared/components';
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { MdComputer, MdOpenInNew } from 'react-icons/md';
+import { MdComputer, MdTab } from 'react-icons/md';
 import { MSG_TYPES } from '../shared/messageTypes';
 import { useAudioLevel } from '../shared/useAudioLevel';
 import permissionsImage from '../assets/permissions-small.png';
@@ -46,6 +46,7 @@ function AudioLevelBar({ level }: { level: number }) {
 // --- Main Component ---
 
 export function PreRecordingView() {
+
     // Mic state
     const [micEnabled, setMicEnabled] = useState(false);
     const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
@@ -252,7 +253,6 @@ export function PreRecordingView() {
                 setError(resp?.error || 'Failed to start recording');
                 setStarting(false);
             } else {
-                // Countdown is now showing in the tab — close the popup
                 window.close();
             }
         } catch (e: any) {
@@ -268,9 +268,17 @@ export function PreRecordingView() {
         });
     };
 
-    const handleOpenController = async () => {
+    const handleOpenSourcePicker = async () => {
         stopAllPreviews();
-        await chrome.runtime.sendMessage({ type: MSG_TYPES.POPUP_OPEN_CONTROLLER });
+        await chrome.runtime.sendMessage({
+            type: MSG_TYPES.POPUP_OPEN_SOURCE_PICKER,
+            payload: {
+                hasAudio: micEnabled,
+                audioDeviceId: selectedMicId || undefined,
+                hasCamera: camEnabled,
+                videoDeviceId: selectedCamId || undefined,
+            },
+        });
         window.close();
     };
 
@@ -312,7 +320,6 @@ export function PreRecordingView() {
                 </div>
                 {camEnabled && (
                     <div className="px-3 pb-3 flex flex-col gap-2">
-                        {/* Live preview */}
                         <div className="rounded-[var(--radius-sm)] overflow-hidden bg-black aspect-video w-full">
                             <video
                                 ref={camVideoRef}
@@ -334,14 +341,6 @@ export function PreRecordingView() {
                         )}
                     </div>
                 )}
-            </div>
-
-            {/* Screen row — tab-only, no picker needed */}
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border border-border bg-surface">
-                <MdComputer className="icon-md text-text-muted" />
-                <span className="text-sm font-medium text-text-main">Screen</span>
-                <div className="flex-1" />
-                <span className="text-xs text-text-muted">Current tab</span>
             </div>
 
             {permissionError && (
@@ -372,23 +371,25 @@ export function PreRecordingView() {
                 </p>
             )}
 
-            {/* Actions */}
+            {/* Primary action */}
             <Button
                 variant="primary"
                 onClick={handleStartRecording}
                 disabled={starting || !canRecordTab}
-                className="w-full justify-center"
+                className="w-full justify-center gap-2"
             >
-                {starting ? 'Starting…' : 'Start Recording'}
+                <MdTab className="icon-md" />
+                {starting ? 'Starting…' : 'Record Tab'}
             </Button>
 
+            {/* Window / Desktop */}
             <Button
-                variant="ghost"
-                onClick={handleOpenController}
-                className="w-full justify-center text-text-muted"
+                variant="base"
+                onClick={handleOpenSourcePicker}
+                className="w-full justify-center gap-2"
             >
-                <MdOpenInNew className="icon-sm" />
-                Record Window or Desktop
+                <MdComputer className="icon-md" />
+                Record Window
             </Button>
         </div>
     );

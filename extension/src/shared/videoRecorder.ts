@@ -61,6 +61,11 @@ export class VideoRecorder {
     private activeStreams: MediaStream[] = [];
     private audioContext: AudioContext | null = null;
 
+    // Pre-warmed mic/camera streams opened before recording starts (controller mode).
+    // Consumed by initializeStreams() and stopped by cancel() if unused.
+    private prewarmedMicStream: MediaStream | null = null;
+    private prewarmedCameraStream: MediaStream | null = null;
+
     private startTime: number = 0;
 
     // Pause tracking
@@ -98,6 +103,48 @@ export class VideoRecorder {
     constructor(sessionId: string, config: RecordingConfig) {
         this.currentSessionId = sessionId;
         this.config = config;
+    }
+
+    /** Updates the session ID. Call this before start() if the recorder was created early for warmup. */
+    public setSessionId(id: string) {
+        this.currentSessionId = id;
+    }
+
+    /**
+     * Opens mic/camera streams early so they're settled (auto-exposure, auto-gain) by recording start.
+     * Call this as soon as the config is known, before prepare(). Non-blocking — fires and forgets.
+     * Streams are consumed automatically in initializeStreams() and stopped in cancel() if unused.
+     */
+    public async prewarm(config: { hasAudio: boolean; audioDeviceId?: string; hasCamera: boolean; videoDeviceId?: string }): Promise<void> {
+        if (config.hasCamera) {
+            try {
+                this.prewarmedCameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        ...(config.videoDeviceId && { deviceId: { exact: config.videoDeviceId } }),
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                });
+                console.log('[VideoRecorder] Camera prewarmed');
+            } catch (e) {
+                console.warn('[VideoRecorder] Camera prewarm failed:', e);
+            }
+        }
+        if (config.hasAudio) {
+            try {
+                this.prewarmedMicStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        ...(config.audioDeviceId && { deviceId: { exact: config.audioDeviceId } }),
+                        noiseSuppression: true,
+                        echoCancellation: true,
+                        autoGainControl: true,
+                    },
+                });
+                console.log('[VideoRecorder] Mic prewarmed');
+            } catch (e) {
+                console.warn('[VideoRecorder] Mic prewarm failed:', e);
+            }
+        }
     }
 
 
@@ -412,6 +459,11 @@ export class VideoRecorder {
             }
         }
         this.activeStreams = [];
+        // Stop any prewarmed streams that were never consumed (e.g. user cancelled before recording started)
+        this.prewarmedMicStream?.getTracks().forEach(t => t.stop());
+        this.prewarmedMicStream = null;
+        this.prewarmedCameraStream?.getTracks().forEach(t => t.stop());
+        this.prewarmedCameraStream = null;
         this.releaseStreams();
     }
 
@@ -526,7 +578,8 @@ export class VideoRecorder {
         }
 
         // 3. Get Mic Stream (reuse pre-warmed stream if available)
-        let micStream: MediaStream | null = config.warmMicStream || null;
+        let micStream: MediaStream | null = config.warmMicStream || this.prewarmedMicStream || null;
+        this.prewarmedMicStream = null;
         if (micStream) {
             console.log('[VideoRecorder] Reusing pre-warmed mic stream');
             this.activeStreams.push(micStream);
@@ -556,7 +609,8 @@ export class VideoRecorder {
         }
 
         // 4. Get Camera Stream (reuse pre-warmed stream if available)
-        let cameraStream: MediaStream | null = config.warmCameraStream || null;
+        let cameraStream: MediaStream | null = config.warmCameraStream || this.prewarmedCameraStream || null;
+        this.prewarmedCameraStream = null;
         if (cameraStream) {
             console.log('[VideoRecorder] Reusing pre-warmed camera stream');
             this.activeStreams.push(cameraStream);

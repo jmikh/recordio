@@ -62,7 +62,8 @@ export function PopupApp() {
         if (!recordingState) return;
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
             if (area === 'session' && changes[STORAGE_KEYS.RECORDING_STATE]) {
-                setRecordingState(changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState ?? null);
+                const newState = changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState | undefined;
+                setRecordingState(newState?.isRecording ? newState : null);
             }
         };
         chrome.storage.onChanged.addListener(listener);

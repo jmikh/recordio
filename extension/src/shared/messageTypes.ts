@@ -16,7 +16,7 @@
  *
  *   POPUP → BACKGROUND (chrome.runtime.sendMessage)
  *     POPUP_START_TAB_RECORDING   Start tab recording via offscreen doc
- *     POPUP_OPEN_CONTROLLER       Open the controller tab (window/desktop mode)
+ *     POPUP_OPEN_SOURCE_PICKER    Open controller tab; recording starts automatically after source picked
  *     POPUP_PAUSE_RECORDING       Pause active recording (routed to offscreen or controller)
  *     POPUP_RESUME_RECORDING      Resume paused recording
  *     POPUP_CANCEL_RECORDING      Cancel and discard recording
@@ -34,13 +34,15 @@
  *     OFFSCREEN_DONE              Recording complete or cancelled, carries result
  *
  *   BACKGROUND → CONTROLLER TAB (chrome.tabs.sendMessage)
- *     STOP_SESSION                  Stop/finish controller recording
- *     BACKGROUND_CONTROLLER_PAUSE   Pause the controller recording
- *     BACKGROUND_CONTROLLER_RESUME  Resume the controller recording
- *     BACKGROUND_CONTROLLER_CANCEL  Cancel and discard the controller recording
+ *     STOP_SESSION                           Stop/finish controller recording
+ *     BACKGROUND_CONTROLLER_PAUSE            Pause the controller recording
+ *     BACKGROUND_CONTROLLER_RESUME           Resume the controller recording
+ *     BACKGROUND_CONTROLLER_CANCEL           Cancel and discard the controller recording
+ *     BACKGROUND_CONTROLLER_START_RECORDING  Start recording now (sent after popup countdown)
  *
  *   CONTROLLER → BACKGROUND (chrome.runtime.sendMessage)
- *     CONTROLLER_STARTED_RECORDING
+ *     CONTROLLER_SOURCE_SELECTED    Source picked, stream ready; background switches back to original tab
+ *     CONTROLLER_STARTED_RECORDING  Recording has started (confirmation)
  *     CONTROLLER_STOPPED_RECORDING
  *     RECORDING_FAILED              Save failed — background stores error + cleans up
  *
@@ -107,8 +109,9 @@ export const MSG_TYPES = {
     /** Popup → Background: start tab recording via offscreen doc
      *  payload: { hasAudio, audioDeviceId?, hasVideo, videoDeviceId? } */
     POPUP_START_TAB_RECORDING: 'POPUP_START_TAB_RECORDING',
-    /** Popup → Background: open the controller tab for window/desktop recording */
-    POPUP_OPEN_CONTROLLER: 'POPUP_OPEN_CONTROLLER',
+    /** Popup → Background: open controller tab for source selection; recording starts automatically after
+     *  payload: { hasAudio, audioDeviceId?, hasCamera, videoDeviceId? } */
+    POPUP_OPEN_SOURCE_PICKER: 'POPUP_OPEN_SOURCE_PICKER',
     /** Popup → Background: pause the active recording (offscreen or controller) */
     POPUP_PAUSE_RECORDING: 'POPUP_PAUSE_RECORDING',
     /** Popup → Background: resume the paused recording */
@@ -145,6 +148,21 @@ export const MSG_TYPES = {
     BACKGROUND_CONTROLLER_RESUME: 'BACKGROUND_CONTROLLER_RESUME',
     /** Background → Controller tab: cancel and discard the controller recording */
     BACKGROUND_CONTROLLER_CANCEL: 'BACKGROUND_CONTROLLER_CANCEL',
+    /** Background → Controller tab: start recording now with provided config
+     *  payload: { hasAudio, audioDeviceId?, hasCamera, videoDeviceId?, sessionId } */
+    BACKGROUND_CONTROLLER_START_RECORDING: 'BACKGROUND_CONTROLLER_START_RECORDING',
+
+    // ── Controller → Background ──────────────────────────────────────────────
+    /** Controller → Background: source selected, stream ready; background switches to original tab
+     *  payload: { captureType: 'another_window' | 'desktop', sourceName: string } */
+    CONTROLLER_SOURCE_SELECTED: 'CONTROLLER_SOURCE_SELECTED',
+    /** Controller → Background: tab loaded and ready; background responds with pending mic/camera config
+     *  so the controller can prewarm streams while the OS picker is open.
+     *  response: { hasAudio, audioDeviceId?, hasCamera, videoDeviceId? } | null */
+    CONTROLLER_READY: 'CONTROLLER_READY',
+    /** Popup → Controller tab: request a JPEG preview frame of the display stream
+     *  response: { dataUrl: string } | null */
+    POPUP_REQUEST_PREVIEW_FRAME: 'POPUP_REQUEST_PREVIEW_FRAME',
 
     // ── Background → Content (countdown) ────────────────────────────────────
     /** Background → Content: show countdown overlay before tab recording starts */

@@ -53,6 +53,10 @@ const DEFAULT_STATE: RecordingState = {
     captureType: null,
 };
 
+// Mic/camera config from the popup, held until the controller selects a source.
+// Not persisted to session storage — ephemeral within the SW lifetime.
+let pendingRecordingConfig: { hasAudio: boolean; audioDeviceId?: string; hasCamera: boolean; videoDeviceId?: string } | null = null;
+
 let currentState: RecordingState | null = null;
 let stateReady: Promise<void> | null = null;
 
@@ -395,7 +399,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
         // Controller closed while recording — aborted, just clean up
         await handleRecordingAborted(null); // tab is already gone
     } else if (isControllerTab && !currentState.isRecording) {
-        // Controller closed before recording started — just clear the ref
+        // Controller closed before recording started — clear ref and discard pending config
+        pendingRecordingConfig = null;
         await saveState({ controllerTabId: null });
     }
 });
@@ -415,7 +420,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
             // Navigated away during recording — aborted, just clean up
             await handleRecordingAborted(tabId);
         } else {
-            // Navigated away before recording — just clear the ref
+            // Navigated away before recording — clear ref and discard pending config
+            pendingRecordingConfig = null;
             await saveState({ controllerTabId: null });
         }
     }
@@ -636,12 +642,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 break;
             }
 
-            case MSG_TYPES.POPUP_OPEN_CONTROLLER: {
-                // Guard: only one recording at a time
+            case MSG_TYPES.POPUP_OPEN_SOURCE_PICKER: {
+                // Open controller; recording starts automatically as soon as the user picks a source
                 if (currentState.isRecording) {
                     sendResponse({ success: false, error: 'A recording is already in progress' });
                     return;
                 }
+
+                const { hasAudio, audioDeviceId, hasCamera, videoDeviceId } = message.payload || {};
+                pendingRecordingConfig = { hasAudio: !!hasAudio, audioDeviceId, hasCamera: !!hasCamera, videoDeviceId };
 
                 const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 const originalTabId = activeTab?.id || null;
@@ -652,6 +661,38 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
                 const controllerTabId = await openControllerTab();
                 await saveState({ controllerTabId, originalTabId });
+                sendResponse({ success: true });
+                break;
+            }
+
+            case MSG_TYPES.CONTROLLER_READY: {
+                // Controller tab just loaded — respond with the pending mic/camera config
+                // so it can prewarm streams while the OS source picker is open.
+                sendResponse(pendingRecordingConfig ?? null);
+                break;
+            }
+
+            case MSG_TYPES.CONTROLLER_SOURCE_SELECTED: {
+                // Source picked — start recording immediately, no countdown
+                const config = pendingRecordingConfig;
+                pendingRecordingConfig = null;
+
+                const sessionId = crypto.randomUUID();
+                await saveState({ currentSessionId: sessionId });
+
+                if (currentState.controllerTabId) {
+                    chrome.tabs.sendMessage(currentState.controllerTabId, {
+                        type: MSG_TYPES.BACKGROUND_CONTROLLER_START_RECORDING,
+                        payload: {
+                            hasAudio: config?.hasAudio ?? false,
+                            audioDeviceId: config?.audioDeviceId,
+                            hasCamera: config?.hasCamera ?? false,
+                            videoDeviceId: config?.videoDeviceId,
+                            sessionId,
+                        },
+                    }).catch(() => { });
+                }
+
                 sendResponse({ success: true });
                 break;
             }
