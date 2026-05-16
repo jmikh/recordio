@@ -112,10 +112,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
             // Poll for progress
             pollRef.current = setInterval(async () => {
                 const { data: job } = await supabase!
-                    .from('render_jobs')
-                    .select('status, progress, error, render_storage_path')
-                    .eq('id', jobId)
-                    .maybeSingle();
+                    .rpc('render_job_get_status', { p_job_id: jobId });
 
                 if (!job) return;
 
