@@ -42,19 +42,14 @@ serve(withAuth(async (req, { user }) => {
         }
     }
 
-    try {
-        const signedUrls: Record<string, string> = {};
+    const signedUrls: Record<string, string> = {};
 
-        await Promise.all(
-            storagePaths.map(async (storagePath: string) => {
-                const command = new GetObjectCommand({ Bucket: BUCKET, Key: storagePath });
-                signedUrls[storagePath] = await getSignedUrl(s3, command, { expiresIn: 3600 });
-            }),
-        );
+    await Promise.all(
+        storagePaths.map(async (storagePath: string) => {
+            const command = new GetObjectCommand({ Bucket: BUCKET, Key: storagePath });
+            signedUrls[storagePath] = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        }),
+    );
 
-        return jsonResponse({ signedUrls });
-    } catch (err) {
-        console.error('[storage-download-urls] S3 presign failed:', err);
-        return errorResponse('Failed to create download URLs', 500);
-    }
+    return jsonResponse({ signedUrls });
 }));

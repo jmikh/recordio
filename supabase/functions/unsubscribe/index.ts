@@ -121,13 +121,7 @@ serve(async (req) => {
             .update({ email_subscribed: false, updated_at: new Date().toISOString() })
             .eq('user_id', userId);
 
-        if (error) {
-            console.error('[Unsubscribe] DB error:', error);
-            return new Response(
-                confirmationPage(false, 'We couldn\'t process your request. Please try again later.'),
-                { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-            );
-        }
+        if (error) throw new Error('user_profiles update failed', { cause: error });
 
         console.log('[Unsubscribe] User unsubscribed:', userId);
 

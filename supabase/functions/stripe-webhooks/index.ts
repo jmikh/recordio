@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { captureException } from '../_shared/sentry.ts';
+import { withBoundary } from '../_shared/auth.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
     apiVersion: '2024-11-20.acacia',
@@ -38,45 +38,34 @@ function periodEndToIso(value: number | string | null | undefined): string | nul
 // Webhook Handler
 // ============================================================================
 
-serve(async (req) => {
+serve(withBoundary('stripe-webhooks', async (req) => {
     const signature = req.headers.get('stripe-signature');
     if (!signature) return new Response('No signature', { status: 400 });
 
-    try {
-        const body = await req.text();
-        const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-        console.log('[Webhook] Event:', event.type);
+    const body = await req.text();
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    console.log('[Webhook] Event:', event.type);
 
-        switch (event.type) {
-            case 'checkout.session.completed':
-                await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-                break;
-            case 'customer.subscription.created':
-            case 'customer.subscription.updated':
-                await handleSubscriptionUpdate(event.data.object as Stripe.Subscription, event.created);
-                break;
-            case 'customer.subscription.deleted':
-                await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, event.created);
-                break;
-            default:
-                console.log('[Webhook] Unhandled event type:', event.type);
-        }
-
-        return new Response(JSON.stringify({ received: true }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 200,
-        });
-    } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        const stack = error instanceof Error ? error.stack : '';
-        console.error('[Webhook] Error:', msg);
-        await captureException(error, { function: 'stripe-webhooks' });
-        return new Response(JSON.stringify({
-            error: msg,
-            details: stack?.substring(0, 200),
-        }), { headers: { 'Content-Type': 'application/json' }, status: 400 });
+    switch (event.type) {
+        case 'checkout.session.completed':
+            await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+            break;
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+            await handleSubscriptionUpdate(event.data.object as Stripe.Subscription, event.created);
+            break;
+        case 'customer.subscription.deleted':
+            await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, event.created);
+            break;
+        default:
+            console.log('[Webhook] Unhandled event type:', event.type);
     }
-});
+
+    return new Response(JSON.stringify({ received: true }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+    });
+}));
 
 // ============================================================================
 // Checkout Completed
@@ -88,31 +77,23 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const customerId  = session.customer as string;
     const subscriptionId = session.subscription as string;
 
-    if (!userId) { console.error('[Webhook] No userId in checkout session'); return; }
-    if (!workspaceId) { console.error('[Webhook] No workspaceId in checkout metadata'); return; }
-    if (!subscriptionId) { console.error('[Webhook] No subscriptionId in checkout session'); return; }
+    if (!userId) throw new Error('checkout.session.completed missing userId');
+    if (!workspaceId) throw new Error('checkout.session.completed missing workspaceId in metadata');
+    if (!subscriptionId) throw new Error('checkout.session.completed missing subscriptionId');
 
     console.log('[Webhook] Checkout completed — user:', userId, 'workspace:', workspaceId);
 
-    // Fetch authoritative subscription data from Stripe
-    let plan: 'pro' | 'teams' = 'pro';
-    let billingInterval: string | null = null;
-    let stripeStatus = 'active';
-    let stripePeriodEnd: string | null = null;
-    let seats: number | null = null;
-
-    try {
-        const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-        const item  = stripeSub.items?.data?.[0];
-        const price = item?.price;
-        plan           = planFromSubscription(stripeSub);
-        billingInterval = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-        stripeStatus    = stripeSub.status;
-        stripePeriodEnd = periodEndToIso(item?.current_period_end ?? stripeSub.current_period_end);
-        seats           = plan === 'teams' ? (item?.quantity ?? null) : null;
-    } catch (err) {
-        console.error('[Webhook] Error fetching Stripe subscription:', err);
-    }
+    // Fetch authoritative subscription data from Stripe. If this fails we
+    // can't fill the row meaningfully — let it throw to Sentry rather than
+    // upserting a half-correct row.
+    const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+    const item  = stripeSub.items?.data?.[0];
+    const price = item?.price;
+    const plan = planFromSubscription(stripeSub);
+    const billingInterval = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+    const stripeStatus = stripeSub.status;
+    const stripePeriodEnd = periodEndToIso(item?.current_period_end ?? stripeSub.current_period_end);
+    const seats = plan === 'teams' ? (item?.quantity ?? null) : null;
 
     const { error } = await supabase
         .from('subscriptions')
@@ -130,7 +111,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             updated_at:             new Date().toISOString(),
         }, { onConflict: 'workspace_id' });
 
-    if (error) { console.error('[Webhook] Upsert error:', error); return; }
+    if (error) throw new Error('subscriptions upsert failed', { cause: error });
 
     await supabase.rpc('set_project_expiry', { p_user_id: userId, p_expires_at: null });
     console.log('[Webhook] Subscription upserted — plan:', plan, 'seats:', seats);
@@ -150,8 +131,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription, event
         .maybeSingle();
 
     if (!existingSub) {
-        console.error('[Webhook] No subscription found for customer:', customerId);
-        return;
+        throw new Error(`subscription update for unknown customer ${customerId}`);
     }
 
     // Discard out-of-order delivery using Stripe's event timestamp.
@@ -172,8 +152,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription, event
     const cancelAtEnd = subscription.cancel_at_period_end;
 
     if (!periodEnd) {
-        console.error('[Webhook] Invalid period_end:', item?.current_period_end);
-        throw new Error('Invalid current_period_end');
+        throw new Error(`Invalid current_period_end: ${item?.current_period_end}`);
     }
 
     const { error } = await supabase
@@ -189,7 +168,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription, event
         })
         .eq('stripe_customer_id', customerId);
 
-    if (error) { console.error('[Webhook] Update error:', error); return; }
+    if (error) throw new Error('subscriptions update failed', { cause: error });
 
     const isNowActive = ['active', 'trialing', 'past_due'].includes(newStatus);
     const wasActive   = ['active', 'trialing', 'past_due'].includes(oldStatus);
@@ -229,7 +208,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription, even
         })
         .eq('stripe_customer_id', customerId);
 
-    if (error) { console.error('[Webhook] Delete error:', error); return; }
+    if (error) throw new Error('subscriptions delete update failed', { cause: error });
 
     if (existingSub) {
         await supabase.rpc('set_project_expiry', {

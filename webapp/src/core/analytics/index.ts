@@ -110,213 +110,6 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
 // Public API - Specific Event Tracking Functions
 // ============================================================================
 
-export interface ExportCompletedParams {
-    // Export context
-    quality: '480p' | '720p' | '1080p' | '2K' | '4K';
-    fps: number;
-    export_duration_ms: number;
-
-    // Recording context
-    recording_current_window: boolean;
-    input_duration_ms: number;
-    output_duration_ms: number;
-    first_url: string | null;
-
-    // Event counts
-    events_clicks: number;
-    events_keyboard: number;
-    events_typing: number;
-    events_drags: number;
-    events_hovered_cards: number;
-    events_url_changes: number;
-
-    // Screen settings
-    screen_mode: 'device' | 'border';
-    screen_border_radius: number;
-    screen_padding: number;
-    screen_device_frame_id: string | null;
-    screen_toolbar_enabled: boolean;
-    output_crop: string;
-
-    // Camera settings
-    has_camera: boolean;
-    camera_shape: string | null;
-    camera_feather: boolean;
-
-    // Background
-    background_type: 'color' | 'preset' | 'custom';
-    background_color_mode: 'gradient' | 'solid';
-    background_image_choice: string | null;
-
-    // Audio
-    music_enabled: boolean;
-    music_choice: string | null;
-    mic_muted: boolean;
-    screen_audio_muted: boolean;
-
-    // Effects
-    click_effect_enabled: boolean;
-    click_sound_enabled: boolean;
-    drag_effect_enabled: boolean;
-    hotkeys_enabled: boolean;
-
-    // Timeline features
-    zoom_count: number;
-    spotlight_count: number;
-    camera_move_count: number;
-    caption_count: number;
-    text_overlay_count: number;
-    blur_overlay_count: number;
-    outline_overlay_count: number;
-    arrow_overlay_count: number;
-    captions_generated: boolean;
-    captions_visible: boolean;
-    auto_cut_used: boolean;
-
-    // Outcome
-    success: boolean;
-    error?: string;
-
-    // Codec resolution
-    video_codec: string;
-    video_codec_fallback: boolean;
-    video_codecs_tried: string[];
-    audio_codec: string;
-    audio_codec_fallback: boolean;
-    video_decode_mode: 'hardware' | 'software';
-    video_decode_fallback: boolean;
-}
-
-/**
- * Extract project-level properties for the export_completed event.
- * Keeps ExportSettings.tsx clean — just pass the project object.
- */
-import type { Project } from '@shared/types';
-import { TimeMapper } from '@shared/mappers/timeMapper';
-
-export function extractProjectProperties(project: Project): Omit<ExportCompletedParams,
-    'quality' | 'fps' | 'export_type' | 'export_duration_ms' | 'upload_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
-> {
-    const { settings, timeline, screenSource } = project;
-    const userEvents = project.userEvents ?? { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] };
-    const timeMapper = new TimeMapper(timeline.outputWindows);
-
-    // Derive background image choice
-    let background_image_choice: string | null = null;
-    if (settings.background.type === 'preset' && settings.background.imageUrl) {
-        // Extract filename from the preset URL as the choice name
-        const parts = settings.background.imageUrl.split('/');
-        background_image_choice = parts[parts.length - 1]?.split('.')[0] ?? null;
-    } else if (settings.background.type === 'custom') {
-        background_image_choice = 'custom';
-    }
-
-    // Derive music choice
-    let music_choice: string | null = null;
-    if (settings.audio.music.enabled) {
-        if (settings.audio.music.source === 'preset' && settings.audio.music.presetName) {
-            music_choice = settings.audio.music.presetName;
-        } else if (settings.audio.music.source === 'custom') {
-            music_choice = 'custom';
-        }
-    }
-
-    // Shorten first URL to hostname
-    let first_url: string | null = null;
-    if (userEvents.urlChanges.length > 0) {
-        try {
-            first_url = new URL(userEvents.urlChanges[0].url).hostname;
-        } catch {
-            first_url = userEvents.urlChanges[0].url;
-        }
-    }
-
-    return {
-        // Recording context
-        recording_current_window: !!screenSource.trackableContentRect,
-        input_duration_ms: Math.round(timeline.durationMs),
-        output_duration_ms: Math.round(timeMapper.outputDuration),
-        first_url,
-
-        // Event counts
-        events_clicks: userEvents.mouseClicks.length,
-        events_keyboard: userEvents.keyboardEvents.length,
-        events_typing: userEvents.typingEvents.length,
-        events_drags: userEvents.drags.length,
-        events_hovered_cards: userEvents.hoveredCards.length,
-        events_url_changes: userEvents.urlChanges.length,
-
-        // Screen settings
-        screen_mode: settings.screen.mode,
-        screen_border_radius: settings.screen.borderRadiusPx,
-        screen_padding: settings.screen.padding,
-        screen_device_frame_id: settings.screen.mode === 'device' ? (settings.screen.deviceFrameId ?? null) : null,
-        screen_toolbar_enabled: settings.screen.toolbar.enabled,
-        output_crop: settings.screen.outputCrop ?? 'none',
-
-        // Camera settings
-        has_camera: !!project.cameraSource,
-        camera_shape: settings.camera?.shape ?? null,
-        camera_feather: settings.camera?.hasFeather ?? false,
-
-        // Background
-        background_type: settings.background.type,
-        background_color_mode: settings.background.colorMode,
-        background_image_choice,
-
-        // Audio
-        music_enabled: settings.audio.music.enabled,
-        music_choice,
-        mic_muted: settings.audio.muteMicrophone,
-        screen_audio_muted: settings.audio.muteScreenAudio,
-
-        // Effects
-        click_effect_enabled: settings.mouse.mouseClickEnabled,
-        click_sound_enabled: settings.mouse.soundEnabled,
-        drag_effect_enabled: settings.mouse.mouseDragEnabled,
-        hotkeys_enabled: settings.keyboard.showHotkeys,
-
-        // Timeline features
-        zoom_count: timeline.zoomSegments.length,
-        spotlight_count: timeline.spotlightSegments.length,
-        camera_move_count: timeline.cameraMoveSegments.length,
-        caption_count: timeline.captionSegments.length,
-        text_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'text').length,
-        blur_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'blur').length,
-        outline_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'border').length,
-        arrow_overlay_count: (timeline.overlaySegments ?? []).filter(s => s.item?.type === 'arrow').length,
-        captions_generated: !!settings.captions.transcriptionSource,
-        captions_visible: settings.captions.enabled ?? true,
-        auto_cut_used: settings.autoCutApplied ?? false,
-    };
-}
-
-export type ExportStartedParams = Omit<ExportCompletedParams,
-    'export_duration_ms' | 'success' | 'error' | 'video_codec' | 'video_codec_fallback' | 'video_codecs_tried' | 'audio_codec' | 'audio_codec_fallback' | 'video_decode_mode' | 'video_decode_fallback'
-> & {
-    export_type: 'download' | 'publish';
-};
-
-/**
- * Fires at the start of an export so we have telemetry even if the export
- * crashes midway and never reaches export_completed.
- */
-export function trackExportStarted(params: ExportStartedParams) {
-    trackEvent('export_started', params);
-}
-
-export function trackExportCompleted(params: ExportCompletedParams) {
-    trackEvent('export_completed', params);
-}
-
-export type VideoPublishedParams = ExportCompletedParams & {
-    upload_duration_ms: number;
-};
-
-export function trackVideoPublished(params: VideoPublishedParams) {
-    trackEvent('video_published', params);
-}
-
 // ============================================================================
 // Upgrade Funnel Events
 // ============================================================================
@@ -342,6 +135,26 @@ export interface GenerateCaptionsParams {
 
 export function trackGenerateCaptions(params: GenerateCaptionsParams) {
     trackEvent('generate_captions', params);
+}
+
+export function trackGenerateCaptionsClicked(projectId: string, transcriptionMethod: 'cloud' | 'local') {
+    trackEvent('generate_captions_clicked', { project_id: projectId, transcription_method: transcriptionMethod });
+}
+
+export function trackGenerateCaptionsCompleted(params: {
+    project_id: string;
+    video_duration_s: number;
+    generate_duration_s: number;
+    segment_count: number;
+}) {
+    trackEvent('generate_captions_completed', params);
+}
+
+export function trackGenerateCaptionsFailed(params: {
+    project_id: string;
+    error: string;
+}) {
+    trackEvent('generate_captions_failed', params);
 }
 
 // ============================================================================
@@ -379,8 +192,24 @@ export function trackProjectOpened() {
     trackEvent('project_opened');
 }
 
-export function trackEditorLoaded() {
-    trackEvent('editor_loaded');
+export function trackEditorPageLoaded(workspaceId: string | null) {
+    trackEvent('editor_page_loaded', { workspace_id: workspaceId });
+}
+
+export function trackDashboardPageLoaded(workspaceId: string | null) {
+    trackEvent('dashboard_page_loaded', { workspace_id: workspaceId });
+}
+
+export function trackBillingPageLoaded(workspaceId: string | null) {
+    trackEvent('billing_page_loaded', { workspace_id: workspaceId });
+}
+
+export function trackMembersPageLoaded(workspaceId: string | null) {
+    trackEvent('members_page_loaded', { workspace_id: workspaceId });
+}
+
+export function trackGeneralSettingsPageLoaded(workspaceId: string | null) {
+    trackEvent('general_settings_page_loaded', { workspace_id: workspaceId });
 }
 
 export function trackExtensionUninstalled() {
@@ -401,5 +230,54 @@ export function trackReviewModalDismissed() {
 
 export function trackReviewModalReviewClicked() {
     trackEvent('review_modal_review_clicked');
+}
+
+// ============================================================================
+// Render & Export Events
+// ============================================================================
+
+export function trackDownloadClicked(projectId: string) {
+    trackEvent('download_clicked', { project_id: projectId });
+}
+
+export function trackRenderInCloudClicked(projectId: string) {
+    trackEvent('render_in_cloud_clicked', { project_id: projectId });
+}
+
+export function trackRenderLocallyClicked(projectId: string) {
+    trackEvent('render_locally_clicked', { project_id: projectId });
+}
+
+export function trackPublishClicked(projectId: string) {
+    trackEvent('publish_clicked', { project_id: projectId });
+}
+
+export function trackRenderCompleted(params: {
+    project_id: string;
+    video_duration_s: number;
+    render_duration_s: number;
+    input_resolution: string;
+    output_resolution: string;
+}) {
+    trackEvent('render_completed', params);
+}
+
+export function trackRenderFailed(params: {
+    project_id: string;
+    error: string;
+}) {
+    trackEvent('render_failed', params);
+}
+
+export function trackUploadBackgroundClicked(projectId: string) {
+    trackEvent('upload_background_clicked', { project_id: projectId });
+}
+
+export function trackUploadMusicClicked(projectId: string) {
+    trackEvent('upload_music_clicked', { project_id: projectId });
+}
+
+export function trackAutocutClicked(projectId: string) {
+    trackEvent('autocut_clicked', { project_id: projectId });
 }
 

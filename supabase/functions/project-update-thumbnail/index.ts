@@ -58,17 +58,12 @@ serve(withAuth(async (req, { user }) => {
     const storagePath = `${user.id}/${projectId}/thumbnail.webp`;
     const fileBuffer = await file.arrayBuffer();
 
-    try {
-        await s3.send(new PutObjectCommand({
-            Bucket: BUCKET,
-            Key: storagePath,
-            Body: new Uint8Array(fileBuffer),
-            ContentType: 'image/webp',
-        }));
-    } catch (err) {
-        console.error('[project-update-thumbnail] S3 upload failed:', err);
-        return errorResponse('Failed to upload thumbnail', 500);
-    }
+    await s3.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: storagePath,
+        Body: new Uint8Array(fileBuffer),
+        ContentType: 'image/webp',
+    }));
 
     // Update the project row
     const { error: updateError } = await adminSupabase
@@ -76,10 +71,7 @@ serve(withAuth(async (req, { user }) => {
         .update({ thumbnail_storage_path: storagePath })
         .eq('id', projectId);
 
-    if (updateError) {
-        console.error('[project-update-thumbnail] DB update failed:', updateError);
-        return errorResponse('Failed to update project', 500);
-    }
+    if (updateError) throw new Error('projects update failed', { cause: updateError });
 
     return jsonResponse({ storagePath });
 }));

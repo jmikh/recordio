@@ -18,7 +18,7 @@ import { AuthManager, supabase } from '../auth/AuthManager';
 import { SupportModal } from '../components/SupportModal';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { useToast } from '../editor/components/Toast';
-import { trackProjectOpened } from '../core/analytics';
+import { trackProjectOpened, trackDashboardPageLoaded } from '../core/analytics';
 
 import { navigate } from '../navigate';
 
@@ -81,6 +81,8 @@ export function DashboardPage() {
     };
 
     useEffect(() => {
+        trackDashboardPageLoaded(workspaceId);
+
         const params = new URLSearchParams(window.location.search);
         const error = params.get('error');
         if (error) {

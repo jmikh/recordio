@@ -17,11 +17,7 @@ serve(withAuth(async (req, { supabase }) => {
     const { data: sub, error: subError } = await supabase
         .rpc('subscription_get', { p_workspace_id: workspaceId });
 
-    if (subError) {
-        console.error('[stripe-portal] subscription_get error:', subError.message);
-        return errorResponse('Failed to fetch subscription', 500);
-    }
-
+    if (subError) throw new Error('subscription_get failed', { cause: subError });
     if (!sub?.stripe_customer_id) {
         return errorResponse('No subscription found for this workspace', 404);
     }

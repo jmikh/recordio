@@ -8,6 +8,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../Toast';
 import { useLocalRender } from './useLocalRender';
 import type { CloudRenderPhase } from './useCloudRender';
+import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderCompleted, trackRenderFailed } from '../../../core/analytics';
 
 function formatDurationLabel(ms: number): string {
     const totalSeconds = Math.round(ms / 1000);
@@ -137,7 +138,7 @@ export function DownloadModal({
                                 {hasNonFreeAccess ? (
                                     <Button
                                         variant="primary"
-                                        onClick={() => setView('cloud')}
+                                        onClick={() => { trackRenderInCloudClicked(project.id); setView('cloud'); }}
                                         className="w-full mt-4"
                                     >
                                         Render in cloud
@@ -171,7 +172,7 @@ export function DownloadModal({
 
                                 <Button
                                     variant="base"
-                                    onClick={() => setView('local')}
+                                    onClick={() => { trackRenderLocallyClicked(project.id); setView('local'); }}
                                     className="w-full mt-4"
                                 >
                                     Render locally
@@ -315,15 +316,27 @@ function LocalRenderView({
 
     const startedRef = useRef(false);
 
+    const renderStartRef = useRef(0);
+
     useEffect(() => {
         if (isOpen && !startedRef.current) {
             startedRef.current = true;
+            renderStartRef.current = performance.now();
             (async () => {
                 const result = await startOrCancel();
                 if (result.success) {
                     addToast({ type: 'success', title: 'Export complete' });
+                    const renderDurationS = Math.round((performance.now() - renderStartRef.current) / 1000);
+                    trackRenderCompleted({
+                        project_id: project.id,
+                        video_duration_s: Math.round(project.timeline.durationMs / 1000),
+                        render_duration_s: renderDurationS,
+                        input_resolution: `${project.screenSource.size.width}x${project.screenSource.size.height}`,
+                        output_resolution: `${project.settings.outputSize.width}x${project.settings.outputSize.height}`,
+                    });
                     onClose();
                 } else if (result.error) {
+                    trackRenderFailed({ project_id: project.id, error: result.error });
                     addToast({ type: 'error', title: 'Export failed', message: result.error });
                     onBack();
                 }

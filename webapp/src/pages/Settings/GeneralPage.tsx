@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../editor/components/Toast';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { trackGeneralSettingsPageLoaded } from '../../core/analytics';
 import type { WorkspaceDetails } from './types';
 
 export function GeneralPage({ details, isAdmin, onRenamed }: {
@@ -12,6 +14,7 @@ export function GeneralPage({ details, isAdmin, onRenamed }: {
     const [name, setName]     = useState(details.name);
     const [saving, setSaving] = useState(false);
     const { addToast }        = useToast();
+    useEffect(() => { trackGeneralSettingsPageLoaded(useWorkspaceStore.getState().workspaceId); }, []);
 
     const handleSave = async () => {
         const trimmed = name.trim();

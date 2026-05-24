@@ -14,6 +14,7 @@ import { TbBackground } from 'react-icons/tb';
 import { useToast } from '../Toast';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
+import { trackUploadBackgroundClicked } from '../../../core/analytics';
 
 
 
@@ -149,6 +150,7 @@ export const BackgroundSettings = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        trackUploadBackgroundClicked(project.id);
         setIsUploading(true);
         try {
             const asset = await UserAssetService.uploadAsset(file, 'background');

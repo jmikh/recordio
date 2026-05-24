@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendEmail } from '../_shared/emails/resend.ts';
 import { emailLayout } from '../_shared/emails/layout.ts';
 import { create, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
-import { captureException } from '../_shared/sentry.ts';
+import { jsonResponse, errorResponse, withBoundary } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -85,60 +85,49 @@ function buildWelcomeEmailHtml(unsubscribeUrl: string): string {
 // Handler — triggered by Database Webhook on auth.users INSERT
 // ============================================================================
 
-serve(async (req) => {
-    try {
-        const payload = await req.json();
+serve(withBoundary('send-welcome-email', async (req) => {
+    const payload = await req.json();
 
-        // Database webhook sends { type, table, record, ... }
-        const record = payload.record;
-        if (!record) {
-            console.error('[WelcomeEmail] No record in payload');
-            return new Response(JSON.stringify({ error: 'No record' }), { status: 400 });
-        }
+    // Database webhook sends { type, table, record, ... }
+    const record = payload.record;
+    if (!record) return errorResponse('No record', 400);
 
-        const userId: string = record.id;
-        const email: string | undefined = record.email;
+    const userId: string = record.id;
+    const email: string | undefined = record.email;
 
-        if (!email) {
-            console.log('[WelcomeEmail] No email for user:', userId, '— skipping');
-            return new Response(JSON.stringify({ skipped: true, reason: 'no email' }), { status: 200 });
-        }
-
-        // Check if user has unsubscribed (future-proofing for re-signups)
-        const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('email_subscribed')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (profile && !profile.email_subscribed) {
-            console.log('[WelcomeEmail] User unsubscribed, skipping:', userId);
-            return new Response(JSON.stringify({ skipped: true, reason: 'unsubscribed' }), { status: 200 });
-        }
-
-        // Generate unsubscribe token and build URL
-        const token = await generateUnsubscribeToken(userId);
-        const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe?token=${token}`;
-
-        // Build and send
-        const html = buildWelcomeEmailHtml(unsubscribeUrl);
-        const result = await sendEmail({
-            to: email,
-            subject: "Welcome to Recordio — I'd love your feedback",
-            html,
-        });
-
-        if (!result.success) {
-            console.error('[WelcomeEmail] Failed to send:', result.error);
-            return new Response(JSON.stringify({ error: result.error }), { status: 500 });
-        }
-
-        console.log('[WelcomeEmail] Sent welcome email to:', email);
-        return new Response(JSON.stringify({ sent: true }), { status: 200 });
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[WelcomeEmail] Error:', message);
-        await captureException(err, { function: 'send-welcome-email' });
-        return new Response(JSON.stringify({ error: message }), { status: 500 });
+    if (!email) {
+        console.log('[WelcomeEmail] No email for user:', userId, '— skipping');
+        return jsonResponse({ skipped: true, reason: 'no email' });
     }
-});
+
+    // Check if user has unsubscribed (future-proofing for re-signups)
+    const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('email_subscribed')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (profile && !profile.email_subscribed) {
+        console.log('[WelcomeEmail] User unsubscribed, skipping:', userId);
+        return jsonResponse({ skipped: true, reason: 'unsubscribed' });
+    }
+
+    // Generate unsubscribe token and build URL
+    const token = await generateUnsubscribeToken(userId);
+    const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe?token=${token}`;
+
+    // Build and send
+    const html = buildWelcomeEmailHtml(unsubscribeUrl);
+    const result = await sendEmail({
+        to: email,
+        subject: "Welcome to Recordio — I'd love your feedback",
+        html,
+    });
+
+    if (!result.success) {
+        throw new Error(`Resend send failed: ${result.error}`);
+    }
+
+    console.log('[WelcomeEmail] Sent welcome email to:', email);
+    return jsonResponse({ sent: true });
+}));

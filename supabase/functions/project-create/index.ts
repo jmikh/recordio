@@ -100,27 +100,17 @@ serve(withAuth(async (req, { user }) => {
             expires_at: hasActiveSub ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
-    if (upsertError) {
-        console.error('[project-create] Upsert failed:', upsertError);
-        return errorResponse('Failed to save project', 500);
-    }
+    if (upsertError) throw new Error('projects upsert failed', { cause: upsertError });
     console.log(`[project-create] Upsert done, generating S3 presigned URLs for ${mediaFiles.length} files`);
 
     // 4. Create S3 presigned upload URLs for each media file
     const uploads: { fileType: string; storagePath: string; signedUrl: string }[] = [];
 
-    try {
-        await Promise.all(mediaFiles.map(async (mf) => {
-            console.log(`[project-create] Presigning ${mf.fileType}: ${mf.storagePath}`);
-            const command = new PutObjectCommand({ Bucket: BUCKET, Key: mf.storagePath });
-            const signedUrl = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
-            console.log(`[project-create] Presigned ${mf.fileType} OK`);
-            uploads.push({ fileType: mf.fileType, storagePath: mf.storagePath, signedUrl });
-        }));
-    } catch (err) {
-        console.error('[project-create] S3 presign failed:', err);
-        return errorResponse('Failed to create upload URLs', 500);
-    }
+    await Promise.all(mediaFiles.map(async (mf) => {
+        const command = new PutObjectCommand({ Bucket: BUCKET, Key: mf.storagePath });
+        const signedUrl = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
+        uploads.push({ fileType: mf.fileType, storagePath: mf.storagePath, signedUrl });
+    }));
 
     console.log(`[project-create] Done, returning ${uploads.length} upload URLs`);
     return jsonResponse({ projectId, uploads });

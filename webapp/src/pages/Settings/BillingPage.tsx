@@ -7,6 +7,7 @@ import { useUserStore } from '../../editor/stores/useUserStore';
 import { useToast } from '../../editor/components/Toast';
 import { StripeService, SubscriptionChangePreview } from '../../editor/stripe/StripeService';
 import type { BillingInterval } from './types';
+import { trackBillingPageLoaded } from '../../core/analytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     const displaySeats   = pendingSeats ?? (showTeamsUpgrade ? Math.max(seatFloor, 1) : currentSeats);
     const hasPendingChange = (isActiveTeams && pendingSeats !== null && pendingSeats !== currentSeats)
                            || (isActivePro && showTeamsUpgrade && pendingSeats !== null);
+
+    useEffect(() => { trackBillingPageLoaded(workspaceId); }, []);
 
     // ── Fetch preview whenever pending seat count changes ────────────────────
     useEffect(() => {

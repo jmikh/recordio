@@ -24,7 +24,8 @@ import { AuthModal } from './components/header/AuthModal';
 
 import { useUserStore } from './stores/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
-import { trackEditorLoaded } from '../core/analytics';
+import { trackEditorPageLoaded } from '../core/analytics';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { navigate } from '../navigate';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
 import { useBackgroundUpload } from '../hooks/useBackgroundUpload';
@@ -125,7 +126,7 @@ function Editor() {
 
                 loadProject(result.project, result.name);
                 setIsLoading(false);
-                trackEditorLoaded();
+                trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId);
 
                 // Load asset library in background (non-blocking)
                 useAssetLibraryStore.getState().load().catch(console.error);

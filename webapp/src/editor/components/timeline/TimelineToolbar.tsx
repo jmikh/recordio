@@ -17,6 +17,7 @@ import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
 import { createDefaultItem } from '../settings/OverlayInspector';
 import type { OverlayItemType, OverlaySegment } from '@shared/types/overlay';
+import { trackAutocutClicked } from '../../../core/analytics';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
@@ -99,8 +100,11 @@ export const TimelineToolbar: React.FC = () => {
     const hasUserEvents = userEvents.mousePositions.length > 0;
     const showAutoCut = hasMic && (!!cameraSource || hasUserEvents);
 
+    const projectId = useProjectStore(s => s.project.id);
+
     const handleAutoCut = useCallback(async () => {
         if (isAnalyzing) return;
+        trackAutocutClicked(projectId);
         setIsAnalyzing(true);
 
         const toastId = addToast({

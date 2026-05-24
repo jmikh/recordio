@@ -3,7 +3,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAuth, jsonResponse, errorResponse } from '../_shared/auth.ts';
 import { getProjectIfEditor } from '../_shared/projectAccess.ts';
 import { uploadToMux } from '../_shared/muxUpload.ts';
-import { captureException } from '../_shared/sentry.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -52,14 +51,8 @@ serve(withAuth(async (req, { user }) => {
         })
         .single();
 
-    if (rpcError || !result) {
-        console.error('[mux-video-create] mux_video_get_or_create failed:', rpcError);
-        await captureException(rpcError ?? new Error('mux_video_get_or_create returned null'), {
-            function: 'mux-video-create',
-            projectId,
-        });
-        return errorResponse('Failed to resolve mux video', 500);
-    }
+    if (rpcError) throw new Error('mux_video_get_or_create failed', { cause: rpcError });
+    if (!result) throw new Error('mux_video_get_or_create returned null');
 
     const muxVideoId = result.mux_video_id;
     console.log(`[mux-video-create] Resolved: status=${result.status}, is_new=${result.is_new}, mux_video_id=${muxVideoId}`);
@@ -69,22 +62,30 @@ serve(withAuth(async (req, { user }) => {
         return jsonResponse({ status: result.status, muxVideoId });
     }
 
-    // 3. New row — call render-job-create to get/create a render job
+    // 3. New row — call render-job-create to get/create a render job.
+    // On failure: mark the mux_video failed in DB before rethrowing so the row
+    // doesn't sit in 'pending' forever.
     console.log(`[mux-video-create] New mux_video, calling render-job-create for project ${projectId} v${cloudVersion}`);
-    const renderResult = await callRenderStart(adminSupabase, projectId, cloudVersion);
 
-    if (!renderResult) {
-        console.error('[mux-video-create] render-job-create call failed, marking mux_video failed');
-        await captureException(new Error('render-job-create call failed'), {
-            function: 'mux-video-create',
-            projectId,
-            muxVideoId,
+    let renderResult: { jobId: string; status: string; renderStoragePath?: string };
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/render-job-create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+                'x-service-role-key': SERVICE_ROLE_KEY,
+            },
+            body: JSON.stringify({ projectId, cloudVersion }),
         });
+        if (!resp.ok) throw new Error(`render-job-create returned ${resp.status}: ${await resp.text()}`);
+        renderResult = await resp.json();
+    } catch (err) {
         await adminSupabase
             .from('mux_videos')
             .update({ status: 'failed', error: 'Render dispatch failed', updated_at: new Date().toISOString() })
             .eq('id', muxVideoId);
-        return errorResponse('Render dispatch failed', 500);
+        throw err;
     }
 
     console.log(`[mux-video-create] render-job-create returned: jobId=${renderResult.jobId}, status=${renderResult.status}`);
@@ -101,13 +102,7 @@ serve(withAuth(async (req, { user }) => {
         });
 
         if (!uploadResult.success) {
-            await captureException(new Error(uploadResult.error || 'Mux upload failed'), {
-                function: 'mux-video-create',
-                projectId,
-                muxVideoId,
-                step: 'mux-upload',
-            });
-            return errorResponse(uploadResult.error || 'Mux upload failed', 500);
+            throw new Error(`Mux upload failed: ${uploadResult.error ?? 'unknown'}`);
         }
 
         return jsonResponse({ status: 'pending', muxVideoId });
@@ -117,30 +112,3 @@ serve(withAuth(async (req, { user }) => {
     console.log(`[mux-video-create] Render pending (job ${renderResult.jobId}), waiting for worker`);
     return jsonResponse({ status: 'pending', muxVideoId });
 }));
-
-async function callRenderStart(
-    adminSupabase: ReturnType<typeof createClient>,
-    projectId: string,
-    cloudVersion: number,
-): Promise<{ jobId: string; status: string; renderStoragePath?: string } | null> {
-    try {
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/render-job-create`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-                'x-service-role-key': SERVICE_ROLE_KEY,
-            },
-            body: JSON.stringify({ projectId, cloudVersion }),
-        });
-        if (!resp.ok) {
-            console.error('[mux-video-create] render-job-create failed:', resp.status, await resp.text());
-            return null;
-        }
-        return await resp.json();
-    } catch (err) {
-        console.error('[mux-video-create] render-job-create dispatch failed:', err);
-        await captureException(err, { function: 'mux-video-create', step: 'call-render-start', projectId, cloudVersion });
-        return null;
-    }
-}

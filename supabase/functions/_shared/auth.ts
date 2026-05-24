@@ -26,13 +26,14 @@ export function errorResponse(error: string, status: number): Response {
 }
 
 type AuthHandler = (req: Request, ctx: AuthContext) => Promise<Response>;
+type RawHandler = (req: Request) => Promise<Response>;
 
 /**
  * Wraps an edge-function handler with CORS preflight, JWT auth, and
  * a catch-all error handler. The inner handler receives the authenticated
  * user and a user-scoped Supabase client.
  */
-export function withAuth(handler: AuthHandler): (req: Request) => Promise<Response> {
+export function withAuth(handler: AuthHandler): RawHandler {
     return async (req: Request) => {
         if (req.method === 'OPTIONS') {
             return new Response('ok', { headers: corsHeaders });
@@ -62,8 +63,31 @@ export function withAuth(handler: AuthHandler): (req: Request) => Promise<Respon
             userId = user.id;
             return await handler(req, { user, supabase });
         } catch (err) {
-            console.error('Unexpected error:', err);
+            console.error(`[withAuth] Unexpected error:`, err);
             await captureException(err, userId ? { userId } : undefined);
+            return errorResponse('Internal server error', 500);
+        }
+    };
+}
+
+/**
+ * Wraps a non-JWT edge-function handler (webhooks, crons, internal callers)
+ * with CORS preflight and a catch-all that captures uncaught errors to Sentry.
+ *
+ * Use this for any function that doesn't go through `withAuth`. Let internal
+ * errors throw — the boundary reports them. Use `errorResponse(..., 4xx)`
+ * for user-facing validation; reserve throws for actual bugs.
+ */
+export function withBoundary(name: string, handler: RawHandler): RawHandler {
+    return async (req: Request) => {
+        if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: corsHeaders });
+        }
+        try {
+            return await handler(req);
+        } catch (err) {
+            console.error(`[${name}] Unexpected error:`, err);
+            await captureException(err, { function: name });
             return errorResponse('Internal server error', 500);
         }
     };

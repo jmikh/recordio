@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonResponse, errorResponse, withBoundary } from '../_shared/auth.ts';
 import { captureException } from '../_shared/sentry.ts';
 
 /**
@@ -18,121 +19,81 @@ import { captureException } from '../_shared/sentry.ts';
  *
  * Authenticated via service role key (set by the cron job).
  */
-serve(async (req) => {
-    try {
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized' }),
-                { status: 401, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
+serve(withBoundary('purge-deleted-projects', async (req) => {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return errorResponse('Unauthorized', 401);
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        );
+    const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
 
-        // Fetch projects soft-deleted more than 30 days ago that haven't been
-        // partially processed yet (permanently_deleted = false means fresh).
-        // Also pick up permanently_deleted = true from a previous failed run.
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    // Fetch projects soft-deleted more than 30 days ago that haven't been
+    // partially processed yet (permanently_deleted = false means fresh).
+    // Also pick up permanently_deleted = true from a previous failed run.
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const { data: projects, error: fetchError } = await supabase
-            .from('projects')
-            .select('id, created_by, permanently_deleted')
-            .not('deleted_at', 'is', null)
-            .lt('deleted_at', thirtyDaysAgo)
-            .limit(20);
+    const { data: projects, error: fetchError } = await supabase
+        .from('projects')
+        .select('id, created_by, permanently_deleted')
+        .not('deleted_at', 'is', null)
+        .lt('deleted_at', thirtyDaysAgo)
+        .limit(20);
 
-        if (fetchError) {
-            console.error('[purge-projects] Failed to fetch deleted projects:', fetchError);
-            return new Response(
-                JSON.stringify({ error: 'Failed to fetch deleted projects' }),
-                { status: 500, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
+    if (fetchError) throw new Error('Failed to fetch deleted projects', { cause: fetchError });
 
-        if (!projects || projects.length === 0) {
-            return new Response(
-                JSON.stringify({ message: 'No projects to purge', processed: 0 }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
+    if (!projects || projects.length === 0) {
+        return jsonResponse({ message: 'No projects to purge', processed: 0 });
+    }
 
-        let succeeded = 0;
-        let failed = 0;
+    let succeeded = 0;
+    let failed = 0;
 
-        for (const project of projects) {
-            try {
-                // 1. Mark permanently deleted (user can no longer restore)
-                if (!project.permanently_deleted) {
-                    const { error: markError } = await supabase
-                        .from('projects')
-                        .update({ permanently_deleted: true })
-                        .eq('id', project.id);
-
-                    if (markError) {
-                        console.error(`[purge-projects] Failed to mark permanently_deleted for ${project.id}:`, markError);
-                        failed++;
-                        continue;
-                    }
-                }
-
-                // 2. Delete all files from storage (created_by/project_id/*)
-                const prefix = `${project.created_by}/${project.id}`;
-                const { data: files, error: listError } = await supabase.storage
-                    .from('project-media')
-                    .list(prefix);
-
-                if (listError) {
-                    console.error(`[purge-projects] Storage list failed for ${project.id}:`, listError);
-                    failed++;
-                    continue;
-                }
-
-                if (files && files.length > 0) {
-                    const { error: removeError } = await supabase.storage
-                        .from('project-media')
-                        .remove(files.map(f => `${prefix}/${f.name}`));
-
-                    if (removeError) {
-                        console.error(`[purge-projects] Storage delete failed for ${project.id}:`, removeError);
-                        failed++;
-                        continue;
-                    }
-                }
-
-                // 3. Hard-delete the project row (only if all above succeeded)
-                const { error: deleteError } = await supabase
+    for (const project of projects) {
+        try {
+            // 1. Mark permanently deleted (user can no longer restore)
+            if (!project.permanently_deleted) {
+                const { error: markError } = await supabase
                     .from('projects')
-                    .delete()
+                    .update({ permanently_deleted: true })
                     .eq('id', project.id);
 
-                if (deleteError) {
-                    console.error(`[purge-projects] Failed to delete project ${project.id}:`, deleteError);
-                    failed++;
-                } else {
-                    succeeded++;
-                }
-            } catch (e) {
-                console.error(`[purge-projects] Error processing project ${project.id}:`, e);
-                failed++;
+                if (markError) throw new Error('mark permanently_deleted failed', { cause: markError });
             }
+
+            // 2. Delete all files from storage (created_by/project_id/*)
+            const prefix = `${project.created_by}/${project.id}`;
+            const { data: files, error: listError } = await supabase.storage
+                .from('project-media')
+                .list(prefix);
+
+            if (listError) throw new Error('storage list failed', { cause: listError });
+
+            if (files && files.length > 0) {
+                const { error: removeError } = await supabase.storage
+                    .from('project-media')
+                    .remove(files.map(f => `${prefix}/${f.name}`));
+
+                if (removeError) throw new Error('storage delete failed', { cause: removeError });
+            }
+
+            // 3. Hard-delete the project row (only if all above succeeded)
+            const { error: deleteError } = await supabase
+                .from('projects')
+                .delete()
+                .eq('id', project.id);
+
+            if (deleteError) throw new Error('project delete failed', { cause: deleteError });
+
+            succeeded++;
+        } catch (err) {
+            // Per-project catch so one bad row doesn't kill the batch.
+            // Report each failure; row will be retried on the next cron run.
+            failed++;
+            await captureException(err, { function: 'purge-deleted-projects', projectId: project.id });
         }
-
-        console.log(`[purge-projects] Processed ${projects.length}: ${succeeded} succeeded, ${failed} failed`);
-
-        return new Response(
-            JSON.stringify({ processed: projects.length, succeeded, failed }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-    } catch (err) {
-        console.error('[purge-projects] Unexpected error:', err);
-        await captureException(err, { function: 'purge-deleted-projects' });
-        return new Response(
-            JSON.stringify({ error: 'Internal server error' }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
     }
-});
+
+    console.log(`[purge-projects] Processed ${projects.length}: ${succeeded} succeeded, ${failed} failed`);
+    return jsonResponse({ processed: projects.length, succeeded, failed });
+}));

@@ -3,6 +3,8 @@ import { LuMail, LuLoader, LuX, LuEllipsis } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../editor/components/Toast';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { trackMembersPageLoaded } from '../../core/analytics';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
 
 const VIEWER_SEATS_PER_CREATOR = 10;
@@ -226,6 +228,7 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
     onGoToBilling?: () => void;
 }) {
     const { addToast }                    = useToast();
+    useEffect(() => { trackMembersPageLoaded(useWorkspaceStore.getState().workspaceId); }, []);
     const [inviteEmail, setInviteEmail]   = useState('');
     const [inviteRole, setInviteRole]     = useState<'viewer' | 'creator'>('creator');
     const [inviting, setInviting]         = useState(false);

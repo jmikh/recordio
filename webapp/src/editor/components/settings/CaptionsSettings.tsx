@@ -18,7 +18,7 @@ import { CloudTranscriptionService } from '../../../core/transcription/CloudTran
 import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
 import { AuthModal } from '../header/AuthModal';
 
-import { trackGenerateCaptions } from '../../../core/analytics';
+import { trackGenerateCaptions, trackGenerateCaptionsClicked, trackGenerateCaptionsCompleted, trackGenerateCaptionsFailed } from '../../../core/analytics';
 import { useToast } from '../Toast';
 import { ColorButton } from './ColorButton';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
@@ -200,6 +200,10 @@ export function CaptionsSettings() {
             }
         }
 
+        const projectId = state.project.id;
+        trackGenerateCaptionsClicked(projectId, engine === 'openai' ? 'cloud' : 'local');
+        const generateStart = performance.now();
+
         try {
             // Pause playback
             setIsPlaying(false);
@@ -256,6 +260,12 @@ export function CaptionsSettings() {
                 transcription_method: engine === 'openai' ? 'cloud' : 'local',
                 success: true,
             });
+            trackGenerateCaptionsCompleted({
+                project_id: projectId,
+                video_duration_s: Math.round(state.project.timeline.durationMs / 1000),
+                generate_duration_s: Math.round((performance.now() - generateStart) / 1000),
+                segment_count: transcriptionData.length,
+            });
 
             if (transcriptionData.length === 0) {
                 addToast({
@@ -286,6 +296,10 @@ export function CaptionsSettings() {
                 segment_count: 0,
                 transcription_method: engine === 'openai' ? 'cloud' : 'local',
                 success: false,
+                error: error.message,
+            });
+            trackGenerateCaptionsFailed({
+                project_id: projectId,
                 error: error.message,
             });
 

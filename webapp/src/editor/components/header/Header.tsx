@@ -11,6 +11,7 @@ import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { useUserStore } from '../../stores/useUserStore';
 
+import { trackDownloadClicked, trackPublishClicked } from '../../../core/analytics';
 import { useNonFreeAccess } from '../../../hooks/useNonFreeAccess';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
@@ -71,6 +72,7 @@ export const Header = () => {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
     const handleDownload = () => {
+        trackDownloadClicked(project.id);
         if (cloudRender.isActive) {
             setIsDownloadModalOpen(true);
             return;
@@ -114,6 +116,7 @@ export const Header = () => {
 
     const handleShare = async () => {
         if (!supabase || !project?.id || isSharing) return;
+        trackPublishClicked(project.id);
         setIsSharing(true);
         try {
             let slug = shareSlug;

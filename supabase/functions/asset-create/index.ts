@@ -85,10 +85,7 @@ serve(withAuth(async (req, { user }) => {
         .eq('status', 'ready')
         .eq('is_deleted', false);
 
-    if (countError) {
-        console.error('[asset-create] Count query failed:', countError);
-        return errorResponse('Failed to check library size', 500);
-    }
+    if (countError) throw new Error('user_assets count failed', { cause: countError });
 
     if ((count ?? 0) >= LIBRARY_LIMIT) {
         return jsonResponse({
@@ -116,25 +113,17 @@ serve(withAuth(async (req, { user }) => {
             status: 'pending',
         });
 
-    if (insertError) {
-        console.error('[asset-create] Insert failed:', insertError);
-        return errorResponse('Failed to create asset record', 500);
-    }
+    if (insertError) throw new Error('user_assets insert failed', { cause: insertError });
 
-    // 5. Create S3 presigned upload URL
+    // 5. Create S3 presigned upload URL. On failure, clean up the pending row
+    // before rethrowing so it doesn't linger.
     try {
         const command = new PutObjectCommand({ Bucket: BUCKET, Key: storagePath });
         const signedUrl = await getS3SignedUrl(s3, command, { expiresIn: 3600 });
 
-        return jsonResponse({
-            signedUrl,
-            storagePath,
-            assetId,
-        });
+        return jsonResponse({ signedUrl, storagePath, assetId });
     } catch (err) {
-        console.error('[asset-create] S3 presign failed:', err);
-        // Clean up the pending row
         await adminSupabase.from('user_assets').delete().eq('id', assetId);
-        return errorResponse('Failed to create upload URL', 500);
+        throw err;
     }
 }));

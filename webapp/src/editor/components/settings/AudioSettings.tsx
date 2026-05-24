@@ -8,6 +8,7 @@ import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
+import { trackUploadMusicClicked } from '../../../core/analytics';
 
 // CDN preset music tracks
 const PRESET_MUSIC = [
@@ -146,6 +147,7 @@ export const AudioSettingsPanel = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        trackUploadMusicClicked(project.id);
         setIsUploading(true);
         try {
             const asset = await UserAssetService.uploadAsset(file, 'music');

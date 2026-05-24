@@ -47,10 +47,8 @@ serve(withAuth(async (req, { supabase }) => {
         .is('deleted_at', null)
         .maybeSingle();
 
-    if (projectError || !project) {
-        console.error('[transcribe] project lookup failed:', { projectId, projectError, found: !!project });
-        return errorResponse('Project not found', 404);
-    }
+    if (projectError) throw new Error('project lookup failed', { cause: projectError });
+    if (!project) return errorResponse('Project not found', 404);
 
     // --- Check active subscription for the project's workspace ---
     const { data: subscription } = await supabase.rpc('subscription_get', {
@@ -67,15 +65,9 @@ serve(withAuth(async (req, { supabase }) => {
     }
 
     // --- Download audio from S3 ---
-    let fileData: Blob;
-    try {
-        const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: micPath }));
-        const bytes = await res.Body!.transformToByteArray();
-        fileData = new Blob([bytes]);
-    } catch (err) {
-        console.error('[transcribe] S3 download failed:', err);
-        return errorResponse('Failed to download audio from storage', 500);
-    }
+    const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: micPath }));
+    const bytes = await res.Body!.transformToByteArray();
+    const fileData = new Blob([bytes]);
 
     // --- Call OpenAI Whisper API ---
     const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') ?? '' });
@@ -88,19 +80,13 @@ serve(withAuth(async (req, { supabase }) => {
     const mimeType = mimeMap[ext] ?? 'audio/wav';
     const file = new File([fileData], `audio.${ext}`, { type: mimeType });
 
-    let whisperResponse;
-    try {
-        whisperResponse = await openai.audio.transcriptions.create({
-            model: 'whisper-1',
-            file,
-            timestamp_granularities: ['segment', 'word'],
-            response_format: 'verbose_json',
-            prompt: 'This is a clear, professional recording with proper punctuation and capitalization. The speaker communicates articulately without hesitation.',
-        });
-    } catch (err) {
-        console.error('[transcribe] OpenAI transcription failed:', err);
-        return errorResponse('Transcription service failed', 502);
-    }
+    const whisperResponse = await openai.audio.transcriptions.create({
+        model: 'whisper-1',
+        file,
+        timestamp_granularities: ['segment', 'word'],
+        response_format: 'verbose_json',
+        prompt: 'This is a clear, professional recording with proper punctuation and capitalization. The speaker communicates articulately without hesitation.',
+    });
 
     // --- Build word-level segments ---
     const rawWords = (whisperResponse.words ?? []).map((w: any) => ({
