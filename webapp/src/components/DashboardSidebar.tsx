@@ -4,7 +4,9 @@ import { LuLayoutGrid, LuStar, LuShare2, LuTrash2, LuFolder, LuPlus, LuEllipsis,
 import { MdOutlineBugReport } from 'react-icons/md';
 import { Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
 import { UserMenu } from './UserMenu';
+import { WorkspaceDropdown } from './WorkspaceDropdown';
 import type { CloudFolder } from '../storage/cloudStorage';
+import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
 
 export type DashboardView = 'all' | 'starred' | 'published' | 'trash' | { folder: string };
 
@@ -26,6 +28,14 @@ interface DashboardSidebarProps {
     isAuthenticated: boolean;
     onOpenSupport: () => void;
     onOpenAuthModal: () => void;
+    workspaces: WorkspaceListItem[];
+    currentWorkspaceId: string | null;
+    currentWorkspaceName: string | null;
+    currentRole: 'viewer' | 'creator' | 'admin' | null;
+    currentUserId: string | null;
+    onSwitchWorkspace: (workspaceId: string) => void;
+    onCreateWorkspace: () => void;
+    onOpenWorkspaceSettings: () => void;
 }
 
 interface NavItem {
@@ -51,6 +61,14 @@ export function DashboardSidebar({
     isAuthenticated,
     onOpenSupport,
     onOpenAuthModal,
+    workspaces,
+    currentWorkspaceId,
+    currentWorkspaceName,
+    currentRole,
+    currentUserId,
+    onSwitchWorkspace,
+    onCreateWorkspace,
+    onOpenWorkspaceSettings,
 }: DashboardSidebarProps) {
 
     // Create folder modal
@@ -143,16 +161,30 @@ export function DashboardSidebar({
 
     return (
         <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col overflow-y-auto">
+            {/* Workspace */}
+            <div className="px-4 pt-4 pb-3">
+                <WorkspaceDropdown
+                    workspaces={workspaces}
+                    currentWorkspaceId={currentWorkspaceId}
+                    currentWorkspaceName={currentWorkspaceName}
+                    currentRole={currentRole}
+                    currentUserId={currentUserId}
+                    onSwitch={onSwitchWorkspace}
+                    onCreate={onCreateWorkspace}
+                    onOpenSettings={onOpenWorkspaceSettings}
+                />
+            </div>
+
             {/* New Recording */}
-            <div className="px-4 pt-4 pb-2">
+            <div className="px-4 pb-2">
                 <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="w-full">
                     New recording
                 </Button>
             </div>
 
             {/* Library */}
-            <div className="pl-0 pr-3 mt-2">
-                <span className="text-[11px] text-text-muted uppercase tracking-wider px-4 mb-1 block">
+            <div className="px-2 mt-2">
+                <span className="text-[11px] text-text-muted uppercase tracking-wider px-3 mb-1 block">
                     Library
                 </span>
                 <nav className="flex flex-col gap-0.5 mt-1">
@@ -163,17 +195,12 @@ export function DashboardSidebar({
                                 key={item.label}
                                 type="button"
                                 onClick={() => item.view && onViewChange(item.view)}
-                                className={`
-                                    relative flex items-center gap-4 px-4 py-2 rounded-r-lg text-sm transition-colors w-full text-left cursor-pointer
-                                    ${isActive
-                                        ? 'bg-primary/15 text-primary'
+                                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
+                                    isActive
+                                        ? 'bg-primary/10 text-primary font-medium'
                                         : 'text-text-main hover:bg-state-hover'
-                                    }
-                                `}
+                                }`}
                             >
-                                {isActive && (
-                                    <span className="absolute left-0 inset-y-0 w-[3px] bg-primary rounded-r-sm" />
-                                )}
                                 <item.icon className="icon-sm shrink-0" />
                                 <span className="flex-1 truncate">{item.label}</span>
                                 {item.count !== undefined && (
@@ -212,8 +239,8 @@ export function DashboardSidebar({
             )}
 
             {/* Folders */}
-            <div className="pl-0 pr-3 mt-6">
-                <div className="flex items-center gap-1 px-4 mb-1">
+            <div className="px-2 mt-6">
+                <div className="flex items-center gap-1 px-3 mb-1">
                     <span className="text-[11px] text-text-muted uppercase tracking-wider">
                         Folders
                     </span>
@@ -234,17 +261,12 @@ export function DashboardSidebar({
                                 <button
                                     type="button"
                                     onClick={() => onViewChange({ folder: folder.id })}
-                                    className={`
-                                        relative flex items-center gap-4 px-4 py-2 rounded-r-lg text-sm transition-colors w-full text-left cursor-pointer
-                                        ${isActive
-                                            ? 'bg-primary/15 text-primary'
+                                    className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
+                                        isActive
+                                            ? 'bg-primary/10 text-primary font-medium'
                                             : 'text-text-main hover:bg-state-hover'
-                                        }
-                                    `}
+                                    }`}
                                 >
-                                    {isActive && (
-                                        <span className="absolute left-0 inset-y-0 w-[3px] bg-primary rounded-r-sm" />
-                                    )}
                                     <LuFolder className="icon-sm shrink-0" />
                                     <span className="flex-1 truncate">{folder.name}</span>
                                     {/* Fixed-width slot: count or three-dots */}

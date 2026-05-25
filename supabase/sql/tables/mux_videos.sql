@@ -16,11 +16,8 @@
 │     "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()  │
 │ );                                                                │
 └───────────────────────────────────────────────────────────────────┘
-│                     rls_info                     │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│ -- RLS: ENABLED                                  │
-│ -- Policy: Users can manage own mux videos (ALL) │
-│ --   USING:      (auth.uid() = user_id)          │
-│ --   WITH CHECK: (auth.uid() = user_id)          │
-└──────────────────────────────────────────────────┘
+│    rls_info     │
+├─────────────────┤
+│                 │
+│ -- RLS: ENABLED │
+└─────────────────┘

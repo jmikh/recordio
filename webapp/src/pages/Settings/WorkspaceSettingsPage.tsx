@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { LuArrowLeft, LuUsers, LuSettings2, LuCreditCard, LuLoader } from 'react-icons/lu';
-import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useUserStore } from '../../editor/stores/useUserStore';
 import { useToast } from '../../editor/components/Toast';
 import { navigate } from '../../navigate';
 import { captureError } from '../../utils/sentry';
+import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
 import { GeneralPage } from './GeneralPage';
 import { MembersPage } from './MembersPage';
 import { BillingPage } from './BillingPage';
 import type { Tab, WorkspaceDetails } from './types';
 
 export function WorkspaceSettingsPage() {
-    const { workspaceId, workspaceName, workspaceRole, setWorkspace, workspaceOwnerId, workspaceSeats, hasActivePlan, subscription } = useWorkspaceStore();
+    const {
+        workspaceId, workspaceName, workspaceRole, setWorkspace,
+        workspaceOwnerId, workspaceSeats, hasActivePlan, subscription,
+        workspaceList, setWorkspaceList,
+    } = useWorkspaceStore();
     const { userId } = useUserStore();
     const { addToast } = useToast();
 
@@ -48,6 +52,21 @@ export function WorkspaceSettingsPage() {
             }
         })();
     }, [workspaceId]);
+
+    useEffect(() => {
+        if (!supabase || workspaceList.length > 0) return;
+        supabase.rpc('workspace_list').then(({ data, error }) => {
+            if (!error && Array.isArray(data)) setWorkspaceList(data);
+        });
+    }, []);
+
+    const handleSwitchWorkspace = async (newWorkspaceId: string) => {
+        const ws = workspaceList.find(w => w.id === newWorkspaceId);
+        if (!ws) return;
+        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.seats);
+        if (supabase) supabase.rpc('workspace_set_default', { p_workspace_id: newWorkspaceId }).then();
+        navigate('/');
+    };
 
     const handleRenamed = (name: string) => {
         if (!workspaceId || !workspaceOwnerId) return;
@@ -136,20 +155,34 @@ export function WorkspaceSettingsPage() {
 
     return (
         <div className="min-h-screen bg-surface-body text-text-main flex flex-col">
-            {/* Top bar */}
-            <div className="h-header border-b border-border px-6 flex items-center gap-3">
-                <Button variant="icon" icon={LuArrowLeft} onClick={() => navigate('/')} title="Back to Dashboard" />
-                <div>
-                    <p className="text-xs text-text-muted">Workspace</p>
-                    <h1 className="text-sm font-semibold text-text-highlighted leading-tight">
-                        {workspaceName ?? 'Workspace Settings'}
-                    </h1>
-                </div>
-            </div>
-
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar nav */}
-                <aside className="w-52 shrink-0 border-r border-border py-4 px-2 flex flex-col gap-0.5">
+                <aside className="w-60 shrink-0 border-r border-border bg-surface flex flex-col">
+                    {/* Workspace */}
+                    <div className="px-4 pt-4 pb-2">
+                        <WorkspaceDropdown
+                            workspaces={workspaceList}
+                            currentWorkspaceId={workspaceId}
+                            currentWorkspaceName={workspaceName}
+                            currentRole={workspaceRole}
+                            currentUserId={userId}
+                            onSwitch={handleSwitchWorkspace}
+                            onCreate={() => navigate('/')}
+                            onOpenSettings={() => {}}
+                        />
+                    </div>
+
+                    {/* Back to dashboard */}
+                    <button
+                        type="button"
+                        onClick={() => navigate('/')}
+                        className="mx-4 mb-3 flex items-center gap-2 text-xs text-text-muted hover:text-text-main transition-colors cursor-pointer self-start"
+                    >
+                        <LuArrowLeft className="icon-sm" />
+                        Back to dashboard
+                    </button>
+
+                    <div className="px-2 flex flex-col gap-0.5">
                     {tabs.map(tab => {
                         const active = activeTab === tab.id;
                         return (
@@ -168,6 +201,7 @@ export function WorkspaceSettingsPage() {
                             </button>
                         );
                     })}
+                    </div>
                 </aside>
 
                 {/* Content — centered in the available space */}

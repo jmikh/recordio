@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { LuTrash2, LuSearch } from 'react-icons/lu';
-import { WorkspaceDropdown } from '../components/WorkspaceDropdown';
+import { LuTrash2 } from 'react-icons/lu';
 import { CloudProjectService, type ProjectListItem } from '../storage/cloudProjectService';
 import type { CloudFolder } from '../storage/cloudStorage';
 import { ProjectCard } from '../components/ProjectCard';
@@ -445,32 +444,6 @@ export function DashboardPage() {
 
     return (
         <div className="min-h-screen bg-surface-body text-text-main flex flex-col">
-            {/* Top Header */}
-            <div className="h-header shrink-0 border-b border-border bg-surface flex items-center px-4 relative z-[var(--z-index-navbar)]">
-                <div className="shrink-0">
-                    <WorkspaceDropdown
-                        workspaces={workspaceList}
-                        currentWorkspaceId={workspaceId}
-                        currentWorkspaceName={workspaceName}
-                        currentRole={workspaceRole}
-                        currentUserId={userId}
-                        onSwitch={handleSwitchWorkspace}
-                        onCreate={handleCreateWorkspace}
-                        onOpenSettings={() => navigate('/workspace/settings')}
-                    />
-                </div>
-                <div className="absolute left-1/2 -translate-x-1/2 w-72">
-                    <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 icon-sm text-text-muted pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search recordings..."
-                        className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-            </div>
-
             {/* Body */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
@@ -490,6 +463,14 @@ export function DashboardPage() {
                     isAuthenticated={isAuthenticated}
                     onOpenSupport={() => setIsSupportModalOpen(true)}
                     onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                    workspaces={workspaceList}
+                    currentWorkspaceId={workspaceId}
+                    currentWorkspaceName={workspaceName}
+                    currentRole={workspaceRole}
+                    currentUserId={userId}
+                    onSwitchWorkspace={handleSwitchWorkspace}
+                    onCreateWorkspace={handleCreateWorkspace}
+                    onOpenWorkspaceSettings={() => navigate('/workspace/settings')}
                 />
 
                 {/* Main Content */}

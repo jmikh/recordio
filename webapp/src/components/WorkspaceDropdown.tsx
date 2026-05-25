@@ -64,7 +64,7 @@ export function WorkspaceDropdown({
                 ref={triggerRef}
                 type="button"
                 onClick={open ? () => setOpen(false) : openMenu}
-                className="flex items-center gap-1.5 w-44 group rounded-md px-1 py-0.5 -mx-1 hover:bg-state-hover transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 w-full group rounded-md px-2 py-1 hover:bg-state-hover transition-colors cursor-pointer"
             >
                 <div className="flex flex-col flex-1 min-w-0 text-left overflow-hidden leading-tight">
                     <span className="text-[11px] text-text-muted">Workspace</span>

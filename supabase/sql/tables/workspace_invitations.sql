@@ -12,14 +12,8 @@
 │     "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now() │
 │ );                                                               │
 └──────────────────────────────────────────────────────────────────┘
-│                                                                                   rls_info                                                                                   │
-├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                                                                                              │
-│ -- RLS: ENABLED                                                                                                                                                              │
-│ -- Policy: workspace_invitations_select (SELECT)                                                                                                                             │
-│ --   USING:      ((email = (( SELECT users.email                                                                                                                             │
-│    FROM auth.users                                                                                                                                                           │
-│   WHERE (users.id = auth.uid())))::text) OR (EXISTS ( SELECT 1                                                                                                               │
-│    FROM workspace_members                                                                                                                                                    │
-│   WHERE ((workspace_members.workspace_id = workspace_invitations.workspace_id) AND (workspace_members.user_id = auth.uid()) AND (workspace_members.role = 'admin'::text))))) │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+│    rls_info     │
+├─────────────────┤
+│                 │
+│ -- RLS: ENABLED │
+└─────────────────┘

@@ -1,14 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuUser, LuLogOut, LuSettings } from 'react-icons/lu';
+import { LuUser, LuLogOut } from 'react-icons/lu';
 import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
-import { BiCrown } from 'react-icons/bi';
-import { ProBadge } from '@shared/components';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useThemeStore } from '../stores/useThemeStore';
 import { AuthManager } from '../auth/AuthManager';
-import { StripeService } from '../editor/stripe/StripeService';
 import { navigate } from '../navigate';
 
 interface UserMenuProps {
@@ -17,13 +14,10 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
-    const { email, name, picture, hasFreeTrial, trialEndsAt } = useUserStore();
-    const { hasActivePlan, subscription } = useWorkspaceStore();
+    const { email, name, picture } = useUserStore();
     const { theme, setTheme } = useThemeStore();
     const isDark = theme === 'dark';
 
-    // Trial state comes from user_profiles table
-    const isTrialing = hasFreeTrial();
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -55,24 +49,6 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMen
         navigate('/');
     };
 
-    const handleManageSubscription = async () => {
-        const { url, error } = await StripeService.createPortalSession();
-
-        if (error || !url) {
-            console.error('[UserMenu] Failed to create portal session:', error);
-            return;
-        }
-
-        // Open Stripe Customer Portal in new tab
-        window.open(url, '_blank');
-        setIsOpen(false);
-    };
-
-    const handleUpgrade = () => {
-        setIsOpen(false);
-        navigate('/workspace/settings?tab=billing');
-    };
-
     const handleToggle = () => {
         if (!isOpen && openDirection === 'up' && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
@@ -98,50 +74,11 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMen
                     <p className="text-xs text-text-muted truncate">{email}</p>
                 </div>
             </div>
-
-            <div className="flex flex-col gap-1 mt-1">
-                <span className="text-xs text-text-muted">Status</span>
-                <div className="flex flex-col gap-1 items-start">
-                    <ProBadge variant={isTrialing ? 'trial' : hasActivePlan ? 'pro' : 'free'} />
-                    {isTrialing && trialEndsAt && (
-                        <span className="text-[11px] text-text-muted">
-                            Expires {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                    )}
-                    {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
-                        <span className="text-[11px] text-text-muted">
-                            Expires {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                    )}
-                </div>
-            </div>
         </div>
     );
 
     const menuActions = (
         <div className="p-1.5 space-y-0.5">
-            {hasActivePlan && !isTrialing ? (
-                subscription?.stripeCustomerId && (
-                    <button
-                        onClick={handleManageSubscription}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
-                    >
-                        <LuSettings className="icon-sm text-text-muted" />
-                        Manage Subscription
-                    </button>
-                )
-            ) : (
-                <button
-                    onClick={handleUpgrade}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-primary/10 rounded-md transition-colors text-left font-medium group"
-                >
-                    <BiCrown className="icon-sm group-hover:scale-110 transition-transform" />
-                    Upgrade to Pro
-                </button>
-            )}
-
-            <div className="h-px bg-border mx-2 my-1" />
-
             <button
                 onClick={() => { setTheme(isDark ? 'light' : 'dark'); }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"

@@ -25,18 +25,8 @@
 │     "workspace_id" UUID NOT NULL                                        │
 │ );                                                                      │
 └─────────────────────────────────────────────────────────────────────────┘
-│                                                     rls_info                                                      │
-├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                                   │
-│ -- RLS: ENABLED                                                                                                   │
-│ -- Policy: projects_delete (DELETE)                                                                               │
-│ --   USING:      (owner_id = auth.uid())                                                                          │
-│ -- Policy: projects_insert (INSERT)                                                                               │
-│ --   WITH CHECK: ((owner_id = auth.uid()) AND (created_by = auth.uid()))                                          │
-│ -- Policy: projects_select (SELECT)                                                                               │
-│ --   USING:      (EXISTS ( SELECT 1                                                                               │
-│    FROM workspace_members                                                                                         │
-│   WHERE ((workspace_members.workspace_id = projects.workspace_id) AND (workspace_members.user_id = auth.uid())))) │
-│ -- Policy: projects_update (UPDATE)                                                                               │
-│ --   USING:      (owner_id = auth.uid())                                                                          │
-└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+│    rls_info     │
+├─────────────────┤
+│                 │
+│ -- RLS: ENABLED │
+└─────────────────┘
