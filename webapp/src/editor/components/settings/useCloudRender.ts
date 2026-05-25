@@ -4,6 +4,7 @@ import { useUserStore } from '../../stores/useUserStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 
 export type CloudRenderPhase = 'idle' | 'saving' | 'queued' | 'rendering' | 'downloading' | 'completed' | 'failed';
 
@@ -54,6 +55,12 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
             });
             if (error || data?.error) {
                 const msg = data?.error || error?.message || 'Unknown error';
+                captureError(error ?? new Error(msg), {
+                    flow: 'render',
+                    phase: 'downloading',
+                    projectId,
+                    extra: { kind: 'cloud', http_status: (error as any)?.context?.status },
+                });
                 trackRenderInCloudFailed({
                     project_id: projectId,
                     error: msg,
@@ -89,6 +96,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                 setProgress(0);
             }, 1500);
         } catch (e: any) {
+            captureError(e, { flow: 'render', phase: 'downloading', projectId, extra: { kind: 'cloud' } });
             trackRenderInCloudFailed({
                 project_id: projectId,
                 error: e?.message || 'Unknown error',
@@ -142,6 +150,12 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
 
             if (error || data?.error) {
                 const msg = data?.message || data?.error || error?.message || 'Failed to start render';
+                captureError(error ?? new Error(msg), {
+                    flow: 'render',
+                    phase: 'creating_job',
+                    projectId,
+                    extra: { kind: 'cloud', http_status: (error as any)?.context?.status },
+                });
                 trackRenderInCloudFailed({
                     project_id: projectId,
                     error: msg,
@@ -191,9 +205,18 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                     });
                     await downloadFile(job.render_storage_path, projectName, projectId, projectMeta);
                 } else if (job.status === 'failed' || job.status === 'canceled') {
+                    const msg = job.error || `Render ${job.status}`;
+                    if (job.status === 'failed') {
+                        captureError(new Error(msg), {
+                            flow: 'render',
+                            phase: 'server_render',
+                            projectId,
+                            extra: { kind: 'cloud', job_status: job.status },
+                        });
+                    }
                     trackRenderInCloudFailed({
                         project_id: projectId,
-                        error: job.error || `Render ${job.status}`,
+                        error: msg,
                         phase: 'server_render',
                         job_status: job.status,
                         is_offline: !navigator.onLine,
@@ -203,12 +226,13 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                     onToast({
                         type: 'error',
                         title: 'Render failed',
-                        message: job.error || `Render ${job.status}`,
+                        message: msg,
                         duration: 0,
                     });
                 }
             }, 3000);
         } catch (e: any) {
+            captureError(e, { flow: 'render', phase: failPhase, projectId, extra: { kind: 'cloud' } });
             trackRenderInCloudFailed({
                 project_id: projectId,
                 error: e?.message || 'Connection failed',

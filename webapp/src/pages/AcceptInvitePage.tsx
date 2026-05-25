@@ -4,6 +4,8 @@ import { Button, LogoLink } from '@shared/components';
 import { supabase } from '../auth/AuthManager';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { AuthModal } from '../editor/components/header/AuthModal';
+import { trackInviteAcceptFailed } from '../core/analytics';
+import { captureError } from '../utils/sentry';
 
 type Status = 'waiting-auth' | 'accepting' | 'success' | 'error';
 
@@ -30,6 +32,12 @@ export function AcceptInvitePage() {
             // Full reload so AuthManager re-loads the now-default workspace
             setTimeout(() => { window.location.href = '/'; }, 1800);
         } catch (err: any) {
+            captureError(err, { flow: 'invite_accept' });
+            trackInviteAcceptFailed({
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+            });
             setErrorMsg(err?.message ?? 'Failed to accept invitation.');
             setStatus('error');
         }

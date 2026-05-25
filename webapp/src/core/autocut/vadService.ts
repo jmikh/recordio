@@ -1,12 +1,13 @@
 /**
  * VAD (Voice Activity Detection) Service
- * 
+ *
  * Uses @ricky0123/vad-web with Silero ONNX model for accurate
  * speech detection in pre-recorded audio.
- * 
+ *
  * NOTE: Loads library from CDN to avoid Vite/CommonJS bundling issues.
  * The vad-web library uses CommonJS requires that Vite cannot handle.
  */
+import { captureError } from '../../utils/sentry';
 
 // ============================================================================
 // VAD Configuration
@@ -225,7 +226,7 @@ export async function detectSpeechSegments(audioUrl: string): Promise<SpeechSegm
     try {
         audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     } catch (e) {
-        console.error('[VAD] Audio decoding failed:', e);
+        captureError(e, { flow: 'autocut', phase: 'vad_decode' });
         throw new Error('Failed to decode audio data. The file format may not be supported.');
     }
 

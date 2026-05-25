@@ -5,6 +5,7 @@ import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { getClickSoundBuffer, getDragSoundBuffers } from '../../../core/audio/clickSoundPlayer';
 import { LocalPreferences } from '../../../storage/localPreferences';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { captureError } from '../../../utils/sentry';
 import type { Project } from '@shared/types';
 
 interface UseLocalRenderOptions {
@@ -95,6 +96,12 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             if (e?.message === 'Export cancelled') {
                 return { success: false, error: null };
             }
+            captureError(e, {
+                flow: 'render',
+                phase,
+                projectId: project.id,
+                extra: { kind: 'local' },
+            });
             return {
                 success: false,
                 error: e?.message || 'Unknown error',

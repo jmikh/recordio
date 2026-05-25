@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useState, useRef } from 'react';
-import { captureImportError } from '../utils/sentry';
+import { captureImportError, captureError } from '../utils/sentry';
 import {
     BRIDGE_MSG,
     PORT_MSG,
@@ -435,7 +435,7 @@ export function useExtensionBridge() {
             });
 
         } catch (error) {
-            console.error('[useExtensionBridge] Error confirming handoff:', error);
+            captureError(error, { flow: 'import', phase: 'confirm_handoff', extra: { recordingId: state.recordingId } });
         }
     }, [state.recordingId]);
 

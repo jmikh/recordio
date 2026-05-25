@@ -8,7 +8,8 @@ import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
-import { trackUploadMusicClicked } from '../../../core/analytics';
+import { trackUploadMusicClicked, trackUploadMusicFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 
 // CDN preset music tracks
 const PRESET_MUSIC = [
@@ -139,7 +140,7 @@ export const AudioSettingsPanel = () => {
         try {
             await selectMusic(storagePath);
         } catch (err) {
-            console.error('Failed to select custom music', err);
+            captureError(err, { flow: 'music', phase: 'select', projectId: project.id });
         }
     };
 
@@ -153,8 +154,21 @@ export const AudioSettingsPanel = () => {
             const asset = await UserAssetService.uploadAsset(file, 'music');
             addAsset(asset);
             await selectMusic(asset.storagePath);
-        } catch (err) {
-            console.error('Failed to upload music', err);
+        } catch (err: any) {
+            captureError(err, {
+                flow: 'music',
+                phase: 'upload',
+                projectId: project.id,
+                extra: { file_size: file.size, file_type: file.type },
+            });
+            trackUploadMusicFailed({
+                project_id: project.id,
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+                file_size: file.size,
+                file_type: file.type,
+            });
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

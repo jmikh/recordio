@@ -5,6 +5,7 @@ import type { Project, ID, UserEvents } from '@shared/types';
 import { ProjectImpl } from '../../core/Project';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { CloudStorage } from '../../storage/cloudStorage';
+import { captureError } from '../../utils/sentry';
 import { BlobCache } from '../../storage/blobCache';
 import { useMediaUrlStore } from './useMediaUrlStore';
 import { useUserStore } from './useUserStore';
@@ -225,7 +226,7 @@ export const useProjectStore = create<ProjectState>()(
                             await CloudProjectService.saveProject(fullProject, userId);
                         }
                     } catch (e) {
-                        console.error("Failed to save project:", e);
+                        captureError(e, { flow: 'project_save', projectId: get().project.id });
                     } finally {
                         set({ isSaving: false });
                     }
@@ -289,7 +290,9 @@ export const useProjectStore = create<ProjectState>()(
                     set({ projectName: name });
                     // Persist to DB immediately (fire-and-forget, no debounce)
                     const projectId = get().project.id;
-                    CloudStorage.updateProjectName(projectId, name).catch(console.error);
+                    CloudStorage.updateProjectName(projectId, name).catch(err =>
+                        captureError(err, { flow: 'project_rename', projectId })
+                    );
                 },
 
                 setExportState: (updates) => {
@@ -324,7 +327,7 @@ useProjectStore.subscribe(
             if (!userId) return;
             const userEvents = useProjectStore.getState().userEvents;
             const fullProject = { ...project, userEvents };
-            CloudProjectService.saveProject(fullProject, userId).catch(console.error);
+            CloudProjectService.saveProject(fullProject, userId).catch(() => { /* saveProject already reports to Sentry */ });
         }, 2000);
     }
 );

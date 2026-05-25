@@ -19,6 +19,7 @@ import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
 import { AuthModal } from '../header/AuthModal';
 
 import { trackGenerateCaptions, trackGenerateCaptionsClicked, trackGenerateCaptionsCompleted, trackGenerateCaptionsFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 import { useToast } from '../Toast';
 import { ColorButton } from './ColorButton';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
@@ -256,6 +257,7 @@ export function CaptionsSettings() {
             });
 
             trackGenerateCaptions({
+                project_id: projectId,
                 segment_count: transcriptionData.length,
                 transcription_method: engine === 'openai' ? 'cloud' : 'local',
                 success: true,
@@ -290,9 +292,14 @@ export function CaptionsSettings() {
         } catch (error: any) {
             if (error.message === 'Aborted') return;
 
-            console.error('[CaptionsSettings] Failed to generate transcription:', error);
+            captureError(error, {
+                flow: 'transcribe',
+                phase: engine === 'openai' ? 'cloud' : 'local',
+                projectId,
+            });
 
             trackGenerateCaptions({
+                project_id: projectId,
                 segment_count: 0,
                 transcription_method: engine === 'openai' ? 'cloud' : 'local',
                 success: false,

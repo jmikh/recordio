@@ -1,6 +1,7 @@
 import type { Project, ID } from '@shared/types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
+import { captureError } from '../utils/sentry';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
@@ -403,7 +404,7 @@ export class CloudProjectService {
                     if (url) onThumbnailLoaded(item.id, url);
                 }
             })
-            .catch(err => console.warn('[CloudProjectService] Thumbnail batch load failed:', err));
+            .catch(err => captureError(err, { flow: 'thumbnail_batch_load' }));
     }
 
     // ─── Delete ──────────────────────────────────────────────
@@ -484,7 +485,7 @@ export class CloudProjectService {
         // Upload to cloud (non-blocking)
         CloudStorage.uploadThumbnail(projectId, blob)
             .then(() => { this.thumbnailHashes.set(projectId, hash); })
-            .catch(err => console.warn('[CloudProjectService] Thumbnail upload failed:', err));
+            .catch(err => captureError(err, { flow: 'thumbnail_upload', projectId }));
     }
 
     // ─── Folders ─────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
 import { captureImportError } from '../utils/sentry';
-import { trackProjectCreated } from '../core/analytics';
+import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
@@ -38,10 +38,21 @@ export function ImportPage() {
     const params = new URLSearchParams(window.location.search);
     const recordingId = params.get('id')?.replace(/^proj-/, '') ?? null;
 
+    // Track page view once on mount
+    useEffect(() => {
+        trackImportPageLoaded({ recording_id: recordingId });
+    }, []);
+
     // Start handoff when page loads
     useEffect(() => {
         if (!recordingId) {
             setStatus('error-no-id');
+            trackImportFailed({
+                recording_id: null,
+                phase: 'no_id',
+                error: 'No recording id in URL',
+                is_offline: !navigator.onLine,
+            });
             return;
         }
 
@@ -90,6 +101,13 @@ export function ImportPage() {
             setStatus('error-extension');
             setErrorDetails(state.error);
 
+            trackImportFailed({
+                recording_id: recordingId,
+                phase: 'extension',
+                bridge_status: state.status,
+                error: state.error || 'Extension bridge error',
+                is_offline: !navigator.onLine,
+            });
             trackProjectCreatedFailure('extension');
         }
     }, [state]);
@@ -127,6 +145,12 @@ export function ImportPage() {
         }
         if (!workspaceId) {
             console.error('[ImportPage] No workspace ID available');
+            trackImportFailed({
+                recording_id: recordingId,
+                phase: 'no_workspace',
+                error: 'No workspace id available',
+                is_offline: !navigator.onLine,
+            });
             setStatus('error-upload');
             return;
         }
@@ -158,7 +182,7 @@ export function ImportPage() {
 
             // Navigate to editor immediately — upload continues in background
             navigate(`/editor?projectId=${project.id}`);
-        } catch (error) {
+        } catch (error: any) {
             console.error('[ImportPage] Import failed:', error);
             captureImportError(error, {
                 recordingId,
@@ -171,6 +195,15 @@ export function ImportPage() {
             setStatus('error-upload');
             setErrorDetails(error instanceof Error ? error.message : 'Import failed');
 
+            trackProjectCreationFailed({
+                recording_id: recordingId,
+                error: error?.message || 'Import failed',
+                error_name: error?.name,
+                is_offline: !navigator.onLine,
+                screen_video_size: state.screenVideo?.size,
+                camera_video_size: state.cameraVideo?.size ?? undefined,
+                mic_audio_size: state.micAudio?.size ?? undefined,
+            });
             trackProjectCreatedFailure('import', error instanceof Error ? error.message : undefined);
         }
     }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { UserAssetService, type UserAsset } from '../../storage/userAssetService';
 import { BlobCache } from '../../storage/blobCache';
+import { captureError } from '../../utils/sentry';
 
 const LIBRARY_LIMIT = 10;
 
@@ -49,7 +50,7 @@ export const useAssetLibraryStore = create<AssetLibraryState>()((set, get) => ({
                     .catch(() => {});
             }
         } catch (err) {
-            console.error('Failed to load asset library:', err);
+            captureError(err, { flow: 'asset_library', phase: 'load' });
         }
     },
 

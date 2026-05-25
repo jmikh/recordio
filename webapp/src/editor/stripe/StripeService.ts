@@ -1,5 +1,7 @@
 import { supabase } from '../../auth/AuthManager';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { captureError } from '../../utils/sentry';
+import { trackCheckoutSessionFailed, trackSubscriptionChangeFailed } from '../../core/analytics';
 
 export interface SubscriptionChangePreview {
     immediateCharge:   number;               // dollars charged today (proration)
@@ -45,15 +47,27 @@ export class StripeService {
             });
 
             if (error) {
-                console.error('[Stripe] Error creating checkout session:', error);
-                console.error('[Stripe] Error details:', JSON.stringify(error, null, 2));
+                captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval } });
+                trackCheckoutSessionFailed({
+                    plan, interval,
+                    error: error.message,
+                    error_name: error.name,
+                    is_offline: !navigator.onLine,
+                });
                 popup?.close();
                 return { error };
             }
 
             if (!data?.url) {
+                const err = new Error('No checkout URL returned');
+                captureError(err, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval, reason: 'no_url' } });
+                trackCheckoutSessionFailed({
+                    plan, interval,
+                    error: err.message,
+                    is_offline: !navigator.onLine,
+                });
                 popup?.close();
-                return { error: new Error('No checkout URL returned') };
+                return { error: err };
             }
 
             if (popup) {
@@ -64,8 +78,14 @@ export class StripeService {
             }
 
             return {};
-        } catch (error) {
-            console.error('[Stripe] Unexpected error:', error);
+        } catch (error: any) {
+            captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval } });
+            trackCheckoutSessionFailed({
+                plan, interval,
+                error: error?.message || 'Unknown error',
+                error_name: error?.name,
+                is_offline: !navigator.onLine,
+            });
             return { error: error as Error };
         }
     }
@@ -91,14 +111,34 @@ export class StripeService {
             });
 
             if (error) {
-                console.error('[Stripe] subscriptionChange error:', error);
+                if (!params.dryRun) {
+                    captureError(error, { flow: 'billing', phase: 'subscription_change', workspaceId: params.workspaceId });
+                    trackSubscriptionChangeFailed({
+                        workspace_id: params.workspaceId,
+                        new_plan: params.newPlan,
+                        new_seats: params.newSeats,
+                        error: error.message,
+                        error_name: error.name,
+                        is_offline: !navigator.onLine,
+                    });
+                }
                 return { error: error as Error };
             }
 
             if (params.dryRun) return { preview: data as SubscriptionChangePreview };
             return { success: true };
-        } catch (err) {
-            console.error('[Stripe] subscriptionChange unexpected error:', err);
+        } catch (err: any) {
+            if (!params.dryRun) {
+                captureError(err, { flow: 'billing', phase: 'subscription_change', workspaceId: params.workspaceId });
+                trackSubscriptionChangeFailed({
+                    workspace_id: params.workspaceId,
+                    new_plan: params.newPlan,
+                    new_seats: params.newSeats,
+                    error: err?.message || 'Unknown error',
+                    error_name: err?.name,
+                    is_offline: !navigator.onLine,
+                });
+            }
             return { error: err as Error };
         }
     }
@@ -114,9 +154,9 @@ export class StripeService {
             return { error: new Error('Supabase not configured') };
         }
 
+        const { workspaceId } = useWorkspaceStore.getState();
         try {
             const returnUrl = `${window.location.origin}/workspace/settings/billing`;
-            const { workspaceId } = useWorkspaceStore.getState();
 
             const { data, error } = await supabase.functions.invoke('stripe-portal', {
                 body: {
@@ -126,13 +166,13 @@ export class StripeService {
             });
 
             if (error) {
-                console.error('[Stripe] Failed to create portal session:', error);
+                captureError(error, { flow: 'billing', phase: 'portal_session', workspaceId: workspaceId ?? undefined });
                 return { error };
             }
 
             return { url: data?.url };
         } catch (error) {
-            console.error('[Stripe] Unexpected error:', error);
+            captureError(error, { flow: 'billing', phase: 'portal_session', workspaceId: workspaceId ?? undefined });
             return { error: error as Error };
         }
     }

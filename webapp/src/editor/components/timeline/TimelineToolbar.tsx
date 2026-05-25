@@ -17,7 +17,8 @@ import { getCachedSpeechSegments } from '../../../core/autocut/vadService';
 import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
 import { createDefaultItem } from '../settings/OverlayInspector';
 import type { OverlayItemType, OverlaySegment } from '@shared/types/overlay';
-import { trackAutocutClicked } from '../../../core/analytics';
+import { trackAutocutClicked, trackAutocutFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;
@@ -146,8 +147,14 @@ export const TimelineToolbar: React.FC = () => {
             } else {
                 removeToast(toastId);
             }
-        } catch (error) {
-            console.error('AutoCut failed:', error);
+        } catch (error: any) {
+            captureError(error, { flow: 'autocut', projectId });
+            trackAutocutFailed({
+                project_id: projectId,
+                error: error?.message || 'Unknown error',
+                error_name: error?.name,
+                is_offline: !navigator.onLine,
+            });
             updateToast(toastId, {
                 type: 'error',
                 title: 'AutoCut failed',

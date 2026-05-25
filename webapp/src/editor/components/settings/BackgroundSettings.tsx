@@ -14,7 +14,8 @@ import { TbBackground } from 'react-icons/tb';
 import { useToast } from '../Toast';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
-import { trackUploadBackgroundClicked } from '../../../core/analytics';
+import { trackUploadBackgroundClicked, trackUploadBackgroundFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 
 
 
@@ -130,7 +131,7 @@ export const BackgroundSettings = () => {
         try {
             await selectBackground(storagePath);
         } catch (err) {
-            console.error('Failed to select background from library', err);
+            captureError(err, { flow: 'background', phase: 'select', projectId: project.id });
         }
     };
 
@@ -142,7 +143,7 @@ export const BackgroundSettings = () => {
             }
             await removeAsset(assetId, storagePath);
         } catch (err) {
-            console.error('Failed to delete background asset', err);
+            captureError(err, { flow: 'background', phase: 'delete', projectId: project.id, extra: { assetId } });
         }
     };
 
@@ -157,8 +158,21 @@ export const BackgroundSettings = () => {
             addAsset(asset);
             await selectBackground(asset.storagePath);
             addToast({ type: 'success', title: 'Background saved in your library' });
-        } catch (err) {
-            console.error('Failed to upload background', err);
+        } catch (err: any) {
+            captureError(err, {
+                flow: 'background',
+                phase: 'upload',
+                projectId: project.id,
+                extra: { file_size: file.size, file_type: file.type },
+            });
+            trackUploadBackgroundFailed({
+                project_id: project.id,
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+                file_size: file.size,
+                file_type: file.type,
+            });
             addToast({ type: 'error', title: 'Failed to upload background' });
         } finally {
             setIsUploading(false);

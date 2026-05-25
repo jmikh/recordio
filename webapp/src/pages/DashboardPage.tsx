@@ -18,7 +18,8 @@ import { AuthManager, supabase } from '../auth/AuthManager';
 import { SupportModal } from '../components/SupportModal';
 import { AuthModal } from '../editor/components/header/AuthModal';
 import { useToast } from '../editor/components/Toast';
-import { trackProjectOpened, trackDashboardPageLoaded } from '../core/analytics';
+import { trackProjectOpened, trackDashboardPageLoaded, trackWorkspaceCreateFailed, trackProjectDeleteFailed } from '../core/analytics';
+import { captureError } from '../utils/sentry';
 
 import { navigate } from '../navigate';
 
@@ -133,7 +134,7 @@ export function DashboardPage() {
                     });
                 }
             } catch (error) {
-                if (!ctrl.cancelled) console.error('Failed to load projects:', error);
+                if (!ctrl.cancelled) captureError(error, { flow: 'dashboard_load', workspaceId });
             } finally {
                 if (!ctrl.cancelled) setLoading(false);
             }
@@ -265,8 +266,13 @@ export function DashboardPage() {
             setNewWorkspaceName('');
             setShowCreateWorkspace(false);
             addToast({ type: 'success', title: `Workspace "${created.name}" created` });
-        } catch (err) {
-            console.error('Failed to create workspace:', err);
+        } catch (err: any) {
+            captureError(err, { flow: 'workspace', phase: 'create' });
+            trackWorkspaceCreateFailed({
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+            });
             addToast({ type: 'error', title: 'Failed to create workspace' });
         }
     };
@@ -277,7 +283,7 @@ export function DashboardPage() {
             setFolders(prev => [...prev, folder]);
             addToast({ type: 'success', title: `Folder "${name}" created` });
         } catch (err) {
-            console.error('Failed to create folder:', err);
+            captureError(err, { flow: 'folder', phase: 'create', workspaceId: workspaceId ?? undefined });
             addToast({ type: 'error', title: 'Failed to create folder' });
         }
     };
@@ -290,7 +296,7 @@ export function DashboardPage() {
                 addToast({ type: 'success', title: `Folder updated` });
             }
         } catch (err) {
-            console.error('Failed to update folder:', err);
+            captureError(err, { flow: 'folder', phase: 'update', extra: { folderId } });
             addToast({ type: 'error', title: 'Failed to update folder' });
         }
     };
@@ -310,7 +316,7 @@ export function DashboardPage() {
             }
             addToast({ type: 'success', title: `Folder "${folder?.name}" deleted` });
         } catch (err) {
-            console.error('Failed to delete folder:', err);
+            captureError(err, { flow: 'folder', phase: 'delete', extra: { folderId } });
             addToast({ type: 'error', title: 'Failed to delete folder' });
         }
     };
@@ -339,7 +345,7 @@ export function DashboardPage() {
                 p.id === projectId ? { ...p, name: newName } : p
             ));
         } catch (err) {
-            console.error('Failed to rename project:', err);
+            captureError(err, { flow: 'project', phase: 'rename', projectId });
             addToast({ type: 'error', title: 'Failed to rename project' });
         }
     };
@@ -352,7 +358,7 @@ export function DashboardPage() {
                 p.id === projectId ? { ...p, isStarred: starred } : p
             ));
         } catch (err) {
-            console.error('Failed to star project:', err);
+            captureError(err, { flow: 'project', phase: 'star', projectId, extra: { starred } });
             addToast({ type: 'error', title: 'Failed to update star' });
         }
     };
@@ -367,7 +373,7 @@ export function DashboardPage() {
             const folderName = folderId ? folders.find(f => f.id === folderId)?.name : null;
             addToast({ type: 'success', title: folderId ? `Moved to "${folderName}"` : 'Removed from folder' });
         } catch (err) {
-            console.error('Failed to move project:', err);
+            captureError(err, { flow: 'project', phase: 'move', projectId, extra: { folderId } });
             addToast({ type: 'error', title: 'Failed to move project' });
         }
     };
@@ -381,8 +387,14 @@ export function DashboardPage() {
                 p.id === projectId ? { ...p, deletedAt: now } : p
             ));
             addToast({ type: 'success', title: 'Moved to Trash' });
-        } catch (err) {
-            console.error('Failed to delete project:', err);
+        } catch (err: any) {
+            captureError(err, { flow: 'project', phase: 'delete', projectId });
+            trackProjectDeleteFailed({
+                project_id: projectId,
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+            });
             addToast({ type: 'error', title: 'Failed to delete project' });
         }
     };
@@ -403,8 +415,14 @@ export function DashboardPage() {
             setSelectedIds(new Set());
             setShowBulkDeleteModal(false);
             addToast({ type: 'success', title: 'Moved to Trash', message: `${count} project${count !== 1 ? 's' : ''} moved to trash` });
-        } catch (error) {
-            console.error('Failed to delete projects:', error);
+        } catch (error: any) {
+            captureError(error, { flow: 'project', phase: 'bulk_delete', extra: { count } });
+            trackProjectDeleteFailed({
+                count,
+                error: error?.message || 'Unknown error',
+                error_name: error?.name,
+                is_offline: !navigator.onLine,
+            });
         } finally {
             setIsBulkDeleting(false);
         }

@@ -33,6 +33,37 @@ export function initSentry() {
 }
 
 // ============================================
+// Generic Error Reporting
+// ============================================
+
+export interface ErrorContext {
+    flow: string;
+    phase?: string;
+    projectId?: string;
+    workspaceId?: string;
+    extra?: Record<string, unknown>;
+}
+
+/**
+ * Capture an error with structured scope tags for triage.
+ * Use in every catch block where the error is otherwise swallowed.
+ */
+export function captureError(error: unknown, ctx: ErrorContext) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    Sentry.withScope((scope) => {
+        scope.setTag('flow', ctx.flow);
+        if (ctx.phase) scope.setTag(`${ctx.flow}.phase`, ctx.phase);
+        if (ctx.projectId) scope.setTag('projectId', ctx.projectId);
+        if (ctx.workspaceId) scope.setTag('workspaceId', ctx.workspaceId);
+        scope.setExtra('isOffline', !navigator.onLine);
+        if (ctx.extra) {
+            for (const [k, v] of Object.entries(ctx.extra)) scope.setExtra(k, v);
+        }
+        Sentry.captureException(err);
+    });
+}
+
+// ============================================
 // Import Error Reporting
 // ============================================
 

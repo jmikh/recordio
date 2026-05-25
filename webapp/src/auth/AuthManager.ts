@@ -3,6 +3,8 @@ import * as Sentry from '@sentry/react';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { supabase, setUnauthorizedHandler } from '../supabase/client';
+import { captureError } from '../utils/sentry';
+import { trackSigninFailed } from '../core/analytics';
 
 // Re-export so existing callers keep working.
 export { supabase };
@@ -288,14 +290,26 @@ export class AuthManager {
             });
 
             if (error) {
-                console.error('[Auth] OAuth error:', error);
+                captureError(error, { flow: 'auth', phase: 'oauth', extra: { provider } });
+                trackSigninFailed({
+                    provider,
+                    error: error.message,
+                    error_name: error.name,
+                    is_offline: !navigator.onLine,
+                });
                 return { data: null, error };
             }
 
             // Browser will redirect automatically to the OAuth provider
             return { data, error: null };
-        } catch (error) {
-            console.error('[Auth] OAuth error:', error);
+        } catch (error: any) {
+            captureError(error, { flow: 'auth', phase: 'oauth', extra: { provider } });
+            trackSigninFailed({
+                provider,
+                error: error?.message || 'Unknown error',
+                error_name: error?.name,
+                is_offline: !navigator.onLine,
+            });
             return { data: null, error: error as Error };
         }
     }

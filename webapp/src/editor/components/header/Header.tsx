@@ -11,7 +11,8 @@ import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { useUserStore } from '../../stores/useUserStore';
 
-import { trackDownloadClicked, trackPublishClicked } from '../../../core/analytics';
+import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../core/analytics';
+import { captureError } from '../../../utils/sentry';
 import { useNonFreeAccess } from '../../../hooks/useNonFreeAccess';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
@@ -133,10 +134,16 @@ export const Header = () => {
             if (cloudVersion !== undefined) {
                 supabase.functions.invoke('mux-video-create', {
                     body: { projectId: project.id, cloudVersion },
-                }).catch(err => console.error('[Share] mux-video-create failed:', err));
+                }).catch(err => captureError(err, { flow: 'publish', phase: 'mux_create', projectId: project.id }));
             }
         } catch (e: any) {
-            console.error('[Share] Failed:', e);
+            captureError(e, { flow: 'publish', projectId: project.id });
+            trackPublishFailed({
+                project_id: project.id,
+                error: e?.message || 'Unknown error',
+                error_name: e?.name,
+                is_offline: !navigator.onLine,
+            });
             addToast({ type: 'error', title: 'Share failed', message: e?.message || 'Unknown error' });
         } finally {
             setIsSharing(false);

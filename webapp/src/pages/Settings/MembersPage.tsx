@@ -4,7 +4,8 @@ import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../editor/components/Toast';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { trackMembersPageLoaded } from '../../core/analytics';
+import { trackMembersPageLoaded, trackWorkspaceSeatsSetFailed, trackWorkspaceInviteFailed } from '../../core/analytics';
+import { captureError } from '../../utils/sentry';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
 
 const VIEWER_SEATS_PER_CREATOR = 10;
@@ -152,7 +153,13 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
             });
             if (error) throw error;
             onRoleChanged(member.user_id, role);
-        } catch {
+        } catch (err) {
+            captureError(err, {
+                flow: 'workspace',
+                phase: 'role_update',
+                workspaceId: details.id,
+                extra: { targetRole: role, targetUserId: member.user_id },
+            });
             addToast({ type: 'error', title: 'Failed to update role' });
         } finally {
             setUpdatingRole(false);
@@ -311,7 +318,15 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
                                 if (error) throw error;
                                 onSeatsUpdated(seatPicker);
                                 addToast({ type: 'success', title: `Team workspace configured with ${seatPicker} creator seats` });
-                            } catch {
+                            } catch (err: any) {
+                                captureError(err, { flow: 'workspace', phase: 'seats_set', workspaceId: details.id, extra: { seats: seatPicker } });
+                                trackWorkspaceSeatsSetFailed({
+                                    workspace_id: details.id,
+                                    seats: seatPicker,
+                                    error: err?.message || 'Unknown error',
+                                    error_name: err?.name,
+                                    is_offline: !navigator.onLine,
+                                });
                                 addToast({ type: 'error', title: 'Failed to configure seats' });
                             } finally {
                                 setSettingSeats(false);
@@ -341,6 +356,14 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
             setInviteEmail('');
             addToast({ type: 'success', title: `Invitation sent to ${inviteEmail.trim()}` });
         } catch (err: any) {
+            captureError(err, { flow: 'workspace', phase: 'invite', workspaceId: details.id, extra: { role: inviteRole } });
+            trackWorkspaceInviteFailed({
+                workspace_id: details.id,
+                role: inviteRole,
+                error: err?.message || 'Unknown error',
+                error_name: err?.name,
+                is_offline: !navigator.onLine,
+            });
             addToast({ type: 'error', title: err?.message ?? 'Failed to send invitation' });
         } finally {
             setInviting(false);
@@ -357,7 +380,8 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
             if (error) throw error;
             onMemberRemoved(userId);
             addToast({ type: 'success', title: 'Member removed' });
-        } catch {
+        } catch (err) {
+            captureError(err, { flow: 'workspace', phase: 'member_remove', workspaceId: details.id, extra: { targetUserId: userId } });
             addToast({ type: 'error', title: 'Failed to remove member' });
         } finally {
             setRemovingId(null);
@@ -373,7 +397,8 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
             if (error) throw error;
             onInvitationRescinded(invitationId);
             addToast({ type: 'success', title: `Invitation to ${email} cancelled` });
-        } catch {
+        } catch (err) {
+            captureError(err, { flow: 'workspace', phase: 'invite_rescind', workspaceId: details.id, extra: { invitationId } });
             addToast({ type: 'error', title: 'Failed to cancel invitation' });
         } finally {
             setRescindingId(null);
@@ -390,7 +415,8 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
             });
             if (error) throw error;
             addToast({ type: 'success', title: `Invitation resent to ${email}` });
-        } catch {
+        } catch (err) {
+            captureError(err, { flow: 'workspace', phase: 'invite_resend', workspaceId: details.id, extra: { role } });
             addToast({ type: 'error', title: 'Failed to resend invitation' });
         } finally {
             setResendingId(null);

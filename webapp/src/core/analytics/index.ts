@@ -125,6 +125,7 @@ export function trackGetProClicked(billingInterval: 'monthly' | 'yearly') {
 }
 
 export interface GenerateCaptionsParams {
+    project_id: string;
     segment_count: number;
     transcription_method: 'cloud' | 'local';
     success: boolean;
@@ -190,8 +191,8 @@ export function trackProjectOpened() {
     trackEvent('project_opened');
 }
 
-export function trackEditorPageLoaded(workspaceId: string | null) {
-    trackEvent('editor_page_loaded', { workspace_id: workspaceId });
+export function trackEditorPageLoaded(workspaceId: string | null, projectId: string) {
+    trackEvent('editor_page_loaded', { workspace_id: workspaceId, project_id: projectId });
 }
 
 export function trackDashboardPageLoaded(workspaceId: string | null) {
@@ -301,5 +302,117 @@ export function trackUploadMusicClicked(projectId: string) {
 
 export function trackAutocutClicked(projectId: string) {
     trackEvent('autocut_clicked', { project_id: projectId });
+}
+
+// ============================================================================
+// Failure Events (mirror Sentry captures for funnel-relevant actions)
+// ============================================================================
+
+interface BaseFailureParams {
+    error: string;
+    error_name?: string;
+    is_offline: boolean;
+}
+
+export function trackProjectLoadFailed(params: BaseFailureParams & {
+    project_id: string;
+    loading_status?: string;
+}) {
+    trackEvent('project_load_failed', params);
+}
+
+export function trackAutocutFailed(params: BaseFailureParams & { project_id: string }) {
+    trackEvent('autocut_failed', params);
+}
+
+export function trackWorkspaceCreateFailed(params: BaseFailureParams) {
+    trackEvent('workspace_create_failed', params);
+}
+
+export function trackProjectDeleteFailed(params: BaseFailureParams & {
+    project_id?: string;
+    count?: number;
+}) {
+    trackEvent('project_delete_failed', params);
+}
+
+export function trackUploadBackgroundFailed(params: BaseFailureParams & {
+    project_id: string;
+    file_size?: number;
+    file_type?: string;
+}) {
+    trackEvent('upload_background_failed', params);
+}
+
+export function trackUploadMusicFailed(params: BaseFailureParams & {
+    project_id: string;
+    file_size?: number;
+    file_type?: string;
+}) {
+    trackEvent('upload_music_failed', params);
+}
+
+export function trackWorkspaceSeatsSetFailed(params: BaseFailureParams & {
+    workspace_id: string;
+    seats: number;
+}) {
+    trackEvent('workspace_seats_set_failed', params);
+}
+
+export function trackWorkspaceInviteFailed(params: BaseFailureParams & {
+    workspace_id: string;
+    role: 'viewer' | 'creator' | 'admin';
+}) {
+    trackEvent('workspace_invite_failed', params);
+}
+
+export function trackInviteAcceptFailed(params: BaseFailureParams) {
+    trackEvent('invite_accept_failed', params);
+}
+
+export function trackCheckoutSessionFailed(params: BaseFailureParams & {
+    plan: 'pro' | 'teams';
+    interval: 'monthly' | 'yearly';
+}) {
+    trackEvent('checkout_session_failed', params);
+}
+
+export function trackSubscriptionChangeFailed(params: BaseFailureParams & {
+    workspace_id: string;
+    new_plan: 'teams';
+    new_seats: number;
+}) {
+    trackEvent('subscription_change_failed', params);
+}
+
+export function trackPublishFailed(params: BaseFailureParams & { project_id: string }) {
+    trackEvent('publish_failed', params);
+}
+
+export function trackSigninFailed(params: BaseFailureParams & {
+    provider: string;
+}) {
+    trackEvent('signin_failed', params);
+}
+
+export function trackImportPageLoaded(params: { recording_id: string | null }) {
+    trackEvent('import_page_loaded', params);
+}
+
+export function trackImportFailed(params: BaseFailureParams & {
+    recording_id: string | null;
+    phase: 'no_id' | 'extension' | 'no_workspace';
+    bridge_status?: string;
+}) {
+    trackEvent('import_failed', params);
+}
+
+export function trackProjectCreationFailed(params: BaseFailureParams & {
+    recording_id: string | null;
+    screen_video_size?: number;
+    camera_video_size?: number;
+    mic_audio_size?: number;
+}) {
+    trackEvent('project_creation_failed', params);
 }
 

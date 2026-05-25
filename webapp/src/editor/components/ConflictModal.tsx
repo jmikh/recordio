@@ -6,6 +6,7 @@ import { useProjectStore } from '../stores/useProjectStore';
 import { useUserStore } from '../stores/useUserStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { navigate } from '../../navigate';
+import { captureError } from '../../utils/sentry';
 import { TbCloudDown, TbCloudUp } from 'react-icons/tb';
 
 /**
@@ -35,7 +36,7 @@ export function ConflictModal() {
             }
             afterResolve();
         } catch (err) {
-            console.error('[ConflictModal] Failed to load cloud version:', err);
+            captureError(err, { flow: 'conflict', phase: 'load_cloud', projectId: conflict.projectId });
         } finally {
             setLoading(null);
         }
@@ -52,7 +53,7 @@ export function ConflictModal() {
             }
             afterResolve();
         } catch (err) {
-            console.error('[ConflictModal] Failed to overwrite cloud version:', err);
+            captureError(err, { flow: 'conflict', phase: 'overwrite', projectId: conflict.projectId });
         } finally {
             setLoading(null);
         }

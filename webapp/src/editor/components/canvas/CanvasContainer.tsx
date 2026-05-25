@@ -3,6 +3,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
+import { captureError } from '../../../utils/sentry';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
@@ -332,7 +333,9 @@ export const CanvasContainer = () => {
                     offscreen.height = thumbH;
                     offscreen.getContext('2d')!.drawImage(canvas, 0, 0, thumbW, thumbH);
                     offscreen.toBlob((blob) => {
-                        if (blob) CloudProjectService.saveThumbnail(project.id, blob).catch(console.warn);
+                        if (blob) CloudProjectService.saveThumbnail(project.id, blob).catch(err =>
+                            captureError(err, { flow: 'thumbnail_save', projectId: project.id })
+                        );
                     }, 'image/webp', 0.8);
                 }
             };

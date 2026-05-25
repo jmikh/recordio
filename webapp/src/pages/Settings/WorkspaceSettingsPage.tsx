@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useUserStore } from '../../editor/stores/useUserStore';
 import { useToast } from '../../editor/components/Toast';
 import { navigate } from '../../navigate';
+import { captureError } from '../../utils/sentry';
 import { GeneralPage } from './GeneralPage';
 import { MembersPage } from './MembersPage';
 import { BillingPage } from './BillingPage';
@@ -39,7 +40,8 @@ export function WorkspaceSettingsPage() {
                 const { data, error } = await supabase!.rpc('workspace_get', { p_workspace_id: workspaceId });
                 if (!error && data) setDetails(data as WorkspaceDetails);
                 else addToast({ type: 'error', title: 'Failed to load workspace' });
-            } catch {
+            } catch (err) {
+                captureError(err, { flow: 'workspace', phase: 'load', workspaceId: workspaceId ?? undefined });
                 addToast({ type: 'error', title: 'Failed to load workspace' });
             } finally {
                 setLoading(false);

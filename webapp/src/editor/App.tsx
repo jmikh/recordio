@@ -24,7 +24,8 @@ import { AuthModal } from './components/header/AuthModal';
 
 import { useUserStore } from './stores/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
-import { trackEditorPageLoaded } from '../core/analytics';
+import { trackEditorPageLoaded, trackProjectLoadFailed } from '../core/analytics';
+import { captureError } from '../utils/sentry';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { navigate } from '../navigate';
 import { usePendingUploadStore } from '../storage/pendingUploadStore';
@@ -126,21 +127,32 @@ function Editor() {
 
                 loadProject(result.project, result.name);
                 setIsLoading(false);
-                trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId);
+                trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId, projectId);
 
                 // Load asset library in background (non-blocking)
-                useAssetLibraryStore.getState().load().catch(console.error);
+                useAssetLibraryStore.getState().load().catch(err =>
+                    captureError(err, { flow: 'asset_library', phase: 'load' })
+                );
 
 
-            } catch (err) {
+            } catch (err: any) {
                 if (cancelled) return;
-                console.error('[Editor] Project init failed:', err);
-                console.error('[Editor] loadingStatus at catch time:', loadingStatus);
+                captureError(err, {
+                    flow: 'project_load',
+                    phase: loadingStatus,
+                    projectId,
+                });
+                trackProjectLoadFailed({
+                    project_id: projectId,
+                    error: err?.message || 'Unknown error',
+                    error_name: err?.name,
+                    is_offline: !navigator.onLine,
+                    loading_status: loadingStatus,
+                });
                 if (loadingStatus.includes('media') || loadingStatus.includes('Loading Project')) {
                     setLoadError('Could not load project media. Please contact support.');
                     setIsLoading(false);
                 } else {
-                    console.error('[Editor] Treating as "project not found" because loadingStatus does not indicate media phase');
                     navigate(`/?error=${encodeURIComponent('Project not found')}`, { replace: true });
                 }
             }

@@ -4,6 +4,7 @@ import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../editor/components/Toast';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { trackGeneralSettingsPageLoaded } from '../../core/analytics';
+import { captureError } from '../../utils/sentry';
 import type { WorkspaceDetails } from './types';
 
 export function GeneralPage({ details, isAdmin, onRenamed }: {
@@ -28,7 +29,8 @@ export function GeneralPage({ details, isAdmin, onRenamed }: {
             if (error) throw error;
             onRenamed(data.name);
             addToast({ type: 'success', title: `Workspace renamed to "${data.name}"` });
-        } catch {
+        } catch (err) {
+            captureError(err, { flow: 'workspace', phase: 'rename', workspaceId: details.id });
             addToast({ type: 'error', title: 'Failed to rename workspace' });
         } finally {
             setSaving(false);
