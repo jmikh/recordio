@@ -8,7 +8,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../Toast';
 import { useLocalRender } from './useLocalRender';
 import type { CloudRenderPhase } from './useCloudRender';
-import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderCompleted, trackRenderFailed } from '../../../core/analytics';
+import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../core/analytics';
 
 function formatDurationLabel(ms: number): string {
     const totalSeconds = Math.round(ms / 1000);
@@ -327,7 +327,7 @@ function LocalRenderView({
                 if (result.success) {
                     addToast({ type: 'success', title: 'Export complete' });
                     const renderDurationS = Math.round((performance.now() - renderStartRef.current) / 1000);
-                    trackRenderCompleted({
+                    trackRenderLocallyCompleted({
                         project_id: project.id,
                         video_duration_s: Math.round(project.timeline.durationMs / 1000),
                         render_duration_s: renderDurationS,
@@ -336,7 +336,17 @@ function LocalRenderView({
                     });
                     onClose();
                 } else if (result.error) {
-                    trackRenderFailed({ project_id: project.id, error: result.error });
+                    trackRenderLocallyFailed({
+                        project_id: project.id,
+                        error: result.error,
+                        error_name: result.errorName,
+                        error_stack: result.errorStack,
+                        phase: result.phase,
+                        is_offline: !navigator.onLine,
+                        video_duration_s: Math.round(project.timeline.durationMs / 1000),
+                        input_resolution: `${project.screenSource.size.width}x${project.screenSource.size.height}`,
+                        output_resolution: `${project.settings.outputSize.width}x${project.settings.outputSize.height}`,
+                    });
                     addToast({ type: 'error', title: 'Export failed', message: result.error });
                     onBack();
                 }

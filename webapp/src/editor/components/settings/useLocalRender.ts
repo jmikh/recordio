@@ -20,7 +20,15 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
     const exportRef = useRef<ExportManager | null>(null);
 
     const startOrCancel = useCallback(async (): Promise<
-        { success: true; message: string } | { success: false; error: string | null }
+        | { success: true; message: string }
+        | { success: false; error: null }
+        | {
+            success: false;
+            error: string;
+            errorName?: string;
+            errorStack?: string;
+            phase: 'loading_sounds' | 'exporting' | 'downloading';
+        }
     > => {
         if (isLocalRendering) {
             exportRef.current?.cancel();
@@ -32,6 +40,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
         const exportManager = new ExportManager();
         exportRef.current = exportManager;
 
+        let phase: 'loading_sounds' | 'exporting' | 'downloading' = 'loading_sounds';
         try {
             const [clickBuffer, dragBuffers] = await Promise.all([
                 getClickSoundBuffer(),
@@ -60,6 +69,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             // Runtime store strips userEvents from project — reconstruct full project
             const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
 
+            phase = 'exporting';
             const result = await exportManager.exportProject(
                 fullProject,
                 '1080p',
@@ -69,7 +79,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
                 projectName,
             );
 
-            // Download the blob
+            phase = 'downloading';
             const url = URL.createObjectURL(result.blob!);
             const a = document.createElement('a');
             a.href = url;
@@ -85,7 +95,13 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             if (e?.message === 'Export cancelled') {
                 return { success: false, error: null };
             }
-            return { success: false, error: e?.message || 'Unknown error' };
+            return {
+                success: false,
+                error: e?.message || 'Unknown error',
+                errorName: e?.name,
+                errorStack: typeof e?.stack === 'string' ? e.stack.split('\n').slice(0, 5).join('\n') : undefined,
+                phase,
+            };
         } finally {
             setIsLocalRendering(false);
             setLocalRenderProgress(null);

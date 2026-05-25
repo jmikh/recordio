@@ -1,52 +1,11 @@
-import { createClient, type Session } from '@supabase/supabase-js';
+import { type Session } from '@supabase/supabase-js';
 import * as Sentry from '@sentry/react';
 import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { supabase, setUnauthorizedHandler } from '../supabase/client';
 
-// These will be set via environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-/** Prevents re-entrant sign-out calls from the fetch interceptor. */
-let isSigningOutDueToAuth = false;
-
-/**
- * Intercepts Supabase fetch calls:
- * - On 401 (invalid/expired token), signs out so the UI shows the login screen.
- * - On RPC failures, reports to Sentry.
- */
-const sentryFetch: typeof fetch = async (url, options) => {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-        const urlStr = url.toString();
-
-        // 401 on a non-auth endpoint means the server rejected our token.
-        // Sign out asynchronously so onAuthStateChange fires and the UI reacts.
-        if (response.status === 401 && !urlStr.includes('/auth/v1/') && !isSigningOutDueToAuth) {
-            isSigningOutDueToAuth = true;
-            console.warn('[Auth] 401 received — session invalid, signing out');
-            Promise.resolve().then(() =>
-                AuthManager.signOut().finally(() => { isSigningOutDueToAuth = false; })
-            );
-        }
-
-        const rpcMatch = urlStr.match(/\/rpc\/([^?]+)/);
-        if (rpcMatch) {
-            const rpcName = rpcMatch[1];
-            const body = await response.clone().json().catch(() => ({}));
-            console.warn(`[Auth] RPC failed: ${rpcName}`, { status: response.status, body });
-            Sentry.captureException(new Error(`RPC failed: ${rpcName}`), {
-                extra: { rpcName, status: response.status, body },
-            });
-        }
-    }
-    return response;
-};
-
-// Create Supabase client (only if env vars are set)
-export const supabase = supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: sentryFetch } })
-    : null;
+// Re-export so existing callers keep working.
+export { supabase };
 
 /** Cache a remote avatar URL as a data URL to avoid CORS issues on reload */
 async function cacheAvatarUrl(url: string): Promise<string | null> {
@@ -174,6 +133,8 @@ export class AuthManager {
             AuthManager.readyResolve();
             return;
         }
+
+        setUnauthorizedHandler(() => AuthManager.signOut());
 
         let firstEvent = true;
         supabase.auth.onAuthStateChange((event, session) => {

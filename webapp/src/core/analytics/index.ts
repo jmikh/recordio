@@ -1,9 +1,3 @@
-/**
- * @fileoverview Analytics Integration (Mixpanel)
- *
- * ⚠️  When adding or modifying events/properties, update ./mixpanel-events.md
- */
-
 import mixpanel from 'mixpanel-browser';
 
 // ============================================================================
@@ -96,6 +90,10 @@ export function identifyExtensionUser(extensionDistinctId: string) {
 // ============================================================================
 
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
+    if (!IS_PRODUCTION) {
+        console.log(`[Analytics] ${eventName}`, params);
+        return;
+    }
     try {
         if (!mixpanelReady) {
             console.warn(`[Analytics] Mixpanel not ready, dropping event: ${eventName}`);
@@ -252,21 +250,45 @@ export function trackPublishClicked(projectId: string) {
     trackEvent('publish_clicked', { project_id: projectId });
 }
 
-export function trackRenderCompleted(params: {
+interface RenderCompletedParams {
     project_id: string;
     video_duration_s: number;
     render_duration_s: number;
     input_resolution: string;
     output_resolution: string;
-}) {
-    trackEvent('render_completed', params);
 }
 
-export function trackRenderFailed(params: {
+export function trackRenderLocallyCompleted(params: RenderCompletedParams) {
+    trackEvent('render_locally_completed', params);
+}
+
+export function trackRenderInCloudCompleted(params: RenderCompletedParams) {
+    trackEvent('render_in_cloud_completed', params);
+}
+
+interface RenderFailedBaseParams {
     project_id: string;
     error: string;
+    error_name?: string;
+    error_stack?: string;
+    is_offline: boolean;
+    video_duration_s?: number;
+    input_resolution?: string;
+    output_resolution?: string;
+}
+
+export function trackRenderLocallyFailed(params: RenderFailedBaseParams & {
+    phase: 'loading_sounds' | 'exporting' | 'downloading';
 }) {
-    trackEvent('render_failed', params);
+    trackEvent('render_locally_failed', params);
+}
+
+export function trackRenderInCloudFailed(params: RenderFailedBaseParams & {
+    phase: 'saving_project' | 'creating_job' | 'polling_status' | 'server_render' | 'downloading';
+    job_status?: string;
+    http_status?: number;
+}) {
+    trackEvent('render_in_cloud_failed', params);
 }
 
 export function trackUploadBackgroundClicked(projectId: string) {
