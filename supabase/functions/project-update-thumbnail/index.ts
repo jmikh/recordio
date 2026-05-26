@@ -28,7 +28,7 @@ const s3 = new S3Client({
  * Request:  multipart/form-data with fields: projectId, file (blob)
  * Response: { storagePath }
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('project-update-thumbnail', async (req, { user }) => {
     const formData = await req.formData();
     const projectId = formData.get('projectId') as string;
     const file = formData.get('file') as File | null;

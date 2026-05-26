@@ -49,7 +49,7 @@ const adminSupabase = createClient(
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 );
 
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('asset-create', async (req, { user }) => {
     const { assetType, sizeBytes, fileName } = await req.json();
 
     // 1. Validate inputs

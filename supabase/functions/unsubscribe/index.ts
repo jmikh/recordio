@@ -132,7 +132,7 @@ serve(async (req) => {
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('[Unsubscribe] Error:', message);
-        await captureException(err, { function: 'unsubscribe' });
+        await captureException(err, 'unsubscribe');
         return new Response(
             confirmationPage(false, 'Something unexpected happened. Please try again.'),
             { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } },

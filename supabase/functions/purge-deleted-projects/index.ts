@@ -90,7 +90,7 @@ serve(withBoundary('purge-deleted-projects', async (req) => {
             // Per-project catch so one bad row doesn't kill the batch.
             // Report each failure; row will be retried on the next cron run.
             failed++;
-            await captureException(err, { function: 'purge-deleted-projects', projectId: project.id });
+            await captureException(err, 'purge-deleted-projects', { projectId: project.id });
         }
     }
 

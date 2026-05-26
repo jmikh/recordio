@@ -13,6 +13,7 @@ import { useUserStore } from '../editor/stores/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useNonFreeAccess } from '../hooks/useNonFreeAccess';
 import { AuthManager, supabase } from '../auth/AuthManager';
+import { switchWorkspace } from '../workspace/switchWorkspace';
 
 import { SupportModal } from '../components/SupportModal';
 import { AuthModal } from '../editor/components/header/AuthModal';
@@ -219,31 +220,7 @@ export function DashboardPage() {
     const handleSwitchWorkspace = async (newWorkspaceId: string) => {
         const ws = workspaceList.find(w => w.id === newWorkspaceId);
         if (!ws) return;
-        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.seats);
-        // Persist as default workspace for next login
-        if (supabase) supabase.rpc('workspace_set_default', { p_workspace_id: newWorkspaceId }).then();
-        // Reload subscription for the new workspace
-        if (supabase) {
-            const { data } = await supabase.rpc('subscription_get', { p_workspace_id: newWorkspaceId });
-            const { setSubscription } = useWorkspaceStore.getState();
-            if (data) {
-                setSubscription({
-                    status: data.status,
-                    plan: data.plan ?? 'pro',
-                    currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
-                    cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
-                    billingInterval: data.billing_interval || null,
-                    seats: data.seats ?? null,
-                    stripeCustomerId: data.stripe_customer_id ?? null,
-                }, userId ?? undefined);
-            } else {
-                setSubscription({
-                    status: null, plan: 'pro', currentPeriodEnd: null,
-                    cancelAtPeriodEnd: false, billingInterval: null,
-                    seats: null, stripeCustomerId: null,
-                }, userId ?? undefined);
-            }
-        }
+        await switchWorkspace(ws, userId);
         // Projects reload automatically via the workspaceId effect
     };
 

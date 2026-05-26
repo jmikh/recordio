@@ -25,7 +25,7 @@ const s3 = new S3Client({
  * Request body: { storagePaths: string[] }
  * Response:     { signedUrls: Record<string, string> }
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('storage-download-urls', async (req, { user }) => {
     const { storagePaths } = await req.json();
 
     if (!Array.isArray(storagePaths) || storagePaths.length === 0) {

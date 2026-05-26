@@ -35,7 +35,7 @@ const EXT_MAP: Record<string, string> = {
  * Request:  { project, name?, workspaceId }
  * Response: { projectId, uploads: [{ fileType, storagePath, signedUrl }] }
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('project-create', async (req, { user }) => {
     // deno-lint-ignore no-explicit-any
     const { project, name, workspaceId } = await req.json() as { project: any; name?: string; workspaceId?: string };
 

@@ -14,11 +14,6 @@ interface WorkspaceDropdownProps {
     onOpenSettings: () => void;
 }
 
-function roleLabel(role: string | null, isOwner: boolean): string {
-    if (isOwner) return 'owner';
-    return role ?? '';
-}
-
 export function WorkspaceDropdown({
     workspaces,
     currentWorkspaceId,
@@ -80,31 +75,24 @@ export function WorkspaceDropdown({
                     style={{ top: menuPos.top, left: menuPos.left, minWidth: Math.max(menuPos.width, 200) }}
                 >
                     {/* Workspace list */}
-                    {workspaces.map(ws => {
-                        const wsIsOwner = !!currentUserId && currentUserId === ws.owner_id;
-                        const wsRole    = roleLabel(ws.role, wsIsOwner);
-                        return (
-                            <button
-                                key={ws.id}
-                                type="button"
-                                onClick={() => {
-                                    setOpen(false);
-                                    if (ws.id !== currentWorkspaceId) onSwitch(ws.id);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                            >
-                                <div className="flex flex-col flex-1 min-w-0 text-left">
-                                    <span className="truncate">{ws.name}</span>
-                                    {wsRole && (
-                                        <span className="text-[10px] text-text-muted capitalize">{wsRole}</span>
-                                    )}
-                                </div>
-                                {ws.id === currentWorkspaceId && (
-                                    <LuCheck className="icon-sm text-primary shrink-0" />
-                                )}
-                            </button>
-                        );
-                    })}
+                    {workspaces.map(ws => (
+                        <button
+                            key={ws.id}
+                            type="button"
+                            onClick={() => {
+                                setOpen(false);
+                                if (ws.id !== currentWorkspaceId) onSwitch(ws.id);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
+                        >
+                            <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <span className="truncate">{ws.name}</span>
+                            </div>
+                            {ws.id === currentWorkspaceId && (
+                                <LuCheck className="icon-sm text-primary shrink-0" />
+                            )}
+                        </button>
+                    ))}
 
                     <div className="h-px bg-border my-1" />
 

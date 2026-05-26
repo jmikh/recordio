@@ -33,7 +33,7 @@ type RawHandler = (req: Request) => Promise<Response>;
  * a catch-all error handler. The inner handler receives the authenticated
  * user and a user-scoped Supabase client.
  */
-export function withAuth(handler: AuthHandler): RawHandler {
+export function withAuth(name: string, handler: AuthHandler): RawHandler {
     return async (req: Request) => {
         if (req.method === 'OPTIONS') {
             return new Response('ok', { headers: corsHeaders });
@@ -44,7 +44,7 @@ export function withAuth(handler: AuthHandler): RawHandler {
         try {
             const authHeader = req.headers.get('Authorization');
             if (!authHeader) {
-                console.error('[withAuth] No Authorization header');
+                console.error(`[${name}] No Authorization header`);
                 return errorResponse('Unauthorized', 401);
             }
 
@@ -56,15 +56,15 @@ export function withAuth(handler: AuthHandler): RawHandler {
 
             const { data: { user }, error: authError } = await supabase.auth.getUser();
             if (authError || !user) {
-                console.error('[withAuth] auth.getUser() failed:', authError?.message ?? 'no user');
+                console.error(`[${name}] auth.getUser() failed:`, authError?.message ?? 'no user');
                 return errorResponse('Unauthorized', 401);
             }
 
             userId = user.id;
             return await handler(req, { user, supabase });
         } catch (err) {
-            console.error(`[withAuth] Unexpected error:`, err);
-            await captureException(err, userId ? { userId } : undefined);
+            console.error(`[${name}] Unexpected error:`, err);
+            await captureException(err, name, userId ? { userId } : undefined);
             return errorResponse('Internal server error', 500);
         }
     };
@@ -87,7 +87,7 @@ export function withBoundary(name: string, handler: RawHandler): RawHandler {
             return await handler(req);
         } catch (err) {
             console.error(`[${name}] Unexpected error:`, err);
-            await captureException(err, { function: name });
+            await captureException(err, name);
             return errorResponse('Internal server error', 500);
         }
     };

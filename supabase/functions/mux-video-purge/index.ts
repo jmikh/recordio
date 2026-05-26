@@ -74,7 +74,7 @@ serve(withBoundary('mux-video-purge', async (req) => {
         } catch (err) {
             // Per-row catch so one bad row doesn't kill the batch.
             // Report each to Sentry; row is left for next run.
-            await captureException(err, { function: 'mux-video-purge', muxVideoId: row.id });
+            await captureException(err, 'mux-video-purge', { muxVideoId: row.id });
         }
     }
 

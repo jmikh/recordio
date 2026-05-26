@@ -31,7 +31,7 @@ const PRICE_IDS: Record<string, string> = {
  *   - Seat additions / plan upgrades: charged immediately
  *   - Seat reductions: credit applied to next invoice
  */
-serve(withAuth(async (req, { supabase }) => {
+serve(withAuth('subscription-change', async (req, { supabase }) => {
     const { workspaceId, newPlan, newSeats, newInterval, dryRun } = await req.json();
 
     if (!workspaceId)                              return errorResponse('Missing workspaceId', 400);

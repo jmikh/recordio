@@ -249,20 +249,12 @@ export class CloudProjectService {
         }
         console.log('[CloudProjectService.loadProject] Got metadata:', { upload_status: cloudProject.upload_status, cloud_version: cloudProject.cloud_version, user_id: cloudProject.user_id });
 
-        // Reject projects that haven't finished uploading media — unless
-        // blobs are available locally (cached by importRecordingLocal or
-        // a previous download). BlobCache is the durable signal; the
-        // ephemeral pendingUploadStore can be cleared by concurrent ops.
+        // Projects only ever reach the editor after ImportPage has fully
+        // uploaded media and confirmed upload_status='ready'. A 'pending'
+        // status here means an old, orphaned project — reject it.
         if (cloudProject.upload_status !== 'ready') {
-            const rawProject = cloudProject.project_data as Project;
-            const screenPath = rawProject.screenSource?.storagePath;
-            const hasCachedMedia = screenPath ? await BlobCache.has(screenPath) : false;
-            const { usePendingUploadStore } = await import('./pendingUploadStore');
-            const hasPendingUpload = usePendingUploadStore.getState().pending?.projectId === projectId;
-            if (!hasCachedMedia && !hasPendingUpload) {
-                console.log('[CloudProjectService.loadProject] Rejecting pending project: no cached media and no pending upload');
-                return null;
-            }
+            console.log('[CloudProjectService.loadProject] Rejecting project with non-ready upload_status:', cloudProject.upload_status);
+            return null;
         }
 
         const rawProject = cloudProject.project_data as Project;

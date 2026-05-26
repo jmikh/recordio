@@ -7,6 +7,7 @@ import { useToast } from '../../editor/components/Toast';
 import { navigate } from '../../navigate';
 import { captureError } from '../../utils/sentry';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
+import { switchWorkspace } from '../../workspace/switchWorkspace';
 import { GeneralPage } from './GeneralPage';
 import { MembersPage } from './MembersPage';
 import { BillingPage } from './BillingPage';
@@ -63,9 +64,7 @@ export function WorkspaceSettingsPage() {
     const handleSwitchWorkspace = async (newWorkspaceId: string) => {
         const ws = workspaceList.find(w => w.id === newWorkspaceId);
         if (!ws) return;
-        setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.seats);
-        if (supabase) supabase.rpc('workspace_set_default', { p_workspace_id: newWorkspaceId }).then();
-        navigate('/');
+        await switchWorkspace(ws, userId);
     };
 
     const handleRenamed = (name: string) => {

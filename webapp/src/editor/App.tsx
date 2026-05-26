@@ -28,8 +28,6 @@ import { trackEditorPageLoaded, trackProjectLoadFailed } from '../core/analytics
 import { captureError } from '../utils/sentry';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { navigate } from '../navigate';
-import { usePendingUploadStore } from '../storage/pendingUploadStore';
-import { useBackgroundUpload } from '../hooks/useBackgroundUpload';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -51,17 +49,7 @@ function Editor() {
     const [needsAuth, setNeedsAuth] = useState(false);
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
 
-    // Background upload: kicks off media upload for freshly imported projects
-    const projectId = new URLSearchParams(window.location.search).get('projectId');
     const saveProject = useProjectStore(s => s.saveProject);
-    const { retry: retryUpload } = useBackgroundUpload(projectId, () => {
-        // Upload complete — flush any buffered edits.
-        // Guard: only save if the real project is loaded in the store
-        // (upload can finish before loadProject completes on fast local S3).
-        if (useProjectStore.getState().project.id === projectId) {
-            saveProject();
-        }
-    });
 
 
     // Once user signs in after being prompted, reload the project
@@ -109,12 +97,7 @@ function Editor() {
             }
 
             try {
-                // If we just imported this project, blob URLs are already set
-                // in useMediaUrlStore by importRecordingLocal — don't revoke them.
-                const hasPendingUpload = usePendingUploadStore.getState().pending?.projectId === projectId;
-                if (!hasPendingUpload) {
-                    useMediaUrlStore.getState().revokeAll();
-                }
+                useMediaUrlStore.getState().revokeAll();
 
                 const result = await CloudProjectService.loadProject(projectId, setLoadingStatus);
 
@@ -336,7 +319,7 @@ function Editor() {
             </div>
 
             <ConflictModal />
-            <SyncFailedModal onRetry={retryUpload} />
+            <SyncFailedModal onRetry={() => { saveProject(); }} />
         </div>
     );
 }

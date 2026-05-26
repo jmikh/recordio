@@ -32,7 +32,7 @@ const s3 = new S3Client({
  * 4. Calls OpenAI Whisper API
  * 5. Returns word-level caption segments
  */
-serve(withAuth(async (req, { supabase }) => {
+serve(withAuth('transcribe', async (req, { supabase }) => {
     const { projectId } = await req.json();
 
     if (!projectId || typeof projectId !== 'string') {

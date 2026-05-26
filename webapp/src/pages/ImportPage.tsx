@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
 import { CloudProjectService } from '../storage/cloudProjectService';
-import { usePendingUploadStore } from '../storage/pendingUploadStore';
+import { useSyncStatusStore } from '../storage/syncStatusStore';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../core/analytics';
 import { useUserStore } from '../editor/stores/useUserStore';
@@ -28,6 +28,7 @@ export function ImportPage() {
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
     const [hasStarted, setHasStarted] = useState(false);
     const [uploadPhase, setUploadPhase] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     // Auth modal state
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -124,8 +125,12 @@ export function ImportPage() {
     async function performUpload() {
         if (!state.recording || !state.screenVideo) return;
 
+        // Reset any lingering sync-error state from a previous attempt
+        useSyncStatusStore.getState().setIdle();
+
         setStatus('uploading');
         setUploadPhase('Saving project...');
+        setUploadProgress(0);
 
         // Tell extension which user this is so its events share the same Mixpanel distinct_id.
         // The extension aliases its anonymous UUID to the email and switches going forward.
@@ -156,7 +161,7 @@ export function ImportPage() {
         }
 
         try {
-            // Fast local import: create project on server, get signed URLs + blob URLs
+            // 1. Create project on server, get signed upload URLs, cache blobs locally
             const { project, uploads } = await CloudProjectService.importRecordingLocal(
                 state.recording,
                 state.screenVideo,
@@ -165,22 +170,32 @@ export function ImportPage() {
                 state.micAudio || undefined,
             );
 
-            // Store blobs + signed URLs for background upload in editor
-            usePendingUploadStore.getState().setPending({
-                projectId: project.id,
-                screenBlob: state.screenVideo,
-                cameraBlob: state.cameraVideo || undefined,
-                micBlob: state.micAudio || undefined,
-                uploads,
-            });
+            // 2. Upload media to cloud — block until all blobs are uploaded
+            //    and project_confirm_upload flips upload_status to 'ready'.
+            setUploadPhase('Uploading media...');
+            const blobs: { fileType: string; blob: Blob }[] = [
+                { fileType: 'screen', blob: state.screenVideo },
+            ];
+            if (state.cameraVideo) blobs.push({ fileType: 'camera', blob: state.cameraVideo });
+            if (state.micAudio) blobs.push({ fileType: 'mic', blob: state.micAudio });
 
+            await CloudProjectService.uploadMedia(
+                project.id,
+                uploads,
+                blobs,
+                (_phase, fraction) => {
+                    // uploadMedia tracks min progress across files via syncStatusStore;
+                    // for the import UI use the aggregate fraction directly.
+                    const { currentUpload } = useSyncStatusStore.getState();
+                    setUploadProgress(Math.round((currentUpload?.progress ?? fraction) * 100));
+                },
+            );
+
+            // 3. All media uploaded and confirmed — safe to open the editor.
+            setUploadProgress(100);
             setStatus('success');
             confirmHandoff(project.id);
-
-            // --- Analytics: project_created ---
             trackProjectCreatedSuccess(project);
-
-            // Navigate to editor immediately — upload continues in background
             navigate(`/editor?projectId=${project.id}`);
         } catch (error: any) {
             console.error('[ImportPage] Import failed:', error);
@@ -308,10 +323,12 @@ export function ImportPage() {
     const isError = status.startsWith('error');
     const progress = state.progress;
 
-    // Progress: streaming progress from extension bridge
-    const progressPercent = (progress && progress.totalBytes > 0)
+    // Progress: streaming progress from extension bridge during streaming,
+    // then media-upload progress during upload.
+    const streamingPercent = (progress && progress.totalBytes > 0)
         ? Math.round((progress.bytesReceived / progress.totalBytes) * 100)
         : 0;
+    const progressPercent = status === 'uploading' ? uploadProgress : streamingPercent;
 
     return (
         <div className="min-h-screen bg-surface-body text-text-main flex flex-col items-center justify-center">
@@ -342,22 +359,31 @@ export function ImportPage() {
                             {progressPercent}%
                         </div>
 
-                        {status === 'uploading' && (
+                        {status === 'uploading' && uploadPhase && (
                             <div className="mt-3 text-xs text-text-muted">
-                                Preparing project...
+                                {uploadPhase}
                             </div>
                         )}
                     </div>
                 )}
 
                 {isError && (
-                    <Button
-                        variant="ghost"
-                        onClick={() => navigate('/')}
-                        className="mt-4"
-                    >
-                        Go to Dashboard
-                    </Button>
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                        {status === 'error-upload' && state.recording && state.screenVideo && (
+                            <Button
+                                variant="primary"
+                                onClick={() => performUpload()}
+                            >
+                                Retry upload
+                            </Button>
+                        )}
+                        <Button
+                            variant="ghost"
+                            onClick={() => navigate('/')}
+                        >
+                            Go to Dashboard
+                        </Button>
+                    </div>
                 )}
             </div>
 

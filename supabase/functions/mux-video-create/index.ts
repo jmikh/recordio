@@ -19,7 +19,7 @@ const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!;
  * Request body: { projectId, cloudVersion }
  * Response:     { status, muxVideoId? }
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('mux-video-create', async (req, { user }) => {
     const { projectId, cloudVersion } = await req.json();
     if (!projectId) {
         return errorResponse('Missing projectId', 400);

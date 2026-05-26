@@ -27,7 +27,7 @@ const PRICE_IDS: Record<string, string> = {
  * - seats: number (Teams only, defaults to 5)
  * - workspaceId: UUID of the workspace being upgraded
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('stripe-checkout', async (req, { user }) => {
     const { userId, userEmail, plan = 'pro', interval = 'yearly', workspaceId, seats = 5, successUrl, cancelUrl } = await req.json();
 
     if (userId !== user.id) {

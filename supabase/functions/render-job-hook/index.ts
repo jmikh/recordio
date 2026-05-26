@@ -89,7 +89,7 @@ serve(withBoundary('render-job-hook', async (req) => {
         if (status === 'failed') {
             // Worker-reported failure: capture as a domain event, don't throw (the
             // hook itself succeeded, the render didn't).
-            await captureException(new Error(errorMsg ?? 'Render job failed'), { function: 'render-job-hook', jobId });
+            await captureException(new Error(errorMsg ?? 'Render job failed'), 'render-job-hook', { jobId });
         }
         await adminSupabase.rpc('render_job_complete', {
             p_job_id: jobId,
@@ -119,8 +119,8 @@ serve(withBoundary('render-job-hook', async (req) => {
                 if (!result.success) {
                     // Capture but don't throw — uploadToMux already marked the mux_video
                     // failed in the DB. Returning 200 keeps the worker happy.
-                    await captureException(new Error(result.error ?? 'Mux upload failed'), {
-                        function: 'render-job-hook', muxVideoId: pendingMux.id,
+                    await captureException(new Error(result.error ?? 'Mux upload failed'), 'render-job-hook', {
+                        muxVideoId: pendingMux.id,
                     });
                 }
             }

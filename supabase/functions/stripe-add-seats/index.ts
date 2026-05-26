@@ -20,7 +20,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
  * Request body: { workspaceId, additionalSeats }
  * Response:     { seats } — new total seat count
  */
-serve(withAuth(async (req, { user }) => {
+serve(withAuth('stripe-add-seats', async (req, { user }) => {
     const { workspaceId, additionalSeats } = await req.json();
 
     if (!workspaceId) return errorResponse('Missing workspaceId', 400);

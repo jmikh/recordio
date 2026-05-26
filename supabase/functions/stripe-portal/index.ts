@@ -7,7 +7,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
     httpClient: Stripe.createFetchHttpClient(),
 });
 
-serve(withAuth(async (req, { supabase }) => {
+serve(withAuth('stripe-portal', async (req, { supabase }) => {
     const { returnUrl, workspaceId } = await req.json();
 
     if (!workspaceId) return errorResponse('Missing workspaceId', 400);
