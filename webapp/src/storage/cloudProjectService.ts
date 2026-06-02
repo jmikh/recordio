@@ -227,6 +227,159 @@ export class CloudProjectService {
         }
     }
 
+    // ─── Import / Upload (v2 — S3 multipart) ─────────────────
+
+    /**
+     * v2 of importRecordingLocal — uses the project-create-v2 edge function,
+     * which initiates S3 multipart uploads. Upload is direct-to-S3 with parts
+     * in parallel, avoiding the Cloudflare 524 timeout that single-PUT uploads
+     * hit on long recordings.
+     */
+    static async importRecordingLocalV2(
+        recording: RawRecording,
+        screenBlob: Blob,
+        workspaceId: string,
+        cameraBlob?: Blob,
+        micBlob?: Blob,
+    ): Promise<{
+        project: Project;
+        name: string;
+        partSize: number;
+        uploads: { fileType: string; storagePath: string; uploadId: string; partUrls: string[] }[];
+    }> {
+        const projectId = recording.id;
+
+        const screenSource = { ...recording.screenSource, storagePath: '' };
+        const cameraSource = recording.cameraSource && cameraBlob
+            ? { ...recording.cameraSource, storagePath: '' }
+            : undefined;
+        const microphoneSource = recording.microphoneSource && micBlob
+            ? { ...recording.microphoneSource, storagePath: '' }
+            : undefined;
+
+        const project = ProjectImpl.createFromSource(
+            projectId, screenSource, recording.userEvents,
+            cameraSource, microphoneSource,
+        );
+
+        let name = recording.name || 'New Project';
+        if (name.length > 40) name = name.substring(0, 37) + '...';
+
+        const fileSizes: Record<string, number> = { screen: screenBlob.size };
+        if (cameraBlob) fileSizes.camera = cameraBlob.size;
+        if (micBlob) fileSizes.mic = micBlob.size;
+
+        const { partSize, uploads } = await CloudStorage.createProjectV2(project, name, workspaceId, fileSizes);
+
+        const pathMap = new Map(uploads.map(u => [u.fileType, u.storagePath]));
+        if (pathMap.has('screen')) project.screenSource.storagePath = pathMap.get('screen')!;
+        if (pathMap.has('camera') && project.cameraSource) project.cameraSource.storagePath = pathMap.get('camera')!;
+        if (pathMap.has('mic') && project.microphoneSource) project.microphoneSource.storagePath = pathMap.get('mic')!;
+
+        const { setUrl } = useMediaUrlStore.getState();
+        await BlobCache.put(project.screenSource.storagePath, screenBlob);
+        setUrl(project.screenSource.storagePath, URL.createObjectURL(screenBlob));
+        if (project.cameraSource && cameraBlob) {
+            await BlobCache.put(project.cameraSource.storagePath, cameraBlob);
+            setUrl(project.cameraSource.storagePath, URL.createObjectURL(cameraBlob));
+        }
+        if (project.microphoneSource && micBlob) {
+            await BlobCache.put(project.microphoneSource.storagePath, micBlob);
+            setUrl(project.microphoneSource.storagePath, URL.createObjectURL(micBlob));
+        }
+
+        const hash = await this.projectDataHash(project);
+        this.projectHashes.set(projectId, hash);
+
+        return { project, name, partSize, uploads };
+    }
+
+    /**
+     * v2: Upload media blobs via S3 multipart. Each blob's parts go up in
+     * parallel directly to S3 via presigned URLs, then a CompleteMultipartUpload
+     * POST finalizes the object. Confirms the project upload via the existing
+     * project_confirm_upload RPC once all files are done.
+     */
+    static async uploadMediaV2(
+        projectId: string,
+        partSize: number,
+        uploads: { fileType: string; storagePath: string; uploadId: string; partUrls: string[] }[],
+        blobs: { fileType: string; blob: Blob }[],
+        onProgress?: (phase: string, fraction: number) => void,
+        maxRetries = 2,
+    ): Promise<void> {
+        const store = useSyncStatusStore.getState();
+        store.setPendingMediaUploads(blobs.length);
+
+        const uploadMap = new Map(uploads.map(u => [u.fileType, u]));
+
+        // Bytes-weighted aggregate: sum(loaded) / sum(total) across all files.
+        const totalBytes = blobs.reduce((sum, { blob }) => sum + blob.size, 0);
+        const loadedMap = new Map<string, number>();
+        const updateAggregateProgress = () => {
+            let loaded = 0;
+            for (const v of loadedMap.values()) loaded += v;
+            const fraction = totalBytes > 0 ? Math.min(1, loaded / totalBytes) : 0;
+            store.setCurrentUpload({ projectId, type: 'media', progress: fraction });
+        };
+
+        const uploadAndCache = async (fileType: string, blob: Blob) => {
+            const uploadInfo = uploadMap.get(fileType);
+            if (!uploadInfo) throw new Error(`No upload info for ${fileType}`);
+
+            loadedMap.set(fileType, 0);
+            updateAggregateProgress();
+
+            let lastError: Error | null = null;
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const parts = await CloudStorage.uploadBlobMultipart(
+                        blob,
+                        uploadInfo.partUrls,
+                        partSize,
+                        (frac) => {
+                            loadedMap.set(fileType, frac * blob.size);
+                            updateAggregateProgress();
+                            onProgress?.(fileType, frac);
+                        },
+                    );
+
+                    await BlobCache.put(uploadInfo.storagePath, blob);
+                    loadedMap.set(fileType, blob.size);
+                    updateAggregateProgress();
+                    const current = useSyncStatusStore.getState();
+                    current.setPendingMediaUploads(current.pendingMediaUploads - 1);
+                    return { storagePath: uploadInfo.storagePath, uploadId: uploadInfo.uploadId, parts };
+                } catch (e) {
+                    lastError = e instanceof Error ? e : new Error(String(e));
+                    console.error(`[CloudProjectService] Upload ${fileType} attempt ${attempt + 1}/${maxRetries} failed:`, e);
+                }
+            }
+            throw lastError!;
+        };
+
+        try {
+            const completions = await Promise.all(
+                blobs.map(({ fileType, blob }) => uploadAndCache(fileType, blob)),
+            );
+
+            // Server-side finalize each multipart upload and flip upload_status to 'ready'
+            // in one call. project-multipart-complete calls project_confirm_upload internally.
+            await CloudStorage.completeProjectMultipartUpload(projectId, completions);
+
+            store.setPendingMediaUploads(0);
+            store.setCurrentUpload(null);
+            store.setLastSyncedAt(new Date());
+            store.setIdle();
+        } catch (e) {
+            console.error('[CloudProjectService] Media upload (v2) failed after retries:', e);
+            Sentry.captureException(e, { extra: { phase: 'media_upload_v2', projectId } });
+            store.setCurrentUpload(null);
+            store.setError(e instanceof Error ? e.message : 'Media upload failed');
+            throw e;
+        }
+    }
+
     // ─── Load ────────────────────────────────────────────────
 
     /**

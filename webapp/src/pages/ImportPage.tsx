@@ -161,8 +161,8 @@ export function ImportPage() {
         }
 
         try {
-            // 1. Create project on server, get signed upload URLs, cache blobs locally
-            const { project, uploads } = await CloudProjectService.importRecordingLocal(
+            // 1. Create project on server, get multipart upload URLs, cache blobs locally
+            const { project, partSize, uploads } = await CloudProjectService.importRecordingLocalV2(
                 state.recording,
                 state.screenVideo,
                 workspaceId,
@@ -170,8 +170,8 @@ export function ImportPage() {
                 state.micAudio || undefined,
             );
 
-            // 2. Upload media to cloud — block until all blobs are uploaded
-            //    and project_confirm_upload flips upload_status to 'ready'.
+            // 2. Upload media to cloud via S3 multipart — block until all blobs
+            //    are uploaded and project_confirm_upload flips upload_status to 'ready'.
             setUploadPhase('Uploading media...');
             const blobs: { fileType: string; blob: Blob }[] = [
                 { fileType: 'screen', blob: state.screenVideo },
@@ -179,13 +179,12 @@ export function ImportPage() {
             if (state.cameraVideo) blobs.push({ fileType: 'camera', blob: state.cameraVideo });
             if (state.micAudio) blobs.push({ fileType: 'mic', blob: state.micAudio });
 
-            await CloudProjectService.uploadMedia(
+            await CloudProjectService.uploadMediaV2(
                 project.id,
+                partSize,
                 uploads,
                 blobs,
                 (_phase, fraction) => {
-                    // uploadMedia tracks min progress across files via syncStatusStore;
-                    // for the import UI use the aggregate fraction directly.
                     const { currentUpload } = useSyncStatusStore.getState();
                     setUploadProgress(Math.round((currentUpload?.progress ?? fraction) * 100));
                 },

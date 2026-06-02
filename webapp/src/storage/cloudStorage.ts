@@ -314,6 +314,40 @@ export class CloudStorage {
     }
 
     /**
+     * v2: Create a project on the server using S3 multipart upload.
+     * Returns presigned URLs for each part + a presigned CompleteMultipartUpload
+     * URL per file. Client uploads parts in parallel directly to S3, then POSTs
+     * the part list to completeUrl, then calls project_confirm_upload RPC.
+     */
+    static async createProjectV2(
+        project: Project,
+        name: string,
+        workspaceId: string,
+        fileSizes: Record<string, number>,
+    ): Promise<{
+        projectId: string;
+        bucket: string;
+        partSize: number;
+        uploads: { fileType: string; storagePath: string; uploadId: string; partUrls: string[] }[];
+    }> {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.functions.invoke('project-create-v2', {
+            body: { project, name, workspaceId, fileSizes },
+        });
+
+        if (error) throw error;
+        if (data?.error) {
+            if (data.error === 'quota_exceeded') {
+                throw new StorageQuotaExceededError(data.usedBytes, data.limitBytes);
+            }
+            throw new Error(data.error);
+        }
+
+        return data;
+    }
+
+    /**
      * Confirm project media upload — flips upload_status from 'pending' to 'ready'.
      */
     static async confirmProjectUpload(projectId: string): Promise<void> {
@@ -363,6 +397,105 @@ export class CloudStorage {
             xhr.onabort = () => reject(new Error('Upload aborted'));
             xhr.send(blob);
         });
+    }
+
+    /**
+     * Upload a blob to S3 via multipart upload. Each part PUTs directly to S3
+     * using a presigned URL, with up to `concurrency` parts in flight at once.
+     * Returns the part ETags — the caller must pass them (with the uploadId)
+     * to `project-multipart-complete` to finalize the object.
+     *
+     * Avoids the Cloudflare 524 timeout (each part is small) while keeping
+     * direct-to-S3 throughput (no Supabase storage-api in the data path).
+     */
+    static async uploadBlobMultipart(
+        blob: Blob,
+        partUrls: string[],
+        partSize: number,
+        onProgress?: (fraction: number) => void,
+        concurrency = 6,
+    ): Promise<{ partNumber: number; etag: string }[]> {
+        const partCount = partUrls.length;
+        if (partCount === 0) throw new Error('No part URLs provided');
+
+        const parts: { partNumber: number; etag: string }[] = new Array(partCount);
+        const partLoaded = new Array<number>(partCount).fill(0);
+        const partSizes = new Array<number>(partCount);
+        const totalBytes = blob.size;
+
+        const updateProgress = () => {
+            if (!onProgress || totalBytes === 0) return;
+            let loaded = 0;
+            for (let i = 0; i < partCount; i++) loaded += partLoaded[i];
+            onProgress(Math.min(1, loaded / totalBytes));
+        };
+
+        const uploadPart = (index: number) => new Promise<void>((resolve, reject) => {
+            const start = index * partSize;
+            const end = Math.min(start + partSize, blob.size);
+            const partBlob = blob.slice(start, end);
+            partSizes[index] = partBlob.size;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', partUrls[index], true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    partLoaded[index] = e.loaded;
+                    updateProgress();
+                }
+            };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const etag = xhr.getResponseHeader('ETag');
+                    if (!etag) {
+                        reject(new Error(`Part ${index + 1} response missing ETag header (check S3 CORS ExposeHeaders includes ETag)`));
+                        return;
+                    }
+                    parts[index] = { partNumber: index + 1, etag };
+                    partLoaded[index] = partSizes[index];
+                    updateProgress();
+                    resolve();
+                } else {
+                    reject(new Error(`Part ${index + 1} upload failed: ${xhr.status} ${xhr.responseText}`));
+                }
+            };
+            xhr.onerror = () => reject(new Error(`Part ${index + 1} upload failed: network error`));
+            xhr.onabort = () => reject(new Error(`Part ${index + 1} upload aborted`));
+            xhr.send(partBlob);
+        });
+
+        // Concurrency-limited worker pool over part indices
+        let nextIndex = 0;
+        const worker = async () => {
+            while (true) {
+                const i = nextIndex++;
+                if (i >= partCount) return;
+                await uploadPart(i);
+            }
+        };
+        const workers = Array.from({ length: Math.min(concurrency, partCount) }, () => worker());
+        await Promise.all(workers);
+
+        return parts;
+    }
+
+    /**
+     * Finalize one or more S3 multipart uploads and flip the project's
+     * upload_status to 'ready' in one server-side call. See
+     * `project-multipart-complete` for why this can't be done from the browser.
+     */
+    static async completeProjectMultipartUpload(
+        projectId: string,
+        completions: { storagePath: string; uploadId: string; parts: { partNumber: number; etag: string }[] }[],
+    ): Promise<void> {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.functions.invoke('project-multipart-complete', {
+            body: { projectId, completions },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
     }
 
     /**
