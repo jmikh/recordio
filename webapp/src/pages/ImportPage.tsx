@@ -161,8 +161,8 @@ export function ImportPage() {
         }
 
         try {
-            // 1. Create project on server, get multipart upload URLs, cache blobs locally
-            const { project, partSize, uploads } = await CloudProjectService.importRecordingLocalV2(
+            // 1. Create project on server, get storage paths, cache blobs locally
+            const { project, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
                 state.recording,
                 state.screenVideo,
                 workspaceId,
@@ -170,7 +170,7 @@ export function ImportPage() {
                 state.micAudio || undefined,
             );
 
-            // 2. Upload media to cloud via S3 multipart — block until all blobs
+            // 2. Upload media to cloud via TUS resumable — block until all blobs
             //    are uploaded and project_confirm_upload flips upload_status to 'ready'.
             setUploadPhase('Uploading media...');
             const blobs: { fileType: string; blob: Blob }[] = [
@@ -181,7 +181,7 @@ export function ImportPage() {
 
             await CloudProjectService.uploadMediaV2(
                 project.id,
-                partSize,
+                bucket,
                 uploads,
                 blobs,
                 (_phase, fraction) => {

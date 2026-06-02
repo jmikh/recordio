@@ -227,13 +227,13 @@ export class CloudProjectService {
         }
     }
 
-    // ─── Import / Upload (v2 — S3 multipart) ─────────────────
+    // ─── Import / Upload (v2 — TUS resumable) ────────────────
 
     /**
      * v2 of importRecordingLocal — uses the project-create-v2 edge function,
-     * which initiates S3 multipart uploads. Upload is direct-to-S3 with parts
-     * in parallel, avoiding the Cloudflare 524 timeout that single-PUT uploads
-     * hit on long recordings.
+     * which does not return signed URLs. Upload is done via TUS resumable
+     * (chunked) so per-chunk retries are handled by tus-js-client and a
+     * single transient failure doesn't fail the whole upload.
      */
     static async importRecordingLocalV2(
         recording: RawRecording,
@@ -241,12 +241,7 @@ export class CloudProjectService {
         workspaceId: string,
         cameraBlob?: Blob,
         micBlob?: Blob,
-    ): Promise<{
-        project: Project;
-        name: string;
-        partSize: number;
-        uploads: { fileType: string; storagePath: string; uploadId: string; partUrls: string[] }[];
-    }> {
+    ): Promise<{ project: Project; name: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
         const projectId = recording.id;
 
         const screenSource = { ...recording.screenSource, storagePath: '' };
@@ -265,11 +260,7 @@ export class CloudProjectService {
         let name = recording.name || 'New Project';
         if (name.length > 40) name = name.substring(0, 37) + '...';
 
-        const fileSizes: Record<string, number> = { screen: screenBlob.size };
-        if (cameraBlob) fileSizes.camera = cameraBlob.size;
-        if (micBlob) fileSizes.mic = micBlob.size;
-
-        const { partSize, uploads } = await CloudStorage.createProjectV2(project, name, workspaceId, fileSizes);
+        const { bucket, uploads } = await CloudStorage.createProjectV2(project, name, workspaceId);
 
         const pathMap = new Map(uploads.map(u => [u.fileType, u.storagePath]));
         if (pathMap.has('screen')) project.screenSource.storagePath = pathMap.get('screen')!;
@@ -291,19 +282,20 @@ export class CloudProjectService {
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
-        return { project, name, partSize, uploads };
+        return { project, name, bucket, uploads };
     }
 
     /**
-     * v2: Upload media blobs via S3 multipart. Each blob's parts go up in
-     * parallel directly to S3 via presigned URLs, then a CompleteMultipartUpload
-     * POST finalizes the object. Confirms the project upload via the existing
-     * project_confirm_upload RPC once all files are done.
+     * v2: Upload media blobs via TUS resumable upload. tus-js-client handles
+     * chunk-level retry and resumption internally, so the outer retry loop
+     * only guards against catastrophic failures (e.g. expired token).
+     * Confirms the project via the existing project_confirm_upload RPC once
+     * all files are done.
      */
     static async uploadMediaV2(
         projectId: string,
-        partSize: number,
-        uploads: { fileType: string; storagePath: string; uploadId: string; partUrls: string[] }[],
+        bucket: string,
+        uploads: { fileType: string; storagePath: string }[],
         blobs: { fileType: string; blob: Blob }[],
         onProgress?: (phase: string, fraction: number) => void,
         maxRetries = 2,
@@ -312,6 +304,12 @@ export class CloudProjectService {
         store.setPendingMediaUploads(blobs.length);
 
         const uploadMap = new Map(uploads.map(u => [u.fileType, u]));
+
+        const MIME_MAP: Record<string, string> = {
+            screen: 'video/webm',
+            camera: 'video/webm',
+            mic: 'audio/wav',
+        };
 
         // Bytes-weighted aggregate: sum(loaded) / sum(total) across all files.
         const totalBytes = blobs.reduce((sum, { blob }) => sum + blob.size, 0);
@@ -333,10 +331,11 @@ export class CloudProjectService {
             let lastError: Error | null = null;
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const parts = await CloudStorage.uploadBlobMultipart(
+                    await CloudStorage.uploadBlobResumable(
+                        bucket,
+                        uploadInfo.storagePath,
                         blob,
-                        uploadInfo.partUrls,
-                        partSize,
+                        MIME_MAP[fileType] ?? 'application/octet-stream',
                         (frac) => {
                             loadedMap.set(fileType, frac * blob.size);
                             updateAggregateProgress();
@@ -349,7 +348,7 @@ export class CloudProjectService {
                     updateAggregateProgress();
                     const current = useSyncStatusStore.getState();
                     current.setPendingMediaUploads(current.pendingMediaUploads - 1);
-                    return { storagePath: uploadInfo.storagePath, uploadId: uploadInfo.uploadId, parts };
+                    return;
                 } catch (e) {
                     lastError = e instanceof Error ? e : new Error(String(e));
                     console.error(`[CloudProjectService] Upload ${fileType} attempt ${attempt + 1}/${maxRetries} failed:`, e);
@@ -359,14 +358,9 @@ export class CloudProjectService {
         };
 
         try {
-            const completions = await Promise.all(
-                blobs.map(({ fileType, blob }) => uploadAndCache(fileType, blob)),
-            );
+            await Promise.all(blobs.map(({ fileType, blob }) => uploadAndCache(fileType, blob)));
 
-            // Server-side finalize each multipart upload and flip upload_status to 'ready'
-            // in one call. project-multipart-complete calls project_confirm_upload internally.
-            await CloudStorage.completeProjectMultipartUpload(projectId, completions);
-
+            await CloudStorage.confirmProjectUpload(projectId);
             store.setPendingMediaUploads(0);
             store.setCurrentUpload(null);
             store.setLastSyncedAt(new Date());
