@@ -165,6 +165,13 @@ export class BlobCache {
         return !!match;
     }
 
+    /** Get a cached blob without falling back to a network download. */
+    static async getBlobIfCached(storagePath: string): Promise<Blob | null> {
+        const cache = await caches.open(CACHE_NAME);
+        const match = await cache.match(this.cacheKey(storagePath));
+        return match ? await match.blob() : null;
+    }
+
     /** Evict a single cache entry. */
     static async evict(storagePath: string): Promise<void> {
         const cache = await caches.open(CACHE_NAME);

@@ -161,8 +161,10 @@ export function ImportPage() {
         }
 
         try {
-            // 1. Create project on server, get storage paths, cache blobs locally
-            const { project, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
+            // 1. Create project on server, get storage paths, cache blobs locally.
+            //    Blobs are cached BEFORE the upload starts, so editor playback works
+            //    immediately and a refresh mid-upload can resume from cache.
+            const { project, name, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
                 state.recording,
                 state.screenVideo,
                 workspaceId,
@@ -170,27 +172,19 @@ export function ImportPage() {
                 state.micAudio || undefined,
             );
 
-            // 2. Upload media to cloud via TUS resumable — block until all blobs
-            //    are uploaded and project_confirm_upload flips upload_status to 'ready'.
-            setUploadPhase('Uploading media...');
+            // 2. Kick off the cloud upload as fire-and-forget. The editor will
+            //    show progress via the UploadProgressToast (reads syncStatusStore),
+            //    and project_confirm_upload flips upload_status to 'ready' when done.
             const blobs: { fileType: string; blob: Blob }[] = [
                 { fileType: 'screen', blob: state.screenVideo },
             ];
             if (state.cameraVideo) blobs.push({ fileType: 'camera', blob: state.cameraVideo });
             if (state.micAudio) blobs.push({ fileType: 'mic', blob: state.micAudio });
 
-            await CloudProjectService.uploadMediaV2(
-                project.id,
-                bucket,
-                uploads,
-                blobs,
-                (_phase, fraction) => {
-                    const { currentUpload } = useSyncStatusStore.getState();
-                    setUploadProgress(Math.round((currentUpload?.progress ?? fraction) * 100));
-                },
-            );
+            CloudProjectService.startMediaUpload(project.id, name, bucket, uploads, blobs);
 
-            // 3. All media uploaded and confirmed — safe to open the editor.
+            // 3. Navigate immediately — editor allows pending projects whose upload
+            //    is active in this tab.
             setUploadProgress(100);
             setStatus('success');
             confirmHandoff(project.id);

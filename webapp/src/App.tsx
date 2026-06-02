@@ -10,6 +10,8 @@ import { ToastProvider } from './editor/components/Toast';
 import { AuthManager } from './auth/AuthManager';
 import { AuthModal } from './editor/components/header/AuthModal';
 import { useUserStore } from './editor/stores/useUserStore';
+import { UploadProgressToast } from './components/UploadProgressToast';
+import { useUploadBeforeUnloadWarning } from './hooks/useUploadBeforeUnloadWarning';
 
 // Initialize auth before React renders — ensures onAuthStateChange fires
 // before any component tries to make Supabase queries.
@@ -24,6 +26,8 @@ export function App() {
     const [path, setPath] = useState(window.location.pathname);
     const [authReady, setAuthReady] = useState(false);
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
+
+    useUploadBeforeUnloadWarning();
 
     useEffect(() => {
         AuthManager.ready.then(() => setAuthReady(true));
@@ -81,6 +85,7 @@ export function App() {
         <ToastProvider>
             {getPage()}
             <AuthModal isOpen={showAuthModal} onClose={() => {}} />
+            <UploadProgressToast />
         </ToastProvider>
     );
 }
