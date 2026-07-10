@@ -2,18 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2, LuArrowLeft } from 'react-icons/lu';
-import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../../../workspace/useWorkspaceStore';
 
 import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
-import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
-import { navigate } from '../../../navigate';
+import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
+import { navigate } from '../../../lib/navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { useUserStore } from '../../../auth/useUserStore';
 
-import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../core/analytics';
-import { captureError } from '../../../utils/sentry';
-import { useNonFreeAccess } from '../../../hooks/useNonFreeAccess';
+import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../analytics';
+import { captureError } from '../../../lib/sentry';
+import { useNonFreeAccess } from '../../../billing/useNonFreeAccess';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';

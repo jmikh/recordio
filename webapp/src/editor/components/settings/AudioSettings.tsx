@@ -8,8 +8,8 @@ import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
-import { trackUploadMusicClicked, trackUploadMusicFailed } from '../../../core/analytics';
-import { captureError } from '../../../utils/sentry';
+import { trackUploadMusicClicked, trackUploadMusicFailed } from '../../../analytics';
+import { captureError } from '../../../lib/sentry';
 
 // CDN preset music tracks
 const PRESET_MUSIC = [

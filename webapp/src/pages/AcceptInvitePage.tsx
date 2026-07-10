@@ -4,8 +4,8 @@ import { Button, LogoLink } from '@shared/components';
 import { supabase } from '../auth/AuthManager';
 import { useUserStore } from '../auth/useUserStore';
 import { AuthModal } from '../auth/AuthModal';
-import { trackInviteAcceptFailed } from '../core/analytics';
-import { captureError } from '../utils/sentry';
+import { trackInviteAcceptFailed } from '../analytics';
+import { captureError } from '../lib/sentry';
 
 type Status = 'waiting-auth' | 'accepting' | 'success' | 'error';
 

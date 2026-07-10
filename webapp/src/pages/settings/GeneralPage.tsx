@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../components/Toast';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { trackGeneralSettingsPageLoaded } from '../../core/analytics';
-import { captureError } from '../../utils/sentry';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
+import { trackGeneralSettingsPageLoaded } from '../../analytics';
+import { captureError } from '../../lib/sentry';
 import type { WorkspaceDetails } from './types';
 
 export function GeneralPage({ details, isAdmin, onRenamed }: {

@@ -1,27 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { LuTrash2 } from 'react-icons/lu';
-import { CloudProjectService, type ProjectListItem } from '../storage/cloudProjectService';
-import type { CloudFolder } from '../storage/cloudStorage';
-import { ProjectCard } from '../components/ProjectCard';
-import { DashboardSidebar, type DashboardView } from '../components/DashboardSidebar';
-import { DashboardHeader, type FilterTab, type SortOrder } from '../components/DashboardHeader';
+import { CloudProjectService, type ProjectListItem } from '../../storage/cloudProjectService';
+import type { CloudFolder } from '../../storage/cloudStorage';
+import { ProjectCard } from './ProjectCard';
+import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
+import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
 import { XButton, Modal, Button } from '@shared/components';
 import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
-import { useUserStore } from '../auth/useUserStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useNonFreeAccess } from '../hooks/useNonFreeAccess';
-import { AuthManager, supabase } from '../auth/AuthManager';
-import { switchWorkspace } from '../workspace/switchWorkspace';
+import { useUserStore } from '../../auth/useUserStore';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
+import { useNonFreeAccess } from '../../billing/useNonFreeAccess';
+import { AuthManager, supabase } from '../../auth/AuthManager';
+import { switchWorkspace } from '../../workspace/switchWorkspace';
 
-import { SupportModal } from '../components/SupportModal';
-import { AuthModal } from '../auth/AuthModal';
-import { useToast } from '../components/Toast';
-import { trackProjectOpened, trackDashboardPageLoaded, trackWorkspaceCreateFailed, trackProjectDeleteFailed } from '../core/analytics';
-import { captureError } from '../utils/sentry';
+import { SupportModal } from '../../components/SupportModal';
+import { AuthModal } from '../../auth/AuthModal';
+import { useToast } from '../../components/Toast';
+import { trackProjectOpened, trackDashboardPageLoaded, trackWorkspaceCreateFailed, trackProjectDeleteFailed } from '../../analytics';
+import { captureError } from '../../lib/sentry';
 
-import { navigate } from '../navigate';
+import { navigate } from '../../lib/navigate';
 
 const EXTENSION_ID = import.meta.env.DEV
     ? 'lpponocoanighhephabalkejmdbjlhmi'

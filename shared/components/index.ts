@@ -16,6 +16,5 @@ export { ProBadge } from './ProBadge';
 export { ProgressModal } from './ProgressModal';
 export { Scrollbar } from './Scrollbar';
 export { Slider } from './Slider';
-export { ThemeToggle } from './ThemeToggle';
 export { Toggle } from './Toggle';
 export { XButton } from './XButton';

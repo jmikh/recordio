@@ -5,8 +5,8 @@ import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
 import { ProGate } from './ProGate';
-import { timeAgo } from '../utils/timeAgo';
-import type { CloudFolder } from '../storage/cloudStorage';
+import { timeAgo } from './timeAgo';
+import type { CloudFolder } from '../../storage/cloudStorage';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 const VIDEO_BASE_URL = import.meta.env.PROD

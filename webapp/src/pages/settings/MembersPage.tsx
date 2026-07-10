@@ -3,9 +3,9 @@ import { LuMail, LuLoader, LuX, LuEllipsis } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
 import { useToast } from '../../components/Toast';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { trackMembersPageLoaded, trackWorkspaceSeatsSetFailed, trackWorkspaceInviteFailed } from '../../core/analytics';
-import { captureError } from '../../utils/sentry';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
+import { trackMembersPageLoaded, trackWorkspaceSeatsSetFailed, trackWorkspaceInviteFailed } from '../../analytics';
+import { captureError } from '../../lib/sentry';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
 
 const VIEWER_SEATS_PER_CREATOR = 10;

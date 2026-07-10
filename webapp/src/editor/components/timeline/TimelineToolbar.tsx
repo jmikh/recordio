@@ -17,8 +17,8 @@ import { getCachedSpeechSegments } from '../../autocut/vadService';
 import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
 import { createDefaultItem } from '../settings/OverlayInspector';
 import type { OverlayItemType, OverlaySegment } from '@shared/types/overlay';
-import { trackAutocutClicked, trackAutocutFailed } from '../../../core/analytics';
-import { captureError } from '../../../utils/sentry';
+import { trackAutocutClicked, trackAutocutFailed } from '../../../analytics';
+import { captureError } from '../../../lib/sentry';
 
 export const MIN_PIXELS_PER_SEC = 10;
 export const MAX_PIXELS_PER_SEC = 200;

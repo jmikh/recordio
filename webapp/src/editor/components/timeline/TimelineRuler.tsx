@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { formatTimeCode } from '../../utils';
-import { useThemeStore } from '../../../stores/useThemeStore';
+import { useThemeStore } from '../../../theme/useThemeStore';
 
 interface TimelineRulerProps {
     totalWidth: number;

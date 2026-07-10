@@ -1,7 +1,7 @@
 import type { Project, ID } from '@shared/types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
-import { captureError } from '../utils/sentry';
+import { captureError } from '../lib/sentry';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';

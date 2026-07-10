@@ -3,7 +3,8 @@ import type { ProjectState } from '../useProjectStore';
 import type { ID, ZoomSegment } from '@shared/types';
 import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from '../../../core/zoom';
+import { calculateAutoZooms, getAllFocusAreas } from '../../zoom';
+import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 export interface ZoomSegmentSlice {

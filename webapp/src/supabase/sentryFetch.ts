@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react';
 import { useUserStore } from '../auth/useUserStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 
 /**
  * HTTP statuses we don't want to flood Sentry with. These are expected

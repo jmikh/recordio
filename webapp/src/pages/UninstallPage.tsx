@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { trackExtensionUninstalled } from '../core/analytics';
+import { trackExtensionUninstalled } from '../analytics';
 import logoBackground from '@shared/assets/logo.svg';
 import { SUPPORT_EMAIL } from '@shared/types/bridge';
 

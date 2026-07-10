@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuCheck, LuPlus, LuSettings, LuChevronDown } from 'react-icons/lu';
-import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
+import type { WorkspaceListItem } from '../workspace/useWorkspaceStore';
 
 interface WorkspaceDropdownProps {
     workspaces: WorkspaceListItem[];

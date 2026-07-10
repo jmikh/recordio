@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { LuLoader, LuCheck, LuX, LuCreditCard, LuShieldCheck } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { supabase, AuthManager } from '../../auth/AuthManager';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
 import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
 import type { BillingInterval } from './types';
-import { trackBillingPageLoaded } from '../../core/analytics';
+import { trackBillingPageLoaded } from '../../analytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

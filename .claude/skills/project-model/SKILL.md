@@ -5,152 +5,82 @@ description: How projects are created, stored, versioned, edited with batched hi
 
 # Project Model
 
-## 1. Project Creation
+## 1. Creation & Auto Effects
 
-A project is born from a screen recording. The flow:
+Flow: the Chrome extension records screen + optional camera/mic into a `RawRecording` (`shared/types/core.ts`) → the webapp import flow calls `CloudProjectService.importRecording*()` (`webapp/src/storage/cloudProjectService.ts`) → `ProjectImpl.createFromSource()` (`webapp/src/core/Project.ts`) builds the `Project` struct → media uploads to cloud storage (tus/chunked), metadata via edge functions.
 
-1. **Chrome extension** records screen + optional camera + optional microphone, producing a `RawRecording` (`shared/types/core.ts`)
-2. `ProjectStorage.importFromRawRecording()` (`webapp/src/storage/projectStorage.ts`) saves media blobs to IndexedDB and calls `ProjectImpl.createFromSource()`
-3. `ProjectImpl.createFromSource()` (`webapp/src/core/Project.ts`) builds the full `Project`:
-   - Creates default settings (1920x1080, 60fps, all effects enabled)
-   - Sets timeline duration = screen recording duration
-   - Creates a single `OutputWindow` spanning `[0, durationMs]` at 1x speed
-   - Auto-calculates `zoomSegments` and `spotlightSegments` from `userEvents` (mouse/keyboard)
-   - Initializes empty `captionSegments`, `cameraMoveSegments`, `overlaySegments`
-   - Stamps `schemaVersion: CURRENT_SCHEMA_VERSION`
+**`createFromSource` is a plain struct builder** — default settings, one full-length `OutputWindow`, empty segment arrays, `autoEffectsGenerated: false`.
 
-The `Project` type (`webapp/src/types/project.ts`):
-```
-Project {
-  id, schemaVersion, name, createdAt, updatedAt, thumbnail?,
-  screenSource, cameraSource?, microphoneSource?,
-  userEvents,
-  settings: ProjectSettings,
-  timeline: Timeline
-}
-```
+**Auto zoom/spotlight segments are generated on first editor open**, not at upload. `useProjectStore.loadProject()` checks `project.autoEffectsGenerated`; if false it runs `calculateAutoZooms` / `calculateAutoSpotlights` / `getAllFocusAreas` (`webapp/src/editor/zoom/`, `webapp/src/editor/spotlight/`) from `userEvents`, stamps the results on the timeline, and flips the flag. This happens *before* `set()` so the effects are part of the initial, non-undoable state.
 
----
+⚠️ Never infer "needs generation" from empty `zoomSegments` — an empty array may mean the user deleted them. Only the flag decides.
 
-## 2. Storage
+The `Project` type lives in `shared/types/project.ts`.
 
-### Local-first: IndexedDB
+## 2. Storage & Sync (pointers)
 
-All project data lives client-side in IndexedDB (`webapp/src/storage/projectStorage.ts`).
+Cloud-first via Supabase. Entry points, not descriptions — read the files:
 
-| Store | Contents |
-|---|---|
-| `projects` | Full `Project` JSON documents (keyed by `id`) |
-| `recordings` | Media blobs (video, audio, background images, music) |
-| `thumbnails` | Project preview images |
-| `customBackgrounds` | Global background library (copy-on-select into project) |
-| `customMusic` | Global music library (copy-on-select into project) |
+- `webapp/src/storage/cloudProjectService.ts` — orchestration: import, load, save, conflict handling
+- `webapp/src/storage/cloudStorage.ts` — server calls (edge functions: `project-create-v2`, `render-job-create`, `mux-video-*`, …)
+- `webapp/src/storage/blobCache.ts` — media cache using the **Cache API** (`caches.open`), keyed by storagePath
+- `webapp/src/storage/useMediaUrlStore.ts` — transient blob URLs for playback (never persisted)
+- Video sharing uses **Mux** (`shared_videos` table + `mux-video-*` edge functions)
 
-**Blob references** use a `recordio-blob://{id}` scheme for persistent `storageUrl`. On load, blobs are hydrated to transient `runtimeUrl` via `URL.createObjectURL()`. Before save, `runtimeUrl` is stripped — only `storageUrl` persists.
+**Auto-save:** a `subscribeWithSelector` subscription at the bottom of `useProjectStore.ts` debounces project changes 2s, re-attaches `userEvents`, and calls `CloudProjectService.saveProject`, which skips no-op writes via SHA-256 hash and raises a conflict modal on cloud version mismatch.
 
-### Supabase (backend)
+### userEvents separation (runtime vs persistence)
 
-Backend tables track sharing/billing, not project content:
-- `shared_videos` — links projects to Cloudflare Stream uploads (has its own `version` column for re-uploads)
-- `user_metadata`, `subscriptions`, `project_unlocks` — billing
-- `transcription_usage` — usage tracking
+`userEvents` is persisted as part of the project JSON, but `loadProject()` strips it into a separate store slot so zundo doesn't snapshot the huge arrays on every mutation:
 
-### Auto-save
-
-A Zustand `subscribeWithSelector` subscription debounces saves to IndexedDB (2-second delay). Before writing, it re-attaches `userEvents` (stripped at load time for undo/redo performance):
-
-```
-project changes → debounce 2s → re-attach userEvents → ProjectStorage.saveProject()
-```
-
----
+- `useProjectData()` / `s.project` does NOT contain `userEvents` at runtime
+- read events via `useProjectStore(s => s.userEvents)` or `useUserEvents()`
+- auto-save re-attaches them before writing
 
 ## 3. Versioning & Migrations
 
-### Schema version
-
-- Constant: `CURRENT_SCHEMA_VERSION` in `webapp/src/core/Project.ts` (currently **2**)
-- Stored on every project as `project.schemaVersion`
-
-### Adding a migration
-
-File: `webapp/src/core/migrateProject.ts`
-
-```typescript
-export function migrateProject(raw: any): any {
-    const version = raw.schemaVersion ?? 0;
-
-    if (version < 2) { /* v1→v2: rename cameraLayout → cameraMove */ }
-    // Add new: if (version < 3) { /* v2→v3 */ }
-
-    // Backfill missing fields (version-independent)
-    if (raw.timeline && !raw.timeline.displaySettings) { /* add defaults */ }
-
-    raw.schemaVersion = CURRENT_SCHEMA_VERSION;
-    return raw;
-}
-```
+- Constant: `CURRENT_SCHEMA_VERSION` in `webapp/src/core/Project.ts`
+- Migrations: `webapp/src/core/migrateProject.ts`, run by `CloudProjectService.loadProject()`
+- Runtime backfills for fields that don't warrant a version bump live in `useProjectStore.loadProject()`
 
 **Rules for safe migrations:**
 1. Bump `CURRENT_SCHEMA_VERSION`
 2. Add a new `if (version < N)` block — migrations run sequentially
 3. For renames: copy to new key, delete old key
 4. For new fields: add a version-independent backfill at the bottom (handles projects that predate the field entirely)
-5. `migrateProject()` runs automatically on every `loadProject()` call
-
-### Runtime backfills
-
-`useProjectStore.loadProject()` also backfills fields that were added after the initial schema but don't warrant a version bump (e.g. `overlaySegments`, `overlay` settings). These are in `webapp/src/editor/stores/useProjectStore.ts` lines 96-119.
-
----
 
 ## 4. History Batching (useHistoryBatcher)
 
 File: `webapp/src/editor/hooks/useHistoryBatcher.ts`
 
-### Problem
+Undo/redo uses [zundo](https://github.com/charkour/zundo) (temporal middleware). Without batching, dragging a slider 0→100 would create 100 history entries; we want one.
 
-Undo/redo uses [zundo](https://github.com/charkour/zundo) (temporal middleware on Zustand). Without batching, dragging a slider from 0→100 would create 100 history entries. We want one.
-
-### Solution: Latch pattern
+### Latch pattern
 
 ```
-startInteraction()     — called on pointerDown / drag start
-  batchAction(fn)      — called on every change (slider onChange, drag move)
-  batchAction(fn)      — ...
-  batchAction(fn)      — ...
-endInteraction()       — called on pointerUp / drag end
+startInteraction()     — pointerDown / drag start
+  batchAction(fn)      — every change (slider onChange, drag move)
+  ...
+endInteraction()       — pointerUp / drag end
 ```
 
-**How it works:**
-1. `startInteraction()` increments a global `interactionCount` ref counter. On first interaction, ensures zundo tracking is active.
-2. `batchAction(action)` executes the store mutation. If zundo recorded a new history entry AND we haven't latched yet, it **pauses** tracking (`hasLatched = true`). All subsequent mutations during this interaction skip history.
-3. `endInteraction()` decrements the counter. When it hits 0, **resumes** tracking. Result: the entire interaction is one undo step.
+1. `startInteraction()` increments a module-level `interactionCount` ref counter
+2. `batchAction(action)` executes the mutation; on the first recorded history entry it **pauses** zundo tracking (latch) — subsequent mutations in this interaction skip history
+3. `endInteraction()` decrements; at 0 it **resumes** tracking → whole interaction = one undo step
 
-**Nesting support:** `interactionCount` is module-level, so overlapping interactions (e.g. ZoomEditor session + ZoomTrack drag) nest correctly.
-
-### Usage pattern in components
+Nesting works because the counter is module-level (e.g. ZoomEditor session + ZoomTrack drag overlap).
 
 ```tsx
 const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
-<Slider
-    onPointerDown={startInteraction}
-    onPointerUp={endInteraction}
-    onChange={(val) => batchAction(() => updateSettings({ ... }))}
-/>
+<Slider onPointerDown={startInteraction} onPointerUp={endInteraction}
+        onChange={(val) => batchAction(() => updateSettings({ ... }))} />
 ```
 
-For canvas drag operations: `onDragStart` → `startInteraction()`, every move → `batchAction()`, `onCommit` → `batchAction()` + `endInteraction()`.
+### Zundo config (in useProjectStore.ts)
 
-### Zundo config
-
-In `useProjectStore.ts`:
-- **partialize:** Only `{ project }` is tracked — `userEvents` (immutable, large) is excluded
-- **equality:** `JSON.stringify` deep comparison prevents no-op history entries
-- **limit:** 50 undo/redo states max
-
----
+- **partialize:** only `{ project }` tracked (`userEvents` excluded)
+- **equality:** `JSON.stringify` deep compare prevents no-op entries
+- **limit:** 50
 
 ## 5. Source Time vs Output Time
 
@@ -173,7 +103,7 @@ interface OutputWindow {
 }
 ```
 
-OutputWindows define which source ranges appear in the output. Gaps between windows = cut content. Speed affects output duration: `outputDuration = sourceDuration / speed`.
+OutputWindows define which source ranges appear in the output. Gaps between windows = cut content. `outputDuration = sourceDuration / speed`.
 
 Example:
 - Window A: [0, 5000ms] at 1x → output [0, 5000ms]
@@ -197,23 +127,14 @@ interface TimeSegment {
 
 ### TimeMapper
 
-File: `webapp/src/core/mappers/timeMapper.ts`
+File: `shared/mappers/timeMapper.ts`
 
-Key methods:
 - `mapSourceToOutputTime(sourceMs)` → output ms (or -1 if in a gap)
 - `mapOutputToSourceTime(outputMs)` → source ms
 - `mapSourceRangeToOutputRange(start, end)` → `{start, end}` or `null` if fully cut
 - `getOutputDuration()` → total output video length
 
-### recomputeOutputTimes()
-
-Same file. Stamps cached output times onto segments:
-
-```typescript
-function recomputeOutputTimes<T extends TimeSegment>(segments: T[], timeMapper: TimeMapper): T[]
-```
-
-**Must be called whenever `outputWindows` change.** Each store slice (zoom, spotlight, transcription, cameraMove, overlay) calls this in `windowSlice.ts` when windows are modified.
+`recomputeOutputTimes(segments, timeMapper)` (same file) stamps cached output times onto segments. **Must be called whenever `outputWindows` change** — each store slice does this via `windowSlice.ts`.
 
 ### Spatial coordinate systems
 
@@ -222,17 +143,17 @@ function recomputeOutputTimes<T extends TimeSegment>(segments: T[], timeMapper: 
 | ZoomSegment | source time | `rectPx` in OUTPUT pixels |
 | SpotlightSegment | source time | `sourceRect` in SOURCE pixels |
 | CameraMoveSegment | source time | x/y/width/height in OUTPUT pixels |
-| OverlaySegment | source time | All positions in OUTPUT pixels |
+| OverlaySegment | source time | all positions in OUTPUT pixels |
 | CaptionSegment | source time (per-word too) | N/A (rendered by captions system) |
 
 ### When adding a new segment type
 
 1. Extend `TimeSegment` — store times in source time
 2. Call `recomputeOutputTimes()` on creation and in the window slice's `updateOutputWindow`/`splitWindow`/etc.
-3. Add the segment array to the `Timeline` interface
+3. Add the segment array to the `Timeline` interface (`shared/types/timeline.ts`)
 4. Add a store slice following the pattern in `webapp/src/editor/stores/slices/`
-5. Backfill empty array in `migrateProject.ts` or `loadProject()` for existing projects
+5. Backfill an empty array in `migrateProject.ts` or `loadProject()` for existing projects
 
 ### Export scaling
 
-`ProjectImpl.scale()` proportionally scales all fields ending in `Px` when exporting at different resolutions. Source-coordinate fields (no `Px` suffix, e.g. `sourceRect`) are NOT scaled. This convention is load-bearing — always suffix output-pixel fields with `Px`.
+`ProjectImpl.scale()` (→ `shared/utils/projectScale.ts`) proportionally scales all fields ending in `Px` when exporting at different resolutions. Source-coordinate fields (no `Px` suffix, e.g. `sourceRect`) are NOT scaled. **This convention is load-bearing — always suffix output-pixel fields with `Px`.**

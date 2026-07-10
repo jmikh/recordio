@@ -3,8 +3,6 @@ import { ViewMapper } from '@shared/mappers/viewMapper';
 import { TimeMapper } from '@shared/mappers/timeMapper';
 import { rectContainsRect, clampViewportToBounds, unionRects } from '@shared/utils/geometry';
 
-export * from '@shared/mappers/viewMapper';
-
 // ============================================================================
 // Internal Types
 // ============================================================================

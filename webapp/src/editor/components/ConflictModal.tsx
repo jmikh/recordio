@@ -4,9 +4,9 @@ import { useSyncStatusStore } from '../../storage/syncStatusStore';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useUserStore } from '../../auth/useUserStore';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { navigate } from '../../navigate';
-import { captureError } from '../../utils/sentry';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
+import { navigate } from '../../lib/navigate';
+import { captureError } from '../../lib/sentry';
 import { TbCloudDown, TbCloudUp } from 'react-icons/tb';
 
 /**

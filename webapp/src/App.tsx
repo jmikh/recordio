@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { DashboardPage } from './pages/DashboardPage';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
-import { ImportPage } from './pages/ImportPage';
+import { ImportPage } from './pages/import/ImportPage';
 import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
-import { WorkspaceSettingsPage } from './pages/Settings/WorkspaceSettingsPage';
+import { WorkspaceSettingsPage } from './pages/settings/WorkspaceSettingsPage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
 import { AuthModal } from './auth/AuthModal';
 import { useUserStore } from './auth/useUserStore';
-import { UploadProgressToast } from './components/UploadProgressToast';
-import { useUploadBeforeUnloadWarning } from './hooks/useUploadBeforeUnloadWarning';
+import { UploadProgressToast } from './storage/UploadProgressToast';
+import { useUploadBeforeUnloadWarning } from './storage/useUploadBeforeUnloadWarning';
 
 // Initialize auth before React renders — ensures onAuthStateChange fires
 // before any component tries to make Supabase queries.

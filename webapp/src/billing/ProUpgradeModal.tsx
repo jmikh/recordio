@@ -1,5 +1,5 @@
 import { Modal, Button, LogoLink } from '@shared/components';
-import { navigate } from '../navigate';
+import { navigate } from '../lib/navigate';
 
 interface ProUpgradeModalProps {
     isOpen: boolean;

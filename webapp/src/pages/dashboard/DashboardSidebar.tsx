@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuLayoutGrid, LuStar, LuShare2, LuTrash2, LuFolder, LuPlus, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
-import { Button, ThemeToggle, Modal, Tooltip } from '@shared/components';
-import { UserMenu } from './UserMenu';
-import { WorkspaceDropdown } from './WorkspaceDropdown';
-import type { CloudFolder } from '../storage/cloudStorage';
-import type { WorkspaceListItem } from '../stores/useWorkspaceStore';
+import { Button, Modal, Tooltip } from '@shared/components';
+import { ThemeToggle } from '../../theme/ThemeToggle';
+import { UserMenu } from '../../components/UserMenu';
+import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
+import type { CloudFolder } from '../../storage/cloudStorage';
+import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 
 export type DashboardView = 'all' | 'starred' | 'published' | 'trash' | { folder: string };
 

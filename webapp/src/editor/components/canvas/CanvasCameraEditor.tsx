@@ -10,7 +10,7 @@ import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
 import { drawCamera } from '@shared/painters/cameraPainter';
 import { drawOverlays } from '@shared/painters/overlayPainter';
-import { getViewportStateAtTime } from '../../../core/zoom';
+import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy (for CameraEdit mode)

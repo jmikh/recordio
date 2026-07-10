@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useExtensionBridge } from '../hooks/useExtensionBridge';
-import { CloudProjectService } from '../storage/cloudProjectService';
-import { useSyncStatusStore } from '../storage/syncStatusStore';
-import { captureImportError } from '../utils/sentry';
-import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../core/analytics';
-import { useUserStore } from '../auth/useUserStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useExtensionBridge } from './useExtensionBridge';
+import { CloudProjectService } from '../../storage/cloudProjectService';
+import { useSyncStatusStore } from '../../storage/syncStatusStore';
+import { captureImportError } from '../../lib/sentry';
+import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../../analytics';
+import { useUserStore } from '../../auth/useUserStore';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
-import { AuthModal } from '../auth/AuthModal';
-import { navigate } from '../navigate';
-import { supabase } from '../auth/AuthManager';
+import { AuthModal } from '../../auth/AuthModal';
+import { navigate } from '../../lib/navigate';
+import { supabase } from '../../auth/AuthManager';
 
 type ImportStatus =
     | 'init'

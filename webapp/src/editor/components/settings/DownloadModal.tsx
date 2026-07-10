@@ -8,7 +8,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
 import type { CloudRenderPhase } from './useCloudRender';
-import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../core/analytics';
+import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../analytics';
 
 function formatDurationLabel(ms: number): string {
     const totalSeconds = Math.round(ms / 1000);

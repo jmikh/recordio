@@ -5,11 +5,11 @@ import type { Project, ID, UserEvents } from '@shared/types';
 import { ProjectImpl } from '../../core/Project';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { CloudStorage } from '../../storage/cloudStorage';
-import { captureError } from '../../utils/sentry';
+import { captureError } from '../../lib/sentry';
 import { BlobCache } from '../../storage/blobCache';
 import { useMediaUrlStore } from '../../storage/useMediaUrlStore';
 import { useUserStore } from '../../auth/useUserStore';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { createWindowSlice, type WindowSlice } from './slices/windowSlice';
 import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
 import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActionSlice';
@@ -17,6 +17,11 @@ import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSli
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 import { createCameraMoveSlice, type CameraMoveSlice } from './slices/cameraMoveSlice';
 import { createOverlaySlice, type OverlaySlice } from './slices/overlaySlice';
+import { ViewMapper } from '@shared/mappers/viewMapper';
+import { TimeMapper } from '@shared/mappers/timeMapper';
+import { getDeviceFrame } from '@shared/utils/deviceFrames';
+import { calculateAutoZooms, getAllFocusAreas } from '../zoom';
+import { calculateAutoSpotlights } from '../spotlight/autoSpotlight';
 
 
 export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, OverlaySlice {
@@ -208,6 +213,46 @@ export const useProjectStore = create<ProjectState>()(
                         // Migrate old default white to new default colors
                         projectWithoutEvents.settings.overlay.textDefaults.color = '#454545';
                         projectWithoutEvents.settings.overlay.textDefaults.backgroundColor = '#ffdb57';
+                    }
+
+                    // First open: generate auto zoom/spotlight segments and focus areas
+                    // from userEvents. Upload skips this (createFromSource leaves them
+                    // empty). Done before set() so the effects are part of the initial,
+                    // non-undoable state; the next auto-save persists them with the flag.
+                    if (!projectWithoutEvents.autoEffectsGenerated) {
+                        const { screenSource, settings, timeline } = projectWithoutEvents;
+                        // Desktop recordings have no captured events — nothing to detect.
+                        const hasUserEvents = userEvents.mousePositions.length > 0;
+
+                        const deviceFrame = settings.screen.mode === 'device'
+                            ? getDeviceFrame(settings.screen.deviceFrameId)
+                            : undefined;
+                        const viewMapper = new ViewMapper(
+                            screenSource.size,
+                            settings.outputSize,
+                            settings.screen.padding,
+                            undefined,
+                            screenSource.trackableContentRect,
+                            settings.screen.toolbar.enabled,
+                            deviceFrame
+                        );
+                        const timeMapper = new TimeMapper(timeline.outputWindows);
+
+                        timeline.focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
+                        timeline.zoomSegments = hasUserEvents
+                            ? calculateAutoZooms(settings.zoom, viewMapper, timeMapper, timeline.focusAreas)
+                            : [];
+                        timeline.spotlightSegments = hasUserEvents
+                            ? calculateAutoSpotlights(
+                                viewMapper,
+                                timeMapper,
+                                userEvents.hoveredCards || [],
+                                timeline.zoomSegments,
+                                settings.zoom,
+                                settings.spotlight
+                            )
+                            : [];
+                        projectWithoutEvents.autoEffectsGenerated = true;
                     }
 
                     set({ project: projectWithoutEvents as Project, projectName: name, userEvents });

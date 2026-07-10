@@ -7,7 +7,7 @@
  * NOTE: Loads library from CDN to avoid Vite/CommonJS bundling issues.
  * The vad-web library uses CommonJS requires that Vite cannot handle.
  */
-import { captureError } from '../../utils/sentry';
+import { captureError } from '../../lib/sentry';
 
 // ============================================================================
 // VAD Configuration

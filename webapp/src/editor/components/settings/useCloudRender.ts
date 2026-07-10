@@ -3,8 +3,8 @@ import { supabase } from '../../../auth/AuthManager';
 import { useUserStore } from '../../../auth/useUserStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
-import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../../../core/analytics';
-import { captureError } from '../../../utils/sentry';
+import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../../../analytics';
+import { captureError } from '../../../lib/sentry';
 
 export type CloudRenderPhase = 'idle' | 'saving' | 'queued' | 'rendering' | 'downloading' | 'completed' | 'failed';
 

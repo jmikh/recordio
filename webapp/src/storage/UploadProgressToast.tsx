@@ -1,5 +1,5 @@
 import { Button } from '@shared/components';
-import { useSyncStatusStore } from '../storage/syncStatusStore';
+import { useSyncStatusStore } from './syncStatusStore';
 
 /**
  * Floating bottom-right toast that surfaces the in-flight media upload.

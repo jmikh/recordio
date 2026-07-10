@@ -1,12 +1,8 @@
 import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ProjectSettings, type Timeline } from '@shared/types';
-import { calculateAutoZooms, ViewMapper, getAllFocusAreas } from './zoom';
-import { TimeMapper } from '@shared/mappers/timeMapper';
-import { calculateAutoSpotlights } from './spotlight/autoSpotlight';
-import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { scaleProject } from '@shared/utils/projectScale';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // Default display settings for tracks — single source of truth
 const DEFAULT_DISPLAY_SETTINGS = {
@@ -193,6 +189,8 @@ export class ProjectImpl {
         return {
             id: '',
             schemaVersion: CURRENT_SCHEMA_VERSION,
+            // Placeholder project has no events — nothing to generate.
+            autoEffectsGenerated: true,
             screenSource: createPlaceholderSource(),
             userEvents: EMPTY_USER_EVENTS,
             settings: createDefaultSettings(),
@@ -215,9 +213,6 @@ export class ProjectImpl {
     ): Project {
         const settings = createDefaultSettings();
 
-        // Detect if user events were captured (Chrome tab/window vs desktop)
-        const hasUserEvents = userEvents.mousePositions.length > 0;
-
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
 
@@ -228,51 +223,16 @@ export class ProjectImpl {
             speed: 1,
         }];
 
-        // Calculate Zoom Schedule
-        const deviceFrame = settings.screen.mode === 'device'
-            ? getDeviceFrame(settings.screen.deviceFrameId)
-            : undefined;
-
-        const viewMapper = new ViewMapper(
-            screenSource.size,
-            settings.outputSize,
-            settings.screen.padding,
-            undefined,
-            screenSource.trackableContentRect,
-            settings.screen.toolbar.enabled,
-            deviceFrame
-        );
-
-        const timeMapper = new TimeMapper(outputWindows);
-        const focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
-        const zoomSegments = hasUserEvents
-            ? calculateAutoZooms(
-                settings.zoom,
-                viewMapper,
-                timeMapper,
-                focusAreas
-            )
-            : [];
-
-        // Calculate Spotlight Schedule (if has events)
-        const spotlightSegments = hasUserEvents
-            ? calculateAutoSpotlights(
-                viewMapper,
-                timeMapper,
-                userEvents.hoveredCards || [],
-                zoomSegments,
-                settings.zoom,
-                settings.spotlight
-            )
-            : [];
-
+        // Auto zoom/spotlight segments and focus areas are NOT computed here —
+        // the editor generates them from userEvents on first open (see
+        // autoEffectsGenerated). This keeps upload free of effect logic.
         const timeline: Timeline = {
             id: crypto.randomUUID(),
             durationMs: durationMs,
             outputWindows: outputWindows,
-            zoomSegments: zoomSegments,
-            spotlightSegments: spotlightSegments,
-            focusAreas: focusAreas,
+            zoomSegments: [],
+            spotlightSegments: [],
+            focusAreas: [],
             captionSegments: [],
             cameraMoveSegments: [],
             overlaySegments: [],
@@ -282,6 +242,7 @@ export class ProjectImpl {
         return {
             id: projectId,
             schemaVersion: CURRENT_SCHEMA_VERSION,
+            autoEffectsGenerated: false,
             screenSource,
             cameraSource,
             microphoneSource,

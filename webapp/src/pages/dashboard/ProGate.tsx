@@ -1,6 +1,6 @@
 import { useState, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { navigate } from '../navigate';
+import { navigate } from '../../lib/navigate';
 
 interface ProGateProps {
     /** The locked feature name shown in the tooltip, e.g. "shareable links" */

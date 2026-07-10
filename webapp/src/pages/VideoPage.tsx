@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { LogoLink } from '@shared/components/LogoLink';
-import { Button, ThemeToggle } from '@shared/components';
+import { Button } from '@shared/components';
+import { ThemeToggle } from '../theme/ThemeToggle';
 import { TbCopy } from 'react-icons/tb';
 import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
 import { supabase } from '../auth/AuthManager';
-import { navigate } from '../navigate';
+import { navigate } from '../lib/navigate';
 
 interface VideoPageData {
     status?: 'completed' | 'pending' | 'failed';

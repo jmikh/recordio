@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { LuArrowLeft, LuUsers, LuSettings2, LuCreditCard, LuLoader } from 'react-icons/lu';
 import { supabase } from '../../auth/AuthManager';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
-import { navigate } from '../../navigate';
-import { captureError } from '../../utils/sentry';
+import { navigate } from '../../lib/navigate';
+import { captureError } from '../../lib/sentry';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
 import { switchWorkspace } from '../../workspace/switchWorkspace';
 import { GeneralPage } from './GeneralPage';

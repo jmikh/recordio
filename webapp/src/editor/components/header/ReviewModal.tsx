@@ -1,6 +1,6 @@
 import { Modal, Button } from '@shared/components';
-import { trackReviewModalShown, trackReviewModalDismissed, trackReviewModalReviewClicked } from '../../../core/analytics';
-import { LocalPreferences } from '../../../storage/localPreferences';
+import { trackReviewModalShown, trackReviewModalDismissed, trackReviewModalReviewClicked } from '../../../analytics';
+import { LocalPreferences } from '../../../lib/localPreferences';
 const REVIEW_URL = 'https://chromewebstore.google.com/detail/recordio-smart-screen-rec/bbcdpipjplklaneplfmlhhibnllhinii/reviews';
 
 interface ReviewModalProps {

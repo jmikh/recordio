@@ -7,7 +7,7 @@
 
 import type { HoveredCardEvent, ZoomSegment, SpotlightSegment, SpotlightSettings, Rect, Size, ZoomSettings } from '@shared/types';
 import { ViewMapper } from '@shared/mappers/viewMapper';
-import { getViewportStateAtTime } from '../zoom';
+import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 import { TimeMapper } from '@shared/mappers/timeMapper';
 
 // ============================================================================

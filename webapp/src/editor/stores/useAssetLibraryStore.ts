@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { UserAssetService, type UserAsset } from '../../storage/userAssetService';
 import { BlobCache } from '../../storage/blobCache';
-import { captureError } from '../../utils/sentry';
+import { captureError } from '../../lib/sentry';
 
 const LIBRARY_LIMIT = 10;
 

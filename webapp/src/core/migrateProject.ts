@@ -94,6 +94,13 @@ export function migrateProject(raw: any): any {
         // No structural changes needed — storagePath is backfilled on load.
     }
 
+    // v5 → v6: autoEffectsGenerated flag added. Pre-v6 projects had their auto
+    // zoom/spotlight segments computed at creation (upload time), so mark them
+    // generated — regenerating would clobber user edits (e.g. deleted zooms).
+    if (version < 6) {
+        raw.autoEffectsGenerated = true;
+    }
+
     // Backfill displaySettings if missing (pre-displaySettings projects)
     if (raw.timeline && !raw.timeline.displaySettings) {
         raw.timeline.displaySettings = {

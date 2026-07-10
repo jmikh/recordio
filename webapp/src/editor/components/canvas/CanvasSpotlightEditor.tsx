@@ -10,7 +10,7 @@ import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
-import { getZoomBoundsForRange } from '../../../core/zoom/zoomBounds';
+import { getZoomBoundsForRange } from '../../utils/zoomBounds';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';

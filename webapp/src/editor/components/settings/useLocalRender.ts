@@ -3,9 +3,9 @@ import { ExportManager, type ExportProgress, type ExportEnvironment } from '@sha
 import { browserRenderContext } from '../../utils/renderContext';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { getClickSoundBuffer, getDragSoundBuffers } from '../../audio/clickSoundPlayer';
-import { LocalPreferences } from '../../../storage/localPreferences';
+import { LocalPreferences } from '../../../lib/localPreferences';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { captureError } from '../../../utils/sentry';
+import { captureError } from '../../../lib/sentry';
 import type { Project } from '@shared/types';
 
 interface UseLocalRenderOptions {

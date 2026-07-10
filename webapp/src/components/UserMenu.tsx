@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { LuUser, LuLogOut } from 'react-icons/lu';
 import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
 import { useUserStore } from '../auth/useUserStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useThemeStore } from '../stores/useThemeStore';
+import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
+import { useThemeStore } from '../theme/useThemeStore';
 import { AuthManager } from '../auth/AuthManager';
-import { navigate } from '../navigate';
+import { navigate } from '../lib/navigate';
 
 interface UserMenuProps {
     onOpenSupportModal?: () => void;

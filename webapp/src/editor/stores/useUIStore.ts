@@ -3,7 +3,7 @@ import type { ID, TimeMs, Size } from '@shared/types';
 
 import { useProjectStore } from './useProjectStore';
 import type { DisplaySettings } from '@shared/types/timeline';
-import { LocalPreferences } from '../../storage/localPreferences';
+import { LocalPreferences } from '../../lib/localPreferences';
 
 export const CanvasMode = {
     Preview: 'preview',

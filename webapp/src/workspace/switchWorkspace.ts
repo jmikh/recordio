@@ -1,5 +1,5 @@
 import { supabase } from '../auth/AuthManager';
-import { useWorkspaceStore, type WorkspaceListItem } from '../stores/useWorkspaceStore';
+import { useWorkspaceStore, type WorkspaceListItem } from './useWorkspaceStore';
 
 /**
  * Switch the active workspace: update the store, persist as default,

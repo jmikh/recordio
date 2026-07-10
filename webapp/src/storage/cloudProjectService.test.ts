@@ -76,7 +76,8 @@ vi.stubGlobal('crypto', {
 function makeProject(id = 'proj-1') {
     return {
         id,
-        schemaVersion: 5,
+        schemaVersion: 6,
+        autoEffectsGenerated: true,
         screenSource: { storagePath: 'u/p/screen.webm', durationMs: 10000, size: { width: 1920, height: 1080 }, hasAudio: true },
         userEvents: { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] },
         settings: {} as any,

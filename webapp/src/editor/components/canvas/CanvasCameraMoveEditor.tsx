@@ -9,7 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
 import { drawCamera } from '@shared/painters/cameraPainter';
-import { getViewportStateAtTime } from '../../../core/zoom';
+import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy (for CameraMoveEdit mode)

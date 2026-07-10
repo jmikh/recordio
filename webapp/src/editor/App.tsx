@@ -24,10 +24,10 @@ import { AuthModal } from '../auth/AuthModal';
 
 import { useUserStore } from '../auth/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
-import { trackEditorPageLoaded, trackProjectLoadFailed } from '../core/analytics';
-import { captureError } from '../utils/sentry';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { navigate } from '../navigate';
+import { trackEditorPageLoaded, trackProjectLoadFailed } from '../analytics';
+import { captureError } from '../lib/sentry';
+import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
+import { navigate } from '../lib/navigate';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);

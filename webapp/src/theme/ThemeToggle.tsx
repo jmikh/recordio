@@ -1,6 +1,6 @@
 import React from 'react';
 import { MdLightMode, MdDarkMode } from 'react-icons/md';
-import { useThemeStore } from '../../webapp/src/stores/useThemeStore';
+import { useThemeStore } from './useThemeStore';
 
 const ANIMATION_DURATION = '200ms';
 const ANIMATION_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';

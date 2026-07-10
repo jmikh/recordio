@@ -3,8 +3,8 @@ import type { ProjectState } from '../useProjectStore';
 import type { ID, SpotlightSegment } from '@shared/types';
 import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { calculateAutoSpotlights } from '../../../core/spotlight/autoSpotlight';
-import { ViewMapper } from '../../../core/zoom';
+import { calculateAutoSpotlights } from '../../spotlight/autoSpotlight';
+import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 export interface SpotlightSlice {

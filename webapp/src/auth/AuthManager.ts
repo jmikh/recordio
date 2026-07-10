@@ -1,10 +1,10 @@
 import { type Session } from '@supabase/supabase-js';
 import * as Sentry from '@sentry/react';
 import { useUserStore } from './useUserStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { supabase, setUnauthorizedHandler } from '../supabase/client';
-import { captureError } from '../utils/sentry';
-import { trackSigninFailed } from '../core/analytics';
+import { captureError } from '../lib/sentry';
+import { trackSigninFailed } from '../analytics';
 
 // Re-export so existing callers keep working.
 export { supabase };

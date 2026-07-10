@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useState, useRef } from 'react';
-import { captureImportError, captureError } from '../utils/sentry';
+import { captureImportError, captureError } from '../../lib/sentry';
 import {
     BRIDGE_MSG,
     PORT_MSG,

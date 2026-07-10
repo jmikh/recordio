@@ -14,8 +14,8 @@ import { TbBackground } from 'react-icons/tb';
 import { useToast } from '../../../components/Toast';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
-import { trackUploadBackgroundClicked, trackUploadBackgroundFailed } from '../../../core/analytics';
-import { captureError } from '../../../utils/sentry';
+import { trackUploadBackgroundClicked, trackUploadBackgroundFailed } from '../../../analytics';
+import { captureError } from '../../../lib/sentry';
 
 
 

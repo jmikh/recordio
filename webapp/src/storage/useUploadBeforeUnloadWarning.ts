@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useSyncStatusStore } from '../storage/syncStatusStore';
+import { useSyncStatusStore } from './syncStatusStore';
 
 /**
  * Registers a `beforeunload` listener while a media upload is in flight,

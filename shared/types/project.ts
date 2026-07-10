@@ -34,6 +34,13 @@ export interface Project {
     schemaVersion: number;
     /** URL (blob or remote) to project, or just a generic placeholder if undefined */
     thumbnail?: string;
+    /**
+     * Whether auto zoom/spotlight segments (and focus areas) have been
+     * generated from userEvents. False at creation; the editor generates them
+     * on first open and flips this to true. Never regenerate once true — an
+     * empty zoomSegments array may mean the user deleted them.
+     */
+    autoEffectsGenerated: boolean;
 
     /** Screen recording source metadata (always present) */
     screenSource: ScreenMetadata;

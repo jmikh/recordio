@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { LocalPreferences } from '../storage/localPreferences';
+import { LocalPreferences } from '../lib/localPreferences';
 
 export type Theme = 'light' | 'dark';
 

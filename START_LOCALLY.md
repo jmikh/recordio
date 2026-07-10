@@ -8,6 +8,11 @@ All commands run from the repo root unless noted.
 # 1. Local Supabase (DB, auth, storage — Studio at http://127.0.0.1:54323)
 supabase start
 
+# 1b. Apply any migrations added since your local DB was created
+#     (supabase start does NOT run new migrations on an existing volume;
+#      symptoms: RLS errors like "new row violates row-level security policy")
+supabase migration up
+
 # 2. Edge functions (required for stripe, uploads, etc.)
 supabase functions serve --env-file supabase/.env.local
 
@@ -18,6 +23,12 @@ npm run dev:webapp
 stripe listen --forward-to http://127.0.0.1:54321/functions/v1/stripe-webhooks
 ```
 
+**Storage bucket:** the webapp uploads project media to the `project-media` Supabase Storage bucket. It's declared in `supabase/config.toml` (`[storage.buckets.project-media]`) so it's created automatically on `supabase start`. If uploads fail with tus 404 "Bucket not found", the bucket is missing — restart Supabase or create it directly:
+
+```sql
+insert into storage.buckets (id, name) values ('project-media', 'project-media');
+```
+
 **Stripe gotcha:** each `stripe listen` session prints a new `whsec_...` secret. Paste it into `STRIPE_WEBHOOK_SECRET` in `supabase/.env.local` and restart the `functions serve` terminal. The `sk_test_...` key and price IDs in that file persist and don't need touching.
 
 ### Optional extras
@@ -25,10 +36,19 @@ stripe listen --forward-to http://127.0.0.1:54321/functions/v1/stripe-webhooks
 ```bash
 # Render worker (needed for export/render features)
 PORT=8090 npx tsx --env-file=render-worker/.env.local render-worker/src/server.ts
-
-# MinIO — local S3 (needed for uploads/integration tests)
-docker compose up -d minio
 ```
+
+### Media storage (local)
+
+All media lives in local Supabase Storage (`project-media` bucket): the webapp
+uploads via tus, and edge functions read the same store through its
+S3-compatible endpoint (`http://127.0.0.1:54321/storage/v1/s3`, keys from
+`supabase status -o env`, configured in `supabase/.env.local`). Browse files in
+Studio → Storage at http://127.0.0.1:54323.
+
+MinIO is no longer used for dev (it was only needed when uploads went through
+presigned S3 multipart; tus replaced that). Integration tests may still expect
+it — `docker compose up -d minio` if so.
 
 ## Webapp: prod vs local
 

@@ -6,7 +6,7 @@ import type { SpotlightSegment } from '@shared/types';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS, type TimelineSegmentDragState } from '../shared/useTimelineSegmentDrag';
 import { getValidBlockRange, doSourceRangesOverlap } from '../shared/timelineTrackUtils';
 import type { TimeMapper } from '@shared/mappers/timeMapper';
-import { getZoomBoundsForRange } from '../../../../../core/zoom/zoomBounds';
+import { getZoomBoundsForRange } from '../../../../utils/zoomBounds';
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 

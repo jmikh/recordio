@@ -3,7 +3,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
-import { captureError } from '../../../utils/sentry';
+import { captureError } from '../../../lib/sentry';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
