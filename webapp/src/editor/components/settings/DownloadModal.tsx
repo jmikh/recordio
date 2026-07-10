@@ -5,7 +5,7 @@ import { TbDeviceDesktop, TbCloud } from 'react-icons/tb';
 import { PiWarningFill } from 'react-icons/pi';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { useToast } from '../Toast';
+import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
 import type { CloudRenderPhase } from './useCloudRender';
 import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../core/analytics';

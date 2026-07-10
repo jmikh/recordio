@@ -2,7 +2,7 @@ import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
 
 import { getAllFocusAreas } from '../../core/zoom';
-import { useToast, type ToastType } from './Toast';
+import { useToast, type ToastType } from '../../components/Toast';
 
 const TOAST_TYPES: { type: ToastType; label: string; emoji: string }[] = [
     { type: 'info', label: 'Info', emoji: 'ℹ️' },

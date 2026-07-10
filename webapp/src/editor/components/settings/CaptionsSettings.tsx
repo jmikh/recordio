@@ -6,21 +6,21 @@ import { RiPaletteLine } from 'react-icons/ri';
 import { TbSparkles, TbCopy, TbDownload } from 'react-icons/tb';
 import { LuCaptions } from 'react-icons/lu';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
+import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { useUserStore } from '../../stores/useUserStore';
+import { useUserStore } from '../../../auth/useUserStore';
 import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, InfoTooltip, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { TranscriptionService } from '../../../core/transcription/TranscriptionService';
-import { CloudTranscriptionService } from '../../../core/transcription/CloudTranscriptionService';
+import { TranscriptionService } from '../../transcription/TranscriptionService';
+import { CloudTranscriptionService } from '../../transcription/CloudTranscriptionService';
 
 import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
-import { AuthModal } from '../header/AuthModal';
+import { AuthModal } from '../../../auth/AuthModal';
 
 import { trackGenerateCaptions, trackGenerateCaptionsClicked, trackGenerateCaptionsCompleted, trackGenerateCaptionsFailed } from '../../../core/analytics';
 import { captureError } from '../../../utils/sentry';
-import { useToast } from '../Toast';
+import { useToast } from '../../../components/Toast';
 import { ColorButton } from './ColorButton';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 

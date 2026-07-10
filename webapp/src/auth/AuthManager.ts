@@ -1,6 +1,6 @@
 import { type Session } from '@supabase/supabase-js';
 import * as Sentry from '@sentry/react';
-import { useUserStore } from '../editor/stores/useUserStore';
+import { useUserStore } from './useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { supabase, setUnauthorizedHandler } from '../supabase/client';
 import { captureError } from '../utils/sentry';

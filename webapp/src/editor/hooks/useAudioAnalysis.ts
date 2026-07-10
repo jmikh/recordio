@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../core/audioConstants';
+import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../audio/audioConstants';
 
 export interface AudioAnalysisResult {
     peaks: number[]; // Normalized -1..1 or 0..1 depending on usage

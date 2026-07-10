@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import { useUserStore } from '../editor/stores/useUserStore';
+import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 
 /**

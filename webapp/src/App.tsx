@@ -6,10 +6,10 @@ import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { WorkspaceSettingsPage } from './pages/Settings/WorkspaceSettingsPage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
-import { ToastProvider } from './editor/components/Toast';
+import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
-import { AuthModal } from './editor/components/header/AuthModal';
-import { useUserStore } from './editor/stores/useUserStore';
+import { AuthModal } from './auth/AuthModal';
+import { useUserStore } from './auth/useUserStore';
 import { UploadProgressToast } from './components/UploadProgressToast';
 import { useUploadBeforeUnloadWarning } from './hooks/useUploadBeforeUnloadWarning';
 

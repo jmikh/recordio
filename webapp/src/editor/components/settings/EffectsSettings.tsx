@@ -9,7 +9,7 @@ import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '@shared/types/settings';
 import { TbPlayerPlay } from 'react-icons/tb';
 import { MdOutlineKeyboardCommandKey, MdAdsClick } from 'react-icons/md';
-import { previewClickSound } from '../../../core/audio/clickSoundPlayer';
+import { previewClickSound } from '../../audio/clickSoundPlayer';
 
 // Click effect toggle options
 const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string; icon?: React.ReactNode }[] = [

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '../../../auth/AuthManager';
-import { useUserStore } from '../../stores/useUserStore';
+import { useUserStore } from '../../../auth/useUserStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../../../core/analytics';

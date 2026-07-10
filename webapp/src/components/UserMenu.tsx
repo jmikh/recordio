@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuUser, LuLogOut } from 'react-icons/lu';
 import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
-import { useUserStore } from '../editor/stores/useUserStore';
+import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useThemeStore } from '../stores/useThemeStore';
 import { AuthManager } from '../auth/AuthManager';

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { identifyUser, setUserProfileOnce, resetUser } from '../../core/analytics';
+import { identifyUser, setUserProfileOnce, resetUser } from '../core/analytics';
 
 export interface UserState {
     // Auth state

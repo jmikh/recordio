@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useUIStore } from '../stores/useUIStore';
 import { useProjectData } from '../stores/useProjectStore';
-import { useMediaUrlStore } from '../stores/useMediaUrlStore';
+import { useMediaUrlStore } from '../../storage/useMediaUrlStore';
 
 /**
  * Hook that manages background music playback in sync with the editor's

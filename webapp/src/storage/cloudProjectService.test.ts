@@ -39,7 +39,7 @@ vi.mock('@sentry/react', () => ({
     captureException: vi.fn(),
 }));
 
-vi.mock('../editor/stores/useMediaUrlStore', () => ({
+vi.mock('./useMediaUrlStore', () => ({
     useMediaUrlStore: {
         getState: () => ({ setUrl: vi.fn() }),
     },

@@ -1,6 +1,6 @@
 import type { BaseEvent, DragEvent } from '@shared/types';
 import type { TimeMapper } from '@shared/mappers/timeMapper';
-import { useUIStore } from '../../editor/stores/useUIStore';
+import { useUIStore } from '../stores/useUIStore';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
 const CLICK_SOUND_URL = `${CDN_ORIGIN}/sounds/mouse-click.mp3`;

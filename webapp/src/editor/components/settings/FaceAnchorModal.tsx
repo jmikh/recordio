@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Modal, Button} from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
+import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useUIStore } from '../../stores/useUIStore';
 

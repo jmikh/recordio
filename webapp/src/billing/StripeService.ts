@@ -1,7 +1,7 @@
-import { supabase } from '../../auth/AuthManager';
-import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { captureError } from '../../utils/sentry';
-import { trackCheckoutSessionFailed, trackSubscriptionChangeFailed } from '../../core/analytics';
+import { supabase } from '../auth/AuthManager';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { captureError } from '../utils/sentry';
+import { trackCheckoutSessionFailed, trackSubscriptionChangeFailed } from '../core/analytics';
 
 export interface SubscriptionChangePreview {
     immediateCharge:   number;               // dollars charged today (proration)

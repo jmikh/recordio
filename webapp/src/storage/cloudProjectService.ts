@@ -5,7 +5,7 @@ import { captureError } from '../utils/sentry';
 import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
-import { useMediaUrlStore } from '../editor/stores/useMediaUrlStore';
+import { useMediaUrlStore } from './useMediaUrlStore';
 import { migrateProject } from '../core/migrateProject';
 import { ProjectImpl } from '../core/Project';
 import { cloudStoragePath, hydrateMediaUrls } from './projectBlobs';

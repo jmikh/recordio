@@ -1,15 +1,15 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
-import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
+import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { captureError } from '../../../utils/sentry';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useBackgroundMusic } from '../../hooks/useBackgroundMusic';
 
 import { PlaybackRenderer, type RenderResources } from '@shared/export/PlaybackRenderer';
-import { playClickSounds, playDragSounds, resetClickSounds } from '../../../core/audio/clickSoundPlayer';
-import { browserRenderContext } from '../../../core/renderContext';
+import { playClickSounds, playDragSounds, resetClickSounds } from '../../audio/clickSoundPlayer';
+import { browserRenderContext } from '../../utils/renderContext';
 import { ZoomEditor, renderZoomEditor } from './CanvasZoomEditor';
 import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor';
 import { renderCropEditor, CropEditor } from './CanvasCropEditor';

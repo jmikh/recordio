@@ -9,15 +9,15 @@ import { DashboardHeader, type FilterTab, type SortOrder } from '../components/D
 import { XButton, Modal, Button } from '@shared/components';
 import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
-import { useUserStore } from '../editor/stores/useUserStore';
+import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useNonFreeAccess } from '../hooks/useNonFreeAccess';
 import { AuthManager, supabase } from '../auth/AuthManager';
 import { switchWorkspace } from '../workspace/switchWorkspace';
 
 import { SupportModal } from '../components/SupportModal';
-import { AuthModal } from '../editor/components/header/AuthModal';
-import { useToast } from '../editor/components/Toast';
+import { AuthModal } from '../auth/AuthModal';
+import { useToast } from '../components/Toast';
 import { trackProjectOpened, trackDashboardPageLoaded, trackWorkspaceCreateFailed, trackProjectDeleteFailed } from '../core/analytics';
 import { captureError } from '../utils/sentry';
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FcGoogle } from 'react-icons/fc';
-import { AuthManager } from '../../../auth/AuthManager';
+import { AuthManager } from './AuthManager';
 import { Modal, LogoLink, Button } from '@shared/components';
 import { MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
 

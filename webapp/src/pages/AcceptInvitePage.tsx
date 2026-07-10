@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { LuLoader, LuCircleCheck, LuCircleX } from 'react-icons/lu';
 import { Button, LogoLink } from '@shared/components';
 import { supabase } from '../auth/AuthManager';
-import { useUserStore } from '../editor/stores/useUserStore';
-import { AuthModal } from '../editor/components/header/AuthModal';
+import { useUserStore } from '../auth/useUserStore';
+import { AuthModal } from '../auth/AuthModal';
 import { trackInviteAcceptFailed } from '../core/analytics';
 import { captureError } from '../utils/sentry';
 

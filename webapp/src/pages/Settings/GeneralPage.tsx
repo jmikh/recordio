@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
 import { supabase } from '../../auth/AuthManager';
-import { useToast } from '../../editor/components/Toast';
+import { useToast } from '../../components/Toast';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { trackGeneralSettingsPageLoaded } from '../../core/analytics';
 import { captureError } from '../../utils/sentry';

@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { ExportManager, type ExportProgress, type ExportEnvironment } from '@shared/export/ExportManager';
-import { browserRenderContext } from '../../../core/renderContext';
-import { useMediaUrlStore } from '../../stores/useMediaUrlStore';
-import { getClickSoundBuffer, getDragSoundBuffers } from '../../../core/audio/clickSoundPlayer';
+import { browserRenderContext } from '../../utils/renderContext';
+import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
+import { getClickSoundBuffer, getDragSoundBuffers } from '../../audio/clickSoundPlayer';
 import { LocalPreferences } from '../../../storage/localPreferences';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { captureError } from '../../../utils/sentry';

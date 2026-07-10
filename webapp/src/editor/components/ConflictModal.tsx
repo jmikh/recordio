@@ -3,7 +3,7 @@ import { Modal } from '@shared/components';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useProjectStore } from '../stores/useProjectStore';
-import { useUserStore } from '../stores/useUserStore';
+import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { navigate } from '../../navigate';
 import { captureError } from '../../utils/sentry';

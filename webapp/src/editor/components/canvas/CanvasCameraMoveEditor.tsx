@@ -3,7 +3,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import type { CameraSettings, CameraMoveSegment, Rect, Project } from '@shared/types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
-import { DimmedOverlay } from '../../../components/DimmedOverlay';
+import { DimmedOverlay } from './DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';

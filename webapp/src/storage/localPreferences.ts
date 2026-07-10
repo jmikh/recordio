@@ -4,7 +4,7 @@
  * Every persisted preference key lives here so there's a single place
  * to see (and search for) all local state the app writes to disk.
  *
- * NOTE: The inline <script> in editor/index.html also reads 'recordio-theme'
+ * NOTE: The inline <script> in webapp/index.html also reads 'recordio-theme'
  * directly — that's intentional (it runs before any JS bundle loads to
  * prevent a white flash).
  */

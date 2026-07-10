@@ -4,12 +4,12 @@ import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2, LuArrowLeft } from 'react-icons/lu';
 import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 
-import { AuthModal } from './AuthModal';
+import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
 import { ProUpgradeModal } from '../../../components/ProUpgradeModal';
 import { navigate } from '../../../navigate';
 import { UserMenu } from '../../../components/UserMenu';
-import { useUserStore } from '../../stores/useUserStore';
+import { useUserStore } from '../../../auth/useUserStore';
 
 import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../core/analytics';
 import { captureError } from '../../../utils/sentry';
@@ -22,7 +22,7 @@ import { DownloadModal } from '../settings/DownloadModal';
 import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
 import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
-import { useToast } from '../Toast';
+import { useToast } from '../../../components/Toast';
 import { supabase } from '../../../auth/AuthManager';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 

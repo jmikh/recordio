@@ -7,7 +7,7 @@ import { drawScreen } from '@shared/painters/screenPainter';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { BoundingBox, type CornerRadii } from './bounding-box';
-import { DimmedOverlay } from '../../../components/DimmedOverlay';
+import { DimmedOverlay } from './DimmedOverlay';
 
 // ------------------------------------------------------------------
 // LOGIC: Render Strategy

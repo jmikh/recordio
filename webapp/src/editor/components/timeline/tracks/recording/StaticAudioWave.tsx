@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../../../../core/audioConstants';
+import { AUDIO_PEAKS_SAMPLES_PER_SEC } from '../../../../audio/audioConstants';
 
 interface StaticAudioWaveProps {
     peaks: number[]; // Full cached peaks for the source

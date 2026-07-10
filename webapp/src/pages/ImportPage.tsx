@@ -4,10 +4,10 @@ import { CloudProjectService } from '../storage/cloudProjectService';
 import { useSyncStatusStore } from '../storage/syncStatusStore';
 import { captureImportError } from '../utils/sentry';
 import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../core/analytics';
-import { useUserStore } from '../editor/stores/useUserStore';
+import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
-import { AuthModal } from '../editor/components/header/AuthModal';
+import { AuthModal } from '../auth/AuthModal';
 import { navigate } from '../navigate';
 import { supabase } from '../auth/AuthManager';
 

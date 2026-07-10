@@ -10,7 +10,7 @@ import { getTimeMapper } from './hooks/useTimeMapper';
 
 
 import { CloudProjectService } from '../storage/cloudProjectService';
-import { useMediaUrlStore } from './stores/useMediaUrlStore';
+import { useMediaUrlStore } from '../storage/useMediaUrlStore';
 import { useAssetLibraryStore } from './stores/useAssetLibraryStore';
 import { Modal } from '@shared/components';
 import { SUPPORT_EMAIL } from '@shared/types/bridge';
@@ -18,11 +18,11 @@ import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
 import { SyncFailedModal } from './components/SyncFailedModal';
-import { AuthModal } from './components/header/AuthModal';
+import { AuthModal } from '../auth/AuthModal';
 
 
 
-import { useUserStore } from './stores/useUserStore';
+import { useUserStore } from '../auth/useUserStore';
 import { AuthManager } from '../auth/AuthManager';
 import { trackEditorPageLoaded, trackProjectLoadFailed } from '../core/analytics';
 import { captureError } from '../utils/sentry';

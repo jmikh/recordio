@@ -3,9 +3,9 @@ import { LuLoader, LuCheck, LuX, LuCreditCard, LuShieldCheck } from 'react-icons
 import { Button } from '@shared/components';
 import { supabase, AuthManager } from '../../auth/AuthManager';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { useUserStore } from '../../editor/stores/useUserStore';
-import { useToast } from '../../editor/components/Toast';
-import { StripeService, SubscriptionChangePreview } from '../../editor/stripe/StripeService';
+import { useUserStore } from '../../auth/useUserStore';
+import { useToast } from '../../components/Toast';
+import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
 import type { BillingInterval } from './types';
 import { trackBillingPageLoaded } from '../../core/analytics';
 
