@@ -20,4 +20,11 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Server logs are structured pino events only (see server/README.md)
+    files: ['server/**/*.ts'],
+    rules: {
+      'no-console': 'error',
+    },
+  },
 ])

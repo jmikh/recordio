@@ -6,9 +6,83 @@ Out of scope: RPC proxying, auth, storage uploads, business-logic rewrites.
 Organizing constraint: **testability first**. Every architectural choice in
 Steps 0–2 exists to make route handlers testable in-process with no network,
 no Docker, and no external accounts. Definition of done for every route:
-unit tests against fakes, an idempotency (run-twice) test where the route is
-webhook/cron-invoked, and a parity fixture proving response compatibility
-with the edge function it replaces.
+comprehensive tests written fresh with the port (e2e against real local
+Postgres + unit against fakes), an idempotency (run-twice) test where the
+route is webhook/cron-invoked, the client call site switched behind the
+`USE_SERVER_INSTEAD_OF_SUPA` flag, and a manual local verification by the
+user with the flag on.
+
+## Status (updated 2026-07-13)
+
+**Done:**
+- **Step 0** — `server/` scaffolded (Fastify + TypeBox, `buildApp(deps)` factory,
+  `/health` + `/debug-sentry`, tsup/tsx per render-worker conventions). Railway
+  service deployed and verified by the user (health returns git SHA, Sentry
+  receives events). CI: `.github/workflows/server-tests.yml` (typecheck + tests
+  on every PR/master push); Railway "Wait for CI" enabled. Root vitest picks up
+  `server/` tests.
+- **Step 0.5** — ports in `server/src/ports/` (aggregated in `src/deps.ts`),
+  in-memory fakes in `server/test/fakes/` (`createFakeDeps()`, throwing-db
+  default). Includes `SupabaseApiPort` (auth admin getUserById + storage
+  list/remove) which the original plan missed. Survey findings: **no S3
+  multipart anywhere** (asset-create is a plain presigned PUT — Wave B simpler
+  than planned); `_shared/muxUpload.ts`'s storage `createSignedUrl` can become
+  `S3Port.presignDownload` at migration. Real adapters land with the first
+  route that needs them (`server.ts` wires throwing `unimplementedPort`
+  proxies until then).
+- **Step 0.6** — skipped (see section below).
+- **Step 0.7** — logging foundation: `src/logging.ts` (typed `DomainLogFields`,
+  `ErrorType` enum, `logEvent()` catalog, redact backstop), canonical
+  per-request event via `onResponse` hook, `req.logCtx`, `console.*` banned by
+  eslint in `server/`, level policy in `server/README.md`, Sentry events tagged
+  with `request_id`.
+- **Step 1** — auth: `src/plugins/auth.ts`. `requireUser` verifies **both**
+  token formats by header alg — HS256 via `SUPABASE_JWT_SECRET`, ES256/RS256
+  via the project JWKS (`SUPABASE_URL`), because the local stack (and possibly
+  prod) issues the new asymmetric "JWT signing keys" tokens. Rejects anon/
+  service-role tokens (`sub` + `role === 'authenticated'` required). Plus
+  `requireServiceBearer(secret)` for machine-to-machine routes. Contract tests
+  run against real local-Supabase tokens (auto-skip without env).
+- **Step 2** — folded into per-function migrations: each `_shared` helper is
+  ported with its first consuming route, not speculatively.
+- **Env files:** `server/.env.local` (local stack, `npm run dev`),
+  `server/.env.prod` (prod-pointed local run, `npm run dev:prod`),
+  `server/.env.example` committed. Railway holds prod env.
+- **Test-infra fixes:** root `.env.test` creds aligned to `supabase/seed.sql`
+  users (`user1@gmail.com`/`user2@gmail.com`, password `password123`);
+  seed.sql's bcrypt hash regenerated — it matched neither of its two
+  contradictory comments.
+
+**Next: Step 3** (client API module + flag), then Wave A #1
+(`storage-download-urls`).
+
+### Step 3 implementation notes (recon done, for the next session)
+
+- The supabase client lives at `webapp/src/supabase/client.ts` — exports
+  `supabase` (nullable!) and `setUnauthorizedHandler`; its `authAwareFetch`
+  already funnels any 401 → `AuthManager.signOut()`. The new API client must
+  route its own 401s through the same funnel.
+- `supabase.functions.invoke` call sites found in `webapp/src` (12):
+  `storage/userAssetService.ts` (asset-create); `storage/cloudStorage.ts`
+  (project-create, project-create-v2, project-update-thumbnail,
+  storage-download-urls); `pages/VideoPage.tsx` (shared-video-get);
+  `billing/StripeService.ts` (stripe-checkout, subscription-change,
+  stripe-portal); `editor/transcription/CloudTranscriptionService.ts`
+  (transcribe); `editor/components/settings/useCloudRender.ts`
+  (storage-download-urls, render-job-create);
+  `editor/components/header/Header.tsx` (mux-video-create).
+- **Resolved (was an open check):** `stripe-add-seats` has **zero callers**
+  anywhere in the repo — dead edge function; don't port, list it for
+  decommission (user to confirm). `send-workspace-invite` is **DB-invoked**:
+  `supabase/sql/functions/workspace_invite.sql` (a client-called RPC) fires it
+  via `net.http_post` — it migrates in Wave E (repoint the URL inside that SQL
+  function), not Wave A.
+- Wrapper design: `invokeFunction(name, body)` returns the supabase-shaped
+  `{ data, error }`; routes to `${VITE_API_URL}/${name}` (Bearer = current
+  session token) only when `VITE_USE_SERVER === 'true'` AND name is in the
+  migrated-functions registry; otherwise falls through to
+  `supabase.functions.invoke`. Call sites convert per function, in the same
+  change as that function's server port.
 
 ## Step 0 — Scaffold and deploy the skeleton
 
@@ -63,28 +137,21 @@ Rules:
   CI job that's allowed to be slow/optional.
 - Fakes live in `server/test/fakes/` and are the default in every unit test.
 
-## Step 0.6 — Parity fixture harness
+## Step 0.6 — Parity fixture harness — SKIPPED (decision 2026-07-13)
 
-The migration-specific safety net: prove each Fastify route is
-request/response-compatible with the edge function it replaces, using
-recorded traffic rather than re-derived expectations.
+Dropped: the edge functions have no test seams or mocks, so captured
+fixtures would only enshrine untested, poorly-understood behavior.
+Replacement per function:
 
-- Before porting a function, capture fixtures from the edge function running
-  on the local Supabase stack (`supabase functions serve`) with seeded data —
-  not production. For each meaningful case (success, auth failure, validation
-  failure, domain error), record request (method, headers minus secrets,
-  body) and response (status, body) as JSON files in
-  `server/test/fixtures/parity/<function-name>/`.
-- Parity test runner: replays each fixture through `app.inject()` against
-  `buildApp(fakeDeps)` (db pointed at the same seeded local Postgres) and
-  diffs status + body. Header differences are expected and ignored except
-  `content-type`.
-- Known-acceptable diffs (e.g. better validation messages) are recorded per
-  fixture as an explicit allowlist entry, never by loosening the diff.
-
-This makes "did the port change behavior?" a test failure instead of a
-production incident, and the fixtures double as documentation of each edge
-function's actual contract — which today exists only as untyped Deno code.
+- Comprehensive tests written fresh with the port (e2e against real seeded
+  local Postgres + unit against fakes) — the tests define the contract,
+  informed by reading the edge function, not by recorded traffic.
+- The client call site moves behind the `USE_SERVER_INSTEAD_OF_SUPA` flag
+  (Step 3) in the same change, and the user verifies the function manually
+  in local dev with the flag on before cutover.
+- Response shapes still stay identical to the edge function (no client type
+  changes); any deliberate behavior change is called out explicitly in the
+  PR description.
 
 ## Step 0.7 — Logging foundation
 
@@ -169,14 +236,24 @@ review):
 - `webapp/src/api/client.ts`: thin `fetch` wrapper — base URL from env
   (`VITE_API_URL`), attaches the current Supabase access token, JSON
   in/out, funnels 401 through the existing unauthorized handler.
-- Route-by-route, `supabase.functions.invoke('x')` → `api.post('/x')`
-  (~13 call sites). Keep response shapes identical — no client type changes.
+- **Global flag `USE_SERVER_INSTEAD_OF_SUPA`** (from `VITE_USE_SERVER`,
+  defaults to false): an `invokeFunction(name, body)` wrapper routes to the
+  Fastify server only when the flag is on AND the function is in the
+  wrapper's migrated-functions registry; otherwise it falls through to
+  `supabase.functions.invoke`. This keeps cutover per-function (the registry)
+  while giving one switch to flip during local development, and makes
+  rollback a flag flip.
+- Route-by-route, `supabase.functions.invoke('x')` → the wrapper
+  (~13 call sites). The client side of each function moves in the same
+  change as its server port. Keep response shapes identical — no client
+  type changes.
 
 ## Step 4 — Migrate routes in risk order
 
-Each route: capture parity fixtures → port → **write its tests** → tests
-green (end-to-end + parity + idempotency where applicable) → deploy → switch
-traffic → observe → **pause**. Tests are part of each function's migration,
+Each route: port → **write comprehensive tests** → tests green (end-to-end
++ idempotency where applicable) → switch the client call site behind the
+flag → **user verifies manually in local dev with the flag on** → deploy →
+cut over → observe → **pause**. Tests are part of each function's migration,
 written alongside the port and never deferred to a follow-up — a function
 without green tests does not cut over, and we do not move to the next
 function. One function at a time; after each function's cutover, stop and
@@ -201,9 +278,10 @@ self-contained server code, not a shell around SQL — with one guard rail:
 
 First task per function: list the DB functions it calls and classify each as
 exclusive vs. shared (grep `supabase/sql/functions/` callers + the client's
-`supabase.rpc(...)` names). The parity fixtures gate the ported logic: same
+`supabase.rpc(...)` names). The e2e tests gate the ported logic: same
 inputs must produce the same response **and the same resulting DB state** as
-the edge function + SQL pair they replace.
+the edge function + SQL pair they replace (asserted by tests derived from
+reading the edge function, plus the user's manual local verification).
 
 ### Per-function analysis pass (simplification / cleanup)
 
@@ -220,15 +298,15 @@ the PR description):
 - **Consistency:** error responses, status codes, and naming normalized to
   the server's conventions instead of each function's ad-hoc style.
 - **Smells worth flagging but NOT fixing now:** anything that would change
-  behavior beyond the allowlist — record it in the plan/issue tracker
-  instead.
+  behavior beyond what's explicitly called out — record it in the plan/issue
+  tracker instead.
 
 Discipline: simplification must not silently change the contract. Anything
-that alters an observable response lands as an explicit parity-allowlist
-entry (Step 0.6) with a one-line justification — the diff between "cleaner"
-and "different" stays visible. Internal cleanups (fewer queries, clearer
-code) need no allowlist entry, but the end-to-end tests must still pass
-against the same seeded data and expected DB state.
+that alters an observable response is called out explicitly in the PR
+description with a one-line justification — the diff between "cleaner" and
+"different" stays visible. Internal cleanups (fewer queries, clearer code)
+need no callout, but the end-to-end tests must still pass against the same
+seeded data and expected DB state.
 
 ### Per-function testing: end-to-end against a real seeded database
 
@@ -265,15 +343,17 @@ rather than a review guideline.
 Webhooks go **last**, deliberately: they require provider-side configuration
 changes (Stripe dashboard, Mux dashboard, render-worker callback URL) and are
 the hardest to e2e test. By the time they migrate, the server, auth plugin,
-ports, and parity harness are proven on lower-stakes routes.
+ports, and test harness are proven on lower-stakes routes.
 
 ### Wave A — Client-invoked, low risk (simple request/response)
 1. `storage-download-urls` (S3 presign)
 2. `shared-video-get` (public, no auth — add rate limit)
-3. `stripe-checkout`, `stripe-portal`, `stripe-add-seats`,
-   `subscription-change` (these call Stripe's API but are plain
-   request/response — no Stripe dashboard changes needed, unlike webhooks)
-4. `send-workspace-invite`
+3. `stripe-checkout`, `stripe-portal`, `subscription-change` (these call
+   Stripe's API but are plain request/response — no Stripe dashboard changes
+   needed, unlike webhooks). ~~`stripe-add-seats`~~ — dead code, zero callers
+   anywhere in the repo; don't port, decommission instead (user to confirm).
+4. ~~`send-workspace-invite`~~ — moved to Wave E: it's invoked from the DB
+   (`workspace_invite.sql` via `net.http_post`), not by the client.
 5. `unsubscribe` (public link target — this is a URL in sent emails; keep the
    old edge function alive as a redirect, or accept that old emails break,
    or proxy the old URL. Decide before cutover.)
@@ -339,6 +419,9 @@ delete-by-condition (the second runner finds nothing to delete).
     repoint the trigger's URL (pg_net) at Fastify, bearer-token protected.
     Idempotent: welcome-email-sent flag on the profile row (trigger retries
     must not double-send).
+19. `send-workspace-invite` (moved from Wave A) — invoked by the
+    `workspace_invite` SQL RPC via `net.http_post`; port the route
+    (bearer-token protected) and repoint the URL inside that SQL function.
 
 ## Step 5 — Decommission (manual, done by hand at the very end)
 
@@ -363,8 +446,8 @@ user to execute manually once all waves have soaked:
 function, written with the port, exercising the full path: routing, TypeBox
 validation, auth (real Supabase-issued JWTs via the existing
 `test/helpers/supabaseClient.ts` patterns), the migrated TS/SQL logic, and
-the resulting DB state. Parity fixture replays (Step 0.6) live here. See
-"Per-function testing" in Step 4 for seeding/isolation mechanics.
+the resulting DB state. See "Per-function testing" in Step 4 for
+seeding/isolation mechanics.
 
 **Unit (fast, no Docker, for logic that doesn't touch the DB):** same
 `app.inject()` harness with all fakes. Covers validation edges, error
@@ -400,13 +483,13 @@ of Part 1. No data migrations occur in Part 1.
 
 ## Estimated shape
 
-- Step 0–3 (skeleton, ports/fakes, parity harness, logging foundation, auth,
-  helpers, client module): the foundation chunk — deliberately front-loaded. The ports and
-  parity harness feel like overhead before the first route ships, but they
+- Step 0–3 (skeleton, ports/fakes, logging foundation, auth, helpers,
+  client module): the foundation chunk — deliberately front-loaded. The
+  ports and fakes feel like overhead before the first route ships, but they
   are what make Waves A–E mechanical instead of risky, and they're the whole
   point of the testability focus.
-- Wave A: mechanical, batchable — the first proof that the fake/parity
-  harness pays off, on the lowest-stakes routes.
+- Wave A: mechanical, batchable — the first proof that the fake harness
+  pays off, on the lowest-stakes routes.
 - Wave B: the fiddly 30% — S3 multipart, render-worker coordination. Budget
   most of the review attention here; also where the fakes (S3Port,
   RenderWorkerPort) earn their keep, since the real services are the hardest

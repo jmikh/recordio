@@ -2,7 +2,7 @@
 -- Seed data for local Supabase testing
 -- ============================================================================
 -- Run after `supabase db reset` applies migrations.
--- Password for all users: admin123
+-- Password for all users: password123
 --
 -- Users
 --   user1@gmail.com  — 4 workspaces (personal + 3 team with varied subscriptions)
@@ -43,7 +43,7 @@ INSERT INTO auth.users (
     '11111111-1111-1111-1111-111111111111',
     'authenticated', 'authenticated',
     'user1@gmail.com',
-    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
+    '$2a$10$bGG9wO7.m4EdPm58tOuSd.TUuBLj3U/6KGCzOQTNjcTzGb4MHkz0G',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"name":"User One"}'::jsonb,
@@ -54,7 +54,7 @@ INSERT INTO auth.users (
     '22222222-2222-2222-2222-222222222222',
     'authenticated', 'authenticated',
     'user2@gmail.com',
-    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
+    '$2a$10$bGG9wO7.m4EdPm58tOuSd.TUuBLj3U/6KGCzOQTNjcTzGb4MHkz0G',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"name":"User Two"}'::jsonb,
@@ -65,7 +65,7 @@ INSERT INTO auth.users (
     '33333333-3333-3333-3333-333333333333',
     'authenticated', 'authenticated',
     'user3@gmail.com',
-    '$2a$10$CjFSRRZGnNT1njGNOxbImOOp14omn5WynckNE9rFL1v3XMZbiqYH6',
+    '$2a$10$bGG9wO7.m4EdPm58tOuSd.TUuBLj3U/6KGCzOQTNjcTzGb4MHkz0G',
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"name":"User Three"}'::jsonb,

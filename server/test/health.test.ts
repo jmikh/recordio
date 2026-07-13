@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { systemClock, type Db } from '../src/deps.js';
-
-/** Health must not touch any dependency — a db call here is a bug. */
-const throwingDb: Db = {
-    query: async () => {
-        throw new Error('health check must not touch the database');
-    },
-};
+import { createFakeDeps } from './fakes/index.js';
 
 function testApp() {
-    return buildApp({ db: throwingDb, clock: systemClock }, { version: 'test-sha' });
+    return buildApp(createFakeDeps(), { version: 'test-sha', logLevel: 'silent' });
 }
 
 describe('GET /health', () => {

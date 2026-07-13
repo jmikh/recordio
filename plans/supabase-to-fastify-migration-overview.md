@@ -35,15 +35,26 @@ last — or never, if the hybrid end state proves stable.
   built as a dependency-injected app factory (`buildApp(deps)`) with every
   external service (Stripe, Mux, S3, email, render worker, transcription,
   clock) behind a small port interface with an in-memory fake. A route is not
-  "done" until it has unit tests against fakes, an idempotency (run-twice)
-  test where applicable, and a parity fixture proving it matches the edge
-  function it replaces. This is the main payoff of leaving Deno edge
-  functions — the current code has no test seam at all.
+  "done" until it has comprehensive tests (e2e against a real seeded local
+  Postgres + unit against fakes), an idempotency (run-twice) test where
+  applicable, its client call site switched behind the
+  `USE_SERVER_INSTEAD_OF_SUPA` flag, and manual local verification by the
+  user. (Parity fixtures were dropped 2026-07-13 — the edge functions are
+  too untested for recorded traffic to be a trustworthy oracle.) This is
+  the main payoff of leaving Deno edge functions — the current code has no
+  test seam at all.
 
 ## Phases
 
 ### Part 1 — Stand up Fastify server; migrate edge functions
 (Detailed in `fastify-part1-edge-functions-migration.md`)
+
+**Status 2026-07-13:** foundation done — server deployed on Railway (health +
+Sentry verified), ports/fakes, logging foundation, auth plugin (dual-alg JWT:
+HS256 secret + ES256 JWKS) all landed with tests. Parity-fixture step dropped;
+per-function comprehensive tests + `USE_SERVER_INSTEAD_OF_SUPA` client flag +
+manual local verification instead. Next: client API module (Step 3), then the
+first function (`storage-download-urls`).
 
 Scaffold `server/` (Fastify + TypeBox), deploy to Railway, validate Supabase
 JWTs, then port all 21 edge functions route-by-route in risk order:
@@ -89,8 +100,8 @@ shared with client-called RPCs, unlocked as Part 2 moves their callers
 server-side. Keep pure-data-access functions in SQL. No deadline; driven by
 pain, not principle. The port/fake architecture from Part 1 is what makes
 this phase cheap: logic pulled into TS lands in already-testable service
-code, and each migrated function inherits the parity-fixture pattern (same
-inputs → same rows/response as the SQL version) as its acceptance test.
+code, and each migrated function keeps the same acceptance criterion (same
+inputs → same rows/response as the SQL version), asserted by e2e tests.
 
 ### Part 4 — Storage
 
