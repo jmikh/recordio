@@ -24,8 +24,11 @@ last — or never, if the hybrid end state proves stable.
 ## Guiding principles
 
 - Ship value at every phase; each phase is independently stoppable.
-- Postgres functions remain the business-logic source of truth initially;
-  Fastify proxies to them. Pull logic into TS later, function by function.
+- Every rule has exactly one live implementation. DB functions used *only*
+  by an edge function migrate to TypeScript together with that edge function
+  in Part 1 (tested end-to-end against a real seeded Postgres); DB functions
+  shared with client-called RPCs stay SQL — never forked into a TS copy —
+  until their last SQL caller migrates in Part 2/3.
 - Auth stays on Supabase until everything else is proven on Fastify.
 - Every migrated route must be idempotent-safe for webhook/cron retries.
 - **Testability is an architecture constraint, not a phase.** The server is
@@ -43,14 +46,31 @@ last — or never, if the hybrid end state proves stable.
 (Detailed in `fastify-part1-edge-functions-migration.md`)
 
 Scaffold `server/` (Fastify + TypeBox), deploy to Railway, validate Supabase
-JWTs, then port all 21 edge functions route-by-route in risk order: webhooks →
-cron targets → client-invoked. Client swaps `supabase.functions.invoke()` for a
-thin fetch-based API client. Supabase edge functions are deleted as each route
-cuts over.
+JWTs, then port all 21 edge functions route-by-route in risk order:
+client-invoked routes first, scheduled jobs next, **webhooks last** (they
+need provider-side config changes and are the hardest to e2e test — migrate
+them once the server is proven on lower-stakes routes). Client swaps
+`supabase.functions.invoke()` for a thin fetch-based API client. The two
+edge-function crons move onto a minimal in-process scheduler (hourly tick +
+`job_runs` ledger keyed on date); pure-SQL pg_cron jobs are untouched.
 
-**Exit criteria:** zero edge functions deployed; all webhooks (Stripe, Mux,
-render-worker) and pg_cron HTTP jobs point at Fastify; client no longer calls
-`functions.invoke`.
+Each migrated function is self-contained server code: DB functions called
+exclusively by that edge function have their SQL logic ported into TS in the
+same step (shared DB functions keep being called as SQL — see guiding
+principles), and each function ships with end-to-end tests against a real
+seeded Postgres before anything cuts over.
+
+Cadence: **one function at a time, pausing after each cutover** for explicit
+go-ahead before the next; tests are written with each function, never
+deferred. **Nothing is deleted from Supabase** — edge
+functions and pg_cron entries stay in place (idle) throughout; the user
+decommissions them manually at the very end, so every route stays
+rollback-able for the entire migration.
+
+**Exit criteria:** all traffic served by Fastify (webhooks repointed, the two
+former edge-function crons running on the server's scheduler with ledger rows
+proving daily runs, client no longer calls `functions.invoke`); edge
+functions still deployed but idle, awaiting manual decommission.
 
 ### Part 2 — Proxy RPCs through Fastify
 
@@ -62,13 +82,15 @@ Client swaps `supabase.rpc()` for the API client. No SQL logic rewritten.
 
 ### Part 3 — Business logic consolidation (optional, ongoing)
 
-Migrate individual Postgres functions into TypeScript service code where it
-helps (testability, shared types, complex logic). Keep pure-data-access
-functions in SQL. No deadline; driven by pain, not principle. The port/fake
-architecture from Part 1 is what makes this phase cheap: logic pulled into TS
-lands in already-testable service code, and each migrated function inherits
-the parity-fixture pattern (same inputs → same rows/response as the SQL
-version) as its acceptance test.
+Migrate the remaining Postgres functions into TypeScript service code where
+it helps (testability, shared types, complex logic) — Part 1 already
+absorbed the edge-function-exclusive ones, so what's left here is the SQL
+shared with client-called RPCs, unlocked as Part 2 moves their callers
+server-side. Keep pure-data-access functions in SQL. No deadline; driven by
+pain, not principle. The port/fake architecture from Part 1 is what makes
+this phase cheap: logic pulled into TS lands in already-testable service
+code, and each migrated function inherits the parity-fixture pattern (same
+inputs → same rows/response as the SQL version) as its acceptance test.
 
 ### Part 4 — Storage
 
@@ -87,9 +109,12 @@ Involves: OAuth flows, session/JWT issuance, user identity migration,
 
 ### Part 6 — Scheduled jobs review
 
-pg_cron survives all phases (it lives in Postgres). After Part 1 its HTTP jobs
-target Fastify routes. Optionally consolidate pure-SQL cron jobs vs. HTTP jobs;
-keep pg_cron as the scheduler for durability (survives deploys/restarts).
+Split ownership after Part 1: pure-SQL jobs stay in pg_cron (it lives in
+Postgres and survives all phases); jobs needing server code run on the
+server's in-process scheduler (hourly tick + `job_runs` date-keyed ledger —
+survives deploys, never double-runs, auditable via SELECT). New scheduled
+work defaults to the server scheduler unless it's pure SQL. Revisit only if
+job volume or precision requirements outgrow the daily-tick model.
 
 ## Infrastructure decisions (made)
 
@@ -97,7 +122,19 @@ keep pg_cron as the scheduler for durability (survives deploys/restarts).
 - **Hosting:** Railway, always-on (no app sleeping — webhooks), usage caps set,
   region matched to the Supabase project region
 - **DB access:** Supavisor pooler from Fastify's connection pool
-- **Monitoring:** existing Sentry project + Railway logs + uptime ping on `/health`
+- **Logging:** structured pino JSON with a fixed envelope, a documented level
+  policy, and one canonical wide event per request emitted by a central hook
+  (see Part 1, "Logging foundation"). Field names lean on OTEL semantic
+  conventions. The log analytics backend is deliberately deferred — logs go
+  to stdout (Railway log viewer) for now, shipped via an app-side pino
+  transport later; the field discipline is the part that can't be
+  retrofitted, the destination is config.
+- **Monitoring:** existing Sentry project (correlated to logs by request_id)
+  + uptime ping on `/health`. Per-route throughput/status/latency comes from
+  Sentry tracing initially (100% sample rate at current traffic — exact
+  counts, no new vendor). A dedicated log-analytics backend is a later,
+  trigger-based addition: adopt one only when an ad-hoc question the logs
+  could answer can't be asked in Sentry/Railway, or retention bites.
 - **Deploys:** GitHub-triggered Railway deploys; PR preview environments
 
 ## Risks

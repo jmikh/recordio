@@ -12,9 +12,7 @@
         "tabs",
         "unlimitedStorage",
         "tabCapture",
-        "offscreen",
-        "microphone",
-        "camera"
+        "offscreen"
     ],
     "host_permissions": [
         "<all_urls>"

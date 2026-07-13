@@ -7,6 +7,7 @@
     "dev": "npm run dev:extension",
     "dev:extension": "cd extension && vite",
     "dev:webapp": "cd webapp && vite --port 3001",
+    "dev:server": "cd server && npm run dev",
     "dev:webapp:prod": "cd webapp && vite --mode production --port 3001",
     "build": "npm run build:extension",
     "build:extension": "cd extension && tsc -b && vite build && node -e \"const f='dist/manifest.json';const m=JSON.parse(require('fs').readFileSync(f));delete m.key;require('fs').writeFileSync(f,JSON.stringify(m,null,2))\" && cd dist && zip -r ../extension.zip . -x '*.DS_Store' '.vite/*'",

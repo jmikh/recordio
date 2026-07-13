@@ -10,6 +10,8 @@ export default defineConfig({
             'shared/**/*.test.ts',
             'webapp/src/**/*.test.ts',
             'render-worker/src/**/*.test.ts',
+            'server/src/**/*.test.ts',
+            'server/test/**/*.test.ts',
             'test/**/*.test.ts',
         ],
         environment: 'node',
