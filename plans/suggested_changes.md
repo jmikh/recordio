@@ -64,6 +64,23 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   only `data`, swallowing DB errors as "no access" → a DB outage looks
   like a 404. The server port throws instead; fix the Deno copy or note
   it dies with Wave B. Found 2026-07-16.
+- **asset-create**: the extension (and the size) come solely from the
+  client-supplied `fileName`/`sizeBytes` — the actual uploaded content is
+  never validated (the presigned PUT has no ContentType/length
+  conditions), so any bytes can land under a `.jpg` key
+  (`server/src/routes/assetCreate.ts`, edge-fn parity). Found 2026-07-16.
+- **asset-create**: the library-limit count and the insert are not
+  atomic — two concurrent uploads at 9/10 can both pass the check and
+  end at 11/10 (edge-fn parity; a partial unique index or
+  count-in-insert CTE would close it). Found 2026-07-16.
+- **asset-create**: `pending` rows whose upload is never confirmed are
+  never reaped — orphans accumulate (invisible to the limit count, so
+  harmless-ish; a cleanup cron or TTL would tidy). Found 2026-07-16.
+- **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
+  numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
+  and accepted where the edge fns' `typeof` checks 400'd. Pinned by an
+  assetCreate test. Consider `coerceTypes: false` (or leave — clients
+  send correct types). Found 2026-07-16.
 
 ## Server config / infra cleanups
 

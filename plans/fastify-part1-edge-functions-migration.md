@@ -428,11 +428,77 @@ cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
 **Next:** user verifies `project-update-thumbnail` (local webapp
-flag-on: save a project in the editor to trigger the thumbnail upload,
-check storage + the projects row; then against Railway after deploy).
-That completes Wave A (`unsubscribe` was punted to Wave E #20). Then:
-**Wave B**, starting with #7 `asset-create`, each function on explicit
-go.
+flag-on: save a project in the editor to trigger the thumbnail upload —
+a Railway 200 POST was already observed but not confirmed as verified;
+that completes Wave A, `unsubscribe` punted to Wave E #20) and
+`asset-create` (local webapp flag-on: upload a background image and a
+music file from the editor asset library, hit the full-library case if
+easy; then against Railway after deploy). Then: **Wave B #8
+`transcribe`** (external transcription API call, longer request), on
+explicit go with a prompt file first.
+
+- **Wave B #7 — `asset-create`** (code complete 2026-07-16; awaiting
+  user verification. No new env vars, no new dependencies):
+  - Route: `server/src/routes/assetCreate.ts` — `requireUser`; TypeBox
+    body schema (`assetType` background|music literal union, `fileName`
+    minLength 1, `sizeBytes` exclusiveMinimum 0); handler checks with
+    exact edge-fn bodies for the cross-field rules (extension allow-list
+    per type, size caps 25 MB background / 50 MB music); library limit
+    10 per type counting only `status='ready' AND is_deleted=false`;
+    pending `user_assets` insert (id TEXT, fresh uuid); presigned PUT
+    via `S3Port.presignUpload` (3600 s); **compensating cleanup** — if
+    presigning throws, the pending row is DELETEd before rethrowing
+    (first route with the pattern). `asset.type` added to
+    `DomainLogFields`. The `asset_confirm_upload` RPC stays a
+    client-called SQL function — untouched.
+  - **DB-function classification: none called** — direct `user_assets`
+    count/insert/delete, plain SQL over the pg pool.
+  - **Deliberate FIX (user-approved 2026-07-16), not parity:** the
+    library-full response is **200 with the exact rich body**
+    `{ error: 'library_full', message, count, limit }` where the edge fn
+    sent 403 — `supabase.functions.invoke` turns any non-2xx into
+    `data: null` + a generic error, so the client's
+    `AssetLibraryFullError` branch was dead code. With 200,
+    `invokeFunction` hands the body to the existing branch verbatim —
+    zero client-logic changes. The flag-off/edge-fn path keeps the old
+    broken-generic behavior until cutover.
+  - Other divergences (documented): per-field 400 bodies replaced by
+    Fastify schema-validation 400s (same as all waves); a
+    numeric-STRING `sizeBytes` (e.g. `"2048"`) is coerced by Fastify's
+    default Ajv where the edge fn's `typeof` check 400'd — pinned by
+    test, noted in suggested_changes.md (client always sends a number);
+    the `S3_ENDPOINT_DEV` Docker split stays dropped.
+  - Tests: `server/test/assetCreate.test.ts` (22 — 401 no/garbage
+    token; schema 400s incl. sizeBytes 0/negative/non-numeric-string
+    via throwing db; exact-body 400s for wrong-type extensions (both
+    types), extensionless name, one-byte-over both caps with no
+    presign; e2e on real Postgres: success with lowercased-extension
+    storagePath + 1h presign + full pending-row field assert, at-cap
+    boundary passes both types, library-full 200 exact body with NO
+    insert, soft-deleted/pending rows don't count, limit is per-type
+    and per-user, **presign-failure → row deleted → 500**
+    (compensating-cleanup test), Ajv-coercion divergence pin, canonical
+    log fields incl. asset.type). `seedUserAsset` + `deleteUserAssets`
+    added to `test/helpers/db.ts` (`user_assets.id` is TEXT).
+  - Client: `userAssetService.uploadAsset`'s asset-create invoke
+    converted to `invokeFunction` (typed response; `library_full`
+    branch untouched — that's the point of the fix); `'asset-create'`
+    registered in `MIGRATED_FUNCTIONS`. `!supabase` guard kept (the
+    confirm RPC and list/delete still use supabase directly).
+  - **Analysis:** dead weight — the S3_ENDPOINT_DEV split (Docker
+    artifact) and the edge fn's per-field typeof checks (schema does
+    it). Simplification — service-role client + raw fetch presign
+    machinery collapses to one count, one insert and a port call.
+    Consistency — same throwing-db/e2e split, exact-body handler checks
+    and Union-200 response schema as subscription-change. Smells NOT
+    fixed (in suggested_changes.md): extension parsed from fileName
+    only, never checked against actual content; count+insert not
+    atomic (concurrent uploads can exceed the limit); pending rows that
+    never get confirmed are never reaped.
+  - Checks: root `npx vitest run server webapp/src/api` (134 passed, S3
+    + Stripe adapter integrations skipped), server typecheck, webapp
+    `tsc -b`, eslint clean on changed files (userAssetService's
+    `row: any` in asset_list mapping pre-exists on HEAD).
 
 - **Wave A #6 — `project-update-thumbnail`** (code complete 2026-07-16;
   awaiting user verification — local webapp flag-on: save a project in the

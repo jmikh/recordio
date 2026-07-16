@@ -1,4 +1,5 @@
 import { supabase } from '../auth/AuthManager';
+import { invokeFunction } from '../api/client';
 import { CloudStorage } from './cloudStorage';
 import { BlobCache } from './blobCache';
 
@@ -72,13 +73,21 @@ export class UserAssetService {
             uploadFileName = compressed.fileName;
         }
 
-        // 1. Create asset record + get signed URL
-        const { data, error } = await supabase.functions.invoke('asset-create', {
-            body: {
-                assetType: type,
-                sizeBytes: uploadBlob.size,
-                fileName: uploadFileName,
-            },
+        // 1. Create asset record + get signed URL. The server returns 200
+        // for library_full (the edge fn's 403 made this branch dead code);
+        // error/message/count/limit are only present on that response
+        const { data, error } = await invokeFunction<{
+            signedUrl: string;
+            storagePath: string;
+            assetId: string;
+            error?: string;
+            message?: string;
+            count: number;
+            limit: number;
+        }>('asset-create', {
+            assetType: type,
+            sizeBytes: uploadBlob.size,
+            fileName: uploadFileName,
         });
 
         if (error) throw error;

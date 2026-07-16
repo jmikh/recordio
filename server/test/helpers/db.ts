@@ -175,3 +175,40 @@ export async function deleteWorkspaces(db: Db, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.query('DELETE FROM workspaces WHERE id = ANY($1::uuid[])', [ids]);
 }
+
+export interface SeedUserAssetOptions {
+    userId?: string;
+    assetType?: 'background' | 'music';
+    status?: 'pending' | 'ready';
+    isDeleted?: boolean;
+    name?: string | null;
+    sizeBytes?: number;
+}
+
+/** `user_assets.id` is TEXT (the edge fn stored a stringified uuid). */
+export async function seedUserAsset(db: Db, opts: SeedUserAssetOptions = {}): Promise<string> {
+    const id = randomUUID();
+    const userId = opts.userId ?? SEEDED_USER_ID;
+    const assetType = opts.assetType ?? 'background';
+    await db.query(
+        `INSERT INTO user_assets
+            (id, user_id, asset_type, storage_path, name, size_bytes, status, is_deleted)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+            id,
+            userId,
+            assetType,
+            `${userId}/assets/${id}.bin`,
+            opts.name === undefined ? 'seed-asset' : opts.name,
+            opts.sizeBytes ?? 1024,
+            opts.status ?? 'ready',
+            opts.isDeleted ?? false,
+        ],
+    );
+    return id;
+}
+
+export async function deleteUserAssets(db: Db, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.query('DELETE FROM user_assets WHERE id = ANY($1::text[])', [ids]);
+}

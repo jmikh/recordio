@@ -15,6 +15,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'stripe-portal',
     'subscription-change',
     'project-update-thumbnail',
+    'asset-create',
 ]);
 
 export type InvokeResult<T> =

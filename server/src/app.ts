@@ -14,6 +14,7 @@ import { stripeCheckoutRoutes, type StripePriceIds } from './routes/stripeChecko
 import { stripePortalRoutes } from './routes/stripePortal.js';
 import { subscriptionChangeRoutes } from './routes/subscriptionChange.js';
 import { projectUpdateThumbnailRoutes } from './routes/projectUpdateThumbnail.js';
+import { assetCreateRoutes } from './routes/assetCreate.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -121,6 +122,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(stripePortalRoutes);
     app.register(subscriptionChangeRoutes, { priceIds: opts.stripePriceIds });
     app.register(projectUpdateThumbnailRoutes);
+    app.register(assetCreateRoutes);
 
     app.get('/health', {
         schema: {
