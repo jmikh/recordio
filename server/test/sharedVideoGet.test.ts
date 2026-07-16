@@ -10,7 +10,8 @@
  * The route is read-only, so the "resulting DB state" assertion is that
  * the rows it read are unchanged.
  */
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import type pg from 'pg';
 import { buildApp, type App } from '../src/app.js';
 import { createFakeDeps, type FakeDeps } from './fakes/index.js';
 import { TEST_JWT_SECRET } from './helpers/tokens.js';
@@ -59,8 +60,14 @@ describe('POST /shared-video-get (validation, no db)', () => {
 });
 
 describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () => {
-    const pool = createTestPool();
+    // Lazy: describe bodies run at collection time even when runIf skips,
+    // so the pool must not be created until the suite actually executes.
+    let pool: pg.Pool;
     const createdProjects: string[] = [];
+
+    beforeAll(() => {
+        pool = createTestPool();
+    });
 
     afterEach(async () => {
         await deleteProjects(pool, createdProjects);

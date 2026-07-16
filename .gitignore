@@ -14,6 +14,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# Committed on purpose: well-known local-stack values only (CI + local tests)
+!.env.test
 
 .gemini/*
 supabase/.temp/*
