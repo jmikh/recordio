@@ -2,6 +2,7 @@ import './instrument.js';
 import * as Sentry from '@sentry/node';
 import pg from 'pg';
 import { buildApp } from './app.js';
+import { createS3Adapter } from './adapters/s3.js';
 import { loadConfig } from './config.js';
 import { systemClock } from './deps.js';
 
@@ -22,13 +23,23 @@ function unimplementedPort<T extends object>(name: string): T {
     });
 }
 
+const s3Configured =
+    config.S3_REGION && config.S3_ENDPOINT && config.S3_ACCESS_KEY && config.S3_SECRET_KEY;
+
 const app = buildApp(
     {
         db: pool,
         clock: systemClock,
         stripe: unimplementedPort('stripe'),
         mux: unimplementedPort('mux'),
-        s3: unimplementedPort('s3'),
+        s3: s3Configured
+            ? createS3Adapter({
+                  region: config.S3_REGION!,
+                  endpoint: config.S3_ENDPOINT!,
+                  accessKeyId: config.S3_ACCESS_KEY!,
+                  secretAccessKey: config.S3_SECRET_KEY!,
+              })
+            : unimplementedPort('s3'),
         email: unimplementedPort('email'),
         renderWorker: unimplementedPort('renderWorker'),
         transcription: unimplementedPort('transcription'),
@@ -42,6 +53,10 @@ const app = buildApp(
         supabaseUrl: config.SUPABASE_URL,
     },
 );
+
+if (!s3Configured) {
+    app.log.warn('S3_REGION/S3_ENDPOINT/S3_ACCESS_KEY/S3_SECRET_KEY not fully set — s3 port unimplemented, storage routes will 500');
+}
 
 Sentry.setupFastifyErrorHandler(app);
 

@@ -16,7 +16,11 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler) {
     unauthorizedHandler = handler;
 }
 
-const authAwareFetch: typeof fetch = async (url, options) => {
+/**
+ * Shared by the supabase client and the Fastify API client
+ * (src/api/client.ts) so both funnel 401s into the same sign-out path.
+ */
+export const authAwareFetch: typeof fetch = async (url, options) => {
     const response = await sentryFetch(url, options);
     if (
         response.status === 401 &&

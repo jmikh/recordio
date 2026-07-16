@@ -1,5 +1,6 @@
 import * as tus from 'tus-js-client';
 import { supabase } from '../auth/AuthManager';
+import { invokeFunction } from '../api/client';
 
 import type { Project } from '@shared/types';
 
@@ -491,9 +492,10 @@ export class CloudStorage {
     static async requestDownloadUrls(storagePaths: string[]): Promise<Record<string, string>> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.functions.invoke('storage-download-urls', {
-            body: { storagePaths },
-        });
+        const { data, error } = await invokeFunction<{ signedUrls: Record<string, string>; error?: string }>(
+            'storage-download-urls',
+            { storagePaths },
+        );
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);

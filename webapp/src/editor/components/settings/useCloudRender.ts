@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '../../../auth/AuthManager';
+import { invokeFunction } from '../../../api/client';
 import { useUserStore } from '../../../auth/useUserStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
@@ -50,9 +51,10 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
     ) => {
         setPhase('downloading');
         try {
-            const { data, error } = await supabase!.functions.invoke('storage-download-urls', {
-                body: { storagePaths: [storagePath] },
-            });
+            const { data, error } = await invokeFunction<{ signedUrls: Record<string, string>; error?: string }>(
+                'storage-download-urls',
+                { storagePaths: [storagePath] },
+            );
             if (error || data?.error) {
                 const msg = data?.error || error?.message || 'Unknown error';
                 captureError(error ?? new Error(msg), {

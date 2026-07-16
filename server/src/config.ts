@@ -13,6 +13,16 @@ const EnvSchema = Type.Object({
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),
+    /**
+     * S3-compatible storage (project-media bucket) — same values the edge
+     * functions use. Optional as a group: when any is missing the s3 port
+     * stays unimplemented (fails loudly per call) instead of failing the
+     * whole deploy.
+     */
+    S3_REGION: Type.Optional(Type.String()),
+    S3_ENDPOINT: Type.Optional(Type.String()),
+    S3_ACCESS_KEY: Type.Optional(Type.String()),
+    S3_SECRET_KEY: Type.Optional(Type.String()),
 });
 
 export type Config = Static<typeof EnvSchema>;

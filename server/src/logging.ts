@@ -35,6 +35,7 @@ export interface DomainLogFields {
     'render.job_id'?: string;
     'mux.asset_id'?: string;
     'stripe.event_type'?: string;
+    'storage.path_count'?: number;
     error_type?: ErrorType;
 }
 

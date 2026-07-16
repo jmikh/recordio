@@ -8,6 +8,7 @@ import type { DestinationStream } from 'pino';
 import type { Deps } from './deps.js';
 import { createLogger, RequestLogContext } from './logging.js';
 import { authPlugin } from './plugins/auth.js';
+import { storageDownloadUrlsRoutes } from './routes/storageDownloadUrls.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -105,6 +106,9 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
         max: 300,
         timeWindow: '1 minute',
     });
+
+    // Migrated edge-function routes (plan Step 4) — one module per function
+    app.register(storageDownloadUrlsRoutes);
 
     app.get('/health', {
         schema: {

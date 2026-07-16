@@ -1,5 +1,14 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL?: string;
+    readonly VITE_SUPABASE_ANON_KEY?: string;
+    /** Fastify server base URL (Supabase → Fastify migration). Local dev: http://localhost:8090 */
+    readonly VITE_API_URL?: string;
+    /** 'true' → invoke MIGRATED_FUNCTIONS (src/api/client.ts) on the Fastify server. Default off. */
+    readonly VITE_USE_SERVER?: string;
+}
+
 declare module '*.png' {
     const src: string;
     export default src;

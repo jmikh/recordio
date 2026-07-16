@@ -53,8 +53,79 @@ user with the flag on.
   seed.sql's bcrypt hash regenerated — it matched neither of its two
   contradictory comments.
 
-**Next: Step 3** (client API module + flag), then Wave A #1
-(`storage-download-urls`).
+- **Step 3** — client API module: `webapp/src/api/client.ts` exports
+  `invokeFunction(name, body)` (supabase-shaped `{ data, error }`, returns
+  real `FunctionsHttpError`/`FunctionsFetchError` instances) and the
+  `MIGRATED_FUNCTIONS` registry (empty). Routes to `${VITE_API_URL}/${name}`
+  (POST JSON, Bearer = current session token) only when
+  `VITE_USE_SERVER === 'true'` AND the name is registered; otherwise falls
+  through to `supabase.functions.invoke`. Server 401s reuse the exact same
+  funnel as supabase calls: `authAwareFetch` is now exported from
+  `webapp/src/supabase/client.ts` and the API client fetches through it.
+  Env: `VITE_API_URL`/`VITE_USE_SERVER` documented in `webapp/.env.example`
+  + typed in `vite-env.d.ts` (flag defaults off; local server
+  `http://localhost:8090`). Tests: `webapp/src/api/client.test.ts` (8) cover
+  flag off / flag on + unregistered / flag on + registered (URL, headers,
+  body) / no-session / missing VITE_API_URL / non-2xx / network error / 401
+  funnel (real `authAwareFetch` + `setUnauthorizedHandler`, mocked global
+  fetch). No call sites converted yet — they move per-function.
+
+- **Wave A #1 — `storage-download-urls`** (code complete, awaiting user's
+  manual local verification with the flag on):
+  - Route: `server/src/routes/storageDownloadUrls.ts` (first route module;
+    registered in `app.ts`), TypeBox request + response schemas,
+    `requireUser`, `storage.path_count` added to `DomainLogFields`.
+  - First real adapter: `server/src/adapters/s3.ts` (AWS SDK v3, path-style,
+    bucket `project-media` fixed in the adapter). `server.ts` wires it only
+    when all of `S3_REGION`/`S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`
+    are set (optional in config so a missing group can't fail the deploy —
+    startup warn + per-call throw instead). Local values (supabase CLI's
+    fixed S3 creds) in `server/.env.example`; **Railway needs these four
+    vars before prod cutover** (same values as the edge function secrets).
+  - Tests (all green): unit via fakes (9 — auth/validation/ownership/admin
+    bypass/log field; this route has no DB, so this IS its e2e tier), and
+    the adapter integration test (`test/adapters/s3.integration.test.ts`,
+    auto-skip without S3_* env; verified manually against local stack
+    storage — put/get/presign-GET/presign-PUT all pass). Shared token helper
+    added: `server/test/helpers/tokens.ts`. A per-route contract test with
+    real Supabase tokens was written, then deleted as redundant — see the
+    testing-strategy decision below (2026-07-14).
+  - Client: both call sites (`storage/cloudStorage.ts:requestDownloadUrls`,
+    `editor/components/settings/useCloudRender.ts:downloadFile`) converted
+    to `invokeFunction`; `'storage-download-urls'` registered in
+    `MIGRATED_FUNCTIONS`.
+  - **Analysis (per-function pass):** function is minimal — no DB calls, no
+    dead weight. Kept identical: hardcoded admin-bypass user id
+    (`01f290d7-…`) — flagged as a smell, should become env config later, not
+    changed now. Deliberate observable divergences: (1) 400 validation
+    errors return Fastify's default `{ statusCode, error, message }` body
+    instead of the edge fn's `{ error }` (status identical; no call site
+    reads a 400 body); (2) unhandled 500s likewise use Fastify's default
+    shape; (3) non-string scalar array entries are coerced to strings by
+    Ajv, then rejected 403 by the prefix check (edge fn also returned 403
+    for non-admin callers — parity in practice); (4) JWT verified locally
+    instead of `auth.getUser()` network call (Step 1 trade-off: revoked
+    sessions stay valid until expiry).
+
+**Next:** user verifies `storage-download-urls` locally
+(`VITE_USE_SERVER=true` + `VITE_API_URL=http://localhost:8090` in
+`webapp/.env.development.local`, `npm run dev` in `server/`; server needs
+the S3_* block from `server/.env.example` in its `.env.local`), then deploy
+(**Railway needs the four S3_* vars**) + cutover + observe, **pause**, then
+Wave A #2 (`shared-video-get`).
+
+**Wave A #2 carries a CI change:** it's the first route whose merge-blocking
+e2e tests need a real Postgres, so `.github/workflows/server-tests.yml` must
+spin up the local stack (`supabase/setup-cli` → `supabase start`) and run
+tests via the **root** vitest config (which loads the committed `.env.test`
+— all well-known local-stack values, no GitHub secrets needed). The auth
+contract tests start running in CI for free at that point. The adapter
+integration tier stays out of the blocking job (separate optional job,
+later).
+
+Known pre-existing failure (not this migration's): `cloudProjectService.test.ts
+> passes expected version to CloudStorage` — stale expectation, `saveProject`
+no longer passes the 4th `true` arg to `saveProjectMetadata`.
 
 ### Step 3 implementation notes (recon done, for the next session)
 
@@ -346,7 +417,8 @@ the hardest to e2e test. By the time they migrate, the server, auth plugin,
 ports, and test harness are proven on lower-stakes routes.
 
 ### Wave A — Client-invoked, low risk (simple request/response)
-1. `storage-download-urls` (S3 presign)
+1. ~~`storage-download-urls`~~ (S3 presign) — code complete 2026-07-13, see
+   Status; awaiting user local verification + cutover.
 2. `shared-video-get` (public, no auth — add rate limit)
 3. `stripe-checkout`, `stripe-portal`, `subscription-change` (these call
    Stripe's API but are plain request/response — no Stripe dashboard changes
@@ -444,10 +516,22 @@ user to execute manually once all waves have soaked:
 `app.inject()` against `buildApp()` with a **real seeded local Postgres**
 (`supabase start`) and fakes only for third parties. One suite per migrated
 function, written with the port, exercising the full path: routing, TypeBox
-validation, auth (real Supabase-issued JWTs via the existing
-`test/helpers/supabaseClient.ts` patterns), the migrated TS/SQL logic, and
-the resulting DB state. See "Per-function testing" in Step 4 for
-seeding/isolation mechanics.
+validation, auth wiring, the migrated TS/SQL logic, and the resulting DB
+state. See "Per-function testing" in Step 4 for seeding/isolation mechanics.
+
+**Auth tokens in e2e are hand-signed, not real (decision 2026-07-14):**
+after `requireUser`, a token is reduced to `req.userId`/`req.user.email`
+strings — real and hand-signed tokens with the same `sub` are
+indistinguishable downstream, and unlike the edge functions the server
+never forwards the JWT to Postgres (no RLS path; ownership checks are
+explicit route code). So per-route e2e mints tokens via
+`test/helpers/tokens.ts` (`sub` must still be a *seeded* user id wherever
+FKs apply — the row must be real, the token needn't be). The
+"does the server accept what Supabase actually issues" contract is pinned
+exactly once, centrally, in `auth.contract.test.ts` (real local-Supabase
+sign-in, ES256/JWKS path, anon-key rejection — auto-skip without env).
+Exception: if a future route forwards the raw bearer token to an external
+service as the user, that route's e2e must use a real token.
 
 **Unit (fast, no Docker, for logic that doesn't touch the DB):** same
 `app.inject()` harness with all fakes. Covers validation edges, error

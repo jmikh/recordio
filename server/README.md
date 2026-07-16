@@ -70,9 +70,10 @@ database is never faked; only third-party services are.
 | `SENTRY_DSN` | No | Enables Sentry when set |
 | `NODE_ENV` | No | `production` on Railway; controls log format + Sentry environment |
 | `RAILWAY_GIT_COMMIT_SHA` | No | Injected by Railway; surfaced by `/health` as `version` |
+| `S3_REGION` / `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` | For storage routes | S3-compatible storage, `project-media` bucket — same values as the edge function secrets. Local: the `supabase start` storage S3 endpoint (see `.env.example`). If any is missing the s3 port stays unimplemented (storage routes 500) and a startup warning is logged |
 
-More vars land as routes migrate (Stripe, Mux, AWS, email, transcription,
-`SUPABASE_JWT_SECRET`, ...). Add each to the table when it lands.
+More vars land as routes migrate (Stripe, Mux, email, transcription, ...).
+Add each to the table when it lands.
 
 ## Railway setup (manual, once)
 
