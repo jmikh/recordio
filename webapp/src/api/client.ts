@@ -12,6 +12,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'storage-download-urls',
     'shared-video-get',
     'stripe-checkout',
+    'stripe-portal',
 ]);
 
 export type InvokeResult<T> =

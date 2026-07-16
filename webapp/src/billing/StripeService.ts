@@ -145,19 +145,13 @@ export class StripeService {
      * In the browser: opens portal in a new tab.
      */
     static async createPortalSession(): Promise<{ url?: string; error?: Error }> {
-        if (!supabase) {
-            return { error: new Error('Supabase not configured') };
-        }
-
         const { workspaceId } = useWorkspaceStore.getState();
         try {
             const returnUrl = `${window.location.origin}/workspace/settings/billing`;
 
-            const { data, error } = await supabase.functions.invoke('stripe-portal', {
-                body: {
-                    returnUrl,
-                    workspaceId,
-                },
+            const { data, error } = await invokeFunction<{ url: string }>('stripe-portal', {
+                returnUrl,
+                workspaceId,
             });
 
             if (error) {

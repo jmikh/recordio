@@ -11,6 +11,7 @@ import { authPlugin } from './plugins/auth.js';
 import { storageDownloadUrlsRoutes } from './routes/storageDownloadUrls.js';
 import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
 import { stripeCheckoutRoutes, type StripePriceIds } from './routes/stripeCheckout.js';
+import { stripePortalRoutes } from './routes/stripePortal.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -115,6 +116,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(storageDownloadUrlsRoutes);
     app.register(sharedVideoGetRoutes);
     app.register(stripeCheckoutRoutes, { priceIds: opts.stripePriceIds });
+    app.register(stripePortalRoutes);
 
     app.get('/health', {
         schema: {

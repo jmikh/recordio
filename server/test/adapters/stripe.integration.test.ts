@@ -39,4 +39,20 @@ describe.runIf(hasTestModeKey)('stripe adapter (Stripe test mode)', () => {
 
         expect(url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
     });
+
+    it('createPortalSession returns a billing.stripe.com URL', async () => {
+        const stripe = new Stripe(STRIPE_SECRET_KEY!);
+        const customer = await stripe.customers.create({
+            email: 'adapter-test@example.com',
+            description: 'adapter-integration-test',
+        });
+
+        const adapter = createStripeAdapter({ secretKey: STRIPE_SECRET_KEY! });
+        const { url } = await adapter.createPortalSession({
+            customer: customer.id,
+            return_url: 'https://example.com/billing',
+        });
+
+        expect(url).toMatch(/^https:\/\/billing\.stripe\.com\//);
+    });
 });

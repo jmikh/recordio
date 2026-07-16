@@ -203,13 +203,11 @@ user with the flag on.
       excluded (`-x realtime,imgproxy,mailpit,postgres-meta,studio,
       edge-runtime,logflare,vector,supavisor`).
 
-- **Wave A #3 (1/3) — `stripe-checkout`** (code complete AND locally
-  verified 2026-07-16 — flag-on webapp against the local server, real
-  test-mode checkout URL returned. The 400 on first try was an archived
-  sandbox `pro_yearly` price (fixed in the Stripe dashboard), not code.
-  **Railway still pending:** add the five Stripe vars there before the next
-  deploy — config requires them, so a deploy without them fails loudly —
-  then verify local webapp flag-on against Railway):
+- **Wave A #3 (1/3) — `stripe-checkout`** (code complete, locally verified
+  AND Railway-verified 2026-07-16 — user confirmed flag-on webapp against
+  the prod Railway server works; the five Stripe vars are live on Railway.
+  The 400 on first local try was an archived sandbox `pro_yearly` price
+  (fixed in the Stripe dashboard), not code):
   - Route: `server/src/routes/stripeCheckout.ts` — `requireUser`, TypeBox
     request/response schemas (plan/interval constrained to enums, defaults
     applied in the handler exactly like the edge fn's destructuring);
@@ -272,6 +270,69 @@ user with the flag on.
     `tsc -b`, eslint clean on changed files (StripeService's two
     `no-explicit-any` findings pre-exist on HEAD).
 
+- **Wave A #3 (2/3) — `stripe-portal`** (code complete 2026-07-16; awaiting
+  user verification — local webapp flag-on against the local server needs a
+  subscription-bearing workspace, then against Railway after deploy. No new
+  env vars):
+  - Route: `server/src/routes/stripePortal.ts` — `requireUser`, TypeBox
+    request/response schemas, exact 404 body
+    `{ error: 'No subscription found for this workspace' }`. No new
+    `DomainLogFields` (`workspace.id` already existed).
+  - **DB-function classification: `subscription_get` — SHARED** (client
+    RPCs in `AuthManager.ts`/`switchWorkspace.ts` + the unmigrated
+    `transcribe` edge fn) → the SQL function stays untouched and still
+    called by those. But it **cannot** be called via the Db port: its
+    membership check is `wm.user_id = auth.uid()`, and over the server's
+    pg pool (postgres role, no JWT claims) `auth.uid()` is NULL → NULL for
+    everyone. The query is ported inline instead — `subscriptions JOIN
+    workspace_members` with an explicit `$user_id` param, same membership
+    semantics, selecting only `stripe_customer_id` (all the route needs).
+    This is a **third call pattern** (not exclusive-port / not
+    shared-via-Db-port): shared SQL fn re-implemented inline because it is
+    auth.uid()-dependent — no fork risk in practice since the inline copy
+    is 1 trivial join, but noted for Part 2/3 when subscription_get's last
+    RLS-context caller migrates.
+  - Adapter: `createPortalSession` implemented in
+    `server/src/adapters/stripe.ts` (billingPortal.sessions.create;
+    getSubscription's throw-message no longer mentions portal). Same
+    no-apiVersion-pin divergence as checkout.
+  - Tests: `server/test/stripePortal.test.ts` (11 — 401 no/garbage token,
+    400 missing workspaceId/returnUrl proven pre-query via throwing db;
+    e2e on real Postgres: member+subscription 200 with recorded portal
+    params, viewer-role member 200 (RPC parity: any member), non-member
+    404 exact body, member-without-subscription 404, NULL
+    stripe_customer_id 404, canonical log fields, read-only DB-state
+    snapshot). Seed builders added to `test/helpers/db.ts`:
+    `seedWorkspace`/`seedWorkspaceMember`/`seedSubscription`/
+    `deleteWorkspaces` (+ `SEEDED_USER_2_ID`); isolation = unique
+    workspace ids + targeted deletes (members/subscriptions cascade).
+    Adapter integration test extended with a `createPortalSession` case
+    (throwaway test-mode customer; `sk_test_` guard kept; third-party
+    tier, out of blocking CI).
+  - Client: `StripeService.createPortalSession` → `invokeFunction` (its
+    now-redundant `if (!supabase)` guard dropped — the wrapper handles it);
+    `'stripe-portal'` registered in `MIGRATED_FUNCTIONS`.
+    `subscriptionChange` untouched.
+  - **Analysis:** dead weight — the RPC's `p_workspace_id NULL` fallback
+    (oldest owned workspace) never runs here (edge fn 400s without
+    workspaceId) → not ported. Simplification — RPC round trip returning a
+    7-field JSONB collapsed to one inline join selecting only
+    `stripe_customer_id`. Consistency — 400s use Fastify's default body
+    (same documented divergence as prior waves; returnUrl is now
+    schema-required where the edge fn would have passed undefined through
+    to Stripe — no call site omits it); Stripe SDK 4xx errors pass through
+    Fastify's default error handler where the edge fn returned an opaque
+    500 (same as checkout, not wrapped). Smells flagged NOT fixed:
+    non-member and no-subscription are indistinguishable 404s (RPC
+    returned NULL for both — kept for parity); a malformed (non-UUID)
+    workspaceId hits the uuid cast and 500s (edge fn also 500'd via the
+    RPC error path); returnUrl is client-controlled and forwarded to
+    Stripe unchecked (same class as checkout's success/cancel URLs).
+  - Checks: root `npx vitest run server webapp/src/api` (79 passed, S3 +
+    Stripe adapter integrations skipped), server typecheck, webapp
+    `tsc -b`, eslint clean on changed files (StripeService's two
+    `no-explicit-any` findings pre-exist on HEAD).
+
 **Cutover strategy change (user decision 2026-07-16):** the prod-webapp
 flag flip is **deferred to the end of the migration** — while the server
 is under heavy churn, prod traffic stays on the edge functions to protect
@@ -281,11 +342,11 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** Wave A #3 (2/3) — `stripe-portal` (prompt:
-`plans/fastify-part5-stripe-portal-prompt.md`). In parallel, user adds the
-five Stripe vars to Railway and verifies checkout against Railway after the
-next deploy. `subscription-change` stays untouched until explicit go after
-portal is verified.
+**Next:** user verifies `stripe-portal` — local webapp flag-on against the
+local server (needs a subscription-bearing workspace; complete a test
+checkout first if the local DB has none), then against Railway after
+deploy. After portal is verified: Wave A #3 (3/3) — `subscription-change`,
+only on explicit go.
 
 Cleanup candidates noted 2026-07-16 (separate from the migration):
 - Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod

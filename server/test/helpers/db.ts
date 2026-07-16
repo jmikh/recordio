@@ -20,6 +20,9 @@ import type { Db } from '../../src/deps.js';
 /** Seeded by supabase/seed.sql (user1@gmail.com) — FK targets for owner/created_by. */
 export const SEEDED_USER_ID = process.env.TEST_USER_PRO_ID ?? '11111111-1111-1111-1111-111111111111';
 
+/** Second seeded user (user2@gmail.com) — for non-member/other-user cases. */
+export const SEEDED_USER_2_ID = process.env.TEST_USER_TRIAL_ID ?? '22222222-2222-2222-2222-222222222222';
+
 export function hasTestDb(): boolean {
     return Boolean(process.env.DATABASE_URL);
 }
@@ -97,4 +100,63 @@ export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<v
 export async function deleteProjects(db: Db, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.query('DELETE FROM projects WHERE id = ANY($1::uuid[])', [ids]);
+}
+
+export interface SeededWorkspace {
+    id: string;
+    ownerId: string;
+}
+
+export async function seedWorkspace(
+    db: Db,
+    opts: { ownerId?: string; name?: string } = {},
+): Promise<SeededWorkspace> {
+    const id = randomUUID();
+    const ownerId = opts.ownerId ?? SEEDED_USER_ID;
+    await db.query(
+        'INSERT INTO workspaces (id, name, owner_id) VALUES ($1, $2, $3)',
+        [id, opts.name ?? 'Test workspace', ownerId],
+    );
+    return { id, ownerId };
+}
+
+export async function seedWorkspaceMember(
+    db: Db,
+    opts: { workspaceId: string; userId: string; role?: 'viewer' | 'creator' | 'admin' },
+): Promise<void> {
+    await db.query(
+        'INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, $3)',
+        [opts.workspaceId, opts.userId, opts.role ?? 'admin'],
+    );
+}
+
+export interface SeedSubscriptionOptions {
+    workspaceId: string;
+    userId?: string;
+    plan?: 'pro' | 'teams';
+    status?: string;
+    stripeCustomerId?: string | null;
+    /** Constraint: seats only allowed when plan = 'teams' */
+    seats?: number | null;
+}
+
+export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): Promise<void> {
+    await db.query(
+        `INSERT INTO subscriptions (workspace_id, user_id, plan, status, stripe_customer_id, seats)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+            opts.workspaceId,
+            opts.userId ?? SEEDED_USER_ID,
+            opts.plan ?? 'pro',
+            opts.status ?? 'active',
+            opts.stripeCustomerId === undefined ? `cus_test_${randomUUID().slice(0, 8)}` : opts.stripeCustomerId,
+            opts.seats ?? null,
+        ],
+    );
+}
+
+/** workspace_members and subscriptions rows cascade with their workspace. */
+export async function deleteWorkspaces(db: Db, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.query('DELETE FROM workspaces WHERE id = ANY($1::uuid[])', [ids]);
 }

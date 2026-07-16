@@ -33,11 +33,15 @@ export function createStripeAdapter(config: StripeAdapterConfig): StripePort {
             });
             return { url: session.url };
         },
-        async createPortalSession() {
-            throw new Error('stripe.createPortalSession: lands with stripe-portal');
+        async createPortalSession(params) {
+            const session = await stripe.billingPortal.sessions.create({
+                customer: params.customer,
+                return_url: params.return_url,
+            });
+            return { url: session.url };
         },
         async getSubscription() {
-            throw new Error('stripe.getSubscription: lands with stripe-portal / subscription-change');
+            throw new Error('stripe.getSubscription: lands with subscription-change');
         },
         async updateSubscription() {
             throw new Error('stripe.updateSubscription: lands with subscription-change');
