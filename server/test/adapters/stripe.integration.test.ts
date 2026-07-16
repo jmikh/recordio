@@ -55,4 +55,55 @@ describe.runIf(hasTestModeKey)('stripe adapter (Stripe test mode)', () => {
 
         expect(url).toMatch(/^https:\/\/billing\.stripe\.com\//);
     });
+
+    it('getSubscription / previewInvoice / getPrice / updateSubscription round-trip', async () => {
+        const stripe = new Stripe(STRIPE_SECRET_KEY!);
+        const customer = await stripe.customers.create({
+            email: 'adapter-test@example.com',
+            description: 'adapter-integration-test',
+        });
+        const price = await stripe.prices.create({
+            currency: 'usd',
+            unit_amount: 700,
+            recurring: { interval: 'month' },
+            product_data: { name: 'adapter-integration-test-sub' },
+        });
+        // Trialing subscription — needs no payment method
+        const created = await stripe.subscriptions.create({
+            customer: customer.id,
+            items: [{ price: price.id, quantity: 2 }],
+            trial_period_days: 30,
+        });
+
+        const adapter = createStripeAdapter({ secretKey: STRIPE_SECRET_KEY! });
+
+        const sub = await adapter.getSubscription(created.id, { expandItemPrices: true });
+        expect(sub.status).toBe('trialing');
+        expect(sub.customer).toBe(customer.id);
+        const item = sub.items!.data[0];
+        expect(item.quantity).toBe(2);
+        expect((item.price as { id: string }).id).toBe(price.id);
+        // Our API version keeps current_period_end on the ITEM — the route
+        // depends on this (nextRenewalDate); verify against the real API
+        expect(item.current_period_end).toBeTypeOf('number');
+
+        const retrieved = await adapter.getPrice(price.id);
+        expect(retrieved.unit_amount).toBe(700);
+
+        const preview = await adapter.previewInvoice({
+            customer: customer.id,
+            subscription: created.id,
+            item: { id: item.id, quantity: 3 },
+            proration_behavior: 'always_invoice',
+        });
+        expect(preview.amount_due).toBeTypeOf('number');
+        expect(preview.currency).toBe('usd');
+
+        await adapter.updateSubscription(created.id, {
+            items: [{ id: item.id, quantity: 3 }],
+            proration_behavior: 'always_invoice',
+        });
+        const updated = await adapter.getSubscription(created.id);
+        expect(updated.items!.data[0].quantity).toBe(3);
+    });
 });

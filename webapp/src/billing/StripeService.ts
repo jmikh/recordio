@@ -1,4 +1,3 @@
-import { supabase } from '../auth/AuthManager';
 import { invokeFunction } from '../api/client';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { captureError } from '../lib/sentry';
@@ -98,12 +97,8 @@ export class StripeService {
         newInterval?: 'monthly' | 'yearly';
         dryRun: boolean;
     }): Promise<{ preview?: SubscriptionChangePreview; success?: boolean; error?: Error }> {
-        if (!supabase) return { error: new Error('Supabase not configured') };
-
         try {
-            const { data, error } = await supabase.functions.invoke('subscription-change', {
-                body: params,
-            });
+            const { data, error } = await invokeFunction('subscription-change', params);
 
             if (error) {
                 if (!params.dryRun) {

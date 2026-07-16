@@ -7,10 +7,19 @@
  * not speculatively here.
  */
 import Stripe from 'stripe';
-import type { StripePort } from '../ports/stripe.js';
+import type { StripePort, StripePrice } from '../ports/stripe.js';
 
 export interface StripeAdapterConfig {
     secretKey: string;
+}
+
+function mapPrice(price: Stripe.Price): StripePrice {
+    return {
+        id: price.id,
+        unit_amount: price.unit_amount,
+        metadata: price.metadata,
+        recurring: price.recurring ? { interval: price.recurring.interval } : null,
+    };
 }
 
 export function createStripeAdapter(config: StripeAdapterConfig): StripePort {
@@ -40,17 +49,62 @@ export function createStripeAdapter(config: StripeAdapterConfig): StripePort {
             });
             return { url: session.url };
         },
-        async getSubscription() {
-            throw new Error('stripe.getSubscription: lands with subscription-change');
+        async getSubscription(id, opts) {
+            const sub = await stripe.subscriptions.retrieve(
+                id,
+                opts?.expandItemPrices ? { expand: ['items.data.price'] } : {},
+            );
+            return {
+                id: sub.id,
+                status: sub.status,
+                customer: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
+                cancel_at_period_end: sub.cancel_at_period_end,
+                // This API version keeps current_period_end on the item, not
+                // the subscription (the edge fn's pinned 2024 version had it
+                // subscription-level) — the port carries it on both
+                items: {
+                    data: sub.items.data.map((item) => ({
+                        id: item.id,
+                        quantity: item.quantity,
+                        current_period_end: item.current_period_end,
+                        price: item.price ? mapPrice(item.price) : undefined,
+                    })),
+                },
+            };
         },
-        async updateSubscription() {
-            throw new Error('stripe.updateSubscription: lands with subscription-change');
+        async updateSubscription(id, params) {
+            await stripe.subscriptions.update(id, {
+                items: params.items,
+                proration_behavior:
+                    params.proration_behavior as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+            });
         },
-        async getPrice() {
-            throw new Error('stripe.getPrice: lands with subscription-change');
+        async getPrice(id) {
+            return mapPrice(await stripe.prices.retrieve(id));
         },
-        async previewInvoice() {
-            throw new Error('stripe.previewInvoice: lands with subscription-change');
+        async previewInvoice(params) {
+            const invoice = await stripe.invoices.createPreview({
+                customer: params.customer,
+                subscription: params.subscription,
+                subscription_details: {
+                    items: [
+                        {
+                            id: params.item.id,
+                            quantity: params.item.quantity,
+                            ...(params.item.price ? { price: params.item.price } : {}),
+                        },
+                    ],
+                    proration_behavior:
+                        params.proration_behavior as Stripe.InvoiceCreatePreviewParams.SubscriptionDetails.ProrationBehavior,
+                },
+            });
+            return {
+                amount_due: invoice.amount_due,
+                subtotal: invoice.subtotal,
+                total: invoice.total,
+                currency: invoice.currency,
+                lines: { data: invoice.lines.data as unknown as Array<Record<string, unknown>> },
+            };
         },
         async verifyWebhook() {
             throw new Error('stripe.verifyWebhook: lands with stripe-webhooks');

@@ -13,6 +13,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'shared-video-get',
     'stripe-checkout',
     'stripe-portal',
+    'subscription-change',
 ]);
 
 export type InvokeResult<T> =

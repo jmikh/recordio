@@ -109,13 +109,13 @@ export interface SeededWorkspace {
 
 export async function seedWorkspace(
     db: Db,
-    opts: { ownerId?: string; name?: string } = {},
+    opts: { ownerId?: string; name?: string; deletedAt?: string | null } = {},
 ): Promise<SeededWorkspace> {
     const id = randomUUID();
     const ownerId = opts.ownerId ?? SEEDED_USER_ID;
     await db.query(
-        'INSERT INTO workspaces (id, name, owner_id) VALUES ($1, $2, $3)',
-        [id, opts.name ?? 'Test workspace', ownerId],
+        'INSERT INTO workspaces (id, name, owner_id, deleted_at) VALUES ($1, $2, $3, $4)',
+        [id, opts.name ?? 'Test workspace', ownerId, opts.deletedAt ?? null],
     );
     return { id, ownerId };
 }
@@ -136,20 +136,25 @@ export interface SeedSubscriptionOptions {
     plan?: 'pro' | 'teams';
     status?: string;
     stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    billingInterval?: 'monthly' | 'yearly' | null;
     /** Constraint: seats only allowed when plan = 'teams' */
     seats?: number | null;
 }
 
 export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): Promise<void> {
     await db.query(
-        `INSERT INTO subscriptions (workspace_id, user_id, plan, status, stripe_customer_id, seats)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO subscriptions
+            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
             opts.workspaceId,
             opts.userId ?? SEEDED_USER_ID,
             opts.plan ?? 'pro',
             opts.status ?? 'active',
             opts.stripeCustomerId === undefined ? `cus_test_${randomUUID().slice(0, 8)}` : opts.stripeCustomerId,
+            opts.stripeSubscriptionId === undefined ? `sub_test_${randomUUID().slice(0, 8)}` : opts.stripeSubscriptionId,
+            opts.billingInterval === undefined ? 'monthly' : opts.billingInterval,
             opts.seats ?? null,
         ],
     );

@@ -270,10 +270,8 @@ user with the flag on.
     `tsc -b`, eslint clean on changed files (StripeService's two
     `no-explicit-any` findings pre-exist on HEAD).
 
-- **Wave A #3 (2/3) — `stripe-portal`** (code complete 2026-07-16; awaiting
-  user verification — local webapp flag-on against the local server needs a
-  subscription-bearing workspace, then against Railway after deploy. No new
-  env vars):
+- **Wave A #3 (2/3) — `stripe-portal`** (code complete AND user-verified
+  2026-07-16, flag-on against prod Railway. No new env vars):
   - Route: `server/src/routes/stripePortal.ts` — `requireUser`, TypeBox
     request/response schemas, exact 404 body
     `{ error: 'No subscription found for this workspace' }`. No new
@@ -333,6 +331,95 @@ user with the flag on.
     `tsc -b`, eslint clean on changed files (StripeService's two
     `no-explicit-any` findings pre-exist on HEAD).
 
+- **Wave A #3 (3/3) — `subscription-change`** (code complete 2026-07-16;
+  awaiting user verification — local webapp flag-on: preview + apply a
+  seat change on a teams workspace (sandbox Stripe), then against Railway
+  after deploy. Webhook overlap is harmless (re-syncs the same values).
+  **First migrated route with a DB WRITE.** No new env vars):
+  - Route: `server/src/routes/subscriptionChange.ts` — `requireUser`,
+    TypeBox request/response schemas (200 is a Union of the preview and
+    success shapes; 400/500 schemas use `additionalProperties: true` so
+    business-rule 400s send exact `{ error }` edge-fn bodies while
+    schema-validation 400s keep Fastify's full default body — same
+    documented divergence as all waves). Price ids via the existing
+    `AppOptions.stripePriceIds`. `stripe.dry_run` added to
+    `DomainLogFields`.
+  - **DB-function classification: `subscription_workspace_get` —
+    EXCLUSIVE** (only caller is this edge fn; the SQL file's "Called by:
+    WorkspaceSettingsPage billing tab" comment is stale). Logic ported
+    inline; the SQL function is now **orphaned → Step 5 decommission
+    list**. It was auth.uid()-dependent anyway (assert_workspace_admin)
+    so it couldn't be called over the pg pool. The RPC's 403/404 split is
+    preserved via one LEFT JOIN query (no admin+live-workspace row → 403
+    `Unauthorized or subscription not found`; row with NULL status →
+    404 `No subscription found for this workspace`); the edge fn's
+    second service-role read of the same subscriptions row is collapsed
+    into that query (no user-vs-service-role split over the pool), with
+    the check ORDER kept identical (status → downgrade → no-op →
+    stripe-ids 404 → seat floor).
+  - Adapter: `getSubscription` (expand option), `updateSubscription`,
+    `getPrice`, `previewInvoice` implemented in
+    `server/src/adapters/stripe.ts`. The edge fn raw-fetched
+    `POST /v1/invoices/create_preview` (not in stripe-node v14); v22 has
+    `invoices.createPreview` — used. **API-version divergence confirmed
+    against the real API:** dahlia keeps `current_period_end` on the
+    subscription ITEM (acacia had it subscription-level); the route reads
+    `item.current_period_end ?? sub.current_period_end`.
+  - Schema divergences (documented): `newPlan` is `Literal('teams')`
+    (schema 400 replaces the edge fn's "Only upgrades to Teams" 400);
+    `newSeats` is `Integer({ minimum: 1 })` (edge fn allowed floats);
+    **`dryRun` is REQUIRED** — the edge fn treated a missing dryRun as
+    falsy and silently APPLIED the change; missing now 400s instead of
+    defaulting into the destructive branch.
+  - Tests: `server/test/subscriptionChange.test.ts` (21 — 401; schema
+    400s incl. missing-dryRun-never-applies, proven pre-query via
+    throwing db; e2e on real Postgres: 403 non-member / creator-role /
+    soft-deleted workspace, 404 no-subscription-row, 400 not-active,
+    400 yearly→monthly, 400 no-op, 404 no-stripe-ids, 400 seat floor
+    with exact interpolated body, 500 no-items exact body, dryRun
+    preview math parity + **DB-unchanged** + no update call, dryRun
+    interval change carries target price + billingInterval-stays-current
+    parity, apply seats-only records update without price + **DB row
+    written**, apply pro→teams (trialing) with price, canonical log
+    fields incl. stripe.dry_run). Seed builders extended:
+    `seedWorkspace` deletedAt, `seedSubscription`
+    stripeSubscriptionId/billingInterval. Adapter integration test
+    extended with a getSubscription/previewInvoice/getPrice/
+    updateSubscription round-trip on a trialing test-mode subscription
+    (no payment method needed) — **run against real Stripe test mode
+    2026-07-16, all 3 pass** (verifies item-level current_period_end);
+    `sk_test_` guard kept, stays out of blocking CI.
+  - Client: `StripeService.subscriptionChange` → `invokeFunction`; the
+    now-unused `supabase` import dropped from StripeService (all three
+    of its functions are converted); `'subscription-change'` registered
+    in `MIGRATED_FUNCTIONS`. Callers: `BillingPage.tsx` (preview +
+    apply) — client-invoked, NOT a webhook; `stripe-webhooks` (Wave D)
+    remains the authoritative DB sync.
+  - **Analysis:** dead weight — the `plan === 'teams' && newPlan ===
+    'pro'` downgrade check was unreachable (newPlan already forced to
+    'teams') → dropped; DEBUG console.log blocks dropped (console.*
+    banned; fields go to logCtx); the "No price configured" 500 branch
+    unreachable with required env vars (same as checkout).
+    Simplification — RPC + second service-role read collapsed to one
+    LEFT JOIN; `updated_at` via SQL `now()` instead of a JS timestamp.
+    Consistency — Stripe SDK 4xx errors (incl. preview errors the edge
+    fn re-wrapped as 400 `{ error: message }`) pass through Fastify's
+    default handler; no client reads those bodies (FunctionsHttpError
+    message is generic) — kept, documented. Smells flagged NOT fixed:
+    the dryRun preview reports the CURRENT billing interval even when
+    previewing an interval change (renewal amount uses the TARGET price
+    — inconsistent pair; parity kept, test pins it); apply is not
+    atomic (Stripe update then DB update — a crash between leaves DB
+    stale until the webhook syncs; acceptable, webhook is
+    authoritative); seat floor counts members but not pending
+    invitations; malformed (non-UUID) workspaceId → pg cast error 500
+    (edge fn also 500'd via RPC error).
+  - Checks: root `npx vitest run server webapp/src/api` (100 passed, S3
+    + Stripe adapter integrations skipped there; Stripe integration run
+    separately with the sandbox key — 3/3 pass), server typecheck,
+    webapp `tsc -b`, eslint clean on changed files (StripeService's two
+    `no-explicit-any` findings pre-exist on HEAD).
+
 **Cutover strategy change (user decision 2026-07-16):** the prod-webapp
 flag flip is **deferred to the end of the migration** — while the server
 is under heavy churn, prod traffic stays on the edge functions to protect
@@ -342,11 +429,12 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `stripe-portal` — local webapp flag-on against the
-local server (needs a subscription-bearing workspace; complete a test
-checkout first if the local DB has none), then against Railway after
-deploy. After portal is verified: Wave A #3 (3/3) — `subscription-change`,
-only on explicit go.
+**Next:** user verifies `subscription-change` — local webapp flag-on
+(preview + apply a seat change on a teams workspace, sandbox Stripe),
+then against Railway after deploy. Wave A #3 is then fully done. After
+that: Wave A #5 `unsubscribe` (decide the old-emails-URL question first
+— old sent emails link to the Supabase edge fn URL) and #6
+`project-update-thumbnail`, each on explicit go.
 
 Cleanup candidates noted 2026-07-16 (separate from the migration):
 - Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod
