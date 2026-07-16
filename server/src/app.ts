@@ -10,6 +10,7 @@ import { createLogger, RequestLogContext } from './logging.js';
 import { authPlugin } from './plugins/auth.js';
 import { storageDownloadUrlsRoutes } from './routes/storageDownloadUrls.js';
 import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
+import { stripeCheckoutRoutes, type StripePriceIds } from './routes/stripeCheckout.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -34,6 +35,8 @@ export interface AppOptions {
     /** Injectable for tests — assert emitted log events */
     logStream?: DestinationStream;
     prettyLogs?: boolean;
+    /** Stripe price ids by `${plan}_${interval}` — required by /stripe-checkout */
+    stripePriceIds?: StripePriceIds;
 }
 
 export type App = ReturnType<typeof buildApp>;
@@ -111,6 +114,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     // Migrated edge-function routes (plan Step 4) — one module per function
     app.register(storageDownloadUrlsRoutes);
     app.register(sharedVideoGetRoutes);
+    app.register(stripeCheckoutRoutes, { priceIds: opts.stripePriceIds });
 
     app.get('/health', {
         schema: {

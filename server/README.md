@@ -63,10 +63,12 @@ database is never faked; only third-party services are.
 
 | Var | Required | Description |
 |-----|----------|-------------|
-| `DATABASE_URL` | Yes | Supavisor pooled connection string (transaction mode). Local: `supabase start` DB |
+| `DATABASE_URL` | Yes | Postgres connection string. Prod: Supabase **direct** connection (`db.<ref>.supabase.co:5432`) — the direct host is IPv6-only, which requires Railway's IPv6 egress (enabled on our service). If IPv6 egress is ever off, fall back to the Supavisor transaction pooler (`aws-0-<region>.pooler.supabase.com:6543`, username `postgres.<ref>`, IPv4). Local: `supabase start` DB |
 | `SUPABASE_URL` | Yes | Supabase project URL — JWKS for new-style (ES256) user tokens; platform APIs later |
 | `SUPABASE_JWT_SECRET` | Yes | Legacy HS256 secret for user JWTs (dashboard → Project Settings → API → JWT Settings) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service-role key for Supabase platform APIs (auth admin user lookup; storage later). Local: the `supabase start` secret key (see `.env.example`) |
+| `STRIPE_SECRET_KEY` | Yes | Stripe API secret key — same value as the edge function secret. Local: a **test-mode** key (`sk_test_…`) |
+| `STRIPE_PRO_PRICE_ID_MONTHLY` / `STRIPE_PRO_PRICE_ID_YEARLY` / `STRIPE_TEAMS_PRICE_ID_MONTHLY` / `STRIPE_TEAMS_PRICE_ID_YEARLY` | Yes | Subscription price ids, keyed by plan + interval — same names/values as the edge function secrets. Local: test-mode price ids |
 | `PORT` | No | Default 8080 (Railway injects its own) |
 | `SENTRY_DSN` | No | Enables Sentry when set |
 | `NODE_ENV` | No | `production` on Railway; controls log format + Sentry environment |

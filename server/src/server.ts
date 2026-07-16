@@ -1,17 +1,12 @@
 import './instrument.js';
-import { setDefaultResultOrder } from 'node:dns';
 import * as Sentry from '@sentry/node';
 import pg from 'pg';
 import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
+import { createStripeAdapter } from './adapters/stripe.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
 import { loadConfig } from './config.js';
 import { systemClock } from './deps.js';
-
-// Railway has no IPv6 route; Node 17+ tries DNS results verbatim, and the
-// Supavisor pooler host resolves AAAA first → connect ENETUNREACH. Prefer
-// the pooler's IPv4 records instead.
-setDefaultResultOrder('ipv4first');
 
 const config = loadConfig();
 
@@ -37,7 +32,7 @@ const app = buildApp(
     {
         db: pool,
         clock: systemClock,
-        stripe: unimplementedPort('stripe'),
+        stripe: createStripeAdapter({ secretKey: config.STRIPE_SECRET_KEY }),
         mux: unimplementedPort('mux'),
         s3: s3Configured
             ? createS3Adapter({
@@ -61,6 +56,12 @@ const app = buildApp(
         prettyLogs: config.NODE_ENV !== 'production',
         supabaseJwtSecret: config.SUPABASE_JWT_SECRET,
         supabaseUrl: config.SUPABASE_URL,
+        stripePriceIds: {
+            pro_monthly: config.STRIPE_PRO_PRICE_ID_MONTHLY,
+            pro_yearly: config.STRIPE_PRO_PRICE_ID_YEARLY,
+            teams_monthly: config.STRIPE_TEAMS_PRICE_ID_MONTHLY,
+            teams_yearly: config.STRIPE_TEAMS_PRICE_ID_YEARLY,
+        },
     },
 );
 

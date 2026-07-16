@@ -38,6 +38,8 @@ export interface DomainLogFields {
     'mux.asset_id'?: string;
     'mux.video_status'?: string;
     'stripe.event_type'?: string;
+    'stripe.plan'?: string;
+    'stripe.interval'?: string;
     'storage.path_count'?: number;
     error_type?: ErrorType;
 }

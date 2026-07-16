@@ -12,7 +12,7 @@ route is webhook/cron-invoked, the client call site switched behind the
 `USE_SERVER_INSTEAD_OF_SUPA` flag, and a manual local verification by the
 user with the flag on.
 
-## Status (updated 2026-07-13)
+## Status (updated 2026-07-16)
 
 **Done:**
 - **Step 0** — `server/` scaffolded (Fastify + TypeBox, `buildApp(deps)` factory,
@@ -113,8 +113,10 @@ user with the flag on.
     instead of `auth.getUser()` network call (Step 1 trade-off: revoked
     sessions stay valid until expiry).
 
-- **Wave A #2 — `shared-video-get`** (code complete 2026-07-16, awaiting
-  user's local verification with the flag on):
+- **Wave A #2 — `shared-video-get`** (code complete AND user-verified
+  2026-07-16: locally against the local stack, and flag-on from the local
+  webapp against the **deployed Railway server** with prod data — 200s in
+  Railway logs. Prod-webapp flag flip stays deferred to end of migration):
   - Route: `server/src/routes/sharedVideoGet.ts` — PUBLIC (no `requireUser`),
     per-route rate limit 60/min/IP (global 300 stays the backstop; VideoPage
     polls at 12/min). TypeBox request + response schemas; `project.slug`,
@@ -172,6 +174,103 @@ user with the flag on.
     integration skipped), server typecheck, webapp `tsc -b`, eslint clean
     on changed files (VideoPage's 3 react-hooks findings pre-exist on
     HEAD).
+  - **Deploy fallout fixed during cutover (2026-07-16):**
+    - `.env.test` was never actually in git (root `.gitignore`'s `.env.*`)
+      despite this plan calling it "committed" — now committed via a
+      `!.env.test` exception; all values are well-known local-stack
+      constants (`RENDER_SECRET` was already hardcoded in committed test
+      files). GitHub push protection flags the local `sb_secret_*` demo
+      key — bypassed once via the unblock link ("used in tests").
+    - e2e suites must create their pg pool lazily (`beforeAll`), not in
+      the `describe` body — vitest executes describe bodies at collection
+      even when `runIf` skips, which broke CI before `.env.test` existed
+      there.
+    - **Railway `DATABASE_URL` was broken since Step 0** and only surfaced
+      now (first prod route to touch the db): it pointed at the direct
+      `db.<ref>.supabase.co` host, which is **IPv6-only**, and the Railway
+      service had no IPv6 egress → `connect ENETUNREACH`. Interim fix was
+      the IPv4 Supavisor pooler + `setDefaultResultOrder('ipv4first')`;
+      **final resolution (same day): Railway outbound IPv6 enabled**, so
+      `DATABASE_URL` uses the **direct connection** (`db.<ref>:5432` — no
+      pooler hop, full Postgres features; fine for one always-on instance
+      with pool max 10) and the ipv4first workaround was removed from
+      `server.ts`. README documents the direct-vs-pooler choice; local
+      `dev:prod` runs keep the IPv4 pooler string (home networks may lack
+      IPv6).
+    - Railway env now also has `SUPABASE_SERVICE_ROLE_KEY`.
+    - CI workflow further optimized by the user: `supabase start` runs in
+      the background overlapping `npm ci`, with non-essential services
+      excluded (`-x realtime,imgproxy,mailpit,postgres-meta,studio,
+      edge-runtime,logflare,vector,supavisor`).
+
+- **Wave A #3 (1/3) — `stripe-checkout`** (code complete AND locally
+  verified 2026-07-16 — flag-on webapp against the local server, real
+  test-mode checkout URL returned. The 400 on first try was an archived
+  sandbox `pro_yearly` price (fixed in the Stripe dashboard), not code.
+  **Railway still pending:** add the five Stripe vars there before the next
+  deploy — config requires them, so a deploy without them fails loudly —
+  then verify local webapp flag-on against Railway):
+  - Route: `server/src/routes/stripeCheckout.ts` — `requireUser`, TypeBox
+    request/response schemas (plan/interval constrained to enums, defaults
+    applied in the handler exactly like the edge fn's destructuring);
+    `stripe.plan` + `stripe.interval` added to `DomainLogFields`
+    (`workspace.id` already existed).
+  - **DB-function classification: none called** — the edge fn is auth +
+    price lookup + one Stripe call; even the user-scoped supabase client
+    `withAuth` hands it goes unused. Nothing exclusive-vs-shared to
+    classify; no DB tier → the fakes suite IS its e2e tier (same as
+    Wave A #1).
+  - Third real adapter: `server/src/adapters/stripe.ts` (`stripe` SDK v22
+    in server runtime deps). Only `createCheckoutSession` is implemented —
+    the other StripePort methods throw until their consumers land
+    (portal / subscription-change / webhooks). **API-version divergence
+    (user-confirmed 2026-07-16):** no `apiVersion` override — stripe-node
+    sends its bundled `2026-06-24.dahlia`, while the edge fn pins
+    `2024-11-20.acacia`; irrelevant to `checkout.sessions.create`.
+  - Env — all **required** in `config.ts` (no-optional-vars preference):
+    `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID_MONTHLY`,
+    `STRIPE_PRO_PRICE_ID_YEARLY`, `STRIPE_TEAMS_PRICE_ID_MONTHLY`,
+    `STRIPE_TEAMS_PRICE_ID_YEARLY` (same names as the edge fn secrets).
+    README env table + `.env.example` updated; placeholder blocks appended
+    to `.env.local` (test-mode) and `.env.prod` (live) for the user to fill.
+    Price ids reach the route via `AppOptions.stripePriceIds` (business
+    config, not a port); if absent (a test that forgot them) the route
+    throws 500 instead of creating a session with an empty price id.
+  - Tests: `server/test/stripeCheckout.test.ts` (11 — 401/400 validation,
+    403 mismatch with the exact edge-fn body, pro-yearly defaults with full
+    session-params parity, pro ignores seats, teams quantity + default-5 +
+    clamp-below-at-1, `seats: String(quantity)` metadata parity, fail-loud
+    without price ids, canonical log fields). Adapter integration test
+    `test/adapters/stripe.integration.test.ts` — third-party tier, out of
+    the blocking CI job; auto-skips unless `STRIPE_SECRET_KEY` starts with
+    `sk_test_` (a live key can never be exercised); creates a throwaway
+    test-mode product/price per run.
+  - Client: `StripeService.createCheckoutSession` → `invokeFunction`
+    (checkout only — portal and subscription-change untouched);
+    `'stripe-checkout'` registered in `MIGRATED_FUNCTIONS`.
+  - **Analysis:** dead weight — the unused user-scoped supabase client;
+    `interval || 'yearly'` in the metadata is unreachable (the destructure
+    default already applied). Simplification — schema enums for
+    plan/interval + required non-empty price env vars make the edge fn's
+    "No price configured" 400 branch unreachable → dropped (schema 400
+    replaces it; no call site reads 400 bodies). Consistency — 400s use
+    Fastify's default body (same documented divergence as Waves A #1/#2);
+    403 keeps the exact `{ error: 'Unauthorized: User ID mismatch' }`;
+    check-order divergence: schema validation (incl. workspaceId presence)
+    now runs before the userId-mismatch 403; Stripe-error divergence (seen
+    during verification): Stripe SDK 4xx errors carry `statusCode` and pass
+    through Fastify's default error handler, so the client gets Stripe's
+    status + message where the edge fn returned an opaque 500 — kept (no
+    call site reads the body), documented here. Smells flagged NOT fixed:
+    client-supplied `userEmail` forwarded to Stripe unchecked against the
+    token's email; `workspaceId` never validated against the caller's
+    membership (any authed user can start a checkout that targets any
+    workspace id — the webhook applies it); `seats` has no upper bound;
+    success/cancel URLs are client-controlled.
+  - Checks: root `npx vitest run server webapp/src/api` (68 passed, S3 +
+    Stripe adapter integrations skipped), server typecheck, webapp
+    `tsc -b`, eslint clean on changed files (StripeService's two
+    `no-explicit-any` findings pre-exist on HEAD).
 
 **Cutover strategy change (user decision 2026-07-16):** the prod-webapp
 flag flip is **deferred to the end of the migration** — while the server
@@ -182,13 +281,11 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `shared-video-get` locally with the flag on (both
-the local stack and against prod via `dev:webapp` — the shared video page
-at `/video/<slug>`, all four states if possible: completed / pending /
-failed / no video; server needs `SUPABASE_SERVICE_ROLE_KEY`, already in
-`.env.local`; **Railway needs it too**), **pause**, then Wave A #3
-(`stripe-checkout` / `stripe-portal` / `subscription-change`) on explicit
-go-ahead.
+**Next:** Wave A #3 (2/3) — `stripe-portal` (prompt:
+`plans/fastify-part5-stripe-portal-prompt.md`). In parallel, user adds the
+five Stripe vars to Railway and verifies checkout against Railway after the
+next deploy. `subscription-change` stays untouched until explicit go after
+portal is verified.
 
 Cleanup candidates noted 2026-07-16 (separate from the migration):
 - Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod

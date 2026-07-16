@@ -12,6 +12,16 @@ const EnvSchema = Type.Object({
     SUPABASE_JWT_SECRET: Type.String({ minLength: 1 }),
     /** Service-role key for Supabase platform APIs (auth admin user lookup, storage) */
     SUPABASE_SERVICE_ROLE_KEY: Type.String({ minLength: 1 }),
+    /**
+     * Stripe secret key + the four subscription price ids (same names as the
+     * edge function secrets). Required — a deploy without Stripe config
+     * should fail loudly, not degrade. Local: test-mode values.
+     */
+    STRIPE_SECRET_KEY: Type.String({ minLength: 1 }),
+    STRIPE_PRO_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
+    STRIPE_PRO_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
+    STRIPE_TEAMS_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
+    STRIPE_TEAMS_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),

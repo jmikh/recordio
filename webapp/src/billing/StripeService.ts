@@ -1,4 +1,5 @@
 import { supabase } from '../auth/AuthManager';
+import { invokeFunction } from '../api/client';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { captureError } from '../lib/sentry';
 import { trackCheckoutSessionFailed, trackSubscriptionChangeFailed } from '../analytics';
@@ -21,10 +22,6 @@ export class StripeService {
      * In the browser: opens Stripe checkout in a popup window.
      */
     static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly', plan: 'pro' | 'teams' = 'pro', workspaceId: string | null = null, seats = 5): Promise<{ error?: Error }> {
-        if (!supabase) {
-            return { error: new Error('Supabase not configured') };
-        }
-
         try {
             // Open popup IMMEDIATELY in the synchronous click handler stack
             // to prevent mobile Safari and other browsers from blocking it.
@@ -33,17 +30,15 @@ export class StripeService {
             const redirectUrl = `${window.location.origin}/workspace/settings/billing`;
             const cancelUrl = redirectUrl;
 
-            const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-                body: {
-                    userId,
-                    userEmail,
-                    plan,
-                    interval,
-                    workspaceId,
-                    seats,
-                    successUrl: redirectUrl,
-                    cancelUrl,
-                },
+            const { data, error } = await invokeFunction<{ url: string | null }>('stripe-checkout', {
+                userId,
+                userEmail,
+                plan,
+                interval,
+                workspaceId,
+                seats,
+                successUrl: redirectUrl,
+                cancelUrl,
             });
 
             if (error) {
