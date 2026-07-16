@@ -10,6 +10,7 @@ import { authAwareFetch, supabase } from '../supabase/client';
  */
 export const MIGRATED_FUNCTIONS = new Set<string>([
     'storage-download-urls',
+    'shared-video-get',
 ]);
 
 export type InvokeResult<T> =

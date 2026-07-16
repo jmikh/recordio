@@ -9,6 +9,7 @@ import type { Deps } from './deps.js';
 import { createLogger, RequestLogContext } from './logging.js';
 import { authPlugin } from './plugins/auth.js';
 import { storageDownloadUrlsRoutes } from './routes/storageDownloadUrls.js';
+import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -109,6 +110,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
 
     // Migrated edge-function routes (plan Step 4) — one module per function
     app.register(storageDownloadUrlsRoutes);
+    app.register(sharedVideoGetRoutes);
 
     app.get('/health', {
         schema: {

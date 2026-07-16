@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/node';
 import pg from 'pg';
 import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
+import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
 import { loadConfig } from './config.js';
 import { systemClock } from './deps.js';
 
@@ -43,7 +44,10 @@ const app = buildApp(
         email: unimplementedPort('email'),
         renderWorker: unimplementedPort('renderWorker'),
         transcription: unimplementedPort('transcription'),
-        supabaseApi: unimplementedPort('supabaseApi'),
+        supabaseApi: createSupabaseApiAdapter({
+            url: config.SUPABASE_URL,
+            serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
+        }),
     },
     {
         version: config.RAILWAY_GIT_COMMIT_SHA ?? 'dev',

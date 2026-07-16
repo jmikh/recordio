@@ -2,6 +2,12 @@ name: server-tests
 
 # Railway is configured to "Wait for CI" — its deploy of server/ is blocked
 # until this check is green on the commit.
+#
+# The e2e tier runs against a real local Postgres (`supabase start`), so the
+# job spins up the local stack and runs tests via the ROOT vitest config,
+# which loads the committed .env.test (well-known local-stack values — no
+# GitHub secrets). The third-party adapter integration tier (real S3 creds
+# etc.) auto-skips here — it stays out of the blocking job by design.
 on:
   pull_request:
   push:
@@ -10,16 +16,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
       - run: npm ci
+      - run: npm ci
+        working-directory: server
       - run: npm run typecheck
-      - run: npm test
+        working-directory: server
+      - run: npx vitest run server webapp/src/api

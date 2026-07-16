@@ -5,7 +5,7 @@ import { Button } from '@shared/components';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { TbCopy } from 'react-icons/tb';
 import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
-import { supabase } from '../auth/AuthManager';
+import { invokeFunction } from '../api/client';
 import { navigate } from '../lib/navigate';
 
 interface VideoPageData {
@@ -28,9 +28,10 @@ export function VideoPage() {
 
     const fetchVideo = async () => {
         if (!slug) return;
-        const { data: result, error: fetchError } = await supabase?.functions.invoke('shared-video-get', {
-            body: { slug },
-        }) ?? { data: null, error: new Error('No supabase client') };
+        const { data: result, error: fetchError } = await invokeFunction<VideoPageData & { error?: string }>(
+            'shared-video-get',
+            { slug },
+        );
 
         if (fetchError || !result || result.error) {
             setError('Video not found or has been removed');

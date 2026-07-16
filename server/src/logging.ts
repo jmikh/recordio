@@ -22,7 +22,8 @@ export type ErrorType =
     | 'UnhandledException'
     | 'StripeSignatureInvalid'
     | 'MuxSignatureInvalid'
-    | 'RenderWorkerTimeout';
+    | 'RenderWorkerTimeout'
+    | 'SupabaseApiUnavailable';
 
 /**
  * Known domain fields — the typed surface handlers can contribute to the
@@ -31,9 +32,11 @@ export type ErrorType =
  */
 export interface DomainLogFields {
     'project.id'?: string;
+    'project.slug'?: string;
     'workspace.id'?: string;
     'render.job_id'?: string;
     'mux.asset_id'?: string;
+    'mux.video_status'?: string;
     'stripe.event_type'?: string;
     'storage.path_count'?: number;
     error_type?: ErrorType;

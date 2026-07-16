@@ -66,6 +66,7 @@ database is never faked; only third-party services are.
 | `DATABASE_URL` | Yes | Supavisor pooled connection string (transaction mode). Local: `supabase start` DB |
 | `SUPABASE_URL` | Yes | Supabase project URL — JWKS for new-style (ES256) user tokens; platform APIs later |
 | `SUPABASE_JWT_SECRET` | Yes | Legacy HS256 secret for user JWTs (dashboard → Project Settings → API → JWT Settings) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service-role key for Supabase platform APIs (auth admin user lookup; storage later). Local: the `supabase start` secret key (see `.env.example`) |
 | `PORT` | No | Default 8080 (Railway injects its own) |
 | `SENTRY_DSN` | No | Enables Sentry when set |
 | `NODE_ENV` | No | `production` on Railway; controls log format + Sentry environment |

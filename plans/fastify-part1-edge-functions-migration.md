@@ -70,8 +70,14 @@ user with the flag on.
   funnel (real `authAwareFetch` + `setUnauthorizedHandler`, mocked global
   fetch). No call sites converted yet — they move per-function.
 
-- **Wave A #1 — `storage-download-urls`** (code complete, awaiting user's
-  manual local verification with the flag on):
+- **Wave A #1 — `storage-download-urls`** (code complete; user verified
+  locally with the flag on 2026-07-16, then verified local webapp against
+  the **prod Railway server** same day. Railway env now has the four S3_*
+  vars (new Supabase S3 access key pair minted 2026-07-16 — old pair left
+  valid for the edge functions), plus `SUPABASE_URL` and
+  `SUPABASE_JWT_SECRET` (missed at Step 0 setup; server config requires
+  them since Step 1). Remaining: deploy the prod webapp with
+  `VITE_USE_SERVER=true` + `VITE_API_URL` baked in, observe):
   - Route: `server/src/routes/storageDownloadUrls.ts` (first route module;
     registered in `app.ts`), TypeBox request + response schemas,
     `requireUser`, `storage.path_count` added to `DomainLogFields`.
@@ -107,12 +113,92 @@ user with the flag on.
     instead of `auth.getUser()` network call (Step 1 trade-off: revoked
     sessions stay valid until expiry).
 
-**Next:** user verifies `storage-download-urls` locally
-(`VITE_USE_SERVER=true` + `VITE_API_URL=http://localhost:8090` in
-`webapp/.env.development.local`, `npm run dev` in `server/`; server needs
-the S3_* block from `server/.env.example` in its `.env.local`), then deploy
-(**Railway needs the four S3_* vars**) + cutover + observe, **pause**, then
-Wave A #2 (`shared-video-get`).
+- **Wave A #2 — `shared-video-get`** (code complete 2026-07-16, awaiting
+  user's local verification with the flag on):
+  - Route: `server/src/routes/sharedVideoGet.ts` — PUBLIC (no `requireUser`),
+    per-route rate limit 60/min/IP (global 300 stays the backstop; VideoPage
+    polls at 12/min). TypeBox request + response schemas; `project.slug`,
+    `mux.video_status` added to `DomainLogFields`,
+    `SupabaseApiUnavailable` added to `ErrorType`.
+  - **DB-function classification: none called** — the edge fn is PostgREST
+    table reads (`projects`, `mux_videos`) + `auth.admin.getUserById`.
+    Nothing to classify exclusive-vs-shared; port = direct SQL via `Db` +
+    `SupabaseApiPort.getUserById`.
+  - Second real adapter: `server/src/adapters/supabaseApi.ts`
+    (`@supabase/supabase-js` moved to server runtime deps; auth admin
+    getUserById only — the storage methods throw until their Wave C
+    consumers land). `SUPABASE_SERVICE_ROLE_KEY` is a **required** config
+    var (user decision: fail deploys loudly rather than degrade) —
+    **Railway needs it before the next deploy**. Its integration test runs
+    in the blocking job on purpose: it needs only the local stack (same
+    dependency as the e2e tier), not third-party creds.
+  - First real-Postgres e2e suite: `server/test/sharedVideoGet.test.ts`
+    (20 tests — 404 paths, full mux priority matrix incl. the
+    NULL-playback-id fall-through and canceled-ignored parity, userName
+    fallback chain, supabaseApi-failure degradation, canonical log fields,
+    read-only DB-state assertion, 429 over the per-route limit). Seed
+    builders in `server/test/helpers/db.ts`. **Isolation deviation from the
+    plan's truncate mechanics:** unique ids/slugs + targeted deletes in
+    `afterEach` instead of truncation, because the root vitest run executes
+    other e2e suites against the same database in parallel and truncation
+    would wipe their seed rows. `DATABASE_URL` added to the committed root
+    `.env.test`; e2e suites `describe.runIf(hasTestDb())` so a bare
+    `vitest` inside `server/` (no root config) skips instead of failing
+    confusingly — CI always uses the root config, so the tier stays
+    merge-blocking where it matters.
+  - CI: `server-tests.yml` now runs `supabase/setup-cli` → `supabase start`
+    and tests via the **root** vitest config (`npx vitest run server
+    webapp/src/api`) so `.env.test` loads — no GitHub secrets. The auth
+    contract tests now run in CI for free. S3 adapter integration still
+    auto-skips (no S3_* in `.env.test`).
+  - Client: `pages/VideoPage.tsx` converted to `invokeFunction` (the old
+    `supabase?.functions.invoke` null-fallback is now handled inside the
+    wrapper); `'shared-video-get'` registered in `MIGRATED_FUNCTIONS`.
+  - **Analysis:** dead weight — comment numbering skips 3 (copy-paste
+    residue); pending-lookup ordered by cloud_version when only existence
+    matters. Simplification — three sequential mux queries collapsed to one
+    `SELECT DISTINCT ON (status) … ORDER BY status, cloud_version DESC`
+    with identical priority logic in TS (incl. the latest-completed-with-
+    NULL-playback → pending fall-through); owner lookup + mux query run in
+    parallel. Consistency — 400s use Fastify's default body (same
+    documented divergence as Wave A #1); 404 keeps the exact
+    `{ error: 'not_found' }` body. Smells flagged NOT fixed: completed
+    lookup ignores `is_deleted` despite its comment (a soft-deleted
+    completed video can outrank a newer pending one); `canceled` rows
+    silently ignored; getUserById failures degrade to `userName: 'Unknown'`
+    (kept, but now tagged `error_type: SupabaseApiUnavailable` in the
+    canonical event).
+  - Checks: root `npx vitest run server webapp/src/api` (57 passed, S3
+    integration skipped), server typecheck, webapp `tsc -b`, eslint clean
+    on changed files (VideoPage's 3 react-hooks findings pre-exist on
+    HEAD).
+
+**Cutover strategy change (user decision 2026-07-16):** the prod-webapp
+flag flip is **deferred to the end of the migration** — while the server
+is under heavy churn, prod traffic stays on the edge functions to protect
+availability. Per-function verification = local webapp against the prod
+Railway server (flag on locally). At the end, one prod webapp deploy with
+`VITE_USE_SERVER=true` + `VITE_API_URL=https://recordio-production.up.railway.app`
+cuts over every migrated function at once (observe per-function in Railway
+logs; rollback = remove the two vars and redeploy).
+
+**Next:** user verifies `shared-video-get` locally with the flag on (both
+the local stack and against prod via `dev:webapp` — the shared video page
+at `/video/<slug>`, all four states if possible: completed / pending /
+failed / no video; server needs `SUPABASE_SERVICE_ROLE_KEY`, already in
+`.env.local`; **Railway needs it too**), **pause**, then Wave A #3
+(`stripe-checkout` / `stripe-portal` / `subscription-change`) on explicit
+go-ahead.
+
+Cleanup candidates noted 2026-07-16 (separate from the migration):
+- Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod
+  signs ES256 only (legacy HS256 key rotated out ~6 months ago); the
+  secret path serves local/test hand-signed tokens.
+- Migrate the prod webapp's legacy `eyJ…` anon key to the new
+  `sb_publishable_…` key, **then** revoke the previous JWT signing key in
+  the Supabase dashboard — not before, revoking breaks legacy API keys.
+- `webapp/.env` (gitignored) holds server-side secrets (live Stripe secret
+  key, Resend, Mux) that aren't `VITE_`-prefixed and don't belong there.
 
 **Wave A #2 carries a CI change:** it's the first route whose merge-blocking
 e2e tests need a real Postgres, so `.github/workflows/server-tests.yml` must
