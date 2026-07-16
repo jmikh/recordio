@@ -13,6 +13,7 @@ import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
 import { stripeCheckoutRoutes, type StripePriceIds } from './routes/stripeCheckout.js';
 import { stripePortalRoutes } from './routes/stripePortal.js';
 import { subscriptionChangeRoutes } from './routes/subscriptionChange.js';
+import { projectUpdateThumbnailRoutes } from './routes/projectUpdateThumbnail.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -119,6 +120,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(stripeCheckoutRoutes, { priceIds: opts.stripePriceIds });
     app.register(stripePortalRoutes);
     app.register(subscriptionChangeRoutes, { priceIds: opts.stripePriceIds });
+    app.register(projectUpdateThumbnailRoutes);
 
     app.get('/health', {
         schema: {

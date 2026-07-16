@@ -462,19 +462,18 @@ export class CloudStorage {
         projectId: string,
         blob: Blob,
     ): Promise<string> {
-        if (!supabase) throw new Error('Supabase not configured');
-
         const formData = new FormData();
         formData.append('projectId', projectId);
         formData.append('file', blob, 'thumbnail.webp');
 
-        const { data, error } = await supabase.functions.invoke('project-update-thumbnail', {
-            body: formData,
-        });
+        const { data, error } = await invokeFunction<{ storagePath: string; error?: string }>(
+            'project-update-thumbnail',
+            formData,
+        );
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
-        return data.storagePath;
+        return data!.storagePath;
     }
 
     /**

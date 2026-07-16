@@ -91,6 +91,26 @@ describe('invokeFunction routing', () => {
         expect(result).toEqual({ data: { via: 'server' }, error: null });
     });
 
+    it('passes a FormData body through untouched with no JSON content-type', async () => {
+        vi.stubEnv('VITE_USE_SERVER', 'true');
+        MIGRATED_FUNCTIONS.add(FN);
+        fetchMock.mockResolvedValue(jsonResponse({ storagePath: 'u/p/thumbnail.webp' }));
+
+        const form = new FormData();
+        form.append('projectId', 'p-1');
+        form.append('file', new Blob(['x'], { type: 'image/webp' }), 'thumbnail.webp');
+
+        const result = await invokeFunction(FN, form);
+
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('http://localhost:8090/test-fn');
+        // The exact instance — no JSON.stringify — and no Content-Type so
+        // the browser sets the multipart boundary
+        expect(options.body).toBe(form);
+        expect(options.headers).toEqual({ Authorization: 'Bearer test-token' });
+        expect(result).toEqual({ data: { storagePath: 'u/p/thumbnail.webp' }, error: null });
+    });
+
     it('omits the Authorization header when there is no session', async () => {
         vi.stubEnv('VITE_USE_SERVER', 'true');
         MIGRATED_FUNCTIONS.add(FN);

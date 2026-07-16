@@ -331,10 +331,8 @@ user with the flag on.
     `tsc -b`, eslint clean on changed files (StripeService's two
     `no-explicit-any` findings pre-exist on HEAD).
 
-- **Wave A #3 (3/3) — `subscription-change`** (code complete 2026-07-16;
-  awaiting user verification — local webapp flag-on: preview + apply a
-  seat change on a teams workspace (sandbox Stripe), then against Railway
-  after deploy. Webhook overlap is harmless (re-syncs the same values).
+- **Wave A #3 (3/3) — `subscription-change`** (code complete AND
+  user-verified 2026-07-16 — preview + apply against sandbox Stripe.
   **First migrated route with a DB WRITE.** No new env vars):
   - Route: `server/src/routes/subscriptionChange.ts` — `requireUser`,
     TypeBox request/response schemas (200 is a Union of the preview and
@@ -429,22 +427,78 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `subscription-change` — local webapp flag-on
-(preview + apply a seat change on a teams workspace, sandbox Stripe),
-then against Railway after deploy. Wave A #3 is then fully done. After
-that: Wave A #5 `unsubscribe` (decide the old-emails-URL question first
-— old sent emails link to the Supabase edge fn URL) and #6
-`project-update-thumbnail`, each on explicit go.
+**Next:** user verifies `project-update-thumbnail` (local webapp
+flag-on: save a project in the editor to trigger the thumbnail upload,
+check storage + the projects row; then against Railway after deploy).
+That completes Wave A (`unsubscribe` was punted to Wave E #20). Then:
+**Wave B**, starting with #7 `asset-create`, each function on explicit
+go.
 
-Cleanup candidates noted 2026-07-16 (separate from the migration):
-- Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod
-  signs ES256 only (legacy HS256 key rotated out ~6 months ago); the
-  secret path serves local/test hand-signed tokens.
-- Migrate the prod webapp's legacy `eyJ…` anon key to the new
-  `sb_publishable_…` key, **then** revoke the previous JWT signing key in
-  the Supabase dashboard — not before, revoking breaks legacy API keys.
-- `webapp/.env` (gitignored) holds server-side secrets (live Stripe secret
-  key, Resend, Mux) that aren't `VITE_`-prefixed and don't belong there.
+- **Wave A #6 — `project-update-thumbnail`** (code complete 2026-07-16;
+  awaiting user verification — local webapp flag-on: save a project in the
+  editor so the thumbnail updates, check storage + the projects row; then
+  against Railway after deploy. **Last Wave A route.** No new env vars;
+  new server dependency `@fastify/multipart`):
+  - Route: `server/src/routes/projectUpdateThumbnail.ts` — first
+    MULTIPART route (plugin registered in the route module's scope,
+    1 MB fileSize backstop above the 500 KB business cap) and first
+    direct server-side S3 upload (`S3Port.putObject`, already existed).
+    `requireUser`; no body schema (TypeBox doesn't validate multipart —
+    field presence checked in-handler, exact edge bodies kept:
+    400 `Missing projectId or file`, 413 `Thumbnail too large: <n> bytes
+    (max 512000)`, 404 `Project not found or access denied`).
+    `storage.bytes` added to `DomainLogFields`.
+  - **DB-function classification: none called** — direct `projects` /
+    `project_editors` reads + one UPDATE. `_shared/projectAccess.ts`'s
+    `getProjectIfEditor` ported as the FIRST shared server module
+    (`src/services/projectAccess.ts`, plain function over the Db port —
+    the services convention from suggested_changes.md); it's also needed
+    by mux-video-create and render-job-create in Wave B, whose Deno copy
+    stays live until then. The edge fn's two queries collapse to one
+    OR-EXISTS (parity-safe: not-found and no-access are both null → one
+    404).
+  - Deliberate divergences (documented): a malformed non-UUID projectId
+    500s (the Deno helper swallowed the PostgREST error → 404; no caller
+    sends one); an absurdly-oversized upload (>1 MB backstop) gets
+    @fastify/multipart's default-body 413 instead of the interpolated
+    edge body (the exact body covers everything ≤1 MB); the edge fn's
+    `S3_ENDPOINT_DEV` Docker split is dropped (server runs on the host).
+  - Tests: `server/test/projectUpdateThumbnail.test.ts` (11 — 401;
+    exact-body 400 missing projectId / missing file; exact interpolated
+    413 with no S3 put — all pre-query via throwing db; e2e on real
+    Postgres: 404 unknown / soft-deleted / non-owner-non-editor with
+    DB-unchanged assert, owner 200 with S3 key/bytes/content-type + DB
+    row updated, explicit project_editors editor 200 incl. the
+    caller-id-prefix parity subtlety, overwrite second upload same path,
+    canonical log fields incl. storage.bytes). Multipart payloads built
+    via `new Response(FormData)` (body + boundary header, no new dev
+    deps). `seedProjectEditor` added to `test/helpers/db.ts`.
+  - Client: `invokeFunction` learned **FormData passthrough** (body
+    passed untouched, no `Content-Type` header so the browser sets the
+    multipart boundary; supabase fall-through path unchanged) +
+    client.test.ts coverage; `cloudStorage.uploadThumbnail` converted
+    (redundant `!supabase` guard dropped); `'project-update-thumbnail'`
+    registered in `MIGRATED_FUNCTIONS`.
+  - **Analysis:** dead weight — the `S3_ENDPOINT_DEV` fallback (Docker
+    artifact). Simplification — access check collapsed to one query;
+    fields parsed in a single parts() pass. Smells flagged NOT fixed (in
+    suggested_changes.md): ContentType hardcoded `image/webp` and file
+    content never validated as an image; S3 put → DB update not atomic
+    (orphan object on crash — harmless, deterministic path); an editor's
+    upload lands under the CALLER's id prefix, so the row repoints and
+    the owner's previous thumbnail object is orphaned; the Deno
+    getProjectIfEditor swallows DB errors as "no access".
+  - Checks: root `npx vitest run server webapp/src/api` (112 passed, S3
+    + Stripe adapter integrations skipped), server typecheck, webapp
+    `tsc -b`, eslint clean on changed files (cloudStorage's
+    `project_data: any` finding at line 48 pre-exists on HEAD).
+
+**Suggested-changes log:** `plans/suggested_changes.md` is the running
+document for smells, dead code, and cleanup candidates found during
+migration work but deliberately not fixed (parity first). Every agent
+working a migration step must ADD new findings there (the per-function
+analysis paragraph in this Status stays the summary; the log is the
+actionable list). The former "cleanup candidates" list moved there.
 
 **Wave A #2 carries a CI change:** it's the first route whose merge-blocking
 e2e tests need a real Postgres, so `.github/workflows/server-tests.yml` must
@@ -701,8 +755,9 @@ the PR description):
 - **Consistency:** error responses, status codes, and naming normalized to
   the server's conventions instead of each function's ad-hoc style.
 - **Smells worth flagging but NOT fixing now:** anything that would change
-  behavior beyond what's explicitly called out — record it in the plan/issue
-  tracker instead.
+  behavior beyond what's explicitly called out — record it in
+  `plans/suggested_changes.md` (the running log every migration step adds
+  to) as well as summarizing it in this plan's Status entry.
 
 Discipline: simplification must not silently change the contract. Anything
 that alters an observable response is called out explicitly in the PR
@@ -758,9 +813,14 @@ ports, and test harness are proven on lower-stakes routes.
    anywhere in the repo; don't port, decommission instead (user to confirm).
 4. ~~`send-workspace-invite`~~ — moved to Wave E: it's invoked from the DB
    (`workspace_invite.sql` via `net.http_post`), not by the client.
-5. `unsubscribe` (public link target — this is a URL in sent emails; keep the
-   old edge function alive as a redirect, or accept that old emails break,
-   or proxy the old URL. Decide before cutover.)
+5. ~~`unsubscribe`~~ — punted to Wave E (user decision 2026-07-16): it has
+   no webapp call site — its "caller" is the URL embedded in sent emails
+   by `send-welcome-email` (Wave E), so its real cutover is that email-URL
+   change. Prompt already written:
+   `plans/fastify-part7-unsubscribe-prompt.md` (incl. the token-secret
+   gotcha: tokens are HS256-signed with SUPABASE_SERVICE_ROLE_KEY as the
+   HMAC secret — legacy `eyJ…` vs new `sb_secret_…` value mismatch would
+   400 every old link).
 6. `project-update-thumbnail`
 
 ### Wave B — Client-invoked, heavier flows
@@ -826,6 +886,12 @@ delete-by-condition (the second runner finds nothing to delete).
 19. `send-workspace-invite` (moved from Wave A) — invoked by the
     `workspace_invite` SQL RPC via `net.http_post`; port the route
     (bearer-token protected) and repoint the URL inside that SQL function.
+20. `unsubscribe` (moved from Wave A, 2026-07-16) — GET/public/HTML email-link
+    target; migrate alongside `send-welcome-email` (#18), which generates its
+    tokens and embeds its URL. Prompt:
+    `plans/fastify-part7-unsubscribe-prompt.md`. Old emails (tokens live
+    365 days) keep hitting the edge-fn URL — keep-alive/redirect/let-break
+    is a decommission-time decision.
 
 ## Step 5 — Decommission (manual, done by hand at the very end)
 

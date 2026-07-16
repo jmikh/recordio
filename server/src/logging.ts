@@ -42,6 +42,7 @@ export interface DomainLogFields {
     'stripe.interval'?: string;
     'stripe.dry_run'?: boolean;
     'storage.path_count'?: number;
+    'storage.bytes'?: number;
     error_type?: ErrorType;
 }
 

@@ -96,7 +96,17 @@ export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<v
     );
 }
 
-/** mux_videos rows cascade with their project. */
+export async function seedProjectEditor(
+    db: Db,
+    opts: { projectId: string; userId: string },
+): Promise<void> {
+    await db.query(
+        'INSERT INTO project_editors (project_id, user_id) VALUES ($1, $2)',
+        [opts.projectId, opts.userId],
+    );
+}
+
+/** mux_videos and project_editors rows cascade with their project. */
 export async function deleteProjects(db: Db, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.query('DELETE FROM projects WHERE id = ANY($1::uuid[])', [ids]);

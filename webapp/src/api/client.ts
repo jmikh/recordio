@@ -14,6 +14,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'stripe-checkout',
     'stripe-portal',
     'subscription-change',
+    'project-update-thumbnail',
 ]);
 
 export type InvokeResult<T> =
@@ -42,7 +43,13 @@ export async function invokeFunction<T = unknown>(name: string, body?: unknown):
         return { data: null, error: new Error('VITE_USE_SERVER is on but VITE_API_URL is not set') };
     }
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    // FormData passes through untouched with no Content-Type header —
+    // the browser sets the multipart boundary (supabase.functions.invoke
+    // handles FormData the same way on the fall-through path)
+    const isFormData = body instanceof FormData;
+    const headers: Record<string, string> = isFormData
+        ? {}
+        : { 'Content-Type': 'application/json' };
     if (supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) headers.Authorization = `Bearer ${session.access_token}`;
@@ -53,7 +60,7 @@ export async function invokeFunction<T = unknown>(name: string, body?: unknown):
         response = await authAwareFetch(`${baseUrl}/${name}`, {
             method: 'POST',
             headers,
-            body: JSON.stringify(body ?? {}),
+            body: isFormData ? body : JSON.stringify(body ?? {}),
         });
     } catch (err) {
         return { data: null, error: new FunctionsFetchError(err) };
