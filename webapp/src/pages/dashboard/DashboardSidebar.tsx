@@ -161,7 +161,7 @@ export function DashboardSidebar({
     const inputClassName = "w-full px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
     return (
-        <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col overflow-y-auto">
+        <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col">
             {/* Workspace */}
             <div className="px-4 pt-4 pb-3">
                 <WorkspaceDropdown
@@ -183,130 +183,133 @@ export function DashboardSidebar({
                 </Button>
             </div>
 
-            {/* Library */}
-            <div className="px-2 mt-2">
-                <span className="text-[11px] text-text-muted uppercase tracking-wider px-3 mb-1 block">
-                    Library
-                </span>
-                <nav className="flex flex-col gap-0.5 mt-1">
-                    {libraryItems.map(item => {
-                        const isActive = item.view != null && item.view === activeView;
-                        return (
-                            <button
-                                key={item.label}
-                                type="button"
-                                onClick={() => item.view && onViewChange(item.view)}
-                                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
-                                    isActive
-                                        ? 'bg-primary/10 text-primary font-medium'
-                                        : 'text-text-main hover:bg-state-hover'
-                                }`}
-                            >
-                                <item.icon className="icon-sm shrink-0" />
-                                <span className="flex-1 truncate">{item.label}</span>
-                                {item.count !== undefined && (
-                                    <span className={`text-xs ${isActive ? 'text-primary' : 'text-text-muted'}`}>
-                                        {item.count}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </nav>
-            </div>
-
-            {/* Free plan usage */}
-            {!hasNonFreeAccess && (
-                <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
-                    <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-text-main">
-                            {projectCount} of {FREE_PROJECT_LIMIT} projects used
-                        </span>
-                    </div>
-                    <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
-                        <div
-                            className={`h-full rounded-full transition-all ${
-                                projectCount >= FREE_PROJECT_LIMIT ? 'bg-destructive' : 'bg-primary'
-                            }`}
-                            style={{ width: `${Math.min((projectCount / FREE_PROJECT_LIMIT) * 100, 100)}%` }}
-                        />
-                    </div>
-                    {projectCount >= FREE_PROJECT_LIMIT && (
-                        <p className="text-[11px] text-text-muted mt-1.5">
-                            Upgrade to Pro for unlimited projects
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {/* Folders */}
-            <div className="px-2 mt-6">
-                <div className="flex items-center gap-1 px-3 mb-1">
-                    <span className="text-[11px] text-text-muted uppercase tracking-wider">
-                        Folders
+            {/* Scrollable middle — bottom bar stays pinned */}
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+                {/* Library */}
+                <div className="px-2 mt-2">
+                    <span className="text-[11px] text-text-muted uppercase tracking-wider px-3 mb-1 block">
+                        Library
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => setShowCreateModal(true)}
-                        className="text-text-muted hover:text-text-main transition-colors cursor-pointer"
-                        title="New folder"
-                    >
-                        <LuPlus className="icon-sm" />
-                    </button>
-                </div>
-                <nav className="flex flex-col gap-0.5 mt-1">
-                    {folders.map(folder => {
-                        const isActive = activeFolderId === folder.id;
-                        const folderRow = (
-                            <div key={folder.id} className="group relative">
+                    <nav className="flex flex-col gap-0.5 mt-1">
+                        {libraryItems.map(item => {
+                            const isActive = item.view != null && item.view === activeView;
+                            return (
                                 <button
+                                    key={item.label}
                                     type="button"
-                                    onClick={() => onViewChange({ folder: folder.id })}
+                                    onClick={() => item.view && onViewChange(item.view)}
                                     className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
                                         isActive
                                             ? 'bg-primary/10 text-primary font-medium'
                                             : 'text-text-main hover:bg-state-hover'
                                     }`}
                                 >
-                                    <LuFolder className="icon-sm shrink-0" />
-                                    <span className="flex-1 truncate">{folder.name}</span>
-                                    {/* Fixed-width slot: count or three-dots */}
-                                    <span className="w-6 flex items-center justify-center shrink-0">
-                                        <span className={`text-xs group-hover:hidden ${isActive ? 'text-primary' : 'text-text-muted'}`}>
-                                            {folder.project_count}
+                                    <item.icon className="icon-sm shrink-0" />
+                                    <span className="flex-1 truncate">{item.label}</span>
+                                    {item.count !== undefined && (
+                                        <span className={`text-xs ${isActive ? 'text-primary' : 'text-text-muted'}`}>
+                                            {item.count}
                                         </span>
-                                        <span
-                                            ref={el => { if (el) menuButtonRefs.current.set(folder.id, el as unknown as HTMLButtonElement); }}
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={e => { e.stopPropagation(); openMenu(e as unknown as React.MouseEvent, folder.id); }}
-                                            onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); openMenu(e as unknown as React.MouseEvent, folder.id); } }}
-                                            className="hidden group-hover:flex items-center justify-center text-text-muted hover:text-text-main cursor-pointer rounded-md"
-                                        >
-                                            <LuEllipsis className="w-3.5 h-3.5" />
-                                        </span>
-                                    </span>
+                                    )}
                                 </button>
-                            </div>
-                        );
-
-                        if (folder.description) {
-                            return (
-                                <Tooltip key={folder.id} text={folder.description} position="top">
-                                    {folderRow}
-                                </Tooltip>
                             );
-                        }
-                        return folderRow;
-                    })}
-                    {folders.length === 0 && (
-                        <p className="px-4 py-2 text-xs text-text-muted">No folders yet</p>
-                    )}
-                </nav>
+                        })}
+                    </nav>
+                </div>
+
+                {/* Free plan usage */}
+                {!hasNonFreeAccess && (
+                    <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-medium text-text-main">
+                                {projectCount} of {FREE_PROJECT_LIMIT} projects used
+                            </span>
+                        </div>
+                        <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all ${
+                                    projectCount >= FREE_PROJECT_LIMIT ? 'bg-destructive' : 'bg-primary'
+                                }`}
+                                style={{ width: `${Math.min((projectCount / FREE_PROJECT_LIMIT) * 100, 100)}%` }}
+                            />
+                        </div>
+                        {projectCount >= FREE_PROJECT_LIMIT && (
+                            <p className="text-[11px] text-text-muted mt-1.5">
+                                Upgrade to Pro for unlimited projects
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* Folders */}
+                <div className="px-2 mt-6">
+                    <div className="flex items-center gap-1 px-3 mb-1">
+                        <span className="text-[11px] text-text-muted uppercase tracking-wider">
+                            Folders
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowCreateModal(true)}
+                            className="text-text-muted hover:text-text-main transition-colors cursor-pointer"
+                            title="New folder"
+                        >
+                            <LuPlus className="icon-sm" />
+                        </button>
+                    </div>
+                    <nav className="flex flex-col gap-0.5 mt-1">
+                        {folders.map(folder => {
+                            const isActive = activeFolderId === folder.id;
+                            const folderRow = (
+                                <div key={folder.id} className="group relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => onViewChange({ folder: folder.id })}
+                                        className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
+                                            isActive
+                                                ? 'bg-primary/10 text-primary font-medium'
+                                                : 'text-text-main hover:bg-state-hover'
+                                        }`}
+                                    >
+                                        <LuFolder className="icon-sm shrink-0" />
+                                        <span className="flex-1 truncate">{folder.name}</span>
+                                        {/* Fixed-width slot: count or three-dots */}
+                                        <span className="w-6 flex items-center justify-center shrink-0">
+                                            <span className={`text-xs group-hover:hidden ${isActive ? 'text-primary' : 'text-text-muted'}`}>
+                                                {folder.project_count}
+                                            </span>
+                                            <span
+                                                ref={el => { if (el) menuButtonRefs.current.set(folder.id, el as unknown as HTMLButtonElement); }}
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={e => { e.stopPropagation(); openMenu(e as unknown as React.MouseEvent, folder.id); }}
+                                                onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); openMenu(e as unknown as React.MouseEvent, folder.id); } }}
+                                                className="hidden group-hover:flex items-center justify-center text-text-muted hover:text-text-main cursor-pointer rounded-md"
+                                            >
+                                                <LuEllipsis className="w-3.5 h-3.5" />
+                                            </span>
+                                        </span>
+                                    </button>
+                                </div>
+                            );
+
+                            if (folder.description) {
+                                return (
+                                    <Tooltip key={folder.id} text={folder.description} position="top">
+                                        {folderRow}
+                                    </Tooltip>
+                                );
+                            }
+                            return folderRow;
+                        })}
+                        {folders.length === 0 && (
+                            <p className="px-4 py-2 text-xs text-text-muted">No folders yet</p>
+                        )}
+                    </nav>
+                </div>
             </div>
 
             {/* Bottom */}
-            <div className="mt-auto px-3 py-3 border-t border-border flex items-center gap-1">
+            <div className="px-3 py-3 border-t border-border flex items-center gap-1">
                 <Button variant="icon" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
                 <ThemeToggle />
                 <div className="flex-1" />

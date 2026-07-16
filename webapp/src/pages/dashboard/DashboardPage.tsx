@@ -420,7 +420,7 @@ export function DashboardPage() {
     if (isAuthenticated && !workspaceReady) return null;
 
     return (
-        <div className="min-h-screen bg-surface-body text-text-main flex flex-col">
+        <div className="h-screen bg-surface-body text-text-main flex flex-col">
             {/* Body */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
