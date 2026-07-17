@@ -427,17 +427,121 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `transcribe` — **set the new REQUIRED
-`OPENAI_API_KEY` on Railway first (deploy fails loudly without it)**;
-local webapp flag-on: generate captions in the editor on a project
-with mic audio, confirm segments/timings; then against Railway after
-deploy. After that: #9 `mux-video-create` (Mux adapter; also folds the
-render-job-create service-role path in-process), Wave C crons
-(scheduler), Wave D webhooks, Wave E emails — each on explicit go with
-a prompt file first.
+**Next:** **Wave C — crons** (in-process scheduler + `job_runs`
+ledger: purge-deleted-projects, mux-video-purge — the MuxPort
+`deleteAsset` it needs is already implemented), prompt file first, on
+explicit go. After that: Wave D webhooks, Wave E emails — each on
+explicit go with a prompt file first.
 
-- **Wave B #8 — `transcribe`** (code complete 2026-07-17; awaiting
-  user verification. **One new REQUIRED env var: `OPENAI_API_KEY`**
+- **Wave B #9 — `mux-video-create`** (code complete 2026-07-17;
+  awaiting user verification. **Two new REQUIRED env vars:
+  `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`** (config.ts, .env.example — set
+  them on Railway BEFORE deploying this); no new npm dependencies —
+  the Mux adapter is raw fetch. Last plain Wave B route):
+  - **Service extraction (the architectural payoff):** the
+    render-job-create core (parity project read →
+    `render_job_get_or_create` RPC → presigns → fire-and-forget worker
+    dispatch) moved verbatim from the route into
+    `src/services/renderJobs.ts#getOrCreateRenderJob(deps,
+    { projectId, userId, cloudVersion, statusCallbackUrl, log })`; the
+    route keeps schema/auth/editor check and delegates. **The
+    renderJobCreate suite passed UNCHANGED — the refactor guard.**
+    mux-video-create calls the service in-process, replacing the edge
+    fn's service-role HTTP hop; the server never implements the
+    service-role auth path (it dies with the edge fn at decommission).
+  - Route: `server/src/routes/muxVideoCreate.ts` — `requireUser`; body
+    `{ projectId minLength 1, cloudVersion Type.Integer({minimum:1}) }`
+    (same Ajv-coercion reasoning as render-job-create); check-order
+    parity: editor 404 (`getProjectIfEditor`, SELECT extended with
+    `slug`) → no-slug 400 `Project not shared. Create a share link
+    first.` → `mux_video_get_or_create($project, $OWNER, $version)`
+    (**EXCLUSIVE to this route, explicit `p_user_id`, no auth.uid() →
+    stays SQL over the pool**); `is_new` false → `{ status,
+    muxVideoId }` as-is (completed cache-hit or pending dedup);
+    new/retried → in-process render get-or-create — **ANY failure
+    there marks the mux_video `failed` with error `Render dispatch
+    failed` before rethrowing (pinned: no eternal pending)**; render
+    already completed → `uploadToMux`; both kicked-off paths return
+    `{ status: 'pending', muxVideoId }` (the Mux webhook, Wave D,
+    completes the row).
+  - **Attribution parity (pinned by test):** BOTH RPCs get the project
+    OWNER's id — an explicit editor triggering this creates
+    mux_videos/render_jobs rows and a render path under the OWNER's
+    prefix, opposite of the direct /render-job-create route (caller).
+  - `src/services/muxUpload.ts` — ports `_shared/muxUpload.ts` (shared
+    on purpose: render-job-hook reuses it in Wave D). Presigned S3 GET
+    of the render (divergence, documented: replaces the
+    Supabase-Storage signed URL — same object, different URL flavor;
+    Mux just fetches it) → `MuxPort.createAsset` → UPDATE
+    mux_asset_id + render_storage_path (status STAYS pending). Failure
+    contract kept with the exact edge-fn strings (`Failed to generate
+    signed URL`, `Mux API request failed`, `Mux API error: <status>`) —
+    distinguishing the last two needed a typed `MuxApiError(status)`
+    on the port (adapters throw it for non-2xx, plain Error for
+    transport). Also exports `markMuxVideoFailed` (the route's
+    compensation uses it).
+  - Adapter: `src/adapters/mux.ts` (first MuxPort adapter) — raw
+    fetch, basic auth; `createAsset` POST `/video/v1/assets`
+    `{ input: [{url}], playback_policy: ['public'] }` → `data.id`;
+    `deleteAsset` with 404-as-success (Wave C mux-video-purge needs
+    it — implemented now, it's 3 lines); `verifyWebhookSignature`
+    fails loudly until Wave D lands `MUX_WEBHOOK_SECRET` + the HMAC
+    check. Wired in server.ts (mux was the last `unimplementedPort`
+    besides email).
+  - Tests: `server/test/muxVideoCreate.test.ts` (22 — 401 no/garbage;
+    schema 400s via throwing db incl. null/zero/non-integer
+    cloudVersion; e2e: 404 unknown/soft-deleted/non-editor (DB
+    unchanged); **400 not-shared exact body with zero RPC side
+    effects**; completed cache-hit and pending dedup (no render job,
+    no mux call); new+render-pending (job created under owner,
+    dispatched with the render-job-hook callback, NO mux asset);
+    new+render-completed (asset created from the presigned render URL,
+    row gains mux_asset_id + render_storage_path, **status stays
+    pending**, nothing re-dispatched); retry resets
+    error/mux_asset_id/mux_playback_id/render_storage_path and reruns
+    the pipeline; **render-failure compensation pin** (presignUpload
+    throws inside the service → 500 + row failed `Render dispatch
+    failed`); mux transport-vs-API failure string mapping (both →
+    500 + row failed); **owner-attribution pin**; canonical log fields
+    incl. mux.video_status + mux.asset_id) +
+    `test/adapters/mux.test.ts` (5 — ephemeral local HTTP server via a
+    `baseUrl` test override, merge-blocking tier; asserts basic auth,
+    body shape, data.id extraction, MuxApiError snippet,
+    404-as-success delete, webhook-secret loud failure). A real-Mux
+    integration test is deliberately skipped: creating real assets
+    costs storage and the adapter is two trivial calls. Helpers:
+    `seedProject.slug` is now `string | null` (`=== undefined` check —
+    NULL needed for the not-shared test); `seedMuxVideo` returns the
+    row id and gained `muxAssetId`/`error` options.
+  - Client: `Header.tsx#handleShare` converted to `invokeFunction`
+    (typed response, fire-and-forget kept). Note: the old
+    `.catch(captureError)` never fired for HTTP errors —
+    `supabase.functions.invoke` resolves with `{ error }`, so failures
+    were silently dropped; the converted `.then(({error}) => …)` now
+    reports them to Sentry (small observability win, share flow still
+    never blocks). `'mux-video-create'` in MIGRATED_FUNCTIONS.
+  - **Analysis:** dead weight — the edge fn's service-role HTTP hop
+    and render-job-create's service-role auth path (never ported); the
+    Deno helper's `MUX_API_URL` env override (the adapter has a
+    test-only `baseUrl` param instead). Simplification — the Mux SDK
+    avoided (two REST calls, raw fetch like Whisper); the in-process
+    render call removes a network hop, a service-role key use, and the
+    double JSON round-trip. Consistency — same
+    schema-400/exact-body/compensation patterns, `services/` reuse
+    (projectAccess, renderJobs, muxUpload), canonical logging. Smells
+    NOT fixed (suggested_changes.md): the RPC ignores `is_deleted`
+    when matching rows; a crash between the RPC and the failure CATCH
+    leaves a pending mux_video forever (no reaper); publish gives the
+    user no feedback when this call fails (fire-and-forget by design);
+    owner-vs-caller attribution asymmetry across the two render
+    entry points.
+  - Checks: root `npx vitest run server webapp/src/api` (209 + 9
+    passed), server typecheck, webapp `tsc -b`, eslint clean on
+    changed files (the 4 Header.tsx findings are pre-existing on
+    HEAD).
+
+- **Wave B #8 — `transcribe`** (code complete 2026-07-17; **user
+  verified 2026-07-17**. **One new REQUIRED env var: `OPENAI_API_KEY`**
   (config.ts, .env.example); no new npm dependencies — the Whisper
   adapter is raw fetch):
   - Route: `server/src/routes/transcribe.ts` — `requireUser`; schema

@@ -17,6 +17,7 @@ import { projectUpdateThumbnailRoutes } from './routes/projectUpdateThumbnail.js
 import { assetCreateRoutes } from './routes/assetCreate.js';
 import { projectCreateV2Routes } from './routes/projectCreateV2.js';
 import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
+import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
 import { transcribeRoutes } from './routes/transcribe.js';
 
 declare module 'fastify' {
@@ -128,12 +129,12 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(assetCreateRoutes);
     app.register(projectCreateV2Routes);
     app.register(transcribeRoutes);
-    app.register(renderJobCreateRoutes, {
-        // The EXISTING Supabase hook URL until Wave D (see the route header)
-        statusCallbackUrl: opts.supabaseUrl
-            ? `${opts.supabaseUrl}/functions/v1/render-job-hook`
-            : undefined,
-    });
+    // The EXISTING Supabase hook URL until Wave D (see the renderJobCreate header)
+    const statusCallbackUrl = opts.supabaseUrl
+        ? `${opts.supabaseUrl}/functions/v1/render-job-hook`
+        : undefined;
+    app.register(renderJobCreateRoutes, { statusCallbackUrl });
+    app.register(muxVideoCreateRoutes, { statusCallbackUrl });
 
     app.get('/health', {
         schema: {

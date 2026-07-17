@@ -36,7 +36,7 @@ export function createTestPool(): pg.Pool {
 
 export interface SeededProject {
     id: string;
-    slug: string;
+    slug: string | null;
     name: string;
     ownerId: string;
 }
@@ -44,7 +44,8 @@ export interface SeededProject {
 export interface SeedProjectOptions {
     ownerId?: string;
     name?: string;
-    slug?: string;
+    /** Pass null for a never-shared project (mux-video-create gates on slug) */
+    slug?: string | null;
     sharePolicy?: string | null;
     deletedAt?: string | null;
     projectData?: unknown;
@@ -55,7 +56,7 @@ export interface SeedProjectOptions {
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
     const id = randomUUID();
     const ownerId = opts.ownerId ?? SEEDED_USER_ID;
-    const slug = opts.slug ?? `test-${randomUUID()}`;
+    const slug = opts.slug === undefined ? `test-${randomUUID()}` : opts.slug;
     const name = opts.name ?? 'Test project';
 
     let workspaceId = opts.workspaceId;
@@ -83,23 +84,30 @@ export interface SeedMuxVideoOptions {
     status: 'pending' | 'completed' | 'failed' | 'canceled';
     userId?: string;
     muxPlaybackId?: string | null;
+    muxAssetId?: string | null;
+    error?: string | null;
     isDeleted?: boolean;
 }
 
-export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<void> {
+export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<string> {
+    const id = randomUUID();
     await db.query(
         `INSERT INTO mux_videos
-            (project_id, user_id, cloud_version, status, mux_playback_id, is_deleted)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+            (id, project_id, user_id, cloud_version, status, mux_playback_id, mux_asset_id, error, is_deleted)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
+            id,
             opts.projectId,
             opts.userId ?? SEEDED_USER_ID,
             opts.cloudVersion,
             opts.status,
             opts.muxPlaybackId ?? null,
+            opts.muxAssetId ?? null,
+            opts.error ?? null,
             opts.isDeleted ?? false,
         ],
     );
+    return id;
 }
 
 export async function seedProjectEditor(

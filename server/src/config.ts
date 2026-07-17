@@ -31,6 +31,13 @@ const EnvSchema = Type.Object({
     RENDER_SECRET: Type.String({ minLength: 1 }),
     /** OpenAI Whisper (transcribe) — same value as the edge function secret. */
     OPENAI_API_KEY: Type.String({ minLength: 1 }),
+    /**
+     * Mux (mux-video-create asset ingest) — same values as the edge
+     * function secrets. Required: a deploy without them should fail
+     * loudly, not degrade. MUX_WEBHOOK_SECRET lands with Wave D.
+     */
+    MUX_TOKEN_ID: Type.String({ minLength: 1 }),
+    MUX_TOKEN_SECRET: Type.String({ minLength: 1 }),
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),

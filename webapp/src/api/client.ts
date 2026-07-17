@@ -19,6 +19,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'project-create-v2',
     'render-job-create',
     'transcribe',
+    'mux-video-create',
 ]);
 
 export type InvokeResult<T> =

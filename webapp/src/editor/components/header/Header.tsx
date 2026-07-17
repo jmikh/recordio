@@ -24,6 +24,7 @@ import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/componen
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import { useToast } from '../../../components/Toast';
 import { supabase } from '../../../auth/AuthManager';
+import { invokeFunction } from '../../../api/client';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
@@ -132,9 +133,14 @@ export const Header = () => {
             await copyShareLink(slug);
             const cloudVersion = CloudProjectService.getCloudVersion(project.id);
             if (cloudVersion !== undefined) {
-                supabase.functions.invoke('mux-video-create', {
-                    body: { projectId: project.id, cloudVersion },
-                }).catch(err => captureError(err, { flow: 'publish', phase: 'mux_create', projectId: project.id }));
+                // Fire-and-forget: sharing succeeds regardless; failures are
+                // only reported (invokeFunction resolves with { error }, so
+                // the old .catch never saw HTTP errors — this does)
+                void invokeFunction<{ status: string; muxVideoId: string }>('mux-video-create', {
+                    projectId: project.id, cloudVersion,
+                }).then(({ error }) => {
+                    if (error) captureError(error, { flow: 'publish', phase: 'mux_create', projectId: project.id });
+                });
             }
         } catch (e: any) {
             captureError(e, { flow: 'publish', projectId: project.id });

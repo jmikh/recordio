@@ -1,8 +1,8 @@
 /**
  * Editor-access check — ports `_shared/projectAccess.ts#getProjectIfEditor`.
- * First shared server module: landed with project-update-thumbnail, also
- * needed by mux-video-create and render-job-create when Wave B ports them
- * (the Deno copy stays live for those until then).
+ * First shared server module: landed with project-update-thumbnail; also
+ * used by render-job-create and mux-video-create (all Wave B routes are
+ * ported — the Deno copy dies at decommission).
  *
  * Access = the project exists, is not soft-deleted, and the user is its
  * owner OR has an explicit project_editors row. Returns null otherwise —
@@ -17,6 +17,8 @@ import type { Db } from '../deps.js';
 export interface ProjectAccess {
     id: string;
     owner_id: string;
+    /** Share slug — null until project_share creates one (mux-video-create gates on it) */
+    slug: string | null;
 }
 
 export async function getProjectIfEditor(
@@ -25,7 +27,7 @@ export async function getProjectIfEditor(
     userId: string,
 ): Promise<ProjectAccess | null> {
     const { rows } = await db.query(
-        `SELECT p.id, p.owner_id
+        `SELECT p.id, p.owner_id, p.slug
          FROM projects p
          WHERE p.id = $1
            AND p.deleted_at IS NULL

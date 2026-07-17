@@ -130,6 +130,31 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   vs server stay two (client is typed against Project, server against
   unknown). Consolidate if a shared package ever lands.
   Found 2026-07-17.
+- **mux-video-create**: `mux_video_get_or_create` ignores `is_deleted`
+  when matching rows — a soft-deleted mux_video at (project_id,
+  cloud_version) is returned as a cache-hit/dedup (and the partial
+  unique indexes only cover non-deleted rows, so a fresh insert would
+  collide anyway). Decide whether deleted rows should be resurrected
+  via the retry branch instead (`supabase/sql/functions/
+  mux_video_get_or_create.sql`, RPC parity). Found 2026-07-17.
+- **mux-video-create**: a crash between the RPC insert and the render
+  call leaves a `pending` mux_video forever — only the failure CATCH
+  marks rows `failed`, and no cron reaps stale pending mux_videos
+  (render_jobs have the stale-job cron; mux_videos have nothing)
+  (`server/src/routes/muxVideoCreate.ts`, edge-fn parity).
+  Found 2026-07-17.
+- **mux-video-create client**: publish is fire-and-forget with no user
+  feedback — a failed mux-video-create only lands in Sentry (and
+  before the invokeFunction conversion, HTTP errors weren't even
+  captured: `.catch` never fires on an invoke that resolves with
+  `{ error }`); the share toast says success regardless
+  (`webapp/src/editor/components/header/Header.tsx`). Found 2026-07-17.
+- **render attribution asymmetry**: mux-video-create attributes
+  render_jobs/mux_videos/render paths to the project OWNER while the
+  direct render-job-create route uses the CALLER — the same render can
+  land under different prefixes depending on which entry point ran
+  first (both pinned by tests, edge-fn parity; same family as the
+  retrying-caller prefix smell above). Found 2026-07-17.
 - **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
   numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an

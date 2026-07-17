@@ -3,19 +3,16 @@
  * (Wave B #10). First route to call a `sql/functions/` DB function over
  * the pg pool, and first to use the RenderWorkerPort.
  *
- * Resolves a render job for (projectId, cloudVersion) via the
- * `render_job_get_or_create` RPC — atomic cache-hit / dedup / retry /
- * insert; it stays SQL on purpose (it takes explicit $user_id, no
- * auth.uid(), so it works over the pool, and reimplementing it in TS
- * would lose the atomicity). On a new/retried job: presign GETs for the
- * project's media + a PUT for the output path, then dispatch to the
- * render worker FIRE-AND-FORGET (not awaited; failures are logged only —
- * the stale-job cron is the safety net, edge-fn parity).
+ * The core (project read → `render_job_get_or_create` RPC → presigns →
+ * fire-and-forget worker dispatch) lives in `services/renderJobs.ts`
+ * since Wave B #9 — mux-video-create calls it in-process, replacing the
+ * edge fn's service-role HTTP hop. This route keeps schema + auth +
+ * editor check and delegates.
  *
  * AUTH SCOPE (user decision 2026-07-16): only the user-JWT path is
  * ported. The edge fn's service-role path (internal caller:
- * mux-video-create) keeps hitting the EDGE function until Wave B #9
- * migrates, then becomes an in-process call.
+ * mux-video-create) is the in-process call above — the server never
+ * implements service-role auth.
  *
  * `statusCallbackUrl` stays the Supabase render-job-hook URL until
  * Wave D (per plan) — built from SUPABASE_URL in app.ts; the edge fn's
@@ -32,14 +29,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { getProjectIfEditor } from '../services/projectAccess.js';
-import { getProjectMediaPaths } from '../services/projectMedia.js';
-
-interface JobResolution {
-    job_id: string;
-    status: string;
-    is_new: boolean;
-    render_storage_path: string | null;
-}
+import { getOrCreateRenderJob } from '../services/renderJobs.js';
 
 export interface RenderJobCreateRoutesOptions {
     /** The Supabase render-job-hook URL handed to the worker (until Wave D) */
@@ -90,74 +80,19 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                 return reply.code(404).send({ error: 'Project not found or access denied' });
             }
 
-            // Kept as a second query for edge-fn parity (its admin re-read);
-            // reachable-miss only via a delete between the two queries
-            const { rows: projectRows } = await app.deps.db.query(
-                `SELECT name, project_data FROM projects
-                 WHERE id = $1 AND deleted_at IS NULL`,
-                [projectId],
-            );
-            const project = projectRows[0] as
-                | { name: string; project_data: unknown }
-                | undefined;
-            if (!project) {
+            const job = await getOrCreateRenderJob(app.deps, {
+                projectId,
+                userId,
+                cloudVersion,
+                statusCallbackUrl,
+                log: req.log,
+            });
+            if (!job) {
                 return reply.code(404).send({ error: 'Project not found' });
             }
 
-            const { rows: jobRows } = await app.deps.db.query(
-                'SELECT job_id, status, is_new, render_storage_path FROM render_job_get_or_create($1, $2, $3)',
-                [projectId, userId, cloudVersion],
-            );
-            const job = jobRows[0] as JobResolution | undefined;
-            if (!job) throw new Error('render_job_get_or_create returned no row');
-
-            req.logCtx.set({ 'render.job_id': job.job_id });
-
-            // Cache hit or dedup — no presigning, no dispatch
-            if (!job.is_new) {
-                return {
-                    jobId: job.job_id,
-                    status: job.status,
-                    renderStoragePath: job.render_storage_path,
-                };
-            }
-
-            // New (or retried) job: presign media downloads + output upload
-            const mediaUrls: Record<string, string> = {};
-            await Promise.all(
-                getProjectMediaPaths(project.project_data).map(async (entry) => {
-                    mediaUrls[entry.storagePath] = await app.deps.s3.presignDownload(
-                        entry.storagePath,
-                        3600,
-                    );
-                }),
-            );
-            const uploadUrl = await app.deps.s3.presignUpload(job.render_storage_path!, 3600);
-
-            // Fire-and-forget (edge-fn parity): the response never waits on
-            // the worker; a failed dispatch is caught by the stale-job cron
-            void app.deps.renderWorker
-                .submitJob({
-                    jobId: job.job_id,
-                    projectData: project.project_data,
-                    projectName: project.name,
-                    quality: '1080p',
-                    mediaUrls,
-                    uploadUrl,
-                    statusCallbackUrl,
-                })
-                .catch((err: unknown) => {
-                    req.log.warn(
-                        { err, 'render.job_id': job.job_id },
-                        'render worker dispatch failed',
-                    );
-                });
-
-            return {
-                jobId: job.job_id,
-                status: 'pending',
-                renderStoragePath: job.render_storage_path,
-            };
+            req.logCtx.set({ 'render.job_id': job.jobId });
+            return job;
         },
     );
 };

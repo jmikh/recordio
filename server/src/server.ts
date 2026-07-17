@@ -4,6 +4,7 @@ import pg from 'pg';
 import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
 import { createStripeAdapter } from './adapters/stripe.js';
+import { createMuxAdapter } from './adapters/mux.js';
 import { createRenderWorkerAdapter } from './adapters/renderWorker.js';
 import { createTranscriptionAdapter } from './adapters/transcription.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
@@ -35,7 +36,10 @@ const app = buildApp(
         db: pool,
         clock: systemClock,
         stripe: createStripeAdapter({ secretKey: config.STRIPE_SECRET_KEY }),
-        mux: unimplementedPort('mux'),
+        mux: createMuxAdapter({
+            tokenId: config.MUX_TOKEN_ID,
+            tokenSecret: config.MUX_TOKEN_SECRET,
+        }),
         s3: s3Configured
             ? createS3Adapter({
                   region: config.S3_REGION!,
