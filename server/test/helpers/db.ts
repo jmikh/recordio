@@ -48,6 +48,8 @@ export interface SeedProjectOptions {
     sharePolicy?: string | null;
     deletedAt?: string | null;
     projectData?: unknown;
+    /** Defaults to the owner's seeded personal workspace */
+    workspaceId?: string;
 }
 
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
@@ -56,12 +58,15 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
     const slug = opts.slug ?? `test-${randomUUID()}`;
     const name = opts.name ?? 'Test project';
 
-    const { rows } = await db.query(
-        'SELECT id FROM workspaces WHERE owner_id = $1 LIMIT 1',
-        [ownerId],
-    );
-    const workspaceId = (rows[0] as { id: string } | undefined)?.id;
-    if (!workspaceId) throw new Error(`No seeded workspace for owner ${ownerId}`);
+    let workspaceId = opts.workspaceId;
+    if (!workspaceId) {
+        const { rows } = await db.query(
+            'SELECT id FROM workspaces WHERE owner_id = $1 LIMIT 1',
+            [ownerId],
+        );
+        workspaceId = (rows[0] as { id: string } | undefined)?.id;
+        if (!workspaceId) throw new Error(`No seeded workspace for owner ${ownerId}`);
+    }
 
     await db.query(
         `INSERT INTO projects

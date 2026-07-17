@@ -28,6 +28,12 @@ interface ProjectDataShape {
     };
 }
 
+/** Mic-audio path only (transcribe) — null when the project has none. */
+export function getProjectMicPath(projectData: unknown): string | null {
+    const data = (projectData ?? {}) as ProjectDataShape;
+    return data.microphoneSource?.storagePath ?? null;
+}
+
 export function getProjectMediaPaths(projectData: unknown): MediaEntry[] {
     const data = (projectData ?? {}) as ProjectDataShape;
     const entries: MediaEntry[] = [];

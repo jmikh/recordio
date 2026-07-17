@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
 import { createStripeAdapter } from './adapters/stripe.js';
 import { createRenderWorkerAdapter } from './adapters/renderWorker.js';
+import { createTranscriptionAdapter } from './adapters/transcription.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
 import { loadConfig } from './config.js';
 import { systemClock } from './deps.js';
@@ -48,7 +49,7 @@ const app = buildApp(
             url: config.RENDER_WORKER_URL,
             secret: config.RENDER_SECRET,
         }),
-        transcription: unimplementedPort('transcription'),
+        transcription: createTranscriptionAdapter({ apiKey: config.OPENAI_API_KEY }),
         supabaseApi: createSupabaseApiAdapter({
             url: config.SUPABASE_URL,
             serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,

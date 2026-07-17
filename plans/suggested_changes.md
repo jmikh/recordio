@@ -106,6 +106,17 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   "checks Pro subscription" header comment is stale — no plan check
   exists, any project editor can render (confirm intended).
   Found 2026-07-17.
+- **transcribe**: no per-user rate limit or in-flight dedup on an
+  expensive AI endpoint — a double-trigger is two Whisper bills, and
+  only the global 300/min backstop throttles it
+  (`server/src/routes/transcribe.ts`, edge-fn parity). Found 2026-07-17.
+- **transcribe**: the whole mic audio is buffered in memory per request
+  (a long WAV is large); streaming to the Whisper API would cap the
+  footprint. Found 2026-07-17.
+- **subscription-status inconsistency**: transcribe gates on
+  `active|trialing` while project-create-v2's expiry check treats
+  `active|past_due` as entitled — decide one policy (parity kept in
+  both ports). Found 2026-07-17.
 - **migrations vs sql/ drift**: the baseline schema migration snapshots
   `sql/`-managed function bodies and rots (found: a stale
   `render_job_get_or_create` without the attempt_count bump — a fresh

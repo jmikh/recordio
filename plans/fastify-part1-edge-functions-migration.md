@@ -427,20 +427,86 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `render-job-create` — **set the two new
-REQUIRED env vars on Railway first (RENDER_WORKER_URL, RENDER_SECRET;
-the deploy fails loudly without them)** — local webapp flag-on: render
-a saved project from the editor (fresh render, then re-render the same
-version for the cache-hit path); then against Railway after deploy.
-After that the low-friction batch is done — remaining functions all
-carry a new dependency or new infra: #8 `transcribe` (external
-transcription API), #9 `mux-video-create` (Mux adapter; also folds the
+**Next:** user verifies `transcribe` — **set the new REQUIRED
+`OPENAI_API_KEY` on Railway first (deploy fails loudly without it)**;
+local webapp flag-on: generate captions in the editor on a project
+with mic audio, confirm segments/timings; then against Railway after
+deploy. After that: #9 `mux-video-create` (Mux adapter; also folds the
 render-job-create service-role path in-process), Wave C crons
-(scheduler), Wave D webhooks, Wave E emails. Each on explicit go with a
-prompt file first.
+(scheduler), Wave D webhooks, Wave E emails — each on explicit go with
+a prompt file first.
+
+- **Wave B #8 — `transcribe`** (code complete 2026-07-17; awaiting
+  user verification. **One new REQUIRED env var: `OPENAI_API_KEY`**
+  (config.ts, .env.example); no new npm dependencies — the Whisper
+  adapter is raw fetch):
+  - Route: `server/src/routes/transcribe.ts` — `requireUser`; schema
+    `{ projectId minLength 1 }`; check-order parity: project lookup
+    (404 `Project not found`) → subscription gate (403 `Active
+    subscription required`) → mic path (400 `Project has no microphone
+    audio`) → `S3Port.getObject` → Whisper → merge. The pure
+    post-processing (`addPunctuationFromSegments`, seconds→ms
+    rounding, ±50 ms window grouping, empty-words short-circuit) is
+    ported verbatim as exported route-module helpers with direct unit
+    tests. `getProjectMicPath` added to `services/projectMedia.ts`.
+  - **DB-function classification: `subscription_get` is SHARED and
+    auth.uid()-dependent** — webapp calls it directly (AuthManager,
+    BillingPage, switchWorkspace), so the SQL fn stays untouched; its
+    membership+subscription read is ported INLINE with explicit
+    `$user_id`. **The workspace_members JOIN is the endpoint's only
+    access control** (no editor/owner check — gate = member of the
+    project's workspace + active|trialing sub); non-member /
+    no-subscription / wrong-status all collapse to the same 403
+    (parity). Pinned by the non-member e2e test.
+  - Adapter: `src/adapters/transcription.ts` (first TranscriptionPort
+    adapter) — raw-fetch multipart POST to
+    `api.openai.com/v1/audio/transcriptions` (Node 22 native
+    FormData/File; model whisper-1, verbose_json, segment+word
+    granularities, the verbatim edge-fn prompt); throws on non-2xx
+    with a body snippet; **120 s AbortSignal.timeout** (documented
+    addition per plan — Railway has no request ceiling; edge runtime's
+    was ~150 s). Wired in server.ts.
+  - Divergences (documented): schema 400 replaces `Missing projectId`;
+    the 120 s adapter timeout; `S3_ENDPOINT_DEV`-first split dropped
+    (server-side download from the host).
+  - Tests: `server/test/transcribe.test.ts` (18 — 3 pure-helper units
+    (punctuation restore incl. the mismatched-token heuristic, ±50 ms
+    grouping with orphan-drop and empty-window skip); 401 no/garbage;
+    schema 400s via throwing db; e2e: 404 unknown/soft-deleted, **403
+    non-member with their own active sub elsewhere**
+    (security-critical), 403 no-sub-row / canceled / past_due (note:
+    past_due rejected here but accepted by project-create-v2 —
+    inconsistency flagged, parity kept), 400 no-mic exact body,
+    success with exact merged-segments assert (rounding + punctuation
+    + windows) and recorded fileName/mime/byteLength, `.webm` mime
+    mapping, empty-words → `{ segments: [] }`, canonical log fields
+    incl. storage.bytes; every reject path asserts no S3 read/no
+    Whisper call) + `test/adapters/transcription.integration.test.ts`
+    (third-party tier, auto-skips without `OPENAI_API_KEY`; generated
+    0.5 s WAV, shape asserts). `seedProject` gained `workspaceId`
+    (transcribe tests need fresh workspaces — subscriptions key on
+    workspace_id and the seeded personal workspaces are shared).
+  - Client: `CloudTranscriptionService.transcribe` converted to
+    `invokeFunction` (typed response). The error-body fallback chain
+    (`body?.message || body?.error`) was DEAD code (data is always
+    null alongside error, on the old supabase path too) — dropped; the
+    now-typed `segments` mapping also let the two `seg/w: any`
+    annotations go. `'transcribe'` registered in MIGRATED_FUNCTIONS.
+    The local-Whisper worker path untouched.
+  - **Analysis:** dead weight — the client's error-body fallbacks and
+    `any` mappers; `S3_ENDPOINT_DEV`. Simplification — SDK dropped for
+    one fetch; the user-client/admin-client split collapses to two
+    pool queries. Consistency — services/ reuse (projectMedia), same
+    exact-body/schema-400 pattern. Smells NOT fixed (in
+    suggested_changes.md): no per-user rate limit on an expensive AI
+    endpoint; whole audio buffered in memory; no in-flight dedup
+    (double-trigger = two Whisper bills); active|trialing vs
+    active|past_due inconsistency.
+  - Checks: root `npx vitest run server webapp/src/api` (191 passed),
+    server typecheck, webapp `tsc -b`, eslint clean on changed files.
 
 - **Wave B #10 — `render-job-create`** (code complete 2026-07-17;
-  awaiting user verification. **Two new REQUIRED env vars:
+  **user verified 2026-07-17**. **Two new REQUIRED env vars:
   `RENDER_WORKER_URL`, `RENDER_SECRET`** (config.ts, .env.example, root
   .env.test); no new npm dependencies):
   - Route: `server/src/routes/renderJobCreate.ts` — `requireUser`;

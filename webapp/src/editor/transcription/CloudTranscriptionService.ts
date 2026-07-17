@@ -1,4 +1,5 @@
 import { supabase } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import type { CaptionSegment } from '@shared/types';
 
 /**
@@ -16,26 +17,35 @@ export class CloudTranscriptionService {
 
         onProgress?.(0.1);
 
-        const { data, error } = await supabase.functions.invoke('transcribe', {
-            body: { projectId },
-        });
+        // error/message only appear on error responses
+        const { data, error } = await invokeFunction<{
+            segments: {
+                sourceStartTimeMs: number;
+                sourceEndTimeMs: number;
+                words: { word: string; sourceStartTimeMs: number; sourceEndTimeMs: number }[];
+            }[];
+            error?: string;
+            message?: string;
+        }>('transcribe', { projectId });
 
         if (error) {
-            const body = typeof data === 'object' ? data : {};
-            throw new Error(body?.message || body?.error || error.message || 'Transcription failed');
+            // data is always null alongside error (both here and on the
+            // old supabase.functions.invoke path) — the previous body
+            // fallbacks were dead code
+            throw new Error(error.message || 'Transcription failed');
         }
 
         onProgress?.(0.9);
 
         // Map edge function segments to CaptionSegment format
-        const segments: CaptionSegment[] = (data.segments ?? []).map((seg: any) => ({
+        const segments: CaptionSegment[] = (data.segments ?? []).map((seg) => ({
             id: crypto.randomUUID(),
             sourceStartTimeMs: seg.sourceStartTimeMs,
             sourceEndTimeMs: seg.sourceEndTimeMs,
             outputStartTimeMs: 0,
             outputEndTimeMs: 0,
             visible: true,
-            words: (seg.words ?? []).map((w: any) => ({
+            words: (seg.words ?? []).map((w) => ({
                 id: crypto.randomUUID(),
                 word: w.word,
                 sourceStartTimeMs: w.sourceStartTimeMs,
