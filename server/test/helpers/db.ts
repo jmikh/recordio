@@ -47,6 +47,7 @@ export interface SeedProjectOptions {
     slug?: string;
     sharePolicy?: string | null;
     deletedAt?: string | null;
+    projectData?: unknown;
 }
 
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
@@ -65,8 +66,8 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
     await db.query(
         `INSERT INTO projects
             (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at)
-         VALUES ($1, $2, $2, $3, $4, '{}'::jsonb, $5, $6, $7)`,
-        [id, ownerId, workspaceId, name, slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null],
+         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
+        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null],
     );
     return { id, slug, name, ownerId };
 }
@@ -211,4 +212,32 @@ export async function seedUserAsset(db: Db, opts: SeedUserAssetOptions = {}): Pr
 export async function deleteUserAssets(db: Db, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.query('DELETE FROM user_assets WHERE id = ANY($1::text[])', [ids]);
+}
+
+export interface SeedRenderJobOptions {
+    projectId: string;
+    cloudVersion: number;
+    status?: 'pending' | 'completed' | 'failed' | 'canceled';
+    userId?: string;
+    renderStoragePath?: string | null;
+}
+
+/** render_jobs rows cascade with their project (deleteProjects covers them). */
+export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise<string> {
+    const id = randomUUID();
+    await db.query(
+        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+            id,
+            opts.projectId,
+            opts.userId ?? SEEDED_USER_ID,
+            opts.cloudVersion,
+            opts.status ?? 'pending',
+            opts.renderStoragePath === undefined
+                ? `${opts.userId ?? SEEDED_USER_ID}/${opts.projectId}/renders/v${opts.cloudVersion}.mp4`
+                : opts.renderStoragePath,
+        ],
+    );
+    return id;
 }

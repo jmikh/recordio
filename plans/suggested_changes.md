@@ -93,6 +93,32 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **webapp cloudStorage**: the `quota_exceeded` error branches in
   `createProject`/`createProjectV2` are vestigial — no edge fn or
   server route ever returns that error shape. Found 2026-07-17.
+- **render-job-create**: dispatch is fire-and-forget — a worker outage
+  leaves the job `pending` with the user polling until the stale-job
+  cron fails it; no immediate feedback
+  (`server/src/routes/renderJobCreate.ts`, edge-fn parity, failures now
+  at least logged). Found 2026-07-17.
+- **render-job-create**: a retry by a different editor regenerates
+  `render_storage_path` under the RETRYING caller's prefix — renders
+  for one project can scatter across user prefixes (same class as the
+  thumbnail caller-prefix smell; RPC parity). Found 2026-07-17.
+- **render-job-create**: `quality` hardcoded to '1080p'; the edge fn's
+  "checks Pro subscription" header comment is stale — no plan check
+  exists, any project editor can render (confirm intended).
+  Found 2026-07-17.
+- **migrations vs sql/ drift**: the baseline schema migration snapshots
+  `sql/`-managed function bodies and rots (found: a stale
+  `render_job_get_or_create` without the attempt_count bump — a fresh
+  `supabase start` ran different SQL than production until CI gained a
+  `sql/deploy.sh` step, 2026-07-17). Consider stripping sql/-managed
+  functions from future schema dumps, or regenerating the snapshot
+  whenever sql/ changes. Found 2026-07-17.
+- **shared projectMedia logic ×3**: `getProjectMediaPaths` now exists
+  in webapp `shared/utils/`, Deno `_shared/`, and
+  `server/src/services/` — the Deno copy dies at decommission; webapp
+  vs server stay two (client is typed against Project, server against
+  unknown). Consolidate if a shared package ever lands.
+  Found 2026-07-17.
 - **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
   numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an

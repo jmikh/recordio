@@ -146,9 +146,14 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
             setPhase('queued');
             failPhase = 'creating_job';
 
-            const { data, error } = await supabase!.functions.invoke('render-job-create', {
-                body: { projectId, cloudVersion },
-            });
+            // error/message only appear on error responses
+            const { data, error } = await invokeFunction<{
+                jobId: string;
+                status: string;
+                renderStoragePath: string | null;
+                error?: string;
+                message?: string;
+            }>('render-job-create', { projectId, cloudVersion });
 
             if (error || data?.error) {
                 const msg = data?.message || data?.error || error?.message || 'Failed to start render';

@@ -16,6 +16,7 @@ import { subscriptionChangeRoutes } from './routes/subscriptionChange.js';
 import { projectUpdateThumbnailRoutes } from './routes/projectUpdateThumbnail.js';
 import { assetCreateRoutes } from './routes/assetCreate.js';
 import { projectCreateV2Routes } from './routes/projectCreateV2.js';
+import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -125,6 +126,12 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(projectUpdateThumbnailRoutes);
     app.register(assetCreateRoutes);
     app.register(projectCreateV2Routes);
+    app.register(renderJobCreateRoutes, {
+        // The EXISTING Supabase hook URL until Wave D (see the route header)
+        statusCallbackUrl: opts.supabaseUrl
+            ? `${opts.supabaseUrl}/functions/v1/render-job-hook`
+            : undefined,
+    });
 
     app.get('/health', {
         schema: {

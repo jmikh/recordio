@@ -22,6 +22,13 @@ const EnvSchema = Type.Object({
     STRIPE_PRO_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
     STRIPE_TEAMS_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
     STRIPE_TEAMS_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
+    /**
+     * Render worker (render-job-create dispatch) — same values the edge
+     * function secrets use. Required: a deploy without them should fail
+     * loudly, not degrade.
+     */
+    RENDER_WORKER_URL: Type.String({ minLength: 1 }),
+    RENDER_SECRET: Type.String({ minLength: 1 }),
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),

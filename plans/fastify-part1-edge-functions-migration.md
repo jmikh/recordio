@@ -427,14 +427,92 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `project-create-v2` (local webapp flag-on:
-import a recording via the Import page — screen-only and
-screen+camera+mic if easy; confirm the project appears, media plays
-after upload, and expires_at matches the workspace subscription; then
-against Railway after deploy). Then **#10 `render-job-create`** — part
-2 of `plans/fastify-part10-project-create-v2-render-job-create-prompt.md`
-— on explicit go (needs the two new env vars on Railway:
-RENDER_WORKER_URL, RENDER_SECRET). **#11 `project-create` is
+**Next:** user verifies `render-job-create` — **set the two new
+REQUIRED env vars on Railway first (RENDER_WORKER_URL, RENDER_SECRET;
+the deploy fails loudly without them)** — local webapp flag-on: render
+a saved project from the editor (fresh render, then re-render the same
+version for the cache-hit path); then against Railway after deploy.
+After that the low-friction batch is done — remaining functions all
+carry a new dependency or new infra: #8 `transcribe` (external
+transcription API), #9 `mux-video-create` (Mux adapter; also folds the
+render-job-create service-role path in-process), Wave C crons
+(scheduler), Wave D webhooks, Wave E emails. Each on explicit go with a
+prompt file first.
+
+- **Wave B #10 — `render-job-create`** (code complete 2026-07-17;
+  awaiting user verification. **Two new REQUIRED env vars:
+  `RENDER_WORKER_URL`, `RENDER_SECRET`** (config.ts, .env.example, root
+  .env.test); no new npm dependencies):
+  - Route: `server/src/routes/renderJobCreate.ts` — `requireUser`;
+    body schema (`projectId` minLength 1, `cloudVersion`
+    `Type.Integer({ minimum: 1 })` — the bound also stops Ajv coercing
+    a null into 0); editor check via the existing
+    `services/projectAccess.getProjectIfEditor` (404 `Project not found
+    or access denied`), second project read kept for parity (race-only
+    404 `Project not found`); **first route calling a `sql/functions/`
+    DB function over the pool** — `render_job_get_or_create($1,$2,$3)`
+    stays SQL (explicit `p_user_id`, no auth.uid(); atomic
+    cache-hit/dedup/retry/insert); on `is_new`: presign GETs for all
+    media in project_data (via new `services/projectMedia.ts`, ports
+    the `_shared` copy) + PUT for the output path (3600 s), then
+    **fire-and-forget dispatch** (`void submitJob().catch(log.warn)` —
+    response never waits; stale-job cron is the safety net, parity).
+    `render.job_id` already existed in DomainLogFields.
+  - **AUTH SCOPE (user decision 2026-07-16): user-JWT path only.** The
+    edge fn's service-role path (internal caller mux-video-create)
+    keeps hitting the EDGE function until #9 migrates, then becomes an
+    in-process call.
+  - Adapter: `src/adapters/renderWorker.ts` (first RenderWorkerPort
+    adapter) — one POST `/render` with bearer secret; throws on non-2xx
+    (edge fn ignored it — observability-only divergence, response
+    unaffected). Wired in server.ts; statusCallbackUrl =
+    `${SUPABASE_URL}/functions/v1/render-job-hook` built in app.ts
+    (stays the SUPABASE hook until Wave D; the `RENDER_CALLBACK_URL_DEV`
+    split is dropped).
+  - **CI fix (drift found):** the baseline migration carries a STALE
+    snapshot of `render_job_get_or_create` (pre attempt_count), so a
+    fresh `supabase start` ≠ production SQL. `server-tests.yml` now
+    runs `supabase/sql/deploy.sh` after supabase starts; the retry test
+    pins the current version's attempt_count bump. General drift issue
+    logged in suggested_changes.md.
+  - Divergences (documented): schema 400s replace per-field bodies;
+    cloudVersion must be an integer ≥ 1 (edge fn only checked
+    non-null); adapter throws on non-2xx worker responses (logged,
+    never surfaced).
+  - Tests: `server/test/renderJobCreate.test.ts` (21 — 401 no/garbage
+    token; schema 400s (missing/empty projectId,
+    missing/null/zero/non-integer cloudVersion) via throwing db with
+    no-dispatch asserts; e2e on real Postgres: 404 unknown /
+    soft-deleted / non-owner-non-editor with DB-unchanged, new-job
+    success (row fields, all five media kinds presigned, upload
+    presign, full submission payload incl. statusCallbackUrl), empty
+    project_data → empty mediaUrls but still dispatches, cache-hit
+    completed (no new row/presign/dispatch), dedup pending (same row,
+    no dispatch), **retry: failed → pending, attempt_count 2, same row
+    re-dispatched**, editor renders under the CALLER's id prefix
+    (parity subtlety), fire-and-forget worker throw still 200,
+    canonical log fields incl. render.job_id) +
+    `test/adapters/renderWorker.test.ts` (2 — real HTTP round-trip
+    against an ephemeral local server, runs in the blocking tier).
+    `seedRenderJob` added and `seedProject` gained `projectData`.
+  - Client: `useCloudRender`'s invoke converted to `invokeFunction`
+    (typed response); `'render-job-create'` registered in
+    `MIGRATED_FUNCTIONS`. Polling (`render_job_get_status` RPC) and
+    download stay untouched.
+  - **Analysis:** dead weight — `duration_ms` selected but never used
+    (dropped); the edge fn's "checks Pro subscription" header comment
+    is stale, no such check exists (any editor renders — flagged);
+    `RENDER_CALLBACK_URL_DEV`. Simplification — the dual-client
+    (user + admin) construction collapses to the pool + one access
+    check; media presigning through S3Port. Consistency — same
+    services/ pattern, fire-and-forget made explicit and logged.
+    Smells NOT fixed (in suggested_changes.md): lost dispatch leaves a
+    pending job with no user feedback until the stale-job cron; retry
+    regenerates the output path under the RETRYING caller's prefix;
+    quality hardcoded '1080p'; migrations-vs-sql/ function drift.
+  - Checks: root `npx vitest run server webapp/src/api` (173 passed),
+    server typecheck, webapp `tsc -b`, eslint clean on changed files
+    (useCloudRender's 6 `no-explicit-any` findings pre-exist on HEAD). **#11 `project-create` is
 dead code — not ported (user decision 2026-07-16):** its caller chain
 (`CloudStorage.createProject` ← `importRecordingLocal`) has no webapp
 callers; only the V2 pipeline is used (ImportPage →
@@ -446,7 +524,7 @@ Wave C crons (in-process scheduler), Wave D webhooks (provider
 config), Wave E emails (Resend adapter).
 
 - **Wave B #12 — `project-create-v2`** (code complete 2026-07-17;
-  awaiting user verification. No new env vars, no new dependencies):
+  **user verified 2026-07-17**. No new env vars, no new dependencies):
   - Route: `server/src/routes/projectCreateV2.ts` — `requireUser`;
     TypeBox body schema (`project` object requiring only `id`, with
     **`additionalProperties: true` — load-bearing**: Fastify's Ajv

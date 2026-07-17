@@ -44,4 +44,9 @@ jobs:
           timeout 300 bash -c 'until [ -f /tmp/supabase-start.exit ]; do sleep 2; done'
           cat /tmp/supabase-start.log
           exit "$(cat /tmp/supabase-start.exit)"
+      # migrations/ can carry stale snapshots of sql/-managed functions
+      # (e.g. render_job_get_or_create) — deploy sql/ so the merge-blocking
+      # tier tests the SQL production actually runs
+      - name: Deploy SQL functions/crons/triggers
+        run: supabase/sql/deploy.sh
       - run: npx vitest run server webapp/src/api

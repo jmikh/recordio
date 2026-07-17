@@ -4,6 +4,7 @@ import pg from 'pg';
 import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
 import { createStripeAdapter } from './adapters/stripe.js';
+import { createRenderWorkerAdapter } from './adapters/renderWorker.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
 import { loadConfig } from './config.js';
 import { systemClock } from './deps.js';
@@ -43,7 +44,10 @@ const app = buildApp(
               })
             : unimplementedPort('s3'),
         email: unimplementedPort('email'),
-        renderWorker: unimplementedPort('renderWorker'),
+        renderWorker: createRenderWorkerAdapter({
+            url: config.RENDER_WORKER_URL,
+            secret: config.RENDER_SECRET,
+        }),
         transcription: unimplementedPort('transcription'),
         supabaseApi: createSupabaseApiAdapter({
             url: config.SUPABASE_URL,
