@@ -330,9 +330,17 @@ export class CloudStorage {
     ): Promise<{ projectId: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { data, error } = await supabase.functions.invoke('project-create-v2', {
-            body: { project, name, workspaceId },
-        });
+        // error/usedBytes/limitBytes only appear on error responses (the
+        // quota_exceeded branch below is vestigial — no server path
+        // returns it — but kept as-is during the migration)
+        const { data, error } = await invokeFunction<{
+            projectId: string;
+            bucket: string;
+            uploads: { fileType: string; storagePath: string }[];
+            error?: string;
+            usedBytes: number;
+            limitBytes: number;
+        }>('project-create-v2', { project, name, workspaceId });
 
         if (error) throw error;
         if (data?.error) {

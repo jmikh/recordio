@@ -16,6 +16,7 @@ export const MIGRATED_FUNCTIONS = new Set<string>([
     'subscription-change',
     'project-update-thumbnail',
     'asset-create',
+    'project-create-v2',
 ]);
 
 export type InvokeResult<T> =

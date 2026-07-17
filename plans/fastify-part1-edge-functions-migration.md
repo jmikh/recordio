@@ -427,18 +427,81 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** user verifies `project-update-thumbnail` (local webapp
-flag-on: save a project in the editor to trigger the thumbnail upload —
-a Railway 200 POST was already observed but not confirmed as verified;
-that completes Wave A, `unsubscribe` punted to Wave E #20) and
-`asset-create` (local webapp flag-on: upload a background image and a
-music file from the editor asset library, hit the full-library case if
-easy; then against Railway after deploy). Then: **Wave B #8
-`transcribe`** (external transcription API call, longer request), on
-explicit go with a prompt file first.
+**Next:** user verifies `project-create-v2` (local webapp flag-on:
+import a recording via the Import page — screen-only and
+screen+camera+mic if easy; confirm the project appears, media plays
+after upload, and expires_at matches the workspace subscription; then
+against Railway after deploy). Then **#10 `render-job-create`** — part
+2 of `plans/fastify-part10-project-create-v2-render-job-create-prompt.md`
+— on explicit go (needs the two new env vars on Railway:
+RENDER_WORKER_URL, RENDER_SECRET). **#11 `project-create` is
+dead code — not ported (user decision 2026-07-16):** its caller chain
+(`CloudStorage.createProject` ← `importRecordingLocal`) has no webapp
+callers; only the V2 pipeline is used (ImportPage →
+`importRecordingLocalV2`). Decommission with stripe-add-seats at the
+end; logged in suggested_changes.md. After this batch the remaining
+functions all carry a new dependency or new infra: #8 `transcribe`
+(external transcription API), #9 `mux-video-create` (Mux adapter),
+Wave C crons (in-process scheduler), Wave D webhooks (provider
+config), Wave E emails (Resend adapter).
 
-- **Wave B #7 — `asset-create`** (code complete 2026-07-16; awaiting
-  user verification. No new env vars, no new dependencies):
+- **Wave B #12 — `project-create-v2`** (code complete 2026-07-17;
+  awaiting user verification. No new env vars, no new dependencies):
+  - Route: `server/src/routes/projectCreateV2.ts` — `requireUser`;
+    TypeBox body schema (`project` object requiring only `id`, with
+    **`additionalProperties: true` — load-bearing**: Fastify's Ajv
+    strips unknown body properties otherwise, which would destroy the
+    arbitrary editor struct headed for `project_data`; pinned by a
+    round-trip test); stamps `${userId}/${projectId}/screen.webm` /
+    `camera.webm` / `mic.wav` into the struct for whichever sources
+    exist BEFORE the upsert; subscription status `active`|`past_due` →
+    `expires_at` NULL else now + 14 days via **`deps.clock.now()`**
+    (first route using the Clock port — expiry pinned exactly in
+    tests); `duration_ms` = rounded `timeline.durationMs` (falsy → NULL,
+    parity); name defaults 'Untitled'; single
+    INSERT … ON CONFLICT (id) DO UPDATE matching PostgREST upsert
+    semantics. Response `{ projectId, bucket: 'project-media',
+    uploads: [{ fileType, storagePath }] }`. No S3 — the TUS upload
+    stays on Supabase Storage REST (Part 4); `project_confirm_upload`
+    RPC stays client-called.
+  - **DB-function classification: none called** — one subscriptions
+    read + one projects upsert, plain SQL over the pg pool.
+  - Divergences (documented): per-field 400 bodies (`Missing
+    workspaceId`, `Missing project or project.id`) replaced by Fastify
+    schema-validation 400s; non-UUID ids 500 at the pg cast (edge fn
+    500'd via PostgREST too, different shape).
+  - Tests: `server/test/projectCreateV2.test.ts` (18 — 401 no/garbage
+    token; schema 400s (missing/empty workspaceId, missing project,
+    project without/with-empty id) via throwing db; e2e on real
+    Postgres: full three-source success with row-field + stamped
+    project_data asserts, screen-only, **round-trip test** (deep
+    unknown fields incl. settings/userEvents/arbitrary keys stored
+    verbatim — the removeAdditional pin), expires_at matrix
+    (active/past_due → NULL; trialing/canceled/no-row → exactly
+    now+14d via fakeClock), name default + duration_ms NULL, upsert
+    second-call-updates with row-count-1 assert, canonical log fields).
+  - Client: `cloudStorage.createProjectV2` converted to
+    `invokeFunction` (typed response; the `quota_exceeded` branch is
+    vestigial — nothing returns it — kept as-is, noted in
+    suggested_changes); `'project-create-v2'` registered in
+    `MIGRATED_FUNCTIONS`.
+  - **Analysis:** dead weight — the entire v1 sibling (`project-create`
+    + `CloudStorage.createProject` + `importRecordingLocal`) is dead
+    code, not ported; the client's `quota_exceeded` error branch is
+    vestigial (no code path ever returned it). Simplification — the
+    three copy-paste source blocks collapse to one loop; per-request
+    admin-client construction gone. Consistency — Clock port for
+    time-dependent logic (new precedent), schema 400s, exact PostgREST
+    upsert column set preserved. Smells NOT fixed (in
+    suggested_changes.md): no workspace membership check; upsert
+    takeover — a known project id can be overwritten and re-owned by
+    any authed user; `past_due` grants non-expiring projects.
+  - Checks: root `npx vitest run server webapp/src/api` (152 passed),
+    server typecheck, webapp `tsc -b`, eslint clean on changed files
+    (cloudStorage's `project_data: any` pre-exists on HEAD).
+
+- **Wave B #7 — `asset-create`** (code complete 2026-07-16; **user
+  verified 2026-07-16**. No new env vars, no new dependencies):
   - Route: `server/src/routes/assetCreate.ts` — `requireUser`; TypeBox
     body schema (`assetType` background|music literal union, `fileName`
     minLength 1, `sizeBytes` exclusiveMinimum 0); handler checks with
@@ -501,9 +564,7 @@ explicit go with a prompt file first.
     `row: any` in asset_list mapping pre-exists on HEAD).
 
 - **Wave A #6 — `project-update-thumbnail`** (code complete 2026-07-16;
-  awaiting user verification — local webapp flag-on: save a project in the
-  editor so the thumbnail updates, check storage + the projects row; then
-  against Railway after deploy. **Last Wave A route.** No new env vars;
+  **user verified 2026-07-16 — Wave A complete.** No new env vars;
   new server dependency `@fastify/multipart`):
   - Route: `server/src/routes/projectUpdateThumbnail.ts` — first
     MULTIPART route (plugin registered in the route module's scope,
@@ -898,7 +959,11 @@ ports, and test harness are proven on lower-stakes routes.
     Keeps handing out the **existing Supabase `render-job-hook` URL** as the
     `statusCallbackUrl` until Wave D — only job submission moves now, the
     callback stays on the edge function.
-11. `project-create` (legacy editor upload flow)
+11. ~~`project-create`~~ — dead code (user decision 2026-07-16): the v1
+    import pipeline (`CloudStorage.createProject` ←
+    `CloudProjectService.importRecordingLocal`) has zero webapp callers —
+    only the V2 pipeline is used. Don't port; decommission at the end
+    alongside stripe-add-seats.
 12. `project-create-v2` — port the function, but the TUS upload itself keeps
     going to Supabase Storage REST (storage migration is Part 4). Only the
     project-row orchestration moves.

@@ -76,6 +76,23 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **asset-create**: `pending` rows whose upload is never confirmed are
   never reaped — orphans accumulate (invisible to the limit count, so
   harmless-ish; a cleanup cron or TTL would tidy). Found 2026-07-16.
+- **project-create-v2**: no workspace membership check — any authed
+  user can create a project into ANY workspace id (the edge fn used the
+  service-role client the same way)
+  (`server/src/routes/projectCreateV2.ts`, parity). Found 2026-07-17.
+- **project-create-v2**: upsert takeover — the upsert keys on the
+  client-supplied project id with no ownership check, so an existing
+  project row can be overwritten (project_data, name, owner_id all
+  repointed to the caller) by anyone who knows/guesses its uuid
+  (edge-fn parity, pinned by the upsert test as same-owner behavior).
+  A `WHERE projects.owner_id = $caller` guard on the conflict branch
+  would close it. Found 2026-07-17.
+- **project-create-v2**: `past_due` subscriptions get non-expiring
+  projects, same as `active` (edge-fn parity — may be intentional grace
+  behavior). Found 2026-07-17.
+- **webapp cloudStorage**: the `quota_exceeded` error branches in
+  `createProject`/`createProjectV2` are vestigial — no edge fn or
+  server route ever returns that error shape. Found 2026-07-17.
 - **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
   numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an
@@ -97,6 +114,14 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - `stripe-add-seats` edge function has zero callers anywhere in the repo
   — dead code; decommission rather than port (user to confirm).
   Noted ~2026-07-13.
+- `project-create` edge function is dead code (user confirmed
+  2026-07-16, not ported): its webapp chain `CloudStorage.createProject`
+  ← `CloudProjectService.importRecordingLocal` has zero callers — only
+  the V2 pipeline (ImportPage → `importRecordingLocalV2` →
+  `project-create-v2`) is used. Decommission the edge fn at the end;
+  also delete the dead client methods (and audit the rest of the v1
+  pipeline around them, e.g. `uploadMedia`, for reachability).
+  Found 2026-07-16.
 
 ## Test-infra improvements
 
