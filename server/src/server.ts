@@ -89,6 +89,13 @@ app.addHook('onRequest', async (req) => {
     Sentry.getIsolationScope().setTag('request_id', String(req.id));
 });
 
+// Scheduled jobs (Wave C) — the handle is assigned only after a
+// successful listen (a failed boot never runs a purge), but the onClose
+// hook must be registered BEFORE listen (Fastify forbids addHook on a
+// listening instance)
+const running: { scheduler?: ReturnType<typeof startScheduler> } = {};
+app.addHook('onClose', async () => running.scheduler?.stop());
+
 try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
 } catch (err) {
@@ -96,10 +103,7 @@ try {
     process.exit(1);
 }
 
-// Scheduled jobs (Wave C) — started after listen so a failed boot never
-// runs a purge; stopped with the app so tests/shutdown don't leak timers
-const scheduler = startScheduler(deps, jobs, {
+running.scheduler = startScheduler(deps, jobs, {
     log: app.log,
     onJobError: (err) => Sentry.captureException(err),
 });
-app.addHook('onClose', async () => scheduler.stop());
