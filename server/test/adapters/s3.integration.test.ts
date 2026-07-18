@@ -55,4 +55,18 @@ describe.runIf(hasEnv)('S3 adapter (real endpoint)', () => {
         const res = await fetch(url, { method: 'PUT', body });
         expect(res.ok).toBe(true);
     });
+
+    it('listObjects is recursive under the prefix; deleteObjects removes in batch', async () => {
+        const prefix = `_adapter-test/${randomUUID()}/`;
+        await s3.putObject(`${prefix}top.txt`, body, 'text/plain');
+        await s3.putObject(`${prefix}renders/v1.txt`, body, 'text/plain');
+
+        // Recursive: the renders/ subkey appears (the Deno Storage .list()
+        // this replaced was one-level only — the purge-orphan bug)
+        const keys = await s3.listObjects(prefix);
+        expect(keys.sort()).toEqual([`${prefix}renders/v1.txt`, `${prefix}top.txt`]);
+
+        await s3.deleteObjects(keys);
+        expect(await s3.listObjects(prefix)).toEqual([]);
+    });
 });

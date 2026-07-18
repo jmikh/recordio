@@ -73,9 +73,16 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   atomic — two concurrent uploads at 9/10 can both pass the check and
   end at 11/10 (edge-fn parity; a partial unique index or
   count-in-insert CTE would close it). Found 2026-07-16.
-- **asset-create**: `pending` rows whose upload is never confirmed are
-  never reaped — orphans accumulate (invisible to the limit count, so
-  harmless-ish; a cleanup cron or TTL would tidy). Found 2026-07-16.
+- **asset-create**: ~~`pending` rows whose upload is never confirmed
+  are never reaped~~ CORRECTED 2026-07-17: they ARE reaped daily by
+  the pure-SQL `cron_cleanup_pending_assets` (1 h TTL) — but that
+  cron deletes only the ROWS, leaving any uploaded blobs behind
+  ("storage lifecycle rules" it cites don't exist). The cron WAS
+  decommissioned in part13 (2026-07-18, user decision — the
+  pending-asset flow is being redesigned, see the
+  asset-uploads-through-server bullet below): pending rows now
+  accumulate again (invisible to the limit count, harmless-ish) until
+  the redesign lands. Found 2026-07-16.
 - **project-create-v2**: no workspace membership check — any authed
   user can create a project into ANY workspace id (the edge fn used the
   service-role client the same way)
@@ -155,6 +162,46 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   land under different prefixes depending on which entry point ran
   first (both pinned by tests, edge-fn parity; same family as the
   retrying-caller prefix smell above). Found 2026-07-17.
+- **purge-deleted-projects (edge fn, until decommission)**: two bugs the
+  part13 server job (`projects.purge-deleted`) FIXES but the still-live
+  edge fn keeps: (a) it hard-deletes the project row and the FK cascade
+  drops mux_videos WITHOUT deleting their Mux assets — a permanent leak
+  (no cleanup trigger exists); (b) its Supabase-Storage `.list()` is
+  non-recursive, so `renders/` subfolder files are orphaned on every
+  purge. Both moot once the edge fn is decommissioned. Found 2026-07-17.
+- **purge-deleted-projects**: stale docs — the edge fn header says
+  "3 days" and `cron_purge_deleted_projects.sql` said "3+ days"; the
+  code's window is 30 days (the server job ports the code).
+  Found 2026-07-18.
+- **project purge scope**: the purge deletes only the `${created_by}/`
+  prefix — caller-prefixed files (editor-uploaded thumbnails,
+  retrying-editor renders; known smells above) orphan in storage
+  forever. Found 2026-07-18.
+- **mux_video_purge_candidates**: LIMIT 50 with no ORDER BY
+  (nondeterministic batch) and no `is_deleted` filter — soft-deleted
+  rows are purged via the superseded path only if a completed row
+  outranks them; is_deleted-but-not-superseded rows are never purged
+  (`supabase/sql/functions/mux_video_purge_candidates.sql`).
+  Found 2026-07-17.
+- **cron_render_purge was broken**: it posted hourly (pg_net) to a
+  `render-purge` edge function that never existed — silent 404s,
+  old-version render files never purged. Found 2026-07-17;
+  RESOLVED 2026-07-18: cron decommissioned, replaced by the
+  `render_jobs.purge-superseded` server job (part13).
+- **project-create-v2**: `expires_at` stamping (+14 d for
+  non-subscribed workspaces) is now vestigial — auto-expiry was turned
+  off 2026-07-18 (`cron_cleanup_expired_projects` decommissioned), so
+  nothing acts on the column; the route keeps stamping it (parity port
+  untouched). Revisit if expiry ever returns. Found 2026-07-18.
+- **Planned redesign — asset uploads through the server** (user
+  decision 2026-07-17, post-migration work): replace the
+  presign → client-upload → confirm flow with a single upload to the
+  Fastify server (assets are small audio/images; per-route `bodyLimit`
+  ~20–50 MB; verify Railway passes a ~30 MB body once). Kills the
+  pending state machine, the removed reaper cron's job, the
+  unvalidated-content smell (server sniffs magic bytes + enforces real
+  size), and closes the count+insert race. Project media (large
+  recordings) STAYS on the presigned direct path. Noted 2026-07-17.
 - **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
   numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an

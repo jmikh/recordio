@@ -427,14 +427,116 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **Wave C — crons** (in-process scheduler + `job_runs`
-ledger: purge-deleted-projects, mux-video-purge — the MuxPort
-`deleteAsset` it needs is already implemented), prompt file first, on
-explicit go. After that: Wave D webhooks, Wave E emails — each on
-explicit go with a prompt file first.
+**Next:** **Wave D — webhooks** (render-job-hook, mux-video-hook,
+stripe-webhooks — provider-side config, signature auth,
+`MUX_WEBHOOK_SECRET` lands here, `statusCallbackUrl` finally points at
+the server), prompt file first, on explicit go. After that: Wave E
+emails, then the prod flag flip and the manual decommission checklist.
 
-- **Wave B #9 — `mux-video-create`** (code complete 2026-07-17;
-  awaiting user verification. **Two new REQUIRED env vars:
+- **Wave C — scheduled jobs** (code complete 2026-07-18; awaiting
+  user verification. **No new env vars, no schema changes, no client
+  changes.** First non-route shape — jobs + scheduler, no HTTP):
+  - **Jobs** (`src/jobs/`, naming `{table}.{verb}-{qualifier}` per
+    user decision 2026-07-18; parity LOOSENED for this wave — bugs
+    fixed, not ported):
+    - `projects.purge-deleted` (daily; ports edge fn
+      `purge-deleted-projects`, `jobs/projectsPurgeDeleted.ts`) —
+      30-day window (the edge fn's "3 days" comments were stale, code
+      said 30), batch LIMIT 20 (+ ORDER BY deleted_at, the edge fn had
+      none). **Bug fixes:** (a) the project's mux_videos rows are
+      purged FIRST via the shared `purgeMuxVideo` helper — the edge fn
+      let the FK cascade drop them WITHOUT deleting their Mux assets
+      (permanent leak; verified no cleanup trigger exists); (b) the
+      whole `${created_by}/${id}/` prefix is deleted recursively —
+      the Deno `.list()` was one-level and orphaned `renders/` files
+      on every purge. Row hard-deleted ONLY after mux + storage
+      succeeded (pinned); per-project catch.
+    - `mux_videos.purge-superseded` (hourly; ports edge fn
+      `mux-video-purge`, `jobs/muxVideosPurgeSuperseded.ts`) —
+      candidates from `mux_video_purge_candidates()` (EXCLUSIVE to
+      this job, no auth.uid() → stays SQL over the pool); per row the
+      shared helper: Mux asset → render file → row, row LAST (pinned).
+    - `render_jobs.purge-superseded` (hourly,
+      `jobs/renderJobsPurgeSuperseded.ts`) — **NEW, no edge-fn
+      ancestor: `cron_render_purge` posted hourly to a `render-purge`
+      edge fn that never existed** (silent pg_net 404s — render files
+      were never purged). Implements the cron's stated intent as plain
+      SQL over the pool (server-exclusive, no sql/functions file);
+      the latest completed render + its file survive by construction
+      (they back the user's mp4 download — pinned).
+    - Shared helper `services/muxPurge.ts#purgeMuxVideo` (used by two
+      jobs — the user's anything-called-twice-becomes-a-function
+      rule). **Test-only `onlyIds` seam on both superseded jobs**: the
+      candidate queries are global and e2e runs against the shared
+      long-lived local dev DB — an unscoped run would delete REAL
+      local rows while Mux/S3 deletions hit fakes (creating the exact
+      dangling-asset leak the jobs prevent). Prod callers
+      (jobs/index.ts) pass nothing.
+  - **Scheduler** (`src/scheduler.ts`, spec in "Wave C — Scheduled
+    jobs" above): startup tick + hourly setInterval (unref'd),
+    in-memory last-run-period map (daily → UTC date, hourly → UTC
+    hour), NO ledger (user decision). Period claimed BEFORE the run —
+    a throwing job waits for the next period instead of retrying every
+    tick. Ticks never throw; per-job catch → `job.failed` +
+    `onJobError` (Sentry in prod). Logging IS the metrics surface:
+    `job.completed` / `job.failed` in the typed LogEventCatalog with
+    `job.name`, `job.trigger` (startup|interval), duration_ms,
+    `job.items_processed`/`job.items_failed` (normalized per job in
+    `jobs/index.ts`), `job.batch_full` (backlog signal). Accepted
+    limitation: a dead scheduler emits nothing — liveness is "do I
+    see job.completed lines in Railway". Wired in server.ts after
+    listen (buildApp stays pure); stopped via onClose hook. Timing
+    divergences: daily 03:00 UTC → first tick after UTC midnight (or
+    deploy); hourly :15/:25 → process tick cadence.
+  - **S3Port additions**: `listObjects(prefix)` (recursive,
+    ListObjectsV2 + ContinuationToken loop) and `deleteObjects(keys)`
+    (DeleteObjects, 1000-key chunks). fakeS3: prefix-filtered list,
+    Map deletes + recorded `deletedKeys`. One recursive-list +
+    batch-delete case added to the optional s3 integration tier.
+  - **Decommissioned three pg_cron entries** (user decisions; files
+    deleted, guarded `cron.unschedule` + `DROP FUNCTION
+    cleanup_expired_projects()` in `sql/graveyard.sql`; deployed
+    LOCALLY — **user must run `supabase/sql/deploy.sh --remote`**):
+    `assets-stale-cleanup` (upload flow being redesigned),
+    `projects-delete-expired` (no auto-expiry for now),
+    `render-jobs-purge` (broken, replaced by the server job). Local
+    cron.job now shows only the two watchdogs + the two Pattern-B
+    entries that stay until final decommission.
+  - Tests (29 new): `test/jobs/projectsPurgeDeleted.test.ts` (6 —
+    full pipeline incl. renders/ subkey recursive pin + mux-leak pin
+    with pending+asset rows; skips recent/live; resume; mux-failure
+    and storage-failure compensation; LIMIT 20. **Local-data safety:
+    fakeClock pinned to 2000-01-01 so the 30-day cutoff predates the
+    product — no real local row can match**),
+    `test/jobs/muxVideosPurgeSuperseded.test.ts` (3) and
+    `test/jobs/renderJobsPurgeSuperseded.test.ts` (3) — superseded
+    purged / latest-completed survives (+ file, mp4 pin), pending
+    never purged, NULL asset/path steps skipped, failure keeps row +
+    batch continues; own-rows-only assertions via `onlyIds`;
+    `test/scheduler.test.ts` (7, NO db — fakeClock + stub jobs +
+    capture logger): startup runs all once, same-period dedup,
+    hour/day boundary re-runs, fresh-instance re-run (documented
+    deploy behavior), throwing job → tick survives + job.failed +
+    onJobError, no same-period retry after failure, stop idempotent.
+  - **Analysis:** dead weight — cron_render_purge (broken for its
+    whole life), cron_cleanup_expired_projects (+ its SQL fn),
+    cron_cleanup_pending_assets, and the edge fns' pg_net/bearer
+    plumbing (server jobs need no HTTP surface at all).
+    Simplification — no ledger table, no schema change; jobs are
+    ~40-line functions; the scheduler is one file. Consistency — jobs
+    take injected deps like routes, purge order (externals before
+    row) is uniform via the shared helper, log events extend the
+    existing typed catalog. Smells NOT fixed (suggested_changes.md):
+    candidates LIMIT 50 with no ORDER BY and no is_deleted filter
+    (is_deleted-but-not-superseded mux rows are never purged);
+    purge only clears the created_by prefix (caller-prefixed files
+    orphan); the still-live EDGE purge fn keeps both purge bugs until
+    decommission; expires_at stamping now vestigial.
+  - Checks: root `npx vitest run server` (228 passed), server
+    typecheck, eslint clean on changed files.
+
+- **Wave B #9 — `mux-video-create`** (code complete 2026-07-17; **user
+  verified 2026-07-17**. **Two new REQUIRED env vars:
   `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`** (config.ts, .env.example — set
   them on Railway BEFORE deploying this); no new npm dependencies —
   the Mux adapter is raw fetch. Last plain Wave B route):
@@ -1217,35 +1319,64 @@ ports, and test harness are proven on lower-stakes routes.
     project-row orchestration moves.
 
 ### Wave C — Scheduled jobs (in-process scheduler, not pg_cron→HTTP)
-The 5 pure-SQL pg_cron jobs (`cron_cleanup_expired_projects`,
-`cron_cleanup_pending_assets`, `cron_mux_video_stale_jobs`,
-`cron_render_purge`, `cron_render_stale_jobs`) never touch the server —
-they stay in pg_cron, untouched, indefinitely.
+Only the two pure-SQL WATCHDOG crons stay in pg_cron, untouched,
+indefinitely: `cron_render_stale_jobs` (every minute — heartbeat
+timeouts are inherently time-based, and pg_cron keeps running during
+server deploys, exactly when stale-detection gaps hurt) and
+`cron_mux_video_stale_jobs`. The other three pg_cron entries are
+DECOMMISSIONED in part13 (explicit user decisions; sql/ file deleted +
+graveyard unschedule; user applies `--remote`):
+- `cron_cleanup_pending_assets` (2026-07-17: asset uploads will be
+  redesigned to go through the server; the cron also leaked uploaded
+  blobs).
+- `cron_cleanup_expired_projects` (2026-07-18: no auto-expiring
+  projects for now; project-create-v2's `expires_at` stamping becomes
+  vestigial — logged, not changed).
+- `cron_render_purge` (found 2026-07-17: BROKEN — posts hourly to a
+  `render-purge` edge function that doesn't exist, silent pg_net
+  404s, old-version render files never purged; its intent becomes the
+  `render_jobs.purge-superseded` server job).
 
-The 2 crons that call edge functions become **in-process server jobs** —
-no HTTP surface, no bearer tokens, no pg_cron URL config:
-13. `purge-deleted-projects`
-14. `mux-video-purge`
-Their pg_cron entries are **not** deleted — the user disables/removes them
-manually at final decommission. Until then both the old cron and the new
-server job may run in overlap; this is harmless because both jobs are
-delete-by-condition (the second runner finds nothing to delete).
+**Parity is loosened for this wave (user decision 2026-07-17):** crons
+are off the user path and the edge-fn versions are buggy — part13
+FIXES the bugs (Mux-asset leak on project purge, non-recursive
+storage list, the broken render purge) instead of porting them.
 
-**Scheduler design (deliberately minimal):**
+**Job naming (user decision 2026-07-18):** `{table}.{verb}-{qualifier}`
+— table exactly as in Postgres, closed verb set (`purge` = destroy
+rows + externals, `expire` = TTL flip, `fail-stale` = watchdog;
+"cleanup" banned as vague), dot mirrors the log-field namespacing.
+
+Three in-process server jobs — no HTTP surface, no bearer tokens, no
+pg_cron URL config:
+13. `projects.purge-deleted` (ports edge fn `purge-deleted-projects`, daily)
+14. `mux_videos.purge-superseded` (ports edge fn `mux-video-purge`, hourly)
+14b. `render_jobs.purge-superseded` (NEW — replaces the broken
+     `cron_render_purge`, hourly)
+The two Pattern-B pg_cron entries backing #13/#14 are **not** deleted —
+the user disables/removes them manually at final decommission. Until
+then both the old cron and the new server job may run in overlap; this
+is harmless because all jobs are delete-by-condition (the second
+runner finds nothing to delete).
+
+**Scheduler design (deliberately minimal; user decision 2026-07-17 —
+NO `job_runs` ledger table):**
 - A job is a plain function taking injected deps (ports + `Clock`) — unit
   tested exactly like route handlers, no scheduler involved in tests.
 - One `setInterval` tick (hourly) plus a tick on startup. Each tick, for each
-  registered job: compute the current due period (daily → today's date),
-  claim it via `INSERT INTO job_runs (job_name, run_date) ... ON CONFLICT DO
-  NOTHING`; if the insert won, run the job.
-- This survives deploys and restarts (a missed 3am tick is caught by the next
-  tick or the startup tick — the claim is keyed on the *date*, not the
-  clock time), never double-runs (the ledger row is the lock, so it stays
-  correct even if Railway ever runs two instances), and needs zero new
-  infrastructure. Both jobs are delete-by-condition, so re-runs are
-  naturally idempotent anyway.
-- The `job_runs` table doubles as the audit log: "did yesterday's purge run?"
-  is a SELECT.
+  registered job: compute the current period (daily → UTC date, hourly →
+  UTC hour) and run if an **in-memory** last-run-period map says it hasn't
+  run this period. No DB claim: the jobs are delete-by-condition and fully
+  re-run/double-run safe, so a deploy resetting the map (startup tick
+  re-runs) or a brief two-instance overlap is harmless — a ledger table
+  was considered and rejected as complexity that buys nothing for
+  idempotent jobs (single-person-company rule: all state fits in one head,
+  one place to look).
+- Observability = the log events, viewed as metrics in Railway logs: one
+  canonical `job.completed`/`job.failed` event per run (job name, trigger
+  startup|interval, duration_ms, items processed/failed, batch-full flag).
+  Known accepted limitation: a dead scheduler emits nothing — liveness is
+  "do I see job.completed lines", no absence monitor.
 
 ### Wave D — Webhooks (last: provider-side config + hardest e2e)
 15. `render-job-hook` — after cutover, `render-job-create` switches the
@@ -1254,8 +1385,13 @@ delete-by-condition (the second runner finds nothing to delete).
 16. `mux-video-hook` — repoint webhook URL in Mux dashboard.
 17. `stripe-webhooks` — add a second webhook endpoint in Stripe pointing at
     Fastify, verify events arrive and are handled, then disable the Supabase
-    endpoint. Handlers must be idempotent (Stripe redelivers): upsert
-    subscription state, keyed on event id (processed-events ledger table).
+    endpoint. Handlers must be idempotent (Stripe redelivers) — NOTE
+    (verified 2026-07-17): the CURRENT edge fn has no processed-events
+    ledger; idempotency is the upserts being naturally re-run safe (plus
+    `event.created` ordering guards). Port that as-is — a ledger table
+    would be a NEW addition, only add one if a handler turns out not to be
+    upsert-idempotent (user simplicity rule, same call as Wave C's
+    dropped job_runs).
 
 ### Wave E — DB-triggered
 18. `send-welcome-email` — the `auth.users` trigger calls an HTTP endpoint;
@@ -1281,7 +1417,9 @@ user to execute manually once all waves have soaked:
   dashboard shows zero edge function invocations over a full week.
 - Delete edge functions from the Supabase project.
 - Remove the pg_cron entries for `cron_purge_deleted_projects` and
-  `cron_mux_video_purge` (the 5 pure-SQL crons stay).
+  `cron_mux_video_purge` (only the two watchdog crons remain by then —
+  `cron_render_stale_jobs`, `cron_mux_video_stale_jobs`; the other
+  three were decommissioned in part13).
 - Drop the orphaned SQL functions whose logic migrated to TS (each function's
   migration PR lists the DB functions it orphaned — collect them here as the
   waves progress).

@@ -6,7 +6,13 @@
  * Matches the edge functions' client setup (_shared + storage-download-urls):
  * path-style addressing against an S3-compatible endpoint.
  */
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+    DeleteObjectsCommand,
+    GetObjectCommand,
+    ListObjectsV2Command,
+    PutObjectCommand,
+    S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { S3Port } from '../ports/s3.js';
 
@@ -47,6 +53,36 @@ export function createS3Adapter(config: S3AdapterConfig): S3Port {
         async getObject(key) {
             const res = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
             return new Uint8Array(await res.Body!.transformToByteArray());
+        },
+        async listObjects(prefix) {
+            const keys: string[] = [];
+            let continuationToken: string | undefined;
+            do {
+                const res = await client.send(
+                    new ListObjectsV2Command({
+                        Bucket: BUCKET,
+                        Prefix: prefix,
+                        ContinuationToken: continuationToken,
+                    }),
+                );
+                for (const obj of res.Contents ?? []) {
+                    if (obj.Key) keys.push(obj.Key);
+                }
+                continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+            } while (continuationToken);
+            return keys;
+        },
+        async deleteObjects(keys) {
+            // DeleteObjects caps at 1000 keys per request
+            for (let i = 0; i < keys.length; i += 1000) {
+                const chunk = keys.slice(i, i + 1000);
+                await client.send(
+                    new DeleteObjectsCommand({
+                        Bucket: BUCKET,
+                        Delete: { Objects: chunk.map((Key) => ({ Key })) },
+                    }),
+                );
+            }
         },
     };
 }

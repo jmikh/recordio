@@ -38,3 +38,20 @@ DROP FUNCTION IF EXISTS public.trigger_send_welcome_email();
 
 -- Removed: token alone was insufficient auth; decline can be handled client-side
 DROP FUNCTION IF EXISTS public.workspace_invite_decline(UUID);
+
+-- Wave C decommissions (2026-07-18). Guarded unschedules — graveyard runs
+-- on every deploy and cron.unschedule errors on a missing job.
+-- Pending-asset reaper removed: asset uploads are being redesigned to go
+-- through the Fastify server (and the cron leaked uploaded blobs anyway)
+SELECT cron.unschedule('assets-stale-cleanup')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'assets-stale-cleanup');
+
+-- Auto-expiry of free-tier projects turned off (user decision)
+SELECT cron.unschedule('projects-delete-expired')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'projects-delete-expired');
+DROP FUNCTION IF EXISTS public.cleanup_expired_projects();
+
+-- Broken (targeted a render-purge edge function that never existed);
+-- replaced by the render_jobs.purge-superseded server job
+SELECT cron.unschedule('render-jobs-purge')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'render-jobs-purge');

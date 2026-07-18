@@ -9,7 +9,9 @@ import { createRenderWorkerAdapter } from './adapters/renderWorker.js';
 import { createTranscriptionAdapter } from './adapters/transcription.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
 import { loadConfig } from './config.js';
-import { systemClock } from './deps.js';
+import { systemClock, type Deps } from './deps.js';
+import { jobs } from './jobs/index.js';
+import { startScheduler } from './scheduler.js';
 
 const config = loadConfig();
 
@@ -31,34 +33,36 @@ function unimplementedPort<T extends object>(name: string): T {
 const s3Configured =
     config.S3_REGION && config.S3_ENDPOINT && config.S3_ACCESS_KEY && config.S3_SECRET_KEY;
 
+const deps: Deps = {
+    db: pool,
+    clock: systemClock,
+    stripe: createStripeAdapter({ secretKey: config.STRIPE_SECRET_KEY }),
+    mux: createMuxAdapter({
+        tokenId: config.MUX_TOKEN_ID,
+        tokenSecret: config.MUX_TOKEN_SECRET,
+    }),
+    s3: s3Configured
+        ? createS3Adapter({
+              region: config.S3_REGION!,
+              endpoint: config.S3_ENDPOINT!,
+              accessKeyId: config.S3_ACCESS_KEY!,
+              secretAccessKey: config.S3_SECRET_KEY!,
+          })
+        : unimplementedPort('s3'),
+    email: unimplementedPort('email'),
+    renderWorker: createRenderWorkerAdapter({
+        url: config.RENDER_WORKER_URL,
+        secret: config.RENDER_SECRET,
+    }),
+    transcription: createTranscriptionAdapter({ apiKey: config.OPENAI_API_KEY }),
+    supabaseApi: createSupabaseApiAdapter({
+        url: config.SUPABASE_URL,
+        serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
+    }),
+};
+
 const app = buildApp(
-    {
-        db: pool,
-        clock: systemClock,
-        stripe: createStripeAdapter({ secretKey: config.STRIPE_SECRET_KEY }),
-        mux: createMuxAdapter({
-            tokenId: config.MUX_TOKEN_ID,
-            tokenSecret: config.MUX_TOKEN_SECRET,
-        }),
-        s3: s3Configured
-            ? createS3Adapter({
-                  region: config.S3_REGION!,
-                  endpoint: config.S3_ENDPOINT!,
-                  accessKeyId: config.S3_ACCESS_KEY!,
-                  secretAccessKey: config.S3_SECRET_KEY!,
-              })
-            : unimplementedPort('s3'),
-        email: unimplementedPort('email'),
-        renderWorker: createRenderWorkerAdapter({
-            url: config.RENDER_WORKER_URL,
-            secret: config.RENDER_SECRET,
-        }),
-        transcription: createTranscriptionAdapter({ apiKey: config.OPENAI_API_KEY }),
-        supabaseApi: createSupabaseApiAdapter({
-            url: config.SUPABASE_URL,
-            serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
-        }),
-    },
+    deps,
     {
         version: config.RAILWAY_GIT_COMMIT_SHA ?? 'dev',
         env: config.NODE_ENV,
@@ -91,3 +95,11 @@ try {
     app.log.error(err);
     process.exit(1);
 }
+
+// Scheduled jobs (Wave C) — started after listen so a failed boot never
+// runs a purge; stopped with the app so tests/shutdown don't leak timers
+const scheduler = startScheduler(deps, jobs, {
+    log: app.log,
+    onJobError: (err) => Sentry.captureException(err),
+});
+app.addHook('onClose', async () => scheduler.stop());

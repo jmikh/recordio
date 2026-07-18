@@ -63,6 +63,25 @@ export class RequestLogContext {
 export interface LogEventCatalog {
     'render_job.completed': { 'render.job_id': string; 'project.id'?: string };
     'subscription.changed': { 'workspace.id': string; 'stripe.event_type'?: string };
+    /**
+     * Scheduled-job runs (Wave C) — logging IS the metrics/audit surface
+     * for jobs (no ledger table, user decision): counts are read as
+     * metrics in Railway logs, and alerting keys off the event name.
+     * batch_full = processed hit the job's batch LIMIT (backlog signal).
+     */
+    'job.completed': {
+        'job.name': string;
+        'job.trigger': 'startup' | 'interval';
+        duration_ms: number;
+        'job.items_processed': number;
+        'job.items_failed': number;
+        'job.batch_full': boolean;
+    };
+    'job.failed': {
+        'job.name': string;
+        'job.trigger': 'startup' | 'interval';
+        duration_ms: number;
+    };
 }
 
 /** Structural sink — both pino Logger and FastifyBaseLogger satisfy it. */
