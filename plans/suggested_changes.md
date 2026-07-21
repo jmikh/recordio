@@ -202,6 +202,18 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   unvalidated-content smell (server sniffs magic bytes + enforces real
   size), and closes the count+insert race. Project media (large
   recordings) STAYS on the presigned direct path. Noted 2026-07-17.
+- **render-job-webhook**: the duration/progress UPDATE and the terminal
+  `render_job_complete` RPC are two non-atomic writes — a crash between
+  them leaves durations stamped on a still-pending job (the stale-jobs
+  watchdog rescues it; edge-fn parity)
+  (`server/src/routes/renderJobWebhook.ts`). Found 2026-07-21.
+- **render-job-webhook**: heartbeat numbers are unvalidated — negative
+  or absurd progress/durations are accepted verbatim (edge-fn parity;
+  the worker is the only trusted caller). Found 2026-07-21.
+- **render-job-webhook**: the cancel signal rides the NEXT heartbeat
+  (~15 s worst-case latency before the worker aborts, by design); and
+  two racing first-heartbeats could each compute `start_duration_s`
+  (last write wins — harmless). Found 2026-07-21.
 - **server-wide**: Fastify's default Ajv has `coerceTypes` on, so a
   numeric STRING in a JSON body (e.g. `sizeBytes: "2048"`) is coerced
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an

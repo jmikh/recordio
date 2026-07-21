@@ -18,6 +18,7 @@ import { assetCreateRoutes } from './routes/assetCreate.js';
 import { projectCreateV2Routes } from './routes/projectCreateV2.js';
 import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
 import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
+import { renderJobWebhookRoutes } from './routes/renderJobWebhook.js';
 import { transcribeRoutes } from './routes/transcribe.js';
 
 declare module 'fastify' {
@@ -45,6 +46,10 @@ export interface AppOptions {
     prettyLogs?: boolean;
     /** Stripe price ids by `${plan}_${interval}` — required by /stripe-checkout */
     stripePriceIds?: StripePriceIds;
+    /** This server's own public base URL — statusCallbackUrl = `${publicUrl}/render-job-webhook` */
+    publicUrl?: string;
+    /** Shared bearer secret the render worker authenticates with (RENDER_SECRET) */
+    renderSecret?: string;
 }
 
 export type App = ReturnType<typeof buildApp>;
@@ -129,12 +134,16 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(assetCreateRoutes);
     app.register(projectCreateV2Routes);
     app.register(transcribeRoutes);
-    // The EXISTING Supabase hook URL until Wave D (see the renderJobCreate header)
-    const statusCallbackUrl = opts.supabaseUrl
-        ? `${opts.supabaseUrl}/functions/v1/render-job-hook`
+    // Wave D cutover: newly dispatched jobs call THIS server's webhook.
+    // In-flight jobs keep whatever URL they were dispatched with (the
+    // still-live edge hook) — the URL is per-job payload, so overlap is
+    // automatic and safe until decommission.
+    const statusCallbackUrl = opts.publicUrl
+        ? `${opts.publicUrl}/render-job-webhook`
         : undefined;
     app.register(renderJobCreateRoutes, { statusCallbackUrl });
     app.register(muxVideoCreateRoutes, { statusCallbackUrl });
+    app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
 
     app.get('/health', {
         schema: {

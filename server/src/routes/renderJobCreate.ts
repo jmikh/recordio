@@ -14,9 +14,10 @@
  * mux-video-create) is the in-process call above — the server never
  * implements service-role auth.
  *
- * `statusCallbackUrl` stays the Supabase render-job-hook URL until
- * Wave D (per plan) — built from SUPABASE_URL in app.ts; the edge fn's
- * RENDER_CALLBACK_URL_DEV split is dropped (server runs on the host).
+ * `statusCallbackUrl` points at THIS server's /render-job-webhook
+ * since Wave D #15 — built from PUBLIC_URL in app.ts (the edge fn's
+ * RENDER_CALLBACK_URL_DEV split is dropped; server runs on the host).
+ * In-flight jobs keep the URL they were dispatched with.
  *
  * Divergences (documented): schema 400s replace the per-field bodies;
  * cloudVersion must be an integer (the RPC param is INT — the edge fn

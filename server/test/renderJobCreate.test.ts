@@ -30,9 +30,10 @@ import {
 
 const ownerToken = () => userToken({ sub: SEEDED_USER_ID });
 
-/** Mirrors app.ts: statusCallbackUrl is derived from supabaseUrl. */
 const TEST_SUPABASE_URL = 'http://127.0.0.1:54321';
-const EXPECTED_CALLBACK = `${TEST_SUPABASE_URL}/functions/v1/render-job-hook`;
+/** Mirrors app.ts: statusCallbackUrl is derived from publicUrl (Wave D cutover). */
+const TEST_PUBLIC_URL = 'http://127.0.0.1:8090';
+const EXPECTED_CALLBACK = `${TEST_PUBLIC_URL}/render-job-webhook`;
 
 const MEDIA_PROJECT_DATA = {
     screenSource: { storagePath: 'u1/p1/screen.webm' },
@@ -67,6 +68,7 @@ describe('POST /render-job-create (auth + validation, no db)', () => {
         const app = buildApp(deps, {
             supabaseJwtSecret: TEST_JWT_SECRET,
             supabaseUrl: TEST_SUPABASE_URL,
+            publicUrl: TEST_PUBLIC_URL,
             logLevel: 'silent',
         });
         return { app, deps };
@@ -128,6 +130,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         const app = buildApp(deps, {
             supabaseJwtSecret: TEST_JWT_SECRET,
             supabaseUrl: TEST_SUPABASE_URL,
+            publicUrl: TEST_PUBLIC_URL,
             logLevel: 'silent',
         });
         return { app, deps: deps as FakeDeps };
@@ -345,6 +348,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         const app = buildApp(deps, {
             supabaseJwtSecret: TEST_JWT_SECRET,
             supabaseUrl: TEST_SUPABASE_URL,
+            publicUrl: TEST_PUBLIC_URL,
             logStream: {
                 write(chunk: string) {
                     for (const line of chunk.split('\n')) {

@@ -1,6 +1,7 @@
 /**
- * Job `mux_videos.purge-superseded` (hourly) — ports the mux-video-purge
- * edge function (Wave C, parity loosened per plan).
+ * Job `mux_videos.purge-superseded` (daily; the old cron was hourly —
+ * user decision 2026-07-18, purges have no urgency) — ports the
+ * mux-video-purge edge function (Wave C, parity loosened per plan).
  *
  * Candidates come from the `mux_video_purge_candidates()` DB function
  * (EXCLUSIVE to this job, no params, no auth.uid() → stays SQL over the

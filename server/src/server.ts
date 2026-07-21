@@ -69,6 +69,8 @@ const app = buildApp(
         prettyLogs: config.NODE_ENV !== 'production',
         supabaseJwtSecret: config.SUPABASE_JWT_SECRET,
         supabaseUrl: config.SUPABASE_URL,
+        publicUrl: config.PUBLIC_URL,
+        renderSecret: config.RENDER_SECRET,
         stripePriceIds: {
             pro_monthly: config.STRIPE_PRO_PRICE_ID_MONTHLY,
             pro_yearly: config.STRIPE_PRO_PRICE_ID_YEARLY,

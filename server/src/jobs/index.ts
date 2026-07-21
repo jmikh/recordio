@@ -37,7 +37,7 @@ export const jobs: JobDefinition[] = [
     },
     {
         name: 'mux_videos.purge-superseded',
-        period: 'hourly',
+        period: 'daily',
         async run(deps, log) {
             const r = await muxVideosPurgeSuperseded(deps, log);
             return {
@@ -49,7 +49,7 @@ export const jobs: JobDefinition[] = [
     },
     {
         name: 'render_jobs.purge-superseded',
-        period: 'hourly',
+        period: 'daily',
         async run(deps, log) {
             const r = await renderJobsPurgeSuperseded(deps, log);
             return {

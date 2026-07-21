@@ -1,5 +1,5 @@
 /**
- * Job `render_jobs.purge-superseded` (hourly) — NEW in Wave C, no edge-fn
+ * Job `render_jobs.purge-superseded` (daily) — NEW in Wave C, no edge-fn
  * ancestor: `cron_render_purge` posted hourly to a `render-purge` edge
  * function that never existed (silent pg_net 404s), so old-version
  * render files were never purged. This implements what that cron's

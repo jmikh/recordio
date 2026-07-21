@@ -427,15 +427,83 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **Wave D — webhooks** (render-job-hook, mux-video-hook,
-stripe-webhooks — provider-side config, signature auth,
-`MUX_WEBHOOK_SECRET` lands here, `statusCallbackUrl` finally points at
-the server), prompt file first, on explicit go. After that: Wave E
-emails, then the prod flag flip and the manual decommission checklist.
+**Next:** **Wave D #16 — mux-video-hook** (`MUX_WEBHOOK_SECRET` +
+the real HMAC in the mux adapter's `verifyWebhookSignature` + Mux
+dashboard repoint), prompt file first, on explicit go. Then #17
+stripe-webhooks (raw-body signature check; parity upsert idempotency,
+NO processed-events ledger per the 2026-07-17 note). After Wave D:
+Wave E emails, then the prod flag flip and the manual decommission
+checklist.
 
-- **Wave C — scheduled jobs** (code complete 2026-07-18; awaiting
-  user verification. **No new env vars, no schema changes, no client
-  changes.** First non-route shape — jobs + scheduler, no HTTP):
+- **Wave D #15 — `render-job-hook` → `/render-job-webhook`** (code
+  complete 2026-07-21; awaiting user verification. **One new REQUIRED
+  env var: `PUBLIC_URL`** (config.ts, .env.example — set on Railway
+  BEFORE deploy). Server route/path named "webhook" per user decision
+  2026-07-21; only the edge fn keeps "hook"):
+  - Route: `server/src/routes/renderJobWebhook.ts` — **first non-JWT
+    route**: the render worker's `Bearer RENDER_SECRET` (exact match,
+    parity), checked in an `onRequest` hook so auth precedes schema
+    validation (edge-fn check order — bad body + bad secret must 401,
+    pinned). Body `{ jobId minLength 1 }` + optional status /
+    progress / error / three `*_duration_s` numbers (worker sends
+    heartbeats ~15 s). Flow parity: job read → 404 `Job not found` →
+    non-pending → `{ ok, cancel: true }` with NO writes (the cancel
+    signal the worker polls, pinned per terminal status) → one
+    dynamic UPDATE from `deps.clock` (progress, durations,
+    `start_duration_s` on first callback only — pinned as
+    never-overwritten; completed also stamps total_duration_s +
+    progress 1) → terminal → `render_job_complete($1,$2,$3)` over the
+    pool → completed + path → pending-mux lookup → `uploadToMux`
+    from services/muxUpload (built shared for this in part12); a
+    failed upload still answers 200 (uploadToMux marked the row
+    failed — pinned). Worker-reported failures become
+    `req.log.error` (the edge fn captureException'd; logs are the
+    one place to look — deliberate). Emits the pre-seeded
+    `render_job.completed` catalog event.
+  - **DB-function classification: `render_job_complete` is SHARED**
+    (stale-jobs watchdog cron also calls it) but explicit params, no
+    auth.uid() → SQL untouched, called over the pool. Its
+    failed/canceled → pending-mux cascade is pinned (incl. the
+    `Render failed` default when the worker sends no message).
+  - **Cutover:** app.ts `statusCallbackUrl` =
+    `${opts.publicUrl}/render-job-webhook` (was the Supabase hook
+    URL) — closes the "until Wave D" note in renderJobCreate's
+    header. Overlap is automatic: the URL is per-job payload, so
+    in-flight jobs and prod renders (edge render-job-create, flag
+    off) keep posting to the still-live edge hook until flag
+    flip/decommission. AppOptions gained `publicUrl` +
+    `renderSecret`; server.ts passes both from config.
+  - Tests: `test/renderJobWebhook.test.ts` (15 — 401 no/wrong secret
+    incl. the auth-precedes-validation pin; schema 400s; 404 exact;
+    heartbeat persistence + start_duration_s-set-once pin (fakeClock
+    advanced between beats); cancel signal ×3 terminal statuses with
+    row untouched; completed without mux (no mux/S3 calls);
+    completed with pending mux (presigned render URL → fake asset,
+    row gains mux_asset_id, **status stays pending** for #16);
+    completed with mux failure → still 200 + row failed; failed
+    cascade with worker error and with RPC default; canonical log
+    fields + render_job.completed event). renderJobCreate +
+    muxVideoCreate suites updated ONLY in their EXPECTED_CALLBACK
+    (now `${publicUrl}/render-job-webhook`) — everything else passed
+    unchanged. No client changes (the worker is the only caller).
+  - **Analysis:** dead weight — the edge fn's admin supabase client
+    and RENDER_CALLBACK_URL_DEV split (PUBLIC_URL covers both
+    environments); captureException plumbing folded into the
+    canonical logs. Simplification — the whole render pipeline is now
+    in-process end to end (create → dispatch → webhook → Mux upload),
+    and the muxUpload/logEvent pieces were already built for it.
+    Consistency — same exact-body/check-order discipline; the
+    per-job-payload URL makes the cutover a config line. Smells NOT
+    fixed (suggested_changes.md): duration UPDATE + terminal RPC are
+    two non-atomic writes; heartbeat numbers unvalidated; cancel
+    rides the next heartbeat (~15 s); start_duration_s heartbeat
+    race (last write wins, harmless).
+  - Checks: root `npx vitest run server` (243 passed), server
+    typecheck, eslint clean on changed files.
+
+- **Wave C — scheduled jobs** (code complete 2026-07-18; **user
+  verified 2026-07-21**. **No new env vars, no schema changes, no
+  client changes.** First non-route shape — jobs + scheduler, no HTTP):
   - **Jobs** (`src/jobs/`, naming `{table}.{verb}-{qualifier}` per
     user decision 2026-07-18; parity LOOSENED for this wave — bugs
     fixed, not ported):
@@ -451,12 +519,13 @@ emails, then the prod flag flip and the manual decommission checklist.
       the Deno `.list()` was one-level and orphaned `renders/` files
       on every purge. Row hard-deleted ONLY after mux + storage
       succeeded (pinned); per-project catch.
-    - `mux_videos.purge-superseded` (hourly; ports edge fn
+    - `mux_videos.purge-superseded` (daily — relaxed from the cron's
+      hourly, user decision 2026-07-18; ports edge fn
       `mux-video-purge`, `jobs/muxVideosPurgeSuperseded.ts`) —
       candidates from `mux_video_purge_candidates()` (EXCLUSIVE to
       this job, no auth.uid() → stays SQL over the pool); per row the
       shared helper: Mux asset → render file → row, row LAST (pinned).
-    - `render_jobs.purge-superseded` (hourly,
+    - `render_jobs.purge-superseded` (daily,
       `jobs/renderJobsPurgeSuperseded.ts`) — **NEW, no edge-fn
       ancestor: `cron_render_purge` posted hourly to a `render-purge`
       edge fn that never existed** (silent pg_net 404s — render files
@@ -485,9 +554,13 @@ emails, then the prod flag flip and the manual decommission checklist.
     `jobs/index.ts`), `job.batch_full` (backlog signal). Accepted
     limitation: a dead scheduler emits nothing — liveness is "do I
     see job.completed lines in Railway". Wired in server.ts after
-    listen (buildApp stays pure); stopped via onClose hook. Timing
-    divergences: daily 03:00 UTC → first tick after UTC midnight (or
-    deploy); hourly :15/:25 → process tick cadence.
+    listen (buildApp stays pure; the onClose hook registers BEFORE
+    listen — Fastify forbids addHook on a listening instance, fixed
+    2026-07-18). Timing divergences: all three jobs are now DAILY
+    (2026-07-18: the two purge-superseded jobs relaxed from the crons'
+    hourly — no urgency), running at the first tick after UTC
+    midnight (or after a deploy). The scheduler's `hourly` period
+    support stays (tested; Wave D+ may want it).
   - **S3Port additions**: `listObjects(prefix)` (recursive,
     ListObjectsV2 + ContinuationToken loop) and `deleteObjects(keys)`
     (DeleteObjects, 1000-key chunks). fakeS3: prefix-filtered list,
@@ -1350,9 +1423,11 @@ rows + externals, `expire` = TTL flip, `fail-stale` = watchdog;
 Three in-process server jobs — no HTTP surface, no bearer tokens, no
 pg_cron URL config:
 13. `projects.purge-deleted` (ports edge fn `purge-deleted-projects`, daily)
-14. `mux_videos.purge-superseded` (ports edge fn `mux-video-purge`, hourly)
+14. `mux_videos.purge-superseded` (ports edge fn `mux-video-purge`;
+    daily — the old cron was hourly, relaxed 2026-07-18: purges have
+    no urgency)
 14b. `render_jobs.purge-superseded` (NEW — replaces the broken
-     `cron_render_purge`, hourly)
+     `cron_render_purge`, daily)
 The two Pattern-B pg_cron entries backing #13/#14 are **not** deleted —
 the user disables/removes them manually at final decommission. Until
 then both the old cron and the new server job may run in overlap; this

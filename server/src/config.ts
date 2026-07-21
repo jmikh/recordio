@@ -38,6 +38,12 @@ const EnvSchema = Type.Object({
      */
     MUX_TOKEN_ID: Type.String({ minLength: 1 }),
     MUX_TOKEN_SECRET: Type.String({ minLength: 1 }),
+    /**
+     * This server's own public base URL (no trailing slash) — handed to
+     * the render worker as the status-callback base (render-job-webhook).
+     * Local: http://localhost:8090. Railway: the service's public domain.
+     */
+    PUBLIC_URL: Type.String({ minLength: 1 }),
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),
