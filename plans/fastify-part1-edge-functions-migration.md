@@ -498,7 +498,15 @@ checklist.
     two non-atomic writes; heartbeat numbers unvalidated; cancel
     rides the next heartbeat (~15 s); start_duration_s heartbeat
     race (last write wins, harmless).
-  - Checks: root `npx vitest run server` (243 passed), server
+  - **Prod-verification bug (found + fixed 2026-07-21):** the worker's
+    final callback sends `progress: 1.0` AND `status: 'completed'`
+    together; the route's SET-fragment builder wrote the progress
+    column twice → Postgres "multiple assignments to same column" →
+    500 → job stuck pending until the stale watchdog failed it (safety
+    net worked). Fixed by building updates as a keyed object (last
+    write wins — the edge fn's object semantics); pinned by a
+    regression test mirroring the worker's exact final payload.
+  - Checks: root `npx vitest run server` (244 passed), server
     typecheck, eslint clean on changed files.
 
 - **Wave C — scheduled jobs** (code complete 2026-07-18; **user

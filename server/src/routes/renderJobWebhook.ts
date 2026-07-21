@@ -121,29 +121,30 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
             }
 
             const now = app.deps.clock.now();
-            const sets: string[] = ['updated_at = $2'];
-            const params: unknown[] = [jobId, now.toISOString()];
-            const set = (column: string, value: unknown) => {
-                params.push(value);
-                sets.push(`${column} = $${params.length}`);
-            };
-
-            if (progress !== undefined) set('progress', progress);
-            if (download_duration_s !== undefined) set('download_duration_s', download_duration_s);
-            if (render_duration_s !== undefined) set('render_duration_s', render_duration_s);
-            if (upload_duration_s !== undefined) set('upload_duration_s', upload_duration_s);
+            // Keyed object, NOT an array of SET fragments: the worker's
+            // final callback sends progress AND status together, and the
+            // completed branch overwrites progress — duplicate column
+            // assignments in one UPDATE are a Postgres error (found in
+            // prod 2026-07-21; the edge fn's object semantics never
+            // collided)
+            const updates: Record<string, unknown> = { updated_at: now.toISOString() };
+            if (progress !== undefined) updates.progress = progress;
+            if (download_duration_s !== undefined) updates.download_duration_s = download_duration_s;
+            if (render_duration_s !== undefined) updates.render_duration_s = render_duration_s;
+            if (upload_duration_s !== undefined) updates.upload_duration_s = upload_duration_s;
             // Dispatch + cold-start latency, computed on the first callback
             if (job.start_duration_s === null) {
-                set('start_duration_s', (now.getTime() - new Date(job.created_at).getTime()) / 1000);
+                updates.start_duration_s = (now.getTime() - new Date(job.created_at).getTime()) / 1000;
             }
             if (status === 'completed') {
-                set('total_duration_s', (now.getTime() - new Date(job.created_at).getTime()) / 1000);
-                set('progress', 1);
+                updates.total_duration_s = (now.getTime() - new Date(job.created_at).getTime()) / 1000;
+                updates.progress = 1;
             }
 
+            const columns = Object.keys(updates);
             await app.deps.db.query(
-                `UPDATE render_jobs SET ${sets.join(', ')} WHERE id = $1`,
-                params,
+                `UPDATE render_jobs SET ${columns.map((c, i) => `${c} = $${i + 2}`).join(', ')} WHERE id = $1`,
+                [jobId, ...columns.map((c) => updates[c])],
             );
 
             // Terminal state — the SHARED RPC guards pending-only and

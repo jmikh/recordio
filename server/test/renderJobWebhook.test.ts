@@ -172,6 +172,37 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         },
     );
 
+    it('regression: the worker\'s REAL final payload (status + progress + durations together) completes cleanly', async () => {
+        // Found in prod 2026-07-21: progress from the body AND the
+        // completed branch both wrote the progress column — duplicate
+        // SET assignments 500'd, the job stuck pending until the stale
+        // watchdog failed it. Mirrors render-worker/src/server.ts:382.
+        const { app } = testApp();
+        const project = await seed();
+        const jobId = await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1 });
+
+        const res = await post(
+            app,
+            {
+                jobId,
+                status: 'completed',
+                progress: 1.0,
+                download_duration_s: 0.265,
+                render_duration_s: 5.0,
+                upload_duration_s: 0.4,
+            },
+            TEST_RENDER_SECRET,
+        );
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ ok: true, cancel: false });
+
+        const row = await jobRow(jobId);
+        expect(row.status).toBe('completed');
+        expect(row.progress).toBe(1);
+        expect(row.download_duration_s).toBe(0.265);
+        expect(row.total_duration_s).not.toBeNull();
+    });
+
     it('completed without a pending mux_video: job completed, totals stamped, no mux/S3 calls', async () => {
         const { app, deps } = testApp();
         const project = await seed();
