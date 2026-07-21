@@ -40,6 +40,7 @@ const deps: Deps = {
     mux: createMuxAdapter({
         tokenId: config.MUX_TOKEN_ID,
         tokenSecret: config.MUX_TOKEN_SECRET,
+        webhookSecret: config.MUX_WEBHOOK_SECRET,
     }),
     s3: s3Configured
         ? createS3Adapter({

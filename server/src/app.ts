@@ -19,6 +19,7 @@ import { projectCreateV2Routes } from './routes/projectCreateV2.js';
 import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
 import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
 import { renderJobWebhookRoutes } from './routes/renderJobWebhook.js';
+import { muxVideoWebhookRoutes } from './routes/muxVideoWebhook.js';
 import { transcribeRoutes } from './routes/transcribe.js';
 
 declare module 'fastify' {
@@ -144,6 +145,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(renderJobCreateRoutes, { statusCallbackUrl });
     app.register(muxVideoCreateRoutes, { statusCallbackUrl });
     app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
+    app.register(muxVideoWebhookRoutes);
 
     app.get('/health', {
         schema: {

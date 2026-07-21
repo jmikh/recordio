@@ -1,7 +1,7 @@
 /**
  * Job `mux_videos.purge-superseded` — e2e against the real local
- * Postgres via the `mux_video_purge_candidates()` DB function (run
- * `supabase/sql/deploy.sh` locally if it's missing; CI deploys it).
+ * Postgres (inline candidates SQL since the soft-delete removal
+ * 2026-07-22; the `mux_video_purge_candidates()` DB function is gone).
  *
  * Every run passes `onlyIds` (the job's TEST-ONLY scoping seam): the
  * candidates query is global and this pool is the shared long-lived
@@ -9,10 +9,10 @@
  * the Mux/S3 deletions hit fakes, creating the exact dangling-asset
  * leak the job exists to prevent. Assertions are own-rows-only.
  *
- * Note: the completed-v1 candidate is seeded `is_deleted: true` — the
- * partial unique index allows only ONE active completed row per
- * project, and the RPC deliberately(?) ignores is_deleted (logged
- * smell); this shape also mirrors sharedVideoGet's seeds.
+ * Note: the completed-v1 candidate coexists with completed-v3 as a
+ * plain second completed row — legal since the one-active-completed
+ * unique index was dropped; superseded completed rows just wait for
+ * this daily sweep.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
@@ -70,7 +70,6 @@ describe.runIf(hasTestDb())('jobs/muxVideosPurgeSuperseded (e2e, real Postgres)'
             projectId: project.id,
             cloudVersion: 1,
             status: 'completed',
-            isDeleted: true,
             muxAssetId: 'asset-v1',
             renderStoragePath: 'u/p/renders/v1.mp4',
         });

@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { createHmac } from 'node:crypto';
 import { createMuxAdapter } from '../../src/adapters/mux.js';
 import { MuxApiError } from '../../src/ports/mux.js';
 
@@ -97,8 +98,57 @@ describe('mux adapter', () => {
         await expect(adapter(mux.url).deleteAsset('asset-123')).rejects.toThrow(MuxApiError);
     });
 
-    it('verifyWebhookSignature fails loudly until Wave D configures the secret', () => {
+    it('verifyWebhookSignature fails loudly without a configured secret', () => {
         const mux = createMuxAdapter({ tokenId: 't', tokenSecret: 's' });
         expect(() => mux.verifyWebhookSignature('{}', 'sig')).toThrow('not configured');
+    });
+
+    describe('verifyWebhookSignature (pure — no HTTP)', () => {
+        const SECRET = 'whsec-test-secret';
+        const BODY = '{"type":"video.asset.ready","data":{"id":"asset-1"}}';
+
+        const mux = createMuxAdapter({
+            tokenId: 't',
+            tokenSecret: 's',
+            webhookSecret: SECRET,
+        });
+
+        /** Real vector, computed the way Mux signs: HMAC-SHA256 over `${t}.${body}` */
+        function sign(body: string, timestamp = '1721600000', secret = SECRET): string {
+            const v1 = createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
+            return `t=${timestamp},v1=${v1}`;
+        }
+
+        it('accepts a valid signature', () => {
+            expect(mux.verifyWebhookSignature(BODY, sign(BODY))).toBe(true);
+        });
+
+        it('rejects when the body was tampered with', () => {
+            const tampered = BODY.replace('asset-1', 'asset-2');
+            expect(mux.verifyWebhookSignature(tampered, sign(BODY))).toBe(false);
+        });
+
+        it('rejects a signature made with a different secret', () => {
+            expect(mux.verifyWebhookSignature(BODY, sign(BODY, '1721600000', 'wrong-secret'))).toBe(false);
+        });
+
+        it('rejects when the timestamp in the header was altered (signed string changes)', () => {
+            const valid = sign(BODY, '1721600000');
+            const altered = valid.replace('t=1721600000', 't=1721600001');
+            expect(mux.verifyWebhookSignature(BODY, altered)).toBe(false);
+        });
+
+        it.each([
+            ['empty header', ''],
+            ['missing v1', 't=1721600000'],
+            ['missing t', 'v1=abcdef'],
+            ['garbage', 'not-a-mux-signature'],
+        ])('rejects bad format: %s', (_name, header) => {
+            expect(mux.verifyWebhookSignature(BODY, header)).toBe(false);
+        });
+
+        it('rejects a v1 of the wrong length (timing-safe compare needs equal lengths)', () => {
+            expect(mux.verifyWebhookSignature(BODY, 't=1721600000,v1=abc')).toBe(false);
+        });
     });
 });

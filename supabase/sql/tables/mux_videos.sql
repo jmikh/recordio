@@ -11,7 +11,6 @@
 │     "status" TEXT NOT NULL DEFAULT 'pending'::text,               │
 │     "error" TEXT,                                                 │
 │     "render_storage_path" TEXT,                                   │
-│     "is_deleted" BOOLEAN NOT NULL DEFAULT false,                  │
 │     "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), │
 │     "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()  │
 │ );                                                                │

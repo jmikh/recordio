@@ -12,7 +12,7 @@ route is webhook/cron-invoked, the client call site switched behind the
 `USE_SERVER_INSTEAD_OF_SUPA` flag, and a manual local verification by the
 user with the flag on.
 
-## Status (updated 2026-07-16)
+## Status (updated 2026-07-22)
 
 **Done:**
 - **Step 0** — `server/` scaffolded (Fastify + TypeBox, `buildApp(deps)` factory,
@@ -427,16 +427,145 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **Wave D #16 — mux-video-hook** (`MUX_WEBHOOK_SECRET` +
-the real HMAC in the mux adapter's `verifyWebhookSignature` + Mux
-dashboard repoint), prompt file first, on explicit go. Then #17
-stripe-webhooks (raw-body signature check; parity upsert idempotency,
-NO processed-events ledger per the 2026-07-17 note). After Wave D:
-Wave E emails, then the prod flag flip and the manual decommission
-checklist.
+**Next:** **Wave D #17 — stripe-webhooks** (raw-body signature check —
+reuse the scoped content-type-parser pattern from #16; parity upsert
+idempotency, NO processed-events ledger per the 2026-07-17 note), on
+explicit go. After Wave D: Wave E emails, then the prod flag flip and
+the manual decommission checklist.
+
+- **Wave D #16 — `mux-video-hook` → `/mux-video-webhook`** (code
+  complete 2026-07-22; **PAUSED for user verification** — numbered
+  cutover steps below, order matters. **One new REQUIRED env var:
+  `MUX_WEBHOOK_SECRET`** (config.ts, .env.example, README env table —
+  set on Railway BEFORE deploy; placeholders appended to the gitignored
+  `.env.local`/`.env.prod`, which are otherwise stale — see
+  suggested_changes). First route with provider signature auth and the
+  first needing RAW request bytes):
+  - Route: `server/src/routes/muxVideoWebhook.ts` — POST, no
+    `requireUser`, NO body schema (the body is the raw string; the edge
+    fn validated nothing); response schemas only (200
+    `{ ok: true, message? }`, 401, 500). **Raw body without new
+    dependencies:** the plugin registers a SCOPED
+    `addContentTypeParser('application/json', { parseAs: 'string' })` —
+    Fastify encapsulation keeps it from leaking to other routes (pinned
+    by an isolation test). Flow parity: missing `mux-signature` → 401
+    exact body → `deps.mux.verifyWebhookSignature(rawBody, header)` →
+    401 `Invalid signature` → JSON.parse → missing `data.id` → 200
+    acknowledged; `video.asset.ready` → `mux_video_complete($1,$2)`
+    over the pool, `found=false` → 200 + message + warn log, no
+    playback id → THROW (500 — Mux retries); `video.asset.errored` →
+    the PENDING row for the asset marked failed with
+    `errors.messages.join('; ')` or `Unknown Mux error` (`??`
+    semantics — an empty messages array joins to `''` and is stored),
+    no row → still 200; unhandled type → 200 `Ignored event: …`
+    (prevents retries). `updated_at` from `deps.clock`; log fields
+    `mux.asset_id` / `mux.video_status` / `project.id` (the RPC
+    returns it on ready) + `error_type: MuxSignatureInvalid` on 401.
+    Registered in app.ts (no options).
+  - **DB-function classification: `mux_video_complete` is EXCLUSIVE
+    to this webhook, explicit params, no auth.uid() → stays SQL over
+    the pool** (untouched).
+  - Adapter: real `verifyWebhookSignature` in `src/adapters/mux.ts`
+    (replaces the throwing stub) — parse `t=`/`v1=`, HMAC-SHA256
+    (`node:crypto`) over `${t}.${rawBody}`, the hex strings compared
+    via `timingSafeEqual` (documented hardening over the edge fn's
+    `===`; identical accept/reject). Bad format → false (documented
+    divergence: the edge fn's separate 401 `Invalid signature format`
+    body collapses into `Invalid signature`; Mux reads no bodies). NO
+    timestamp tolerance check (parity — unlimited replay window,
+    logged in suggested_changes). Still throws 'not configured'
+    without a secret; server.ts wires
+    `webhookSecret: config.MUX_WEBHOOK_SECRET`.
+  - **RE-PUBLISH DEADLOCK FIX (found 2026-07-21; user decision
+    2026-07-22 — soft-delete machinery removed entirely):** nothing
+    ever set `mux_videos.is_deleted = true`, and the partial unique
+    index `idx_mux_videos_one_active_completed` made a second
+    version's `asset.ready` 500 forever (the purge could never break
+    the tie — candidates must sit below the highest COMPLETED
+    version; v2 never completed). Purging is server-side work, no
+    fast soft-delete flag needed. Migration
+    `20260721221112_mux_videos_drop_soft_delete.sql` (applied
+    locally; **user applies to prod BEFORE cutover**, step 1 below)
+    drops `idx_mux_videos_one_active_completed`,
+    `idx_mux_videos_deleted`, and the `is_deleted` column;
+    `sql/tables/mux_videos.sql` doc updated. Verified nothing else
+    references the column (no SQL fn/trigger/edge fn/webapp).
+    `sql/functions/mux_video_purge_candidates.sql` DELETED +
+    graveyard DROP. **EARLY DECOMMISSION, flagged: dropping the RPC
+    breaks the still-live edge `mux-video-purge` fn IMMEDIATELY** —
+    accepted (its replacement job `mux_videos.purge-superseded` is
+    live and user-verified since Wave C), so
+    `sql/crons/cron_mux_video_purge.sql` is deleted and its pg_cron
+    entry unscheduled in the same graveyard block rather than left
+    500ing hourly. Local `sql/deploy.sh` run + verified: cron gone,
+    RPC gone, `mux_video_complete` intact.
+    `jobs/muxVideosPurgeSuperseded.ts` rewritten to inline SQL, the
+    exact shape of renderJobsPurgeSuperseded (latest completed per
+    project → all lower non-pending purged; LIMIT 50; `onlyIds` test
+    seam stays) — the two purge jobs now mirror each other.
+  - Tests: `test/muxVideoWebhook.test.ts` (14 — 401
+    missing-header/bad-signature exact bodies via throwing-db;
+    EXACT-raw-string capture pin (non-canonical whitespace survives
+    to the verifier byte-for-byte); no-asset-id and unhandled-event
+    200s with zero queries; e2e: ready completes the pending row
+    with the playback id, unknown-asset 200 + message + DB
+    untouched, no-playback-id 500 + row untouched, errored joined
+    messages / `Unknown Mux error` default / completed-row no-op,
+    **the deadlock pin** — completed v1 + pending v2 → ready v2 →
+    200, BOTH rows completed, shared-video-get serves v2 (v1 waits
+    for the daily purge, already covered by the purge suite);
+    scoped-parser isolation (shared-video-get still parses JSON);
+    canonical log fields). `test/adapters/mux.test.ts` grew 9
+    signature cases (real HMAC vectors computed in the test: accept;
+    tampered body / wrong secret / altered timestamp / 4 bad formats
+    / wrong-length v1 → false; the not-configured throw kept).
+    Schema-change fallout: `seedMuxVideo` lost `isDeleted`;
+    sharedVideoGet's "soft-deleted completed" seed became the REAL
+    new-world case (older completed row awaiting the daily purge —
+    NEWEST completed wins; the route already ordered
+    `cloud_version DESC`, no route change, asserted);
+    muxVideosPurgeSuperseded's is_deleted seed is now a plain
+    (legal) second completed row. No client changes (Mux is the
+    only caller).
+  - **Analysis:** dead weight — the edge fn's per-request admin
+    supabase-js client and the crypto.subtle import/sign
+    boilerplate (a node:crypto one-liner); the separate
+    `Invalid signature format` body. Simplification — the deadlock
+    fix deletes a whole layer (one column, two indexes, one SQL
+    function, one cron, one edge-fn dependency) and makes the two
+    superseded-purge jobs symmetric. Consistency — same
+    exact-body/check-order discipline as prior waves; raw body
+    handled by a scoped parser instead of a global config switch.
+    Smells flagged NOT fixed (suggested_changes.md): no timestamp
+    tolerance (unlimited replay); `mux_video_complete` matches ANY
+    status (a late webhook silently revives a canceled/failed row
+    to completed); `render_purge_candidates.sql` found ORPHANED
+    (part13 missed it — decommission candidate).
+  - Checks: root `npx vitest run server` (267 passed), server
+    typecheck, eslint clean on changed files.
+  - **Cutover (HARD SWAP, user decision 2026-07-21 — publish is
+    barely used; rollback = repoint the URL back to the edge fn):**
+    1. Apply the migration to prod (`supabase db push --linked`),
+       then `supabase/sql/deploy.sh --remote` (graveyard drops
+       `mux_video_purge_candidates` + unschedules the
+       `mux-video-purge` cron — the edge purge fn dies NOW; its
+       server replacement is live). BEFORE the webhook swap.
+    2. Railway: set `MUX_WEBHOOK_SECRET`, deploy. **WHICH secret —
+       each Mux webhook endpoint has its OWN:** if step 3 EDITS the
+       existing endpoint's URL and Mux keeps its secret, reuse the
+       edge fn's current `MUX_WEBHOOK_SECRET` value; if a NEW
+       endpoint must be created, use the NEW endpoint's signing
+       secret.
+    3. Mux dashboard (Settings → Webhooks): repoint the webhook URL
+       to `https://recordio-production.up.railway.app/mux-video-webhook`.
+    4. Publish a project from the flag-on local webapp — the webhook
+       completes the mux_video, the shared page plays. Then
+       RE-publish a new version of the same project (the old
+       deadlock case) and watch v2 complete alongside v1.
 
 - **Wave D #15 — `render-job-hook` → `/render-job-webhook`** (code
-  complete 2026-07-21; awaiting user verification. **One new REQUIRED
+  complete 2026-07-21; **user verified 2026-07-21** (prod render
+  end-to-end after the duplicate-column fix below). **One new REQUIRED
   env var: `PUBLIC_URL`** (config.ts, .env.example — set on Railway
   BEFORE deploy). Server route/path named "webhook" per user decision
   2026-07-21; only the edge fn keeps "hook"):

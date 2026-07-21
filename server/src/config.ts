@@ -34,10 +34,16 @@ const EnvSchema = Type.Object({
     /**
      * Mux (mux-video-create asset ingest) — same values as the edge
      * function secrets. Required: a deploy without them should fail
-     * loudly, not degrade. MUX_WEBHOOK_SECRET lands with Wave D.
+     * loudly, not degrade.
      */
     MUX_TOKEN_ID: Type.String({ minLength: 1 }),
     MUX_TOKEN_SECRET: Type.String({ minLength: 1 }),
+    /**
+     * Signing secret of the Mux webhook ENDPOINT posting to
+     * /mux-video-webhook (each endpoint has its OWN secret — Mux
+     * dashboard → Settings → Webhooks). Required (Wave D #16).
+     */
+    MUX_WEBHOOK_SECRET: Type.String({ minLength: 1 }),
     /**
      * This server's own public base URL (no trailing slash) — handed to
      * the render worker as the status-callback base (render-job-webhook).

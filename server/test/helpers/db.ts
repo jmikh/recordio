@@ -87,15 +87,14 @@ export interface SeedMuxVideoOptions {
     muxAssetId?: string | null;
     renderStoragePath?: string | null;
     error?: string | null;
-    isDeleted?: boolean;
 }
 
 export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<string> {
     const id = randomUUID();
     await db.query(
         `INSERT INTO mux_videos
-            (id, project_id, user_id, cloud_version, status, mux_playback_id, mux_asset_id, render_storage_path, error, is_deleted)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            (id, project_id, user_id, cloud_version, status, mux_playback_id, mux_asset_id, render_storage_path, error)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
             id,
             opts.projectId,
@@ -106,7 +105,6 @@ export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<s
             opts.muxAssetId ?? null,
             opts.renderStoragePath ?? null,
             opts.error ?? null,
-            opts.isDeleted ?? false,
         ],
     );
     return id;

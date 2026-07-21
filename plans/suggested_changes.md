@@ -25,10 +25,13 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **storage-download-urls**: hardcoded admin-bypass user id
   (`01f290d7-…`) in the route — should become env config
   (`server/src/routes/storageDownloadUrls.ts`). Found 2026-07-13.
-- **shared-video-get**: the completed-video lookup ignores `is_deleted`
+- **shared-video-get**: ~~the completed-video lookup ignores `is_deleted`
   despite the original comment claiming otherwise — a soft-deleted
-  completed video can outrank a newer pending one
-  (`server/src/routes/sharedVideoGet.ts`). Found 2026-07-16.
+  completed video can outrank a newer pending one~~ MOOT 2026-07-22:
+  `mux_videos.is_deleted` was removed entirely (re-publish deadlock fix,
+  Wave D #16) — multiple completed rows are legal now and the newest
+  wins by cloud_version (`server/src/routes/sharedVideoGet.ts`).
+  Found 2026-07-16.
 - **shared-video-get**: `canceled` mux rows are silently ignored.
   Found 2026-07-16.
 - **subscription-change**: the dryRun preview reports the CURRENT billing
@@ -137,13 +140,13 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   vs server stay two (client is typed against Project, server against
   unknown). Consolidate if a shared package ever lands.
   Found 2026-07-17.
-- **mux-video-create**: `mux_video_get_or_create` ignores `is_deleted`
+- **mux-video-create**: ~~`mux_video_get_or_create` ignores `is_deleted`
   when matching rows — a soft-deleted mux_video at (project_id,
-  cloud_version) is returned as a cache-hit/dedup (and the partial
-  unique indexes only cover non-deleted rows, so a fresh insert would
-  collide anyway). Decide whether deleted rows should be resurrected
-  via the retry branch instead (`supabase/sql/functions/
-  mux_video_get_or_create.sql`, RPC parity). Found 2026-07-17.
+  cloud_version) is returned as a cache-hit/dedup~~ MOOT 2026-07-22:
+  the `is_deleted` column is gone (Wave D #16); matching any row at
+  (project_id, cloud_version) is now the only possible behavior
+  (`supabase/sql/functions/mux_video_get_or_create.sql`).
+  Found 2026-07-17.
 - **mux-video-create**: a crash between the RPC insert and the render
   call leaves a `pending` mux_video forever — only the failure CATCH
   marks rows `failed`, and no cron reaps stale pending mux_videos
@@ -177,12 +180,13 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   prefix — caller-prefixed files (editor-uploaded thumbnails,
   retrying-editor renders; known smells above) orphan in storage
   forever. Found 2026-07-18.
-- **mux_video_purge_candidates**: LIMIT 50 with no ORDER BY
-  (nondeterministic batch) and no `is_deleted` filter — soft-deleted
-  rows are purged via the superseded path only if a completed row
-  outranks them; is_deleted-but-not-superseded rows are never purged
-  (`supabase/sql/functions/mux_video_purge_candidates.sql`).
-  Found 2026-07-17.
+- **mux_video_purge_candidates**: ~~LIMIT 50 with no ORDER BY
+  (nondeterministic batch) and no `is_deleted` filter~~ PARTLY MOOT
+  2026-07-22: the SQL function was DELETED (Wave D #16 — the query went
+  inline into `jobs/muxVideosPurgeSuperseded.ts`) and the is_deleted
+  concern died with the column. Still true: the inline query keeps
+  LIMIT 50 with no ORDER BY (nondeterministic batch) — as does its
+  mirror `jobs/renderJobsPurgeSuperseded.ts`. Found 2026-07-17.
 - **cron_render_purge was broken**: it posted hourly (pg_net) to a
   `render-purge` edge function that never existed — silent 404s,
   old-version render files never purged. Found 2026-07-17;
@@ -219,6 +223,40 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   and accepted where the edge fns' `typeof` checks 400'd. Pinned by an
   assetCreate test. Consider `coerceTypes: false` (or leave — clients
   send correct types). Found 2026-07-16.
+- **re-publish deadlock**: nothing ever set `mux_videos.is_deleted =
+  true`, and the partial unique index
+  `idx_mux_videos_one_active_completed` made a second published
+  version's `asset.ready` violate the index — the webhook 500'd
+  forever and the purge could never break the tie (candidates must sit
+  below the highest COMPLETED version; v2 never completed). Found
+  2026-07-21; RESOLVED 2026-07-22 (Wave D #16, user decision): the
+  soft-delete machinery was removed entirely (migration
+  `20260721221112` drops both indexes + the column;
+  `mux_video_purge_candidates` deleted, purge job inline; pinned by an
+  e2e test — v2 completes alongside v1 and shared-video-get serves v2).
+- **mux-video-webhook**: no timestamp tolerance on the `mux-signature`
+  check — a captured webhook replays forever (edge-fn parity; Mux's
+  docs suggest rejecting stale timestamps)
+  (`server/src/adapters/mux.ts`). Found 2026-07-22.
+- **mux_video_complete**: matches a row by `mux_asset_id` in ANY
+  status — a late/replayed `asset.ready` silently revives a
+  canceled/failed row to completed (maybe fine: the asset genuinely
+  exists at Mux; note the interaction with the unlimited-replay smell
+  above) (`supabase/sql/functions/mux_video_complete.sql`).
+  Found 2026-07-22.
+- **render_purge_candidates.sql is ORPHANED**: its only intended
+  caller was the `render-purge` edge function that never existed
+  (part13 replaced that whole path with the inline-SQL server job but
+  missed this fn). Decommission candidate: delete the file + graveyard
+  DROP — ask the user. Found 2026-07-22.
+- **server/README env-var table drift**: the table stops at the S3
+  group (+ the new `MUX_WEBHOOK_SECRET` row) — `RENDER_WORKER_URL`,
+  `RENDER_SECRET`, `OPENAI_API_KEY`, `MUX_TOKEN_ID`,
+  `MUX_TOKEN_SECRET`, `PUBLIC_URL` never got rows despite the "add
+  each when it lands" note; the gitignored `server/.env.local` /
+  `.env.prod` are likewise missing every required var added since
+  Wave B (placeholders appended for `MUX_WEBHOOK_SECRET` only).
+  Found 2026-07-22.
 
 ## Server config / infra cleanups
 

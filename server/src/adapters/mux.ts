@@ -1,17 +1,19 @@
 /**
  * Real Mux adapter — landed with mux-video-create. Raw fetch, no
- * `@mux/mux-node` package: the surface is two REST calls with basic auth.
- *
- * `webhookSecret` is optional until Wave D: mux-video-hook lands the
- * required MUX_WEBHOOK_SECRET env var together with the HMAC
- * verification — until then verifyWebhookSignature fails loudly.
+ * `@mux/mux-node` package: the surface is two REST calls with basic auth
+ * plus webhook signature verification (Wave D #16).
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { MuxApiError, type MuxPort } from '../ports/mux.js';
 
 export interface MuxAdapterConfig {
     tokenId: string;
     tokenSecret: string;
-    /** Lands with Wave D (mux-video-hook) */
+    /**
+     * Signing secret of the Mux webhook ENDPOINT (each endpoint has its
+     * own — MUX_WEBHOOK_SECRET). Optional in the type so tests can build
+     * the adapter without it; verifyWebhookSignature throws when absent.
+     */
     webhookSecret?: string;
     /** Test override (ephemeral local server) */
     baseUrl?: string;
@@ -56,11 +58,28 @@ export function createMuxAdapter(config: MuxAdapterConfig): MuxPort {
             }
         },
 
-        verifyWebhookSignature() {
+        verifyWebhookSignature(rawBody, signatureHeader) {
             if (!config.webhookSecret) {
-                throw new Error('MuxAdapter: webhookSecret not configured (MUX_WEBHOOK_SECRET lands with Wave D)');
+                throw new Error('MuxAdapter: webhookSecret not configured (MUX_WEBHOOK_SECRET)');
             }
-            throw new Error('MuxAdapter.verifyWebhookSignature: implemented in Wave D (mux-video-hook)');
+            // Mux signatures: t=<timestamp>,v1=<hex>. A malformed header is
+            // just a failed verification (the edge fn's separate 401 body
+            // for it collapses into 'Invalid signature' — Mux reads neither).
+            const elements = signatureHeader.split(',');
+            const timestamp = elements.find((e) => e.startsWith('t='))?.slice(2);
+            const v1Sig = elements.find((e) => e.startsWith('v1='))?.slice(3);
+            if (!timestamp || !v1Sig) return false;
+
+            // No timestamp tolerance check — edge-fn parity (logged smell:
+            // unlimited replay window)
+            const expectedHex = createHmac('sha256', config.webhookSecret)
+                .update(`${timestamp}.${rawBody}`)
+                .digest('hex');
+            // Compare the hex STRINGS as buffers: exact `===` accept/reject
+            // semantics of the edge fn, hardened to constant time
+            const expected = Buffer.from(expectedHex);
+            const received = Buffer.from(v1Sig);
+            return expected.length === received.length && timingSafeEqual(expected, received);
         },
     };
 }

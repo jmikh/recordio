@@ -55,3 +55,14 @@ DROP FUNCTION IF EXISTS public.cleanup_expired_projects();
 -- replaced by the render_jobs.purge-superseded server job
 SELECT cron.unschedule('render-jobs-purge')
 WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'render-jobs-purge');
+
+-- Wave D #16 decommissions (2026-07-22): the mux_videos soft-delete
+-- machinery is gone (migration 20260721221112) and the superseded-purge
+-- query went inline into the server job mux_videos.purge-superseded.
+-- Dropping the RPC breaks the still-live mux-video-purge EDGE function
+-- immediately — accepted (its replacement server job is live and
+-- verified since Wave C), so its hourly cron is unscheduled in the same
+-- breath rather than left 500ing until final decommission.
+SELECT cron.unschedule('mux-video-purge')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'mux-video-purge');
+DROP FUNCTION IF EXISTS public.mux_video_purge_candidates();

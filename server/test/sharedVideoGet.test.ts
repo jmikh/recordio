@@ -137,9 +137,11 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         const { app, deps } = testApp();
         const project = await seed();
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
-        // Older completed rows are soft-deleted in prod (partial unique index
-        // allows one active completed per project)
-        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old', isDeleted: true });
+        // Since the soft-delete removal (2026-07-22) an older completed row
+        // legally coexists with a newer one until the daily purge sweeps
+        // it — the NEWEST completed version must win (the route orders by
+        // cloud_version DESC)
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 2, status: 'completed', muxPlaybackId: 'pb-new' });
 
         const res = await post(app, { slug: project.slug });

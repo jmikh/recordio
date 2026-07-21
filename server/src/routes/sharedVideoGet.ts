@@ -11,9 +11,10 @@
  *   3. Any failed → failed
  *   4. Otherwise → no mux data (frontend shows "Could not find video")
  *
- * Kept for parity, flagged as smells in the plan: the completed lookup does
- * NOT filter is_deleted (despite the edge function's comment claiming it
- * does), and 'canceled' rows are silently ignored.
+ * Kept for parity, flagged as a smell in the plan: 'canceled' rows are
+ * silently ignored. (mux_videos.is_deleted no longer exists — removed
+ * 2026-07-22; an older completed row now legally coexists with a newer
+ * one until the daily purge, and cloud_version DESC picks the newest.)
  *
  * Request:  { slug }
  * Response: { name, userName, status?, muxPlaybackId? }
