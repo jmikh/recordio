@@ -427,15 +427,143 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **Wave D #17 — stripe-webhooks** (raw-body signature check —
-reuse the scoped content-type-parser pattern from #16; parity upsert
-idempotency, NO processed-events ledger per the 2026-07-17 note), on
-explicit go. After Wave D: Wave E emails, then the prod flag flip and
-the manual decommission checklist.
+**Next:** **Wave E — emails** (#18 send-welcome-email (auth.users
+trigger URL repoint, idempotency flag), #19 send-workspace-invite
+(called by the `workspace_invite` SQL RPC via net.http_post — repoint
+inside that fn), #20 unsubscribe (GET/public/HTML)), on explicit go.
+The email port's real adapter (Resend) lands here — the last
+`unimplementedPort`. After Wave E: the prod flag flip and the manual
+decommission checklist.
+
+- **Wave D #17 — `stripe-webhooks` → `/stripe-webhooks`** (code
+  complete 2026-07-22; **PAUSED for user verification** — numbered
+  cutover steps below; cutover is OVERLAPPED (second Stripe endpoint,
+  verify, then disable the Supabase one), NOT a hard swap. **One new
+  REQUIRED env var: `STRIPE_WEBHOOK_SECRET`** (config.ts,
+  .env.example, README env table; the NEW endpoint's signing secret —
+  set on Railway BEFORE deploy or config validation fails the boot;
+  `.env.prod` got a placeholder, `.env.local`'s existing value is
+  likely the OLD endpoint's). Second raw-body route — same scoped
+  content-type-parser pattern as #16):
+  - Route: `server/src/routes/stripeWebhooks.ts` — POST, no body
+    schema; response schemas 200 `{ received: true }` / 400 / 500.
+    Dispatch: `checkout.session.completed` → metadata
+    userId/workspaceId + subscription id (missing → THROW 500, Stripe
+    retries) → authoritative `getSubscription` from Stripe → INSERT …
+    ON CONFLICT (workspace_id) DO UPDATE (does NOT stamp
+    stripe_event_at — parity, pinned); `customer.subscription.created|
+    updated` → row by stripe_customer_id (unknown → THROW — the
+    event-beats-checkout race, Stripe's retry resolves it; pinned) →
+    out-of-order discard when `event.created` ≤ stored
+    `stripe_event_at` (200 + warn, pinned at equality) → UPDATE +
+    stamp; `customer.subscription.deleted` → canceled / plan pro /
+    seats NULL + stamp, NO ordering guard (parity smell, pinned: a
+    stale redelivered deleted still cancels); unhandled → 200.
+    `plan` from `price.metadata.plan_type` (missing/invalid → THROW);
+    period end `item.current_period_end ?? sub.current_period_end`
+    (dahlia item-level vs older payloads; `periodEndToIso` ported
+    verbatim); update missing BOTH → THROW. Timestamps from
+    `deps.clock`. Log fields `stripe.event_type` + `workspace.id`
+    (deleted handler's SELECT now fetches workspace_id for this);
+    emits the pre-seeded `subscription.changed` catalog event per
+    mutating handler; `error_type: StripeSignatureInvalid` on 400s.
+    Registered in app.ts (no options).
+  - **Two user decisions (2026-07-22), documented divergences:**
+    (a) **signature failures → 400 for BOTH cases** (`No signature` /
+    `Invalid signature` JSON bodies) — the edge fn 400'd the missing
+    header but 500'd invalid signatures through its boundary (+ a
+    Sentry event each); Stripe retries any non-2xx, so behavior toward
+    Stripe is identical, and garbage signatures stay out of Sentry.
+    The adapter's 'not configured' throw is rethrown (500) — a
+    missing secret is a deployment error, not a bad caller.
+    (b) **the webhook NEVER touches projects** — the edge fn's
+    `set_project_expiry` calls (clear on activation, +14 d on
+    deactivation/deletion) are NOT ported; subscription changes stop
+    writing projects.expires_at. Pinned: every mutating handler's e2e
+    test seeds a dated + an undated project and asserts both survive
+    verbatim. `set_project_expiry` stays deployed (the edge fn calls
+    it during overlap) and becomes an ORPHAN once the Supabase
+    endpoint is disabled → Step 5 decommission list, NOT graveyard.
+    Consequence logged in suggested_changes: expires_at is now fully
+    vestigial-except-stamping (only project-create-v2 writes it, the
+    dashboard badge still displays it).
+  - **DB-function classification: `set_project_expiry` is EXCLUSIVE
+    to this webhook** — and deliberately not ported (decision b). All
+    other DB work is plain table reads/upserts, inline over the pool.
+    NO processed-events ledger (2026-07-17 decision): idempotency =
+    re-run-safe upserts + the `event.created` ordering guard.
+  - Adapter: real `verifyWebhook` in `src/adapters/stripe.ts`
+    (replaces the throwing stub) — `webhookSecret?` on the config
+    (throws 'not configured' when absent; server.ts wires
+    `config.STRIPE_WEBHOOK_SECRET`), SDK `constructEventAsync`,
+    mapped to the port's `StripeWebhookEvent`. The SDK's default
+    **300 s timestamp tolerance is kept** — closes the
+    unlimited-replay smell the Mux webhook retains for parity. Port
+    gained `StripeCheckoutSession` (metadata / client_reference_id /
+    customer / subscription — raw snake_case).
+  - Tests: `test/adapters/stripe.test.ts` NEW blocking-tier file
+    (6 — real vectors via the SDK's `generateTestHeaderString`:
+    accept + port shape; tampered body / wrong secret / garbage
+    header throw; stale-timestamp-beyond-300s throw (replay pin);
+    not-configured throw). `test/stripeWebhooks.test.ts` (19 — 400
+    missing-header/bad-signature exact bodies via throwing-db;
+    EXACT-raw-string capture pin; unhandled-event 200 + zero
+    queries; checkout missing userId/workspaceId/subscriptionId and
+    missing plan_type → 500 all pre-query; e2e: checkout full-row
+    upsert mapping (teams/yearly/5 seats/item-level period end/
+    stripe_event_at stays NULL) + update-in-place over an existing
+    row; subscription.updated field updates + stamp; out-of-order
+    discard at equality; unknown customer 500; no-period-end 500 +
+    row unchanged; deleted → canceled/pro/NULL + stale-deleted
+    parity pin + unknown-customer 200 no-op; **projects-untouched
+    pins on all three mutating handlers** (decision b); scoped-parser
+    isolation; canonical log fields + subscription.changed).
+    Helpers: `seedSubscription` gained
+    stripeEventAt/currentPeriodEnd/cancelAtPeriodEnd; `seedProject`
+    gained expiresAt. No client changes (Stripe is the only caller;
+    MIGRATED_FUNCTIONS untouched).
+  - **Analysis:** dead weight — with decision (b) the update/delete
+    handlers' user_id/status reads existed only to feed the expiry
+    calls → their SELECTs shrank to workspace_id (+ stripe_event_at
+    for the guard); the edge fn's per-request service-role client.
+    Simplification — the SDK does HMAC + replay tolerance in one
+    call; the supabase upsert becomes one INSERT … ON CONFLICT.
+    Consistency — same scoped-parser/raw-body/exact-raw-string
+    discipline as #16; `subscription.changed` finally emitted where
+    the catalog always intended. Smells flagged NOT fixed
+    (suggested_changes.md): deleted handler has no ordering guard;
+    subscriptions created OUTSIDE the checkout flow can never sync
+    (unknown customer → 500 until Stripe stops retrying); only
+    `items.data[0]` is read (multi-item subscriptions ignored,
+    parity).
+  - Checks: root `npx vitest run server` (292 passed), server
+    typecheck, eslint clean on changed files.
+  - **Cutover (OVERLAPPED — both endpoints stay live until verified;
+    rollback = re-enable the Supabase endpoint / disable the new
+    one):**
+    1. Stripe dashboard → Developers → Webhooks → ADD a second
+       endpoint:
+       `https://recordio-production.up.railway.app/stripe-webhooks`,
+       event selection mirroring the existing endpoint (at minimum:
+       checkout.session.completed,
+       customer.subscription.created/updated/deleted). Copy the NEW
+       endpoint's signing secret.
+    2. Railway: set `STRIPE_WEBHOOK_SECRET` to that secret, deploy
+       (config requires it — deploying first would fail the boot).
+    3. Overlap-verify: from the flag-on local webapp run a test-mode
+       checkout + a subscription change; both endpoints show 200s in
+       the Stripe dashboard, Railway logs show the handlers +
+       subscription.changed events, the subscriptions row is correct.
+    4. Disable the SUPABASE endpoint in the Stripe dashboard; run one
+       more subscription change to confirm the server endpoint alone
+       keeps the row in sync. (With decision (b) live, subscription
+       changes no longer rewrite project expiry badges.)
 
 - **Wave D #16 — `mux-video-hook` → `/mux-video-webhook`** (code
-  complete 2026-07-22; **PAUSED for user verification** — numbered
-  cutover steps below, order matters. **One new REQUIRED env var:
+  complete 2026-07-22; **user verified 2026-07-22** — prod migration +
+  graveyard applied, `MUX_WEBHOOK_SECRET` on Railway, hard swap done in
+  the Mux dashboard, publish + re-publish (the old deadlock case)
+  verified end-to-end. **One new REQUIRED env var:
   `MUX_WEBHOOK_SECRET`** (config.ts, .env.example, README env table —
   set on Railway BEFORE deploy; placeholders appended to the gitignored
   `.env.local`/`.env.prod`, which are otherwise stale — see

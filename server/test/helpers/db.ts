@@ -51,6 +51,7 @@ export interface SeedProjectOptions {
     projectData?: unknown;
     /** Defaults to the owner's seeded personal workspace */
     workspaceId?: string;
+    expiresAt?: string | null;
 }
 
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
@@ -71,9 +72,9 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
 
     await db.query(
         `INSERT INTO projects
-            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at)
-         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
-        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null],
+            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at, expires_at)
+         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)`,
+        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null, opts.expiresAt ?? null],
     );
     return { id, slug, name, ownerId };
 }
@@ -164,13 +165,16 @@ export interface SeedSubscriptionOptions {
     billingInterval?: 'monthly' | 'yearly' | null;
     /** Constraint: seats only allowed when plan = 'teams' */
     seats?: number | null;
+    stripeEventAt?: string | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean;
 }
 
 export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): Promise<void> {
     await db.query(
         `INSERT INTO subscriptions
-            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats, stripe_event_at, current_period_end, cancel_at_period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
             opts.workspaceId,
             opts.userId ?? SEEDED_USER_ID,
@@ -180,6 +184,9 @@ export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): P
             opts.stripeSubscriptionId === undefined ? `sub_test_${randomUUID().slice(0, 8)}` : opts.stripeSubscriptionId,
             opts.billingInterval === undefined ? 'monthly' : opts.billingInterval,
             opts.seats ?? null,
+            opts.stripeEventAt ?? null,
+            opts.currentPeriodEnd ?? null,
+            opts.cancelAtPeriodEnd ?? false,
         ],
     );
 }

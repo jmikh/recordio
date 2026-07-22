@@ -66,6 +66,15 @@ export interface StripeWebhookEvent {
     data: { object: unknown };
 }
 
+/** checkout.session.completed payload — the fields the webhook reads. */
+export interface StripeCheckoutSession {
+    metadata?: Record<string, string> | null;
+    client_reference_id?: string | null;
+    /** Id string in webhook payloads (objects only when expanded) */
+    customer?: string | null;
+    subscription?: string | null;
+}
+
 export interface StripePort {
     /** checkout.sessions.create (mode: 'subscription') */
     createCheckoutSession(params: StripeCheckoutSessionParams): Promise<{ url: string | null }>;

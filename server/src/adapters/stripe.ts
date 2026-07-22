@@ -11,6 +11,13 @@ import type { StripePort, StripePrice } from '../ports/stripe.js';
 
 export interface StripeAdapterConfig {
     secretKey: string;
+    /**
+     * Signing secret of the Stripe webhook ENDPOINT posting to
+     * /stripe-webhooks (STRIPE_WEBHOOK_SECRET). Optional in the type so
+     * tests can build the adapter without it; verifyWebhook throws when
+     * absent.
+     */
+    webhookSecret?: string;
 }
 
 function mapPrice(price: Stripe.Price): StripePrice {
@@ -106,8 +113,24 @@ export function createStripeAdapter(config: StripeAdapterConfig): StripePort {
                 lines: { data: invoice.lines.data as unknown as Array<Record<string, unknown>> },
             };
         },
-        async verifyWebhook() {
-            throw new Error('stripe.verifyWebhook: lands with stripe-webhooks');
+        async verifyWebhook(rawBody, signature) {
+            if (!config.webhookSecret) {
+                throw new Error('StripeAdapter: webhookSecret not configured (STRIPE_WEBHOOK_SECRET)');
+            }
+            // The SDK checks the HMAC AND enforces its default 300 s
+            // timestamp tolerance — deliberately kept (closes the
+            // unlimited-replay smell the Mux webhook retains for parity)
+            const event = await stripe.webhooks.constructEventAsync(
+                rawBody,
+                signature,
+                config.webhookSecret,
+            );
+            return {
+                id: event.id,
+                type: event.type,
+                created: event.created,
+                data: { object: event.data.object },
+            };
         },
     };
 }

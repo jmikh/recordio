@@ -192,11 +192,19 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   old-version render files never purged. Found 2026-07-17;
   RESOLVED 2026-07-18: cron decommissioned, replaced by the
   `render_jobs.purge-superseded` server job (part13).
-- **project-create-v2**: `expires_at` stamping (+14 d for
-  non-subscribed workspaces) is now vestigial — auto-expiry was turned
-  off 2026-07-18 (`cron_cleanup_expired_projects` decommissioned), so
-  nothing acts on the column; the route keeps stamping it (parity port
-  untouched). Revisit if expiry ever returns. Found 2026-07-18.
+- **project-create-v2 / projects.expires_at**: `expires_at` stamping
+  (+14 d for non-subscribed workspaces) is now vestigial — auto-expiry
+  was turned off 2026-07-18 (`cron_cleanup_expired_projects`
+  decommissioned), so nothing deletes on the column; the route keeps
+  stamping it (parity port untouched). UPDATED 2026-07-22 (Wave D #17
+  decision): the server stripe-webhooks route does NOT port the
+  `set_project_expiry` calls either, so once the Supabase endpoint is
+  disabled NOTHING clears or rewrites expires_at anymore — the
+  dashboard ProjectCard countdown badge still displays it, so a
+  subscriber's pre-existing badge goes stale (never cleared on
+  activation). Cleanup candidate: drop the stamping + the badge + the
+  column together, user to confirm post-migration.
+  Found 2026-07-18.
 - **Planned redesign — asset uploads through the server** (user
   decision 2026-07-17, post-migration work): replace the
   presign → client-upload → confirm flow with a single upload to the
@@ -249,8 +257,32 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   (part13 replaced that whole path with the inline-SQL server job but
   missed this fn). Decommission candidate: delete the file + graveyard
   DROP — ask the user. Found 2026-07-22.
+- **stripe-webhooks**: the `customer.subscription.deleted` handler has
+  NO `event.created` ordering guard (updated/created do) — a stale
+  redelivered deleted always cancels the row; the next genuine
+  subscription event un-cancels it, but there's a wrong-status window
+  (`server/src/routes/stripeWebhooks.ts`, edge-fn parity, pinned by
+  test). Found 2026-07-22.
+- **stripe-webhooks**: a subscription created OUTSIDE the checkout
+  flow (e.g. manually in the Stripe dashboard) can never sync —
+  `customer.subscription.created` for an unknown customer 500s until
+  Stripe stops retrying (~3 days), and no row is ever created
+  (edge-fn parity; the throw exists to cover the
+  event-beats-checkout race). Found 2026-07-22.
+- **stripe-webhooks**: only `items.data[0]` is read everywhere — a
+  multi-item subscription's other items are ignored for
+  plan/seats/period-end (edge-fn parity; the product never creates
+  multi-item subs). Found 2026-07-22.
+- **set_project_expiry is ORPHANED after the #17 cutover** (user
+  decision 2026-07-22 — the server webhook doesn't touch projects):
+  its only caller is the edge stripe-webhooks fn, which dies when the
+  Supabase endpoint is disabled. Do NOT graveyard before then (the
+  edge fn calls it during the overlap window) — Step 5 decommission
+  list (`supabase/sql/functions/set_project_expiry.sql`).
+  Found 2026-07-22.
 - **server/README env-var table drift**: the table stops at the S3
-  group (+ the new `MUX_WEBHOOK_SECRET` row) — `RENDER_WORKER_URL`,
+  group (+ the `MUX_WEBHOOK_SECRET`/`STRIPE_WEBHOOK_SECRET` rows) —
+  `RENDER_WORKER_URL`,
   `RENDER_SECRET`, `OPENAI_API_KEY`, `MUX_TOKEN_ID`,
   `MUX_TOKEN_SECRET`, `PUBLIC_URL` never got rows despite the "add
   each when it lands" note; the gitignored `server/.env.local` /

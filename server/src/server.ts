@@ -36,7 +36,10 @@ const s3Configured =
 const deps: Deps = {
     db: pool,
     clock: systemClock,
-    stripe: createStripeAdapter({ secretKey: config.STRIPE_SECRET_KEY }),
+    stripe: createStripeAdapter({
+        secretKey: config.STRIPE_SECRET_KEY,
+        webhookSecret: config.STRIPE_WEBHOOK_SECRET,
+    }),
     mux: createMuxAdapter({
         tokenId: config.MUX_TOKEN_ID,
         tokenSecret: config.MUX_TOKEN_SECRET,

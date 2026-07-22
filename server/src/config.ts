@@ -23,6 +23,12 @@ const EnvSchema = Type.Object({
     STRIPE_TEAMS_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
     STRIPE_TEAMS_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
     /**
+     * Signing secret of the Stripe webhook ENDPOINT posting to
+     * /stripe-webhooks (each endpoint has its OWN secret — dashboard →
+     * Developers → Webhooks). Required (Wave D #17).
+     */
+    STRIPE_WEBHOOK_SECRET: Type.String({ minLength: 1 }),
+    /**
      * Render worker (render-job-create dispatch) — same values the edge
      * function secrets use. Required: a deploy without them should fail
      * loudly, not degrade.
