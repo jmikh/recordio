@@ -3,7 +3,9 @@
 -- Creates a fresh invitation for the given email in this workspace.
 -- Any existing invitation for that email is deleted first (re-invite flow).
 -- Caller must be a workspace admin.
--- Fires an invite email via the send-workspace-invite edge function.
+-- Fires an invite email via the Fastify server's
+-- /send-workspace-invite-email (Wave E cutover 2026-07-23 — Vault
+-- SERVER_URL, bearer unchanged).
 -- Invitations do not expire — admins rescind them manually.
 -- Returns the invitation id and token.
 --
@@ -40,10 +42,10 @@ BEGIN
     VALUES (p_workspace_id, lower(p_email), p_role, _uid, gen_random_uuid(), 'pending')
     RETURNING id, token INTO _inv_id, _token;
 
-    -- Fire invite email via edge function
+    -- Fire invite email via the Fastify server
     PERFORM net.http_post(
-        url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_URL')
-                   || '/functions/v1/send-workspace-invite',
+        url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SERVER_URL')
+                   || '/send-workspace-invite-email',
         headers := jsonb_build_object(
             'Content-Type',  'application/json',
             'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SECRET_KEY')

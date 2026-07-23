@@ -38,6 +38,12 @@ const EnvSchema = Type.Object({
     /** OpenAI Whisper (transcribe) — same value as the edge function secret. */
     OPENAI_API_KEY: Type.String({ minLength: 1 }),
     /**
+     * Resend (welcome + workspace-invite emails) — same value as the
+     * edge function secret. Required (Wave E): a deploy without it
+     * should fail loudly, not degrade.
+     */
+    RESEND_API_KEY: Type.String({ minLength: 1 }),
+    /**
      * Mux (mux-video-create asset ingest) — same values as the edge
      * function secrets. Required: a deploy without them should fail
      * loudly, not degrade.

@@ -111,6 +111,26 @@ export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<s
     return id;
 }
 
+/**
+ * Sets user_profiles.name (upsert — the signup trigger normally creates the
+ * row) and returns the previous value so tests can RESTORE it in afterEach:
+ * seeded users' profile rows are shared global state across parallel suites.
+ */
+export async function setUserProfileName(
+    db: Db,
+    userId: string,
+    name: string | null,
+): Promise<string | null> {
+    const { rows } = await db.query('SELECT name FROM user_profiles WHERE user_id = $1', [userId]);
+    const previous = (rows[0] as { name: string | null } | undefined)?.name ?? null;
+    await db.query(
+        `INSERT INTO user_profiles (user_id, name) VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name`,
+        [userId, name],
+    );
+    return previous;
+}
+
 export async function seedProjectEditor(
     db: Db,
     opts: { projectId: string; userId: string },

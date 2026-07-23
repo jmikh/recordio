@@ -21,6 +21,8 @@ import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
 import { renderJobWebhookRoutes } from './routes/renderJobWebhook.js';
 import { muxVideoWebhookRoutes } from './routes/muxVideoWebhook.js';
 import { stripeWebhooksRoutes } from './routes/stripeWebhooks.js';
+import { sendWelcomeEmailRoutes } from './routes/sendWelcomeEmail.js';
+import { sendWorkspaceInviteEmailRoutes } from './routes/sendWorkspaceInviteEmail.js';
 import { transcribeRoutes } from './routes/transcribe.js';
 
 declare module 'fastify' {
@@ -52,6 +54,8 @@ export interface AppOptions {
     publicUrl?: string;
     /** Shared bearer secret the render worker authenticates with (RENDER_SECRET) */
     renderSecret?: string;
+    /** Bearer the DB's pg_net email calls carry (SUPABASE_SERVICE_ROLE_KEY) */
+    serviceRoleKey?: string;
 }
 
 export type App = ReturnType<typeof buildApp>;
@@ -148,6 +152,8 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
     app.register(muxVideoWebhookRoutes);
     app.register(stripeWebhooksRoutes);
+    app.register(sendWelcomeEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
+    app.register(sendWorkspaceInviteEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
 
     app.get('/health', {
         schema: {

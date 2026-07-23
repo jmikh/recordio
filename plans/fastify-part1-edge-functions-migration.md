@@ -427,18 +427,165 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **Wave E — emails** (#18 send-welcome-email (auth.users
-trigger URL repoint, idempotency flag), #19 send-workspace-invite
-(called by the `workspace_invite` SQL RPC via net.http_post — repoint
-inside that fn), #20 unsubscribe (GET/public/HTML)), on explicit go.
-The email port's real adapter (Resend) lands here — the last
-`unimplementedPort`. After Wave E: the prod flag flip and the manual
-decommission checklist.
+**Next:** **THE ENDGAME.** Every edge function is now migrated,
+removed, or decommission-listed. Remaining, in order: (1) the prod
+webapp flag flip — one deploy with `VITE_USE_SERVER=true` +
+`VITE_API_URL=https://recordio-production.up.railway.app` baked in
+cuts every client-called migrated function over at once (observe
+per-function in Railway logs; rollback = remove the two vars and
+redeploy); (2) the Step 5 manual decommission checklist (edge
+functions, orphaned SQL fns, the remaining Pattern-B crons).
+
+- **Wave E — `send-welcome-email` + `send-workspace-invite` →
+  `/send-welcome-email` + `/send-workspace-invite-email`, and
+  `unsubscribe` REMOVED** (code complete 2026-07-23; **PAUSED for
+  user verification** — numbered steps below. **One new REQUIRED env
+  var: `RESEND_API_KEY`** (config.ts, .env.example, README table,
+  placeholders in `.env.local`/`.env.prod`; set on Railway BEFORE
+  deploy — config fails the boot without it). The real Resend adapter
+  lands — the LAST `unimplementedPort` is gone. The stale Wave E
+  section text was corrected in place):
+  - **Unsubscribe removal (user decision 2026-07-23):** migration
+    `20260723114413_user_profiles_drop_email_subscribed.sql` (applied
+    locally) drops the feature's only DB footprint;
+    `sql/tables/user_profiles.sql` doc updated;
+    `supabase/functions/unsubscribe/` deleted from the repo (undeploy
+    is verification step 6 — the one approved early edge-fn
+    removal; no SQL to graveyard, it had no DB function). The email
+    layout lost its `unsubscribeUrl` param; the welcome fn's
+    unsubscribe-JWT machinery is not ported. Overlap-safe: the
+    still-deployed edge send-welcome-email swallows the column-drop
+    error (destructured select) and just sends. Accepted: unsubscribe
+    links in already-sent emails dead-end; future welcome emails
+    carry no opt-out link.
+  - Adapter: `src/adapters/email.ts` (Resend, raw fetch like the Deno
+    helper) — result-shaped per the port contract, NEVER throws
+    (non-2xx → `Resend API <status>: <snippet>`, transport error →
+    message); defaults `from 'Recordio Team <john@recordio.io>'` /
+    `reply_to 'john@recordio.io'`; `baseUrl` test override. Wired in
+    server.ts. Divergence: the Deno helper degraded to a result error
+    when RESEND_API_KEY was unset; the server requires it at boot.
+  - Templates: `src/emails/` (layout.ts minus the unsubscribe footer,
+    welcomeEmail.ts, workspaceInviteEmail.ts) — HTML ported verbatim;
+    `PHOTO_URL`/`APP_URL` stay hardcoded constants as in the edge fns
+    (flagged in analysis).
+  - Routes (both: `requireServiceBearer(SUPABASE_SERVICE_ROLE_KEY)`
+    in onRequest — auth precedes schema validation, pinned; new
+    AppOptions.serviceRoleKey; `email.template` added to
+    DomainLogFields):
+    - `src/routes/sendWelcomeEmail.ts` — body
+      `{ record: { id, email? } }` (trial_start's leftover DB-webhook
+      shape, kept); no email → 200 `{ skipped: true, reason: 'no
+      email' }` (parity branch); the edge fn's email_subscribed
+      skip-check is gone with the column; send → `!success` THROWS
+      500 (pg_net ignores responses — Railway logs/Sentry are the
+      only failure surface). Divergence: missing `record` → schema
+      400 (edge fn's `{ error: 'No record' }`; no caller reads
+      bodies). NO db queries at all — the suite runs on throwing-db.
+    - `src/routes/sendWorkspaceInviteEmail.ts` — body
+      workspace_id/email/role/token/invited_by (per-field schema 400s
+      replace the edge fn's one `Missing fields` body, documented).
+      Workspace-name + profile-name lookups in parallel over the
+      pool; **INVITER-NAME FIX (user decision 2026-07-23, pinned):**
+      the edge fn selects `user_profiles.display_name`, a column that
+      DOESN'T EXIST (silently-swallowed error → the name always fell
+      back to the auth email); the server reads the real `name`
+      column → `supabaseApi.getUserById().email` (failure degrades +
+      tags SupabaseApiUnavailable, sharedVideoGet pattern) →
+      `'Someone'`. Unknown workspace → `'a workspace'` (parity).
+      acceptUrl `${APP_URL}/accept-invite?token=...`.
+  - **DB-function classification: `trial_start` and
+    `workspace_invite` are SHARED client RPCs, auth.uid()-dependent —
+    their logic stays SQL; edited ONLY to repoint the net.http_post
+    URL** to `(Vault SERVER_URL) + /send-welcome-email` (resp.
+    `/send-workspace-invite-email`), bearer header UNCHANGED (still
+    Vault SUPABASE_SECRET_KEY — the server accepts it as
+    SUPABASE_SERVICE_ROLE_KEY, values verified at cutover). Vault
+    `SERVER_URL` seeded in seed.sql (`http://host.docker.internal:8090`
+    — pg_net runs inside the DB container, NOT localhost) + created
+    directly in the running local DB; `sql/deploy.sh` run locally
+    (workspace_invite verified referencing SERVER_URL). Local caveat:
+    the local Vault SUPABASE_SECRET_KEY is the legacy demo JWT — if
+    `.env.local`'s SUPABASE_SERVICE_ROLE_KEY holds the `sb_secret_`
+    format instead, a local end-to-end email hook 401s (tests inject
+    the bearer directly; prod is covered by verification step 2).
+  - Tests (+26): `test/adapters/email.test.ts` (4 — ephemeral local
+    Resend, blocking tier: bearer + exact payload with edge-fn
+    defaults, explicit from/replyTo passthrough, non-2xx →
+    success:false with snippet, transport error → success:false,
+    never throws). `test/sendWelcomeEmail.test.ts` (8, throwing-db
+    throughout — 401 no/wrong bearer incl. auth-precedes-validation
+    pin; schema 400 no record; skipped-no-email with nothing sent;
+    full send assert (to, exact subject, PHOTO_URL, adapter-default
+    from/replyTo); **REMOVAL PIN: html contains no
+    unsubscribe link**; Resend failure → 500; email.template log
+    field). `test/sendWorkspaceInviteEmail.test.ts` (14 — 401s;
+    schema 400 per missing field; e2e: **inviter-name-fix pin**
+    (profile name used, auth email asserted ABSENT) + full content
+    (workspace name, Creator role label, acceptUrl with token);
+    fallback chain auth-email / 'Someone' / getUserById-failure with
+    SupabaseApiUnavailable tag; unknown-workspace parity; Resend
+    failure → 500; workspace.id + email.template log fields).
+    Helper: `setUserProfileName` (upsert + returns previous value —
+    profile rows of seeded users are shared global state, tests
+    restore in afterEach). No client changes (Postgres is the only
+    caller; `trial_start`/`workspace_invite` stay client RPCs;
+    MIGRATED_FUNCTIONS untouched).
+  - **Analysis:** dead weight — the unsubscribe feature end to end
+    (edge fn + JWT mint + djwt dependency + column + skip-check +
+    footer link) and the welcome route's admin supabase client (the
+    server route needs NO db at all). Simplification — the Resend
+    adapter is one fetch; both routes are ~40 lines; cutover is a
+    Vault secret + two URL edits. Consistency — service-bearer +
+    onRequest ordering matches renderJobWebhook; the fallback-degrade
+    pattern matches sharedVideoGet; templates are pure functions like
+    the transcribe helpers. Smells flagged NOT fixed
+    (suggested_changes.md): APP_URL/PHOTO_URL hardcoded in templates;
+    pg_net email calls are fire-and-forget with no retry (a failed
+    send is a log line, the user never knows); trial_start still
+    clears projects.expires_at (the one remaining expires_at writer
+    besides project-create-v2's stamping).
+  - Checks: root `npx vitest run server` (318 passed), server
+    typecheck, eslint clean on changed files.
+  - **Verification steps (PAUSED here), in order:**
+    1. Railway: set `RESEND_API_KEY` (same value as the edge
+       function secret), deploy (config requires it).
+    2. Verify Vault `SUPABASE_SECRET_KEY` (prod) equals Railway's
+       `SUPABASE_SERVICE_ROLE_KEY` — the routes 401 every email hook
+       otherwise; align if they differ.
+    3. Supabase Dashboard → Settings → Vault: add `SERVER_URL` =
+       `https://recordio-production.up.railway.app`.
+    4. `supabase db push --linked` (drops email_subscribed).
+    5. `supabase/sql/deploy.sh --remote` — repoints trial_start +
+       workspace_invite to the server (the cutover moment).
+    6. `supabase functions delete unsubscribe`.
+    7. End-to-end: fresh account → start trial → welcome email
+       arrives WITHOUT an unsubscribe link; invite someone to a
+       workspace → invite email shows the inviter's NAME; both
+       routes 200 in Railway logs.
 
 - **Wave D #17 — `stripe-webhooks` → `/stripe-webhooks`** (code
-  complete 2026-07-22; **PAUSED for user verification** — numbered
-  cutover steps below; cutover is OVERLAPPED (second Stripe endpoint,
-  verify, then disable the Supabase one), NOT a hard swap. **One new
+  complete 2026-07-22; **user verified 2026-07-23** — overlapped
+  cutover done (second Stripe endpoint live with
+  `STRIPE_WEBHOOK_SECRET` on Railway, Supabase endpoint disabled),
+  including the verification-found `cancel_at` fix below.
+  **Verification-found fix (user, 2026-07-23, commit `3daa5d2`):**
+  on 2025+ Stripe API versions (e.g. 2025-12-15.clover) a portal
+  "cancel at period end" sets the subscription's `cancel_at`
+  TIMESTAMP and leaves the legacy `cancel_at_period_end` boolean
+  false — so the boolean had silently stopped reflecting
+  cancellations. Migration `20260723095014_subscriptions_cancel_at.sql`
+  replaces the column (`cancel_at_period_end` boolean → `cancel_at`
+  timestamptz, backfilled from current_period_end where the boolean
+  was true); BOTH webhook implementations (server route + the edge fn,
+  which was live during overlap), the subscription_get/
+  subscription_workspace_get SQL fns, seed.sql, the webapp consumers
+  (AuthManager/BillingPage/switchWorkspace/useWorkspaceStore) and the
+  tests/helpers all moved to `cancel_at` (`periodEndToIso` generalized
+  to `timestampToIso`; checkout upsert writes NULL, update writes
+  `timestampToIso(subscription.cancel_at)`). Cutover was OVERLAPPED
+  (second Stripe endpoint, verify, then disable the Supabase one),
+  NOT a hard swap. **One new
   REQUIRED env var: `STRIPE_WEBHOOK_SECRET`** (config.ts,
   .env.example, README env table; the NEW endpoint's signing secret —
   set on Railway BEFORE deploy or config validation fails the boot;
@@ -1734,19 +1881,23 @@ NO `job_runs` ledger table):**
     dropped job_runs).
 
 ### Wave E — DB-triggered
-18. `send-welcome-email` — the `auth.users` trigger calls an HTTP endpoint;
-    repoint the trigger's URL (pg_net) at Fastify, bearer-token protected.
-    Idempotent: welcome-email-sent flag on the profile row (trigger retries
-    must not double-send).
+(Section CORRECTED 2026-07-23 — the original #18 text was stale and
+#20 was removed rather than migrated; see the Wave E Status entry.)
+18. `send-welcome-email` — fired by the client-called `trial_start()`
+    SQL RPC via `net.http_post` (NOT an auth.users trigger; the old
+    signup trigger was graveyarded long ago). Idempotency =
+    trial_start's own `trial_ends_at IS NOT NULL` one-shot guard (no
+    welcome-email-sent flag exists). Port the route (service-bearer
+    protected) and repoint the URL inside trial_start.
 19. `send-workspace-invite` (moved from Wave A) — invoked by the
     `workspace_invite` SQL RPC via `net.http_post`; port the route
-    (bearer-token protected) and repoint the URL inside that SQL function.
-20. `unsubscribe` (moved from Wave A, 2026-07-16) — GET/public/HTML email-link
-    target; migrate alongside `send-welcome-email` (#18), which generates its
-    tokens and embeds its URL. Prompt:
-    `plans/fastify-part7-unsubscribe-prompt.md`. Old emails (tokens live
-    365 days) keep hitting the edge-fn URL — keep-alive/redirect/let-break
-    is a decommission-time decision.
+    (service-bearer protected, server name gains "email") and repoint
+    the URL inside that SQL function.
+20. `unsubscribe` — REMOVED, not migrated (user decision 2026-07-23):
+    migration drops `user_profiles.email_subscribed`, the edge fn is
+    deleted + undeployed, the welcome email loses its unsubscribe
+    link/token. Old emails' unsubscribe links (tokens lived 365 days)
+    dead-end — accepted.
 
 ## Step 5 — Decommission (manual, done by hand at the very end)
 

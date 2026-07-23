@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { createS3Adapter } from './adapters/s3.js';
 import { createStripeAdapter } from './adapters/stripe.js';
 import { createMuxAdapter } from './adapters/mux.js';
+import { createEmailAdapter } from './adapters/email.js';
 import { createRenderWorkerAdapter } from './adapters/renderWorker.js';
 import { createTranscriptionAdapter } from './adapters/transcription.js';
 import { createSupabaseApiAdapter } from './adapters/supabaseApi.js';
@@ -53,7 +54,7 @@ const deps: Deps = {
               secretAccessKey: config.S3_SECRET_KEY!,
           })
         : unimplementedPort('s3'),
-    email: unimplementedPort('email'),
+    email: createEmailAdapter({ apiKey: config.RESEND_API_KEY }),
     renderWorker: createRenderWorkerAdapter({
         url: config.RENDER_WORKER_URL,
         secret: config.RENDER_SECRET,
@@ -75,6 +76,7 @@ const app = buildApp(
         supabaseUrl: config.SUPABASE_URL,
         publicUrl: config.PUBLIC_URL,
         renderSecret: config.RENDER_SECRET,
+        serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
         stripePriceIds: {
             pro_monthly: config.STRIPE_PRO_PRICE_ID_MONTHLY,
             pro_yearly: config.STRIPE_PRO_PRICE_ID_YEARLY,

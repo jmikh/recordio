@@ -5,7 +5,8 @@
 -- Side-effects:
 --   1. Sets trial_ends_at = now() + 7 days
 --   2. Clears expires_at on all non-deleted projects owned by the caller
---   3. Sends welcome email via edge function (pg_net)
+--   3. Sends welcome email via the Fastify server (pg_net; Wave E cutover
+--      2026-07-23 — Vault SERVER_URL, bearer unchanged)
 --
 -- Called by: client RPC
 -- Tables:   user_profiles, projects
@@ -44,8 +45,8 @@ BEGIN
 
     IF v_email IS NOT NULL THEN
         PERFORM net.http_post(
-            url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_URL')
-                       || '/functions/v1/send-welcome-email',
+            url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SERVER_URL')
+                       || '/send-welcome-email',
             headers := jsonb_build_object(
                 'Content-Type',  'application/json',
                 'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SECRET_KEY')

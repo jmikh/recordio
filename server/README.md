@@ -76,6 +76,7 @@ database is never faked; only third-party services are.
 | `S3_REGION` / `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` | For storage routes | S3-compatible storage, `project-media` bucket — same values as the edge function secrets. Local: the `supabase start` storage S3 endpoint (see `.env.example`). If any is missing the s3 port stays unimplemented (storage routes 500) and a startup warning is logged |
 | `MUX_WEBHOOK_SECRET` | Yes | Signing secret of the Mux webhook **endpoint** posting to `/mux-video-webhook`. CAREFUL: each Mux webhook endpoint has its own secret (Mux dashboard → Settings → Webhooks) — use the secret of whichever endpoint points at this server |
 | `STRIPE_WEBHOOK_SECRET` | Yes | Signing secret of the Stripe webhook **endpoint** posting to `/stripe-webhooks`. Same per-endpoint gotcha as Mux (dashboard → Developers → Webhooks) — the server endpoint's secret, not the edge fn's |
+| `RESEND_API_KEY` | Yes | Resend API key for the welcome + workspace-invite emails — same value as the edge function secret |
 
 More vars land as routes migrate (Stripe, Mux, email, transcription, ...).
 Add each to the table when it lands.

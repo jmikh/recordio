@@ -199,12 +199,15 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   stamping it (parity port untouched). UPDATED 2026-07-22 (Wave D #17
   decision): the server stripe-webhooks route does NOT port the
   `set_project_expiry` calls either, so once the Supabase endpoint is
-  disabled NOTHING clears or rewrites expires_at anymore — the
+  disabled the webhook never clears or rewrites expires_at — the
   dashboard ProjectCard countdown badge still displays it, so a
-  subscriber's pre-existing badge goes stale (never cleared on
-  activation). Cleanup candidate: drop the stamping + the badge + the
-  column together, user to confirm post-migration.
-  Found 2026-07-18.
+  paying subscriber's pre-existing badge goes stale (never cleared on
+  subscription activation). CORRECTED 2026-07-23: `trial_start()` is
+  still a live writer (clears expires_at when a trial starts), so the
+  remaining writers are project-create-v2 (stamps) + trial_start
+  (clears); nothing deletes. Cleanup candidate: drop the stamping +
+  the badge + the column + trial_start's clear together, user to
+  confirm post-migration. Found 2026-07-18.
 - **Planned redesign — asset uploads through the server** (user
   decision 2026-07-17, post-migration work): replace the
   presign → client-upload → confirm flow with a single upload to the
@@ -280,6 +283,34 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   edge fn calls it during the overlap window) — Step 5 decommission
   list (`supabase/sql/functions/set_project_expiry.sql`).
   Found 2026-07-22.
+- **send-workspace-invite (edge fn)**: selected the nonexistent
+  `user_profiles.display_name` — the silently-swallowed error meant
+  the inviter name ALWAYS fell back to the auth email. FIXED in the
+  server port 2026-07-23 (Wave E, user decision): reads the real
+  `name` column → auth email → 'Someone', pinned by test. The edge
+  copy keeps the bug until decommission (it's no longer called).
+  Found 2026-07-23.
+- **email hooks are fire-and-forget with no retry**: trial_start /
+  workspace_invite fire pg_net posts and never check the result — a
+  failed welcome/invite email is only a Railway log line (the invite
+  UI reports success regardless). Edge parity; a retry queue or at
+  least a `job.failed`-style alert would close it. Found 2026-07-23.
+- **email templates hardcode APP_URL and PHOTO_URL**
+  (`server/src/emails/` — `https://app.recordio.io/...`), ported
+  as-is from the edge fns; env-config candidates if a staging app
+  host ever exists. Found 2026-07-23.
+- **no email opt-out exists anymore** (user decision 2026-07-23 —
+  unsubscribe removed with its column): fine while the only emails
+  are transactional-ish (welcome, invites); if actual marketing
+  emails ever land, a fresh opt-out mechanism is required (legal in
+  most jurisdictions). Found 2026-07-23.
+- **local Vault vs server env key mismatch**: local Vault
+  `SUPABASE_SECRET_KEY` is the legacy demo service-role JWT while
+  `server/.env.example` suggests the `sb_secret_` format for
+  `SUPABASE_SERVICE_ROLE_KEY` — if they differ locally, the pg_net
+  email hooks 401 against a locally-running server (tests are
+  unaffected, they inject the bearer). Align the two for local
+  end-to-end email testing. Found 2026-07-23.
 - **server/README env-var table drift**: the table stops at the S3
   group (+ the `MUX_WEBHOOK_SECRET`/`STRIPE_WEBHOOK_SECRET` rows) —
   `RENDER_WORKER_URL`,
