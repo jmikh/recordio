@@ -167,13 +167,14 @@ export interface SeedSubscriptionOptions {
     seats?: number | null;
     stripeEventAt?: string | null;
     currentPeriodEnd?: string | null;
-    cancelAtPeriodEnd?: boolean;
+    /** ISO timestamp of a scheduled cancellation; null/absent = renews */
+    cancelAt?: string | null;
 }
 
 export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): Promise<void> {
     await db.query(
         `INSERT INTO subscriptions
-            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats, stripe_event_at, current_period_end, cancel_at_period_end)
+            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats, stripe_event_at, current_period_end, cancel_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
             opts.workspaceId,
@@ -186,7 +187,7 @@ export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): P
             opts.seats ?? null,
             opts.stripeEventAt ?? null,
             opts.currentPeriodEnd ?? null,
-            opts.cancelAtPeriodEnd ?? false,
+            opts.cancelAt ?? null,
         ],
     );
 }

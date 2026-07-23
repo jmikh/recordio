@@ -13,15 +13,22 @@ supabase start
 #      symptoms: RLS errors like "new row violates row-level security policy")
 supabase migration up
 
-# 2. Edge functions (required for stripe, uploads, etc.)
+# 2. Edge functions (uploads and any functions not yet migrated to the server)
 supabase functions serve --env-file supabase/.env.local
 
-# 3. Webapp — runs at http://localhost:3001
+# 3. Fastify server — runs at http://localhost:8080 (the webapp routes
+#    migrated API calls here via VITE_API_URL in .env.development.local)
+(cd server && npm run dev)
+
+# 4. Webapp — runs at http://localhost:3001
 npm run dev:webapp
 
-# 4. Stripe webhook forwarding (only if testing billing)
-stripe listen --forward-to http://127.0.0.1:54321/functions/v1/stripe-webhooks
+# 5. Stripe webhook forwarding (only if testing billing) — stripe-webhooks
+#    moved from the edge functions to the fastify server
+stripe listen --forward-to http://localhost:8080/stripe-webhooks
 ```
+
+**Local ports:** render worker **8090**, fastify server **8080**, webapp 3001, Supabase 54321. The worker port is baked into `supabase/.env.local` (`RENDER_WORKER_URL=http://host.docker.internal:8090`) and `server/.env.local` (`http://localhost:8090`); the server port into `webapp/.env.development.local` (`VITE_API_URL`) and `server/.env.local` (`PORT`, `PUBLIC_URL`). Change one, change them together.
 
 **Storage bucket:** the webapp uploads project media to the `project-media` Supabase Storage bucket. It's declared in `supabase/config.toml` (`[storage.buckets.project-media]`) so it's created automatically on `supabase start`. If uploads fail with tus 404 "Bucket not found", the bucket is missing — restart Supabase or create it directly:
 
@@ -29,7 +36,7 @@ stripe listen --forward-to http://127.0.0.1:54321/functions/v1/stripe-webhooks
 insert into storage.buckets (id, name) values ('project-media', 'project-media');
 ```
 
-**Stripe gotcha:** each `stripe listen` session prints a new `whsec_...` secret. Paste it into `STRIPE_WEBHOOK_SECRET` in `supabase/.env.local` and restart the `functions serve` terminal. The `sk_test_...` key and price IDs in that file persist and don't need touching.
+**Stripe gotcha:** each `stripe listen` session prints a new `whsec_...` secret. Paste it into `STRIPE_WEBHOOK_SECRET` in `server/.env.local` and restart the server. The `sk_test_...` key and price IDs in that file persist and don't need touching.
 
 ### Optional extras
 

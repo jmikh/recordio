@@ -65,7 +65,7 @@ export function createStripeAdapter(config: StripeAdapterConfig): StripePort {
                 id: sub.id,
                 status: sub.status,
                 customer: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
-                cancel_at_period_end: sub.cancel_at_period_end,
+                cancel_at: sub.cancel_at,
                 // This API version keeps current_period_end on the item, not
                 // the subscription (the edge fn's pinned 2024 version had it
                 // subscription-level) — the port carries it on both

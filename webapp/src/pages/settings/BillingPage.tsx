@@ -227,8 +227,8 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                         )}
                         {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
                             <p className="text-xs text-text-muted">
-                                {subscription.cancelAtPeriodEnd ? 'Access until' : 'Renews'}{' '}
-                                {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                {subscription.cancelAt ? 'Access until' : 'Renews'}{' '}
+                                {new Date(subscription.cancelAt ?? subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                                 {subscription.billingInterval && (
                                     <span className="ml-1 capitalize">· {subscription.billingInterval}</span>
                                 )}

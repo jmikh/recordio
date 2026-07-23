@@ -143,7 +143,7 @@ describe('subscription_get', () => {
         expect(data).toBeDefined();
         expect(data.status).toBe('active');
         expect(data.stripe_customer_id).toBe('cus_test_pro');
-        expect(data.cancel_at_period_end).toBe(false);
+        expect(data.cancel_at).toBeNull();
     });
 
     it('returns trial user subscription as trialing', async () => {
@@ -151,7 +151,8 @@ describe('subscription_get', () => {
         expect(error).toBeNull();
         expect(data).toBeDefined();
         expect(data.status).toBe('trialing');
-        expect(data.cancel_at_period_end).toBe(true);
+        // Backfilled from the old cancel_at_period_end=true seed row
+        expect(data.cancel_at).not.toBeNull();
     });
 });
 

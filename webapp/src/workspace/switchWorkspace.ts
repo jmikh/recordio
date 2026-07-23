@@ -20,7 +20,7 @@ export async function switchWorkspace(ws: WorkspaceListItem, userId: string | nu
             status: data.status,
             plan: data.plan ?? 'pro',
             currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
-            cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
+            cancelAt: data.cancel_at ? new Date(data.cancel_at) : null,
             billingInterval: data.billing_interval || null,
             seats: data.seats ?? null,
             stripeCustomerId: data.stripe_customer_id ?? null,
@@ -28,7 +28,7 @@ export async function switchWorkspace(ws: WorkspaceListItem, userId: string | nu
     } else {
         setSubscription({
             status: null, plan: 'pro', currentPeriodEnd: null,
-            cancelAtPeriodEnd: false, billingInterval: null,
+            cancelAt: null, billingInterval: null,
             seats: null, stripeCustomerId: null,
         }, userId ?? undefined);
     }

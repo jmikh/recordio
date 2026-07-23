@@ -65,7 +65,8 @@ interface SubPayloadOptions {
     quantity?: number;
     /** Unix seconds on the ITEM (dahlia placement); undefined → absent */
     periodEnd?: number;
-    cancelAtPeriodEnd?: boolean;
+    /** Unix seconds; clover payloads carry scheduled cancellations here */
+    cancelAt?: number;
 }
 
 /** Subscription object as it appears in webhook payloads / the port shape. */
@@ -74,7 +75,7 @@ function subPayload(customerId: string, opts: SubPayloadOptions = {}): StripeSub
         id: `sub_${randomUUID().slice(0, 8)}`,
         status: opts.status ?? 'active',
         customer: customerId,
-        cancel_at_period_end: opts.cancelAtPeriodEnd ?? false,
+        cancel_at: opts.cancelAt ?? null,
         items: {
             data: [
                 {
@@ -233,7 +234,7 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         plan: string;
         billing_interval: string | null;
         current_period_end: Date | null;
-        cancel_at_period_end: boolean | null;
+        cancel_at: Date | null;
         seats: number | null;
         stripe_event_at: Date | null;
     }
@@ -276,7 +277,7 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
             status: 'trialing',
             plan: 'teams',
             billing_interval: 'yearly',
-            cancel_at_period_end: false,
+            cancel_at: null,
             seats: 5,
             stripe_event_at: null, // parity: checkout does NOT stamp it
         });
@@ -339,7 +340,7 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
                     planType: 'teams',
                     quantity: 7,
                     periodEnd: 1_787_875_200,
-                    cancelAtPeriodEnd: true,
+                    cancelAt: 1_787_875_200,
                 }),
             ),
             signed,
@@ -352,7 +353,7 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
             status: 'canceled',
             plan: 'teams',
             seats: 7,
-            cancel_at_period_end: true,
+            cancel_at: new Date(1_787_875_200 * 1000),
         });
         expect(row.stripe_event_at?.toISOString()).toBe(EVENT_CREATED_ISO);
         // The edge fn would have stamped +14 d on the undated project here

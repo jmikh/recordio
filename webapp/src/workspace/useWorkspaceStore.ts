@@ -14,7 +14,8 @@ export interface WorkspaceSubscription {
     status: 'active' | 'canceled' | 'past_due' | 'inactive' | null;
     plan: 'pro' | 'teams';
     currentPeriodEnd: Date | null;
-    cancelAtPeriodEnd: boolean;
+    /** Scheduled cancellation date; null = renews */
+    cancelAt: Date | null;
     billingInterval: 'monthly' | 'yearly' | null;
     seats: number | null;
     stripeCustomerId: string | null;

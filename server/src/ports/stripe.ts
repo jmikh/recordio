@@ -29,7 +29,8 @@ export interface StripeSubscription {
     status: string;
     customer: string;
     current_period_end?: number;
-    cancel_at_period_end?: boolean;
+    /** Unix seconds; scheduled cancellation (portal "cancel at period end" sets this on 2025+ API versions). Null/absent = renews */
+    cancel_at?: number | null;
     items?: { data: StripeSubscriptionItem[] };
 }
 

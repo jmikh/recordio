@@ -155,7 +155,7 @@ ON CONFLICT (user_id) DO NOTHING;
 -- ============================================================================
 
 INSERT INTO public.subscriptions
-    (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at_period_end, seats)
+    (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, current_period_end, cancel_at, seats)
 VALUES
 -- user1 · Teams Workspace: active teams subscription with 5 seats
 (
@@ -167,7 +167,7 @@ VALUES
     'sub_1TWIlRLra3j0q9yKiFz9DIcQ',
     'yearly',
     NOW() + INTERVAL '300 days',
-    false,
+    NULL,
     5
 ),
 -- user1 · Pro Team: active pro subscription, no seats
@@ -180,7 +180,7 @@ VALUES
     'sub_1TWIlVLra3j0q9yKCU1U8T6l',
     'monthly',
     NOW() + INTERVAL '20 days',
-    false,
+    NULL,
     NULL
 )
 -- user2 has no subscription row; their trial is tracked via user_profiles.trial_ends_at

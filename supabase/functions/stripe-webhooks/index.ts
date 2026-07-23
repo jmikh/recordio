@@ -106,7 +106,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             plan,
             billing_interval:       billingInterval,
             current_period_end:     stripePeriodEnd,
-            cancel_at_period_end:   false,
+            cancel_at:              null,
             seats,
             updated_at:             new Date().toISOString(),
         }, { onConflict: 'workspace_id' });
@@ -148,8 +148,10 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription, event
     const newStatus = subscription.status;
     const oldStatus = existingSub.status;
 
-    const periodEnd   = periodEndToIso(item?.current_period_end ?? subscription.current_period_end);
-    const cancelAtEnd = subscription.cancel_at_period_end;
+    const periodEnd = periodEndToIso(item?.current_period_end ?? subscription.current_period_end);
+    // cancel_at (timestamp) exists on old and new API versions; the legacy
+    // cancel_at_period_end boolean stopped being set on 2025+ versions
+    const cancelAt  = periodEndToIso(subscription.cancel_at);
 
     if (!periodEnd) {
         throw new Error(`Invalid current_period_end: ${item?.current_period_end}`);
@@ -161,7 +163,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription, event
             status:               newStatus,
             plan,
             current_period_end:   periodEnd,
-            cancel_at_period_end: cancelAtEnd,
+            cancel_at:            cancelAt,
             seats,
             stripe_event_at:      incomingAt.toISOString(),
             updated_at:           new Date().toISOString(),

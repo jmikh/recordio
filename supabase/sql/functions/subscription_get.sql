@@ -18,7 +18,7 @@ AS $$
         'status',               s.status,
         'plan',                 s.plan,
         'current_period_end',   s.current_period_end,
-        'cancel_at_period_end', s.cancel_at_period_end,
+        'cancel_at',            s.cancel_at,
         'stripe_customer_id',   s.stripe_customer_id,
         'billing_interval',     s.billing_interval,
         'seats',                s.seats

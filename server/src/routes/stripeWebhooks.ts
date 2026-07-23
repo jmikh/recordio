@@ -61,7 +61,8 @@ function planFromSubscription(subscription: StripeSubscription): 'pro' | 'teams'
     return planType;
 }
 
-function periodEndToIso(value: number | string | null | undefined): string | null {
+/** Unix seconds or date string → ISO; null when absent/invalid. */
+function timestampToIso(value: number | string | null | undefined): string | null {
     if (!value) return null;
     const d = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
     return isNaN(d.getTime()) ? null : d.toISOString();
@@ -71,7 +72,7 @@ function itemPeriodEnd(sub: StripeSubscription, item: StripeSubscriptionItem | u
     // This SDK version keeps current_period_end on the ITEM; older webhook
     // payload versions have it subscription-level — same fallback as the
     // edge fn
-    return periodEndToIso(item?.current_period_end ?? sub.current_period_end);
+    return timestampToIso(item?.current_period_end ?? sub.current_period_end);
 }
 
 export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -112,8 +113,8 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
             `INSERT INTO subscriptions
                 (workspace_id, user_id, stripe_customer_id, stripe_subscription_id,
                  status, plan, billing_interval, current_period_end,
-                 cancel_at_period_end, seats, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, $9, $10)
+                 cancel_at, seats, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              ON CONFLICT (workspace_id) DO UPDATE SET
                 user_id = EXCLUDED.user_id,
                 stripe_customer_id = EXCLUDED.stripe_customer_id,
@@ -122,7 +123,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 plan = EXCLUDED.plan,
                 billing_interval = EXCLUDED.billing_interval,
                 current_period_end = EXCLUDED.current_period_end,
-                cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                cancel_at = EXCLUDED.cancel_at,
                 seats = EXCLUDED.seats,
                 updated_at = EXCLUDED.updated_at`,
             [
@@ -134,6 +135,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 plan,
                 billingInterval,
                 itemPeriodEnd(stripeSub, item),
+                timestampToIso(stripeSub.cancel_at),
                 seats,
                 app.deps.clock.now().toISOString(),
             ],
@@ -190,7 +192,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
         await app.deps.db.query(
             `UPDATE subscriptions SET
                 status = $2, plan = $3, current_period_end = $4,
-                cancel_at_period_end = $5, seats = $6, stripe_event_at = $7,
+                cancel_at = $5, seats = $6, stripe_event_at = $7,
                 updated_at = $8
              WHERE stripe_customer_id = $1`,
             [
@@ -198,7 +200,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 subscription.status,
                 plan,
                 periodEnd,
-                subscription.cancel_at_period_end ?? false,
+                timestampToIso(subscription.cancel_at),
                 seats,
                 incomingAt.toISOString(),
                 app.deps.clock.now().toISOString(),

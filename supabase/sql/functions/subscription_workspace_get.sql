@@ -20,7 +20,7 @@ BEGIN
             'status',               s.status,
             'plan',                 s.plan,
             'current_period_end',   s.current_period_end,
-            'cancel_at_period_end', s.cancel_at_period_end,
+            'cancel_at',            s.cancel_at,
             'billing_interval',     s.billing_interval,
             'seats',                s.seats
         )
