@@ -1,6 +1,5 @@
 import { supabase } from '../auth/AuthManager';
-import { invokeFunction } from '../api/client';
-import { CloudStorage } from './cloudStorage';
+import { invokeFunctionUpload } from '../api/client';
 import { BlobCache } from './blobCache';
 
 export interface UserAsset {
@@ -14,18 +13,6 @@ export interface UserAsset {
 
 const LIBRARY_LIMIT = 10; // per asset type
 const MAX_DIMENSION = 1920; // 1080p cap
-
-/** MIME type for the signed URL upload based on file extension */
-function mimeFromExt(fileName: string): string {
-    const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-    const map: Record<string, string> = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        webp: 'image/webp', avif: 'image/avif',
-        mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac',
-        m4a: 'audio/mp4', ogg: 'audio/ogg',
-    };
-    return map[ext] ?? 'application/octet-stream';
-}
 
 /** Compress an image file to WebP, capping at 4K while maintaining aspect ratio. */
 async function compressImageToWebP(file: File): Promise<{ blob: Blob; fileName: string }> {
@@ -51,19 +38,16 @@ async function compressImageToWebP(file: File): Promise<{ blob: Blob; fileName: 
 
 export class UserAssetService {
     /**
-     * Full upload pipeline:
-     * 1. Call asset-create edge function → get signed URL + pending row
-     * 2. Upload blob to signed URL
-     * 3. Call asset_confirm_upload RPC → flip status to ready
-     * 4. Cache blob locally via BlobCache
+     * Single-request upload: one multipart POST to /asset-upload — the
+     * server validates, stores the bytes in S3 and inserts the row as
+     * 'ready'. Progress reflects client→server transfer; the server→S3
+     * leg happens after 100% and is negligible at these sizes.
      */
     static async uploadAsset(
         file: File,
         type: 'background' | 'music',
         onProgress?: (fraction: number) => void,
     ): Promise<UserAsset> {
-        if (!supabase) throw new Error('Supabase not configured');
-
         // Compress background images to WebP before upload
         let uploadBlob: Blob = file;
         let uploadFileName = file.name;
@@ -73,22 +57,20 @@ export class UserAssetService {
             uploadFileName = compressed.fileName;
         }
 
-        // 1. Create asset record + get signed URL. The server returns 200
-        // for library_full (the edge fn's 403 made this branch dead code);
+        const form = new FormData();
+        form.append('assetType', type);
+        form.append('file', uploadBlob, uploadFileName);
+
+        // library_full comes back as 200 with the rich body;
         // error/message/count/limit are only present on that response
-        const { data, error } = await invokeFunction<{
-            signedUrl: string;
-            storagePath: string;
+        const { data, error } = await invokeFunctionUpload<{
             assetId: string;
+            storagePath: string;
             error?: string;
             message?: string;
             count: number;
             limit: number;
-        }>('asset-create', {
-            assetType: type,
-            sizeBytes: uploadBlob.size,
-            fileName: uploadFileName,
-        });
+        }>('asset-upload', form, onProgress);
 
         if (error) throw error;
         if (data?.error) {
@@ -98,24 +80,9 @@ export class UserAssetService {
             throw new Error(data.message ?? data.error);
         }
 
-        const { signedUrl, storagePath, assetId } = data;
+        const { assetId, storagePath } = data;
 
-        // 2. Upload blob
-        await CloudStorage.uploadBlob(
-            signedUrl,
-            uploadBlob,
-            mimeFromExt(uploadFileName),
-            onProgress,
-        );
-
-        // 3. Confirm upload → pending → ready
-        const { data: confirmed, error: confirmError } = await supabase
-            .rpc('asset_confirm_upload', { p_asset_id: assetId });
-
-        if (confirmError) throw confirmError;
-        if (!confirmed) throw new Error('Failed to confirm asset upload');
-
-        // 4. Cache locally so we don't re-download immediately
+        // Cache locally so we don't re-download immediately
         await BlobCache.put(storagePath, uploadBlob);
 
         return {

@@ -17,22 +17,26 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler) {
 }
 
 /**
+ * Funnel a 401 from any transport into the sign-out path. Exported for
+ * the API client's XHR upload path, which can't go through fetch.
+ */
+export function notifyUnauthorized() {
+    if (isHandlingUnauthorized || !unauthorizedHandler) return;
+    isHandlingUnauthorized = true;
+    console.warn('[Supabase] 401 received — session invalid, signing out');
+    Promise.resolve()
+        .then(() => unauthorizedHandler!())
+        .finally(() => { isHandlingUnauthorized = false; });
+}
+
+/**
  * Shared by the supabase client and the Fastify API client
  * (src/api/client.ts) so both funnel 401s into the same sign-out path.
  */
 export const authAwareFetch: typeof fetch = async (url, options) => {
     const response = await sentryFetch(url, options);
-    if (
-        response.status === 401 &&
-        !url.toString().includes('/auth/v1/') &&
-        !isHandlingUnauthorized &&
-        unauthorizedHandler
-    ) {
-        isHandlingUnauthorized = true;
-        console.warn('[Supabase] 401 received — session invalid, signing out');
-        Promise.resolve()
-            .then(() => unauthorizedHandler!())
-            .finally(() => { isHandlingUnauthorized = false; });
+    if (response.status === 401 && !url.toString().includes('/auth/v1/')) {
+        notifyUnauthorized();
     }
     return response;
 };

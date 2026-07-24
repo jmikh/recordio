@@ -85,3 +85,9 @@ DROP FUNCTION IF EXISTS public.render_purge_candidates();
 -- the server job projects.purge-deleted replaced it in Wave C
 SELECT cron.unschedule('projects-purge-deleted')
 WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'projects-purge-deleted');
+
+-- asset_confirm_upload: orphaned by the single-request /asset-upload
+-- route (2026-07-24) — the server uploads the bytes itself and inserts
+-- user_assets rows directly as 'ready', so there is no pending→ready
+-- flip left to confirm (the presign flow it belonged to is deleted)
+DROP FUNCTION IF EXISTS public.asset_confirm_upload(TEXT);

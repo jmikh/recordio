@@ -1,5 +1,5 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
-import { authAwareFetch, supabase } from '../supabase/client';
+import { authAwareFetch, notifyUnauthorized, supabase } from '../supabase/client';
 
 export type InvokeResult<T> =
     | { data: T; error: null }
@@ -56,4 +56,62 @@ export async function invokeFunction<T = unknown>(name: string, body?: unknown):
         ? await response.json()
         : await response.text();
     return { data: data as T, error: null };
+}
+
+/**
+ * Multipart-upload variant of invokeFunction. Uses XMLHttpRequest
+ * because fetch cannot report request-body progress. Same
+ * `{ data, error }` shape and the same 401 → sign-out funneling
+ * (via notifyUnauthorized, since authAwareFetch can't wrap XHR).
+ */
+export async function invokeFunctionUpload<T = unknown>(
+    name: string,
+    form: FormData,
+    onProgress?: (fraction: number) => void,
+): Promise<InvokeResult<T>> {
+    const baseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+    if (!baseUrl) {
+        return { data: null, error: new Error('VITE_API_URL is not set') };
+    }
+
+    let token: string | undefined;
+    if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) token = session.access_token;
+    }
+
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        // No Content-Type header — XHR sets the multipart boundary
+        xhr.open('POST', `${baseUrl}/${name}`, true);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        if (onProgress) {
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) onProgress(e.loaded / e.total);
+            };
+        }
+
+        xhr.onload = () => {
+            if (xhr.status === 401) notifyUnauthorized();
+            if (xhr.status < 200 || xhr.status >= 300) {
+                resolve({
+                    data: null,
+                    error: new FunctionsHttpError(
+                        new Response(xhr.responseText, { status: xhr.status }),
+                    ),
+                });
+                return;
+            }
+            const contentType = xhr.getResponseHeader('Content-Type') ?? '';
+            const data = contentType.includes('application/json')
+                ? JSON.parse(xhr.responseText)
+                : xhr.responseText;
+            resolve({ data: data as T, error: null });
+        };
+        xhr.onerror = () => resolve({ data: null, error: new FunctionsFetchError(new Error('network error')) });
+        xhr.onabort = () => resolve({ data: null, error: new FunctionsFetchError(new Error('upload aborted')) });
+
+        xhr.send(form);
+    });
 }

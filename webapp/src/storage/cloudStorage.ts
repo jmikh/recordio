@@ -331,42 +331,6 @@ export class CloudStorage {
 
 
     /**
-     * Upload a blob to the signed URL. Uses XMLHttpRequest for progress tracking.
-     */
-    static async uploadBlob(
-        signedUrl: string,
-        blob: Blob,
-        contentType: string,
-        onProgress?: (fraction: number) => void,
-    ): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', signedUrl, true);
-            xhr.setRequestHeader('Content-Type', contentType);
-
-            if (onProgress) {
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        onProgress(e.loaded / e.total);
-                    }
-                };
-            }
-
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve();
-                } else {
-                    reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
-                }
-            };
-
-            xhr.onerror = () => reject(new Error('Upload failed: network error'));
-            xhr.onabort = () => reject(new Error('Upload aborted'));
-            xhr.send(blob);
-        });
-    }
-
-    /**
      * Resumable chunked upload via TUS to Supabase Storage. Each chunk is a
      * short request handled by tus-js-client, which retries individual chunks
      * on failure (network error, 5xx, 524) with exponential backoff and

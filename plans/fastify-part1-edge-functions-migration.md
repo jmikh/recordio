@@ -12,8 +12,10 @@ route is webhook/cron-invoked, the client call site switched behind the
 `USE_SERVER_INSTEAD_OF_SUPA` flag, and a manual local verification by the
 user with the flag on.
 
-## Status (updated 2026-07-24 — **MIGRATION COMPLETE**, pending the
-final manual dashboard checklist in the Step 5 entry)
+## Status (updated 2026-07-24 — **MIGRATION COMPLETE.** The manual
+checklist was executed by the user 2026-07-24; the edge functions no
+longer exist. This plan is CLOSED — the post-migration backlog lives
+in `plans/suggested_changes.md`.)
 
 **Done:**
 - **Step 0** — `server/` scaffolded (Fastify + TypeBox, `buildApp(deps)` factory,
@@ -428,19 +430,20 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** nothing to build — **the migration is code-complete**. What
-remains is the user's manual dashboard checklist in the Step 5 entry
-below (deploy.sh --remote, delete edge fns + secrets, old S3 pair,
-the disabled Stripe endpoint, the collapsed-wrapper webapp deploy).
-The post-migration backlog (asset-uploads-through-server redesign,
-the expires_at cleanup, and every parked smell) lives in
+**Next:** nothing — **THE MIGRATION IS DONE** (2026-07-24). The
+post-migration backlog (asset-uploads-through-server redesign, the
+expires_at cleanup, and every parked smell) lives in
 `plans/suggested_changes.md`.
 
 - **Step 5 — DECOMMISSION** (repo work complete 2026-07-24; prompt
   `plans/fastify-part18-decommission-prompt.md`; the soak week was
   **WAIVED by the user 2026-07-24** at the gate (Wave E verified +
-  flag flip deployed, both confirmed in chat); **PAUSED on the manual
-  checklist below — the migration ends when it's done**):
+  flag flip deployed, both confirmed in chat); **manual checklist
+  EXECUTED by the user 2026-07-24 — all 22 deployed functions deleted
+  (incl. the two pre-migration strays `project-multipart-complete` and
+  `storage-download-url`, found orphaned on the dashboard), secrets +
+  old S3 pair + the disabled Stripe endpoint cleaned up, prod webapp
+  on the collapsed wrapper, click-through green. DONE.**):
   - **Edge tree deleted**: all of `supabase/functions/` incl.
     `_shared` (guard grep found zero imports anywhere; root
     config.toml has no `[functions]` blocks; CI never deployed edge

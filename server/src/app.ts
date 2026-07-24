@@ -14,7 +14,7 @@ import { stripeCheckoutRoutes, type StripePriceIds } from './routes/stripeChecko
 import { stripePortalRoutes } from './routes/stripePortal.js';
 import { subscriptionChangeRoutes } from './routes/subscriptionChange.js';
 import { projectUpdateThumbnailRoutes } from './routes/projectUpdateThumbnail.js';
-import { assetCreateRoutes } from './routes/assetCreate.js';
+import { assetUploadRoutes } from './routes/assetUpload.js';
 import { projectCreateV2Routes } from './routes/projectCreateV2.js';
 import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
 import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
@@ -137,7 +137,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(stripePortalRoutes);
     app.register(subscriptionChangeRoutes, { priceIds: opts.stripePriceIds });
     app.register(projectUpdateThumbnailRoutes);
-    app.register(assetCreateRoutes);
+    app.register(assetUploadRoutes);
     app.register(projectCreateV2Routes);
     app.register(transcribeRoutes);
     // Wave D cutover: newly dispatched jobs call THIS server's webhook.
