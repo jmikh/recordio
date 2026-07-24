@@ -43,7 +43,6 @@ describe('project_list', () => {
         expect(p.cloud_version).toBe(3);
         expect(p.duration_ms).toBe(10000);
         expect(p.is_shared).toBe(false);
-        expect(p.is_starred).toBe(false);
     });
 });
 

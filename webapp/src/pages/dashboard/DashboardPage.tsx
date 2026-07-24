@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { LuTrash2 } from 'react-icons/lu';
 import { CloudProjectService, type ProjectListItem } from '../../storage/cloudProjectService';
-import type { CloudFolder } from '../../storage/cloudStorage';
 import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
@@ -29,7 +28,6 @@ const EXTENSION_ID = import.meta.env.DEV
 
 export function DashboardPage() {
     const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
-    const [folders, setFolders] = useState<CloudFolder[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
@@ -117,13 +115,9 @@ export function DashboardPage() {
             try {
                 await AuthManager.ready;
                 if (ctrl.cancelled) return;
-                const [loaded, loadedFolders] = await Promise.all([
-                    CloudProjectService.listProjects(workspaceId),
-                    CloudProjectService.listFolders(workspaceId),
-                ]);
+                const loaded = await CloudProjectService.listProjects(workspaceId);
                 if (!ctrl.cancelled) {
                     setAllProjects(loaded);
-                    setFolders(loadedFolders);
                     // Load thumbnails AFTER setting state so callbacks patch the correct array
                     CloudProjectService.loadThumbnails(loaded, (projectId, thumbnailUrl) => {
                         if (!ctrl.cancelled) {
@@ -145,14 +139,8 @@ export function DashboardPage() {
 
     // View-filtered base list
     const viewProjects = useMemo(() => {
-        if (activeView === 'starred') {
-            return projects.filter(p => p.isStarred);
-        }
         if (activeView === 'published') {
             return projects.filter(p => p.shareSlug);
-        }
-        if (typeof activeView === 'object') {
-            return projects.filter(p => p.folderId === activeView.folder);
         }
         return projects;
     }, [projects, activeView]);
@@ -199,15 +187,6 @@ export function DashboardPage() {
     }, [projects, searchQuery]);
 
     const sharedCount = useMemo(() => projects.filter(p => p.isShared).length, [projects]);
-    const starredCount = useMemo(() => projects.filter(p => p.isStarred).length, [projects]);
-
-    // Active folder name for header
-    const activeFolderName = useMemo(() => {
-        if (typeof activeView === 'object') {
-            return folders.find(f => f.id === activeView.folder)?.name ?? 'Folder';
-        }
-        return null;
-    }, [activeView, folders]);
 
     // Load the full workspace list once authenticated
     useEffect(() => {
@@ -253,50 +232,6 @@ export function DashboardPage() {
         }
     };
 
-    const handleCreateFolder = async (name: string, description: string) => {
-        try {
-            const folder = await CloudProjectService.createFolder(name, workspaceId!, description);
-            setFolders(prev => [...prev, folder]);
-            addToast({ type: 'success', title: `Folder "${name}" created` });
-        } catch (err) {
-            captureError(err, { flow: 'folder', phase: 'create', workspaceId: workspaceId ?? undefined });
-            addToast({ type: 'error', title: 'Failed to create folder' });
-        }
-    };
-
-    const handleEditFolder = async (folderId: string, name: string, description: string) => {
-        try {
-            const updated = await CloudProjectService.updateFolder(folderId, name, description);
-            if (updated) {
-                setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name: updated.name, description: updated.description, updated_at: updated.updated_at } : f));
-                addToast({ type: 'success', title: `Folder updated` });
-            }
-        } catch (err) {
-            captureError(err, { flow: 'folder', phase: 'update', extra: { folderId } });
-            addToast({ type: 'error', title: 'Failed to update folder' });
-        }
-    };
-
-    const handleDeleteFolder = async (folderId: string) => {
-        const folder = folders.find(f => f.id === folderId);
-        try {
-            await CloudProjectService.deleteFolder(folderId);
-            setFolders(prev => prev.filter(f => f.id !== folderId));
-            // Unassign projects locally
-            setAllProjects(prev => prev.map(p =>
-                p.folderId === folderId ? { ...p, folderId: null } : p
-            ));
-            // If we were viewing this folder, go back to all
-            if (typeof activeView === 'object' && activeView.folder === folderId) {
-                setActiveView('all');
-            }
-            addToast({ type: 'success', title: `Folder "${folder?.name}" deleted` });
-        } catch (err) {
-            captureError(err, { flow: 'folder', phase: 'delete', extra: { folderId } });
-            addToast({ type: 'error', title: 'Failed to delete folder' });
-        }
-    };
-
     const handleOpen = (item: ProjectListItem) => {
         trackProjectOpened();
         navigate(`/editor?projectId=${item.id}`);
@@ -323,34 +258,6 @@ export function DashboardPage() {
         } catch (err) {
             captureError(err, { flow: 'project', phase: 'rename', projectId });
             addToast({ type: 'error', title: 'Failed to rename project' });
-        }
-    };
-
-    // Star/unstar project
-    const handleStar = async (projectId: string, starred: boolean) => {
-        try {
-            await CloudProjectService.starProject(projectId, starred);
-            setAllProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, isStarred: starred } : p
-            ));
-        } catch (err) {
-            captureError(err, { flow: 'project', phase: 'star', projectId, extra: { starred } });
-            addToast({ type: 'error', title: 'Failed to update star' });
-        }
-    };
-
-    // Move project to folder
-    const handleMoveToFolder = async (projectId: string, folderId: string | null) => {
-        try {
-            await CloudProjectService.moveProjectToFolder(projectId, folderId);
-            setAllProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, folderId } : p
-            ));
-            const folderName = folderId ? folders.find(f => f.id === folderId)?.name : null;
-            addToast({ type: 'success', title: folderId ? `Moved to "${folderName}"` : 'Removed from folder' });
-        } catch (err) {
-            captureError(err, { flow: 'project', phase: 'move', projectId, extra: { folderId } });
-            addToast({ type: 'error', title: 'Failed to move project' });
         }
     };
 
@@ -429,13 +336,8 @@ export function DashboardPage() {
                     onViewChange={setActiveView}
                     projectCount={projects.length}
                     hasNonFreeAccess={hasNonFreeAccess}
-                    starredCount={starredCount}
                     trashCount={trashProjects.length}
                     publishedCount={sharedCount}
-                    folders={folders}
-                    onCreateFolder={handleCreateFolder}
-                    onEditFolder={handleEditFolder}
-                    onDeleteFolder={handleDeleteFolder}
                     onRecord={handleRecord}
                     isAuthenticated={isAuthenticated}
                     onOpenSupport={() => setIsSupportModalOpen(true)}
@@ -454,11 +356,6 @@ export function DashboardPage() {
                 <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
                     {activeView !== 'trash' ? (
                         <>
-                            {activeFolderName && (
-                                <div className="px-6 pt-4">
-                                    <h1 className="text-lg font-semibold text-text-highlighted">{activeFolderName}</h1>
-                                </div>
-                            )}
                             <DashboardHeader
                                 searchQuery={searchQuery}
                                 onSearchChange={setSearchQuery}
@@ -481,11 +378,7 @@ export function DashboardPage() {
                                     <p className="text-sm text-text-muted">
                                         {searchQuery.trim() || activeFilter !== 'all'
                                             ? 'No recordings match your search.'
-                                            : activeView === 'starred'
-                                                ? 'No starred projects yet. Star a project from its menu to see it here.'
-                                                : activeFolderName
-                                                    ? 'This folder is empty.'
-                                                    : <>Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.</>
+                                            : <>Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.</>
                                         }
                                     </p>
                                 </div>
@@ -504,18 +397,13 @@ export function DashboardPage() {
                                                 durationMs: item.durationMs,
                                                 expiresAt: item.expiresAt,
                                                 shareSlug: item.shareSlug,
-                                                isStarred: item.isStarred,
-                                                folderId: item.folderId,
                                             }}
                                             onOpen={() => handleOpen(item)}
                                             selectMode={selectMode}
                                             selected={selectedIds.has(item.id)}
                                             onSelect={() => toggleSelect(item.id)}
                                             onRename={handleRename}
-                                            onStar={handleStar}
-                                            onMoveToFolder={handleMoveToFolder}
                                             onDelete={handleDelete}
-                                            folders={folders}
                                             showUpdatedAt={sortOrder === 'last_updated'}
                                         />
                                     ))}

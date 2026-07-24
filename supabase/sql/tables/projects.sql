@@ -19,8 +19,6 @@
 │     "render_cloud_version" INTEGER,                                     │
 │     "slug" TEXT,                                                        │
 │     "share_policy" TEXT,                                                │
-│     "folder_id" UUID,                                                   │
-│     "is_starred" BOOLEAN NOT NULL DEFAULT false,                        │
 │     "owner_id" UUID NOT NULL,                                           │
 │     "workspace_id" UUID NOT NULL                                        │
 │ );                                                                      │

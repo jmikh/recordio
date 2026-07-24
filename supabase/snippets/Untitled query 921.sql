@@ -9,6 +9,3 @@ select public.project_get('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
 
 -- 4. workspace_list shows the workspace
 select public.workspace_list();
-
--- 5. folder_create requires a workspace_id
-select public.folder_create('My Folder', 'eeeeeeee-0000-0000-0000-111111111111');

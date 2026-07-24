@@ -36,9 +36,7 @@ BEGIN
                 'duration_ms',            p.duration_ms,
                 'slug',                   p.slug,
                 'share_policy',           p.share_policy,
-                'is_shared',              p.slug IS NOT NULL,
-                'folder_id',              p.folder_id,
-                'is_starred',             p.is_starred
+                'is_shared',              p.slug IS NOT NULL
             ) AS row_data
             FROM public.projects p
             WHERE p.workspace_id = p_workspace_id

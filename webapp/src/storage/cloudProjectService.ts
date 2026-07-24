@@ -2,7 +2,7 @@ import type { Project, ID } from '@shared/types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { captureError } from '../lib/sentry';
-import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary, type CloudFolder } from './cloudStorage';
+import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary } from './cloudStorage';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
@@ -32,10 +32,6 @@ export interface ProjectListItem {
     durationMs: number | null;
     /** Share slug for public video link (null if not shared) */
     shareSlug: string | null;
-    /** Folder this project belongs to (null = unfiled) */
-    folderId: string | null;
-    /** Whether the project is starred/favorited */
-    isStarred: boolean;
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -520,8 +516,6 @@ export class CloudProjectService {
             cloudVersion: s.cloud_version,
             durationMs: s.duration_ms,
             shareSlug: s.slug,
-            folderId: s.folder_id,
-            isStarred: s.is_starred,
         }));
     }
 
@@ -630,34 +624,6 @@ export class CloudProjectService {
         CloudStorage.uploadThumbnail(projectId, blob)
             .then(() => { this.thumbnailHashes.set(projectId, hash); })
             .catch(err => captureError(err, { flow: 'thumbnail_upload', projectId }));
-    }
-
-    // ─── Folders ─────────────────────────────────────────────
-
-    static async listFolders(workspaceId: string): Promise<CloudFolder[]> {
-        return CloudStorage.listFolders(workspaceId);
-    }
-
-    static async createFolder(name: string, workspaceId: string, description = ''): Promise<CloudFolder> {
-        return CloudStorage.createFolder(name, workspaceId, description);
-    }
-
-    static async updateFolder(folderId: string, name: string, description: string): Promise<CloudFolder | null> {
-        return CloudStorage.updateFolder(folderId, name, description);
-    }
-
-    static async deleteFolder(folderId: string): Promise<boolean> {
-        return CloudStorage.deleteFolder(folderId);
-    }
-
-    static async moveProjectToFolder(projectId: string, folderId: string | null): Promise<boolean> {
-        return CloudStorage.moveProjectToFolder(projectId, folderId);
-    }
-
-    // ─── Star ────────────────────────────────────────────────────
-
-    static async starProject(projectId: string, starred: boolean): Promise<void> {
-        await CloudStorage.starProject(projectId, starred);
     }
 
     // ─── Rename ──────────────────────────────────────────────────

@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuRotateCcw, LuEllipsis, LuPencil, LuStar, LuFolder, LuTrash } from 'react-icons/lu';
+import { LuRotateCcw, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
 import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
 import { ProGate } from './ProGate';
 import { timeAgo } from './timeAgo';
-import type { CloudFolder } from '../../storage/cloudStorage';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
 const VIDEO_BASE_URL = import.meta.env.PROD
@@ -27,10 +26,6 @@ export interface ProjectCardData {
     shareSlug?: string | null;
     /** ISO date when the project was soft-deleted (null = active) */
     deletedAt?: string | null;
-    /** Whether the project is starred */
-    isStarred?: boolean;
-    /** Current folder ID */
-    folderId?: string | null;
     /** Last updated timestamp */
     updatedAt?: Date | string | null;
 }
@@ -46,10 +41,7 @@ interface ProjectCardProps {
     onRestore?: () => void;
     restoreGated?: boolean;
     onRename?: (id: string, newName: string) => void;
-    onStar?: (id: string, starred: boolean) => void;
-    onMoveToFolder?: (id: string, folderId: string | null) => void;
     onDelete?: (id: string) => void;
-    folders?: CloudFolder[];
     showUpdatedAt?: boolean;
 }
 
@@ -81,10 +73,7 @@ export const ProjectCard = ({
     onRestore,
     restoreGated = false,
     onRename,
-    onStar,
-    onMoveToFolder,
     onDelete,
-    folders,
     showUpdatedAt = false,
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
@@ -96,7 +85,6 @@ export const ProjectCard = ({
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-    const [showFolderSubmenu, setShowFolderSubmenu] = useState(false);
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(project.name);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -120,12 +108,10 @@ export const ProjectCard = ({
             setMenuPosition({ top: rect.bottom + 4, left: rect.right - 160 });
         }
         setMenuOpen(true);
-        setShowFolderSubmenu(false);
     };
 
     const closeMenu = () => {
         setMenuOpen(false);
-        setShowFolderSubmenu(false);
     };
 
     useEffect(() => {
@@ -160,17 +146,7 @@ export const ProjectCard = ({
         setIsRenaming(false);
     };
 
-    const handleStarToggle = () => {
-        onStar?.(project.id, !project.isStarred);
-        closeMenu();
-    };
-
-    const handleFolderSelect = (folderId: string | null) => {
-        onMoveToFolder?.(project.id, folderId);
-        closeMenu();
-    };
-
-    const hasMenu = !isTrashed && (onRename || onStar || onMoveToFolder);
+    const hasMenu = !isTrashed && (onRename || onDelete);
 
     return (
         <div
@@ -275,9 +251,6 @@ export const ProjectCard = ({
                     <div className="flex items-center gap-1 shrink-0">
                         {!isTrashed && (
                             <>
-                                {project.isStarred && (
-                                    <LuStar className="w-3.5 h-3.5 text-text-muted" />
-                                )}
                                 {shareUrl ? (
                                     <CopyLinkButton url={shareUrl} title="Copy published link" />
                                 ) : (
@@ -325,56 +298,6 @@ export const ProjectCard = ({
                             <LuPencil className="w-3.5 h-3.5" />
                             Rename
                         </button>
-                    )}
-                    {onStar && (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleStarToggle(); }}
-                            className="w-full text-left px-3 py-2 text-sm text-text-main hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
-                        >
-                            <LuStar className="w-3.5 h-3.5" />
-                            {project.isStarred ? 'Unstar' : 'Star'}
-                        </button>
-                    )}
-                    {onMoveToFolder && folders && (
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setShowFolderSubmenu(!showFolderSubmenu); }}
-                                className="w-full text-left px-3 py-2 text-sm text-text-main hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
-                            >
-                                <LuFolder className="w-3.5 h-3.5" />
-                                Move to Folder
-                            </button>
-                            {showFolderSubmenu && (
-                                <div className="mt-1 ml-2 border-l border-border pl-2">
-                                    {project.folderId && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); handleFolderSelect(null); }}
-                                            className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-state-hover rounded-md cursor-pointer"
-                                        >
-                                            Remove from folder
-                                        </button>
-                                    )}
-                                    {folders.map(folder => (
-                                        <button
-                                            key={folder.id}
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); handleFolderSelect(folder.id); }}
-                                            className={`w-full text-left px-3 py-1.5 text-sm hover:bg-state-hover rounded-md cursor-pointer ${
-                                                project.folderId === folder.id ? 'text-primary font-medium' : 'text-text-main'
-                                            }`}
-                                        >
-                                            {folder.name}
-                                        </button>
-                                    ))}
-                                    {folders.length === 0 && (
-                                        <p className="px-3 py-1.5 text-xs text-text-muted">No folders yet</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
                     )}
                     {onDelete && (
                         <button

@@ -40,8 +40,6 @@ BEGIN
         'slug',                   p.slug,
         'share_policy',           p.share_policy,
         'is_shared',              p.slug IS NOT NULL,
-        'folder_id',              p.folder_id,
-        'is_starred',             p.is_starred,
         'editors',                (
             SELECT COALESCE(jsonb_agg(jsonb_build_object(
                 'user_id', pe.user_id,

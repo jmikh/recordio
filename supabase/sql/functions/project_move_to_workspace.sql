@@ -4,7 +4,6 @@
 -- Caller must be the project owner AND at least a creator in the target workspace.
 -- All project_editors rows are cleared — collaboration must be re-established
 -- in the new workspace.
--- The folder assignment is cleared since folders belong to the old workspace.
 --
 -- Called by: webapp move project UI
 -- Tables:   projects, workspace_members, project_editors
@@ -41,7 +40,6 @@ BEGIN
 
     UPDATE public.projects
     SET workspace_id = p_workspace_id,
-        folder_id    = NULL,
         updated_at   = now()
     WHERE id = p_project_id;
 END;

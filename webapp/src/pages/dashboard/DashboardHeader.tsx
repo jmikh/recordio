@@ -54,7 +54,7 @@ export function DashboardHeader({
                         type="text"
                         value={searchQuery}
                         onChange={e => onSearchChange(e.target.value)}
-                        placeholder="Search recordings, folders, transcripts..."
+                        placeholder="Search recordings, transcripts..."
                         className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
                     />
                 </div>

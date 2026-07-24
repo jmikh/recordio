@@ -22,20 +22,6 @@ export interface CloudProjectSummary {
     duration_ms: number | null;
     is_shared: boolean;
     slug: string | null;
-    folder_id: string | null;
-    is_starred: boolean;
-}
-
-/**
- * Folder summary returned by folder_list RPC.
- */
-export interface CloudFolder {
-    id: string;
-    name: string;
-    description: string;
-    created_at: string;
-    updated_at: string;
-    project_count: number;
 }
 
 /**
@@ -181,96 +167,6 @@ export class CloudStorage {
 
         if (error) throw error;
         return data ?? false;
-    }
-
-    // ─── Folders ─────────────────────────────────────────────────
-
-    /**
-     * List all folders for the current user.
-     */
-    static async listFolders(workspaceId: string): Promise<CloudFolder[]> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('folder_list', {
-            p_workspace_id: workspaceId,
-        });
-
-        if (error) throw error;
-        return data ?? [];
-    }
-
-    /**
-     * Create a new folder. Returns the created folder.
-     */
-    static async createFolder(name: string, workspaceId: string, description = ''): Promise<CloudFolder> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('folder_create', {
-            p_name: name,
-            p_workspace_id: workspaceId,
-            p_description: description,
-        });
-
-        if (error) throw error;
-        return data;
-    }
-
-    /**
-     * Update a folder's name and description. Returns the updated folder.
-     */
-    static async updateFolder(folderId: string, name: string, description: string): Promise<CloudFolder | null> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('folder_update', {
-            p_folder_id: folderId,
-            p_name: name,
-            p_description: description,
-        });
-
-        if (error) throw error;
-        return data;
-    }
-
-    /**
-     * Delete a folder. Projects in it are unassigned (folder_id → NULL).
-     */
-    static async deleteFolder(folderId: string): Promise<boolean> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('folder_delete', {
-            p_folder_id: folderId,
-        });
-
-        if (error) throw error;
-        return data ?? false;
-    }
-
-    /**
-     * Move a project into a folder (or remove from folder with null).
-     */
-    static async moveProjectToFolder(projectId: string, folderId: string | null): Promise<boolean> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('project_move_to_folder', {
-            p_project_id: projectId,
-            p_folder_id: folderId,
-        });
-
-        if (error) throw error;
-        return data ?? false;
-    }
-
-    // ─── Star ──────────────────────────────────────────────────────
-
-    static async starProject(projectId: string, starred: boolean): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { error } = await supabase.rpc('project_star', {
-            p_project_id: projectId,
-            p_starred: starred,
-        });
-
-        if (error) throw error;
     }
 
     // ─── Rename ────────────────────────────────────────────────────

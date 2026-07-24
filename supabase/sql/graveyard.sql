@@ -91,3 +91,15 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'projects-purge-deleted');
 -- user_assets rows directly as 'ready', so there is no pending→ready
 -- flip left to confirm (the presign flow it belonged to is deleted)
 DROP FUNCTION IF EXISTS public.asset_confirm_upload(TEXT);
+
+-- Folders and starred removed from the product (2026-07-24). The
+-- folders table and projects.folder_id/is_starred columns are dropped
+-- in migration 20260724122346_drop_folders_and_starred — run sql/deploy.sh
+-- (replaces project_list/project_get, which stop selecting those
+-- columns) before pushing that migration.
+DROP FUNCTION IF EXISTS public.folder_create(TEXT, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.folder_delete(UUID);
+DROP FUNCTION IF EXISTS public.folder_list(UUID);
+DROP FUNCTION IF EXISTS public.folder_update(UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.project_move_to_folder(UUID, UUID);
+DROP FUNCTION IF EXISTS public.project_star(UUID, BOOLEAN);

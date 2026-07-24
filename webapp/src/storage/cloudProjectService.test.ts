@@ -235,8 +235,6 @@ describe('CloudProjectService.listProjects', () => {
             cloud_version: 1,
             duration_ms: 5000,
             slug: null,
-            folder_id: null,
-            is_starred: false,
         }]);
 
         const items = await CloudProjectService.listProjects('workspace-1');
