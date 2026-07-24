@@ -1,39 +1,45 @@
-# Part 2 — RPC Proxying through Fastify (Design)
+# Part 2 — RPC Migration: client RPCs → server routes with inline SQL
 
 Scope: move all client-called Postgres RPCs behind Fastify routes, batched
-by domain. The SQL functions themselves are **not rewritten** — the server
-calls the exact same functions the client calls today. Out of scope: auth,
-storage uploads (TUS), business-logic consolidation (Part 3), the folders
-domain (feature being deprecated — see survey), and every hardening item in
-`plans/suggested_changes.md` (proxying keeps behavior 1:1; new smells get
-logged there, not fixed here). One deliberate behavior exception:
-`asset_list` gains server-side download-URL enrichment — designed in
+by domain, **porting each function's logic inline into the route** (plain
+SQL over the pool with explicit `$user_id` params — no `auth.uid()`, no
+claims machinery). This absorbs what the overview called Part 3 for the
+client-called functions: after Part 2 there is no separate consolidation
+phase for them. The SQL functions are NOT edited or dropped during the
+migration — they stay deployed, frozen, as the rollback target until the
+final sweep. Out of scope: auth, storage uploads (TUS), the folders
+domain (deprecated 2026-07-24), and every hardening item in
+`plans/suggested_changes.md` (ports keep behavior 1:1 unless a divergence
+is explicitly documented; new smells get logged there, not fixed here).
+One deliberate behavior exception: `asset_list` gains server-side
+download-URL enrichment — designed in
 `fastify-part2-1-assets-rpc-migration.md`.
 
 Exit criteria: `grep -r "supabase.rpc" webapp/` returns nothing;
 `supabase-js` in the client is used only for auth and TUS storage uploads;
-the migration registry/flag machinery is collapsed (same as Part 1 Step 5);
-the SQL functions are unchanged.
+then the **decommission sweep**: graveyard all migrated SQL functions plus
+any `assert_*` helpers left with zero callers (zero-caller grep before
+each drop, per the Part 1 pattern — user runs `sql/deploy.sh`).
 
 ## Current surface (verified against code 2026-07-24)
 
-**28 RPCs in scope** (32 distinct client-called minus the 4 folder fns,
-see below), ~35 call sites, 13 webapp files. All SECURITY DEFINER, all
-`auth.uid()`-dependent (directly or via the `assert_*` helpers); the 5
-explicit-param functions
+**26 RPCs in scope** (32 distinct client-called minus the 6
+folders/starred fns removed by the 2026-07-24 deprecation, see below).
+All SECURITY DEFINER, all `auth.uid()`-dependent (directly or via the
+`assert_*` helpers); the 5 explicit-param functions
 (`mux_video_complete`, `mux_video_get_or_create`, `render_job_get_or_create`,
 `render_job_complete`, `user_profile_create`) are already server/trigger
 territory and are NOT part of this migration.
 
 Findings from the survey:
 
-- **Folders are being deprecated (user decision 2026-07-24):**
-  `folder_list`, `folder_create`, `folder_update`, `folder_delete` do NOT
-  migrate — the feature and its call sites (`cloudStorage.ts`,
-  DashboardPage) are removed separately, outside this migration. The
-  exit-criteria grep therefore also depends on that deprecation landing.
-  `project_move_to_folder` presumably dies with it — confirm before the
-  projects batch; it stays listed there as conditional until then.
+- **Folders/starred deprecation LANDED (2026-07-24, same day):** the
+  webapp has zero remaining call sites; migration
+  `20260724122346_drop_folders_and_starred` + graveyard entries drop
+  `folder_list/create/update/delete`, `project_move_to_folder`, AND
+  `project_star` (none migrate), and project_list/project_get stop
+  selecting the dropped columns. Push order documented in the migration
+  header: webapp+server deploy → `sql/deploy.sh` → `db push`.
 - **`trial_start` has NO client caller** — its header says "Called by:
   client RPC" but no `.rpc('trial_start')` exists anywhere in the repo.
   Confirm with the user whether trials are started some other way; if truly
@@ -41,12 +47,10 @@ Findings from the survey:
 - `asset_confirm_upload` is already dropped (orphaned by the single-request
   `/asset-upload` route, see `sql/graveyard.sql`) — the assets domain is
   just `asset_list` + `asset_delete`.
-- `subscription_get` is the one function with server-side inline copies
-  (stripe-portal, subscription-change ported its join inline because
-  `auth.uid()` is NULL over the pool). After Batch 5 migrates its last
-  client caller, it becomes server-exclusive → Part 3 can consolidate the
-  three implementations into one TS service. Until then: no forks, the SQL
-  stays authoritative for client callers.
+- `subscription_get` already has server-side inline copies (stripe-portal,
+  subscription-change ported its join inline in Part 1). When Batch 4
+  ports its last client caller, consolidate all of it into ONE shared
+  server service in that same batch — don't add a third inline copy.
 - `workspace_invite` fires a pg_net call to the server's
   `/send-workspace-invite-email` route from inside the SQL. Proxying does
   not change this — pg_net fires regardless of who calls the function.
@@ -54,86 +58,76 @@ Findings from the survey:
   `.env.local`'s key format, so the local email hop can 401 — known,
   harmless.)
 
-## Core mechanism: JWT-claims injection (the one architectural decision)
+## Core approach: inline port (user decision 2026-07-24)
 
-`auth.uid()` reads `request.jwt.claims` via `current_setting(...)`. Over
-the server's pg pool that GUC is unset → NULL → every membership check
-fails. Instead of rewriting 27 function signatures (fork risk during
-cutover) or porting logic to TS (that's Part 3), the server does exactly
-what PostgREST does — set the claims for the transaction, then call the
-function:
+Each route reimplements its function's logic as plain SQL/TS over the
+server's pool, with the verified `req.user.id` as an explicit bind param
+wherever the SQL used `auth.uid()`. This is the Part 1 pattern
+(stripe-portal's inline `subscription_get` join was the precedent) applied
+to every client RPC — the end-state architecture directly, no transitional
+proxy layer.
 
-```sql
-BEGIN;
-SELECT set_config('request.jwt.claims',
-                  '{"sub":"<user-id>","role":"authenticated"}', true);
-SELECT * FROM folder_list(p_workspace_id => $1);
-COMMIT;
-```
+- **Access rules become explicit**: membership/ownership checks are ported
+  as joins/WHERE clauses (or reuse existing server services like
+  `services/projectAccess.ts`); the `assert_*` SQL helpers are not called.
+- **Business errors become explicit**: a `RAISE EXCEPTION` whose message a
+  call site reads (toasts etc.) is ported as an explicit 400 with a
+  PostgrestError-shaped body (`{ message, code }`) carrying the exact
+  message. Errors no call site reads keep Fastify defaults.
+- **Hard cutover per batch (user decision 2026-07-24, low-usage app):**
+  client call sites and server routes ship together in one go — no
+  registry, no flag, no `supabase.rpc` fallback path in code. Rollback =
+  git revert + webapp redeploy (the SQL functions stay deployed and
+  frozen until the end sweep, so reverted code Just Works). This removes
+  the fork window almost entirely: the SQL twin exists but nothing calls
+  it except reverted builds.
+- **History:** the original Part 2 design proxied the SQL functions via
+  PostgREST-style JWT-claims injection (`set_config('request.jwt.claims',
+  …)` — designed, gate-tested, and shipped in the Batch 1 pilot), then
+  was superseded by this decision the same day; the claims machinery was
+  deleted and Batch 1 reworked to inline SQL. Git history has it.
 
-- `set_config(..., true)` is transaction-local: it can't leak across pooled
-  connections, and nested calls (the `assert_*` helpers) see it because
-  they run in the same transaction.
-- Zero SQL changes. The same function serves `supabase.rpc` callers and
-  proxied callers during the entire cutover window.
-- **Verify-first step (Batch 1 gate):** a contract test against the real
-  local Postgres pins the mechanism — `auth.uid()` is NULL over a bare
-  pool query, equals the injected `sub` inside the transaction, and is
-  NULL again on the next query from the same connection. If this test
-  can't be made to pass, stop and rediscuss before building anything on
-  top. Per-function claim needs beyond `sub`/`role` (e.g. `email`) are
-  checked per batch while porting (none expected).
+## Server design — regular routes, indistinguishable from Part 1's
+(user decision 2026-07-24: no RPC-specific style or naming)
 
-## Server design
-
-- **Routes:** `POST /rpc/<fn_name>` (exact snake_case SQL name — greppable,
-  one glance from route to SQL file, and the `/rpc/` prefix keeps the
-  namespace and log filtering clean). One route module per domain
-  (`server/src/routes/rpc/folders.ts`, `assets.ts`, `projects.ts`,
-  `workspaces.ts`, `session.ts`), registered under a `/rpc` prefix plugin.
-- **Auth:** existing `requireUser`; the verified `sub` is what gets
-  injected — the client never supplies an identity.
-- **DB helper:** one shared `callRpc(db, userId, fnName, args, resultShape)`
-  in `server/src/rpc.ts` doing the transaction + `set_config` + named-arg
-  call (`p_x => $1`). The fn name and arg names come from route code only —
-  never from request input; request values travel exclusively as bind
-  params. `resultShape: 'scalar' | 'rows' | 'void'` is declared per route
-  to reproduce supabase-js semantics exactly (RETURNS JSONB → the value,
-  SETOF/TABLE → array, void → null).
-- **Request schemas:** strict TypeBox per RPC (arg names/types mirror the
-  SQL signature). **Response schemas: none / passthrough** — Fastify
-  serialization strips properties not in the schema, which would silently
-  break parity on JSONB-returning functions. The response is the SQL
-  result, verbatim. (Deliberate divergence from Part 1's
-  full-response-schema discipline, documented here.)
-- **Error mapping:** a `RAISE EXCEPTION` surfaces via supabase-js as
-  `error.message` (PostgREST → 400, code P0001). The proxy mirrors it:
-  pg errors from the fn call → 400 with
-  `{ message, code, details?, hint? }` (PostgrestError-shaped). Unexpected
-  errors keep Fastify's default 500. Each batch audits its call sites for
-  which error fields they actually read (toast messages in MembersPage
-  etc.) and pins those in tests.
-- **Logging:** `rpc.fn` added to `DomainLogFields`; the canonical
-  per-request event covers the rest. No per-route rate limits (authed CRUD;
-  the global backstop applies).
+- **Routes:** flat kebab-case paths in the top-level namespace, exactly
+  like the Part 1 routes — `POST /asset-list`, `/asset-delete`, later
+  `/project-get`, `/workspace-rename`, … One route module per endpoint in
+  `server/src/routes/` (camelCase file = route name, Part 1 convention).
+  No `/rpc` prefix, no `routes/rpc/` folder.
+- **Auth:** existing `requireUser`; `req.user.id` is the only identity —
+  the client never supplies one.
+- **Request/response shapes are CLIENT-shaped, not SQL-shaped** — with no
+  fallback path there is no supabase.rpc parity constraint. camelCase
+  fields, object-wrapped responses (`{ assets: [...] }`, not a bare
+  array), no `p_` arg prefixes. NULL semantics that call sites key off
+  (e.g. project_update's conflict signal) are preserved deliberately and
+  pinned by tests, as named fields where possible
+  (`{ cloudVersion: null }` beats a bare `null` body).
+- **Schemas:** strict TypeBox request schemas; response schemas per
+  route like every Part 1 route (the strip-unknown-props concern is gone
+  now that the route owns its response shape).
+- **Business errors a call site reads** use the Part 1 pattern (e.g.
+  asset-upload's `library_full`): 200/4xx with a typed error body the
+  client checks explicitly — not PostgrestError reconstruction.
+- **Logging:** the canonical per-request event + `http.route` identify
+  everything; no RPC-specific fields. No per-route rate limits (authed
+  CRUD; the global backstop applies).
 
 ## Client design
 
-- `webapp/src/api/rpc.ts`: `rpc<T>(name, args)` returning the
-  supabase-shaped `{ data, error }` so call-site swaps are mechanical.
-  Fetches `${VITE_API_URL}/rpc/${name}` through `authAwareFetch` (same 401
-  funnel as `invokeFunction`); non-2xx with a PostgrestError-shaped body →
-  that object as `error`.
-- **Registry + flag, same posture as Part 1:** `MIGRATED_RPCS` set +
-  `VITE_USE_SERVER_RPC` env flag; unregistered names (or flag off) fall
-  through to `supabase.rpc`. Difference from Part 1: the prod flag goes ON
-  from Batch 1 and **the committed registry is the per-batch cutover
-  switch** — proxy routes run the same SQL, so the risk profile that made
-  Part 1 defer its prod flip (a server being rewritten under churn) doesn't
-  apply. Rollback per batch = revert the registry entries and redeploy;
-  flag off = revert everything at once.
-- Final step (after all batches soak): collapse the wrapper server-only,
-  delete registry + flag + supabase fallback — Part 1 Step 5 pattern.
+- **The existing `invokeFunction(name, body)` client
+  (`webapp/src/api/client.ts`) — nothing RPC-specific.** Each migrated
+  call site becomes an ordinary API call
+  (`invokeFunction('asset-list', { assetType })`), identical to every
+  Part 1 conversion. Errors are the usual
+  FunctionsHttpError/FunctionsFetchError; business signals a call site
+  needs come as typed response-body fields (server design above).
+- **No registry, no flag, no supabase.rpc fallback** (removed 2026-07-24
+  with the hard-cutover decision — `webapp/src/api/rpc.ts`,
+  `MIGRATED_RPCS`, and `VITE_USE_SERVER_RPC` were built for the proxy
+  design and deleted the same day; git history has them). Client and
+  server for a batch ship together; rollback = git revert + redeploy.
 
 ## Batches (risk order, lowest first)
 
@@ -142,34 +136,38 @@ verification (flag-on local webapp against the prod Railway server), then
 **pause for explicit go-ahead**, then the prod webapp deploy cuts the batch
 over. Nothing SQL-side is deleted at any point.
 
-### Batch 1 — Folders (pilot, 4 fns)
+### Batch 1 — Assets (pilot, 2 fns) — DONE (inline SQL)
 
-`folder_list`, `folder_create`, `folder_update`, `folder_delete` — all in
-`storage/cloudStorage.ts`. Smallest domain, low stakes, exercises the full
-stack: claims-injection contract test (the gate above), the `callRpc`
-helper, error mapping, client wrapper + registry, one mutating fn with a
-DB-state assertion. Everything after this batch is repetition.
+`asset_list`, `asset_delete` — `storage/userAssetService.ts` → regular
+routes `/asset-list` + `/asset-delete` called via `invokeFunction`.
+Landed the test patterns and the one deliberate divergence of Part 2 —
+`asset-list` is enriched server-side with presigned download URLs so the
+asset flow stops calling `/storage-download-urls`. Shipped first as a
+claims-injection proxy under `/rpc/*` with a registry/flag wrapper, then
+reworked twice the same day as the design pivoted (inline SQL → regular
+routes, hard cutover). **Detailed design + status:
+`fastify-part2-1-assets-rpc-migration.md`.**
 
-### Batch 2 — Assets (2 fns)
+### Batch 2 — Projects + render status (10 fns)
 
-`asset_list`, `asset_delete` — `storage/userAssetService.ts`.
-Trivial; confirms the pattern holds outside cloudStorage.
+**Prompt: `fastify-part2-2-projects-rpc-migration-prompt.md`** (verified
+signatures, shapes, call sites, parity pins). `project_get` (3 sites:
+cloudStorage ×2, Header), `project_list`, `project_update`,
+`project_update_name`, `project_rename`, `project_share` (Header),
+`project_restore`, `project_delete`, `project_confirm_upload`
+(cloudStorage), `render_job_get_status` (useCloudRender polling).
+(`project_star`/`project_move_to_folder` died with the folders/starred
+deprecation.) The core editor + dashboard flows. Notes: `project_share`
+RETURNS TABLE → this batch implements callRpc's `'rows'` shape (with the
+forced-ordering lateral); `project_update`'s NULL return IS the version
+conflict the editor's whole conflict flow keys off — load-bearing parity
+pin; `project_update` carries full project_data JSONB (response
+passthrough matters); `project_confirm_upload` sits in the upload flow
+Part 4 later replaces — proxying now is still correct;
+`render_job_get_status` polls during renders — verify cadence in Railway
+logs after cutover.
 
-### Batch 3 — Projects + render status (12 fns)
-
-`project_get` (3 sites: cloudStorage ×2, Header), `project_list`,
-`project_update`, `project_update_name`, `project_rename`, `project_star`,
-`project_share` (Header), `project_restore`, `project_delete`,
-`project_move_to_folder`, `project_confirm_upload` (cloudStorage),
-`render_job_get_status` (useCloudRender polling). The core editor +
-dashboard flows — biggest batch, but uniform CRUD. Notes:
-`project_update` carries full project_data JSONB (response passthrough
-matters here); `project_confirm_upload` sits in the upload flow that
-Part 4 later replaces — proxying now is still correct (the flow around it
-doesn't change); `render_job_get_status` polls during renders — verify
-cadence looks fine in Railway logs after cutover.
-
-### Batch 4 — Workspaces, members, invites (11 fns)
+### Batch 3 — Workspaces, members, invites (11 fns)
 
 `workspace_list` (Dashboard, WorkspaceSettings), `workspace_get`,
 `workspace_create`, `workspace_rename`, `workspace_set_default`
@@ -182,49 +180,85 @@ audit matters most here; `workspace_invite_accept` runs right after
 sign-in on AcceptInvitePage — verify the session token is available to the
 wrapper in that flow.
 
-### Batch 5 — Session/identity (3 fns, last: login-path blast radius)
+### Batch 4 — Session/identity (3 fns, last: login-path blast radius)
 
 `user_profile_get`, `workspace_get_default` (AuthManager + ImportPage),
 `subscription_get` (AuthManager, BillingPage, switchWorkspace). These run
 on every login/workspace switch — any wrapper bug here logs everyone into
-a broken state, hence last, after the mechanism has soaked through four
-batches. After this batch `subscription_get` is server-exclusive (Part 3
-consolidation candidate, see survey).
+a broken state, hence last, after the pattern has soaked through the
+earlier batches. This batch also consolidates `subscription_get` with the
+two Part 1 inline copies into one shared service (see survey).
 
 ## Definition of done (every batch)
 
+- Read the SQL source FIRST (`supabase/sql/functions/<fn>.sql`); port
+  semantics 1:1 — access rules, NULL semantics, return shapes, and any
+  RAISE message a call site reads. Divergences only when explicitly
+  documented in the batch doc/prompt.
 - TypeBox request schema per RPC; e2e tests per RPC against the real
-  seeded local Postgres: happy path, the SQL's own authz failures
-  (non-member / wrong role), RAISE → 400 error-shape parity for whatever
-  fields the call sites read, 401 without a token, DB-state assertions for
-  mutating fns, canonical log fields incl. `rpc.fn`.
-- Client wrapper unit tests (registry off/on, fallback, error shape) —
-  Batch 1 only, then extended if the wrapper changes.
-- All call sites swapped to `rpc()`; names registered in `MIGRATED_RPCS`.
+  seeded local Postgres: happy path, the ported authz denials (non-member
+  / wrong role / other-user), ported business-error bodies for whatever
+  fields the call sites read, 401 without a token, DB-state assertions
+  for mutating fns, canonical log fields incl. `rpc.fn`.
+- All call sites swapped to `invokeFunction` — client and server changes
+  land together (hard cutover; no transitional state in the codebase).
 - Root vitest, server typecheck, webapp `tsc -b`, eslint clean on changed
   files.
+- Anything noticed along the way that is out of scope for the batch —
+  smells, dead code, security gaps, refactor candidates, stale docs — is
+  ADDED to `plans/suggested_changes.md` (one bullet, source file + date
+  found, per that file's own instructions), never fixed inline and never
+  just mentioned in chat and lost.
 - Manual local verification by the user (flag-on local webapp → prod
   Railway server), explicit go-ahead, then prod webapp deploy.
 
 ## Risks / watch list
 
-- **Claims-injection drift:** if Supabase changes how `auth.uid()` reads
-  claims, the contract test catches it (it runs in blocking CI against the
-  local stack, which tracks Supabase versions).
+- **Port divergence** is the likeliest source of subtle breakage: an
+  access rule, NULL semantic, or error body that drifts from the SQL
+  original (PostgrestError fields, null-vs-empty shapes, timestamptz
+  rendering). Mitigated by read-the-SQL-first, the per-batch call-site
+  audit, and pinned e2e tests per fn.
+- **Hard cutover** means a broken batch is user-visible until a revert
+  deploys — accepted explicitly (low usage). The SQL fns are never edited
+  during Part 2 so a git revert always lands on a working fallback.
 - **Connection pool pressure:** every RPC now transits the server's direct
   connection (pool max 10, always-on single instance). Fine at current
   traffic; if saturation shows in logs, point `DATABASE_URL` at Supavisor
   (README documents the trade-off) — no code change.
-- **Error-shape parity** is the likeliest source of subtle breakage
-  (PostgrestError fields, null-vs-empty data shapes). Mitigated by the
-  per-batch call-site audit + pinned tests, and by `resultShape` being
-  explicit per route instead of inferred.
-- **`trial_start` orphan question** — ask the user before Batch 5; if
+- **`trial_start` orphan question** — ask the user before Batch 4; if
   orphaned, graveyard it in a separate, explicit step (not silently inside
   a batch).
 
 ## Status
 
 - 2026-07-24 — design agreed (claims injection, domain batches, registry
-  cutover). Nothing implemented yet. Next: Batch 1 (folders) including the
-  claims-injection contract-test gate.
+  cutover). Folders dropped from scope (feature being deprecated); assets
+  promoted to pilot batch, with `asset_list` download-URL enrichment
+  designed in `fastify-part2-1-assets-rpc-migration.md`.
+- 2026-07-24 — **Batch 1 (assets) CODE COMPLETE — gate PASSED** (see the
+  2-1 doc's status for details). Foundation refinement: `callRpc` needs no
+  transaction plumbing — set_config + fn call are one statement, so the
+  Db port is unchanged and the pattern is pooler-safe.
+- 2026-07-24 — Batch 1 **user-verified** (HTTP smoke test end-to-end +
+  user click-through). Folders/starred deprecation landed the same day
+  (scope now 26 fns; project_star/project_move_to_folder dropped). Batch 2
+  prompt written: `fastify-part2-2-projects-rpc-migration-prompt.md`.
+  NOTE: nothing committed/pushed as of the prompt's creation — the /rpc
+  routes reach prod Railway only after the user's commit+push.
+- 2026-07-24 — **PIVOT (user decision): inline SQL instead of proxying.**
+  Routes port each fn's logic directly (explicit `$user_id`); Part 3 is
+  absorbed for client RPCs; SQL fns stay frozen as rollback until the
+  end-of-part graveyard sweep. Claims-injection machinery DELETED
+  (`server/src/rpc.ts`, its contract tests); Batch 1 reworked to inline
+  SQL the same day (client-visible contract unchanged). Batch 2 prompt
+  rewritten for inline ports.
+- 2026-07-24 — **PIVOT 2 (user decision): regular routes, hard cutover.**
+  No RPC-specific style anywhere: kebab-case flat routes one-module-per-
+  endpoint (Part 1 conventions), client-shaped camelCase
+  requests/responses, existing `invokeFunction` client. The
+  registry/flag/fallback wrapper (`webapp/src/api/rpc.ts`,
+  `MIGRATED_RPCS`, `VITE_USE_SERVER_RPC`) DELETED — client+server ship
+  together per batch; rollback = git revert (accepted: low usage). Batch
+  1 reworked again (`/asset-list`, `/asset-delete`); Batch 2 prompt
+  updated.

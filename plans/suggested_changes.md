@@ -316,6 +316,12 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   Wave B (placeholders appended for `MUX_WEBHOOK_SECRET` only).
   Found 2026-07-22.
 
+- **asset_list**: ~~orders by `(row_data->>'created_at') DESC` — TEXT
+  comparison of the timestamptz's rendered form~~ DONE for the live path
+  2026-07-24: the inline-SQL port in `routes/rpc/assets.ts` orders by the
+  column. The smell survives only in the frozen SQL fallback fn until the
+  Part 2 end sweep drops it. Found 2026-07-24 (Part 2 Batch 1).
+
 ## Server config / infra cleanups
 
 - Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod
@@ -372,6 +378,11 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - `supabase/functions/shared-video-get/index.ts` comment numbering skips
   3 (copy-paste residue) — moot once decommissioned. Found 2026-07-16.
 
+- `webapp/.env.example` + `vite-env.d.ts` say the local-dev
+  `VITE_API_URL` is `http://localhost:8090` — DONE 2026-07-24 (fixed to
+  8080 during the Part 2 regular-routes rework). Found 2026-07-24
+  (Part 2 Batch 1 smoke test).
+
 ## Known pre-existing failures (not introduced by the migration)
 
 - `cloudProjectService.test.ts` › "passes expected version to
@@ -379,3 +390,5 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   4th `true` arg to `saveProjectMetadata`.
 - `VideoPage.tsx` — 3 react-hooks eslint findings.
 - `StripeService.ts` — 2 `no-explicit-any` eslint findings.
+- `useAssetLibraryStore.ts` (`removeAsset`) — 1 `no-unused-vars` eslint
+  finding (the `_` destructure-to-exclude); verified on HEAD 2026-07-24.

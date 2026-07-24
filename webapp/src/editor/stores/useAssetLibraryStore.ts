@@ -42,10 +42,15 @@ export const useAssetLibraryStore = create<AssetLibraryState>()((set, get) => ({
             ]);
             set({ backgrounds, music, isLoaded: true });
 
-            // Pre-resolve blob URLs for all assets in a single batch
-            const allPaths = [...backgrounds, ...music].map(a => a.storagePath);
-            if (allPaths.length > 0) {
-                BlobCache.getBlobUrls(allPaths)
+            // Pre-resolve blob URLs for all assets in a single batch,
+            // downloading misses via the presigned URLs asset_list returned
+            const all = [...backgrounds, ...music];
+            if (all.length > 0) {
+                const knownUrls: Record<string, string> = {};
+                for (const a of all) {
+                    if (a.downloadUrl) knownUrls[a.storagePath] = a.downloadUrl;
+                }
+                BlobCache.getBlobUrls(all.map(a => a.storagePath), knownUrls)
                     .then(urls => set(state => ({ blobUrls: { ...state.blobUrls, ...urls } })))
                     .catch(() => {});
             }
@@ -91,7 +96,25 @@ export const useAssetLibraryStore = create<AssetLibraryState>()((set, get) => ({
         const existing = get().blobUrls[storagePath];
         if (existing) return existing;
 
-        const url = await BlobCache.getBlobUrl(storagePath);
+        const findAsset = () =>
+            [...get().backgrounds, ...get().music].find(a => a.storagePath === storagePath);
+
+        let url: string;
+        try {
+            url = await BlobCache.getBlobUrl(storagePath, undefined, findAsset()?.downloadUrl);
+        } catch (err) {
+            // Likely an expired download URL (a cache miss resolved >1h
+            // after listing): refresh the list once for fresh URLs and
+            // retry, then give up. The list is the only URL source — no
+            // fallback to /storage-download-urls for assets.
+            const asset = findAsset();
+            if (!asset) throw err;
+            const fresh = await UserAssetService.listAssets(asset.assetType);
+            set(asset.assetType === 'background' ? { backgrounds: fresh } : { music: fresh });
+            const refreshed = fresh.find(a => a.storagePath === storagePath);
+            if (!refreshed) throw err; // gone server-side
+            url = await BlobCache.getBlobUrl(storagePath, undefined, refreshed.downloadUrl);
+        }
         set(state => ({ blobUrls: { ...state.blobUrls, [storagePath]: url } }));
         return url;
     },

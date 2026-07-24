@@ -24,6 +24,8 @@ import { stripeWebhooksRoutes } from './routes/stripeWebhooks.js';
 import { sendWelcomeEmailRoutes } from './routes/sendWelcomeEmail.js';
 import { sendWorkspaceInviteEmailRoutes } from './routes/sendWorkspaceInviteEmail.js';
 import { transcribeRoutes } from './routes/transcribe.js';
+import { assetListRoutes } from './routes/assetList.js';
+import { assetDeleteRoutes } from './routes/assetDelete.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -154,6 +156,11 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(stripeWebhooksRoutes);
     app.register(sendWelcomeEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
     app.register(sendWorkspaceInviteEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
+
+    // Part 2 routes — client RPCs ported inline, batch by batch
+    // (plans/fastify-part2-rpc-proxy-migration.md)
+    app.register(assetListRoutes);
+    app.register(assetDeleteRoutes);
 
     app.get('/health', {
         schema: {

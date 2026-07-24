@@ -225,6 +225,8 @@ export interface SeedUserAssetOptions {
     isDeleted?: boolean;
     name?: string | null;
     sizeBytes?: number;
+    /** ISO timestamp — asset_list orders by created_at DESC */
+    createdAt?: string;
 }
 
 /** `user_assets.id` is TEXT (the edge fn stored a stringified uuid). */
@@ -234,8 +236,8 @@ export async function seedUserAsset(db: Db, opts: SeedUserAssetOptions = {}): Pr
     const assetType = opts.assetType ?? 'background';
     await db.query(
         `INSERT INTO user_assets
-            (id, user_id, asset_type, storage_path, name, size_bytes, status, is_deleted)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            (id, user_id, asset_type, storage_path, name, size_bytes, status, is_deleted, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::timestamptz, now()))`,
         [
             id,
             userId,
@@ -245,6 +247,7 @@ export async function seedUserAsset(db: Db, opts: SeedUserAssetOptions = {}): Pr
             opts.sizeBytes ?? 1024,
             opts.status ?? 'ready',
             opts.isDeleted ?? false,
+            opts.createdAt ?? null,
         ],
     );
     return id;

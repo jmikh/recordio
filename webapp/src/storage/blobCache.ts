@@ -24,10 +24,15 @@ export class BlobCache {
      * Get a blob by cloud storage path.
      * Returns from cache if available, otherwise downloads from cloud and caches.
      * Concurrent calls for the same path share a single download.
+     *
+     * `knownUrl`: a ready-to-fetch download URL the caller already holds
+     * (the asset_list enrichment) — on cache miss it is fetched directly
+     * instead of round-tripping the path through /storage-download-urls.
      */
     static async getBlob(
         storagePath: string,
         onProgress?: (fraction: number) => void,
+        knownUrl?: string,
     ): Promise<Blob> {
         const tag = storagePath.split('/').pop() ?? storagePath;
 
@@ -38,7 +43,7 @@ export class BlobCache {
             return existing;
         }
 
-        const promise = this._getBlob(storagePath, tag, onProgress);
+        const promise = this._getBlob(storagePath, tag, onProgress, knownUrl);
         this.inflight.set(storagePath, promise);
         try {
             return await promise;
@@ -51,6 +56,7 @@ export class BlobCache {
         storagePath: string,
         tag: string,
         onProgress?: (fraction: number) => void,
+        knownUrl?: string,
     ): Promise<Blob> {
         const t0 = performance.now();
 
@@ -67,7 +73,9 @@ export class BlobCache {
         // Cache miss — download from cloud
         console.log(`[BlobCache] ${tag}: cache miss, downloading…`);
         const t1 = performance.now();
-        const blob = await CloudStorage.downloadMediaFile(storagePath, onProgress);
+        const blob = knownUrl
+            ? await CloudStorage.downloadBlob(knownUrl, onProgress)
+            : await CloudStorage.downloadMediaFile(storagePath, onProgress);
         console.log(`[BlobCache] ${tag}: downloaded ${(blob.size / 1e6).toFixed(1)}MB in ${((performance.now() - t1) / 1000).toFixed(1)}s`);
 
         const t2 = performance.now();
@@ -85,17 +93,20 @@ export class BlobCache {
     static async getBlobUrl(
         storagePath: string,
         onProgress?: (fraction: number) => void,
+        knownUrl?: string,
     ): Promise<string> {
-        const blob = await this.getBlob(storagePath, onProgress);
+        const blob = await this.getBlob(storagePath, onProgress, knownUrl);
         return URL.createObjectURL(blob);
     }
 
     /**
      * Get blob URLs for multiple paths, batching the signed URL request.
      * Checks cache first, then fetches signed URLs only for misses in a single call.
+     * Paths present in `knownUrls` skip the signed-URL request entirely.
      */
     static async getBlobUrls(
         storagePaths: string[],
+        knownUrls?: Record<string, string>,
     ): Promise<Record<string, string>> {
         const result: Record<string, string> = {};
         const cache = await caches.open(CACHE_NAME);
@@ -119,11 +130,15 @@ export class BlobCache {
 
         if (misses.length === 0) return result;
 
-        // Batch-fetch signed URLs for all misses in one call
-        console.log(`[BlobCache] fetching ${misses.length} signed URLs…`);
-        const t0 = performance.now();
-        const signedUrls = await CloudStorage.requestDownloadUrls(misses);
-        console.log(`[BlobCache] signed URLs obtained in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+        // Batch-fetch signed URLs only for misses without a known URL
+        const needSigned = misses.filter((p) => !knownUrls?.[p]);
+        let signedUrls: Record<string, string> = {};
+        if (needSigned.length > 0) {
+            console.log(`[BlobCache] fetching ${needSigned.length} signed URLs…`);
+            const t0 = performance.now();
+            signedUrls = await CloudStorage.requestDownloadUrls(needSigned);
+            console.log(`[BlobCache] signed URLs obtained in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+        }
 
         // Download all misses in parallel — skip individual failures
         // so one missing thumbnail doesn't block the rest
@@ -133,7 +148,7 @@ export class BlobCache {
                     const tag = storagePath.split('/').pop() ?? storagePath;
                     const t1 = performance.now();
                     console.log(`[BlobCache] ${tag}: downloading…`);
-                    const blob = await CloudStorage.downloadBlob(signedUrls[storagePath]);
+                    const blob = await CloudStorage.downloadBlob(knownUrls?.[storagePath] ?? signedUrls[storagePath]);
                     console.log(`[BlobCache] ${tag}: downloaded ${(blob.size / 1e6).toFixed(1)}MB in ${((performance.now() - t1) / 1000).toFixed(1)}s`);
 
                     await cache.put(this.cacheKey(storagePath), new Response(blob));

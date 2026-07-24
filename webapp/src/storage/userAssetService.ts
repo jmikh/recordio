@@ -1,5 +1,4 @@
-import { supabase } from '../auth/AuthManager';
-import { invokeFunctionUpload } from '../api/client';
+import { invokeFunction, invokeFunctionUpload } from '../api/client';
 import { BlobCache } from './blobCache';
 
 export interface UserAsset {
@@ -9,6 +8,12 @@ export interface UserAsset {
     name: string | null;
     sizeBytes: number;
     createdAt: string;
+    /**
+     * Presigned GET URL from the server's /asset-list enrichment
+     * (fastify-part2-1). Absent on freshly uploaded assets (the blob is
+     * already cached locally) — consumers must treat it as optional.
+     */
+    downloadUrl?: string;
 }
 
 const LIBRARY_LIMIT = 10; // per asset type
@@ -99,38 +104,28 @@ export class UserAssetService {
      * List active assets for a given type (ready + not deleted).
      */
     static async listAssets(type: 'background' | 'music'): Promise<UserAsset[]> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('asset_list', {
-            p_asset_type: type,
+        const { data, error } = await invokeFunction<{ assets: UserAsset[] }>('asset-list', {
+            assetType: type,
         });
 
         if (error) throw error;
 
-        return (data ?? []).map((row: any) => ({
-            id: row.id,
-            assetType: row.asset_type,
-            storagePath: row.storage_path,
-            name: row.name,
-            sizeBytes: row.size_bytes,
-            createdAt: row.created_at,
-        }));
+        return data.assets;
     }
 
     /**
      * Soft-delete an asset (is_deleted = true). Evicts from local cache.
      */
     static async deleteAsset(id: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data: storagePath, error } = await supabase.rpc('asset_delete', {
-            p_asset_id: id,
-        });
+        const { data, error } = await invokeFunction<{ storagePath: string | null }>(
+            'asset-delete',
+            { assetId: id },
+        );
 
         if (error) throw error;
 
-        if (storagePath) {
-            await BlobCache.evict(storagePath);
+        if (data.storagePath) {
+            await BlobCache.evict(data.storagePath);
         }
     }
 
