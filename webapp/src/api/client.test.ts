@@ -3,7 +3,6 @@ import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 
 const mocks = vi.hoisted(() => ({
     supabase: {
-        functions: { invoke: vi.fn() },
         auth: { getSession: vi.fn() },
     },
 }));
@@ -21,7 +20,7 @@ vi.mock('../supabase/sentryFetch', () => ({
     sentryFetch: (url: RequestInfo | URL, options?: RequestInit) => fetch(url, options),
 }));
 
-import { invokeFunction, MIGRATED_FUNCTIONS } from './client';
+import { invokeFunction } from './client';
 import { setUnauthorizedHandler } from '../supabase/client';
 
 const FN = 'test-fn';
@@ -40,7 +39,6 @@ beforeEach(() => {
     mocks.supabase.auth.getSession.mockResolvedValue({
         data: { session: { access_token: 'test-token' } },
     });
-    mocks.supabase.functions.invoke.mockResolvedValue({ data: { via: 'supabase' }, error: null });
     setUnauthorizedHandler(vi.fn());
 });
 
@@ -48,38 +46,14 @@ afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
-    MIGRATED_FUNCTIONS.delete(FN);
 });
 
-describe('invokeFunction routing', () => {
-    it('falls through to supabase.functions.invoke when the flag is off (default)', async () => {
-        MIGRATED_FUNCTIONS.add(FN);
-
-        const result = await invokeFunction(FN, { a: 1 });
-
-        expect(mocks.supabase.functions.invoke).toHaveBeenCalledExactlyOnceWith(FN, { body: { a: 1 } });
-        expect(fetchMock).not.toHaveBeenCalled();
-        expect(result).toEqual({ data: { via: 'supabase' }, error: null });
-    });
-
-    it('falls through to supabase when the flag is on but the function is not registered', async () => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
-
-        const result = await invokeFunction(FN, { a: 1 });
-
-        expect(mocks.supabase.functions.invoke).toHaveBeenCalledExactlyOnceWith(FN, { body: { a: 1 } });
-        expect(fetchMock).not.toHaveBeenCalled();
-        expect(result).toEqual({ data: { via: 'supabase' }, error: null });
-    });
-
-    it('routes to the server when the flag is on and the function is registered', async () => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
-        MIGRATED_FUNCTIONS.add(FN);
+describe('invokeFunction (server-only since the Step 5 decommission)', () => {
+    it('POSTs to ${VITE_API_URL}/${name} with the session bearer and JSON body', async () => {
         fetchMock.mockResolvedValue(jsonResponse({ via: 'server' }));
 
         const result = await invokeFunction(FN, { a: 1 });
 
-        expect(mocks.supabase.functions.invoke).not.toHaveBeenCalled();
         expect(fetchMock).toHaveBeenCalledExactlyOnceWith('http://localhost:8090/test-fn', {
             method: 'POST',
             headers: {
@@ -92,8 +66,6 @@ describe('invokeFunction routing', () => {
     });
 
     it('passes a FormData body through untouched with no JSON content-type', async () => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
-        MIGRATED_FUNCTIONS.add(FN);
         fetchMock.mockResolvedValue(jsonResponse({ storagePath: 'u/p/thumbnail.webp' }));
 
         const form = new FormData();
@@ -112,8 +84,6 @@ describe('invokeFunction routing', () => {
     });
 
     it('omits the Authorization header when there is no session', async () => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
-        MIGRATED_FUNCTIONS.add(FN);
         mocks.supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
         fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
 
@@ -123,24 +93,14 @@ describe('invokeFunction routing', () => {
         expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
     });
 
-    it('errors instead of routing when the flag is on but VITE_API_URL is not set', async () => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
+    it('errors when VITE_API_URL is not set (required — no fallback exists)', async () => {
         vi.stubEnv('VITE_API_URL', '');
-        MIGRATED_FUNCTIONS.add(FN);
 
         const result = await invokeFunction(FN, {});
 
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(mocks.supabase.functions.invoke).not.toHaveBeenCalled();
         expect(result.data).toBeNull();
         expect(result.error?.message).toMatch(/VITE_API_URL/);
-    });
-});
-
-describe('invokeFunction server errors', () => {
-    beforeEach(() => {
-        vi.stubEnv('VITE_USE_SERVER', 'true');
-        MIGRATED_FUNCTIONS.add(FN);
     });
 
     it('returns FunctionsHttpError with the response on .context for non-2xx', async () => {

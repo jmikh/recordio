@@ -66,3 +66,22 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'render-jobs-purge');
 SELECT cron.unschedule('mux-video-purge')
 WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'mux-video-purge');
 DROP FUNCTION IF EXISTS public.mux_video_purge_candidates();
+
+-- Step 5 decommission (2026-07-24, soak waived by user) — the final
+-- sweep, migration complete:
+-- subscription_workspace_get: orphaned by Wave A #3 (subscription-change
+-- ported its logic inline; the fn's "Called by: WorkspaceSettingsPage"
+-- header was stale)
+DROP FUNCTION IF EXISTS public.subscription_workspace_get(UUID);
+-- set_project_expiry: orphaned by Wave D #17 decision (the server
+-- stripe webhook never touches projects); its last caller was the edge
+-- stripe-webhooks fn, dead since the Stripe endpoint swap
+DROP FUNCTION IF EXISTS public.set_project_expiry(UUID, TIMESTAMPTZ);
+-- render_purge_candidates: orphaned since birth — its only intended
+-- caller was the render-purge edge fn that never existed (part13
+-- missed it; user approved the drop 2026-07-24)
+DROP FUNCTION IF EXISTS public.render_purge_candidates();
+-- Last Pattern-B cron: its edge fn purge-deleted-projects is deleted;
+-- the server job projects.purge-deleted replaced it in Wave C
+SELECT cron.unschedule('projects-purge-deleted')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'projects-purge-deleted');

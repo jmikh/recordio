@@ -12,7 +12,8 @@ route is webhook/cron-invoked, the client call site switched behind the
 `USE_SERVER_INSTEAD_OF_SUPA` flag, and a manual local verification by the
 user with the flag on.
 
-## Status (updated 2026-07-22)
+## Status (updated 2026-07-24 — **MIGRATION COMPLETE**, pending the
+final manual dashboard checklist in the Step 5 entry)
 
 **Done:**
 - **Step 0** — `server/` scaffolded (Fastify + TypeBox, `buildApp(deps)` factory,
@@ -427,19 +428,102 @@ Railway server (flag on locally). At the end, one prod webapp deploy with
 cuts over every migrated function at once (observe per-function in Railway
 logs; rollback = remove the two vars and redeploy).
 
-**Next:** **THE ENDGAME.** Every edge function is now migrated,
-removed, or decommission-listed. Remaining, in order: (1) the prod
-webapp flag flip — one deploy with `VITE_USE_SERVER=true` +
-`VITE_API_URL=https://recordio-production.up.railway.app` baked in
-cuts every client-called migrated function over at once (observe
-per-function in Railway logs; rollback = remove the two vars and
-redeploy); (2) the Step 5 manual decommission checklist (edge
-functions, orphaned SQL fns, the remaining Pattern-B crons).
+**Next:** nothing to build — **the migration is code-complete**. What
+remains is the user's manual dashboard checklist in the Step 5 entry
+below (deploy.sh --remote, delete edge fns + secrets, old S3 pair,
+the disabled Stripe endpoint, the collapsed-wrapper webapp deploy).
+The post-migration backlog (asset-uploads-through-server redesign,
+the expires_at cleanup, and every parked smell) lives in
+`plans/suggested_changes.md`.
+
+- **Step 5 — DECOMMISSION** (repo work complete 2026-07-24; prompt
+  `plans/fastify-part18-decommission-prompt.md`; the soak week was
+  **WAIVED by the user 2026-07-24** at the gate (Wave E verified +
+  flag flip deployed, both confirmed in chat); **PAUSED on the manual
+  checklist below — the migration ends when it's done**):
+  - **Edge tree deleted**: all of `supabase/functions/` incl.
+    `_shared` (guard grep found zero imports anywhere; root
+    config.toml has no `[functions]` blocks; CI never deployed edge
+    fns — nothing to edit there). Git history keeps everything.
+  - **SQL graveyard sweep** (files deleted + guarded graveyard
+    entries; local `sql/deploy.sh` run and verified — the three fns
+    are gone, `cron.job` shows ONLY the two pure-SQL watchdogs):
+    `subscription_workspace_get(UUID)` (orphaned by Wave A #3),
+    `set_project_expiry(UUID, TIMESTAMPTZ)` (orphaned by Wave D #17
+    decision b), `render_purge_candidates()` (orphaned since birth),
+    and the last Pattern-B cron `projects-purge-deleted` (its edge fn
+    died with the tree; the Wave C server job replaced it). Zero-
+    caller greps done before each drop.
+  - **Dead v1 client chain deleted**: `CloudStorage.createProject`
+    (the last direct `supabase.functions.invoke`),
+    `CloudProjectService.importRecordingLocal`, `uploadMedia` (v1).
+    Reachability audit KEPT `uploadBlob` (userAssetService) and
+    `confirmProjectUpload` (uploadMediaV2). Also swept:
+    `StorageQuotaExceededError` + BOTH vestigial `quota_exceeded`
+    branches (no catcher existed anywhere — the suggested_changes
+    bullet closes), a stale `createProject` test mock, and the
+    stale comments referencing the v1 flow.
+  - **Client wrapper collapsed to server-only** (user decision
+    2026-07-24): `invokeFunction` always POSTs
+    `${VITE_API_URL}/${name}`; `MIGRATED_FUNCTIONS`,
+    `VITE_USE_SERVER`, and the supabase fallback are DELETED. Kept:
+    the `{ data, error }` shape with real
+    FunctionsHttpError/FunctionsFetchError, session bearer, FormData
+    passthrough, the authAwareFetch 401 funnel. `VITE_API_URL` is now
+    REQUIRED (vite-env.d.ts + webapp/.env.example updated;
+    `client.test.ts` rewritten — 7 tests, flag cases gone).
+    **Cross-check before the registry safety net went**: all 11
+    invokeFunction call-site names verified against
+    `server/src/routes/` paths. **The Step 5 gate holds:**
+    `grep -r "functions.invoke" webapp/` returns NOTHING.
+  - Checks: root `npx vitest run server webapp/src` — 350 passed;
+    the single failure is the KNOWN pre-existing
+    cloudProjectService "passes expected version" stale expectation.
+    webapp `tsc -b` clean; eslint on changed files — 17 findings,
+    ALL verified pre-existing verbatim on HEAD (cloudProjectService
+    .ts/.test.ts `any`s + the destructure-to-exclude `userEvents`,
+    cloudStorage `project_data: any`).
+  - **MANUAL CHECKLIST (user, in order — the finish line):**
+    1. `supabase/sql/deploy.sh --remote` — drops the three SQL fns,
+       unschedules `projects-purge-deleted`. Verify prod `cron.job`
+       lists only `render-jobs-stale-cleanup` +
+       `mux-videos-stale-cleanup`.
+    2. Delete ALL edge functions from the Supabase project
+       (`supabase functions delete <name>` or dashboard):
+       asset-create, mux-video-create, mux-video-hook,
+       mux-video-purge, project-create, project-create-v2,
+       project-update-thumbnail, purge-deleted-projects,
+       render-job-create, render-job-hook, send-welcome-email,
+       send-workspace-invite, shared-video-get, storage-download-urls,
+       stripe-add-seats, stripe-checkout, stripe-portal,
+       stripe-webhooks, subscription-change, transcribe.
+       (unsubscribe went at Wave E.)
+    3. Dashboard → Edge Functions → Secrets: delete the now-unused
+       secrets (STRIPE_*, MUX_*, OPENAI_API_KEY, RESEND_API_KEY,
+       RENDER_*, webhook secrets — Railway holds them all now).
+    4. Dashboard → Storage S3 keys: revoke the OLD access key pair
+       (pre-2026-07-16; Railway uses the new pair).
+    5. Stripe dashboard → Webhooks: DELETE the disabled Supabase
+       endpoint.
+    6. Optional Vault prune: `SUPABASE_URL` is unused now.
+       **`SUPABASE_SECRET_KEY` STAYS** — it's the bearer
+       trial_start/workspace_invite send to the email routes.
+    7. Deploy the prod webapp from this commit (collapsed wrapper;
+       `VITE_API_URL` still baked in; drop `VITE_USE_SERVER` from
+       the deploy env — it's meaningless now). Safe in any order
+       relative to step 2: the flag-on build already routed every
+       function to the server.
+    8. Final click-through on prod: import/publish/share/render/
+       billing/invite/transcribe; Railway logs show traffic.
+       **THE MIGRATION IS DONE.**
 
 - **Wave E — `send-welcome-email` + `send-workspace-invite` →
   `/send-welcome-email` + `/send-workspace-invite-email`, and
-  `unsubscribe` REMOVED** (code complete 2026-07-23; **PAUSED for
-  user verification** — numbered steps below. **One new REQUIRED env
+  `unsubscribe` REMOVED** (code complete 2026-07-23; **user verified
+  2026-07-24** — cutover steps done, both emails confirmed end-to-end
+  in prod. **The prod flag flip is also DEPLOYED (2026-07-24)** and
+  the Step 5 soak week was **explicitly WAIVED by the user
+  2026-07-24** (decommission gate answered in chat). **One new REQUIRED env
   var: `RESEND_API_KEY`** (config.ts, .env.example, README table,
   placeholders in `.env.local`/`.env.prod`; set on Railway BEFORE
   deploy — config fails the boot without it). The real Resend adapter

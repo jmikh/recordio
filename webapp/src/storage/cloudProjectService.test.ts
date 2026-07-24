@@ -15,7 +15,6 @@ vi.mock('./cloudStorage', () => ({
         restoreProject: vi.fn(),
         getCloudVersion: vi.fn(),
         confirmProjectUpload: vi.fn(),
-        createProject: vi.fn(),
         uploadThumbnail: vi.fn(),
     },
     CloudVersionConflictError: class extends Error {

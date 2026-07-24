@@ -97,6 +97,8 @@ Add each to the table when it lands.
 
 ## Rollback
 
-Every cutover in the migration is a URL/env repoint. Nothing is deleted from
-Supabase during Part 1 — edge functions stay deployed (idle), so rolling back
-any route means pointing its caller back at the edge function URL.
+The edge functions were decommissioned 2026-07-24 (Step 5) — there is no
+edge fallback anymore. Rolling back a server change means deploying a
+previous Railway build (or reverting the commit); rolling back a webapp
+change means deploying a previous webapp build. The old edge-function
+source lives in git history (`git log -- supabase/functions`).

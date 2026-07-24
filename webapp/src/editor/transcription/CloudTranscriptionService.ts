@@ -29,8 +29,7 @@ export class CloudTranscriptionService {
         }>('transcribe', { projectId });
 
         if (error) {
-            // data is always null alongside error (both here and on the
-            // old supabase.functions.invoke path) — the previous body
+            // data is always null alongside error — the previous body
             // fallbacks were dead code
             throw new Error(error.message || 'Transcription failed');
         }

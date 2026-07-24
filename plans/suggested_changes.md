@@ -63,10 +63,10 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   CALLER's user-id prefix (`{callerId}/{projectId}/thumbnail.webp`), so
   the projects row repoints and the owner's previous thumbnail object is
   orphaned in S3 (edge-fn parity, pinned by test). Found 2026-07-16.
-- **_shared/projectAccess.ts (Deno)**: `getProjectIfEditor` destructures
-  only `data`, swallowing DB errors as "no access" → a DB outage looks
-  like a 404. The server port throws instead; fix the Deno copy or note
-  it dies with Wave B. Found 2026-07-16.
+- **_shared/projectAccess.ts (Deno)**: ~~`getProjectIfEditor`
+  swallowed DB errors as "no access"~~ MOOT 2026-07-24 (Step 5): the
+  Deno copy died with the edge tree; the server port throws.
+  Found 2026-07-16.
 - **asset-create**: the extension (and the size) come solely from the
   client-supplied `fileName`/`sizeBytes` — the actual uploaded content is
   never validated (the presigned PUT has no ContentType/length
@@ -100,9 +100,11 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **project-create-v2**: `past_due` subscriptions get non-expiring
   projects, same as `active` (edge-fn parity — may be intentional grace
   behavior). Found 2026-07-17.
-- **webapp cloudStorage**: the `quota_exceeded` error branches in
-  `createProject`/`createProjectV2` are vestigial — no edge fn or
-  server route ever returns that error shape. Found 2026-07-17.
+- **webapp cloudStorage**: ~~the `quota_exceeded` error branches in
+  `createProject`/`createProjectV2` are vestigial~~ DONE 2026-07-24
+  (Step 5): createProject deleted with the v1 chain; the v2 branch and
+  the uncaught `StorageQuotaExceededError` class removed.
+  Found 2026-07-17.
 - **render-job-create**: dispatch is fire-and-forget — a worker outage
   leaves the job `pending` with the user polling until the stale-job
   cron fails it; no immediate feedback
@@ -134,12 +136,11 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   `sql/deploy.sh` step, 2026-07-17). Consider stripping sql/-managed
   functions from future schema dumps, or regenerating the snapshot
   whenever sql/ changes. Found 2026-07-17.
-- **shared projectMedia logic ×3**: `getProjectMediaPaths` now exists
-  in webapp `shared/utils/`, Deno `_shared/`, and
-  `server/src/services/` — the Deno copy dies at decommission; webapp
-  vs server stay two (client is typed against Project, server against
-  unknown). Consolidate if a shared package ever lands.
-  Found 2026-07-17.
+- **shared projectMedia logic ×2** (was ×3 — the Deno `_shared/` copy
+  died at Step 5, 2026-07-24): `getProjectMediaPaths` exists in webapp
+  `shared/utils/` and `server/src/services/` (client typed against
+  Project, server against unknown). Consolidate if a shared package
+  ever lands. Found 2026-07-17.
 - **mux-video-create**: ~~`mux_video_get_or_create` ignores `is_deleted`
   when matching rows — a soft-deleted mux_video at (project_id,
   cloud_version) is returned as a cache-hit/dedup~~ MOOT 2026-07-22:
@@ -165,17 +166,12 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   land under different prefixes depending on which entry point ran
   first (both pinned by tests, edge-fn parity; same family as the
   retrying-caller prefix smell above). Found 2026-07-17.
-- **purge-deleted-projects (edge fn, until decommission)**: two bugs the
-  part13 server job (`projects.purge-deleted`) FIXES but the still-live
-  edge fn keeps: (a) it hard-deletes the project row and the FK cascade
-  drops mux_videos WITHOUT deleting their Mux assets — a permanent leak
-  (no cleanup trigger exists); (b) its Supabase-Storage `.list()` is
-  non-recursive, so `renders/` subfolder files are orphaned on every
-  purge. Both moot once the edge fn is decommissioned. Found 2026-07-17.
-- **purge-deleted-projects**: stale docs — the edge fn header says
-  "3 days" and `cron_purge_deleted_projects.sql` said "3+ days"; the
-  code's window is 30 days (the server job ports the code).
-  Found 2026-07-18.
+- **purge-deleted-projects (edge fn)**: ~~two bugs the part13 server
+  job FIXES but the still-live edge fn keeps~~ MOOT 2026-07-24
+  (Step 5): the edge fn and its cron are decommissioned; the server
+  job `projects.purge-deleted` (which fixed both bugs) is the only
+  purge path. Its stale "3 days" docs died with it too.
+  Found 2026-07-17.
 - **project purge scope**: the purge deletes only the `${created_by}/`
   prefix — caller-prefixed files (editor-uploaded thumbnails,
   retrying-editor renders; known smells above) orphan in storage
@@ -287,9 +283,8 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   `user_profiles.display_name` — the silently-swallowed error meant
   the inviter name ALWAYS fell back to the auth email. FIXED in the
   server port 2026-07-23 (Wave E, user decision): reads the real
-  `name` column → auth email → 'Someone', pinned by test. The edge
-  copy keeps the bug until decommission (it's no longer called).
-  Found 2026-07-23.
+  `name` column → auth email → 'Someone', pinned by test. (The buggy
+  edge copy was deleted at Step 5, 2026-07-24.) Found 2026-07-23.
 - **email hooks are fire-and-forget with no retry**: trial_start /
   workspace_invite fire pg_net posts and never check the result — a
   failed welcome/invite email is only a Railway log line (the invite
@@ -333,16 +328,14 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - `webapp/.env` (gitignored) holds server-side secrets (live Stripe
   secret key, Resend, Mux) that aren't `VITE_`-prefixed and don't belong
   in the webapp env. Noted 2026-07-16.
-- `stripe-add-seats` edge function has zero callers anywhere in the repo
-  — dead code; decommission rather than port (user to confirm).
-  Noted ~2026-07-13.
-- `project-create` edge function is dead code (user confirmed
-  2026-07-16, not ported): its webapp chain `CloudStorage.createProject`
-  ← `CloudProjectService.importRecordingLocal` has zero callers — only
-  the V2 pipeline (ImportPage → `importRecordingLocalV2` →
-  `project-create-v2`) is used. Decommission the edge fn at the end;
-  also delete the dead client methods (and audit the rest of the v1
-  pipeline around them, e.g. `uploadMedia`, for reachability).
+- ~~`stripe-add-seats` edge function has zero callers anywhere in the
+  repo — dead code~~ DONE 2026-07-24 (Step 5): deleted with the edge
+  tree; on the user's dashboard-deletion list. Noted ~2026-07-13.
+- ~~`project-create` edge function is dead code~~ DONE 2026-07-24
+  (Step 5): edge fn deleted with the tree; the dead client chain
+  (`createProject` ← `importRecordingLocal`, plus v1 `uploadMedia`)
+  deleted after a reachability audit (`uploadBlob` and
+  `confirmProjectUpload` kept — live v2/asset users).
   Found 2026-07-16.
 
 ## Test-infra improvements
