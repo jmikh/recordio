@@ -12,7 +12,7 @@
  *           null when nothing was deleted
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { AssetDeleteRequestSchema, AssetDeleteResponseSchema } from '@shared/api/assets';
 
 export const assetDeleteRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -20,14 +20,8 @@ export const assetDeleteRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    assetId: Type.String({ minLength: 1 }),
-                }),
-                response: {
-                    200: Type.Object({
-                        storagePath: Type.Union([Type.String(), Type.Null()]),
-                    }),
-                },
+                body: AssetDeleteRequestSchema,
+                response: { 200: AssetDeleteResponseSchema },
             },
         },
         async (req) => {

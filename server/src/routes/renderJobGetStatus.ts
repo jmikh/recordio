@@ -10,7 +10,7 @@
  * Response: { job: {...} | null } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { RenderJobGetStatusRequestSchema } from '@shared/api/renderJobs';
 import { canEditProject } from '../services/projectAccess.js';
 
 export const renderJobGetStatusRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -19,9 +19,7 @@ export const renderJobGetStatusRoutes: FastifyPluginAsyncTypebox = async (app) =
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    jobId: Type.String({ minLength: 1 }),
-                }),
+                body: RenderJobGetStatusRequestSchema,
             },
         },
         async (req, reply) => {

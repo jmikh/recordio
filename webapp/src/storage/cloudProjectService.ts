@@ -2,7 +2,8 @@ import type { Project, ID } from '@shared/types';
 import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { captureError } from '../lib/sentry';
-import { CloudStorage, CloudVersionConflictError, type CloudProjectSummary } from './cloudStorage';
+import { CloudStorage, CloudVersionConflictError } from './cloudStorage';
+import type { CloudProjectSummary } from '@shared/api';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
@@ -380,7 +381,7 @@ export class CloudProjectService {
             console.error('[CloudProjectService.loadProject] loadProjectMetadata returned null — project_get returned NULL. Possible auth.uid() mismatch.');
             return null;
         }
-        console.log('[CloudProjectService.loadProject] Got metadata:', { upload_status: cloudProject.upload_status, cloud_version: cloudProject.cloud_version, user_id: cloudProject.user_id });
+        console.log('[CloudProjectService.loadProject] Got metadata:', { upload_status: cloudProject.upload_status, cloud_version: cloudProject.cloud_version, created_by: cloudProject.created_by });
 
         // Projects may be in 'pending' state while a background upload is in
         // flight (ImportPage navigates to the editor before the upload
@@ -412,8 +413,12 @@ export class CloudProjectService {
 
         this.cloudVersions.set(projectId, cloudProject.cloud_version);
 
-        // Backfill storagePath on sources for pre-v5 projects
-        const userId = cloudProject.user_id;
+        // Backfill storagePath on sources for pre-v5 projects. Media
+        // lives under the creator's prefix ({created_by}/{projectId}/…).
+        // (Was `cloudProject.user_id` — a field project-get never
+        // returned, so the backfill built "undefined/…" paths; the
+        // shared contract surfaced it.)
+        const userId = cloudProject.created_by;
         if (!project.screenSource.storagePath) {
             project.screenSource.storagePath = cloudStoragePath(userId, projectId, 'screen');
         }

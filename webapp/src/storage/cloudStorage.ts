@@ -3,43 +3,9 @@ import { supabase } from '../auth/AuthManager';
 import { invokeFunction } from '../api/client';
 
 import type { Project } from '@shared/types';
+import type { CloudProject, CloudProjectSummary } from '@shared/api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-
-/**
- * Summary row returned by listProjectsSummary — lightweight for dashboard display.
- */
-export interface CloudProjectSummary {
-    id: string;
-    name: string;
-    thumbnail_storage_path: string | null;
-    last_accessed_at: string;
-    updated_at: string;
-    created_at: string;
-    expires_at: string | null;
-    deleted_at: string | null;
-    cloud_version: number;
-    duration_ms: number | null;
-    is_shared: boolean;
-    slug: string | null;
-}
-
-/**
- * Full cloud project row (metadata only, no media blobs).
- */
-export interface CloudProject {
-    id: string;
-    user_id: string;
-    name: string;
-    project_data: any;
-    cloud_version: number;
-    upload_status: string;
-    last_accessed_at: string;
-    updated_at: string;
-    created_at: string;
-    expires_at: string | null;
-    thumbnail_storage_path: string | null;
-}
 
 export type MediaFileType = 'screen' | 'camera' | 'mic' | 'thumbnail';
 
@@ -66,7 +32,7 @@ export class CloudStorage {
         // expectedVersion: undefined is OMITTED by JSON.stringify — the
         // server treats an absent key as "no version check" (sending null
         // would be coerced to 0 by schema validation)
-        const { data, error } = await invokeFunction<{ cloudVersion: number | null }>(
+        const { data, error } = await invokeFunction(
             'project-update',
             {
                 projectId: project.id,
@@ -101,7 +67,7 @@ export class CloudStorage {
         // project-get returns full metadata; we only need cloud_version.
         // A dedicated lightweight endpoint could be added later if perf matters.
         console.log('[CloudStorage] project-get via getCloudVersion', projectId);
-        const { data, error } = await invokeFunction<CloudProject>('project-get', { projectId });
+        const { data, error } = await invokeFunction('project-get', { projectId });
 
         if (error || !data) return null;
         return data.cloud_version;
@@ -113,7 +79,7 @@ export class CloudStorage {
      */
     static async loadProjectMetadata(projectId: string): Promise<CloudProject | null> {
         console.log('[CloudStorage] project-get via loadProjectMetadata', projectId);
-        const { data, error } = await invokeFunction<CloudProject>('project-get', { projectId });
+        const { data, error } = await invokeFunction('project-get', { projectId });
 
         if (error) throw error;
         return data;
@@ -123,10 +89,7 @@ export class CloudStorage {
      * List project summaries for the dashboard (lightweight — no project_data).
      */
     static async listProjectsSummary(workspaceId: string): Promise<CloudProjectSummary[]> {
-        const { data, error } = await invokeFunction<{ projects: CloudProjectSummary[] }>(
-            'project-list',
-            { workspaceId },
-        );
+        const { data, error } = await invokeFunction('project-list', { workspaceId });
 
         if (error) throw error;
         return data.projects ?? [];
@@ -145,10 +108,7 @@ export class CloudStorage {
      * Restore a soft-deleted project (clears deleted_at).
      */
     static async restoreProject(projectId: string): Promise<boolean> {
-        const { data, error } = await invokeFunction<{ restored: boolean }>(
-            'project-restore',
-            { projectId },
-        );
+        const { data, error } = await invokeFunction('project-restore', { projectId });
 
         if (error) throw error;
         return data.restored ?? false;
@@ -194,10 +154,7 @@ export class CloudStorage {
      * Confirm project media upload — flips upload_status from 'pending' to 'ready'.
      */
     static async confirmProjectUpload(projectId: string): Promise<void> {
-        const { data, error } = await invokeFunction<{ confirmed: boolean }>(
-            'project-confirm-upload',
-            { projectId },
-        );
+        const { data, error } = await invokeFunction('project-confirm-upload', { projectId });
 
         if (error) throw error;
         if (!data.confirmed) console.warn('[CloudStorage] project-confirm-upload returned false — project may already be ready');

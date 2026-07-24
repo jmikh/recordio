@@ -15,6 +15,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { randomUUID } from 'node:crypto';
+import { ProjectShareRequestSchema, ProjectShareResponseSchema } from '@shared/api/projects';
 
 export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -22,19 +23,9 @@ export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                    sharePolicy: Type.Optional(Type.Union([
-                        Type.Literal('public'),
-                        Type.Literal('workspace'),
-                        Type.Literal('private'),
-                    ])),
-                }),
+                body: ProjectShareRequestSchema,
                 response: {
-                    200: Type.Object({
-                        slug: Type.String(),
-                        isNew: Type.Boolean(),
-                    }),
+                    200: ProjectShareResponseSchema,
                     403: Type.Object({ error: Type.String() }),
                     404: Type.Object({ error: Type.String() }),
                 },

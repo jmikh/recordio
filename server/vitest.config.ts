@@ -5,4 +5,9 @@ export default defineConfig({
         include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
         environment: 'node',
     },
+    resolve: {
+        alias: {
+            '@shared': new URL('../shared', import.meta.url).pathname,
+        },
+    },
 });

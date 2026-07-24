@@ -327,16 +327,55 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   routes for call-site parity; consolidate to one route + one call path
   later (`server/src/routes/projectUpdateName.ts`/`projectRename.ts`).
   Found 2026-07-24 (Part 2 Batch 2).
-- **Header.tsx share-state effect reads a field that doesn't exist**: it
+- **Header.tsx share-state effect reads a field that doesn't exist**: ~~it
   checks `data?.share_slug` but project-get returns `slug` — the branch
   never fires, so shareSlug never auto-populates on editor open (a second
   "Publish" click re-uses the existing slug anyway via the server, so the
   visible effect is only the button state). Probable intent: `data.slug`.
-  Ported verbatim. Found 2026-07-24 (Part 2 Batch 2).
+  Ported verbatim.~~ DONE 2026-07-25 (shared-api-contract Step 1): the
+  typed contract made the dead read a compile error; fixed to
+  `data.slug` — shareSlug now auto-populates, so an already-shared
+  project opens with Republish/copy-link enabled (small deliberate
+  behavior change). Found 2026-07-24 (Part 2 Batch 2).
+- **cloudProjectService read a phantom `cloudProject.user_id`** (same
+  bug class as the share_slug read, caught by the same compile pass):
+  project_get — the SQL fn AND the route port — never returned a
+  top-level `user_id`, so the pre-v5 storagePath backfill
+  (`cloudStorage.loadProject` path) has been building
+  `undefined/{projectId}/…` paths all along; only projects predating
+  storagePath-on-sources were affected. FIXED 2026-07-25 to
+  `created_by` (the media-path prefix convention — project-create-v2
+  and the purge both key on it). Found 2026-07-25 (shared-api-contract
+  Step 1).
+- **Railway build context vs `shared/api`**: the server now imports
+  `../shared/api/*` (relative, bundled by tsup), but the Railway
+  service is configured with root directory `server/` (README). If
+  Railway isolates the build context to the root directory, the next
+  deploy FAILS at tsup (import not found). Fix if so: widen the root
+  dir + explicit build/start commands (`cd server && …`) + watch paths
+  (`server/**`, `shared/api/**`), or a render-worker-style Dockerfile.
+  Even if the build context is fine, check watch paths: a
+  shared/api-only commit must still trigger a server deploy.
+  Found 2026-07-25 (shared-api-contract Step 1).
 - **project_list orders by the text rendering of updated_at** (same class
   as the asset_list smell) — fixed on the live path (the route orders by
   the column); the smell survives only in the frozen SQL fallback.
   Found 2026-07-24 (Part 2 Batch 2).
+
+- **Stale-bundle reload nudge** (from `plans/shared-api-contract.md`,
+  where the deploy-skew policy lives): nothing today tells an open tab
+  its bundle is stale (verified 2026-07-25 — `VITE_APP_VERSION` only
+  feeds Sentry release tagging; the server version is only in the
+  /health body; the editor's lone `window.location.reload()` is the
+  sync-conflict flow). Design when picked up: server sends its version
+  (already in `AppOptions`) as an `x-server-version` response header on
+  every request + `Access-Control-Expose-Headers` for it (webapp is
+  cross-origin); `authAwareFetch` remembers the FIRST value seen per
+  session and shows a "new version available — reload" toast when it
+  CHANGES mid-session. First-seen-vs-now sidesteps comparing server SHA
+  to bundle SHA (separate artifacts, separate deploys — direct
+  comparison false-positives forever). Shrinks the skew window to near
+  zero for every future contract change. Noted 2026-07-25.
 
 ## Server config / infra cleanups
 

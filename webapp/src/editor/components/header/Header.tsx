@@ -98,9 +98,9 @@ export const Header = () => {
 
     useEffect(() => {
         if (!isAuthenticated || !project?.id) return;
-        invokeFunction<{ share_slug?: string }>('project-get', { projectId: project.id })
+        invokeFunction('project-get', { projectId: project.id })
             .then(({ data }) => {
-                if (data?.share_slug) setShareSlug(data.share_slug);
+                if (data?.slug) setShareSlug(data.slug);
             });
     }, [isAuthenticated, project?.id]);
 
@@ -121,10 +121,7 @@ export const Header = () => {
         try {
             let slug = shareSlug;
             if (!slug) {
-                const { data, error } = await invokeFunction<{ slug: string; isNew: boolean }>(
-                    'project-share',
-                    { projectId: project.id },
-                );
+                const { data, error } = await invokeFunction('project-share', { projectId: project.id });
                 if (error || !data) throw error;
                 slug = data.slug;
                 setShareSlug(slug);

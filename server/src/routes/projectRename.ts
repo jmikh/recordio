@@ -9,6 +9,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { ProjectNameUpdateRequestSchema, ProjectNameUpdateResponseSchema } from '@shared/api/projects';
 import { canEditProject } from '../services/projectAccess.js';
 
 export const projectRenameRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -17,12 +18,9 @@ export const projectRenameRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                    name: Type.String(),
-                }),
+                body: ProjectNameUpdateRequestSchema,
                 response: {
-                    200: Type.Object({ ok: Type.Literal(true) }),
+                    200: ProjectNameUpdateResponseSchema,
                     403: Type.Object({ error: Type.String() }),
                 },
             },

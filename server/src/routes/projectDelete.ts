@@ -8,7 +8,7 @@
  * Response: { deleted: boolean }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { ProjectDeleteResponseSchema, ProjectIdRequestSchema } from '@shared/api/projects';
 
 export const projectDeleteRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -16,12 +16,8 @@ export const projectDeleteRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                }),
-                response: {
-                    200: Type.Object({ deleted: Type.Boolean() }),
-                },
+                body: ProjectIdRequestSchema,
+                response: { 200: ProjectDeleteResponseSchema },
             },
         },
         async (req) => {

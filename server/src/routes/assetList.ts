@@ -14,14 +14,14 @@
  *             createdAt, downloadUrl }] }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { AssetListRequestSchema, AssetListResponseSchema } from '@shared/api/assets';
 
 /** Same expiry as /storage-download-urls; late-miss refresh is client-side. */
 const DOWNLOAD_URL_EXPIRY_SECONDS = 3600;
 
 interface AssetRow {
     id: string;
-    assetType: string;
+    assetType: 'background' | 'music';
     storagePath: string;
     name: string | null;
     sizeBytes: number;
@@ -34,22 +34,8 @@ export const assetListRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    assetType: Type.Union([Type.Literal('background'), Type.Literal('music')]),
-                }),
-                response: {
-                    200: Type.Object({
-                        assets: Type.Array(Type.Object({
-                            id: Type.String(),
-                            assetType: Type.String(),
-                            storagePath: Type.String(),
-                            name: Type.Union([Type.String(), Type.Null()]),
-                            sizeBytes: Type.Number(),
-                            createdAt: Type.String(),
-                            downloadUrl: Type.String(),
-                        })),
-                    }),
-                },
+                body: AssetListRequestSchema,
+                response: { 200: AssetListResponseSchema },
             },
         },
         async (req) => {

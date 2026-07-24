@@ -225,6 +225,9 @@ describe('CloudProjectService.listProjects', () => {
         vi.mocked(CloudStorage.listProjectsSummary).mockResolvedValue([{
             id: 'p1',
             name: 'Test',
+            created_by: 'user-1',
+            owner_id: 'user-1',
+            workspace_id: 'workspace-1',
             thumbnail_storage_path: 'path/thumb.webp',
             updated_at: '2024-01-01',
             created_at: '2024-01-01',
@@ -235,6 +238,7 @@ describe('CloudProjectService.listProjects', () => {
             cloud_version: 1,
             duration_ms: 5000,
             slug: null,
+            share_policy: 'public',
         }]);
 
         const items = await CloudProjectService.listProjects('workspace-1');

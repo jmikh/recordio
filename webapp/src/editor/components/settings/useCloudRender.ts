@@ -188,14 +188,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
 
             // Poll for progress
             pollRef.current = setInterval(async () => {
-                const { data } = await invokeFunction<{
-                    job: {
-                        status: string;
-                        progress: number | null;
-                        error: string | null;
-                        render_storage_path: string | null;
-                    } | null;
-                }>('render-job-get-status', { jobId });
+                const { data } = await invokeFunction('render-job-get-status', { jobId });
 
                 const job = data?.job;
                 if (!job) return;

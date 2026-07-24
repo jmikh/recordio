@@ -9,7 +9,7 @@
  * Response: { confirmed: boolean }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { ProjectConfirmUploadResponseSchema, ProjectIdRequestSchema } from '@shared/api/projects';
 
 export const projectConfirmUploadRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -17,12 +17,8 @@ export const projectConfirmUploadRoutes: FastifyPluginAsyncTypebox = async (app)
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                }),
-                response: {
-                    200: Type.Object({ confirmed: Type.Boolean() }),
-                },
+                body: ProjectIdRequestSchema,
+                response: { 200: ProjectConfirmUploadResponseSchema },
             },
         },
         async (req) => {

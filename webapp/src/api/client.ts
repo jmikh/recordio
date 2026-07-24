@@ -1,4 +1,5 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
+import type { ApiRoutes } from '@shared/api';
 import { authAwareFetch, notifyUnauthorized, supabase } from '../supabase/client';
 
 export type InvokeResult<T> =
@@ -12,6 +13,11 @@ export type InvokeResult<T> =
  * per-function VITE_USE_SERVER/MIGRATED_FUNCTIONS cutover machinery went
  * with them (git history has it).
  *
+ * Routes mapped in ApiRoutes (shared/api — the client↔server contract)
+ * get a checked request body and a typed response with no per-call-site
+ * generic. Unmapped routes fall back to the untyped overload until the
+ * contract map is exhaustive (plans/shared-api-contract.md Steps 2–3).
+ *
  * Returns the supabase-shaped `{ data, error }` (FunctionsHttpError with
  * the Response on `.context` for non-2xx, FunctionsFetchError on network
  * failure) so call sites keep the types they were written against.
@@ -19,7 +25,12 @@ export type InvokeResult<T> =
  * Requests go through authAwareFetch, so a 401 from the server funnels
  * into the same unauthorized handler as supabase calls.
  */
-export async function invokeFunction<T = unknown>(name: string, body?: unknown): Promise<InvokeResult<T>> {
+export async function invokeFunction<K extends keyof ApiRoutes>(
+    name: K,
+    body: ApiRoutes[K]['request'],
+): Promise<InvokeResult<ApiRoutes[K]['response']>>;
+export async function invokeFunction<T = unknown>(name: string, body?: unknown): Promise<InvokeResult<T>>;
+export async function invokeFunction(name: string, body?: unknown): Promise<InvokeResult<unknown>> {
     const baseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
     if (!baseUrl) {
         return { data: null, error: new Error('VITE_API_URL is not set') };
@@ -52,10 +63,10 @@ export async function invokeFunction<T = unknown>(name: string, body?: unknown):
     }
 
     const contentType = response.headers.get('Content-Type') ?? '';
-    const data = contentType.includes('application/json')
+    const data: unknown = contentType.includes('application/json')
         ? await response.json()
         : await response.text();
-    return { data: data as T, error: null };
+    return { data, error: null };
 }
 
 /**

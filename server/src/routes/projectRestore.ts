@@ -7,7 +7,7 @@
  * Response: { restored: boolean }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { ProjectIdRequestSchema, ProjectRestoreResponseSchema } from '@shared/api/projects';
 
 export const projectRestoreRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -15,12 +15,8 @@ export const projectRestoreRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                }),
-                response: {
-                    200: Type.Object({ restored: Type.Boolean() }),
-                },
+                body: ProjectIdRequestSchema,
+                response: { 200: ProjectRestoreResponseSchema },
             },
         },
         async (req) => {

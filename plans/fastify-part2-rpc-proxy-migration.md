@@ -198,6 +198,9 @@ two Part 1 inline copies into one shared service (see survey).
 
 ## Definition of done (every batch)
 
+- Request/response schemas live in `shared/api/` (the shared contract —
+  `plans/shared-api-contract.md`) once that plan's Step 1 lands; new
+  batch routes define their schemas there, never inline.
 - Read the SQL source FIRST (`supabase/sql/functions/<fn>.sql`); port
   semantics 1:1 — access rules, NULL semantics, return shapes, and any
   RAISE message a call site reads. Divergences only when explicitly
@@ -282,3 +285,25 @@ two Part 1 inline copies into one shared service (see survey).
   together per batch; rollback = git revert (accepted: low usage). Batch
   1 reworked again (`/asset-list`, `/asset-delete`); Batch 2 prompt
   updated.
+- 2026-07-25 — **Shared contract Step 1 landed** (design + steps in
+  `plans/shared-api-contract.md`): `shared/api/{assets,projects,
+  renderJobs,index}.ts` now hold the TypeBox request/response schemas
+  the 12 Part 2 routes validate with (imported as `@shared/api/*` —
+  tsconfig paths + tsup alias/noExternal + vitest aliases; server
+  tsconfig also gained `"rootDir": ".."` + the include — TS 7
+  defaults rootDir to the tsconfig dir) and the `ApiRoutes` map typing
+  `invokeFunction`; all Part 2 call sites dropped their inline
+  generics. The contract immediately caught TWO phantom-field reads:
+  Header's dead `share_slug` (fixed → `data.slug`, shareSlug now
+  auto-populates on editor open) and cloudProjectService's
+  `cloudProject.user_id` (never returned by project-get — the pre-v5
+  storagePath backfill built `undefined/…` paths; fixed → `created_by`).
+  Checks: both typechecks clean, 432 tests + known failure, eslint no
+  new findings (−2 in cloudStorage), tsup build green, tsx boot smoke
+  on port 8086 green. ⚠ Deploy note: the Railway service builds with
+  root directory `server/` — if Railway isolates the build context to
+  that directory, `../shared/api` won't exist at build time and tsup
+  fails loudly at deploy; fix = widen the root dir (build
+  `cd server && npm ci && npm run build`) or a small Dockerfile à la
+  render-worker. Verify on the next deploy. Batch 3 (workspaces) routes
+  will be born typed.

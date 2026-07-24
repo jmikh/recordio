@@ -5,13 +5,17 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "dist",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "../shared/api"],
   "exclude": ["node_modules", "dist"]
 }

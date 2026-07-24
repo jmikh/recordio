@@ -104,9 +104,7 @@ export class UserAssetService {
      * List active assets for a given type (ready + not deleted).
      */
     static async listAssets(type: 'background' | 'music'): Promise<UserAsset[]> {
-        const { data, error } = await invokeFunction<{ assets: UserAsset[] }>('asset-list', {
-            assetType: type,
-        });
+        const { data, error } = await invokeFunction('asset-list', { assetType: type });
 
         if (error) throw error;
 
@@ -117,10 +115,7 @@ export class UserAssetService {
      * Soft-delete an asset (is_deleted = true). Evicts from local cache.
      */
     static async deleteAsset(id: string): Promise<void> {
-        const { data, error } = await invokeFunction<{ storagePath: string | null }>(
-            'asset-delete',
-            { assetId: id },
-        );
+        const { data, error } = await invokeFunction('asset-delete', { assetId: id });
 
         if (error) throw error;
 

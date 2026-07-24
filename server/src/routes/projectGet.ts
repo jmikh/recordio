@@ -11,7 +11,7 @@
  * Response: the project object (200) | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { ProjectIdRequestSchema } from '@shared/api/projects';
 import { canEditProject } from '../services/projectAccess.js';
 
 export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -20,9 +20,7 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                }),
+                body: ProjectIdRequestSchema,
             },
         },
         async (req, reply) => {

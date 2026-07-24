@@ -16,6 +16,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { ProjectUpdateRequestSchema, ProjectUpdateResponseSchema } from '@shared/api/projects';
 import { canEditProject } from '../services/projectAccess.js';
 
 export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -24,20 +25,11 @@ export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                // Omittable ints are Optional, NEVER Union([Integer, Null]):
-                // Ajv's coerceTypes turns a JSON null into 0 via the integer
-                // branch (found the hard way — a null expectedVersion became
-                // a compare-and-set against version 0). Clients omit the key.
-                body: Type.Object({
-                    projectId: Type.String({ minLength: 1 }),
-                    projectData: Type.Unknown(),
-                    durationMs: Type.Optional(Type.Integer()),
-                    expectedVersion: Type.Optional(Type.Integer()),
-                }),
+                // The Ajv null→0 coercion gotcha lives with the schema now —
+                // see shared/api/projects.ts (ProjectUpdateRequestSchema)
+                body: ProjectUpdateRequestSchema,
                 response: {
-                    200: Type.Object({
-                        cloudVersion: Type.Union([Type.Integer(), Type.Null()]),
-                    }),
+                    200: ProjectUpdateResponseSchema,
                     403: Type.Object({ error: Type.String() }),
                 },
             },

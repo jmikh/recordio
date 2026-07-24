@@ -13,7 +13,7 @@
  * Response: { projects: [...] } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { Type } from '@sinclair/typebox';
+import { ProjectListRequestSchema } from '@shared/api/projects';
 import { isWorkspaceMember } from '../services/projectAccess.js';
 
 export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -22,9 +22,7 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: Type.Object({
-                    workspaceId: Type.String({ minLength: 1 }),
-                }),
+                body: ProjectListRequestSchema,
             },
         },
         async (req, reply) => {
