@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase } from '../../../auth/AuthManager';
 import { invokeFunction } from '../../../api/client';
 import { useUserStore } from '../../../auth/useUserStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -189,9 +188,16 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
 
             // Poll for progress
             pollRef.current = setInterval(async () => {
-                const { data: job } = await supabase!
-                    .rpc('render_job_get_status', { p_job_id: jobId });
+                const { data } = await invokeFunction<{
+                    job: {
+                        status: string;
+                        progress: number | null;
+                        error: string | null;
+                        render_storage_path: string | null;
+                    } | null;
+                }>('render-job-get-status', { jobId });
 
+                const job = data?.job;
                 if (!job) return;
 
                 if (job.progress !== null) {
@@ -210,7 +216,8 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                         render_duration_s: Math.round((performance.now() - renderStartRef.current) / 1000),
                         ...getProjectMeta(),
                     });
-                    await downloadFile(job.render_storage_path, projectName, projectId, projectMeta);
+                    // completed ⇒ the worker stored the render (path set)
+                    await downloadFile(job.render_storage_path!, projectName, projectId, projectMeta);
                 } else if (job.status === 'failed' || job.status === 'canceled') {
                     const msg = job.error || `Render ${job.status}`;
                     if (job.status === 'failed') {

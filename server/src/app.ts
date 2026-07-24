@@ -26,6 +26,16 @@ import { sendWorkspaceInviteEmailRoutes } from './routes/sendWorkspaceInviteEmai
 import { transcribeRoutes } from './routes/transcribe.js';
 import { assetListRoutes } from './routes/assetList.js';
 import { assetDeleteRoutes } from './routes/assetDelete.js';
+import { projectGetRoutes } from './routes/projectGet.js';
+import { projectListRoutes } from './routes/projectList.js';
+import { projectUpdateRoutes } from './routes/projectUpdate.js';
+import { projectUpdateNameRoutes } from './routes/projectUpdateName.js';
+import { projectRenameRoutes } from './routes/projectRename.js';
+import { projectShareRoutes } from './routes/projectShare.js';
+import { projectDeleteRoutes } from './routes/projectDelete.js';
+import { projectRestoreRoutes } from './routes/projectRestore.js';
+import { projectConfirmUploadRoutes } from './routes/projectConfirmUpload.js';
+import { renderJobGetStatusRoutes } from './routes/renderJobGetStatus.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -161,6 +171,16 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     // (plans/fastify-part2-rpc-proxy-migration.md)
     app.register(assetListRoutes);
     app.register(assetDeleteRoutes);
+    app.register(projectGetRoutes);
+    app.register(projectListRoutes);
+    app.register(projectUpdateRoutes);
+    app.register(projectUpdateNameRoutes);
+    app.register(projectRenameRoutes);
+    app.register(projectShareRoutes);
+    app.register(projectDeleteRoutes);
+    app.register(projectRestoreRoutes);
+    app.register(projectConfirmUploadRoutes);
+    app.register(renderJobGetStatusRoutes);
 
     app.get('/health', {
         schema: {

@@ -106,7 +106,14 @@ proxy layer.
   (`{ cloudVersion: null }` beats a bare `null` body).
 - **Schemas:** strict TypeBox request schemas; response schemas per
   route like every Part 1 route (the strip-unknown-props concern is gone
-  now that the route owns its response shape).
+  now that the route owns its response shape) — EXCEPT routes returning
+  arbitrary jsonb blobs (project_data etc.), which skip the response
+  schema. **Ajv-coercion gotcha (found in Batch 2):** never model an
+  omittable numeric field as `Union([Integer, Null])` — Fastify's
+  default Ajv coerces a JSON null to 0 via the integer branch. Use
+  `Optional(Integer)` and have the client OMIT the key
+  (JSON.stringify drops undefined); an explicit null still coerces to 0,
+  so pick semantics where 0 fails safe and pin it with a test.
 - **Business errors a call site reads** use the Part 1 pattern (e.g.
   asset-upload's `library_full`): 200/4xx with a typed error body the
   client checks explicitly — not PostgrestError reconstruction.
@@ -253,6 +260,19 @@ two Part 1 inline copies into one shared service (see survey).
   (`server/src/rpc.ts`, its contract tests); Batch 1 reworked to inline
   SQL the same day (client-visible contract unchanged). Batch 2 prompt
   rewritten for inline ports.
+- 2026-07-24 — **Batch 2 (projects + render status) CODE COMPLETE +
+  smoke-tested** — 10 routes (`/project-get|list|update|update-name|
+  rename|share|delete|restore|confirm-upload`, `/render-job-get-status`),
+  all inline SQL, regular style; `canEditProject`/`isWorkspaceMember`
+  added to services/projectAccess.ts (assert_* parity incl. the
+  live-workspace check the Part 1 helper lacked); call sites swapped in
+  cloudStorage/Header/useCloudRender. Parity pins landed: conflict-null,
+  hash short-circuit bypassing the version check, owner-only share with
+  isNew, workspace-deleted 403s. Full HTTP smoke test on a throwaway
+  local instance (port 8085): all legs green. 432 tests pass (known
+  pre-existing failure only), typechecks + eslint clean (pre-existing
+  findings verified on HEAD; one removed). Awaiting user browser
+  verification + go-ahead. Details in the 2-2 prompt's status.
 - 2026-07-24 — **PIVOT 2 (user decision): regular routes, hard cutover.**
   No RPC-specific style anywhere: kebab-case flat routes one-module-per-
   endpoint (Part 1 conventions), client-shaped camelCase

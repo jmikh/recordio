@@ -61,35 +61,34 @@ export class CloudStorage {
         userId: string,
         expectedVersion?: number,
     ): Promise<{ cloudVersion: number }> {
-        if (!supabase) throw new Error('Supabase not configured');
-
         const projectData = JSON.parse(JSON.stringify(project));
 
-        const { data, error } = await supabase.rpc('project_update', {
-            p_project_id: project.id,
-            p_project_data: projectData,
-            p_duration_ms: this.computeDurationMs(project),
-            p_expected_version: expectedVersion ?? null,
-        });
+        // expectedVersion: undefined is OMITTED by JSON.stringify — the
+        // server treats an absent key as "no version check" (sending null
+        // would be coerced to 0 by schema validation)
+        const { data, error } = await invokeFunction<{ cloudVersion: number | null }>(
+            'project-update',
+            {
+                projectId: project.id,
+                projectData,
+                durationMs: this.computeDurationMs(project),
+                expectedVersion,
+            },
+        );
 
         if (error) throw error;
-        if (data === null) {
+        if (data.cloudVersion === null) {
             throw new CloudVersionConflictError(project.id, expectedVersion!);
         }
 
-        return { cloudVersion: data };
+        return { cloudVersion: data.cloudVersion };
     }
 
     /**
      * Update only the project name column (no debouncing needed).
      */
     static async updateProjectName(projectId: string, name: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { error } = await supabase.rpc('project_update_name', {
-            p_project_id: projectId,
-            p_name: name,
-        });
+        const { error } = await invokeFunction('project-update-name', { projectId, name });
 
         if (error) throw error;
     }
@@ -99,14 +98,10 @@ export class CloudStorage {
      * Returns null if the project doesn't exist in cloud.
      */
     static async getCloudVersion(projectId: string): Promise<number | null> {
-        if (!supabase) return null;
-
-        // project_get returns full metadata; we only need cloud_version.
-        // A dedicated lightweight RPC could be added later if perf matters.
-        console.log('[CloudStorage] project_get via getCloudVersion', projectId);
-        const { data, error } = await supabase.rpc('project_get', {
-            p_project_id: projectId,
-        });
+        // project-get returns full metadata; we only need cloud_version.
+        // A dedicated lightweight endpoint could be added later if perf matters.
+        console.log('[CloudStorage] project-get via getCloudVersion', projectId);
+        const { data, error } = await invokeFunction<CloudProject>('project-get', { projectId });
 
         if (error || !data) return null;
         return data.cloud_version;
@@ -117,12 +112,8 @@ export class CloudStorage {
      * Also bumps last_accessed_at server-side.
      */
     static async loadProjectMetadata(projectId: string): Promise<CloudProject | null> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        console.log('[CloudStorage] project_get via loadProjectMetadata', projectId);
-        const { data, error } = await supabase.rpc('project_get', {
-            p_project_id: projectId,
-        });
+        console.log('[CloudStorage] project-get via loadProjectMetadata', projectId);
+        const { data, error } = await invokeFunction<CloudProject>('project-get', { projectId });
 
         if (error) throw error;
         return data;
@@ -132,25 +123,20 @@ export class CloudStorage {
      * List project summaries for the dashboard (lightweight — no project_data).
      */
     static async listProjectsSummary(workspaceId: string): Promise<CloudProjectSummary[]> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('project_list', {
-            p_workspace_id: workspaceId,
-        });
+        const { data, error } = await invokeFunction<{ projects: CloudProjectSummary[] }>(
+            'project-list',
+            { workspaceId },
+        );
 
         if (error) throw error;
-        return data ?? [];
+        return data.projects ?? [];
     }
 
     /**
      * Soft-delete a project (sets deleted_at).
      */
     static async softDeleteProject(projectId: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { error } = await supabase.rpc('project_delete', {
-            p_project_id: projectId,
-        });
+        const { error } = await invokeFunction('project-delete', { projectId });
 
         if (error) throw error;
     }
@@ -159,25 +145,19 @@ export class CloudStorage {
      * Restore a soft-deleted project (clears deleted_at).
      */
     static async restoreProject(projectId: string): Promise<boolean> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('project_restore', {
-            p_project_id: projectId,
-        });
+        const { data, error } = await invokeFunction<{ restored: boolean }>(
+            'project-restore',
+            { projectId },
+        );
 
         if (error) throw error;
-        return data ?? false;
+        return data.restored ?? false;
     }
 
     // ─── Rename ────────────────────────────────────────────────────
 
     static async renameProject(projectId: string, name: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { error } = await supabase.rpc('project_rename', {
-            p_project_id: projectId,
-            p_name: name,
-        });
+        const { error } = await invokeFunction('project-rename', { projectId, name });
 
         if (error) throw error;
     }
@@ -214,14 +194,13 @@ export class CloudStorage {
      * Confirm project media upload — flips upload_status from 'pending' to 'ready'.
      */
     static async confirmProjectUpload(projectId: string): Promise<void> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await supabase.rpc('project_confirm_upload', {
-            p_project_id: projectId,
-        });
+        const { data, error } = await invokeFunction<{ confirmed: boolean }>(
+            'project-confirm-upload',
+            { projectId },
+        );
 
         if (error) throw error;
-        if (!data) console.warn('[CloudStorage] project_confirm_upload returned false — project may already be ready');
+        if (!data.confirmed) console.warn('[CloudStorage] project-confirm-upload returned false — project may already be ready');
     }
 
 

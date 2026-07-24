@@ -52,6 +52,11 @@ export interface SeedProjectOptions {
     /** Defaults to the owner's seeded personal workspace */
     workspaceId?: string;
     expiresAt?: string | null;
+    /** Table default is 'pending'; project-list only returns 'ready' */
+    uploadStatus?: 'pending' | 'ready';
+    permanentlyDeleted?: boolean;
+    cloudVersion?: number;
+    updatedAt?: string;
 }
 
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
@@ -72,9 +77,9 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
 
     await db.query(
         `INSERT INTO projects
-            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at, expires_at)
-         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)`,
-        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null, opts.expiresAt ?? null],
+            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at, expires_at, upload_status, permanently_deleted, cloud_version, updated_at)
+         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, COALESCE($10, 'pending'), $11, $12, COALESCE($13::timestamptz, now()))`,
+        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null, opts.expiresAt ?? null, opts.uploadStatus ?? null, opts.permanentlyDeleted ?? false, opts.cloudVersion ?? 1, opts.updatedAt ?? null],
     );
     return { id, slug, name, ownerId };
 }

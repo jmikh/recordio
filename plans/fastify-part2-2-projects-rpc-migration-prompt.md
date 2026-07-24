@@ -128,3 +128,37 @@ numbers in this prompt may have shifted.
   delete/restore + a render poll), go-ahead, commit/push + prod-deploy
   timing is the user's. Update the status sections of the parent doc and
   this file with what landed.
+
+## Status
+
+- 2026-07-24 — **CODE COMPLETE + HTTP-smoke-tested.** All 10 routes
+  landed per this prompt (one module + one test file per route; the
+  rename twins and the three lifecycle booleans share parameterized
+  suites). Notables beyond the plan:
+  - `canEditProject` + `isWorkspaceMember` added to
+    `services/projectAccess.ts` (assert_* parity incl. the
+    live-workspace check; `getProjectIfEditor` left untouched for the
+    Part 1 routes).
+  - **Ajv coercion find:** `Union([Integer, Null])` coerces JSON null →
+    0 (a null expectedVersion silently became a version-0 CAS). Fixed:
+    `Optional(Integer)` + client omits the key; explicit null pinned as
+    fail-safe (conflict, row untouched). Recorded in the parent doc's
+    Server design.
+  - project-share returns `{ slug, isNew }` (Header's `.single()` cast
+    dropped); render-job-get-status returns `{ job: ... | null }` so
+    unknown jobs don't error-spam the poller; project-get/list keep
+    snake_case jsonb shapes the client consumes; `to_jsonb` for
+    client-visible timestamps.
+  - projects do NOT cascade with workspaces (FK NO ACTION) — projectList
+    tests delete projects first.
+  - suggested_changes additions: rename-twin duplication, Header's dead
+    `share_slug` read, project_list text-ordering (fixed on live path).
+  - Tests: 67 new (all green); full suite 432 passed + the known
+    pre-existing failure; typechecks + eslint clean (pre-existing
+    findings verified on HEAD). Smoke test (throwaway instance, port
+    8085): update no-version/conflict/versioned, share ×2, get, list,
+    render-status null, delete, restore — all green, rows cleaned up.
+- **Remaining (user):** restart the dev server on 8080 (tsx, no watch —
+  still serving pre-batch code), browser click-through, go-ahead, then
+  commit/push + prod deploy timing. Batch 3 (workspaces) prompt comes
+  after verification.

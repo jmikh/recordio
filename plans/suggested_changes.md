@@ -322,6 +322,22 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   column. The smell survives only in the frozen SQL fallback fn until the
   Part 2 end sweep drops it. Found 2026-07-24 (Part 2 Batch 1).
 
+- **project_update_name / project_rename are exact duplicates** (same
+  SQL body, both editor-gated name updates) — ported as two identical
+  routes for call-site parity; consolidate to one route + one call path
+  later (`server/src/routes/projectUpdateName.ts`/`projectRename.ts`).
+  Found 2026-07-24 (Part 2 Batch 2).
+- **Header.tsx share-state effect reads a field that doesn't exist**: it
+  checks `data?.share_slug` but project-get returns `slug` — the branch
+  never fires, so shareSlug never auto-populates on editor open (a second
+  "Publish" click re-uses the existing slug anyway via the server, so the
+  visible effect is only the button state). Probable intent: `data.slug`.
+  Ported verbatim. Found 2026-07-24 (Part 2 Batch 2).
+- **project_list orders by the text rendering of updated_at** (same class
+  as the asset_list smell) — fixed on the live path (the route orders by
+  the column); the smell survives only in the frozen SQL fallback.
+  Found 2026-07-24 (Part 2 Batch 2).
+
 ## Server config / infra cleanups
 
 - Make `SUPABASE_JWT_SECRET` optional in `server/src/config.ts` — prod

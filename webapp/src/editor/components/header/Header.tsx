@@ -23,7 +23,6 @@ import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
 import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import { useToast } from '../../../components/Toast';
-import { supabase } from '../../../auth/AuthManager';
 import { invokeFunction } from '../../../api/client';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
@@ -98,9 +97,8 @@ export const Header = () => {
     const [isSharing, setIsSharing] = useState(false);
 
     useEffect(() => {
-        if (!isAuthenticated || !project?.id || !supabase) return;
-        supabase
-            .rpc('project_get', { p_project_id: project.id })
+        if (!isAuthenticated || !project?.id) return;
+        invokeFunction<{ share_slug?: string }>('project-get', { projectId: project.id })
             .then(({ data }) => {
                 if (data?.share_slug) setShareSlug(data.share_slug);
             });
@@ -117,15 +115,16 @@ export const Header = () => {
     };
 
     const handleShare = async () => {
-        if (!supabase || !project?.id || isSharing) return;
+        if (!project?.id || isSharing) return;
         trackPublishClicked(project.id);
         setIsSharing(true);
         try {
             let slug = shareSlug;
             if (!slug) {
-                const { data, error } = await supabase
-                    .rpc('project_share', { p_project_id: project.id })
-                    .single() as { data: { slug: string; is_new: boolean } | null; error: any };
+                const { data, error } = await invokeFunction<{ slug: string; isNew: boolean }>(
+                    'project-share',
+                    { projectId: project.id },
+                );
                 if (error || !data) throw error;
                 slug = data.slug;
                 setShareSlug(slug);
