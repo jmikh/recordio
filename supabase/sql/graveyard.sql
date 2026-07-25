@@ -103,3 +103,68 @@ DROP FUNCTION IF EXISTS public.folder_list(UUID);
 DROP FUNCTION IF EXISTS public.folder_update(UUID, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.project_move_to_folder(UUID, UUID);
 DROP FUNCTION IF EXISTS public.project_star(UUID, BOOLEAN);
+
+-- ── Part 2 end-of-migration sweep (2026-07-25) ──────────────────────
+-- Every client-called RPC is ported inline into the Fastify server
+-- (plans/fastify-part2-rpc-proxy-migration.md); webapp/src has zero
+-- .rpc( calls. APPLY ORDER: deploy the Part 2 server+webapp to prod
+-- FIRST, then run sql/deploy.sh --remote — until then the frozen fns
+-- keep serving any not-yet-updated bundle.
+-- Kept (server/trigger territory): mux_video_complete,
+-- mux_video_get_or_create, render_job_complete,
+-- render_job_get_or_create, user_profile_create.
+
+-- The 26 migrated client RPCs (Batches 1-4)
+DROP FUNCTION IF EXISTS public.asset_delete(p_asset_id text);
+DROP FUNCTION IF EXISTS public.asset_list(p_asset_type text);
+DROP FUNCTION IF EXISTS public.project_confirm_upload(p_project_id uuid);
+DROP FUNCTION IF EXISTS public.project_delete(p_project_id uuid);
+DROP FUNCTION IF EXISTS public.project_get(p_project_id uuid);
+DROP FUNCTION IF EXISTS public.project_list(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.project_rename(p_project_id uuid, p_name text);
+DROP FUNCTION IF EXISTS public.project_restore(p_project_id uuid);
+DROP FUNCTION IF EXISTS public.project_share(p_project_id uuid, p_share_policy text);
+DROP FUNCTION IF EXISTS public.project_update(p_project_id uuid, p_project_data jsonb, p_duration_ms integer, p_expected_version integer);
+DROP FUNCTION IF EXISTS public.project_update_name(p_project_id uuid, p_name text);
+DROP FUNCTION IF EXISTS public.render_job_get_status(p_job_id uuid);
+DROP FUNCTION IF EXISTS public.subscription_get(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.user_profile_get();
+DROP FUNCTION IF EXISTS public.workspace_create(p_name text);
+DROP FUNCTION IF EXISTS public.workspace_get(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.workspace_get_default();
+DROP FUNCTION IF EXISTS public.workspace_invite(p_workspace_id uuid, p_email text, p_role text);
+DROP FUNCTION IF EXISTS public.workspace_invite_accept(p_token uuid);
+DROP FUNCTION IF EXISTS public.workspace_invite_rescind(p_invitation_id uuid);
+DROP FUNCTION IF EXISTS public.workspace_list();
+DROP FUNCTION IF EXISTS public.workspace_member_remove(p_workspace_id uuid, p_user_id uuid);
+DROP FUNCTION IF EXISTS public.workspace_member_update_role(p_workspace_id uuid, p_user_id uuid, p_role text);
+DROP FUNCTION IF EXISTS public.workspace_rename(p_workspace_id uuid, p_name text);
+DROP FUNCTION IF EXISTS public.workspace_seats_set(p_workspace_id uuid, p_seats integer);
+DROP FUNCTION IF EXISTS public.workspace_set_default(p_workspace_id uuid);
+
+-- trial_start KILLED (user decision 2026-07-25): no caller existed;
+-- trials can no longer start. /send-welcome-email (its pg_net target)
+-- is deliberately kept for future re-wiring.
+DROP FUNCTION IF EXISTS public.trial_start();
+
+-- Zero-caller orphans (verified 2026-07-25 across webapp/extension/
+-- server/render-worker/sql): workspace_delete never got a UI;
+-- project_create is the pre-v2 creation path; the editor-management
+-- and move-to-workspace RPCs never got callers.
+DROP FUNCTION IF EXISTS public.workspace_delete(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.project_create(p_name text, p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.project_editor_add(p_project_id uuid, p_user_id uuid);
+DROP FUNCTION IF EXISTS public.project_editor_remove(p_project_id uuid, p_user_id uuid);
+DROP FUNCTION IF EXISTS public.project_move_to_workspace(p_project_id uuid, p_workspace_id uuid);
+
+-- assert_* helpers: their only callers were the fns above (the server
+-- ports the checks as services/projectAccess.ts)
+DROP FUNCTION IF EXISTS public.assert_project_editor(p_project_id uuid);
+DROP FUNCTION IF EXISTS public.assert_workspace_admin(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.assert_workspace_creator(p_workspace_id uuid);
+DROP FUNCTION IF EXISTS public.assert_workspace_viewer(p_workspace_id uuid);
+
+-- Stray render_job_start overload found during the sweep: the old
+-- entry above drops the no-arg form, and render_job_get_or_create.sql
+-- drops a 2-arg form — the 6-arg original survived both. Zero callers.
+DROP FUNCTION IF EXISTS public.render_job_start(uuid, uuid, text, integer, text, real);

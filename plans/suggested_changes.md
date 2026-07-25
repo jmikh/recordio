@@ -253,11 +253,10 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   exists at Mux; note the interaction with the unlimited-replay smell
   above) (`supabase/sql/functions/mux_video_complete.sql`).
   Found 2026-07-22.
-- **render_purge_candidates.sql is ORPHANED**: its only intended
-  caller was the `render-purge` edge function that never existed
-  (part13 replaced that whole path with the inline-SQL server job but
-  missed this fn). Decommission candidate: delete the file + graveyard
-  DROP — ask the user. Found 2026-07-22.
+- **render_purge_candidates.sql is ORPHANED**: ~~its only intended
+  caller was the `render-purge` edge function that never existed~~
+  DONE (verified 2026-07-25): file deleted + graveyard DROP landed
+  (pre-sweep). Found 2026-07-22.
 - **stripe-webhooks**: the `customer.subscription.deleted` handler has
   NO `event.created` ordering guard (updated/created do) — a stale
   redelivered deleted always cancels the row; the next genuine
@@ -275,12 +274,9 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   plan/seats/period-end (edge-fn parity; the product never creates
   multi-item subs). Found 2026-07-22.
 - **set_project_expiry is ORPHANED after the #17 cutover** (user
-  decision 2026-07-22 — the server webhook doesn't touch projects):
-  its only caller is the edge stripe-webhooks fn, which dies when the
-  Supabase endpoint is disabled. Do NOT graveyard before then (the
-  edge fn calls it during the overlap window) — Step 5 decommission
-  list (`supabase/sql/functions/set_project_expiry.sql`).
-  Found 2026-07-22.
+  decision 2026-07-22): ~~its only caller is the edge stripe-webhooks
+  fn~~ DONE (verified 2026-07-25): the edge fn died at Step 5 and the
+  graveyard DROP landed with it. Found 2026-07-22.
 - **send-workspace-invite (edge fn)**: selected the nonexistent
   `user_profiles.display_name` — the silently-swallowed error meant
   the inviter name ALWAYS fell back to the auth email. FIXED in the
@@ -320,9 +316,9 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 
 - **asset_list**: ~~orders by `(row_data->>'created_at') DESC` — TEXT
   comparison of the timestamptz's rendered form~~ DONE for the live path
-  2026-07-24: the inline-SQL port in `routes/rpc/assets.ts` orders by the
-  column. The smell survives only in the frozen SQL fallback fn until the
-  Part 2 end sweep drops it. Found 2026-07-24 (Part 2 Batch 1).
+  2026-07-24 (the inline-SQL port orders by the column); fully DONE
+  2026-07-25 — the SQL fn was dropped at the Part 2 sweep.
+  Found 2026-07-24 (Part 2 Batch 1).
 
 - **project_update_name / project_rename are exact duplicates** (same
   SQL body, both editor-gated name updates) — ported as two identical
@@ -358,11 +354,16 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   (`server/**`, `shared/api/**`), or a render-worker-style Dockerfile.
   Even if the build context is fine, check watch paths: a
   shared/api-only commit must still trigger a server deploy.
+  RESOLVED 2026-07-25: the Batch 3 prod deploy built and serves the
+  new routes (observed live — /workspace-list 200), so the build
+  context includes `../shared`. Still check once: watch paths — a
+  shared/api-ONLY commit must also trigger a server deploy (if they're
+  `server/**`, add `shared/**`).
   Found 2026-07-25 (shared-api-contract Step 1).
 - **project_list orders by the text rendering of updated_at** (same class
   as the asset_list smell) — fixed on the live path (the route orders by
-  the column); the smell survives only in the frozen SQL fallback.
-  Found 2026-07-24 (Part 2 Batch 2).
+  the column); fully DONE 2026-07-25 — the SQL fn dropped at the Part 2
+  sweep. Found 2026-07-24 (Part 2 Batch 2).
 - **workspace_get's pending-invitations list is ALWAYS EMPTY (live
   bug)**: it filters `wi.expires_at > now()`, but migration
   `20260513042717_workspace_invitations_no_expiry.sql` nulled
@@ -370,10 +371,10 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   `NULL > now()` is NULL, so no pending invite ever appears in the
   settings members tab, and MembersPage's seat floor (members +
   pending invitations) under-counts. The Batch 3 route port fixes it
-  (filter on status only, pinned by test); the frozen SQL fn keeps the
-  bug until the sweep. `workspace_list` also has the text-ordering
-  smell (orders by `row_data->>'created_at'`) — fixed on the ported
-  live path too. Found 2026-07-25 (Batch 3+4 scoping).
+  (filter on status only, pinned by test); DONE 2026-07-25 — fixed on
+  the live path AND the buggy SQL fn dropped at the sweep.
+  `workspace_list`'s text-ordering smell (same class) also died with
+  its fn. Found 2026-07-25 (Batch 3+4 scoping).
 - **trial_start KILLED (user decision 2026-07-25)**: no client caller
   existed; no route is ported and the fn joins the graveyard sweep.
   Consequences: trials can no longer be started (new users keep
@@ -384,10 +385,12 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   decision — kept for future re-wiring; its header comment cites
   trial_start and needs updating at the Batch 3+4 port).
 - **workspace_delete has zero callers** (webapp/extension/server
-  checked 2026-07-25) — dead SQL fn, no route ported; graveyard
-  candidate, user confirms at the sweep. (`user_profile_create` also
-  has no client caller but STAYS — it's the auth.users signup
-  trigger.)
+  checked 2026-07-25) — DONE 2026-07-25: dropped at the Part 2 sweep,
+  along with four more zero-caller orphans found by the same audit
+  (`project_create` v1, `project_editor_add`/`_remove`,
+  `project_move_to_workspace`) and a stray 6-arg `render_job_start`
+  overload two earlier graveyard entries had missed by signature.
+  (`user_profile_create` STAYS — it's the auth.users signup trigger.)
 
 - **Stale-bundle reload nudge** (from `plans/shared-api-contract.md`,
   where the deploy-skew policy lives): nothing today tells an open tab

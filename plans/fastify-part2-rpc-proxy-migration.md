@@ -329,3 +329,21 @@ two Part 1 inline copies into one shared service (see survey).
   passing + the known failure); typechecks/eslint/build clean.
   Awaiting user browser verification + go-ahead; then the graveyard
   sweep is the last Part 2 step.
+- 2026-07-25 — **GRAVEYARD SWEEP DONE (repo-side) — Part 2 is
+  code-complete end to end.** All 36 orphaned public fns dropped:
+  the 26 migrated RPCs, trial_start (killed), 5 zero-caller orphans
+  found by the audit (workspace_delete, project_create v1,
+  project_editor_add/_remove, project_move_to_workspace), the 4
+  assert_* helpers (last callers died with the RPCs), plus a stray
+  6-arg render_job_start overload two older graveyard entries missed
+  by signature. DROP signatures generated from pg_proc (no overload
+  misses). sql/functions/ now holds exactly the 5 keepers:
+  mux_video_complete, mux_video_get_or_create, render_job_complete,
+  render_job_get_or_create, user_profile_create. Applied LOCALLY via
+  sql/deploy.sh; full suite re-run against the swept db: 502 passed +
+  the known failure — nothing depended on the dropped fns.
+  **Remaining (user, in order): browser click-through of Batches 3+4 →
+  commit/push → prod deploy of server+webapp (verify the Railway
+  build-context note) → `sql/deploy.sh --remote` LAST** (the frozen
+  fns must outlive any stale prod bundle; the graveyard header
+  documents the order).
