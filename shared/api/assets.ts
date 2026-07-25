@@ -1,7 +1,7 @@
 /**
  * Client↔server contract for the asset routes
  * (plans/shared-api-contract.md). The schema objects here ARE the
- * server's runtime validation — server/src/routes/asset*.ts import them
+ * server's runtime validation — server/src/routes/assets/*.ts import them
  * verbatim — and the webapp's compile-time types via ApiRoutes
  * (./index). Pure schemas + Static<> types: this folder imports nothing
  * from server/ or webapp/.
