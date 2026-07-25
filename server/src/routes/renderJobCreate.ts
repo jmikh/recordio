@@ -3,7 +3,7 @@
  * (Wave B #10). First route to call a `sql/functions/` DB function over
  * the pg pool, and first to use the RenderWorkerPort.
  *
- * The core (project read → `render_job_get_or_create` RPC → presigns →
+ * The core (project read → inline get-or-create → presigns →
  * fire-and-forget worker dispatch) lives in `services/renderJobs.ts`
  * since Wave B #9 — mux-video-create calls it in-process, replacing the
  * edge fn's service-role HTTP hop. This route keeps schema + auth +

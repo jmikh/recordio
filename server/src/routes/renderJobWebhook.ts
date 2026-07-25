@@ -13,10 +13,10 @@
  * `{ ok, cancel: true }` (the worker polls this to abort; NO writes) →
  * one UPDATE with progress/durations (`start_duration_s` computed on
  * the first callback; completed also stamps total_duration_s +
- * progress 1) → terminal states call the SHARED `render_job_complete`
- * DB function over the pool (pending-only guard; failed/canceled
- * cascade to pending mux_videos — the SQL stays untouched, the
- * stale-jobs watchdog cron calls it too) → on completed with a path,
+ * progress 1) → terminal states run the inline complete-and-cascade
+ * CTE (pending-only guard; failed/canceled cascade to pending
+ * mux_videos — the stale-jobs cron inlines the same logic since the
+ * 2026-07-25 sweep) → on completed with a path,
  * a pending mux_video for the same (project_id, cloud_version) is
  * uploaded to Mux via services/muxUpload (built shared for exactly
  * this in part12). A failed Mux upload still answers 200 — uploadToMux
@@ -147,8 +147,10 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                 [jobId, ...columns.map((c) => updates[c])],
             );
 
-            // Terminal state — the SHARED RPC guards pending-only and
-            // cascades failed/canceled to pending mux_videos
+            // Terminal state — inline port of render_job_complete (SQL fn
+            // graveyarded 2026-07-25): one data-modifying CTE guards
+            // pending-only and cascades failed/canceled to pending
+            // mux_videos atomically (both writes in one statement)
             if (status === 'completed' || status === 'failed') {
                 if (status === 'failed') {
                     // Worker-reported failure: a domain event, not a request
@@ -158,11 +160,24 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                         'render worker reported job failure',
                     );
                 }
-                await app.deps.db.query('SELECT render_job_complete($1, $2, $3)', [
-                    jobId,
-                    status,
-                    errorMsg || null,
-                ]);
+                await app.deps.db.query(
+                    `WITH job AS (
+                        UPDATE render_jobs
+                        SET status = $2, error = $3, updated_at = NOW()
+                        WHERE id = $1 AND status = 'pending'
+                        RETURNING project_id, cloud_version
+                    )
+                    UPDATE mux_videos mv
+                    SET status = 'failed',
+                        error = COALESCE($3, 'Render ' || $2),
+                        updated_at = NOW()
+                    FROM job
+                    WHERE $2 IN ('failed', 'canceled')
+                      AND mv.project_id = job.project_id
+                      AND mv.cloud_version = job.cloud_version
+                      AND mv.status = 'pending'`,
+                    [jobId, status, errorMsg || null],
+                );
 
                 if (status === 'completed') {
                     logEvent(req.log, 'render_job.completed', {

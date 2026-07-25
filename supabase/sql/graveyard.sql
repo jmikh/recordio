@@ -168,3 +168,17 @@ DROP FUNCTION IF EXISTS public.assert_workspace_viewer(p_workspace_id uuid);
 -- entry above drops the no-arg form, and render_job_get_or_create.sql
 -- drops a 2-arg form — the 6-arg original survived both. Zero callers.
 DROP FUNCTION IF EXISTS public.render_job_start(uuid, uuid, text, integer, text, real);
+
+-- ── Server-RPC inlining (2026-07-25, post-Part-2) ───────────────────
+-- The last four business-logic fns move inline into the server as
+-- single atomic statements: render_job_get_or_create → CTE in
+-- services/renderJobs.ts; mux_video_get_or_create → upsert in
+-- routes/muxVideoCreate.ts; render_job_complete → CTE in
+-- routes/renderJobWebhook.ts (the stale-jobs cron inlines the same
+-- cascade); mux_video_complete → UPDATE…RETURNING in
+-- routes/muxVideoWebhook.ts. Deploy the server BEFORE running this
+-- remotely. Only the user_profile_create signup trigger fn remains.
+DROP FUNCTION IF EXISTS public.render_job_get_or_create(p_project_id uuid, p_user_id uuid, p_cloud_version integer);
+DROP FUNCTION IF EXISTS public.render_job_complete(p_job_id uuid, p_status text, p_error text);
+DROP FUNCTION IF EXISTS public.mux_video_get_or_create(p_project_id uuid, p_user_id uuid, p_cloud_version integer);
+DROP FUNCTION IF EXISTS public.mux_video_complete(p_mux_asset_id text, p_playback_id text);

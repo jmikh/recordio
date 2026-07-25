@@ -347,3 +347,15 @@ two Part 1 inline copies into one shared service (see survey).
   build-context note) → `sql/deploy.sh --remote` LAST** (the frozen
   fns must outlive any stale prod bundle; the graveyard header
   documents the order).
+- 2026-07-25 — **POST-PART-2: the last four server-called SQL fns
+  inlined** (user decision — details in suggested_changes'
+  "Server-RPC inlining DONE" bullet): get-or-create/complete logic for
+  render_jobs and mux_videos now lives in the routes/services as
+  single atomic statements (CTEs + one true upsert); the stale-jobs
+  cron inlines the cascade it used to get from render_job_complete.
+  All four graveyarded; `sql/functions/` holds ONLY the
+  user_profile_create signup-trigger fn. Verified: the 71 existing
+  route tests pin the ports (all green), full suite 502 + known
+  failure, build/lint clean, cron body executes clean, local deploy
+  leaves exactly one public fn. Same remote apply order: server deploy
+  first, then sql/deploy.sh --remote.

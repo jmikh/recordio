@@ -2,7 +2,10 @@
 --
 -- Every-minute cron that marks pending render jobs as failed if no heartbeat
 -- in 1 minute (4+ missed 15-second heartbeats from the worker).
--- Uses render_job_complete to cascade failure to linked mux_videos.
+-- Inlines the complete-and-cascade logic (was render_job_complete() until
+-- the 2026-07-25 sweep — the server's render-job-webhook runs the same CTE
+-- inline): terminal the pending job, cascade the failure to any pending
+-- mux_videos at the same (project_id, cloud_version).
 --
 -- Schedule: every minute
 -- Pattern:  A (pure SQL, no edge function needed)
@@ -16,9 +19,22 @@ SELECT cron.schedule(
     'render-jobs-stale-cleanup',
     '* * * * *',
     $$
-    SELECT public.render_job_complete(rj.id, 'failed', 'Worker unresponsive')
-    FROM public.render_jobs rj
-    WHERE rj.status = 'pending'
-      AND rj.updated_at < now() - interval '1 minute';
+    WITH stale AS (
+        UPDATE public.render_jobs rj
+        SET status = 'failed',
+            error = 'Worker unresponsive',
+            updated_at = now()
+        WHERE rj.status = 'pending'
+          AND rj.updated_at < now() - interval '1 minute'
+        RETURNING rj.project_id, rj.cloud_version
+    )
+    UPDATE public.mux_videos mv
+    SET status = 'failed',
+        error = 'Worker unresponsive',
+        updated_at = now()
+    FROM stale
+    WHERE mv.project_id = stale.project_id
+      AND mv.cloud_version = stale.cloud_version
+      AND mv.status = 'pending';
     $$
 );

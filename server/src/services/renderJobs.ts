@@ -5,14 +5,14 @@
  * key; the server never implements that auth path — it dies with the edge
  * fn at decommission).
  *
- * Resolves a render job for (projectId, cloudVersion) via the
- * `render_job_get_or_create` RPC — atomic cache-hit / dedup / retry /
- * insert; it stays SQL on purpose (it takes explicit $user_id, no
- * auth.uid(), so it works over the pool, and reimplementing it in TS
- * would lose the atomicity). On a new/retried job: presign GETs for the
- * project's media + a PUT for the output path, then dispatch to the
- * render worker FIRE-AND-FORGET (not awaited; failures are logged only —
- * the stale-job cron is the safety net, edge-fn parity).
+ * Resolves a render job for (projectId, cloudVersion) via one inline
+ * data-modifying CTE — atomic cache-hit / dedup / retry / insert in a
+ * single statement (was the `render_job_get_or_create` SQL fn until the
+ * 2026-07-25 sweep; the CTE keeps its exact semantics). On a
+ * new/retried job: presign GETs for the project's media + a PUT for the
+ * output path, then dispatch to the render worker FIRE-AND-FORGET (not
+ * awaited; failures are logged only — the stale-job cron is the safety
+ * net, edge-fn parity).
  *
  * `userId` is whoever the render is attributed to — the CALLER on the
  * direct route, the project OWNER when mux-video-create triggers it
@@ -67,12 +67,52 @@ export async function getOrCreateRenderJob(
         | undefined;
     if (!project) return null;
 
+    // Inline port of render_job_get_or_create (SQL fn graveyarded
+    // 2026-07-25): one data-modifying CTE = one atomic statement, same
+    // snapshot for all branches. Cache-hit (completed) and dedup
+    // (pending) return the existing row; failed/canceled rows are
+    // RESET (attempt bump, timings cleared, path recomputed under the
+    // CALLER's prefix — known smell, parity); no row → insert. Same
+    // race profile as the fn: no unique index covers non-completed
+    // rows, so a concurrent first render can double-insert (rare,
+    // benign — the stale-job cron reaps the loser).
+    const renderStoragePath = `${userId}/${projectId}/renders/v${cloudVersion}.mp4`;
     const { rows: jobRows } = await deps.db.query(
-        'SELECT job_id, status, is_new, render_storage_path FROM render_job_get_or_create($1, $2, $3)',
-        [projectId, userId, cloudVersion],
+        `WITH existing AS (
+            SELECT id, status, render_storage_path
+            FROM render_jobs
+            WHERE project_id = $1 AND cloud_version = $3
+        ), retried AS (
+            UPDATE render_jobs rj
+            SET status = 'pending',
+                progress = NULL,
+                attempt_count = rj.attempt_count + 1,
+                render_storage_path = $4,
+                start_duration_s = NULL,
+                download_duration_s = NULL,
+                render_duration_s = NULL,
+                upload_duration_s = NULL,
+                total_duration_s = NULL,
+                updated_at = NOW()
+            FROM existing e
+            WHERE rj.id = e.id AND e.status NOT IN ('completed', 'pending')
+            RETURNING rj.id
+        ), inserted AS (
+            INSERT INTO render_jobs (project_id, user_id, cloud_version, render_storage_path)
+            SELECT $1, $2, $3, $4
+            WHERE NOT EXISTS (SELECT 1 FROM existing)
+            RETURNING id
+        )
+        SELECT e.id AS job_id, e.status, FALSE AS is_new, e.render_storage_path
+        FROM existing e WHERE e.status IN ('completed', 'pending')
+        UNION ALL
+        SELECT r.id, 'pending', TRUE, $4 FROM retried r
+        UNION ALL
+        SELECT i.id, 'pending', TRUE, $4 FROM inserted i`,
+        [projectId, userId, cloudVersion, renderStoragePath],
     );
     const job = jobRows[0] as JobResolution | undefined;
-    if (!job) throw new Error('render_job_get_or_create returned no row');
+    if (!job) throw new Error('render job get-or-create returned no row');
 
     // Cache hit or dedup — no presigning, no dispatch
     if (!job.is_new) {

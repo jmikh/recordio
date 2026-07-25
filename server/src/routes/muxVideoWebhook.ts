@@ -15,7 +15,7 @@
  * fn's separate `Invalid signature format` body collapses into
  * `Invalid signature` — documented divergence, Mux reads no bodies) →
  * JSON.parse → missing data.id → 200 acknowledged →
- *   video.asset.ready   → `mux_video_complete` RPC over the pool
+ *   video.asset.ready   → inline complete-UPDATE over the pool
  *                         (EXCLUSIVE to this webhook, explicit params,
  *                         no auth.uid() → stays SQL). Matches ANY
  *                         status; found=false → 200 + message, warn.
@@ -40,9 +40,8 @@ interface MuxWebhookEvent {
 }
 
 interface CompleteRow {
-    mux_video_id: string | null;
-    project_id: string | null;
-    found: boolean;
+    mux_video_id: string;
+    project_id: string;
 }
 
 export const muxVideoWebhookRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -95,20 +94,30 @@ export const muxVideoWebhookRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     throw new Error(`asset.ready but no playback_id for asset ${assetId}`);
                 }
 
+                // Inline port of mux_video_complete (SQL fn graveyarded
+                // 2026-07-25): one UPDATE…RETURNING; zero rows = the old
+                // found:false. Matches by asset id in ANY status (a
+                // replayed asset.ready revives a canceled/failed row —
+                // known smell, parity) and updates ONE row via the
+                // LIMIT 1 subquery (the fn's SELECT INTO took one row;
+                // idx on mux_asset_id is non-unique).
                 const { rows } = await app.deps.db.query(
-                    'SELECT mux_video_id, project_id, found FROM mux_video_complete($1, $2)',
+                    `UPDATE mux_videos
+                     SET status = 'completed', mux_playback_id = $2, updated_at = NOW()
+                     WHERE id = (SELECT id FROM mux_videos WHERE mux_asset_id = $1 LIMIT 1)
+                     RETURNING id AS mux_video_id, project_id`,
                     [assetId, playbackId],
                 );
                 const result = rows[0] as CompleteRow | undefined;
 
-                if (!result?.found) {
+                if (!result) {
                     req.log.warn({ 'mux.asset_id': assetId }, 'no mux_video for ready asset');
                     return { ok: true as const, message: 'No matching pending row' };
                 }
 
                 req.logCtx.set({
                     'mux.video_status': 'completed',
-                    'project.id': result.project_id ?? undefined,
+                    'project.id': result.project_id,
                 });
                 return { ok: true as const };
             }

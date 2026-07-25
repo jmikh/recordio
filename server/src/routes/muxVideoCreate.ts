@@ -2,10 +2,11 @@
  * POST /mux-video-create — ports the edge function of the same name
  * (Wave B #9, last plain Wave B route). First route on the MuxPort.
  *
- * Resolves a mux_video row for (projectId, cloudVersion) via the
- * `mux_video_get_or_create` RPC — atomic cache-hit / dedup / retry /
- * insert; stays SQL over the pool (exclusive to this route, explicit
- * $user_id, no auth.uid()). On a new/retried row: get-or-create the
+ * Resolves a mux_video row for (projectId, cloudVersion) via an inline
+ * upsert on the (project_id, cloud_version) unique index — atomic
+ * cache-hit / dedup / retry / insert in one statement (was the
+ * mux_video_get_or_create SQL fn until the 2026-07-25 sweep). On a
+ * new/retried row: get-or-create the
  * render job IN-PROCESS via `services/renderJobs.ts` (the edge fn made
  * this hop over HTTP with the service-role key), and if the render is
  * already completed, upload it to Mux (`services/muxUpload.ts`). Both
@@ -95,12 +96,36 @@ export const muxVideoCreateRoutes: FastifyPluginAsyncTypebox<MuxVideoCreateRoute
             }
             const ownerId = access.owner_id;
 
+            // Inline port of mux_video_get_or_create (SQL fn graveyarded
+            // 2026-07-25) as a true upsert on the (project_id,
+            // cloud_version) unique index: insert → is_new; conflict with
+            // a failed/canceled row → RESET to pending, is_new; conflict
+            // with completed/pending → the DO UPDATE's WHERE skips it and
+            // the fallback SELECT returns the untouched row, is_new false.
             const { rows } = await app.deps.db.query(
-                'SELECT mux_video_id, status, is_new FROM mux_video_get_or_create($1, $2, $3)',
+                `WITH upserted AS (
+                    INSERT INTO mux_videos (project_id, user_id, cloud_version, status)
+                    VALUES ($1, $2, $3, 'pending')
+                    ON CONFLICT (project_id, cloud_version) DO UPDATE
+                        SET status = 'pending',
+                            error = NULL,
+                            mux_asset_id = NULL,
+                            mux_playback_id = NULL,
+                            render_storage_path = NULL,
+                            updated_at = NOW()
+                        WHERE mux_videos.status NOT IN ('completed', 'pending')
+                    RETURNING id, status, TRUE AS is_new
+                )
+                SELECT u.id AS mux_video_id, u.status, u.is_new FROM upserted u
+                UNION ALL
+                SELECT mv.id, mv.status, FALSE
+                FROM mux_videos mv
+                WHERE mv.project_id = $1 AND mv.cloud_version = $3
+                  AND NOT EXISTS (SELECT 1 FROM upserted)`,
                 [projectId, ownerId, cloudVersion],
             );
             const result = rows[0] as MuxVideoResolution | undefined;
-            if (!result) throw new Error('mux_video_get_or_create returned no row');
+            if (!result) throw new Error('mux video get-or-create returned no row');
 
             const muxVideoId = result.mux_video_id;
             req.logCtx.set({ 'mux.video_status': result.status });

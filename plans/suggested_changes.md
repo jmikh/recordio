@@ -251,8 +251,9 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   status — a late/replayed `asset.ready` silently revives a
   canceled/failed row to completed (maybe fine: the asset genuinely
   exists at Mux; note the interaction with the unlimited-replay smell
-  above) (`supabase/sql/functions/mux_video_complete.sql`).
-  Found 2026-07-22.
+  above). UPDATED 2026-07-25: the SQL fn is inlined into
+  `server/src/routes/muxVideoWebhook.ts` (parity kept — smell moved,
+  not fixed). Found 2026-07-22.
 - **render_purge_candidates.sql is ORPHANED**: ~~its only intended
   caller was the `render-purge` edge function that never existed~~
   DONE (verified 2026-07-25): file deleted + graveyard DROP landed
@@ -406,6 +407,25 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   to bundle SHA (separate artifacts, separate deploys — direct
   comparison false-positives forever). Shrinks the skew window to near
   zero for every future contract change. Noted 2026-07-25.
+
+- **Server-RPC inlining DONE (2026-07-25, user decision)**: the last
+  four business-logic SQL fns moved inline as single atomic
+  statements — render_job_get_or_create → data-modifying CTE
+  (services/renderJobs.ts), mux_video_get_or_create → true upsert on
+  the (project_id, cloud_version) unique index (muxVideoCreate.ts —
+  actually MORE race-proof than the fn's read-then-insert),
+  render_job_complete → complete-and-cascade CTE (renderJobWebhook.ts;
+  the stale-jobs CRON was a second caller and now inlines the same
+  cascade — cron_render_stale_jobs.sql rewritten), mux_video_complete
+  → UPDATE…RETURNING (muxVideoWebhook.ts). All four graveyarded;
+  `sql/functions/` is down to the user_profile_create signup trigger
+  fn. Remaining follow-up candidate: render_jobs lacks a FULL unique
+  index on (project_id, cloud_version) (only the completed-partial
+  one), so the render get-or-create keeps the fn's rare double-insert
+  race under concurrent first renders — adding the index (data model
+  already assumes ≤1 row per pair) would make it a clean upsert like
+  the mux one; needs a migration + prod-data dedup check first.
+  Noted 2026-07-25.
 
 ## Server config / infra cleanups
 
