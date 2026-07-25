@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LuLoader, LuCheck, LuX, LuCreditCard, LuShieldCheck } from 'react-icons/lu';
 import { Button } from '@shared/components';
-import { supabase, AuthManager } from '../../auth/AuthManager';
+import { AuthManager } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
@@ -118,10 +119,11 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     useEffect(() => {
         if (!checkingStatus || !userId || checkoutSuccess) return;
         const poll = setInterval(async () => {
-            if (!supabase) return;
-            const { data, error: rpcErr } = await supabase.rpc('subscription_get', {
-                p_workspace_id: workspaceId ?? null,
-            });
+            // Omit workspaceId (never null) for the oldest-owned fallback
+            const { data, error: rpcErr } = await invokeFunction(
+                'subscription-get',
+                workspaceId ? { workspaceId } : {},
+            );
             if (rpcErr || !data) return;
             if (data?.status === 'active') {
                 setCheckoutSuccess(true);

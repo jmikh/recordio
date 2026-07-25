@@ -11,7 +11,8 @@ import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useNonFreeAccess } from '../../billing/useNonFreeAccess';
-import { AuthManager, supabase } from '../../auth/AuthManager';
+import { AuthManager } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import { switchWorkspace } from '../../workspace/switchWorkspace';
 
 import { SupportModal } from '../../components/SupportModal';
@@ -190,9 +191,9 @@ export function DashboardPage() {
 
     // Load the full workspace list once authenticated
     useEffect(() => {
-        if (!isAuthenticated || !supabase) return;
-        supabase.rpc('workspace_list').then(({ data, error }) => {
-            if (!error && Array.isArray(data)) setWorkspaceList(data);
+        if (!isAuthenticated) return;
+        invokeFunction('workspace-list', {}).then(({ data, error }) => {
+            if (!error && data) setWorkspaceList(data.workspaces);
         });
     }, [isAuthenticated]);
 
@@ -209,13 +210,12 @@ export function DashboardPage() {
 
     const handleCreateWorkspaceConfirm = async () => {
         const name = newWorkspaceName.trim();
-        if (!name || !supabase) return;
+        if (!name) return;
         try {
-            const { data, error } = await supabase.rpc('workspace_create', { p_name: name });
+            const { data: created, error } = await invokeFunction('workspace-create', { name });
             if (error) throw error;
-            const created = data as { id: string; name: string; owner_id: string; role: string };
             // Add to list and switch
-            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, role: created.role as 'admin', seats: null };
+            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, role: created.role, seats: null };
             setWorkspaceList([...workspaceList, newItem]);
             setWorkspace(created.id, created.name, created.owner_id, created.role, null);
             setNewWorkspaceName('');

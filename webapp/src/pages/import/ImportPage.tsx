@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
 import { AuthModal } from '../../auth/AuthModal';
 import { navigate } from '../../lib/navigate';
-import { supabase } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 
 type ImportStatus =
     | 'init'
@@ -140,9 +140,9 @@ export function ImportPage() {
         }
 
         let { workspaceId } = useWorkspaceStore.getState();
-        if (!workspaceId && supabase) {
+        if (!workspaceId) {
             // Workspace fetch may not have completed yet — resolve it now
-            const { data } = await supabase.rpc('workspace_get_default');
+            const { data } = await invokeFunction('workspace-get-default', {});
             if (data?.id) {
                 useWorkspaceStore.getState().setWorkspace(data.id, data.name, data.owner_id);
                 workspaceId = data.id;

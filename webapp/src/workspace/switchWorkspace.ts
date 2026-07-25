@@ -1,5 +1,5 @@
-import { supabase } from '../auth/AuthManager';
-import { useWorkspaceStore, type WorkspaceListItem } from './useWorkspaceStore';
+import { invokeFunction } from '../api/client';
+import { useWorkspaceStore, type WorkspaceListItem, type WorkspaceSubscription } from './useWorkspaceStore';
 
 /**
  * Switch the active workspace: update the store, persist as default,
@@ -10,14 +10,13 @@ export async function switchWorkspace(ws: WorkspaceListItem, userId: string | nu
     const { setWorkspace, setSubscription } = useWorkspaceStore.getState();
     setWorkspace(ws.id, ws.name, ws.owner_id, ws.role, ws.seats);
 
-    if (!supabase) return;
+    void invokeFunction('workspace-set-default', { workspaceId: ws.id });
 
-    supabase.rpc('workspace_set_default', { p_workspace_id: ws.id }).then();
-
-    const { data } = await supabase.rpc('subscription_get', { p_workspace_id: ws.id });
+    const { data } = await invokeFunction('subscription-get', { workspaceId: ws.id });
     if (data) {
         setSubscription({
-            status: data.status,
+            // Wire status is Stripe's string; the store keeps its narrower union
+            status: data.status as WorkspaceSubscription['status'],
             plan: data.plan ?? 'pro',
             currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
             cancelAt: data.cancel_at ? new Date(data.cancel_at) : null,

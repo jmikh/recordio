@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { LuMail, LuLoader, LuX, LuEllipsis } from 'react-icons/lu';
 import { Button } from '@shared/components';
-import { supabase } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { trackMembersPageLoaded, trackWorkspaceSeatsSetFailed, trackWorkspaceInviteFailed } from '../../analytics';
@@ -146,10 +146,10 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
         if (role === member.role) return;
         setUpdatingRole(true);
         try {
-            const { error } = await supabase!.rpc('workspace_member_update_role', {
-                p_workspace_id: details.id,
-                p_user_id: member.user_id,
-                p_role: role,
+            const { error } = await invokeFunction('workspace-member-update-role', {
+                workspaceId: details.id,
+                userId: member.user_id,
+                role,
             });
             if (error) throw error;
             onRoleChanged(member.user_id, role);
@@ -311,9 +311,9 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
                         onClick={async () => {
                             setSettingSeats(true);
                             try {
-                                const { error } = await supabase!.rpc('workspace_seats_set', {
-                                    p_workspace_id: details.id,
-                                    p_seats: seatPicker,
+                                const { error } = await invokeFunction('workspace-seats-set', {
+                                    workspaceId: details.id,
+                                    seats: seatPicker,
                                 });
                                 if (error) throw error;
                                 onSeatsUpdated(seatPicker);
@@ -347,10 +347,10 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
         if (!inviteEmail.trim() || !canInvite) return;
         setInviting(true);
         try {
-            const { error } = await supabase!.rpc('workspace_invite', {
-                p_workspace_id: details.id,
-                p_email: inviteEmail.trim().toLowerCase(),
-                p_role: inviteRole,
+            const { error } = await invokeFunction('workspace-invite', {
+                workspaceId: details.id,
+                email: inviteEmail.trim().toLowerCase(),
+                role: inviteRole,
             });
             if (error) throw error;
             setInviteEmail('');
@@ -373,9 +373,9 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
     const handleRemove = async (userId: string) => {
         setRemovingId(userId);
         try {
-            const { error } = await supabase!.rpc('workspace_member_remove', {
-                p_workspace_id: details.id,
-                p_user_id: userId,
+            const { error } = await invokeFunction('workspace-member-remove', {
+                workspaceId: details.id,
+                userId,
             });
             if (error) throw error;
             onMemberRemoved(userId);
@@ -391,8 +391,8 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
     const handleRescind = async (invitationId: string, email: string) => {
         setRescindingId(invitationId);
         try {
-            const { error } = await supabase!.rpc('workspace_invite_rescind', {
-                p_invitation_id: invitationId,
+            const { error } = await invokeFunction('workspace-invite-rescind', {
+                invitationId,
             });
             if (error) throw error;
             onInvitationRescinded(invitationId);
@@ -408,10 +408,10 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
     const handleResend = async (email: string, role: 'viewer' | 'creator' | 'admin') => {
         setResendingId(email);
         try {
-            const { error } = await supabase!.rpc('workspace_invite', {
-                p_workspace_id: details.id,
-                p_email: email,
-                p_role: role,
+            const { error } = await invokeFunction('workspace-invite', {
+                workspaceId: details.id,
+                email,
+                role,
             });
             if (error) throw error;
             addToast({ type: 'success', title: `Invitation resent to ${email}` });

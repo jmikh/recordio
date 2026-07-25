@@ -36,6 +36,20 @@ import { projectDeleteRoutes } from './routes/projectDelete.js';
 import { projectRestoreRoutes } from './routes/projectRestore.js';
 import { projectConfirmUploadRoutes } from './routes/projectConfirmUpload.js';
 import { renderJobGetStatusRoutes } from './routes/renderJobGetStatus.js';
+import { workspaceCreateRoutes } from './routes/workspaceCreate.js';
+import { workspaceGetRoutes } from './routes/workspaceGet.js';
+import { workspaceListRoutes } from './routes/workspaceList.js';
+import { workspaceRenameRoutes } from './routes/workspaceRename.js';
+import { workspaceSetDefaultRoutes } from './routes/workspaceSetDefault.js';
+import { workspaceInviteRoutes } from './routes/workspaceInvite.js';
+import { workspaceInviteAcceptRoutes } from './routes/workspaceInviteAccept.js';
+import { workspaceInviteRescindRoutes } from './routes/workspaceInviteRescind.js';
+import { workspaceMemberRemoveRoutes } from './routes/workspaceMemberRemove.js';
+import { workspaceMemberUpdateRoleRoutes } from './routes/workspaceMemberUpdateRole.js';
+import { workspaceSeatsSetRoutes } from './routes/workspaceSeatsSet.js';
+import { userProfileGetRoutes } from './routes/userProfileGet.js';
+import { workspaceGetDefaultRoutes } from './routes/workspaceGetDefault.js';
+import { subscriptionGetRoutes } from './routes/subscriptionGet.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -181,6 +195,20 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(projectRestoreRoutes);
     app.register(projectConfirmUploadRoutes);
     app.register(renderJobGetStatusRoutes);
+    app.register(workspaceCreateRoutes);
+    app.register(workspaceGetRoutes);
+    app.register(workspaceListRoutes);
+    app.register(workspaceRenameRoutes);
+    app.register(workspaceSetDefaultRoutes);
+    app.register(workspaceInviteRoutes);
+    app.register(workspaceInviteAcceptRoutes);
+    app.register(workspaceInviteRescindRoutes);
+    app.register(workspaceMemberRemoveRoutes);
+    app.register(workspaceMemberUpdateRoleRoutes);
+    app.register(workspaceSeatsSetRoutes);
+    app.register(userProfileGetRoutes);
+    app.register(workspaceGetDefaultRoutes);
+    app.register(subscriptionGetRoutes);
 
     app.get('/health', {
         schema: {

@@ -77,6 +77,26 @@ export async function canEditProject(
     return rows.length > 0;
 }
 
+/** Ports `assert_workspace_admin`: admin member of a live workspace. */
+export async function isWorkspaceAdmin(
+    db: Db,
+    workspaceId: string,
+    userId: string,
+): Promise<boolean> {
+    const { rows } = await db.query(
+        `SELECT 1
+         FROM workspace_members wm
+         JOIN workspaces w ON w.id = wm.workspace_id
+         WHERE wm.workspace_id = $1
+           AND wm.user_id = $2
+           AND wm.role = 'admin'
+           AND w.deleted_at IS NULL
+         LIMIT 1`,
+        [workspaceId, userId],
+    );
+    return rows.length > 0;
+}
+
 /** Ports `assert_workspace_viewer`: member (any role) of a live workspace. */
 export async function isWorkspaceMember(
     db: Db,

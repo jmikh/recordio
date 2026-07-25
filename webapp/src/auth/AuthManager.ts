@@ -1,8 +1,9 @@
 import { type Session } from '@supabase/supabase-js';
 import * as Sentry from '@sentry/react';
 import { useUserStore } from './useUserStore';
-import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
+import { useWorkspaceStore, type WorkspaceSubscription } from '../workspace/useWorkspaceStore';
 import { supabase, setUnauthorizedHandler } from '../supabase/client';
+import { invokeFunction } from '../api/client';
 import { captureError } from '../lib/sentry';
 import { trackSigninFailed } from '../analytics';
 
@@ -48,11 +49,11 @@ async function syncUserToStore(session: Session) {
     setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
 }
 
-/** Fetch user profile (trial info) via RPC and sync to store */
+/** Fetch user profile (trial info) and sync to store */
 async function fetchProfile() {
     if (!supabase) return;
     try {
-        const { data, error } = await supabase.rpc('user_profile_get');
+        const { data, error } = await invokeFunction('user-profile-get', {});
         if (!error && data) {
             useUserStore.getState().setTrialEndsAt(
                 data.trial_ends_at ? new Date(data.trial_ends_at) : null
@@ -67,7 +68,7 @@ async function fetchProfile() {
 async function loadDefaultWorkspace(userId: string) {
     if (!supabase) return;
     try {
-        const { data, error } = await supabase.rpc('workspace_get_default');
+        const { data, error } = await invokeFunction('workspace-get-default', {});
         if (!error && data) {
             useWorkspaceStore.getState().setWorkspace(
                 data.id, data.name, data.owner_id,
@@ -83,12 +84,16 @@ async function loadDefaultWorkspace(userId: string) {
 
     try {
         const workspaceId = useWorkspaceStore.getState().workspaceId;
-        const { data, error } = await supabase.rpc('subscription_get', {
-            p_workspace_id: workspaceId ?? null,
-        });
+        // Omit workspaceId (never null — schema coercion) for the
+        // oldest-owned-workspace fallback
+        const { data, error } = await invokeFunction(
+            'subscription-get',
+            workspaceId ? { workspaceId } : {},
+        );
         if (!error && data) {
             useWorkspaceStore.getState().setSubscription({
-                status: data.status,
+                // Wire status is Stripe's string; the store keeps its narrower union
+                status: data.status as WorkspaceSubscription['status'],
                 plan: data.plan ?? 'pro',
                 currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
                 cancelAt: data.cancel_at ? new Date(data.cancel_at) : null,

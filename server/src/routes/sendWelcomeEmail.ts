@@ -1,10 +1,11 @@
 /**
  * POST /send-welcome-email — ports the `send-welcome-email` edge fn
- * (Wave E). Called by the client-invoked `trial_start()` SQL RPC via
- * pg_net (NOT an auth.users trigger — the plan's Wave E text was
- * stale), body `{ record: { id, email } }` (a leftover DB-webhook
- * shape, kept for parity). Idempotency lives in trial_start itself
- * (`trial_ends_at` one-shot guard) — no flag here.
+ * (Wave E). CALLER-LESS since Part 2 Batch 3+4 (2026-07-25): its only
+ * caller was the `trial_start()` SQL RPC's pg_net post, and trial_start
+ * was killed (no client caller existed; graveyarded at the Part 2
+ * sweep). KEPT deliberately (user decision) for future re-wiring of
+ * welcome emails. Body `{ record: { id, email } }` (a leftover
+ * DB-webhook shape).
  *
  * Auth: `requireServiceBearer(SUPABASE_SERVICE_ROLE_KEY)` in onRequest
  * (before schema validation) — the SQL fn sends `Bearer <Vault

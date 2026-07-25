@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LuLoader, LuCircleCheck, LuCircleX } from 'react-icons/lu';
 import { Button, LogoLink } from '@shared/components';
-import { supabase } from '../auth/AuthManager';
+import { invokeFunction } from '../api/client';
 import { useUserStore } from '../auth/useUserStore';
 import { AuthModal } from '../auth/AuthModal';
 import { trackInviteAcceptFailed } from '../analytics';
@@ -18,7 +18,7 @@ export function AcceptInvitePage() {
     const [showAuthModal, setShowAuthModal] = useState(false);
 
     const accept = async () => {
-        if (!token || !supabase) {
+        if (!token) {
             setErrorMsg('Invalid invitation link.');
             setStatus('error');
             return;
@@ -26,8 +26,11 @@ export function AcceptInvitePage() {
 
         setStatus('accepting');
         try {
-            const { error } = await supabase.rpc('workspace_invite_accept', { p_token: token });
+            const { data, error } = await invokeFunction('workspace-invite-accept', { token });
             if (error) throw error;
+            // Business failures arrive as 200 + error with the exact
+            // user-facing message (wrong email, used/unknown token)
+            if (data.error) throw new Error(data.error);
             setStatus('success');
             // Full reload so AuthManager re-loads the now-default workspace
             setTimeout(() => { window.location.href = '/'; }, 1800);

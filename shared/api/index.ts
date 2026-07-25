@@ -35,10 +35,41 @@ import type {
     RenderJobGetStatusRequest,
     RenderJobGetStatusResponse,
 } from './renderJobs';
+import type {
+    WorkspaceCreateRequest,
+    WorkspaceCreated,
+    WorkspaceDetails,
+    WorkspaceIdRequest,
+    WorkspaceInviteAcceptRequest,
+    WorkspaceInviteAcceptResponse,
+    WorkspaceInviteRequest,
+    WorkspaceInviteRescindRequest,
+    WorkspaceInviteRescindResponse,
+    WorkspaceInviteResponse,
+    WorkspaceListResponse,
+    WorkspaceMemberRemoveRequest,
+    WorkspaceMemberRemoveResponse,
+    WorkspaceMemberUpdateRoleRequest,
+    WorkspaceMemberUpdateRoleResponse,
+    WorkspaceRenamed,
+    WorkspaceRenameRequest,
+    WorkspaceSeatsSetRequest,
+    WorkspaceSeatsSetResponse,
+    WorkspaceSetDefaultResponse,
+} from './workspaces';
+import type {
+    DefaultWorkspace,
+    EmptyRequest,
+    SubscriptionGetRequest,
+    SubscriptionInfo,
+    UserProfile,
+} from './session';
 
 export * from './assets';
 export * from './projects';
 export * from './renderJobs';
+export * from './workspaces';
+export * from './session';
 
 export interface ApiRoutes {
     'asset-list': { request: AssetListRequest; response: AssetListResponse };
@@ -53,4 +84,18 @@ export interface ApiRoutes {
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };
     'render-job-get-status': { request: RenderJobGetStatusRequest; response: RenderJobGetStatusResponse };
+    'workspace-create': { request: WorkspaceCreateRequest; response: WorkspaceCreated };
+    'workspace-get': { request: WorkspaceIdRequest; response: WorkspaceDetails | null };
+    'workspace-list': { request: EmptyRequest; response: WorkspaceListResponse };
+    'workspace-rename': { request: WorkspaceRenameRequest; response: WorkspaceRenamed };
+    'workspace-set-default': { request: WorkspaceIdRequest; response: WorkspaceSetDefaultResponse };
+    'workspace-invite': { request: WorkspaceInviteRequest; response: WorkspaceInviteResponse };
+    'workspace-invite-accept': { request: WorkspaceInviteAcceptRequest; response: WorkspaceInviteAcceptResponse };
+    'workspace-invite-rescind': { request: WorkspaceInviteRescindRequest; response: WorkspaceInviteRescindResponse };
+    'workspace-member-remove': { request: WorkspaceMemberRemoveRequest; response: WorkspaceMemberRemoveResponse };
+    'workspace-member-update-role': { request: WorkspaceMemberUpdateRoleRequest; response: WorkspaceMemberUpdateRoleResponse };
+    'workspace-seats-set': { request: WorkspaceSeatsSetRequest; response: WorkspaceSeatsSetResponse };
+    'user-profile-get': { request: EmptyRequest; response: UserProfile | null };
+    'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
+    'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionInfo | null };
 }

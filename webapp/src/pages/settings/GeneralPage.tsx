@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
-import { supabase } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { trackGeneralSettingsPageLoaded } from '../../analytics';
@@ -22,9 +22,9 @@ export function GeneralPage({ details, isAdmin, onRenamed }: {
         if (!trimmed || trimmed === details.name) return;
         setSaving(true);
         try {
-            const { data, error } = await supabase!.rpc('workspace_rename', {
-                p_workspace_id: details.id,
-                p_name: trimmed,
+            const { data, error } = await invokeFunction('workspace-rename', {
+                workspaceId: details.id,
+                name: trimmed,
             });
             if (error) throw error;
             onRenamed(data.name);

@@ -23,11 +23,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { requireServiceBearer } from '../plugins/auth.js';
-import {
-    APP_URL,
-    buildInviteEmailHtml,
-    workspaceInviteSubject,
-} from '../emails/workspaceInviteEmail.js';
+import { sendWorkspaceInviteEmail } from '../services/workspaceInviteEmail.js';
 
 export interface SendWorkspaceInviteEmailRoutesOptions {
     /** Bearer the DB's pg_net calls carry (SUPABASE_SERVICE_ROLE_KEY) */
@@ -70,38 +66,15 @@ export const sendWorkspaceInviteEmailRoutes: FastifyPluginAsyncTypebox<
             const { workspace_id, email, role, token, invited_by } = req.body;
             req.logCtx.set({ 'workspace.id': workspace_id, 'email.template': 'workspace-invite' });
 
-            const [workspaceRows, profileRows] = await Promise.all([
-                app.deps.db.query('SELECT name FROM workspaces WHERE id = $1 LIMIT 1', [
-                    workspace_id,
-                ]),
-                app.deps.db.query('SELECT name FROM user_profiles WHERE user_id = $1 LIMIT 1', [
-                    invited_by,
-                ]),
-            ]);
-            const workspaceName =
-                (workspaceRows.rows[0] as { name: string | null } | undefined)?.name ??
-                'a workspace';
-
-            // The fix: real profile name first; auth email as the fallback
-            // (the edge fn's ONLY working path); 'Someone' as the floor
-            let inviterName = (profileRows.rows[0] as { name: string | null } | undefined)?.name;
-            if (!inviterName) {
-                const authUser = await app.deps.supabaseApi.getUserById(invited_by).catch(() => {
-                    req.logCtx.set({ error_type: 'SupabaseApiUnavailable' });
-                    return null;
-                });
-                inviterName = authUser?.email ?? 'Someone';
-            }
-
-            const acceptUrl = `${APP_URL}/accept-invite?token=${token}`;
-            const result = await app.deps.email.send({
-                to: email,
-                subject: workspaceInviteSubject(inviterName, workspaceName),
-                html: buildInviteEmailHtml({ workspaceName, inviterName, role, acceptUrl }),
-            });
-            if (!result.success) {
-                throw new Error(`Resend send failed: ${result.error}`);
-            }
+            // Shared with /workspace-invite (in-process caller) since the
+            // Batch 3 port; throws on a failed send → 500 here
+            await sendWorkspaceInviteEmail(app.deps, {
+                workspaceId: workspace_id,
+                email,
+                role,
+                token,
+                invitedBy: invited_by,
+            }, req.logCtx);
 
             return { sent: true as const };
         },

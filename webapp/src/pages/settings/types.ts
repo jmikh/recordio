@@ -1,30 +1,11 @@
-export interface WorkspaceMember {
-    user_id: string;
-    role: 'viewer' | 'creator' | 'admin';
-    email: string;
-    name: string | null;
-    created_at: string;
-}
-
-export interface WorkspaceInvitation {
-    id: string;
-    email: string;
-    role: 'viewer' | 'creator' | 'admin';
-    invited_by: string;
-    created_at: string;
-    expires_at: string;
-}
-
-export interface WorkspaceDetails {
-    id: string;
-    name: string;
-    owner_id: string;
-    role: 'viewer' | 'creator' | 'admin';
-    seats: number | null;        // creator seats
-    viewer_seats: number | null; // derived: seats * 10
-    members: WorkspaceMember[];
-    invitations: WorkspaceInvitation[];
-}
+// The workspace-details shapes are the shared API contract now
+// (shared/api/workspaces.ts) — re-exported under the names the settings
+// components were written against.
+export type {
+    WorkspaceMemberRow as WorkspaceMember,
+    WorkspaceInvitationRow as WorkspaceInvitation,
+    WorkspaceDetails,
+} from '@shared/api';
 
 export type Tab = 'general' | 'members' | 'billing';
 export type BillingInterval = 'monthly' | 'yearly';

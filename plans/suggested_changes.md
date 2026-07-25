@@ -201,9 +201,11 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   subscription activation). CORRECTED 2026-07-23: `trial_start()` is
   still a live writer (clears expires_at when a trial starts), so the
   remaining writers are project-create-v2 (stamps) + trial_start
-  (clears); nothing deletes. Cleanup candidate: drop the stamping +
-  the badge + the column + trial_start's clear together, user to
-  confirm post-migration. Found 2026-07-18.
+  (clears); nothing deletes. UPDATED 2026-07-25: trial_start is KILLED
+  (user decision, Batch 3+4) — project-create-v2's stamping is now the
+  ONLY writer and nothing ever clears. Cleanup candidate: drop the
+  stamping + the badge + the column together, user to confirm
+  post-migration. Found 2026-07-18.
 - **Planned redesign — asset uploads through the server** (user
   decision 2026-07-17, post-migration work): replace the
   presign → client-upload → confirm flow with a single upload to the
@@ -361,6 +363,31 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   as the asset_list smell) — fixed on the live path (the route orders by
   the column); the smell survives only in the frozen SQL fallback.
   Found 2026-07-24 (Part 2 Batch 2).
+- **workspace_get's pending-invitations list is ALWAYS EMPTY (live
+  bug)**: it filters `wi.expires_at > now()`, but migration
+  `20260513042717_workspace_invitations_no_expiry.sql` nulled
+  expires_at on all pending invitations and dropped the default —
+  `NULL > now()` is NULL, so no pending invite ever appears in the
+  settings members tab, and MembersPage's seat floor (members +
+  pending invitations) under-counts. The Batch 3 route port fixes it
+  (filter on status only, pinned by test); the frozen SQL fn keeps the
+  bug until the sweep. `workspace_list` also has the text-ordering
+  smell (orders by `row_data->>'created_at'`) — fixed on the ported
+  live path too. Found 2026-07-25 (Batch 3+4 scoping).
+- **trial_start KILLED (user decision 2026-07-25)**: no client caller
+  existed; no route is ported and the fn joins the graveyard sweep.
+  Consequences: trials can no longer be started (new users keep
+  trial_ends_at NULL; existing dates still honored wherever read), and
+  the last CLEARER of projects.expires_at dies — project-create-v2's
+  stamping is now the only writer (see the expires_at bullet above).
+  `/send-welcome-email` STAYS despite becoming caller-less (user
+  decision — kept for future re-wiring; its header comment cites
+  trial_start and needs updating at the Batch 3+4 port).
+- **workspace_delete has zero callers** (webapp/extension/server
+  checked 2026-07-25) — dead SQL fn, no route ported; graveyard
+  candidate, user confirms at the sweep. (`user_profile_create` also
+  has no client caller but STAYS — it's the auth.users signup
+  trigger.)
 
 - **Stale-bundle reload nudge** (from `plans/shared-api-contract.md`,
   where the deploy-skew policy lives): nothing today tells an open tab

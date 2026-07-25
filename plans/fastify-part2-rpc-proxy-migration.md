@@ -307,3 +307,25 @@ two Part 1 inline copies into one shared service (see survey).
   `cd server && npm ci && npm run build`) or a small Dockerfile à la
   render-worker. Verify on the next deploy. Batch 3 (workspaces) routes
   will be born typed.
+- 2026-07-25 — **Batches 3+4 merged into one prompt** (user decision):
+  `plans/fastify-part2-3-workspaces-session-rpc-migration-prompt.md` —
+  14 routes (11 workspace + user-profile-get / workspace-get-default /
+  subscription-get), born typed via shared/api. Decisions folded in:
+  **trial_start killed** (no callers; graveyard; expires_at loses its
+  last clearer), `/send-welcome-email` kept despite becoming
+  caller-less, workspace_delete gets no route (zero callers,
+  graveyard candidate), user_profile_create stays (signup trigger).
+  Scoping found a LIVE bug the port fixes: workspace_get's
+  pending-invitations list is always empty (expires_at filter vs the
+  no-expiry migration — see suggested_changes). After this batch,
+  `.rpc(` is gone from webapp/src and the graveyard sweep gets
+  planned. Awaiting go-ahead to implement.
+- 2026-07-25 — **Batches 3+4 CODE COMPLETE + smoke-tested** — all 14
+  workspace/session routes landed born-typed (details in the 2-3
+  prompt's status). `.rpc(` count in webapp/src is ZERO; supabase-js
+  now serves only auth/session + TUS uploads — the Part 2 exit
+  criteria. The workspace_get pending-invitations live bug is fixed on
+  the ported path (pinned + observed live). 70 new tests (502 total
+  passing + the known failure); typechecks/eslint/build clean.
+  Awaiting user browser verification + go-ahead; then the graveyard
+  sweep is the last Part 2 step.

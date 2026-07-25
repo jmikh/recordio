@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LuArrowLeft, LuUsers, LuSettings2, LuCreditCard, LuLoader } from 'react-icons/lu';
-import { supabase } from '../../auth/AuthManager';
+import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
@@ -38,12 +38,12 @@ export function WorkspaceSettingsPage() {
     const isAdmin = workspaceRole === 'admin';
 
     useEffect(() => {
-        if (!workspaceId || !supabase) return;
+        if (!workspaceId) return;
         setLoading(true);
         (async () => {
             try {
-                const { data, error } = await supabase!.rpc('workspace_get', { p_workspace_id: workspaceId });
-                if (!error && data) setDetails(data as WorkspaceDetails);
+                const { data, error } = await invokeFunction('workspace-get', { workspaceId });
+                if (!error && data) setDetails(data);
                 else addToast({ type: 'error', title: 'Failed to load workspace' });
             } catch (err) {
                 captureError(err, { flow: 'workspace', phase: 'load', workspaceId: workspaceId ?? undefined });
@@ -55,9 +55,9 @@ export function WorkspaceSettingsPage() {
     }, [workspaceId]);
 
     useEffect(() => {
-        if (!supabase || workspaceList.length > 0) return;
-        supabase.rpc('workspace_list').then(({ data, error }) => {
-            if (!error && Array.isArray(data)) setWorkspaceList(data);
+        if (workspaceList.length > 0) return;
+        invokeFunction('workspace-list', {}).then(({ data, error }) => {
+            if (!error && data) setWorkspaceList(data.workspaces);
         });
     }, []);
 

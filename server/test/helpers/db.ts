@@ -223,6 +223,103 @@ export async function deleteWorkspaces(db: Db, ids: string[]): Promise<void> {
     await db.query('DELETE FROM workspaces WHERE id = ANY($1::uuid[])', [ids]);
 }
 
+export interface SeededAuthUser {
+    id: string;
+    email: string;
+}
+
+/**
+ * Dedicated auth.users row (mirrors seed.sql's insert) + user_profiles
+ * row. Suites that mutate PER-USER state (default_workspace_id, profile
+ * fields) use one of these instead of the shared seeded users — no
+ * cross-suite contention, and "brand-new user" branches (e.g.
+ * workspace-get-default's bootstrap) become directly testable.
+ * Cleanup: deleteAuthUsers AFTER deleting the user's workspaces/projects.
+ */
+export async function seedAuthUser(
+    db: Db,
+    opts: { name?: string | null; withProfile?: boolean } = {},
+): Promise<SeededAuthUser> {
+    const id = randomUUID();
+    const email = `test-${id.slice(0, 8)}@example.com`;
+    await db.query(
+        `INSERT INTO auth.users (
+            instance_id, id, aud, role, email, encrypted_password,
+            email_confirmed_at, created_at, updated_at,
+            raw_app_meta_data, raw_user_meta_data,
+            confirmation_token, recovery_token, email_change_token_new,
+            email_change_token_current, email_change, phone_change,
+            phone_change_token, reauthentication_token,
+            is_sso_user, is_anonymous
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000000', $1,
+            'authenticated', 'authenticated', $2,
+            '$2a$10$bGG9wO7.m4EdPm58tOuSd.TUuBLj3U/6KGCzOQTNjcTzGb4MHkz0G',
+            NOW(), NOW(), NOW(),
+            '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+            '', '', '', '', '', '', '', '', false, false
+        )`,
+        [id, email],
+    );
+    if (opts.withProfile === false) {
+        // A signup trigger may have created one — the no-profile case needs it gone
+        await db.query('DELETE FROM user_profiles WHERE user_id = $1', [id]);
+    } else {
+        await db.query(
+            `INSERT INTO user_profiles (user_id, name) VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name`,
+            [id, opts.name ?? null],
+        );
+    }
+    return { id, email };
+}
+
+/** Defensively clears the user's dependent rows first (FK actions vary). */
+export async function deleteAuthUsers(db: Db, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.query('DELETE FROM workspace_invitations WHERE invited_by = ANY($1::uuid[])', [ids]);
+    await db.query('DELETE FROM workspace_members WHERE user_id = ANY($1::uuid[])', [ids]);
+    await db.query('DELETE FROM user_profiles WHERE user_id = ANY($1::uuid[])', [ids]);
+    await db.query('DELETE FROM auth.users WHERE id = ANY($1::uuid[])', [ids]);
+}
+
+export interface SeedInvitationOptions {
+    workspaceId: string;
+    email: string;
+    role?: 'viewer' | 'creator' | 'admin';
+    invitedBy?: string;
+    status?: 'pending' | 'accepted' | 'declined';
+}
+
+/** Invitations cascade with their workspace (deleteWorkspaces covers them). */
+export async function seedWorkspaceInvitation(
+    db: Db,
+    opts: SeedInvitationOptions,
+): Promise<{ id: string; token: string }> {
+    const { rows } = await db.query(
+        `INSERT INTO workspace_invitations
+            (workspace_id, email, role, invited_by, token, status)
+         VALUES ($1, lower($2), $3, $4, gen_random_uuid(), $5)
+         RETURNING id, token`,
+        [
+            opts.workspaceId,
+            opts.email,
+            opts.role ?? 'creator',
+            opts.invitedBy ?? SEEDED_USER_ID,
+            opts.status ?? 'pending',
+        ],
+    );
+    return rows[0] as { id: string; token: string };
+}
+
+export async function getDefaultWorkspaceId(db: Db, userId: string): Promise<string | null> {
+    const { rows } = await db.query(
+        'SELECT default_workspace_id AS id FROM user_profiles WHERE user_id = $1',
+        [userId],
+    );
+    return (rows[0] as { id: string | null } | undefined)?.id ?? null;
+}
+
 export interface SeedUserAssetOptions {
     userId?: string;
     assetType?: 'background' | 'music';
