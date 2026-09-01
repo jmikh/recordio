@@ -4,10 +4,9 @@
  * fakeTranscription plays Whisper. Pure unit tests cover the
  * punctuation/grouping helpers directly.
  *
- * The security-critical case: the subscription gate's membership JOIN
- * (inline port of the auth.uid()-dependent `subscription_get`) is the
- * endpoint's ONLY access control — the non-member test proves it
- * survived.
+ * The security-critical case: workspace membership + entitlements
+ * (billing revamp Step 1) are the endpoint's ONLY access control — the
+ * non-member test proves it survived.
  *
  * Isolation: fresh workspace per test (subscriptions key on
  * workspace_id, and the seeded users' personal workspaces are shared
@@ -24,15 +23,18 @@ import { createFakeDeps, type FakeDeps } from './fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from './helpers/tokens.js';
 import {
     createTestPool,
+    deleteAuthUsers,
     deleteProjects,
     deleteWorkspaces,
     hasTestDb,
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
+    seedAuthUser,
     seedProject,
     seedSubscription,
     seedWorkspace,
     seedWorkspaceMember,
+    type SeededAuthUser,
 } from './helpers/db.js';
 
 const ownerToken = () => userToken({ sub: SEEDED_USER_ID });
@@ -128,9 +130,19 @@ describe.runIf(hasTestDb())('POST /transcribe (e2e, real Postgres)', () => {
     let pool: pg.Pool;
     const createdProjects: string[] = [];
     const createdWorkspaces: string[] = [];
+    /**
+     * Dedicated workspace owners for entitlement-state isolation. The
+     * trial lives on the WORKSPACE since revamp Step 2 — seedChain pins
+     * trial_ends_at per workspace (helper default: long-expired = free;
+     * the trial test pins a date after the 2026-01-01 fakeClock).
+     */
+    let freeOwner: SeededAuthUser;
+    let trialOwner: SeededAuthUser;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         pool = createTestPool();
+        freeOwner = await seedAuthUser(pool);
+        trialOwner = await seedAuthUser(pool);
     });
 
     afterEach(async () => {
@@ -140,6 +152,7 @@ describe.runIf(hasTestDb())('POST /transcribe (e2e, real Postgres)', () => {
         createdWorkspaces.length = 0;
     });
     afterAll(async () => {
+        await deleteAuthUsers(pool, [freeOwner.id, trialOwner.id]);
         await pool.end();
     });
 
@@ -155,9 +168,13 @@ describe.runIf(hasTestDb())('POST /transcribe (e2e, real Postgres)', () => {
         subStatus?: string | null;
         member?: boolean;
         workspaceOwnerId?: string;
+        workspaceTrialEndsAt?: string;
         projectData?: unknown;
     } = {}) {
-        const ws = await seedWorkspace(pool, { ownerId: opts.workspaceOwnerId ?? SEEDED_USER_ID });
+        const ws = await seedWorkspace(pool, {
+            ownerId: opts.workspaceOwnerId ?? SEEDED_USER_ID,
+            trialEndsAt: opts.workspaceTrialEndsAt,
+        });
         createdWorkspaces.push(ws.id);
         if (opts.member !== false) {
             await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
@@ -211,26 +228,47 @@ describe.runIf(hasTestDb())('POST /transcribe (e2e, real Postgres)', () => {
 
         const res = await post(app, { projectId: project.id }, await ownerToken());
         expect(res.statusCode).toBe(403);
-        expect(res.json()).toEqual({ error: 'Active subscription required' });
+        expect(res.json()).toEqual({ error: 'subscription_required' });
         expect(deps.transcription.requests).toHaveLength(0);
     });
 
-    it('403 for a member whose workspace has no subscription row', async () => {
+    it('403 for a member whose workspace has no subscription row and no owner trial', async () => {
         const { app } = testApp();
-        const project = await seedChain({ subStatus: null });
+        const project = await seedChain({ subStatus: null, workspaceOwnerId: freeOwner.id });
         const res = await post(app, { projectId: project.id }, await ownerToken());
         expect(res.statusCode).toBe(403);
-        expect(res.json()).toEqual({ error: 'Active subscription required' });
+        expect(res.json()).toEqual({ error: 'subscription_required' });
     });
 
-    // past_due is NOT accepted here, unlike project-create-v2's expiry
-    // check — inconsistency flagged in suggested_changes, parity kept
-    it.each(['canceled', 'past_due'])('403 when the subscription status is %s', async (status) => {
+    it('403 when the subscription status is canceled (no owner trial)', async () => {
         const { app, deps } = testApp();
-        const project = await seedChain({ subStatus: status });
+        const project = await seedChain({ subStatus: 'canceled', workspaceOwnerId: freeOwner.id });
         const res = await post(app, { projectId: project.id }, await ownerToken());
         expect(res.statusCode).toBe(403);
         expect(deps.transcription.requests).toHaveLength(0);
+    });
+
+    // Billing revamp Step 1: past_due = full access through Stripe's
+    // dunning window (was 403 pre-revamp — inconsistency resolved)
+    it('200 when the subscription status is past_due (dunning window)', async () => {
+        const { app } = testApp();
+        const project = await seedChain({ subStatus: 'past_due' });
+        const res = await post(app, { projectId: project.id }, await ownerToken());
+        expect(res.statusCode).toBe(200);
+    });
+
+    // Billing revamp Steps 1–2: the product trial (now
+    // workspaces.trial_ends_at) grants transcription server-side —
+    // pre-revamp only Stripe subscription statuses counted
+    it('200 for a member of a TRIAL workspace (workspace trial live, no subscription row)', async () => {
+        const { app } = testApp();
+        const project = await seedChain({
+            workspaceOwnerId: trialOwner.id,
+            workspaceTrialEndsAt: '2026-06-01T00:00:00Z',
+            subStatus: null,
+        });
+        const res = await post(app, { projectId: project.id }, await ownerToken());
+        expect(res.statusCode).toBe(200);
     });
 
     it('400 with the exact edge-fn body when the project has no mic audio', async () => {

@@ -15,7 +15,14 @@
  * - Never spread raw objects into a log; pick fields explicitly.
  * - Prefer OTEL semantic convention names where one exists.
  */
-import { pino, type DestinationStream, type Logger, type LoggerOptions } from 'pino';
+import {
+    pino,
+    transport as pinoTransport,
+    type DestinationStream,
+    type Logger,
+    type LoggerOptions,
+    type TransportTargetOptions,
+} from 'pino';
 
 /** Stable enum for alerting — grows as routes migrate. Never log message strings here. */
 export type ErrorType =
@@ -67,22 +74,28 @@ export interface LogEventCatalog {
     /**
      * Scheduled-job runs (Wave C) — logging IS the metrics/audit surface
      * for jobs (no ledger table, user decision): counts are read as
-     * metrics in Railway logs, and alerting keys off the event name.
+     * metrics in logs, and alerting keys off `job.status` (mirrors the
+     * request event: one event per occurrence, outcome as a field).
+     * status=success with items_failed>0 is a partial failure;
+     * status=failure means the run threw (no counts available).
      * batch_full = processed hit the job's batch LIMIT (backlog signal).
      */
-    'job.completed': {
-        'job.name': string;
-        'job.trigger': 'startup' | 'interval';
-        duration_ms: number;
-        'job.items_processed': number;
-        'job.items_failed': number;
-        'job.batch_full': boolean;
-    };
-    'job.failed': {
-        'job.name': string;
-        'job.trigger': 'startup' | 'interval';
-        duration_ms: number;
-    };
+    'job.run':
+        | {
+              'job.name': string;
+              'job.trigger': 'startup' | 'interval';
+              'job.status': 'success';
+              duration_ms: number;
+              'job.items_processed': number;
+              'job.items_failed': number;
+              'job.batch_full': boolean;
+          }
+        | {
+              'job.name': string;
+              'job.trigger': 'startup' | 'interval';
+              'job.status': 'failure';
+              duration_ms: number;
+          };
 }
 
 /** Structural sink — both pino Logger and FastifyBaseLogger satisfy it. */
@@ -102,18 +115,23 @@ export interface CreateLoggerOptions {
     env: string;
     version: string;
     level?: string;
-    /** Injectable for tests — assert emitted events instead of reading stdout */
+    /** Injectable for tests — bypasses transports entirely (never touches Axiom) */
     stream?: DestinationStream;
     /** pino-pretty transport for local dev */
     pretty?: boolean;
+    /** Ship logs to Axiom alongside stdout (worker-thread transport) */
+    axiom?: { dataset: string; token: string };
 }
 
 /** Fixed envelope: service/env/version via base; request_id et al. come from the hooks. */
 export function createLogger(opts: CreateLoggerOptions): Logger {
+    const level = opts.level ?? 'info';
     const options: LoggerOptions = {
-        level: opts.level ?? 'info',
+        level,
         base: { service: 'recordio-server', env: opts.env, version: opts.version },
-        // PII/secret backstop — naming discipline is the primary defense
+        // PII/secret backstop — naming discipline is the primary defense.
+        // Redaction runs main-thread before transport serialization, so
+        // Axiom only ever receives '[redacted]'.
         redact: {
             paths: [
                 'authorization',
@@ -127,11 +145,38 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
             censor: '[redacted]',
         },
     };
-    if (opts.pretty) {
-        return pino({
-            ...options,
-            transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } },
-        });
+    // Test sink wins over everything: an injected stream must never spawn
+    // a transport worker or ship to Axiom.
+    if (opts.stream) {
+        return pino(options, opts.stream);
     }
-    return opts.stream ? pino(options, opts.stream) : pino(options);
+
+    // Explicit per-target level: pino's multistream defaults each target to
+    // 'info' regardless of the logger level.
+    const stdoutTarget: TransportTargetOptions = opts.pretty
+        ? { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' }, level }
+        : { target: 'pino/file', options: { destination: 1 }, level };
+
+    if (!opts.axiom) {
+        return opts.pretty ? pino({ ...options, transport: stdoutTarget }) : pino(options);
+    }
+
+    const transport = pinoTransport({
+        targets: [
+            stdoutTarget,
+            {
+                target: '@axiomhq/pino',
+                options: { dataset: opts.axiom.dataset, token: opts.axiom.token },
+                level,
+            },
+        ],
+    });
+    // An unlistened ThreadStream 'error' would take the process down via
+    // uncaughtException; the logger's own sink is this stream, so report
+    // straight to stderr instead.
+    transport.on('error', (err: Error) => {
+        // eslint-disable-next-line no-console
+        console.error('pino transport error:', err);
+    });
+    return pino(options, transport);
 }

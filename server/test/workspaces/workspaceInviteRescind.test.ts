@@ -63,9 +63,8 @@ describe.runIf(hasTestDb())('POST /workspace-invite-rescind (e2e, real Postgres)
     }
 
     async function adminWorkspaceWithInvite(status: 'pending' | 'accepted' = 'pending') {
-        const ws = await seedWorkspace(pool);
+        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         const inv = await seedWorkspaceInvitation(pool, {
             workspaceId: ws.id, email: 'pending@example.com', status,
         });

@@ -325,10 +325,6 @@ export function trackAutocutFailed(params: BaseFailureParams & { project_id: str
     trackEvent('autocut_failed', params);
 }
 
-export function trackWorkspaceCreateFailed(params: BaseFailureParams) {
-    trackEvent('workspace_create_failed', params);
-}
-
 export function trackProjectDeleteFailed(params: BaseFailureParams & {
     project_id?: string;
     count?: number;
@@ -371,7 +367,6 @@ export function trackInviteAcceptFailed(params: BaseFailureParams) {
 }
 
 export function trackCheckoutSessionFailed(params: BaseFailureParams & {
-    plan: 'pro' | 'teams';
     interval: 'monthly' | 'yearly';
 }) {
     trackEvent('checkout_session_failed', params);
@@ -379,7 +374,6 @@ export function trackCheckoutSessionFailed(params: BaseFailureParams & {
 
 export function trackSubscriptionChangeFailed(params: BaseFailureParams & {
     workspace_id: string;
-    new_plan: 'teams';
     new_seats: number;
 }) {
     trackEvent('subscription_change_failed', params);

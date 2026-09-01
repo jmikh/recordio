@@ -54,7 +54,7 @@ describe('scheduler', () => {
         return { handle, lines };
     }
 
-    it('startup tick runs every job once and emits job.completed with trigger=startup and normalized counts', async () => {
+    it('startup tick runs every job once and emits job.run with status=success, trigger=startup and normalized counts', async () => {
         const deps = createFakeDeps();
         const daily = stubJob('test.daily', 'daily');
         const hourly = stubJob('test.hourly', 'hourly', {
@@ -68,11 +68,12 @@ describe('scheduler', () => {
 
         expect(daily.runs).toBe(1);
         expect(hourly.runs).toBe(1);
-        const events = lines.filter((l) => l.event === 'job.completed');
+        const events = lines.filter((l) => l.event === 'job.run');
         expect(events).toHaveLength(2);
         expect(events[0]).toMatchObject({
             'job.name': 'test.daily',
             'job.trigger': 'startup',
+            'job.status': 'success',
             'job.items_processed': 2,
             'job.items_failed': 1,
             'job.batch_full': false,
@@ -117,7 +118,7 @@ describe('scheduler', () => {
 
         // Interval-triggered events are marked as such
         const triggers = lines
-            .filter((l) => l.event === 'job.completed')
+            .filter((l) => l.event === 'job.run')
             .map((l) => l['job.trigger']);
         expect(triggers).toEqual(['startup', 'startup', 'interval', 'interval', 'interval']);
     });
@@ -135,7 +136,7 @@ describe('scheduler', () => {
         expect(daily.runs).toBe(2);
     });
 
-    it('a throwing job: tick survives, later jobs still run, job.failed emitted, onJobError called', async () => {
+    it('a throwing job: tick survives, later jobs still run, job.run with status=failure emitted, onJobError called', async () => {
         const deps = createFakeDeps();
         const boom = new Error('job exploded');
         const bad: JobDefinition = {
@@ -153,13 +154,14 @@ describe('scheduler', () => {
 
         expect(good.runs).toBe(1);
         expect(errors).toEqual([boom]);
-        expect(lines.find((l) => l.event === 'job.failed')).toMatchObject({
+        expect(lines.find((l) => l['job.status'] === 'failure')).toMatchObject({
+            event: 'job.run',
             'job.name': 'test.bad',
             'job.trigger': 'startup',
         });
-        // The completed event for the healthy job still emitted
+        // The success event for the healthy job still emitted
         expect(
-            lines.filter((l) => l.event === 'job.completed').map((l) => l['job.name']),
+            lines.filter((l) => l['job.status'] === 'success').map((l) => l['job.name']),
         ).toEqual(['test.good']);
     });
 

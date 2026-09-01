@@ -12,6 +12,22 @@ description: UI design system reference for this codebase — covers design toke
 - **Check `shared/components/` before building anything custom** — most common UI needs are already covered
 - **No `style={{}}` for layout/theming** — Tailwind classes only; inline styles are acceptable only for dynamically computed values (positions, widths from state, user color pickers)
 - **Use shadow utilities** (`shadow-sm`, `shadow-float`) — not inline `boxShadow`; these are the only two shadow tokens
+- **Every interactive/status element must be addressable by accessible semantics** — see Labels & Testability below
+
+---
+
+## Labels & Testability
+
+E2e tests (`e2e/`) select elements by accessible semantics — role, label, visible text — never CSS classes. Anything a user can click, type into, or perceive as status must be addressable that way. Rollout plan + inventory: `plans/testable-ui-labels.md`.
+
+- **Icon-only buttons** (no visible text): always `aria-label` (`<Button variant="icon" icon={FaUndo} aria-label="Undo" />` — `Button` passes `aria-*` through). `title` alone is a weak fallback.
+- **Inputs**: a real `<label>`, or `aria-label`, or a stable semantic id (the `#project-name-input` pattern). Placeholder text is NOT a label — it changes with copy.
+- **Toasts / async status**: `role="status"` for info/success, `role="alert"` for errors — lets tests (and screen readers) await "any error appeared" generically.
+- **Modals**: `role="dialog"` + `aria-label` naming the dialog.
+- **Loading states**: visible text in the DOM (e.g. "Loading project..."), not just a spinner — tests assert completion by its disappearance.
+- **Toggles/checkboxes/sliders**: wire the accessible name to the visible label (Toggle already does `role="switch"`).
+- **`data-testid`**: last resort, only where no semantic handle exists (e.g. canvas overlays).
+- Label wording = what the user perceives ("Close", "Record", "Search projects"), sentence case, stable — treat renames as breaking changes for tests.
 
 ---
 

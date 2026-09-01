@@ -19,16 +19,21 @@
  * RENDER_CALLBACK_URL_DEV split is dropped; server runs on the host).
  * In-flight jobs keep the URL they were dispatched with.
  *
+ * Cloud renders are trial/Pro (billing revamp Step 1): the project
+ * workspace's entitlements must have canBackgroundExport, else 403
+ * subscription_required. (Replaces the edge-fn era's no-check state —
+ * its "Pro subscription" comment described a gate that never existed.)
+ *
  * Divergences (documented): schema 400s replace the per-field bodies;
  * cloudVersion must be an integer (the RPC param is INT — the edge fn
- * only checked non-null); the "Pro subscription" comment in the edge fn
- * is stale — there is no such check, any project editor can render.
+ * only checked non-null).
  *
  * Request:  { projectId, cloudVersion }
  * Response: { jobId, status, renderStoragePath }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { getWorkspaceEntitlements } from '../services/entitlements.js';
 import { getProjectIfEditor } from '../services/projectAccess.js';
 import { getOrCreateRenderJob } from '../services/renderJobs.js';
 
@@ -59,6 +64,7 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                         renderStoragePath: Type.Union([Type.String(), Type.Null()]),
                     }),
                     400: Type.Object({ error: Type.String() }, { additionalProperties: true }),
+                    403: Type.Object({ error: Type.String() }),
                     404: Type.Object({ error: Type.String() }),
                     500: Type.Object({ error: Type.String() }, { additionalProperties: true }),
                 },
@@ -79,6 +85,15 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
             const access = await getProjectIfEditor(app.deps.db, projectId, userId);
             if (!access) {
                 return reply.code(404).send({ error: 'Project not found or access denied' });
+            }
+
+            const entitlements = await getWorkspaceEntitlements(
+                app.deps.db,
+                app.deps.clock,
+                access.workspace_id,
+            );
+            if (!entitlements.canBackgroundExport) {
+                return reply.code(403).send({ error: 'subscription_required' });
             }
 
             const job = await getOrCreateRenderJob(app.deps, {

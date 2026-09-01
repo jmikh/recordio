@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuCheck, LuPlus, LuSettings, LuChevronDown } from 'react-icons/lu';
+import { LuCheck, LuSettings, LuChevronDown } from 'react-icons/lu';
 import type { WorkspaceListItem } from '../workspace/useWorkspaceStore';
 
 interface WorkspaceDropdownProps {
@@ -8,9 +8,7 @@ interface WorkspaceDropdownProps {
     currentWorkspaceId: string | null;
     currentWorkspaceName: string | null;
     currentRole: 'viewer' | 'creator' | 'admin' | null;
-    currentUserId: string | null;
     onSwitch: (workspaceId: string) => void;
-    onCreate: () => void;
     onOpenSettings: () => void;
 }
 
@@ -19,9 +17,7 @@ export function WorkspaceDropdown({
     currentWorkspaceId,
     currentWorkspaceName,
     currentRole,
-    currentUserId,
     onSwitch,
-    onCreate,
     onOpenSettings,
 }: WorkspaceDropdownProps) {
     const [open, setOpen] = useState(false);
@@ -50,8 +46,6 @@ export function WorkspaceDropdown({
     }, [open]);
 
     const isAdmin = currentRole === 'admin';
-    const ownedCount = currentUserId ? workspaces.filter(ws => ws.owner_id === currentUserId).length : 0;
-    const canCreateWorkspace = ownedCount < 5;
 
     return (
         <>
@@ -94,30 +88,19 @@ export function WorkspaceDropdown({
                         </button>
                     ))}
 
-                    <div className="h-px bg-border my-1" />
-
-                    {/* Create workspace */}
-                    {canCreateWorkspace && (
-                        <button
-                            type="button"
-                            onClick={() => { setOpen(false); onCreate(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                        >
-                            <LuPlus className="icon-sm shrink-0 text-text-muted" />
-                            Create workspace
-                        </button>
-                    )}
-
                     {/* Settings — visible for admins */}
                     {isAdmin && (
-                        <button
-                            type="button"
-                            onClick={() => { setOpen(false); onOpenSettings(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                        >
-                            <LuSettings className="icon-sm shrink-0 text-text-muted" />
-                            Workspace Settings
-                        </button>
+                        <>
+                            <div className="h-px bg-border my-1" />
+                            <button
+                                type="button"
+                                onClick={() => { setOpen(false); onOpenSettings(); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
+                            >
+                                <LuSettings className="icon-sm shrink-0 text-text-muted" />
+                                Workspace Settings
+                            </button>
+                        </>
                     )}
                 </div>,
                 document.body

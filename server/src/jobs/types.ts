@@ -3,7 +3,7 @@
  * deps — no scheduler involvement, tested exactly like services. The
  * scheduler consumes JobDefinition entries (see jobs/index.ts) whose
  * `run` normalizes each job's counts into a JobRunResult for the
- * canonical `job.completed` log event.
+ * canonical `job.run` log event.
  */
 
 /** Structural sink for per-item failure warnings (req-less: jobs run outside requests). */
@@ -11,7 +11,7 @@ export interface JobLogger {
     warn(obj: object, msg?: string): void;
 }
 
-/** Normalized per-run counts — the scheduler folds these into `job.completed`. */
+/** Normalized per-run counts — the scheduler folds these into `job.run`. */
 export interface JobRunResult {
     itemsProcessed: number;
     itemsFailed: number;

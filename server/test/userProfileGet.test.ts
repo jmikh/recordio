@@ -51,19 +51,13 @@ describe.runIf(hasTestDb())('POST /user-profile-get (e2e, real Postgres)', () =>
         });
     }
 
-    it('returns the profile blob (name + trial_ends_at)', async () => {
+    it('returns the profile blob (name only — no trial since revamp Step 2)', async () => {
         const user = await seedAuthUser(pool, { name: 'Profiled Person' });
         createdUsers.push(user.id);
-        await pool.query(
-            `UPDATE user_profiles SET trial_ends_at = '2026-08-01T00:00:00Z' WHERE user_id = $1`,
-            [user.id],
-        );
 
         const res = await post(testApp(), await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);
-        const body = res.json() as { name: string; trial_ends_at: string };
-        expect(body.name).toBe('Profiled Person');
-        expect(body.trial_ends_at).toContain('2026-08-01');
+        expect(res.json()).toEqual({ name: 'Profiled Person' });
     });
 
     it('null when no profile row exists', async () => {

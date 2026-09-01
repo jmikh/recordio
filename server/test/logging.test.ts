@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { logEvent } from '../src/logging.js';
+import { createLogger, logEvent } from '../src/logging.js';
 import { createFakeDeps } from './fakes/index.js';
 
 /** Captures pino output lines so tests can assert emitted events. */
@@ -71,6 +71,22 @@ describe('canonical request event', () => {
         const event = lines.find((l) => l.msg === 'oops');
         expect(event?.authorization).toBe('[redacted]');
         expect((event?.nested as Record<string, unknown>).token).toBe('[redacted]');
+    });
+});
+
+describe('createLogger sink precedence', () => {
+    it('an injected stream wins over axiom — tests can never ship logs', () => {
+        const { lines, stream } = captureStream();
+        const log = createLogger({
+            env: 'test',
+            version: 'x',
+            stream,
+            axiom: { dataset: 'd', token: 't' },
+        });
+        log.info('hello');
+
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toMatchObject({ msg: 'hello', service: 'recordio-server' });
     });
 });
 

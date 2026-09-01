@@ -36,7 +36,6 @@ import { projectDeleteRoutes } from './routes/projects/projectDelete.js';
 import { projectRestoreRoutes } from './routes/projects/projectRestore.js';
 import { projectConfirmUploadRoutes } from './routes/projects/projectConfirmUpload.js';
 import { renderJobGetStatusRoutes } from './routes/renderJobGetStatus.js';
-import { workspaceCreateRoutes } from './routes/workspaces/workspaceCreate.js';
 import { workspaceGetRoutes } from './routes/workspaces/workspaceGet.js';
 import { workspaceListRoutes } from './routes/workspaces/workspaceList.js';
 import { workspaceRenameRoutes } from './routes/workspaces/workspaceRename.js';
@@ -46,7 +45,6 @@ import { workspaceInviteAcceptRoutes } from './routes/workspaces/workspaceInvite
 import { workspaceInviteRescindRoutes } from './routes/workspaces/workspaceInviteRescind.js';
 import { workspaceMemberRemoveRoutes } from './routes/workspaces/workspaceMemberRemove.js';
 import { workspaceMemberUpdateRoleRoutes } from './routes/workspaces/workspaceMemberUpdateRole.js';
-import { workspaceSeatsSetRoutes } from './routes/workspaces/workspaceSeatsSet.js';
 import { userProfileGetRoutes } from './routes/userProfileGet.js';
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
@@ -74,6 +72,8 @@ export interface AppOptions {
     /** Injectable for tests — assert emitted log events */
     logStream?: DestinationStream;
     prettyLogs?: boolean;
+    /** Ship logs to Axiom (in addition to stdout) — set by server.ts from env */
+    axiom?: { dataset: string; token: string };
     /** Stripe price ids by `${plan}_${interval}` — required by /stripe-checkout */
     stripePriceIds?: StripePriceIds;
     /** This server's own public base URL — statusCallbackUrl = `${publicUrl}/render-job-webhook` */
@@ -102,6 +102,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
             level: opts.logLevel,
             stream: opts.logStream,
             pretty: opts.prettyLogs,
+            axiom: opts.axiom,
         }),
         // One canonical event per request (onResponse below) instead of
         // fastify's incoming/completed pair
@@ -195,7 +196,6 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(projectRestoreRoutes);
     app.register(projectConfirmUploadRoutes);
     app.register(renderJobGetStatusRoutes);
-    app.register(workspaceCreateRoutes);
     app.register(workspaceGetRoutes);
     app.register(workspaceListRoutes);
     app.register(workspaceRenameRoutes);
@@ -205,7 +205,6 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(workspaceInviteRescindRoutes);
     app.register(workspaceMemberRemoveRoutes);
     app.register(workspaceMemberUpdateRoleRoutes);
-    app.register(workspaceSeatsSetRoutes);
     app.register(userProfileGetRoutes);
     app.register(workspaceGetDefaultRoutes);
     app.register(subscriptionGetRoutes);

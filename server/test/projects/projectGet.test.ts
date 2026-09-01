@@ -158,7 +158,6 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
     it('403 when the project workspace is soft-deleted (assert_project_editor parity)', async () => {
         const ws = await seedWorkspace(pool, { deletedAt: new Date().toISOString() });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
         const project = await seed({ workspaceId: ws.id });
 
         const { app } = testApp();

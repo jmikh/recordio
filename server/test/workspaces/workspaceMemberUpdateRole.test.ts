@@ -63,9 +63,8 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
     }
 
     async function workspaceWithBoth() {
-        const ws = await seedWorkspace(pool); // owner: SEEDED_USER_ID
+        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'viewer' });
         return ws;
     }

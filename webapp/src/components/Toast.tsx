@@ -120,6 +120,7 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
 
     return (
         <div
+            role={toast.type === 'error' ? 'alert' : 'status'}
             className="flex items-center gap-3 min-w-80 max-w-[420px] bg-surface-raised border border-border-selected rounded-xl shadow-float pointer-events-auto"
             style={{
                 padding: '14px 16px',

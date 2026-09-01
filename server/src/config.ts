@@ -13,15 +13,14 @@ const EnvSchema = Type.Object({
     /** Service-role key for Supabase platform APIs (auth admin user lookup, storage) */
     SUPABASE_SERVICE_ROLE_KEY: Type.String({ minLength: 1 }),
     /**
-     * Stripe secret key + the four subscription price ids (same names as the
-     * edge function secrets). Required — a deploy without Stripe config
+     * Stripe secret key + the single per-seat plan's price ids (billing
+     * revamp Step 1 — the former STRIPE_PRO_PRICE_ID_* prices renamed;
+     * teams prices retired). Required — a deploy without Stripe config
      * should fail loudly, not degrade. Local: test-mode values.
      */
     STRIPE_SECRET_KEY: Type.String({ minLength: 1 }),
-    STRIPE_PRO_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
-    STRIPE_PRO_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
-    STRIPE_TEAMS_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
-    STRIPE_TEAMS_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
+    STRIPE_PRICE_ID_MONTHLY: Type.String({ minLength: 1 }),
+    STRIPE_PRICE_ID_YEARLY: Type.String({ minLength: 1 }),
     /**
      * Signing secret of the Stripe webhook ENDPOINT posting to
      * /stripe-webhooks (each endpoint has its OWN secret — dashboard →
@@ -62,6 +61,14 @@ const EnvSchema = Type.Object({
      * Local: http://localhost:8090. Railway: the service's public domain.
      */
     PUBLIC_URL: Type.String({ minLength: 1 }),
+    /**
+     * Axiom log shipping — app-side pino transport (@axiomhq/pino);
+     * Railway has no native log drains. Required. Datasets are
+     * per-environment (recordio-server for prod, recordio-server-dev for
+     * local dev) so prod dashboards/monitors need no env filters.
+     */
+    AXIOM_TOKEN: Type.String({ minLength: 1 }),
+    AXIOM_DATASET: Type.String({ minLength: 1 }),
     SENTRY_DSN: Type.Optional(Type.String()),
     /** Set automatically by Railway; used as release/version tag. */
     RAILWAY_GIT_COMMIT_SHA: Type.Optional(Type.String()),

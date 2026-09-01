@@ -21,23 +21,6 @@ export const WorkspaceIdRequestSchema = Type.Object({
 });
 export type WorkspaceIdRequest = Static<typeof WorkspaceIdRequestSchema>;
 
-// ── POST /workspace-create ───────────────────────────────────────
-
-export const WorkspaceCreateRequestSchema = Type.Object({
-    name: Type.String({ minLength: 1 }),
-});
-export type WorkspaceCreateRequest = Static<typeof WorkspaceCreateRequestSchema>;
-
-/** workspace_create's blob — the caller is always the admin owner. */
-export interface WorkspaceCreated {
-    id: string;
-    name: string;
-    owner_id: string;
-    role: 'admin';
-    created_at: string;
-    updated_at: string;
-}
-
 // ── POST /workspace-list ─────────────────────────────────────────
 
 /** Row of the workspace switcher list (workspace_list's blob). */
@@ -190,16 +173,3 @@ export const WorkspaceMemberUpdateRoleResponseSchema = Type.Object({
     ok: Type.Literal(true),
 });
 export type WorkspaceMemberUpdateRoleResponse = Static<typeof WorkspaceMemberUpdateRoleResponseSchema>;
-
-// ── POST /workspace-seats-set ────────────────────────────────────
-
-export const WorkspaceSeatsSetRequestSchema = Type.Object({
-    workspaceId: Type.String({ minLength: 1 }),
-    seats: Type.Integer({ minimum: 1 }),
-});
-export type WorkspaceSeatsSetRequest = Static<typeof WorkspaceSeatsSetRequestSchema>;
-
-export const WorkspaceSeatsSetResponseSchema = Type.Object({
-    seats: Type.Integer(),
-});
-export type WorkspaceSeatsSetResponse = Static<typeof WorkspaceSeatsSetResponseSchema>;

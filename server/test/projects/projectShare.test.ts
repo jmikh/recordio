@@ -10,12 +10,18 @@ import { createFakeDeps, type FakeDeps } from '../fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from '../helpers/tokens.js';
 import {
     createTestPool,
+    deleteAuthUsers,
     deleteProjects,
+    deleteWorkspaces,
     hasTestDb,
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
+    seedAuthUser,
     seedProject,
     seedProjectEditor,
+    seedSubscription,
+    seedWorkspace,
+    type SeededAuthUser,
 } from '../helpers/db.js';
 
 async function post(app: App, body: unknown, token?: string) {
@@ -51,15 +57,27 @@ describe('POST /project-share (auth + validation, no db)', () => {
 describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
     let pool: pg.Pool;
     const createdProjects: string[] = [];
+    const createdWorkspaces: string[] = [];
+    /** Subscribed workspace — the share gate needs canShare (revamp Step 1) */
+    let subscribedWs: string;
+    /** Trial-less owner: the fakeClock (2026-01-01) predates the SEEDED users' trials */
+    let freeOwner: SeededAuthUser;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         pool = createTestPool();
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        await seedSubscription(pool, { workspaceId: ws.id, status: 'active' });
+        subscribedWs = ws.id;
+        freeOwner = await seedAuthUser(pool);
     });
     afterEach(async () => {
         await deleteProjects(pool, createdProjects);
         createdProjects.length = 0;
     });
     afterAll(async () => {
+        await deleteWorkspaces(pool, createdWorkspaces);
+        await deleteAuthUsers(pool, [freeOwner.id]);
         await pool.end();
     });
 
@@ -70,7 +88,7 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
     }
 
     async function seed(opts: Parameters<typeof seedProject>[1] = {}) {
-        const p = await seedProject(pool, opts);
+        const p = await seedProject(pool, { workspaceId: subscribedWs, ...opts });
         createdProjects.push(p.id);
         return p;
     }
@@ -135,5 +153,21 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(404);
         expect(res.json()).toEqual({ error: 'Project not found' });
+    });
+
+    // Billing revamp Step 1: share links are trial/Pro — a FREE
+    // workspace (no subscription, owner without a trial) is denied
+    it('403 subscription_required for the owner in a free workspace', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: freeOwner.id });
+        createdWorkspaces.push(ws.id);
+        const p = await seed({ workspaceId: ws.id, slug: null });
+        const { app } = testApp();
+
+        const res = await post(app, { projectId: p.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: 'subscription_required' });
+        expect((await row(p.id)).slug).toBeNull();
     });
 });

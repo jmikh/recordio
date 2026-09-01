@@ -1,6 +1,19 @@
 import { create } from 'zustand';
+import type { WorkspaceEntitlements } from '@shared/api/entitlements';
 
 const DEV_PRO_UID = import.meta.env.VITE_DEV_PRO_UID as string | undefined;
+
+/** Client-side dev override: force pro-shaped entitlements for VITE_DEV_PRO_UID (UI only — server gates use real DB state). */
+const PRO_ENTITLEMENTS: WorkspaceEntitlements = {
+    state: 'pro',
+    canShare: true,
+    canTranscribe: true,
+    canBackgroundExport: true,
+    can4k: true,
+    canInvite: true,
+    projectCap: null,
+    trialEndsAt: null,
+};
 
 export interface WorkspaceListItem {
     id: string;
@@ -10,14 +23,14 @@ export interface WorkspaceListItem {
     seats: number | null;
 }
 
+/** Single plan since the billing revamp — no plan field, seats >= 1. */
 export interface WorkspaceSubscription {
     status: 'active' | 'canceled' | 'past_due' | 'inactive' | null;
-    plan: 'pro' | 'teams';
     currentPeriodEnd: Date | null;
     /** Scheduled cancellation date; null = renews */
     cancelAt: Date | null;
     billingInterval: 'monthly' | 'yearly' | null;
-    seats: number | null;
+    seats: number;
     stripeCustomerId: string | null;
 }
 
@@ -33,13 +46,19 @@ export interface WorkspaceState {
     /** True once the initial workspace_get_default has resolved. Gates authenticated UI. */
     workspaceReady: boolean;
 
-    // Billing — workspace-scoped subscription
+    // Billing — workspace-scoped subscription + server-computed entitlements
     subscription: WorkspaceSubscription | null;
-    hasActivePlan: boolean; // active pro or teams subscription
+    /** From /subscription-get; null until loaded (treat as free) */
+    entitlements: WorkspaceEntitlements | null;
+    hasActivePlan: boolean; // active subscription (incl. past_due dunning)
 
     setWorkspace: (id: string, name: string, ownerId: string, role?: string | null, seats?: number | null) => void;
     setWorkspaceList: (list: WorkspaceListItem[]) => void;
-    setSubscription: (sub: WorkspaceSubscription, userId?: string) => void;
+    setSubscription: (
+        sub: WorkspaceSubscription | null,
+        entitlements: WorkspaceEntitlements,
+        userId?: string,
+    ) => void;
     setWorkspaceReady: () => void;
     clearWorkspace: () => void;
 }
@@ -53,6 +72,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     workspaceList: [],
     workspaceReady: false,
     subscription: null,
+    entitlements: null,
     hasActivePlan: false,
 
     setWorkspace: (workspaceId, workspaceName, workspaceOwnerId, role, seats = null) => {
@@ -71,10 +91,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
 
     setWorkspaceReady: () => set({ workspaceReady: true }),
 
-    setSubscription: (sub, userId) => {
+    setSubscription: (sub, entitlements, userId) => {
         const isDevPro = DEV_PRO_UID && userId ? userId === DEV_PRO_UID : false;
-        const hasActivePlan = isDevPro || sub.status === 'active' || sub.status === 'past_due';
-        set({ subscription: sub, hasActivePlan });
+        const hasActivePlan =
+            isDevPro || sub?.status === 'active' || sub?.status === 'past_due';
+        set({
+            subscription: sub,
+            entitlements: isDevPro ? PRO_ENTITLEMENTS : entitlements,
+            hasActivePlan,
+        });
     },
 
     clearWorkspace: () => {
@@ -87,6 +112,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             workspaceList: [],
             workspaceReady: false,
             subscription: null,
+            entitlements: null,
             hasActivePlan: false,
         });
     },

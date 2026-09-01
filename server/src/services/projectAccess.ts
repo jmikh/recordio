@@ -19,6 +19,7 @@ export interface ProjectAccess {
     owner_id: string;
     /** Share slug — null until project_share creates one (mux-video-create gates on it) */
     slug: string | null;
+    workspace_id: string;
 }
 
 export async function getProjectIfEditor(
@@ -27,7 +28,7 @@ export async function getProjectIfEditor(
     userId: string,
 ): Promise<ProjectAccess | null> {
     const { rows } = await db.query(
-        `SELECT p.id, p.owner_id, p.slug
+        `SELECT p.id, p.owner_id, p.slug, p.workspace_id
          FROM projects p
          WHERE p.id = $1
            AND p.deleted_at IS NULL
@@ -77,7 +78,11 @@ export async function canEditProject(
     return rows.length > 0;
 }
 
-/** Ports `assert_workspace_admin`: admin member of a live workspace. */
+/**
+ * Ports `assert_workspace_admin`: the owner (owner is its own state —
+ * workspaces.owner_id implies admin, revamp Step 2) or an admin member
+ * of a live workspace.
+ */
 export async function isWorkspaceAdmin(
     db: Db,
     workspaceId: string,
@@ -85,19 +90,29 @@ export async function isWorkspaceAdmin(
 ): Promise<boolean> {
     const { rows } = await db.query(
         `SELECT 1
-         FROM workspace_members wm
-         JOIN workspaces w ON w.id = wm.workspace_id
-         WHERE wm.workspace_id = $1
-           AND wm.user_id = $2
-           AND wm.role = 'admin'
+         FROM workspaces w
+         WHERE w.id = $1
            AND w.deleted_at IS NULL
+           AND (
+               w.owner_id = $2
+               OR EXISTS (
+                   SELECT 1 FROM workspace_members wm
+                   WHERE wm.workspace_id = w.id
+                     AND wm.user_id = $2
+                     AND wm.role = 'admin'
+               )
+           )
          LIMIT 1`,
         [workspaceId, userId],
     );
     return rows.length > 0;
 }
 
-/** Ports `assert_workspace_viewer`: member (any role) of a live workspace. */
+/**
+ * Ports `assert_workspace_viewer`: the owner or a member (any role) of
+ * a live workspace. Owners have no workspace_members row (revamp Step 2
+ * — the table holds invited members only).
+ */
 export async function isWorkspaceMember(
     db: Db,
     workspaceId: string,
@@ -105,11 +120,16 @@ export async function isWorkspaceMember(
 ): Promise<boolean> {
     const { rows } = await db.query(
         `SELECT 1
-         FROM workspace_members wm
-         JOIN workspaces w ON w.id = wm.workspace_id
-         WHERE wm.workspace_id = $1
-           AND wm.user_id = $2
+         FROM workspaces w
+         WHERE w.id = $1
            AND w.deleted_at IS NULL
+           AND (
+               w.owner_id = $2
+               OR EXISTS (
+                   SELECT 1 FROM workspace_members wm
+                   WHERE wm.workspace_id = w.id AND wm.user_id = $2
+               )
+           )
          LIMIT 1`,
         [workspaceId, userId],
     );

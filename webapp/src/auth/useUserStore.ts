@@ -11,16 +11,9 @@ export interface UserState {
     pictureSourceUrl: string | null; // Original remote URL that was cached into `picture`
     isAuthenticated: boolean;
 
-    // Trial state (from user_profiles table)
-    trialEndsAt: Date | null;
-
     // Actions
     setUser: (userId: string, email: string, name?: string | null, picture?: string | null, pictureSourceUrl?: string | null) => void;
-    setTrialEndsAt: (trialEndsAt: Date | null) => void;
     clearUser: () => void;
-
-    // Helper methods
-    hasFreeTrial: () => boolean;
 }
 
 export const useUserStore = create<UserState>()(
@@ -33,7 +26,6 @@ export const useUserStore = create<UserState>()(
             picture: null,
             pictureSourceUrl: null,
             isAuthenticated: false,
-            trialEndsAt: null,
 
             // Actions
             setUser: (userId, email, name = null, picture = null, pictureSourceUrl = null) => {
@@ -52,10 +44,6 @@ export const useUserStore = create<UserState>()(
                 }
             },
 
-            setTrialEndsAt: (trialEndsAt) => {
-                set({ trialEndsAt });
-            },
-
             clearUser: () => {
                 resetUser();
                 set({
@@ -65,16 +53,7 @@ export const useUserStore = create<UserState>()(
                     picture: null,
                     pictureSourceUrl: null,
                     isAuthenticated: false,
-                    trialEndsAt: null,
                 });
-            },
-
-            // Helper to check if user has an active free trial (from user_profiles.trial_ends_at)
-            hasFreeTrial: () => {
-                const { isAuthenticated, trialEndsAt } = get();
-                if (!isAuthenticated) return false;
-                if (!trialEndsAt) return false;
-                return new Date(trialEndsAt).getTime() > Date.now();
             },
         }),
         {
@@ -87,7 +66,6 @@ export const useUserStore = create<UserState>()(
                 picture: state.picture,
                 pictureSourceUrl: state.pictureSourceUrl,
                 isAuthenticated: state.isAuthenticated,
-                trialEndsAt: state.trialEndsAt,
             }),
             onRehydrateStorage: () => (state) => {
                 if (state) {

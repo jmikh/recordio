@@ -10,7 +10,7 @@ import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
-import { useNonFreeAccess } from '../../billing/useNonFreeAccess';
+import { useEntitlements } from '../../billing/useEntitlements';
 import { AuthManager } from '../../auth/AuthManager';
 import { invokeFunction } from '../../api/client';
 import { switchWorkspace } from '../../workspace/switchWorkspace';
@@ -18,7 +18,7 @@ import { switchWorkspace } from '../../workspace/switchWorkspace';
 import { SupportModal } from '../../components/SupportModal';
 import { AuthModal } from '../../auth/AuthModal';
 import { useToast } from '../../components/Toast';
-import { trackProjectOpened, trackDashboardPageLoaded, trackWorkspaceCreateFailed, trackProjectDeleteFailed } from '../../analytics';
+import { trackProjectOpened, trackDashboardPageLoaded, trackProjectDeleteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
@@ -33,13 +33,11 @@ export function DashboardPage() {
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
     const { userId } = useUserStore();
-    const hasNonFreeAccess = useNonFreeAccess();
+    const hasNonFreeAccess = useEntitlements().state !== 'free';
     const {
         workspaceId, workspaceName, workspaceRole,
         workspaceList, workspaceReady, setWorkspace, setWorkspaceList,
     } = useWorkspaceStore();
-    const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-    const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
     // Split into active and trashed
     const projects = useMemo(() => allProjects.filter(p => !p.deletedAt), [allProjects]);
@@ -204,34 +202,6 @@ export function DashboardPage() {
         // Projects reload automatically via the workspaceId effect
     };
 
-    const handleCreateWorkspace = async () => {
-        setShowCreateWorkspace(true);
-    };
-
-    const handleCreateWorkspaceConfirm = async () => {
-        const name = newWorkspaceName.trim();
-        if (!name) return;
-        try {
-            const { data: created, error } = await invokeFunction('workspace-create', { name });
-            if (error) throw error;
-            // Add to list and switch
-            const newItem = { id: created.id, name: created.name, owner_id: created.owner_id, role: created.role, seats: null };
-            setWorkspaceList([...workspaceList, newItem]);
-            setWorkspace(created.id, created.name, created.owner_id, created.role, null);
-            setNewWorkspaceName('');
-            setShowCreateWorkspace(false);
-            addToast({ type: 'success', title: `Workspace "${created.name}" created` });
-        } catch (err: any) {
-            captureError(err, { flow: 'workspace', phase: 'create' });
-            trackWorkspaceCreateFailed({
-                error: err?.message || 'Unknown error',
-                error_name: err?.name,
-                is_offline: !navigator.onLine,
-            });
-            addToast({ type: 'error', title: 'Failed to create workspace' });
-        }
-    };
-
     const handleOpen = (item: ProjectListItem) => {
         trackProjectOpened();
         navigate(`/editor?projectId=${item.id}`);
@@ -346,9 +316,7 @@ export function DashboardPage() {
                     currentWorkspaceId={workspaceId}
                     currentWorkspaceName={workspaceName}
                     currentRole={workspaceRole}
-                    currentUserId={userId}
                     onSwitchWorkspace={handleSwitchWorkspace}
-                    onCreateWorkspace={handleCreateWorkspace}
                     onOpenWorkspaceSettings={() => navigate('/workspace/settings')}
                 />
 
@@ -554,29 +522,6 @@ export function DashboardPage() {
                 </Button>
             </Modal>
 
-            {/* Create Workspace Modal */}
-            <Modal isOpen={showCreateWorkspace} onClose={() => { setShowCreateWorkspace(false); setNewWorkspaceName(''); }} maxWidth="max-w-[400px]">
-                <h2 className="text-lg font-semibold text-text-highlighted mb-4">New Workspace</h2>
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <label className="text-sm text-text-main block mb-1">Workspace Name</label>
-                        <input
-                            type="text"
-                            value={newWorkspaceName}
-                            onChange={e => setNewWorkspaceName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && newWorkspaceName.trim()) handleCreateWorkspaceConfirm(); }}
-                            placeholder="e.g. Acme Team"
-                            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors"
-                            autoFocus
-                            maxLength={60}
-                        />
-                    </div>
-                    <div className="flex gap-3 justify-end">
-                        <Button onClick={() => { setShowCreateWorkspace(false); setNewWorkspaceName(''); }}>Cancel</Button>
-                        <Button variant="primary" onClick={handleCreateWorkspaceConfirm} disabled={!newWorkspaceName.trim()}>Create</Button>
-                    </div>
-                </div>
-            </Modal>
         </div>
     );
 }

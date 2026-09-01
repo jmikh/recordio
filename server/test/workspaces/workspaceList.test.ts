@@ -71,10 +71,8 @@ describe.runIf(hasTestDb())('POST /workspace-list (e2e, real Postgres)', () => {
             `UPDATE workspaces SET created_at = now() - interval '1 day' WHERE id = $1`,
             [older.id],
         );
-        await seedWorkspaceMember(pool, { workspaceId: older.id, userId: user.id, role: 'admin' });
         await seedWorkspaceMember(pool, { workspaceId: newer.id, userId: user.id, role: 'viewer' });
-        await seedWorkspaceMember(pool, { workspaceId: deleted.id, userId: user.id });
-        await seedSubscription(pool, { workspaceId: newer.id, plan: 'teams', seats: 7 });
+        await seedSubscription(pool, { workspaceId: newer.id, seats: 7 });
 
         const res = await post(testApp(), await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);

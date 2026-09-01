@@ -89,9 +89,8 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
     }
 
     async function seedOwnWorkspace() {
-        const ws = await seedWorkspace(pool, {});
+        const ws = await seedWorkspace(pool, {}); // owner (implicit member): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
         return ws;
     }
 

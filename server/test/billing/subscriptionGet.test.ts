@@ -1,10 +1,12 @@
 /**
- * POST /subscription-get — Part 2 Batch 4.
- * Pins: member gating (non-member → null, indistinguishable from
- * no-subscription), the omitted-workspaceId fallback to the oldest
- * OWNED workspace, and the fail-safe 400 for an explicit null
- * workspaceId (Ajv coerces null → "" through a string schema, minLength
- * rejects it — clients omit the key).
+ * POST /subscription-get — billing revamp Step 1 contract.
+ * Pins: members always get { subscription, entitlements } (free/trial
+ * workspaces have subscription: null + real entitlements), non-members
+ * get 403 (the old null-for-non-member hiding can't carry
+ * entitlements), the omitted-workspaceId fallback to the oldest OWNED
+ * workspace, and the fail-safe 400 for an explicit null workspaceId
+ * (Ajv coerces null → "" through a string schema, minLength rejects it
+ * — clients omit the key).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
@@ -71,49 +73,108 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
         });
     }
 
-    it('returns the subscription blob for a member', async () => {
+    it('returns the subscription blob + pro entitlements for the owner of a subscribed workspace', async () => {
         const ws = await seedWorkspace(pool, { ownerId: owner.id });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: owner.id });
         await seedSubscription(pool, {
-            workspaceId: ws.id, userId: owner.id, plan: 'teams', status: 'active',
+            workspaceId: ws.id, userId: owner.id, status: 'active',
             billingInterval: 'yearly', seats: 6, cancelAt: '2027-01-01T00:00:00Z',
         });
 
         const res = await post(testApp(), { workspaceId: ws.id },
             await userToken({ sub: owner.id, email: owner.email }));
         expect(res.statusCode).toBe(200);
-        const body = res.json() as Record<string, unknown>;
-        expect(body).toMatchObject({
+        const body = res.json() as Record<string, Record<string, unknown>>;
+        expect(body.subscription).toMatchObject({
             status: 'active',
-            plan: 'teams',
             billing_interval: 'yearly',
             seats: 6,
         });
-        expect(body.cancel_at as string).toContain('2027-01-01');
+        expect(body.subscription.cancel_at as string).toContain('2027-01-01');
+        expect(body.entitlements).toEqual({
+            state: 'pro',
+            canShare: true,
+            canTranscribe: true,
+            canBackgroundExport: true,
+            can4k: true,
+            canInvite: true,
+            projectCap: null,
+            trialEndsAt: null,
+        });
     });
 
-    it('null for a NON-member of a subscribed workspace (information hiding)', async () => {
+    it('403 for a NON-member of a subscribed workspace', async () => {
         const ws = await seedWorkspace(pool, { ownerId: owner.id });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: owner.id });
         await seedSubscription(pool, { workspaceId: ws.id, userId: owner.id });
 
         const res = await post(testApp(), { workspaceId: ws.id },
             await userToken({ sub: SEEDED_USER_2_ID }));
-        expect(res.statusCode).toBe(200);
-        expect(res.body === '' || res.json() === null).toBe(true);
+        expect(res.statusCode).toBe(403);
     });
 
-    it('null when the workspace has no subscription', async () => {
+    it('subscription null + FREE entitlements when the workspace has no subscription and an expired trial', async () => {
         const ws = await seedWorkspace(pool, { ownerId: owner.id });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: owner.id });
 
         const res = await post(testApp(), { workspaceId: ws.id },
             await userToken({ sub: owner.id, email: owner.email }));
         expect(res.statusCode).toBe(200);
-        expect(res.body === '' || res.json() === null).toBe(true);
+        const body = res.json() as { subscription: unknown; entitlements: Record<string, unknown> };
+        expect(body.subscription).toBeNull();
+        expect(body.entitlements).toMatchObject({
+            state: 'free',
+            canShare: false,
+            canTranscribe: false,
+            canBackgroundExport: false,
+            can4k: false,
+            canInvite: false,
+            trialEndsAt: null,
+        });
+        expect(body.entitlements.projectCap).toBeGreaterThanOrEqual(1);
+    });
+
+    it('subscription null + TRIAL entitlements while the WORKSPACE trial is live', async () => {
+        // Trial pinned after the fakeClock (2026-01-01)
+        const ws = await seedWorkspace(pool, {
+            ownerId: owner.id,
+            trialEndsAt: '2026-06-01T00:00:00Z',
+        });
+        createdWorkspaces.push(ws.id);
+
+        const res = await post(testApp(), { workspaceId: ws.id },
+            await userToken({ sub: owner.id, email: owner.email }));
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+            subscription: null,
+            entitlements: {
+                state: 'trial',
+                canShare: true,
+                canTranscribe: true,
+                canBackgroundExport: true,
+                can4k: true,
+                canInvite: false, // trials are solo
+                projectCap: null,
+                trialEndsAt: '2026-06-01T00:00:00.000Z',
+            },
+        });
+    });
+
+    it('one-way door: a canceled subscription pins the workspace FREE even with a live trial', async () => {
+        const ws = await seedWorkspace(pool, {
+            ownerId: owner.id,
+            trialEndsAt: '2026-06-01T00:00:00Z',
+        });
+        createdWorkspaces.push(ws.id);
+        await seedSubscription(pool, { workspaceId: ws.id, userId: owner.id, status: 'canceled' });
+
+        const res = await post(testApp(), { workspaceId: ws.id },
+            await userToken({ sub: owner.id, email: owner.email }));
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+            subscription: { status: 'canceled' },
+            entitlements: { state: 'free', canShare: false, trialEndsAt: null },
+        });
     });
 
     it('omitted workspaceId falls back to the oldest OWNED workspace', async () => {
@@ -124,14 +185,12 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             `UPDATE workspaces SET created_at = now() - interval '2 days' WHERE id = $1`,
             [older.id],
         );
-        await seedWorkspaceMember(pool, { workspaceId: older.id, userId: owner.id });
-        await seedWorkspaceMember(pool, { workspaceId: newer.id, userId: owner.id });
         await seedSubscription(pool, { workspaceId: older.id, userId: owner.id, status: 'trialing' });
         await seedSubscription(pool, { workspaceId: newer.id, userId: owner.id, status: 'active' });
 
         const res = await post(testApp(), {},
             await userToken({ sub: owner.id, email: owner.email }));
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toMatchObject({ status: 'trialing' });
+        expect(res.json()).toMatchObject({ subscription: { status: 'trialing' } });
     });
 });

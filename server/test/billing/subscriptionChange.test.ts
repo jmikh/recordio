@@ -2,9 +2,12 @@
  * POST /subscription-change — e2e against the real local `supabase start`
  * Postgres (merge-blocking tier). First migrated route with a DB WRITE, so
  * the resulting-DB-state assertions cover both directions: dryRun leaves
- * the row untouched, apply updates plan/seats/billing_interval. Stripe is
+ * the row untouched, apply updates seats/billing_interval. Stripe is
  * the in-memory fake (canned subscription/prices/preview, recorded
  * updates); its real adapter has its own integration test.
+ *
+ * Single plan since billing revamp Step 1: no newPlan in the request —
+ * the route only changes seats and/or interval on the per-seat price.
  *
  * Isolation: unique workspace ids, targeted deletes in afterEach
  * (members/subscriptions cascade). Tokens are hand-signed with SEEDED user
@@ -28,10 +31,8 @@ import {
 } from '../helpers/db.js';
 
 const PRICE_IDS: StripePriceIds = {
-    pro_monthly: 'price_pro_m',
-    pro_yearly: 'price_pro_y',
-    teams_monthly: 'price_teams_m',
-    teams_yearly: 'price_teams_y',
+    monthly: 'price_m',
+    yearly: 'price_y',
 };
 
 const SUB_ID = 'sub_change_test';
@@ -42,7 +43,7 @@ const PERIOD_END = 1800000000;
 const adminToken = () => userToken({ sub: SEEDED_USER_ID });
 
 function validBody(workspaceId: string, overrides: Record<string, unknown> = {}) {
-    return { workspaceId, newPlan: 'teams', newSeats: 8, dryRun: true, ...overrides };
+    return { workspaceId, newSeats: 8, dryRun: true, ...overrides };
 }
 
 async function post(app: App, body: unknown, token?: string) {
@@ -54,7 +55,7 @@ async function post(app: App, body: unknown, token?: string) {
     });
 }
 
-/** Canned Stripe state: active teams-monthly subscription, 5 seats. */
+/** Canned Stripe state: active monthly subscription, 5 seats. */
 function seedFakeStripe(deps: FakeDeps) {
     deps.stripe.subscriptions.set(SUB_ID, {
         id: SUB_ID,
@@ -66,18 +67,18 @@ function seedFakeStripe(deps: FakeDeps) {
                     id: 'si_1',
                     quantity: 5,
                     current_period_end: PERIOD_END,
-                    price: { id: 'price_teams_m', unit_amount: 1000, recurring: { interval: 'month' } },
+                    price: { id: 'price_m', unit_amount: 1000, recurring: { interval: 'month' } },
                 },
             ],
         },
     });
-    deps.stripe.prices.set('price_teams_m', {
-        id: 'price_teams_m',
+    deps.stripe.prices.set('price_m', {
+        id: 'price_m',
         unit_amount: 1000,
         recurring: { interval: 'month' },
     });
-    deps.stripe.prices.set('price_teams_y', {
-        id: 'price_teams_y',
+    deps.stripe.prices.set('price_y', {
+        id: 'price_y',
         unit_amount: 10000,
         recurring: { interval: 'year' },
     });
@@ -115,12 +116,6 @@ describe('POST /subscription-change (auth + validation, no db)', () => {
         const body: Record<string, unknown> = validBody('ws-1');
         delete body.workspaceId;
         const res = await post(app, body, await adminToken());
-        expect(res.statusCode).toBe(400);
-    });
-
-    it('400 for a non-teams plan (edge fn: "Only upgrades to Teams are supported")', async () => {
-        const { app } = validationApp();
-        const res = await post(app, validBody('ws-1', { newPlan: 'pro' }), await adminToken());
         expect(res.statusCode).toBe(400);
     });
 
@@ -180,15 +175,13 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         return ws;
     }
 
-    /** Workspace with SEEDED_USER_ID as admin + an active teams subscription linked to the fake Stripe state. */
-    async function seedTeamsWorkspace(
+    /** Workspace owned by SEEDED_USER_ID (owner = implicit admin, no member row) + an active subscription linked to the fake Stripe state. */
+    async function seedSubscribedWorkspace(
         subOverrides: Partial<Parameters<typeof seedSubscription>[1]> = {},
     ) {
         const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
         await seedSubscription(pool, {
             workspaceId: ws.id,
-            plan: 'teams',
             seats: 5,
             billingInterval: 'monthly',
             stripeCustomerId: CUS_ID,
@@ -200,17 +193,17 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     async function getSubRow(workspaceId: string) {
         const { rows } = await pool.query(
-            'SELECT plan, seats, billing_interval, updated_at FROM subscriptions WHERE workspace_id = $1',
+            'SELECT seats, billing_interval, updated_at FROM subscriptions WHERE workspace_id = $1',
             [workspaceId],
         );
-        return rows[0] as { plan: string; seats: number | null; billing_interval: string; updated_at: Date };
+        return rows[0] as { seats: number; billing_interval: string; updated_at: Date };
     }
 
     it('403 with the exact edge-fn body for a non-member, no Stripe calls', async () => {
         const { app, deps } = testApp();
         const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
-        await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, plan: 'teams', seats: 5 });
+        await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, seats: 5 });
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(403);
@@ -224,7 +217,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'creator' });
-        await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, plan: 'teams', seats: 5 });
+        await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, seats: 5 });
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(403);
@@ -235,7 +228,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         const { app } = testApp();
         const ws = await seedWs({ deletedAt: new Date().toISOString() });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
-        await seedSubscription(pool, { workspaceId: ws.id, plan: 'teams', seats: 5 });
+        await seedSubscription(pool, { workspaceId: ws.id, seats: 5 });
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(403);
@@ -253,7 +246,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     it('400 when the subscription is not active/trialing', async () => {
         const { app } = testApp();
-        const ws = await seedTeamsWorkspace({ status: 'canceled' });
+        const ws = await seedSubscribedWorkspace({ status: 'canceled' });
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(400);
@@ -262,25 +255,25 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     it('400 for a yearly → monthly interval downgrade', async () => {
         const { app } = testApp();
-        const ws = await seedTeamsWorkspace({ billingInterval: 'yearly' });
+        const ws = await seedSubscribedWorkspace({ billingInterval: 'yearly' });
 
         const res = await post(app, validBody(ws.id, { newInterval: 'monthly' }), await adminToken());
         expect(res.statusCode).toBe(400);
         expect(res.json()).toEqual({ error: 'Downgrade from yearly to monthly billing is not supported' });
     });
 
-    it('400 no-op guard: same plan, seats and interval', async () => {
+    it('400 no-op guard: same seats and interval', async () => {
         const { app } = testApp();
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
 
         const res = await post(app, validBody(ws.id, { newSeats: 5 }), await adminToken());
         expect(res.statusCode).toBe(400);
-        expect(res.json()).toEqual({ error: 'No change in plan, seats, or billing interval' });
+        expect(res.json()).toEqual({ error: 'No change in seats or billing interval' });
     });
 
     it('404 when the subscription row has no Stripe subscription id', async () => {
         const { app } = testApp();
-        const ws = await seedTeamsWorkspace({ stripeSubscriptionId: null });
+        const ws = await seedSubscribedWorkspace({ stripeSubscriptionId: null });
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(404);
@@ -289,7 +282,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     it('400 seat floor: exact interpolated body, no Stripe calls', async () => {
         const { app, deps } = testApp();
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
 
         const res = await post(app, validBody(ws.id, { newSeats: 1 }), await adminToken());
@@ -307,7 +300,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
             customer: CUS_ID,
             items: { data: [] },
         });
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
 
         const res = await post(app, validBody(ws.id), await adminToken());
         expect(res.statusCode).toBe(500);
@@ -316,19 +309,19 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     it('dryRun seats-only: 200 preview with parity math, DB unchanged, no update call', async () => {
         const { app, deps } = testApp();
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
         const before = await getSubRow(ws.id);
 
         const res = await post(app, validBody(ws.id, { newSeats: 8, dryRun: true }), await adminToken());
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({
             immediateCharge: 30, // amount_due 3000 / 100
-            nextRenewalAmount: 80, // price_teams_m 1000 * 8 seats / 100
+            nextRenewalAmount: 80, // price_m 1000 * 8 seats / 100
             billingInterval: 'monthly',
             nextRenewalDate: new Date(PERIOD_END * 1000).toISOString(),
             currency: 'usd',
         });
-        // No price in the preview item — same plan and interval
+        // No price in the preview item — same interval
         expect(deps.stripe.invoicePreviews).toEqual([
             {
                 customer: CUS_ID,
@@ -343,7 +336,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
     it('dryRun interval change: preview item carries the target price; billingInterval stays CURRENT (edge-fn smell, kept)', async () => {
         const { app, deps } = testApp();
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
 
         const res = await post(
             app,
@@ -352,22 +345,22 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         );
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({
-            nextRenewalAmount: 500, // price_teams_y 10000 * 5 seats / 100
+            nextRenewalAmount: 500, // price_y 10000 * 5 seats / 100
             billingInterval: 'monthly', // parity: current, not target
         });
         expect(deps.stripe.invoicePreviews[0]).toMatchObject({
-            item: { id: 'si_1', quantity: 5, price: 'price_teams_y' },
+            item: { id: 'si_1', quantity: 5, price: 'price_y' },
         });
     });
 
     it('apply seats-only: 200, update recorded without price, DB row written', async () => {
         const { app, deps } = testApp();
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
         const before = await getSubRow(ws.id);
 
         const res = await post(app, validBody(ws.id, { newSeats: 8, dryRun: false }), await adminToken());
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ success: true, plan: 'teams', seats: 8, billingInterval: 'monthly' });
+        expect(res.json()).toEqual({ success: true, seats: 8, billingInterval: 'monthly' });
         expect(deps.stripe.subscriptionUpdates).toEqual([
             {
                 id: SUB_ID,
@@ -381,36 +374,35 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
         // First migrated route with a DB write — assert the resulting state
         const after = await getSubRow(ws.id);
-        expect(after).toMatchObject({ plan: 'teams', seats: 8, billing_interval: 'monthly' });
+        expect(after).toMatchObject({ seats: 8, billing_interval: 'monthly' });
         expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
     });
 
-    it('apply pro → teams upgrade (trialing): update carries the price, DB plan/seats written', async () => {
+    it('apply interval upgrade (trialing): update carries the price, DB interval written', async () => {
         const { app, deps } = testApp();
-        const ws = await seedTeamsWorkspace({
-            plan: 'pro',
-            seats: null, // constraint: seats only on teams
-            status: 'trialing',
-        });
+        const ws = await seedSubscribedWorkspace({ status: 'trialing' });
 
-        const res = await post(app, validBody(ws.id, { newSeats: 3, dryRun: false }), await adminToken());
+        const res = await post(
+            app,
+            validBody(ws.id, { newSeats: 3, newInterval: 'yearly', dryRun: false }),
+            await adminToken(),
+        );
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ success: true, plan: 'teams', seats: 3, billingInterval: 'monthly' });
+        expect(res.json()).toEqual({ success: true, seats: 3, billingInterval: 'yearly' });
         expect(deps.stripe.subscriptionUpdates[0]).toEqual({
             id: SUB_ID,
             params: {
-                items: [{ id: 'si_1', quantity: 3, price: 'price_teams_m' }],
+                items: [{ id: 'si_1', quantity: 3, price: 'price_y' }],
                 proration_behavior: 'always_invoice',
             },
         });
         expect(await getSubRow(ws.id)).toMatchObject({
-            plan: 'teams',
             seats: 3,
-            billing_interval: 'monthly',
+            billing_interval: 'yearly',
         });
     });
 
-    it('contributes workspace/plan/interval/dry_run to the canonical request event', async () => {
+    it('contributes workspace/interval/dry_run to the canonical request event', async () => {
         const lines: Record<string, unknown>[] = [];
         const deps = createFakeDeps({ db: pool });
         seedFakeStripe(deps);
@@ -425,7 +417,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
                 },
             },
         });
-        const ws = await seedTeamsWorkspace();
+        const ws = await seedSubscribedWorkspace();
 
         const res = await post(app, validBody(ws.id, { newSeats: 8, dryRun: true }), await adminToken());
         expect(res.statusCode).toBe(200);
@@ -433,7 +425,6 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
             'http.route': '/subscription-change',
             'http.response.status_code': 200,
             'workspace.id': ws.id,
-            'stripe.plan': 'teams',
             'stripe.interval': 'monthly',
             'stripe.dry_run': true,
             user_id: SEEDED_USER_ID,

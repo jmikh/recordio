@@ -78,7 +78,7 @@ describe.runIf(hasTestDb())('POST /workspace-set-default (e2e, real Postgres)', 
     });
 
     it('persists the default for a member', async () => {
-        const ws = await seedWorkspace(pool, { ownerId: user.id });
+        const ws = await seedWorkspace(pool); // owned by SEEDED user; caller joins as viewer
         createdWorkspaces.push(ws.id);
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: user.id, role: 'viewer' });
 

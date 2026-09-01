@@ -14,7 +14,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 ## Security / correctness smells (kept for edge-fn parity)
 
 - **stripe-checkout**: client-supplied `userEmail` is forwarded to Stripe
-  unchecked against the token's email (`server/src/routes/stripeCheckout.ts`).
+  unchecked against the token's email (`server/src/routes/billing/stripeCheckout.ts`).
   Found 2026-07-16.
 - **stripe-checkout**: `workspaceId` is never validated against the
   caller's membership — any authed user can start a checkout targeting
@@ -24,7 +24,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   client-controlled and forwarded to Stripe unchecked. Found 2026-07-16.
 - **storage-download-urls**: hardcoded admin-bypass user id
   (`01f290d7-…`) in the route — should become env config
-  (`server/src/routes/storageDownloadUrls.ts`). Found 2026-07-13.
+  (`server/src/routes/assets/storageDownloadUrls.ts`). Found 2026-07-13.
 - **shared-video-get**: ~~the completed-video lookup ignores `is_deleted`
   despite the original comment claiming otherwise — a soft-deleted
   completed video can outrank a newer pending one~~ MOOT 2026-07-22:
@@ -37,7 +37,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **subscription-change**: the dryRun preview reports the CURRENT billing
   interval while the renewal amount uses the TARGET price — inconsistent
   pair when previewing an interval change
-  (`server/src/routes/subscriptionChange.ts`, pinned by test).
+  (`server/src/routes/billing/subscriptionChange.ts`, pinned by test).
   Found 2026-07-16.
 - **subscription-change**: apply is not atomic — Stripe update then DB
   update; a crash between leaves the DB stale until the webhook syncs
@@ -54,7 +54,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 
 - **project-update-thumbnail**: ContentType is hardcoded `image/webp`
   regardless of the actual blob, and the file content is never validated
-  as an image (`server/src/routes/projectUpdateThumbnail.ts`).
+  as an image (`server/src/routes/projects/projectUpdateThumbnail.ts`).
   Found 2026-07-16.
 - **project-update-thumbnail**: S3 put → DB update is not atomic — a
   crash between leaves an orphan S3 object (harmless: deterministic
@@ -71,7 +71,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   client-supplied `fileName`/`sizeBytes` — the actual uploaded content is
   never validated (the presigned PUT has no ContentType/length
   conditions), so any bytes can land under a `.jpg` key
-  (`server/src/routes/assetCreate.ts`, edge-fn parity). Found 2026-07-16.
+  (`server/src/routes/assets/assetUpload.ts`, edge-fn parity). Found 2026-07-16.
 - **asset-create**: the library-limit count and the insert are not
   atomic — two concurrent uploads at 9/10 can both pass the check and
   end at 11/10 (edge-fn parity; a partial unique index or
@@ -89,7 +89,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **project-create-v2**: no workspace membership check — any authed
   user can create a project into ANY workspace id (the edge fn used the
   service-role client the same way)
-  (`server/src/routes/projectCreateV2.ts`, parity). Found 2026-07-17.
+  (`server/src/routes/projects/projectCreateV2.ts`, parity). Found 2026-07-17.
 - **project-create-v2**: upsert takeover — the upsert keys on the
   client-supplied project id with no ownership check, so an existing
   project row can be overwritten (project_data, name, owner_id all
@@ -262,7 +262,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
   NO `event.created` ordering guard (updated/created do) — a stale
   redelivered deleted always cancels the row; the next genuine
   subscription event un-cancels it, but there's a wrong-status window
-  (`server/src/routes/stripeWebhooks.ts`, edge-fn parity, pinned by
+  (`server/src/routes/billing/stripeWebhooks.ts`, edge-fn parity, pinned by
   test). Found 2026-07-22.
 - **stripe-webhooks**: a subscription created OUTSIDE the checkout
   flow (e.g. manually in the Stripe dashboard) can never sync —
@@ -324,7 +324,7 @@ without the user's say-so; mark them `DONE (date)` when addressed.
 - **project_update_name / project_rename are exact duplicates** (same
   SQL body, both editor-gated name updates) — ported as two identical
   routes for call-site parity; consolidate to one route + one call path
-  later (`server/src/routes/projectUpdateName.ts`/`projectRename.ts`).
+  later (`server/src/routes/projects/projectUpdateName.ts`/`projectRename.ts`).
   Found 2026-07-24 (Part 2 Batch 2).
 - **Header.tsx share-state effect reads a field that doesn't exist**: ~~it
   checks `data?.share_slug` but project-get returns `slug` — the branch

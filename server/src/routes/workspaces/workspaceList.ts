@@ -20,19 +20,22 @@ export const workspaceListRoutes: FastifyPluginAsyncTypebox = async (app) => {
             preHandler: app.requireUser,
         },
         async (req, reply) => {
+            // Owner has no workspace_members row (revamp Step 2 — owner
+            // is its own state, workspaces.owner_id): owned workspaces
+            // come in via the LEFT JOIN with a synthesized admin role.
             const { rows } = await app.deps.db.query(
                 `SELECT COALESCE(jsonb_agg(jsonb_build_object(
                     'id',         w.id,
                     'name',       w.name,
                     'owner_id',   w.owner_id,
-                    'role',       wm.role,
+                    'role',       CASE WHEN w.owner_id = $1 THEN 'admin' ELSE wm.role END,
                     'seats',      (SELECT s.seats FROM subscriptions s WHERE s.workspace_id = w.id LIMIT 1),
                     'created_at', w.created_at,
                     'updated_at', w.updated_at
                 ) ORDER BY w.created_at ASC, w.name ASC), '[]'::jsonb) AS workspaces
                 FROM workspaces w
-                JOIN workspace_members wm ON wm.workspace_id = w.id
-                WHERE wm.user_id = $1
+                LEFT JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+                WHERE (w.owner_id = $1 OR wm.user_id IS NOT NULL)
                   AND w.deleted_at IS NULL`,
                 [req.user!.id],
             );

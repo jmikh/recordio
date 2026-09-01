@@ -50,14 +50,20 @@ export const stripePortalRoutes: FastifyPluginAsyncTypebox = async (app) => {
             req.logCtx.set({ 'workspace.id': workspaceId });
 
             // Same membership semantics as subscription_get, with the
-            // caller's id passed explicitly instead of auth.uid()
+            // caller's id passed explicitly instead of auth.uid(); the
+            // owner counts without a member row (revamp Step 2).
             const { rows } = await app.deps.db.query(
                 `SELECT s.stripe_customer_id
                  FROM subscriptions s
-                 JOIN workspace_members wm
-                     ON wm.workspace_id = s.workspace_id
-                    AND wm.user_id = $2
+                 JOIN workspaces w ON w.id = s.workspace_id
                  WHERE s.workspace_id = $1
+                   AND (
+                       w.owner_id = $2
+                       OR EXISTS (
+                           SELECT 1 FROM workspace_members wm
+                           WHERE wm.workspace_id = s.workspace_id AND wm.user_id = $2
+                       )
+                   )
                  LIMIT 1`,
                 [workspaceId, req.user!.id],
             );

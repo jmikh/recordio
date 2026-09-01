@@ -40,3 +40,8 @@ extension.zip
 
 diagnostics/*
 .claude/worktrees/*
+
+# Playwright e2e
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/

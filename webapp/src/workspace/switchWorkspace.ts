@@ -3,8 +3,8 @@ import { useWorkspaceStore, type WorkspaceListItem, type WorkspaceSubscription }
 
 /**
  * Switch the active workspace: update the store, persist as default,
- * and refresh the workspace-scoped subscription so plan/billing UI reflects
- * the new workspace immediately.
+ * and refresh the workspace-scoped subscription + entitlements so
+ * plan/billing UI reflects the new workspace immediately.
  */
 export async function switchWorkspace(ws: WorkspaceListItem, userId: string | null): Promise<void> {
     const { setWorkspace, setSubscription } = useWorkspaceStore.getState();
@@ -14,21 +14,19 @@ export async function switchWorkspace(ws: WorkspaceListItem, userId: string | nu
 
     const { data } = await invokeFunction('subscription-get', { workspaceId: ws.id });
     if (data) {
-        setSubscription({
-            // Wire status is Stripe's string; the store keeps its narrower union
-            status: data.status as WorkspaceSubscription['status'],
-            plan: data.plan ?? 'pro',
-            currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
-            cancelAt: data.cancel_at ? new Date(data.cancel_at) : null,
-            billingInterval: data.billing_interval || null,
-            seats: data.seats ?? null,
-            stripeCustomerId: data.stripe_customer_id ?? null,
-        }, userId ?? undefined);
-    } else {
-        setSubscription({
-            status: null, plan: 'pro', currentPeriodEnd: null,
-            cancelAt: null, billingInterval: null,
-            seats: null, stripeCustomerId: null,
-        }, userId ?? undefined);
+        const sub = data.subscription;
+        setSubscription(
+            sub ? {
+                // Wire status is Stripe's string; the store keeps its narrower union
+                status: sub.status as WorkspaceSubscription['status'],
+                currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end) : null,
+                cancelAt: sub.cancel_at ? new Date(sub.cancel_at) : null,
+                billingInterval: sub.billing_interval || null,
+                seats: sub.seats,
+                stripeCustomerId: sub.stripe_customer_id ?? null,
+            } : null,
+            data.entitlements,
+            userId ?? undefined,
+        );
     }
 }

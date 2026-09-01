@@ -16,13 +16,14 @@ import type { Tab, WorkspaceDetails } from './types';
 export function WorkspaceSettingsPage() {
     const {
         workspaceId, workspaceName, workspaceRole, setWorkspace,
-        workspaceOwnerId, workspaceSeats, hasActivePlan, subscription,
+        workspaceOwnerId, workspaceSeats, hasActivePlan,
         workspaceList, setWorkspaceList,
     } = useWorkspaceStore();
     const { userId } = useUserStore();
     const { addToast } = useToast();
 
-    const isTeamsPlan = hasActivePlan && subscription?.plan === 'teams';
+    // Single plan since the billing revamp: any active subscription includes collaboration
+    const hasTeamAccess = hasActivePlan;
 
     const activeTab = ((): Tab => {
         const seg = window.location.pathname.split('/').pop();
@@ -71,12 +72,6 @@ export function WorkspaceSettingsPage() {
         if (!workspaceId || !workspaceOwnerId) return;
         setWorkspace(workspaceId, name, workspaceOwnerId, workspaceRole, workspaceSeats);
         setDetails(prev => prev ? { ...prev, name } : prev);
-    };
-
-    const handleSeatsUpdated = (seats: number) => {
-        if (!workspaceId || !workspaceOwnerId) return;
-        setWorkspace(workspaceId, workspaceName!, workspaceOwnerId, workspaceRole, seats);
-        setDetails(prev => prev ? { ...prev, seats } : prev);
     };
 
     const handleMemberRemoved = (removedUserId: string) => {
@@ -142,8 +137,7 @@ export function WorkspaceSettingsPage() {
             <MembersPage
                 details={details}
                 currentUserId={userId}
-                isTeamsPlan={isTeamsPlan}
-                onSeatsUpdated={handleSeatsUpdated}
+                hasTeamAccess={hasTeamAccess}
                 onMemberRemoved={handleMemberRemoved}
                 onMemberRoleChanged={handleMemberRoleChanged}
                 onInvitationRescinded={handleInvitationRescinded}
@@ -164,9 +158,7 @@ export function WorkspaceSettingsPage() {
                             currentWorkspaceId={workspaceId}
                             currentWorkspaceName={workspaceName}
                             currentRole={workspaceRole}
-                            currentUserId={userId}
                             onSwitch={handleSwitchWorkspace}
-                            onCreate={() => navigate('/')}
                             onOpenSettings={() => {}}
                         />
                     </div>

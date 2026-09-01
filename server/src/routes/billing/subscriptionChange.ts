@@ -2,8 +2,11 @@
  * POST /subscription-change — ports the edge function of the same name
  * (Wave A #3, 3/3). First migrated route with a DB WRITE.
  *
- * Previews (dryRun) or applies a plan/seat/interval change on a workspace
- * subscription. Caller must be a workspace admin. Proration is
+ * Previews (dryRun) or applies a seat/interval change on a workspace
+ * subscription — single plan since billing revamp Step 1, so there is
+ * no plan change anymore; this is also the ONLY legitimate seat-change
+ * path until Step 6 replaces manual seat management with invite-driven
+ * auto-scaling. Caller must be a workspace admin. Proration is
  * always_invoice: upgrades charge immediately, reductions credit the next
  * invoice. On apply, the DB row is updated immediately so the client's
  * refreshSubscription() reflects the change before the Stripe webhook
@@ -19,16 +22,16 @@
  * into the same query — over the pg pool there is no user-vs-service-role
  * client split.
  *
- * Schema divergences (documented in the migration plan): newPlan is a
- * schema literal ('teams'), newSeats an integer >= 1, and dryRun is
- * REQUIRED — the edge fn treated a missing dryRun as falsy and silently
- * APPLIED the change; failing 400 beats defaulting to the destructive
- * branch. Business-rule 400s keep their exact edge-fn bodies.
+ * Schema divergences (documented in the migration plan): newSeats is an
+ * integer >= 1, and dryRun is REQUIRED — the edge fn treated a missing
+ * dryRun as falsy and silently APPLIED the change; failing 400 beats
+ * defaulting to the destructive branch. Business-rule 400s keep their
+ * exact edge-fn bodies.
  *
- * Request:  { workspaceId, newPlan, newSeats, newInterval?, dryRun }
+ * Request:  { workspaceId, newSeats, newInterval?, dryRun }
  * Response: { immediateCharge, nextRenewalAmount, billingInterval,
- *             nextRenewalDate, currency }            (dryRun)
- *           { success, plan, seats, billingInterval } (apply)
+ *             nextRenewalDate, currency }      (dryRun)
+ *           { success, seats, billingInterval } (apply)
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
@@ -37,7 +40,6 @@ import type { StripePriceIds } from './stripeCheckout.js';
 interface SubscriptionRow {
     /** NULL ⇔ no subscription row (LEFT JOIN miss) — status itself is NOT NULL */
     status: string | null;
-    plan: string | null;
     billing_interval: string | null;
     seats: number | null;
     stripe_customer_id: string | null;
@@ -59,7 +61,6 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             schema: {
                 body: Type.Object({
                     workspaceId: Type.String({ minLength: 1 }),
-                    newPlan: Type.Literal('teams'),
                     newSeats: Type.Integer({ minimum: 1 }),
                     newInterval: Type.Optional(
                         Type.Union([Type.Literal('monthly'), Type.Literal('yearly')]),
@@ -77,7 +78,6 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                         }),
                         Type.Object({
                             success: Type.Literal(true),
-                            plan: Type.String(),
                             seats: Type.Number(),
                             billingInterval: Type.String(),
                         }),
@@ -99,28 +99,34 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             const { priceIds } = opts;
             if (!priceIds) throw new Error('subscriptionChangeRoutes: priceIds not configured');
 
-            const { workspaceId, newPlan, newSeats, newInterval, dryRun } = req.body;
+            const { workspaceId, newSeats, newInterval, dryRun } = req.body;
             req.logCtx.set({
                 'workspace.id': workspaceId,
-                'stripe.plan': newPlan,
                 'stripe.dry_run': dryRun,
             });
 
             // Admin check + subscription in one query, keeping the RPC's
-            // 403/404 split: no row = not admin (or deleted workspace),
-            // row with NULL status = admin but no subscription row.
+            // 403/404 split: no row = not owner/admin (or deleted
+            // workspace), row with NULL status = admin but no
+            // subscription row. Owner counts without a member row
+            // (revamp Step 2).
             const { rows } = await app.deps.db.query(
-                `SELECT s.status, s.plan, s.billing_interval, s.seats,
+                `SELECT s.status, s.billing_interval, s.seats,
                         s.stripe_customer_id, s.stripe_subscription_id
-                 FROM workspace_members wm
-                 JOIN workspaces w
-                     ON w.id = wm.workspace_id
-                    AND w.deleted_at IS NULL
+                 FROM workspaces w
                  LEFT JOIN subscriptions s
-                     ON s.workspace_id = wm.workspace_id
-                 WHERE wm.workspace_id = $1
-                   AND wm.user_id = $2
-                   AND wm.role = 'admin'`,
+                     ON s.workspace_id = w.id
+                 WHERE w.id = $1
+                   AND w.deleted_at IS NULL
+                   AND (
+                       w.owner_id = $2
+                       OR EXISTS (
+                           SELECT 1 FROM workspace_members wm
+                           WHERE wm.workspace_id = w.id
+                             AND wm.user_id = $2
+                             AND wm.role = 'admin'
+                       )
+                   )`,
                 [workspaceId, req.user!.id],
             );
             const sub = rows[0] as SubscriptionRow | undefined;
@@ -142,15 +148,15 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                     .send({ error: 'Downgrade from yearly to monthly billing is not supported' });
             }
 
-            // No-op guard — same plan, same seats, same interval
+            // No-op guard — same seats, same interval
             const targetInterval = (newInterval ?? sub.billing_interval ?? 'monthly') as
                 | 'monthly'
                 | 'yearly';
             req.logCtx.set({ 'stripe.interval': targetInterval });
-            if (sub.plan === 'teams' && sub.seats === newSeats && sub.billing_interval === targetInterval) {
+            if (sub.seats === newSeats && sub.billing_interval === targetInterval) {
                 return reply
                     .code(400)
-                    .send({ error: 'No change in plan, seats, or billing interval' });
+                    .send({ error: 'No change in seats or billing interval' });
             }
 
             if (!sub.stripe_subscription_id || !sub.stripe_customer_id) {
@@ -159,9 +165,11 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                     .send({ error: 'No Stripe subscription linked to this workspace' });
             }
 
-            // Seat floor: never fewer seats than current members
+            // Seat floor: never fewer seats than current members. +1 is
+            // the owner's seat — they have no workspace_members row
+            // (revamp Step 2) but always occupy a seat.
             const { rows: countRows } = await app.deps.db.query(
-                'SELECT COUNT(*)::int AS count FROM workspace_members WHERE workspace_id = $1',
+                'SELECT COUNT(*)::int + 1 AS count FROM workspace_members WHERE workspace_id = $1',
                 [workspaceId],
             );
             const memberCount = (countRows[0] as { count: number } | undefined)?.count ?? 1;
@@ -182,8 +190,8 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             }
 
             const billingInterval = (sub.billing_interval ?? 'monthly') as 'monthly' | 'yearly';
-            const needsPriceChange = sub.plan !== newPlan || targetInterval !== billingInterval;
-            const newPriceId = needsPriceChange ? priceIds[`${newPlan}_${targetInterval}`] : null;
+            const needsPriceChange = targetInterval !== billingInterval;
+            const newPriceId = needsPriceChange ? priceIds[targetInterval] : null;
 
             if (dryRun) {
                 const preview = await app.deps.stripe.previewInvoice({
@@ -241,14 +249,13 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             // the Stripe webhook remains authoritative and re-syncs later
             await app.deps.db.query(
                 `UPDATE subscriptions
-                 SET plan = $2, seats = $3, billing_interval = $4, updated_at = now()
+                 SET seats = $2, billing_interval = $3, updated_at = now()
                  WHERE workspace_id = $1`,
-                [workspaceId, newPlan, newSeats, targetInterval],
+                [workspaceId, newSeats, targetInterval],
             );
 
             return {
                 success: true as const,
-                plan: newPlan,
                 seats: newSeats,
                 billingInterval: targetInterval,
             };

@@ -9,13 +9,12 @@
  * grouped into segments by a ±50 ms window).
  *
  * ACCESS CONTROL: there is no editor/owner check — the gate is "caller
- * is a member of the project's workspace AND that workspace has an
- * active|trialing subscription". The edge fn got this from the SHARED,
- * auth.uid()-dependent `subscription_get` RPC (still used directly by
- * the webapp — stays untouched); auth.uid() can't work over the pg
- * pool, so its membership JOIN is ported inline with explicit
- * $user_id. Non-member, no subscription, and wrong status all collapse
- * into the same 403 (parity; information hiding).
+ * is a member of the project's workspace AND that workspace's
+ * entitlements have canTranscribe" (billing revamp Step 1 — replaces
+ * the inline active|trialing status read, which wrongly excluded
+ * product trials tracked on user_profiles.trial_ends_at). Non-member
+ * and not-entitled collapse into the same 403 subscription_required
+ * (information hiding, as before).
  *
  * Divergences (documented): schema 400 replaces the `Missing projectId`
  * body; the adapter aborts Whisper at 120 s (plan requirement — Railway
@@ -29,6 +28,8 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { getWorkspaceEntitlements } from '../services/entitlements.js';
+import { isWorkspaceMember } from '../services/projectAccess.js';
 import { getProjectMicPath } from '../services/projectMedia.js';
 
 const MIME_MAP: Record<string, string> = {
@@ -159,19 +160,18 @@ export const transcribeRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 return reply.code(404).send({ error: 'Project not found' });
             }
 
-            // Inline port of subscription_get's membership + subscription
-            // read — the JOIN is the endpoint's ONLY access control (see
-            // header comment)
-            const { rows: subRows } = await app.deps.db.query(
-                `SELECT s.status FROM subscriptions s
-                 JOIN workspace_members wm
-                   ON wm.workspace_id = s.workspace_id AND wm.user_id = $2
-                 WHERE s.workspace_id = $1`,
-                [project.workspace_id, userId],
+            // Membership + entitlements are the endpoint's ONLY access
+            // control (see header comment)
+            if (!(await isWorkspaceMember(app.deps.db, project.workspace_id, userId))) {
+                return reply.code(403).send({ error: 'subscription_required' });
+            }
+            const entitlements = await getWorkspaceEntitlements(
+                app.deps.db,
+                app.deps.clock,
+                project.workspace_id,
             );
-            const status = (subRows[0] as { status: string } | undefined)?.status;
-            if (status !== 'active' && status !== 'trialing') {
-                return reply.code(403).send({ error: 'Active subscription required' });
+            if (!entitlements.canTranscribe) {
+                return reply.code(403).send({ error: 'subscription_required' });
             }
 
             const micPath = getProjectMicPath(project.project_data);

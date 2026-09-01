@@ -182,3 +182,12 @@ DROP FUNCTION IF EXISTS public.render_job_get_or_create(p_project_id uuid, p_use
 DROP FUNCTION IF EXISTS public.render_job_complete(p_job_id uuid, p_status text, p_error text);
 DROP FUNCTION IF EXISTS public.mux_video_get_or_create(p_project_id uuid, p_user_id uuid, p_cloud_version integer);
 DROP FUNCTION IF EXISTS public.mux_video_complete(p_mux_asset_id text, p_playback_id text);
+
+-- ── Billing revamp Step 2 (2026-09-01) ──────────────────────────────
+-- Signup bootstrap replaces the profile-only trigger: the account's one
+-- workspace is created at signup (user_signup_bootstrap.sql), so the
+-- old trigger/function pair retires. Deploy order: run this graveyard +
+-- deploy.sh together — both triggers briefly coexisting would double-
+-- insert profiles on signup.
+DROP TRIGGER IF EXISTS on_user_signup_create_user_profile ON auth.users;
+DROP FUNCTION IF EXISTS public.user_profile_create();

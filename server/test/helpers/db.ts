@@ -159,17 +159,26 @@ export interface SeededWorkspace {
 
 export async function seedWorkspace(
     db: Db,
-    opts: { ownerId?: string; name?: string; deletedAt?: string | null } = {},
+    opts: { ownerId?: string; name?: string; deletedAt?: string | null; trialEndsAt?: string } = {},
 ): Promise<SeededWorkspace> {
     const id = randomUUID();
     const ownerId = opts.ownerId ?? SEEDED_USER_ID;
+    // Trial defaults to long-expired (also against the unit tier's
+    // 2026-01-01 fake clock) so seeded workspaces read as free — the
+    // column default (now() + 7d) would grant every test workspace a
+    // live trial. Trial-state tests pass an explicit trialEndsAt.
     await db.query(
-        'INSERT INTO workspaces (id, name, owner_id, deleted_at) VALUES ($1, $2, $3, $4)',
-        [id, opts.name ?? 'Test workspace', ownerId, opts.deletedAt ?? null],
+        'INSERT INTO workspaces (id, name, owner_id, deleted_at, trial_ends_at) VALUES ($1, $2, $3, $4, $5)',
+        [id, opts.name ?? 'Test workspace', ownerId, opts.deletedAt ?? null, opts.trialEndsAt ?? '2020-01-01T00:00:00Z'],
     );
     return { id, ownerId };
 }
 
+/**
+ * Invited members only — the owner has NO workspace_members row since
+ * revamp Step 2 (owner is its own state, workspaces.owner_id implies
+ * admin). Don't seed the owner here; the prod model never has that row.
+ */
 export async function seedWorkspaceMember(
     db: Db,
     opts: { workspaceId: string; userId: string; role?: 'viewer' | 'creator' | 'admin' },
@@ -183,13 +192,12 @@ export async function seedWorkspaceMember(
 export interface SeedSubscriptionOptions {
     workspaceId: string;
     userId?: string;
-    plan?: 'pro' | 'teams';
     status?: string;
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
     billingInterval?: 'monthly' | 'yearly' | null;
-    /** Constraint: seats only allowed when plan = 'teams' */
-    seats?: number | null;
+    /** NOT NULL with a >= 1 check since the single-plan migration */
+    seats?: number;
     stripeEventAt?: string | null;
     currentPeriodEnd?: string | null;
     /** ISO timestamp of a scheduled cancellation; null/absent = renews */
@@ -199,17 +207,16 @@ export interface SeedSubscriptionOptions {
 export async function seedSubscription(db: Db, opts: SeedSubscriptionOptions): Promise<void> {
     await db.query(
         `INSERT INTO subscriptions
-            (workspace_id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats, stripe_event_at, current_period_end, cancel_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            (workspace_id, user_id, status, stripe_customer_id, stripe_subscription_id, billing_interval, seats, stripe_event_at, current_period_end, cancel_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
             opts.workspaceId,
             opts.userId ?? SEEDED_USER_ID,
-            opts.plan ?? 'pro',
             opts.status ?? 'active',
             opts.stripeCustomerId === undefined ? `cus_test_${randomUUID().slice(0, 8)}` : opts.stripeCustomerId,
             opts.stripeSubscriptionId === undefined ? `sub_test_${randomUUID().slice(0, 8)}` : opts.stripeSubscriptionId,
             opts.billingInterval === undefined ? 'monthly' : opts.billingInterval,
-            opts.seats ?? null,
+            opts.seats ?? 1,
             opts.stripeEventAt ?? null,
             opts.currentPeriodEnd ?? null,
             opts.cancelAt ?? null,
@@ -238,7 +245,7 @@ export interface SeededAuthUser {
  */
 export async function seedAuthUser(
     db: Db,
-    opts: { name?: string | null; withProfile?: boolean } = {},
+    opts: { name?: string | null; withProfile?: boolean; keepBootstrapWorkspace?: boolean } = {},
 ): Promise<SeededAuthUser> {
     const id = randomUUID();
     const email = `test-${id.slice(0, 8)}@example.com`;
@@ -261,6 +268,13 @@ export async function seedAuthUser(
         )`,
         [id, email],
     );
+    // The signup trigger bootstraps a workspace + profile (revamp Step 2).
+    // Drop the workspace by default so suites keep their "user with no
+    // workspace yet" semantics and full control over what they seed;
+    // trigger-behavior tests pass keepBootstrapWorkspace.
+    if (!opts.keepBootstrapWorkspace) {
+        await db.query('DELETE FROM workspaces WHERE owner_id = $1', [id]);
+    }
     if (opts.withProfile === false) {
         // A signup trigger may have created one — the no-profile case needs it gone
         await db.query('DELETE FROM user_profiles WHERE user_id = $1', [id]);

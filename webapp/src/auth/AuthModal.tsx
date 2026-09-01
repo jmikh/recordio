@@ -55,7 +55,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[460px]">
+        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[460px]" ariaLabel="Sign in">
             <div className="flex flex-col items-center text-center py-6 px-4">
                 <LogoLink imgClassName="h-8" className="mb-12" />
 
@@ -95,6 +95,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                         <div className="flex flex-col gap-2 mb-3">
                             <input
                                 type="email"
+                                aria-label="Email"
                                 placeholder="email@example.com"
                                 value={devEmail}
                                 onChange={e => setDevEmail(e.target.value)}
@@ -102,6 +103,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                             />
                             <input
                                 type="password"
+                                aria-label="Password"
                                 placeholder="password"
                                 value={devPassword}
                                 onChange={e => setDevPassword(e.target.value)}

@@ -6,6 +6,9 @@
  * applies the policy. The old TABLE(slug, is_new) wrapper was an RPC
  * artifact — the response is a plain object (the client used .single()).
  *
+ * Share links are trial/Pro (billing revamp Step 1): the workspace's
+ * entitlements must have canShare, else 403 subscription_required.
+ *
  * The SQL fn's 'Invalid share_policy' RAISE is replaced by the schema
  * enum; PT404/PT403 become plain 404/403 with the same messages.
  *
@@ -16,6 +19,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { randomUUID } from 'node:crypto';
 import { ProjectShareRequestSchema, ProjectShareResponseSchema } from '@shared/api/projects';
+import { getWorkspaceEntitlements } from '../../services/entitlements.js';
 
 export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -38,17 +42,29 @@ export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
             req.logCtx.set({ 'project.id': projectId });
 
             const { rows } = await db.query(
-                `SELECT slug, owner_id AS "ownerId" FROM projects
+                `SELECT slug, owner_id AS "ownerId", workspace_id AS "workspaceId"
+                 FROM projects
                  WHERE id = $1 AND deleted_at IS NULL`,
                 [projectId],
             );
-            const project = rows[0] as { slug: string | null; ownerId: string } | undefined;
+            const project = rows[0] as
+                | { slug: string | null; ownerId: string; workspaceId: string }
+                | undefined;
 
             if (!project) {
                 return reply.code(404).send({ error: 'Project not found' });
             }
             if (project.ownerId !== req.user!.id) {
                 return reply.code(403).send({ error: 'Only the project owner can share a project' });
+            }
+
+            const entitlements = await getWorkspaceEntitlements(
+                db,
+                app.deps.clock,
+                project.workspaceId,
+            );
+            if (!entitlements.canShare) {
+                return reply.code(403).send({ error: 'subscription_required' });
             }
 
             const isNew = project.slug === null;

@@ -20,7 +20,7 @@ export class StripeService {
      *
      * In the browser: opens Stripe checkout in a popup window.
      */
-    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly', plan: 'pro' | 'teams' = 'pro', workspaceId: string | null = null, seats = 5): Promise<{ error?: Error }> {
+    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly', workspaceId: string | null = null): Promise<{ error?: Error }> {
         try {
             // Open popup IMMEDIATELY in the synchronous click handler stack
             // to prevent mobile Safari and other browsers from blocking it.
@@ -32,18 +32,16 @@ export class StripeService {
             const { data, error } = await invokeFunction<{ url: string | null }>('stripe-checkout', {
                 userId,
                 userEmail,
-                plan,
                 interval,
                 workspaceId,
-                seats,
                 successUrl: redirectUrl,
                 cancelUrl,
             });
 
             if (error) {
-                captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval } });
+                captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { interval } });
                 trackCheckoutSessionFailed({
-                    plan, interval,
+                    interval,
                     error: error.message,
                     error_name: error.name,
                     is_offline: !navigator.onLine,
@@ -54,9 +52,9 @@ export class StripeService {
 
             if (!data?.url) {
                 const err = new Error('No checkout URL returned');
-                captureError(err, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval, reason: 'no_url' } });
+                captureError(err, { flow: 'billing', phase: 'checkout_session', extra: { interval, reason: 'no_url' } });
                 trackCheckoutSessionFailed({
-                    plan, interval,
+                    interval,
                     error: err.message,
                     is_offline: !navigator.onLine,
                 });
@@ -73,9 +71,9 @@ export class StripeService {
 
             return {};
         } catch (error: any) {
-            captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { plan, interval } });
+            captureError(error, { flow: 'billing', phase: 'checkout_session', extra: { interval } });
             trackCheckoutSessionFailed({
-                plan, interval,
+                interval,
                 error: error?.message || 'Unknown error',
                 error_name: error?.name,
                 is_offline: !navigator.onLine,
@@ -85,14 +83,14 @@ export class StripeService {
     }
 
     /**
-     * Preview or apply a subscription plan/seat change.
+     * Preview or apply a subscription seat/interval change (single plan
+     * since the billing revamp — no plan changes).
      *
      * dryRun = true  → returns preview with cost breakdown, no side effects
      * dryRun = false → applies the change; DB is updated immediately + webhook syncs
      */
     static async subscriptionChange(params: {
         workspaceId: string;
-        newPlan: 'teams';
         newSeats: number;
         newInterval?: 'monthly' | 'yearly';
         dryRun: boolean;
@@ -105,7 +103,6 @@ export class StripeService {
                     captureError(error, { flow: 'billing', phase: 'subscription_change', workspaceId: params.workspaceId });
                     trackSubscriptionChangeFailed({
                         workspace_id: params.workspaceId,
-                        new_plan: params.newPlan,
                         new_seats: params.newSeats,
                         error: error.message,
                         error_name: error.name,
@@ -122,7 +119,6 @@ export class StripeService {
                 captureError(err, { flow: 'billing', phase: 'subscription_change', workspaceId: params.workspaceId });
                 trackSubscriptionChangeFailed({
                     workspace_id: params.workspaceId,
-                    new_plan: params.newPlan,
                     new_seats: params.newSeats,
                     error: err?.message || 'Unknown error',
                     error_name: err?.name,

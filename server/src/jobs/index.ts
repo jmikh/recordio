@@ -1,7 +1,7 @@
 /**
  * Job registry (Wave C) — the definitions the scheduler runs in
  * production. Each entry adapts its job's natural counts into the
- * normalized JobRunResult the `job.completed` event carries.
+ * normalized JobRunResult the `job.run` event carries.
  *
  * Naming: `{table}.{verb}-{qualifier}` (user decision 2026-07-18) —
  * table exactly as in Postgres, closed verb set (purge/expire/

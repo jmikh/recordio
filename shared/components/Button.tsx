@@ -19,6 +19,19 @@ const variantClass: Record<ButtonVariant, string> = {
     destructive: 'interactive-destructive',
 };
 
+// Icon-only buttons have no visible text, so screen readers and e2e tests
+// can't address them without an aria-label (see ui-guidelines: Labels &
+// Testability). Warn once per icon component in dev.
+const IS_DEV = Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
+const warnedUnlabeledIcons = new Set<string>();
+function warnIfUnlabeled(icon: ComponentType | undefined, props: ButtonHTMLAttributes<HTMLButtonElement>) {
+    if (!IS_DEV || props['aria-label'] || props.title) return;
+    const name = icon?.displayName || icon?.name || 'unknown-icon';
+    if (warnedUnlabeledIcons.has(name)) return;
+    warnedUnlabeledIcons.add(name);
+    console.warn(`[Button] icon-only button (${name}) has no aria-label/title — add one so tests and screen readers can target it`);
+}
+
 /**
  * Unified Button component.
  * Maps `variant` to the corresponding `interactive-*` CSS class,
@@ -37,6 +50,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     children,
     ...rest
 }, ref) => {
+    if (variant === 'icon' && !children) warnIfUnlabeled(Icon, rest);
+
     const base = variantClass[variant];
     const sizeClass = size === 'sm' ? 'text-xs' : '';
     const widthClass = fullWidth ? 'w-full' : '';

@@ -77,11 +77,26 @@ describe.runIf(hasTestDb())('POST /workspace-invite (e2e, real Postgres)', () =>
     }
 
     async function adminWorkspace() {
-        const ws = await seedWorkspace(pool);
+        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         return ws;
     }
+
+    it("409 for the workspace owner's own email; no invitation created", async () => {
+        // Owner has no workspace_members row (revamp Step 2) — without
+        // the guard, accepting this invite would create one.
+        const ws = await adminWorkspace();
+
+        const { app } = testApp();
+        const res = await post(app, { workspaceId: ws.id, email: 'User1@Gmail.com', role: 'admin' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(409);
+        expect(res.json()).toEqual({ error: 'This email belongs to the workspace owner' });
+
+        const { rows } = await pool.query(
+            'SELECT 1 FROM workspace_invitations WHERE workspace_id = $1', [ws.id]);
+        expect(rows).toHaveLength(0);
+    });
 
     it('403 for a non-admin; no invitation created', async () => {
         const ws = await adminWorkspace();

@@ -9,6 +9,8 @@ interface ModalProps {
     maxWidth?: string;
     /** Optional className for the modal panel */
     className?: string;
+    /** Accessible dialog name, e.g. "Sign in" — lets tests/screen readers target getByRole('dialog', { name }) */
+    ariaLabel?: string;
 }
 
 /**
@@ -23,6 +25,7 @@ export function Modal({
     children,
     maxWidth = 'max-w-[500px]',
     className = '',
+    ariaLabel,
 }: ModalProps) {
     if (!isOpen) return null;
 
@@ -39,6 +42,9 @@ export function Modal({
             onClick={handleBackdropClick}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={ariaLabel}
                 className={`bg-surface-raised rounded-lg p-6 w-full border border-border ${maxWidth} ${className}`}
             >
                 {children}

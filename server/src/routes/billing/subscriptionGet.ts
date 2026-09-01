@@ -1,23 +1,21 @@
 /**
- * POST /subscription-get — the workspace's subscription (Part 2
- * Batch 4). Ports subscription_get inline: member-gated via the JOIN
- * (non-members get null, indistinguishable from no-subscription — SQL
- * parity, information hiding); workspaceId OMITTED falls back to the
- * caller's oldest OWNED live workspace; no subscription → null (the
- * client resets to the free plan). Blob shape kept — no response
- * schema.
+ * POST /subscription-get — the workspace's subscription + entitlements
+ * (billing revamp Step 1,
+ * plans/workspace-billing-revamp/workspace-billing-revamp-step-1.md).
  *
- * NOT consolidated with the Part 1 inline status reads
- * (projectCreateV2: active|past_due, no member gate; transcribe:
- * active|trialing) — one-line queries with deliberately different
- * policies (see suggested_changes' subscription-status-inconsistency
- * bullet); a shared helper would blur them.
+ * Members always get entitlements: a free/trial workspace is
+ * `subscription: null` + real entitlements. Non-members get 403 — the
+ * pre-revamp null-for-non-member information hiding can't carry an
+ * entitlements payload. workspaceId OMITTED falls back to the caller's
+ * oldest OWNED live workspace (SQL parity); no workspace resolves →
+ * 404 (a bootstrapped user always has one via workspace-get-default).
  *
  * Request:  { workspaceId? } — omit for the fallback, never null
- * Response: the subscription blob | null
+ * Response: { subscription, entitlements } | 403/404 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { SubscriptionGetRequestSchema } from '@shared/api/session';
+import { getWorkspaceEntitlements } from '../../services/entitlements.js';
 
 export const subscriptionGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -34,32 +32,51 @@ export const subscriptionGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
             if (workspaceId) req.logCtx.set({ 'workspace.id': workspaceId });
 
             const { rows } = await app.deps.db.query(
-                `SELECT jsonb_build_object(
-                    'status',             s.status,
-                    'plan',               s.plan,
-                    'current_period_end', s.current_period_end,
-                    'cancel_at',          s.cancel_at,
-                    'stripe_customer_id', s.stripe_customer_id,
-                    'billing_interval',   s.billing_interval,
-                    'seats',              s.seats
-                ) AS subscription
-                FROM subscriptions s
-                JOIN workspace_members wm
-                    ON wm.workspace_id = s.workspace_id
-                   AND wm.user_id = $1
-                WHERE s.workspace_id = COALESCE(
-                    $2::uuid,
-                    (SELECT w.id FROM workspaces w
-                     WHERE w.owner_id = $1 AND w.deleted_at IS NULL
-                     ORDER BY w.created_at ASC
-                     LIMIT 1)
-                )
-                LIMIT 1`,
+                `SELECT w.id AS workspace_id,
+                        (w.owner_id = $1 OR EXISTS (
+                            SELECT 1 FROM workspace_members wm
+                            WHERE wm.workspace_id = w.id AND wm.user_id = $1
+                        )) AS is_member,
+                        (SELECT jsonb_build_object(
+                            'status',             s.status,
+                            'current_period_end', s.current_period_end,
+                            'cancel_at',          s.cancel_at,
+                            'stripe_customer_id', s.stripe_customer_id,
+                            'billing_interval',   s.billing_interval,
+                            'seats',              s.seats
+                        ) FROM subscriptions s WHERE s.workspace_id = w.id) AS subscription
+                 FROM workspaces w
+                 WHERE w.id = COALESCE(
+                     $2::uuid,
+                     (SELECT w2.id FROM workspaces w2
+                      WHERE w2.owner_id = $1 AND w2.deleted_at IS NULL
+                      ORDER BY w2.created_at ASC
+                      LIMIT 1)
+                 )
+                   AND w.deleted_at IS NULL`,
                 [userId, workspaceId],
             );
-            return reply.send(
-                (rows[0] as { subscription: unknown } | undefined)?.subscription ?? null,
+            const row = rows[0] as
+                | { workspace_id: string; is_member: boolean; subscription: unknown }
+                | undefined;
+
+            if (!row) {
+                return reply.code(404).send({ error: 'Workspace not found' });
+            }
+            if (!row.is_member) {
+                return reply.code(403).send({ error: 'Not a member of this workspace' });
+            }
+
+            const entitlements = await getWorkspaceEntitlements(
+                app.deps.db,
+                app.deps.clock,
+                row.workspace_id,
             );
+
+            return reply.send({
+                subscription: row.subscription ?? null,
+                entitlements,
+            });
         },
     );
 };

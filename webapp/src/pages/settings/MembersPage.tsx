@@ -4,7 +4,7 @@ import { Button } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
-import { trackMembersPageLoaded, trackWorkspaceSeatsSetFailed, trackWorkspaceInviteFailed } from '../../analytics';
+import { trackMembersPageLoaded, trackWorkspaceInviteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
 
@@ -224,11 +224,11 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdated, onMemberRemoved, onMemberRoleChanged, onInvitationRescinded, onGoToBilling }: {
+export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationRescinded, onGoToBilling }: {
     details: WorkspaceDetails;
     currentUserId: string | null;
-    isTeamsPlan: boolean;
-    onSeatsUpdated: (seats: number) => void;
+    /** Active subscription — the single plan includes collaboration (billing revamp Step 1) */
+    hasTeamAccess: boolean;
     onMemberRemoved: (userId: string) => void;
     onMemberRoleChanged: (userId: string, role: 'viewer' | 'creator' | 'admin') => void;
     onInvitationRescinded: (invitationId: string) => void;
@@ -239,8 +239,6 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
     const [inviteEmail, setInviteEmail]   = useState('');
     const [inviteRole, setInviteRole]     = useState<'viewer' | 'creator'>('creator');
     const [inviting, setInviting]         = useState(false);
-    const [seatPicker, setSeatPicker]     = useState(5);
-    const [settingSeats, setSettingSeats] = useState(false);
     const [removingId, setRemovingId]     = useState<string | null>(null);
     const [rescindingId, setRescindingId] = useState<string | null>(null);
     const [resendingId, setResendingId]   = useState<string | null>(null);
@@ -261,81 +259,21 @@ export function MembersPage({ details, currentUserId, isTeamsPlan, onSeatsUpdate
 
     const inputClass = "px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
-    // ── Not on Teams plan ────────────────────────────────────────────────────
-    if (!isTeamsPlan) {
+    // ── No active subscription — collaboration is a Pro feature ──────────────
+    if (!hasTeamAccess) {
         return (
             <div className="w-full max-w-lg">
                 <h2 className="text-base font-semibold text-text-highlighted mb-2">Members</h2>
                 <p className="text-sm text-text-muted">
-                    Adding team members is a Teams plan feature.{' '}
+                    Adding team members is a Pro feature.{' '}
                     <button
                         type="button"
                         className="text-primary font-medium hover:underline cursor-pointer"
                         onClick={onGoToBilling}
                     >
-                        Upgrade to Teams →
+                        Upgrade to Pro →
                     </button>
                 </p>
-            </div>
-        );
-    }
-
-    // ── Seat setup (Teams plan, no seats configured yet) ─────────────────────
-    if (details.seats == null) {
-        return (
-            <div className="w-full max-w-lg">
-                <h2 className="text-base font-semibold text-text-highlighted mb-2">Members</h2>
-                <p className="text-sm text-text-muted mb-6">
-                    Set a seat count to start inviting team members to this workspace.
-                </p>
-                <div className="border border-border rounded-md p-5 flex flex-col gap-4">
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-sm text-text-main">Number of creator seats</label>
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="number"
-                                min={1}
-                                max={500}
-                                value={seatPicker}
-                                onChange={e => setSeatPicker(Math.max(1, parseInt(e.target.value) || 1))}
-                                className={`${inputClass} w-24`}
-                            />
-                            <span className="text-sm text-text-muted">
-                                seats · {seatPicker * VIEWER_SEATS_PER_CREATOR} viewer seats included
-                            </span>
-                        </div>
-                    </div>
-                    <Button
-                        variant="primary"
-                        disabled={settingSeats}
-                        onClick={async () => {
-                            setSettingSeats(true);
-                            try {
-                                const { error } = await invokeFunction('workspace-seats-set', {
-                                    workspaceId: details.id,
-                                    seats: seatPicker,
-                                });
-                                if (error) throw error;
-                                onSeatsUpdated(seatPicker);
-                                addToast({ type: 'success', title: `Team workspace configured with ${seatPicker} creator seats` });
-                            } catch (err: any) {
-                                captureError(err, { flow: 'workspace', phase: 'seats_set', workspaceId: details.id, extra: { seats: seatPicker } });
-                                trackWorkspaceSeatsSetFailed({
-                                    workspace_id: details.id,
-                                    seats: seatPicker,
-                                    error: err?.message || 'Unknown error',
-                                    error_name: err?.name,
-                                    is_offline: !navigator.onLine,
-                                });
-                                addToast({ type: 'error', title: 'Failed to configure seats' });
-                            } finally {
-                                setSettingSeats(false);
-                            }
-                        }}
-                    >
-                        {settingSeats ? 'Setting up…' : 'Set up team access'}
-                    </Button>
-                </div>
             </div>
         );
     }

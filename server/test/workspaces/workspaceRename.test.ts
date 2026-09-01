@@ -74,9 +74,8 @@ describe.runIf(hasTestDb())('POST /workspace-rename (e2e, real Postgres)', () =>
     });
 
     it('renames for an admin and returns the updated blob', async () => {
-        const ws = await seedWorkspace(pool, { name: 'Before' });
+        const ws = await seedWorkspace(pool, { name: 'Before' }); // owner (implicit admin): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
 
         const res = await post(testApp(), { workspaceId: ws.id, name: 'After' },
             await userToken({ sub: SEEDED_USER_ID }));

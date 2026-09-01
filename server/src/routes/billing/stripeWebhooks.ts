@@ -31,10 +31,14 @@
  *   checkout.completed; Stripe's retry resolves it) → discard
  *   out-of-order deliveries (200, warn) → UPDATE + stamp
  *   stripe_event_at.
- * - customer.subscription.deleted → status canceled, plan pro, seats
- *   NULL. NO ordering guard (parity smell, pinned): a stale
- *   redelivered deleted always cancels.
+ * - customer.subscription.deleted → status canceled, seats reset to 1.
+ *   NO ordering guard (parity smell, pinned): a stale redelivered
+ *   deleted always cancels.
  * - anything else → 200 acknowledged.
+ *
+ * Single plan since billing revamp Step 1: no plan derivation (the old
+ * price.metadata.plan_type read is gone — old and new prices both
+ * work), seats always mirrors the subscription item's quantity.
  *
  * Response: { received: true }
  */
@@ -47,19 +51,6 @@ import type {
     StripeSubscription,
     StripeSubscriptionItem,
 } from '../../ports/stripe.js';
-
-/** Read plan from price metadata. Throws if plan_type is missing or invalid. */
-function planFromSubscription(subscription: StripeSubscription): 'pro' | 'teams' {
-    const price = subscription.items?.data?.[0]?.price;
-    const planType = typeof price === 'object' ? price?.metadata?.plan_type : undefined;
-    if (planType !== 'pro' && planType !== 'teams') {
-        const priceId = typeof price === 'object' ? price?.id : price;
-        throw new Error(
-            `Missing or invalid plan_type metadata on price ${priceId ?? 'unknown'}. Expected 'pro' or 'teams'.`,
-        );
-    }
-    return planType;
-}
 
 /** Unix seconds or date string → ISO; null when absent/invalid. */
 function timestampToIso(value: number | string | null | undefined): string | null {
@@ -105,22 +96,20 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
         const stripeSub = await app.deps.stripe.getSubscription(subscriptionId);
         const item = stripeSub.items?.data?.[0];
         const price = typeof item?.price === 'object' ? item.price : undefined;
-        const plan = planFromSubscription(stripeSub);
         const billingInterval = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
-        const seats = plan === 'teams' ? (item?.quantity ?? null) : null;
+        const seats = item?.quantity ?? 1;
 
         await app.deps.db.query(
             `INSERT INTO subscriptions
                 (workspace_id, user_id, stripe_customer_id, stripe_subscription_id,
-                 status, plan, billing_interval, current_period_end,
+                 status, billing_interval, current_period_end,
                  cancel_at, seats, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (workspace_id) DO UPDATE SET
                 user_id = EXCLUDED.user_id,
                 stripe_customer_id = EXCLUDED.stripe_customer_id,
                 stripe_subscription_id = EXCLUDED.stripe_subscription_id,
                 status = EXCLUDED.status,
-                plan = EXCLUDED.plan,
                 billing_interval = EXCLUDED.billing_interval,
                 current_period_end = EXCLUDED.current_period_end,
                 cancel_at = EXCLUDED.cancel_at,
@@ -132,7 +121,6 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 customerId,
                 subscriptionId,
                 stripeSub.status,
-                plan,
                 billingInterval,
                 itemPeriodEnd(stripeSub, item),
                 timestampToIso(stripeSub.cancel_at),
@@ -182,8 +170,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
         }
 
         const item = subscription.items?.data?.[0];
-        const plan = planFromSubscription(subscription);
-        const seats = plan === 'teams' ? (item?.quantity ?? null) : null;
+        const seats = item?.quantity ?? 1;
         const periodEnd = itemPeriodEnd(subscription, item);
         if (!periodEnd) {
             throw new Error(`Invalid current_period_end: ${item?.current_period_end}`);
@@ -191,14 +178,13 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
         await app.deps.db.query(
             `UPDATE subscriptions SET
-                status = $2, plan = $3, current_period_end = $4,
-                cancel_at = $5, seats = $6, stripe_event_at = $7,
-                updated_at = $8
+                status = $2, current_period_end = $3,
+                cancel_at = $4, seats = $5, stripe_event_at = $6,
+                updated_at = $7
              WHERE stripe_customer_id = $1`,
             [
                 customerId,
                 subscription.status,
-                plan,
                 periodEnd,
                 timestampToIso(subscription.cancel_at),
                 seats,
@@ -232,7 +218,7 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
         await app.deps.db.query(
             `UPDATE subscriptions SET
-                status = 'canceled', plan = 'pro', seats = NULL,
+                status = 'canceled', seats = 1,
                 stripe_event_at = $2, updated_at = $3
              WHERE stripe_customer_id = $1`,
             [

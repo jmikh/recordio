@@ -24,6 +24,11 @@
  * upload failure is marked inside uploadToMux with the mapped error
  * string; the route then 500s.
  *
+ * Share plumbing is trial/Pro (billing revamp Step 1): the project
+ * workspace's entitlements must have canShare, else 403
+ * subscription_required — gated with the share flag because this route
+ * only serves already-shared projects.
+ *
  * Divergences (documented): schema 400s replace the edge fn's
  * `Missing projectId` / `Missing cloudVersion` bodies; cloudVersion
  * must be an integer >= 1 (Ajv coercion — same reasoning as
@@ -34,6 +39,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { getWorkspaceEntitlements } from '../services/entitlements.js';
 import { getProjectIfEditor } from '../services/projectAccess.js';
 import { getOrCreateRenderJob, type RenderJobResolution } from '../services/renderJobs.js';
 import { markMuxVideoFailed, uploadToMux } from '../services/muxUpload.js';
@@ -68,6 +74,7 @@ export const muxVideoCreateRoutes: FastifyPluginAsyncTypebox<MuxVideoCreateRoute
                         muxVideoId: Type.String(),
                     }),
                     400: Type.Object({ error: Type.String() }, { additionalProperties: true }),
+                    403: Type.Object({ error: Type.String() }),
                     404: Type.Object({ error: Type.String() }),
                     500: Type.Object({ error: Type.String() }, { additionalProperties: true }),
                 },
@@ -89,6 +96,16 @@ export const muxVideoCreateRoutes: FastifyPluginAsyncTypebox<MuxVideoCreateRoute
             if (!access) {
                 return reply.code(404).send({ error: 'Project not found or access denied' });
             }
+
+            const entitlements = await getWorkspaceEntitlements(
+                app.deps.db,
+                app.deps.clock,
+                access.workspace_id,
+            );
+            if (!entitlements.canShare) {
+                return reply.code(403).send({ error: 'subscription_required' });
+            }
+
             if (!access.slug) {
                 return reply
                     .code(400)

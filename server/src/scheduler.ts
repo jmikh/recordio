@@ -10,10 +10,10 @@
  * startup tick re-runs everything) or a brief two-instance overlap is
  * harmless — `job.trigger` makes those runs identifiable in logs.
  *
- * Logging is the metrics/audit surface: one `job.completed` /
- * `job.failed` event per run (see LogEventCatalog). Known accepted
+ * Logging is the metrics/audit surface: one `job.run` event per run,
+ * discriminated by `job.status` (see LogEventCatalog). Known accepted
  * limitation: a dead scheduler emits nothing — liveness is "do I see
- * job.completed lines in Railway logs".
+ * job.run lines in Railway logs".
  *
  * Timing divergences from the decommissioned pg_cron entries
  * (documented in the plan): the daily job ran at 03:00 UTC → now the
@@ -75,9 +75,10 @@ export function startScheduler(
             const startedAt = performance.now();
             try {
                 const result = await job.run(deps, log);
-                logEvent(log, 'job.completed', {
+                logEvent(log, 'job.run', {
                     'job.name': job.name,
                     'job.trigger': trigger,
+                    'job.status': 'success',
                     duration_ms: Math.round(performance.now() - startedAt),
                     'job.items_processed': result.itemsProcessed,
                     'job.items_failed': result.itemsFailed,
@@ -85,9 +86,10 @@ export function startScheduler(
                 });
             } catch (err) {
                 log.error({ err, 'job.name': job.name }, 'scheduled job threw');
-                logEvent(log, 'job.failed', {
+                logEvent(log, 'job.run', {
                     'job.name': job.name,
                     'job.trigger': trigger,
+                    'job.status': 'failure',
                     duration_ms: Math.round(performance.now() - startedAt),
                 });
                 onJobError?.(err);

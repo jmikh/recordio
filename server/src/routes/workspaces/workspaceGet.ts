@@ -43,10 +43,10 @@ export const workspaceGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'id',          w.id,
                     'name',        w.name,
                     'owner_id',    w.owner_id,
-                    'role',        (
+                    'role',        CASE WHEN w.owner_id = $2 THEN 'admin' ELSE (
                         SELECT wm2.role FROM workspace_members wm2
                         WHERE wm2.workspace_id = w.id AND wm2.user_id = $2
-                    ),
+                    ) END,
                     'seats',       (
                         SELECT s.seats FROM subscriptions s
                         WHERE s.workspace_id = w.id LIMIT 1
@@ -57,16 +57,26 @@ export const workspaceGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                         WHERE s.workspace_id = w.id LIMIT 1
                     ),
                     'members',     (
-                        SELECT COALESCE(jsonb_agg(jsonb_build_object(
-                            'user_id',    wm.user_id,
-                            'role',       wm.role,
-                            'email',      u.email,
-                            'name',       (SELECT name FROM user_profiles WHERE user_id = wm.user_id),
-                            'created_at', wm.created_at
-                        ) ORDER BY wm.created_at ASC), '[]'::jsonb)
-                        FROM workspace_members wm
-                        JOIN auth.users u ON u.id = wm.user_id
-                        WHERE wm.workspace_id = w.id
+                        -- Owner first, synthesized (no workspace_members
+                        -- row since revamp Step 2); member since creation.
+                        SELECT jsonb_build_array(jsonb_build_object(
+                            'user_id',    w.owner_id,
+                            'role',       'admin',
+                            'email',      (SELECT u.email FROM auth.users u WHERE u.id = w.owner_id),
+                            'name',       (SELECT name FROM user_profiles WHERE user_id = w.owner_id),
+                            'created_at', w.created_at
+                        )) || (
+                            SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                                'user_id',    wm.user_id,
+                                'role',       wm.role,
+                                'email',      u.email,
+                                'name',       (SELECT name FROM user_profiles WHERE user_id = wm.user_id),
+                                'created_at', wm.created_at
+                            ) ORDER BY wm.created_at ASC), '[]'::jsonb)
+                            FROM workspace_members wm
+                            JOIN auth.users u ON u.id = wm.user_id
+                            WHERE wm.workspace_id = w.id
+                        )
                     ),
                     'invitations',  (
                         SELECT COALESCE(jsonb_agg(jsonb_build_object(

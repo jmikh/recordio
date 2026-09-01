@@ -72,16 +72,15 @@ const app = buildApp(
         version: config.RAILWAY_GIT_COMMIT_SHA ?? 'dev',
         env: config.NODE_ENV,
         prettyLogs: config.NODE_ENV !== 'production',
+        axiom: { dataset: config.AXIOM_DATASET, token: config.AXIOM_TOKEN },
         supabaseJwtSecret: config.SUPABASE_JWT_SECRET,
         supabaseUrl: config.SUPABASE_URL,
         publicUrl: config.PUBLIC_URL,
         renderSecret: config.RENDER_SECRET,
         serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
         stripePriceIds: {
-            pro_monthly: config.STRIPE_PRO_PRICE_ID_MONTHLY,
-            pro_yearly: config.STRIPE_PRO_PRICE_ID_YEARLY,
-            teams_monthly: config.STRIPE_TEAMS_PRICE_ID_MONTHLY,
-            teams_yearly: config.STRIPE_TEAMS_PRICE_ID_YEARLY,
+            monthly: config.STRIPE_PRICE_ID_MONTHLY,
+            yearly: config.STRIPE_PRICE_ID_YEARLY,
         },
     },
 );
@@ -107,6 +106,8 @@ app.addHook('onClose', async () => running.scheduler?.stop());
 try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
 } catch (err) {
+    // Hard exit: this error reaches stdout/Railway reliably but may miss
+    // the Axiom batch flush — acceptable for a failed boot.
     app.log.error(err);
     process.exit(1);
 }
@@ -115,3 +116,19 @@ running.scheduler = startScheduler(deps, jobs, {
     log: app.log,
     onJobError: (err) => Sentry.captureException(err),
 });
+
+// Graceful shutdown: without this, SIGTERM (Railway redeploy) drops the
+// transport worker's in-flight Axiom batch. Close the app (stops the
+// scheduler via the onClose hook), then give the worker one batch
+// interval plus HTTP time to flush.
+const shutdown = async (signal: string) => {
+    app.log.info({ signal }, 'shutdown');
+    const failsafe = setTimeout(() => process.exit(1), 10_000);
+    failsafe.unref();
+    await app.close();
+    await pool.end();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    process.exit(0);
+};
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));

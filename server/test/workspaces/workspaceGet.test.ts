@@ -69,19 +69,17 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
     it('403 for a non-member', async () => {
         const ws = await seedWorkspace(pool);
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
 
         const res = await post(testApp(), { workspaceId: ws.id },
             await userToken({ sub: SEEDED_USER_2_ID }));
         expect(res.statusCode).toBe(403);
     });
 
-    it('returns details: caller role, seats, viewer_seats, members, and PENDING invitations with NULL expires_at (bug pin)', async () => {
+    it('returns details: caller role, seats, viewer_seats, members (owner synthesized first), and PENDING invitations with NULL expires_at (bug pin)', async () => {
         const ws = await seedWorkspace(pool, { name: 'Details ws' });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
-        await seedSubscription(pool, { workspaceId: ws.id, plan: 'teams', seats: 3 });
+        await seedSubscription(pool, { workspaceId: ws.id, seats: 3 });
         const pending = await seedWorkspaceInvitation(pool, {
             workspaceId: ws.id, email: 'Invitee@Example.com', role: 'viewer',
         });
@@ -106,7 +104,10 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
             viewer_seats: 30,
         });
 
+        // Owner leads, synthesized (no workspace_members row since revamp
+        // Step 2); member-since = workspace creation
         expect(body.members.map((m) => m.user_id)).toEqual([SEEDED_USER_ID, SEEDED_USER_2_ID]);
+        expect(body.members[0]).toMatchObject({ role: 'admin', email: 'user1@gmail.com' });
         expect(body.members[1]).toMatchObject({ role: 'creator', email: 'user2@gmail.com' });
 
         // The bug pin: the pending invite (expires_at NULL) IS listed
@@ -119,10 +120,9 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
     it('null for a deleted workspace is unreachable via the member gate (403 first)', async () => {
         const ws = await seedWorkspace(pool, { deletedAt: new Date().toISOString() });
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
 
         const res = await post(testApp(), { workspaceId: ws.id },
             await userToken({ sub: SEEDED_USER_ID }));
-        expect(res.statusCode).toBe(403); // isWorkspaceMember requires a live workspace
+        expect(res.statusCode).toBe(403); // isWorkspaceMember requires a live workspace, owner included
     });
 });

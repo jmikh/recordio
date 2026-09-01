@@ -19,13 +19,19 @@ import { createFakeDeps, type FakeDeps } from './fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from './helpers/tokens.js';
 import {
     createTestPool,
+    deleteAuthUsers,
     deleteProjects,
+    deleteWorkspaces,
     hasTestDb,
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
+    seedAuthUser,
     seedProject,
     seedProjectEditor,
     seedRenderJob,
+    seedSubscription,
+    seedWorkspace,
+    type SeededAuthUser,
 } from './helpers/db.js';
 
 const ownerToken = () => userToken({ sub: SEEDED_USER_ID });
@@ -112,9 +118,19 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
     // Lazy: describe bodies run at collection time even when runIf skips
     let pool: pg.Pool;
     const createdProjects: string[] = [];
+    const createdWorkspaces: string[] = [];
+    /** Subscribed workspace — the gate needs canBackgroundExport (revamp Step 1) */
+    let subscribedWs: string;
+    /** Trial-less owner: the fakeClock (2026-01-01) predates the SEEDED users' trials */
+    let freeOwner: SeededAuthUser;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         pool = createTestPool();
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        await seedSubscription(pool, { workspaceId: ws.id, status: 'active' });
+        subscribedWs = ws.id;
+        freeOwner = await seedAuthUser(pool);
     });
 
     afterEach(async () => {
@@ -122,6 +138,8 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         createdProjects.length = 0;
     });
     afterAll(async () => {
+        await deleteWorkspaces(pool, createdWorkspaces);
+        await deleteAuthUsers(pool, [freeOwner.id]);
         await pool.end();
     });
 
@@ -140,6 +158,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         const project = await seedProject(pool, {
             projectData: MEDIA_PROJECT_DATA,
             name: 'Render me',
+            workspaceId: subscribedWs,
             ...opts,
         });
         createdProjects.push(project.id);
@@ -174,6 +193,22 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         expect(res.json()).toEqual({ error: 'Project not found or access denied' });
         expect(deps.renderWorker.submissions).toHaveLength(0);
         expect(deps.s3.presignedDownloads).toHaveLength(0);
+    });
+
+    // Billing revamp Step 1: cloud renders are trial/Pro — a FREE
+    // workspace (no subscription, owner without a trial) is denied
+    it('403 subscription_required in a free workspace; no job, no dispatch', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: freeOwner.id });
+        createdWorkspaces.push(ws.id);
+        const project = await seed({ workspaceId: ws.id });
+        const { app, deps } = testApp();
+
+        const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
+
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: 'subscription_required' });
+        expect(await jobRows(project.id)).toHaveLength(0);
+        expect(deps.renderWorker.submissions).toHaveLength(0);
     });
 
     it('404 when the project is soft-deleted', async () => {

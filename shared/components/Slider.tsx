@@ -134,6 +134,12 @@ export const Slider: React.FC<SliderProps> = ({
 
             <div
                 ref={containerRef}
+                role="slider"
+                aria-label={label}
+                aria-valuemin={min}
+                aria-valuemax={max}
+                aria-valuenow={clampedValue}
+                aria-disabled={disabled || undefined}
                 onPointerDown={handlePointerDown}
                 style={{ height: `${SLIDER_HEIGHT}px` }}
                 className={`

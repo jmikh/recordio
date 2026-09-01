@@ -9,7 +9,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../../auth/useUserStore';
-import { useWorkspaceStore } from '../../../workspace/useWorkspaceStore';
+import { useEntitlements } from '../../../billing/useEntitlements';
 import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, InfoTooltip, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../transcription/TranscriptionService';
@@ -61,7 +61,7 @@ export function CaptionsSettings() {
     const hideCloudTranscription = false; // TODO: remove after per-user limits are live
     const [engine, setEngine] = useState<TranscriptionEngine>('openai');
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-    const hasNonFreeAccess = useWorkspaceStore.getState().hasActivePlan;
+    const hasNonFreeAccess = useEntitlements().canTranscribe;
     const [isProModalOpen, setIsProModalOpen] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const captionsCardRef = useRef<HTMLDivElement>(null);

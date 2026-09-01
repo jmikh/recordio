@@ -75,9 +75,8 @@ describe.runIf(hasTestDb())('POST /workspace-member-remove (e2e, real Postgres)'
     }
 
     async function workspaceWithAdmin() {
-        const ws = await seedWorkspace(pool); // owner: SEEDED_USER_ID
+        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
         createdWorkspaces.push(ws.id);
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         return ws;
     }
 

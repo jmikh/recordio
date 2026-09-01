@@ -4,6 +4,7 @@
  * body; blob responses are plain interfaces (snake_case wire shape).
  */
 import { Type, type Static } from '@sinclair/typebox';
+import type { WorkspaceEntitlements } from './entitlements';
 import type { WorkspaceRole } from './workspaces';
 
 /** Empty request body (user-profile-get, workspace-get-default). */
@@ -11,18 +12,21 @@ export type EmptyRequest = Record<string, never>;
 
 // ── POST /user-profile-get ───────────────────────────────────────
 
-/** user_profile_get's blob; the whole response is null if no profile row. */
+/**
+ * user_profile_get's blob; the whole response is null if no profile row.
+ * No trial_ends_at since revamp Step 2 — the trial lives on the
+ * workspace and reaches the client via entitlements.trialEndsAt.
+ */
 export interface UserProfile {
     name: string | null;
-    trial_ends_at: string | null;
 }
 
 // ── POST /workspace-get-default ──────────────────────────────────
 
 /**
- * workspace_get_default's blob — the session bootstrap. The route
- * guarantees a workspace exists (stored default → oldest owned →
- * create), so unlike most blobs this one is never null.
+ * workspace_get_default's blob — the session bootstrap. Every account
+ * owns a workspace from signup (revamp Step 2), so unlike most blobs
+ * this one is never null: stored default → oldest owned.
  */
 export interface DefaultWorkspace {
     id: string;
@@ -47,17 +51,26 @@ export const SubscriptionGetRequestSchema = Type.Object({
 export type SubscriptionGetRequest = Static<typeof SubscriptionGetRequestSchema>;
 
 /**
- * subscription_get's blob; null response = no subscription (free).
- * plan/billing_interval are DB CHECK-constrained; status carries
- * Stripe's subscription statuses verbatim (unconstrained — callers
- * narrow it into their own union).
+ * The subscription row blob; billing_interval is DB CHECK-constrained;
+ * status carries Stripe's subscription statuses verbatim (unconstrained
+ * — callers narrow it into their own union). Single plan since the
+ * billing revamp Step 1 — no plan field, seats is always >= 1.
  */
 export interface SubscriptionInfo {
     status: string;
-    plan: 'pro' | 'teams';
     current_period_end: string | null;
     cancel_at: string | null;
     stripe_customer_id: string | null;
     billing_interval: 'monthly' | 'yearly' | null;
-    seats: number | null;
+    seats: number;
+}
+
+/**
+ * Members always get entitlements — a free/trial workspace is
+ * `subscription: null` + real entitlements. Non-members get 403 (the
+ * old null-for-non-member information hiding can't carry entitlements).
+ */
+export interface SubscriptionGetResponse {
+    subscription: SubscriptionInfo | null;
+    entitlements: WorkspaceEntitlements;
 }

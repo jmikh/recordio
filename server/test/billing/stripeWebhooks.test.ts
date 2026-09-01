@@ -59,8 +59,6 @@ function makeEvent(type: string, object: unknown, created = EVENT_CREATED) {
 
 interface SubPayloadOptions {
     status?: string;
-    /** null → metadata WITHOUT plan_type (the invalid case) */
-    planType?: 'pro' | 'teams' | null;
     interval?: 'month' | 'year';
     quantity?: number;
     /** Unix seconds on the ITEM (dahlia placement); undefined → absent */
@@ -69,7 +67,11 @@ interface SubPayloadOptions {
     cancelAt?: number;
 }
 
-/** Subscription object as it appears in webhook payloads / the port shape. */
+/**
+ * Subscription object as it appears in webhook payloads / the port
+ * shape. Price metadata is empty — the single-plan handlers never read
+ * plan_type (billing revamp Step 1).
+ */
 function subPayload(customerId: string, opts: SubPayloadOptions = {}): StripeSubscription {
     return {
         id: `sub_${randomUUID().slice(0, 8)}`,
@@ -85,7 +87,7 @@ function subPayload(customerId: string, opts: SubPayloadOptions = {}): StripeSub
                     price: {
                         id: 'price_test',
                         unit_amount: 1500,
-                        metadata: opts.planType === null ? {} : { plan_type: opts.planType ?? 'pro' },
+                        metadata: {},
                         recurring: { interval: opts.interval ?? 'month' },
                     },
                 },
@@ -163,16 +165,6 @@ describe('POST /stripe-webhooks (auth + dispatch, no db)', () => {
         expect(res.statusCode).toBe(500);
     });
 
-    it('checkout with a price missing plan_type metadata → 500, pre-query', async () => {
-        const deps = createFakeDeps();
-        const customer = `cus_${randomUUID().slice(0, 8)}`;
-        const session = checkoutSession({ userId: 'u-1', workspaceId: 'ws-1', customer });
-        deps.stripe.subscriptions.set(session.subscription!, subPayload(customer, { planType: null }));
-        const app = build(deps);
-
-        const res = await post(app, makeEvent('checkout.session.completed', session), signed);
-        expect(res.statusCode).toBe(500);
-    });
 });
 
 describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => {
@@ -257,7 +249,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
             session.subscription!,
             subPayload(customer, {
                 status: 'trialing',
-                planType: 'teams',
                 interval: 'year',
                 quantity: 5,
                 periodEnd: 1_787_875_200,
@@ -275,7 +266,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
             stripe_customer_id: customer,
             stripe_subscription_id: session.subscription,
             status: 'trialing',
-            plan: 'teams',
             billing_interval: 'yearly',
             cancel_at: null,
             seats: 5,
@@ -293,7 +283,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         const ws = await seedWs();
         await seedSubscription(pool, {
             workspaceId: ws.id,
-            plan: 'pro',
             status: 'canceled',
             billingInterval: 'monthly',
         });
@@ -301,7 +290,7 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         const session = checkoutSession({ userId: SEEDED_USER_ID, workspaceId: ws.id, customer });
         deps.stripe.subscriptions.set(
             session.subscription!,
-            subPayload(customer, { status: 'active', planType: 'pro', interval: 'month' }),
+            subPayload(customer, { status: 'active', interval: 'month' }),
         );
 
         const res = await post(app, makeEvent('checkout.session.completed', session), signed);
@@ -311,7 +300,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({
             status: 'active',
-            plan: 'pro',
             stripe_customer_id: customer,
             billing_interval: 'monthly',
         });
@@ -324,7 +312,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         const customer = `cus_${randomUUID().slice(0, 8)}`;
         await seedSubscription(pool, {
             workspaceId: ws.id,
-            plan: 'teams',
             seats: 5,
             status: 'active',
             stripeCustomerId: customer,
@@ -337,7 +324,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
                 'customer.subscription.updated',
                 subPayload(customer, {
                     status: 'canceled',
-                    planType: 'teams',
                     quantity: 7,
                     periodEnd: 1_787_875_200,
                     cancelAt: 1_787_875_200,
@@ -351,7 +337,6 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         const [row] = await subRows(ws.id);
         expect(row).toMatchObject({
             status: 'canceled',
-            plan: 'teams',
             seats: 7,
             cancel_at: new Date(1_787_875_200 * 1000),
         });
@@ -423,14 +408,13 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         expect(row.stripe_event_at).toBeNull();
     });
 
-    it('subscription.deleted: canceled / plan pro / seats NULL, stripe_event_at stamped; projects untouched', async () => {
+    it('subscription.deleted: canceled / seats reset to 1, stripe_event_at stamped; projects untouched', async () => {
         const { app } = testApp();
         const ws = await seedWs();
         const pin = await seedExpiryPinProjects();
         const customer = `cus_${randomUUID().slice(0, 8)}`;
         await seedSubscription(pool, {
             workspaceId: ws.id,
-            plan: 'teams',
             seats: 5,
             status: 'active',
             stripeCustomerId: customer,
@@ -438,14 +422,14 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
 
         const res = await post(
             app,
-            makeEvent('customer.subscription.deleted', subPayload(customer, { planType: 'teams' })),
+            makeEvent('customer.subscription.deleted', subPayload(customer)),
             signed,
         );
 
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ received: true });
         const [row] = await subRows(ws.id);
-        expect(row).toMatchObject({ status: 'canceled', plan: 'pro', seats: null });
+        expect(row).toMatchObject({ status: 'canceled', seats: 1 });
         expect(row.stripe_event_at?.toISOString()).toBe(EVENT_CREATED_ISO);
         // The edge fn would have stamped +14 d on the undated project here
         await expectProjectsUntouched(pin);

@@ -25,9 +25,7 @@ interface DashboardSidebarProps {
     currentWorkspaceId: string | null;
     currentWorkspaceName: string | null;
     currentRole: 'viewer' | 'creator' | 'admin' | null;
-    currentUserId: string | null;
     onSwitchWorkspace: (workspaceId: string) => void;
-    onCreateWorkspace: () => void;
     onOpenWorkspaceSettings: () => void;
 }
 
@@ -53,9 +51,7 @@ export function DashboardSidebar({
     currentWorkspaceId,
     currentWorkspaceName,
     currentRole,
-    currentUserId,
     onSwitchWorkspace,
-    onCreateWorkspace,
     onOpenWorkspaceSettings,
 }: DashboardSidebarProps) {
 
@@ -74,9 +70,7 @@ export function DashboardSidebar({
                     currentWorkspaceId={currentWorkspaceId}
                     currentWorkspaceName={currentWorkspaceName}
                     currentRole={currentRole}
-                    currentUserId={currentUserId}
                     onSwitch={onSwitchWorkspace}
-                    onCreate={onCreateWorkspace}
                     onOpenSettings={onOpenWorkspaceSettings}
                 />
             </div>

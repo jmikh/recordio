@@ -77,6 +77,8 @@ database is never faked; only third-party services are.
 | `MUX_WEBHOOK_SECRET` | Yes | Signing secret of the Mux webhook **endpoint** posting to `/mux-video-webhook`. CAREFUL: each Mux webhook endpoint has its own secret (Mux dashboard → Settings → Webhooks) — use the secret of whichever endpoint points at this server |
 | `STRIPE_WEBHOOK_SECRET` | Yes | Signing secret of the Stripe webhook **endpoint** posting to `/stripe-webhooks`. Same per-endpoint gotcha as Mux (dashboard → Developers → Webhooks) — the server endpoint's secret, not the edge fn's |
 | `RESEND_API_KEY` | Yes | Resend API key for the welcome + workspace-invite emails — same value as the edge function secret |
+| `AXIOM_TOKEN` | Yes | Axiom API token with **ingest** permission on the dataset — logs ship app-side via the `@axiomhq/pino` transport (Railway has no log drains). Stdout NDJSON stays intact for the Railway viewer |
+| `AXIOM_DATASET` | Yes | Axiom dataset name, per environment: `recordio-server` (prod/Railway), `recordio-server-dev` (local dev) — prod dashboards/monitors need no env filters |
 
 More vars land as routes migrate (Stripe, Mux, email, transcription, ...).
 Add each to the table when it lands.
@@ -90,7 +92,9 @@ Add each to the table when it lands.
 - [ ] Always-on (no app sleeping — webhooks), usage caps set
 - [ ] Enable **Wait for CI** so deploys block on the `server-tests` GitHub check
 - [ ] Env vars: `DATABASE_URL` (Supavisor, transaction mode), `SENTRY_DSN`,
-      `NODE_ENV=production`; copy edge-function secrets as their routes migrate
+      `NODE_ENV=production`, `AXIOM_TOKEN` + `AXIOM_DATASET` (required —
+      boot fails without them); copy edge-function secrets as their routes
+      migrate
 - [ ] Uptime monitor pinging `GET /health`
 - [ ] Verify: `/health` returns the deployed git SHA; hit `GET /debug-sentry`
       (throws on purpose) and confirm the error appears in Sentry

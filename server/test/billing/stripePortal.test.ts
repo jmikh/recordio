@@ -110,8 +110,7 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
 
     it('member with a subscription: 200 + portal session params recorded', async () => {
         const { app, deps } = testApp();
-        const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
+        const ws = await seedWs(); // owner (implicit member): SEEDED_USER_ID
         await seedSubscription(pool, { workspaceId: ws.id, stripeCustomerId: 'cus_portal_test' });
 
         const res = await post(app, validBody(ws.id), await memberToken());
@@ -125,7 +124,6 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
     it('non-admin membership roles also pass the membership check (RPC parity: any member)', async () => {
         const { app } = testApp();
         const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'viewer' });
         await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
 
@@ -137,7 +135,6 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
         const { app, deps } = testApp();
         // Workspace + subscription exist, but the caller is not a member
         const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
         await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
 
         const res = await post(app, validBody(ws.id), await memberToken());
@@ -148,8 +145,7 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
 
     it('member but no subscription row: 404, same body (RPC returned NULL for both)', async () => {
         const { app, deps } = testApp();
-        const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
+        const ws = await seedWs(); // owner (implicit member): SEEDED_USER_ID
 
         const res = await post(app, validBody(ws.id), await memberToken());
         expect(res.statusCode).toBe(404);
@@ -159,8 +155,7 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
 
     it('subscription with a NULL stripe_customer_id: 404 (edge fn !sub?.stripe_customer_id parity)', async () => {
         const { app, deps } = testApp();
-        const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
+        const ws = await seedWs(); // owner (implicit member): SEEDED_USER_ID
         await seedSubscription(pool, { workspaceId: ws.id, stripeCustomerId: null });
 
         const res = await post(app, validBody(ws.id), await memberToken());
@@ -182,8 +177,7 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
                 },
             },
         });
-        const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
+        const ws = await seedWs(); // owner (implicit member): SEEDED_USER_ID
         await seedSubscription(pool, { workspaceId: ws.id });
 
         const res = await post(app, validBody(ws.id), await memberToken());
@@ -198,8 +192,8 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
 
     it('is read-only: workspace, membership and subscription rows are unchanged', async () => {
         const { app } = testApp();
-        const ws = await seedWs();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID });
+        const ws = await seedWs(); // owner (implicit member): SEEDED_USER_ID
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'viewer' });
         await seedSubscription(pool, { workspaceId: ws.id });
 
         const snapshot = () =>

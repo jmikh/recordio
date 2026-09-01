@@ -49,21 +49,6 @@ async function syncUserToStore(session: Session) {
     setUser(session.user.id, session.user.email || '', userName, userPicture, rawPicture);
 }
 
-/** Fetch user profile (trial info) and sync to store */
-async function fetchProfile() {
-    if (!supabase) return;
-    try {
-        const { data, error } = await invokeFunction('user-profile-get', {});
-        if (!error && data) {
-            useUserStore.getState().setTrialEndsAt(
-                data.trial_ends_at ? new Date(data.trial_ends_at) : null
-            );
-        }
-    } catch {
-        // Profile table not configured yet
-    }
-}
-
 /** Load default workspace + its subscription and sync both to the workspace store */
 async function loadDefaultWorkspace(userId: string) {
     if (!supabase) return;
@@ -91,27 +76,20 @@ async function loadDefaultWorkspace(userId: string) {
             workspaceId ? { workspaceId } : {},
         );
         if (!error && data) {
-            useWorkspaceStore.getState().setSubscription({
-                // Wire status is Stripe's string; the store keeps its narrower union
-                status: data.status as WorkspaceSubscription['status'],
-                plan: data.plan ?? 'pro',
-                currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
-                cancelAt: data.cancel_at ? new Date(data.cancel_at) : null,
-                billingInterval: data.billing_interval || null,
-                seats: data.seats ?? null,
-                stripeCustomerId: data.stripe_customer_id ?? null,
-            }, userId);
-        } else if (!data) {
-            // No subscription for this workspace — reset to free
-            useWorkspaceStore.getState().setSubscription({
-                status: null,
-                plan: 'pro',
-                currentPeriodEnd: null,
-                cancelAt: null,
-                billingInterval: null,
-                seats: null,
-                stripeCustomerId: null,
-            }, userId);
+            const sub = data.subscription;
+            useWorkspaceStore.getState().setSubscription(
+                sub ? {
+                    // Wire status is Stripe's string; the store keeps its narrower union
+                    status: sub.status as WorkspaceSubscription['status'],
+                    currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end) : null,
+                    cancelAt: sub.cancel_at ? new Date(sub.cancel_at) : null,
+                    billingInterval: sub.billing_interval || null,
+                    seats: sub.seats,
+                    stripeCustomerId: sub.stripe_customer_id ?? null,
+                } : null,
+                data.entitlements,
+                userId,
+            );
         }
     } catch {
         // Subscription table not configured yet
@@ -176,7 +154,7 @@ export class AuthManager {
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
                 AuthManager.subscriptionFetchedForUserId = session.user.id;
                 try {
-                    await Promise.all([fetchProfile(), loadDefaultWorkspace(session.user.id)]);
+                    await loadDefaultWorkspace(session.user.id);
                 } finally {
                     // Resolve ready after workspace is loaded (or failed) so the
                     // dashboard never renders before the correct workspace is set.

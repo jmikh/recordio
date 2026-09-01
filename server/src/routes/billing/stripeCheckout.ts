@@ -1,27 +1,27 @@
 /**
  * POST /stripe-checkout — ports the edge function of the same name
- * (Wave A #3).
+ * (Wave A #3). Single per-seat plan since billing revamp Step 1
+ * (plans/workspace-billing-revamp/workspace-billing-revamp-step-1.md):
+ * no plan/seats in the request, quantity is always 1 — the owner buys
+ * their own seat; invite-driven seat auto-scaling lands in Step 6.
  *
- * Creates a Stripe checkout session for Pro or Teams subscriptions and
- * returns its URL. No DB access — auth + price lookup + one Stripe call.
+ * Creates a Stripe checkout session and returns its URL. No DB access
+ * — auth + price lookup + one Stripe call.
  *
  * Kept for parity, flagged as smells in the plan: userEmail is
  * client-supplied and forwarded to Stripe unchecked against the token's
- * email; workspaceId is never checked against the caller's membership;
- * seats has no upper bound.
+ * email; workspaceId is never checked against the caller's membership.
  *
- * Request:  { userId, userEmail, plan?, interval?, workspaceId, seats?, successUrl, cancelUrl }
+ * Request:  { userId, userEmail, interval?, workspaceId, successUrl, cancelUrl }
  * Response: { url }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 
-/** Env-configured Stripe price ids, keyed by `${plan}_${interval}`. */
+/** Env-configured Stripe price ids of the single per-seat plan. */
 export interface StripePriceIds {
-    pro_monthly: string;
-    pro_yearly: string;
-    teams_monthly: string;
-    teams_yearly: string;
+    monthly: string;
+    yearly: string;
 }
 
 export interface StripeCheckoutRoutesOptions {
@@ -40,14 +40,10 @@ export const stripeCheckoutRoutes: FastifyPluginAsyncTypebox<StripeCheckoutRoute
                 body: Type.Object({
                     userId: Type.String({ minLength: 1 }),
                     userEmail: Type.String({ minLength: 1 }),
-                    plan: Type.Optional(
-                        Type.Union([Type.Literal('pro'), Type.Literal('teams')]),
-                    ),
                     interval: Type.Optional(
                         Type.Union([Type.Literal('monthly'), Type.Literal('yearly')]),
                     ),
                     workspaceId: Type.String({ minLength: 1 }),
-                    seats: Type.Optional(Type.Number()),
                     successUrl: Type.String({ minLength: 1 }),
                     cancelUrl: Type.String({ minLength: 1 }),
                 }),
@@ -65,21 +61,17 @@ export const stripeCheckoutRoutes: FastifyPluginAsyncTypebox<StripeCheckoutRoute
             const { priceIds } = opts;
             if (!priceIds) throw new Error('stripeCheckoutRoutes: priceIds not configured');
 
-            // Same defaults as the edge function's destructuring
             const {
                 userId,
                 userEmail,
-                plan = 'pro',
                 interval = 'yearly',
                 workspaceId,
-                seats = 5,
                 successUrl,
                 cancelUrl,
             } = req.body;
 
             req.logCtx.set({
                 'workspace.id': workspaceId,
-                'stripe.plan': plan,
                 'stripe.interval': interval,
             });
 
@@ -87,21 +79,17 @@ export const stripeCheckoutRoutes: FastifyPluginAsyncTypebox<StripeCheckoutRoute
                 return reply.code(403).send({ error: 'Unauthorized: User ID mismatch' });
             }
 
-            const quantity = plan === 'teams' ? Math.max(1, seats) : 1;
-
             const { url } = await app.deps.stripe.createCheckoutSession({
                 customer_email: userEmail,
                 client_reference_id: userId,
-                price: priceIds[`${plan}_${interval}`],
-                quantity,
+                price: priceIds[interval],
+                quantity: 1,
                 success_url: successUrl,
                 cancel_url: cancelUrl,
                 metadata: {
                     userId,
                     workspaceId,
-                    plan,
                     interval,
-                    seats: String(quantity),
                 },
             });
 

@@ -32,6 +32,7 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 response: {
                     200: WorkspaceInviteResponseSchema,
                     403: Type.Object({ error: Type.String() }),
+                    409: Type.Object({ error: Type.String() }),
                 },
             },
         },
@@ -44,6 +45,21 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
             if (!await isWorkspaceAdmin(db, workspaceId, userId)) {
                 return reply.code(403).send({ error: 'Requires admin role in this workspace' });
+            }
+
+            // The owner has no workspace_members row (revamp Step 2), so
+            // the accept-side upsert would happily create one — refuse
+            // their email here instead.
+            const { rows: ownerRows } = await db.query(
+                `SELECT 1
+                 FROM workspaces w
+                 JOIN auth.users u ON u.id = w.owner_id
+                 WHERE w.id = $1 AND lower(u.email) = $2
+                 LIMIT 1`,
+                [workspaceId, email],
+            );
+            if (ownerRows.length > 0) {
+                return reply.code(409).send({ error: 'This email belongs to the workspace owner' });
             }
 
             await db.query(

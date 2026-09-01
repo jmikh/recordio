@@ -5,6 +5,7 @@ import { AuthManager } from '../../auth/AuthManager';
 import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
+import { useEntitlements } from '../../billing/useEntitlements';
 import { useToast } from '../../components/Toast';
 import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
 import type { BillingInterval } from './types';
@@ -12,10 +13,9 @@ import { trackBillingPageLoaded } from '../../analytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PRO_MONTHLY  = 15;
-const PRO_YEARLY   = 12;
-const BIZ_MONTHLY  = 20;
-const BIZ_YEARLY   = 16;
+// Single per-seat plan (billing revamp Step 1)
+const PRICE_MONTHLY = 15;
+const PRICE_YEARLY  = 12;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,8 @@ function formatCurrency(amount: number, currency = 'usd') {
 
 export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: number; onGoToMembers?: () => void }) {
     const { hasActivePlan, subscription, workspaceId, workspaceRole } = useWorkspaceStore();
-    const { userId, email, isAuthenticated, hasFreeTrial, trialEndsAt } = useUserStore();
+    const entitlements = useEntitlements();
+    const { userId, email, isAuthenticated } = useUserStore();
     const { addToast } = useToast();
 
     const isAdmin = workspaceRole === 'admin';
@@ -58,24 +59,20 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     // ── Manage portal state ───────────────────────────────────────────────────
     const [manageLoading, setManageLoading] = useState(false);
 
-    // ── Subscription change state ─────────────────────────────────────────────
+    // ── Seat change state ─────────────────────────────────────────────────────
     const [pendingSeats,   setPendingSeats]   = useState<number | null>(null);
-    const [showTeamsUpgrade, setShowBizUpgrade] = useState(false);
     const [preview,        setPreview]        = useState<SubscriptionChangePreview | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [changeApplying, setChangeApplying] = useState(false);
     const [changeError,    setChangeError]    = useState<string | null>(null);
     const [changeSuccess,  setChangeSuccess]  = useState(false);
 
-    const isTrialing       = hasFreeTrial();
-    const isActivePro      = hasActivePlan && subscription?.plan === 'pro'      && subscription?.status === 'active';
-    const isActiveTeams = hasActivePlan && subscription?.plan === 'teams' && subscription?.status === 'active';
-    const currentPlan: 'free' | 'pro' | 'teams' = isActiveTeams ? 'teams' : isActivePro ? 'pro' : 'free';
+    const isTrialing = entitlements.state === 'trial';
+    const isActive   = hasActivePlan && subscription?.status === 'active';
 
-    const currentSeats   = subscription?.seats ?? 5;
-    const displaySeats   = pendingSeats ?? (showTeamsUpgrade ? Math.max(seatFloor, 1) : currentSeats);
-    const hasPendingChange = (isActiveTeams && pendingSeats !== null && pendingSeats !== currentSeats)
-                           || (isActivePro && showTeamsUpgrade && pendingSeats !== null);
+    const currentSeats   = subscription?.seats ?? 1;
+    const displaySeats   = pendingSeats ?? currentSeats;
+    const hasPendingChange = isActive && pendingSeats !== null && pendingSeats !== currentSeats;
 
     useEffect(() => { trackBillingPageLoaded(workspaceId); }, []);
 
@@ -94,7 +91,6 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
         const timer = setTimeout(async () => {
             const result = await StripeService.subscriptionChange({
                 workspaceId,
-                newPlan:  'teams',
                 newSeats: pendingSeats!,
                 dryRun:   true,
             });
@@ -109,12 +105,6 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
         return () => clearTimeout(timer);
     }, [pendingSeats, hasPendingChange, workspaceId]);
 
-    // Trigger initial preview when upgrade mode opens
-    useEffect(() => {
-        if (!workspaceId || !showTeamsUpgrade || !isActivePro) return;
-        setPendingSeats(Math.max(seatFloor, 1));
-    }, [showTeamsUpgrade]);
-
     // ── Poll for checkout activation ──────────────────────────────────────────
     useEffect(() => {
         if (!checkingStatus || !userId || checkoutSuccess) return;
@@ -125,7 +115,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                 workspaceId ? { workspaceId } : {},
             );
             if (rpcErr || !data) return;
-            if (data?.status === 'active') {
+            if (data.subscription?.status === 'active') {
                 setCheckoutSuccess(true);
                 setCheckingStatus(false);
                 await AuthManager.refreshSubscription();
@@ -135,11 +125,11 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     }, [checkingStatus, userId, checkoutSuccess]);
 
     // ── Handlers ──────────────────────────────────────────────────────────────
-    const handleCheckout = async (plan: 'pro' | 'teams') => {
+    const handleCheckout = async () => {
         if (!isAuthenticated || !userId || !email || hasActivePlan) return;
         setCheckoutLoading(true);
         setCheckoutError(null);
-        const { error: err } = await StripeService.createCheckoutSession(userId, email, billingInterval, plan, workspaceId, 1);
+        const { error: err } = await StripeService.createCheckoutSession(userId, email, billingInterval, workspaceId);
         setCheckoutLoading(false);
         if (err) {
             setCheckoutError(err.message || 'Failed to start checkout. Please try again.');
@@ -165,7 +155,6 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
         setChangeError(null);
         const result = await StripeService.subscriptionChange({
             workspaceId,
-            newPlan:  'teams',
             newSeats: pendingSeats,
             dryRun:   false,
         });
@@ -176,7 +165,6 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
         }
         setChangeSuccess(true);
         setPendingSeats(null);
-        setShowBizUpgrade(false);
         setPreview(null);
         await AuthManager.refreshSubscription();
         setTimeout(() => setChangeSuccess(false), 4000);
@@ -184,23 +172,20 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
 
     const handleCancelChange = () => {
         setPendingSeats(null);
-        setShowBizUpgrade(false);
         setPreview(null);
         setChangeError(null);
     };
 
     const confirmLabel = () => {
         if (!pendingSeats) return 'Confirm';
-        if (showTeamsUpgrade) return `Upgrade to Teams ·${pendingSeats} seat${pendingSeats !== 1 ? 's' : ''}`;
         const delta = pendingSeats - currentSeats;
         return delta > 0
             ? `Add ${delta} seat${delta !== 1 ? 's' : ''}`
             : `Remove ${Math.abs(delta)} seat${Math.abs(delta) !== 1 ? 's' : ''}`;
     };
 
-    const proPrice   = billingInterval === 'monthly' ? PRO_MONTHLY : PRO_YEARLY;
-    const bizPrice   = billingInterval === 'monthly' ? BIZ_MONTHLY : BIZ_YEARLY;
-    const proSavings = Math.round((1 - PRO_YEARLY / PRO_MONTHLY) * 100);
+    const seatPrice = billingInterval === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
+    const savings   = Math.round((1 - PRICE_YEARLY / PRICE_MONTHLY) * 100);
 
     return (
         <div className="w-full max-w-3xl flex flex-col gap-8">
@@ -217,14 +202,14 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                     <div className="flex flex-col gap-1">
                         <p className="text-xs text-text-muted uppercase tracking-wide font-medium">Current plan</p>
                         <p className="text-sm font-semibold text-text-highlighted">
-                            {isTrialing ? 'Pro (Trial)' : currentPlan === 'free' ? 'Free' : currentPlan === 'pro' ? 'Pro' : 'Teams'}
-                            {isActiveTeams && subscription?.seats != null && (
+                            {isTrialing ? 'Pro (Trial)' : entitlements.state === 'free' ? 'Free' : 'Pro'}
+                            {hasActivePlan && subscription != null && (
                                 <span className="text-text-muted font-normal ml-1.5">· {subscription.seats} seat{subscription.seats !== 1 ? 's' : ''}</span>
                             )}
                         </p>
-                        {isTrialing && trialEndsAt && (
+                        {isTrialing && entitlements.trialEndsAt && (
                             <p className="text-xs text-text-muted">
-                                Trial ends {new Date(trialEndsAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                Trial ends {new Date(entitlements.trialEndsAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                             </p>
                         )}
                         {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
@@ -245,8 +230,8 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                     )}
                 </div>
 
-                {/* ── Teams: seat stepper ── */}
-                {isActiveTeams && isAdmin && !changeSuccess && (
+                {/* ── Seat stepper ── */}
+                {isActive && isAdmin && !changeSuccess && (
                     <div className="flex flex-col gap-3 pt-1 border-t border-border">
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-text-muted font-medium">Seats</span>
@@ -289,7 +274,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                             <span className="text-text-muted">
                                                 {preview.immediateCharge > 0 ? 'Charged today' : preview.immediateCharge < 0 ? 'Credit applied' : 'No charge today'}
                                                 {(() => {
-                                                    const delta = showTeamsUpgrade ? (pendingSeats ?? 0) : (pendingSeats ?? currentSeats) - currentSeats;
+                                                    const delta = (pendingSeats ?? currentSeats) - currentSeats;
                                                     return delta > 0 && (
                                                         <span className="block text-[10px] opacity-70">
                                                             {prorationLabel(delta, preview.nextRenewalDate)}
@@ -331,78 +316,11 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                     </div>
                 )}
 
-
-                {isActivePro && showTeamsUpgrade && !changeSuccess && (
-                    <div className="flex flex-col gap-3 pt-1 border-t border-border">
-                        <p className="text-xs text-text-muted font-medium">Upgrade to Teams</p>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-text-muted">Seats</span>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setPendingSeats(Math.max(seatFloor, displaySeats - 1))}
-                                    disabled={displaySeats <= seatFloor}
-                                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-sm text-text-main hover:bg-state-hover disabled:opacity-30 disabled:cursor-default transition-colors"
-                                >−</button>
-                                <span className="text-sm font-semibold text-text-highlighted w-6 text-center">{displaySeats}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setPendingSeats(displaySeats + 1)}
-                                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-sm text-text-main hover:bg-state-hover transition-colors"
-                                >+</button>
-                            </div>
-                        </div>
-
-                        <div className="bg-surface-raised border border-border rounded-lg p-4 flex flex-col gap-3">
-                            {previewLoading && (
-                                <p className="text-xs text-text-muted flex items-center gap-1.5">
-                                    <LuLoader className="icon-sm animate-spin" /> Calculating…
-                                </p>
-                            )}
-                            {preview && !previewLoading && (
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-text-muted">
-                                            {preview.immediateCharge > 0 ? 'Charged today' : 'No charge today'}
-                                        </span>
-                                        <span className="font-semibold text-text-highlighted">
-                                            {preview.immediateCharge > 0
-                                                ? formatCurrency(preview.immediateCharge, preview.currency)
-                                                : '—'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-text-muted">
-                                            Next renewal · {new Date(preview.nextRenewalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
-                                        <span className="font-semibold text-text-highlighted">
-                                            {formatCurrency(preview.nextRenewalAmount, preview.currency)}/{preview.billingInterval === 'yearly' ? 'yr' : 'mo'}
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                            {changeError && (
-                                <p className="text-xs text-destructive">{changeError}</p>
-                            )}
-                            <div className="flex items-center gap-2 pt-1">
-                                <Button variant="ghost" onClick={handleCancelChange} disabled={changeApplying}>Cancel</Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={handleConfirmChange}
-                                    disabled={changeApplying || previewLoading || !preview}
-                                >
-                                    {changeApplying ? 'Upgrading…' : confirmLabel()}
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {/* ── Success feedback ── */}
                 {changeSuccess && (
                     <div className="bg-success/10 border border-success/30 rounded-md px-3 py-2 text-xs text-success flex items-center gap-2">
                         <LuCheck className="icon-sm shrink-0" />
-                        {isActiveTeams ? 'Seats updated successfully.' : 'Upgraded to Teams — welcome!'}
+                        Seats updated successfully.
                     </div>
                 )}
 
@@ -446,7 +364,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                         ? 'bg-text-on-primary/20 text-text-on-primary'
                                         : 'bg-primary/15 text-primary'
                                 }`}>
-                                    -{proSavings}%
+                                    -{savings}%
                                 </span>
                             )}
                         </button>
@@ -455,11 +373,11 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
             </div>
 
             {/* ── Pricing cards ── */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
 
                 {/* Free */}
-                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${currentPlan === 'free' && !isTrialing ? 'border-primary' : 'border-border'}`}>
-                    {currentPlan === 'free' && !isTrialing && (
+                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${entitlements.state === 'free' ? 'border-primary' : 'border-border'}`}>
+                    {entitlements.state === 'free' && (
                         <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
                             Current plan
                         </span>
@@ -472,7 +390,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                         </div>
                         <p className="text-xs text-text-muted">No card needed</p>
                     </div>
-                    {currentPlan !== 'free' && (
+                    {entitlements.state !== 'free' && (
                         <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-disabled text-xs font-medium text-center">
                             Not available
                         </div>
@@ -481,8 +399,8 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                 </div>
 
                 {/* Pro */}
-                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${isActivePro ? 'border-primary' : 'border-border'}`}>
-                    {isActivePro && (
+                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${isActive ? 'border-primary' : 'border-border'}`}>
+                    {isActive && (
                         <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
                             Current plan
                         </span>
@@ -490,89 +408,51 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                     <div>
                         <h3 className="text-xs font-semibold text-primary uppercase tracking-wide mb-3">Pro</h3>
                         <div className="mb-0.5">
-                            <span className="text-2xl font-bold text-text-highlighted">${proPrice}</span>
-                            <span className="text-xs text-text-muted ml-1">/ month</span>
-                        </div>
-                        <p className="text-xs text-text-muted">{billingInterval === 'yearly' ? 'Billed annually' : 'Billed monthly'}</p>
-                    </div>
-                    {!hasActivePlan ? (
-                        <Button variant="primary" fullWidth onClick={() => handleCheckout('pro')} disabled={checkoutLoading || checkingStatus}>
-                            {checkoutLoading ? 'Loading…' : checkingStatus ? 'Waiting…' : 'Upgrade to Pro'}
-                        </Button>
-                    ) : (
-                        <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-muted text-xs font-medium text-center">
-                            {isActivePro ? 'Current plan' : 'Included in Teams'}
-                        </div>
-                    )}
-                    <p className="text-xs text-text-muted">For serious solo creators</p>
-                </div>
-
-                {/* Teams */}
-                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${isActiveTeams ? 'border-primary' : 'border-border'}`}>
-                    {isActiveTeams && (
-                        <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
-                            Current plan
-                        </span>
-                    )}
-                    <div>
-                        <h3 className="text-xs font-semibold text-tertiary uppercase tracking-wide mb-3">Teams</h3>
-                        <div className="mb-0.5">
-                            <span className="text-2xl font-bold text-text-highlighted">${bizPrice}</span>
+                            <span className="text-2xl font-bold text-text-highlighted">${seatPrice}</span>
                             <span className="text-xs text-text-muted ml-1">/ seat / month</span>
                         </div>
                         <p className="text-xs text-text-muted">{billingInterval === 'yearly' ? 'Billed annually' : 'Billed monthly'}</p>
                     </div>
-                    {isActiveTeams ? (
-                        <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-muted text-xs font-medium text-center">
-                            Current plan
-                        </div>
-                    ) : isActivePro && isAdmin && !showTeamsUpgrade ? (
-                        <Button variant="primary" fullWidth onClick={() => setShowBizUpgrade(true)}>
-                            Upgrade to Teams
-                        </Button>
-                    ) : !hasActivePlan ? (
-                        <Button variant="primary" fullWidth onClick={() => handleCheckout('teams')} disabled={checkoutLoading || checkingStatus}>
-                            {checkoutLoading ? 'Loading…' : checkingStatus ? 'Waiting…' : 'Upgrade to Teams'}
+                    {!hasActivePlan ? (
+                        <Button variant="primary" fullWidth onClick={handleCheckout} disabled={checkoutLoading || checkingStatus}>
+                            {checkoutLoading ? 'Loading…' : checkingStatus ? 'Waiting…' : 'Upgrade to Pro'}
                         </Button>
                     ) : (
                         <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-muted text-xs font-medium text-center">
-                            Included in Teams
+                            Current plan
                         </div>
                     )}
-                    <p className="text-xs text-text-muted">For teams that ship together</p>
+                    <p className="text-xs text-text-muted">Solo or with your team — seats scale as you invite</p>
                 </div>
             </div>
 
             {/* ── Feature comparison table ── */}
             <div className="border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-4 px-4 py-3 bg-surface-raised border-b border-border">
+                <div className="grid grid-cols-3 px-4 py-3 bg-surface-raised border-b border-border">
                     <span className="text-xs font-semibold text-text-highlighted">Feature</span>
                     <span className="text-xs font-semibold text-text-muted text-center">Free</span>
                     <span className="text-xs font-semibold text-primary text-center">Pro</span>
-                    <span className="text-xs font-semibold text-tertiary text-center">Teams</span>
                 </div>
                 {[
                     { category: 'Recording' },
-                    { label: 'Recordings per month',           free: '5',       pro: 'Unlimited', biz: 'Unlimited' },
-                    { label: 'Video retention',                free: '7 days',  pro: 'Forever',   biz: 'Forever'   },
-                    { label: 'DOM-aware auto-zoom',            free: true,      pro: true,        biz: true        },
+                    { label: 'Record + edit',                  free: true,      pro: true      },
+                    { label: 'DOM-aware auto-zoom',            free: true,      pro: true      },
                     { category: 'Rendering & Transcription' },
-                    { label: 'Rendering',                      free: 'Browser', pro: 'Cloud',     biz: 'Cloud'     },
-                    { label: 'Transcription',                  free: 'Local',   pro: 'OpenAI',    biz: 'OpenAI'    },
-                    { label: 'Restore deleted videos',         free: false,     pro: '30 days',   biz: '30 days'   },
+                    { label: 'In-browser export (1080p)',      free: true,      pro: true      },
+                    { label: 'Background export',              free: false,     pro: true      },
+                    { label: '4K export',                      free: false,     pro: true      },
+                    { label: 'Transcription',                  free: 'Local',   pro: 'OpenAI'  },
+                    { label: 'Restore deleted videos',         free: false,     pro: '30 days' },
                     { category: 'Editing' },
-                    { label: 'Remove silences',                free: true,      pro: true,        biz: true        },
-                    { label: 'Background presets',             free: true,      pro: true,        biz: true        },
-                    { label: 'Custom background upload',       free: false,     pro: true,        biz: true        },
-                    { label: 'Captions-based editing',         free: false,     pro: true,        biz: true        },
-                    { label: 'Word-by-word caption highlight', free: false,     pro: true,        biz: true        },
-                    { category: 'Sharing' },
-                    { label: 'Share video by link',            free: false,     pro: true,        biz: true        },
-                    { category: 'Team & Governance' },
-                    { label: 'Team workspace',                 free: false,     pro: false,       biz: true        },
-                    { label: 'Role-based access',              free: false,     pro: false,       biz: true        },
-                    { label: 'Shared project library',         free: false,     pro: false,       biz: true        },
-                    { label: 'Seat management',                free: false,     pro: false,       biz: true        },
+                    { label: 'Remove silences',                free: true,      pro: true      },
+                    { label: 'Background presets',             free: true,      pro: true      },
+                    { label: 'Custom background upload',       free: false,     pro: true      },
+                    { label: 'Captions-based editing',         free: false,     pro: true      },
+                    { label: 'Word-by-word caption highlight', free: false,     pro: true      },
+                    { category: 'Sharing & Collaboration' },
+                    { label: 'Share video by link',            free: false,     pro: true      },
+                    { label: 'Team workspace',                 free: false,     pro: true      },
+                    { label: 'Role-based access',              free: false,     pro: true      },
                 ].map((row, i) => {
                     if ('category' in row) {
                         return (
@@ -587,11 +467,10 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                         return <span className="text-xs text-text-main">{val}</span>;
                     };
                     return (
-                        <div key={i} className="grid grid-cols-4 px-4 py-2.5 border-b border-border last:border-b-0 items-center hover:bg-state-hover transition-colors">
+                        <div key={i} className="grid grid-cols-3 px-4 py-2.5 border-b border-border last:border-b-0 items-center hover:bg-state-hover transition-colors">
                             <span className="text-xs text-text-main">{row.label}</span>
                             <div className="flex justify-center">{cell(row.free)}</div>
                             <div className="flex justify-center">{cell(row.pro)}</div>
-                            <div className="flex justify-center">{cell(row.biz)}</div>
                         </div>
                     );
                 })}

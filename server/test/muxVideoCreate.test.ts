@@ -25,8 +25,14 @@ import {
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
     seedMuxVideo,
+    deleteAuthUsers,
+    deleteWorkspaces,
+    seedAuthUser,
     seedProject,
     seedProjectEditor,
+    seedSubscription,
+    seedWorkspace,
+    type SeededAuthUser,
     seedRenderJob,
 } from './helpers/db.js';
 
@@ -99,9 +105,19 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
     // Lazy: describe bodies run at collection time even when runIf skips
     let pool: pg.Pool;
     const createdProjects: string[] = [];
+    const createdWorkspaces: string[] = [];
+    /** Subscribed workspace — the gate needs canShare (revamp Step 1) */
+    let subscribedWs: string;
+    /** Trial-less owner: the fakeClock (2026-01-01) predates the SEEDED users' trials */
+    let freeOwner: SeededAuthUser;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         pool = createTestPool();
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        await seedSubscription(pool, { workspaceId: ws.id, status: 'active' });
+        subscribedWs = ws.id;
+        freeOwner = await seedAuthUser(pool);
     });
 
     afterEach(async () => {
@@ -109,6 +125,8 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
         createdProjects.length = 0;
     });
     afterAll(async () => {
+        await deleteWorkspaces(pool, createdWorkspaces);
+        await deleteAuthUsers(pool, [freeOwner.id]);
         await pool.end();
     });
 
@@ -126,6 +144,7 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
     async function seed(opts: Parameters<typeof seedProject>[1] = {}) {
         const project = await seedProject(pool, {
             name: 'Publish me',
+            workspaceId: subscribedWs,
             ...opts,
         });
         createdProjects.push(project.id);
@@ -206,6 +225,22 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
         expect(res.json()).toEqual({ error: 'Project not shared. Create a share link first.' });
         expect(await muxRows(project.id)).toHaveLength(0);
         expect(await jobRows(project.id)).toHaveLength(0);
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    // Billing revamp Step 1: share plumbing is trial/Pro — a FREE
+    // workspace (no subscription, owner without a trial) is denied
+    it('403 subscription_required in a free workspace; no side effects', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: freeOwner.id });
+        createdWorkspaces.push(ws.id);
+        const project = await seed({ workspaceId: ws.id });
+        const { app, deps } = testApp();
+
+        const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
+
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: 'subscription_required' });
+        expect(await muxRows(project.id)).toHaveLength(0);
         expect(deps.renderWorker.submissions).toHaveLength(0);
     });
 

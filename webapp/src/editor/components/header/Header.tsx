@@ -13,7 +13,7 @@ import { useUserStore } from '../../../auth/useUserStore';
 
 import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../analytics';
 import { captureError } from '../../../lib/sentry';
-import { useNonFreeAccess } from '../../../billing/useNonFreeAccess';
+import { useEntitlements } from '../../../billing/useEntitlements';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
@@ -60,7 +60,7 @@ export const Header = () => {
     const [isProModalOpen, setIsProModalOpen] = useState(false);
     const { isAuthenticated } = useUserStore();
     const workspaceName = useWorkspaceStore(s => s.workspaceName);
-    const hasNonFreeAccess = useNonFreeAccess();
+    const entitlements = useEntitlements();
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
 
     const { addToast } = useToast();
@@ -318,7 +318,7 @@ export const Header = () => {
                         </div>
                     </Tooltip>
 
-                    {hasNonFreeAccess ? (
+                    {entitlements.canShare ? (
                         <div className="flex rounded-[var(--radius-interactive)] overflow-hidden">
                             <button
                                 onClick={handleShare}
@@ -388,7 +388,7 @@ export const Header = () => {
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={() => setIsDownloadModalOpen(false)}
-                hasNonFreeAccess={hasNonFreeAccess}
+                hasNonFreeAccess={entitlements.canBackgroundExport}
                 cloudPhase={cloudRender.phase}
                 cloudProgress={cloudRender.progress}
                 onStartCloudRender={handleStartCloudRender}

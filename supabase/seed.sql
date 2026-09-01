@@ -109,32 +109,29 @@ ON CONFLICT DO NOTHING;
 -- 3. Workspaces
 -- ============================================================================
 
-INSERT INTO public.workspaces (id, name, owner_id) VALUES
+-- trial_ends_at is explicit (the column default is now() + 7d): user1's
+-- workspaces carry an expired trial, user2's a live one, user3's the
+-- "ends now" shape the Step 2 backfill gives the no-trial cohort.
+INSERT INTO public.workspaces (id, name, owner_id, trial_ends_at) VALUES
 -- user1
-('eeeeeeee-0000-0000-0000-000000000001', 'My Workspace',    '11111111-1111-1111-1111-111111111111'),
-('eeeeeeee-0000-0000-0000-000000000002', 'Teams Workspace', '11111111-1111-1111-1111-111111111111'),
-('eeeeeeee-0000-0000-0000-000000000003', 'Pro Team',        '11111111-1111-1111-1111-111111111111'),
-('eeeeeeee-0000-0000-0000-000000000004', 'Unpaid Team',     '11111111-1111-1111-1111-111111111111'),
+('eeeeeeee-0000-0000-0000-000000000001', 'My Workspace',    '11111111-1111-1111-1111-111111111111', NOW() - INTERVAL '30 days'),
+('eeeeeeee-0000-0000-0000-000000000002', 'Teams Workspace', '11111111-1111-1111-1111-111111111111', NOW() - INTERVAL '30 days'),
+('eeeeeeee-0000-0000-0000-000000000003', 'Pro Team',        '11111111-1111-1111-1111-111111111111', NOW() - INTERVAL '30 days'),
+('eeeeeeee-0000-0000-0000-000000000004', 'Unpaid Team',     '11111111-1111-1111-1111-111111111111', NOW() - INTERVAL '30 days'),
 -- user2
-('eeeeeeee-0000-0000-0000-000000000005', 'My Workspace',    '22222222-2222-2222-2222-222222222222'),
+('eeeeeeee-0000-0000-0000-000000000005', 'My Workspace',    '22222222-2222-2222-2222-222222222222', NOW() + INTERVAL '7 days'),
 -- user3
-('eeeeeeee-0000-0000-0000-000000000006', 'My Workspace',    '33333333-3333-3333-3333-333333333333')
+('eeeeeeee-0000-0000-0000-000000000006', 'My Workspace',    '33333333-3333-3333-3333-333333333333', NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================
 -- 4. Workspace members
 -- ============================================================================
 
+-- Owners have NO rows here (owner is its own state — workspaces.owner_id
+-- implies admin, revamp Step 2); only invited members appear.
 INSERT INTO public.workspace_members (workspace_id, user_id, role) VALUES
--- user1 is admin of all their workspaces
-('eeeeeeee-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'admin'),
-('eeeeeeee-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'admin'),
-('eeeeeeee-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'admin'),
-('eeeeeeee-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'admin'),
--- user2 is admin of their own workspace
-('eeeeeeee-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'admin'),
--- user3 is admin of their own workspace + creator in user1's Teams Workspace
-('eeeeeeee-0000-0000-0000-000000000006', '33333333-3333-3333-3333-333333333333', 'admin'),
+-- user3 is a creator in user1's Teams Workspace
 ('eeeeeeee-0000-0000-0000-000000000002', '33333333-3333-3333-3333-333333333333', 'creator')
 ON CONFLICT DO NOTHING;
 
@@ -186,7 +183,7 @@ VALUES
     NULL,
     NULL
 )
--- user2 has no subscription row; their trial is tracked via user_profiles.trial_ends_at
+-- user2 has no subscription row; their trial is tracked via workspaces.trial_ends_at
 ON CONFLICT (workspace_id) DO NOTHING;
 
 -- ============================================================================

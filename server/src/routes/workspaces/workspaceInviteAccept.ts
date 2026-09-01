@@ -53,6 +53,16 @@ export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app
                 return { error: 'This invitation was sent to a different email address' };
             }
 
+            // The owner is never a member row (revamp Step 2) — a stale
+            // pre-guard invitation for their email must not create one.
+            const { rows: ownerRows } = await db.query(
+                `SELECT 1 FROM workspaces WHERE id = $1 AND owner_id = $2 LIMIT 1`,
+                [inv.workspaceId, userId],
+            );
+            if (ownerRows.length > 0) {
+                return { error: 'You already own this workspace' };
+            }
+
             await db.query(
                 `INSERT INTO workspace_members (workspace_id, user_id, role)
                  VALUES ($1, $2, $3)

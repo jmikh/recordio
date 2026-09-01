@@ -134,6 +134,28 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
         expect(again.json()).toEqual({ error: 'Invitation not found or already used' });
     });
 
+    it('owner accepting an invite to their OWN workspace → error, no member row created', async () => {
+        // Stale pre-guard invitations for the owner's email must not
+        // recreate an owner member row (revamp Step 2: owner is its own
+        // state, never in workspace_members).
+        const user = await freshUser();
+        const ws = await seedWorkspace(pool, { ownerId: user.id });
+        createdWorkspaces.push(ws.id);
+        const inv = await seedWorkspaceInvitation(pool, {
+            workspaceId: ws.id, email: user.email, role: 'creator',
+        });
+
+        const res = await post(testApp(), { token: inv.token },
+            await userToken({ sub: user.id, email: user.email }));
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ error: 'You already own this workspace' });
+
+        const { rows } = await pool.query(
+            'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+            [ws.id, user.id]);
+        expect(rows).toHaveLength(0);
+    });
+
     it('re-inviting an existing member UPSERTS their role', async () => {
         const user = await freshUser();
         const ws = await freshWorkspace();

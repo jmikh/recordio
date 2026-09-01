@@ -5,6 +5,8 @@ interface CheckboxProps {
     onChange: (checked: boolean) => void;
     /** Optional label displayed to the right of the checkbox */
     label?: string;
+    /** Accessible name when there's no visible label */
+    ariaLabel?: string;
     className?: string;
 }
 
@@ -12,11 +14,15 @@ export const Checkbox: React.FC<CheckboxProps> = ({
     checked,
     onChange,
     label,
+    ariaLabel,
     className = '',
 }) => {
     return (
         <button
             type="button"
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={ariaLabel}
             onClick={() => onChange(!checked)}
             className={`flex items-center gap-1.5 cursor-pointer select-none ${className}`}
         >

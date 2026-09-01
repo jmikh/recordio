@@ -28,6 +28,8 @@ interface DropdownProps<T> {
     suffix?: React.ReactNode;
     /** If true, hides option suffixes in the trigger button (still shown in the menu) */
     hideSuffixInTrigger?: boolean;
+    /** Accessible name for the trigger when there's no visible `label` (compact mode) */
+    ariaLabel?: string;
 }
 
 export function Dropdown<T>({
@@ -40,7 +42,8 @@ export function Dropdown<T>({
     buttonClassName = '',
     fullWidth = true,
     suffix,
-    hideSuffixInTrigger = false
+    hideSuffixInTrigger = false,
+    ariaLabel,
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -140,6 +143,9 @@ export function Dropdown<T>({
             {/* Trigger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                aria-label={ariaLabel}
+                aria-haspopup="listbox"
+                aria-expanded={isOpen}
                 className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''} ${buttonClassName}`}
             >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
