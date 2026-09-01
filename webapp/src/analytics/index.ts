@@ -232,6 +232,26 @@ export function trackReviewModalReviewClicked() {
 }
 
 // ============================================================================
+// Trial Extension (billing revamp Step 3)
+// ============================================================================
+
+export function trackTrialExtended(workspaceId: string | null) {
+    trackEvent('trial_extended', { workspace_id: workspaceId });
+}
+
+export function trackTrialExtendFailed(workspaceId: string | null) {
+    trackEvent('trial_extend_failed', { workspace_id: workspaceId });
+}
+
+export function trackTrialReviewModalReviewClicked() {
+    trackEvent('trial_review_modal_review_clicked');
+}
+
+export function trackTrialReviewModalDismissed() {
+    trackEvent('trial_review_modal_dismissed');
+}
+
+// ============================================================================
 // Render & Export Events
 // ============================================================================
 

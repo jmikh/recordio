@@ -58,6 +58,8 @@ import type {
     EmptyRequest,
     SubscriptionGetRequest,
     SubscriptionGetResponse,
+    TrialExtendRequest,
+    TrialExtendResponse,
     UserProfile,
 } from './session';
 
@@ -93,4 +95,5 @@ export interface ApiRoutes {
     'user-profile-get': { request: EmptyRequest; response: UserProfile | null };
     'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
     'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionGetResponse };
+    'trial-extend': { request: TrialExtendRequest; response: TrialExtendResponse };
 }

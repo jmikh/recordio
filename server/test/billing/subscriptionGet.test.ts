@@ -100,6 +100,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             canInvite: true,
             projectCap: null,
             trialEndsAt: null,
+            canExtendTrial: false,
         });
     });
 
@@ -130,6 +131,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             can4k: false,
             canInvite: false,
             trialEndsAt: null,
+            canExtendTrial: true, // expired unused trial, never-pro (Step 3)
         });
         expect(body.entitlements.projectCap).toBeGreaterThanOrEqual(1);
     });
@@ -156,6 +158,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
                 canInvite: false, // trials are solo
                 projectCap: null,
                 trialEndsAt: '2026-06-01T00:00:00.000Z',
+                canExtendTrial: false, // live trial — the offer is post-lapse only
             },
         });
     });
@@ -173,7 +176,12 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({
             subscription: { status: 'canceled' },
-            entitlements: { state: 'free', canShare: false, trialEndsAt: null },
+            entitlements: {
+                state: 'free',
+                canShare: false,
+                trialEndsAt: null,
+                canExtendTrial: false, // ever-pro never extends
+            },
         });
     });
 

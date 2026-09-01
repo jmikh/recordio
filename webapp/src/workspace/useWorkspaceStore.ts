@@ -13,6 +13,7 @@ const PRO_ENTITLEMENTS: WorkspaceEntitlements = {
     canInvite: true,
     projectCap: null,
     trialEndsAt: null,
+    canExtendTrial: false,
 };
 
 export interface WorkspaceListItem {

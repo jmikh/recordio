@@ -7,6 +7,7 @@ import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
+import { TrialExtendLink } from '../../../billing/TrialExtendLink';
 import type { CloudRenderPhase } from './useCloudRender';
 import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../analytics';
 
@@ -144,13 +145,19 @@ export function DownloadModal({
                                         Render in cloud
                                     </Button>
                                 ) : (
-                                    <Button
-                                        variant="primary"
-                                        onClick={onUpgrade}
-                                        className="w-full mt-4"
-                                    >
-                                        Upgrade
-                                    </Button>
+                                    <>
+                                        <Button
+                                            variant="primary"
+                                            onClick={onUpgrade}
+                                            className="w-full mt-4"
+                                        >
+                                            Upgrade
+                                        </Button>
+                                        <TrialExtendLink
+                                            label="or extend your free trial"
+                                            className="w-full mt-2"
+                                        />
+                                    </>
                                 )}
                             </div>
                         </div>

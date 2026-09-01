@@ -1,10 +1,12 @@
 /**
- * Entitlements derivation (billing revamp Steps 1–2) — pure-function
+ * Entitlements derivation (billing revamp Steps 1–3) — pure-function
  * matrix pins: subscription status × trial date → state, and state →
  * capability flags. Any subscription row (status non-null) pins non-pro
  * statuses to free — the one-way door: a workspace that has ever been
- * pro never derives trial again. The DB read path is covered by the
- * gated-route and subscription-get e2e suites.
+ * pro never derives trial again. canExtendTrial (Step 3) only ever
+ * surfaces on free. The DB read path (including canExtendTrial's
+ * expired-unused-never-pro derivation) is covered by the gated-route,
+ * subscription-get, and trial-extend e2e suites.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -56,6 +58,7 @@ describe('entitlementsForState', () => {
             canInvite: false,
             projectCap: FREE_PROJECT_CAP,
             trialEndsAt: null,
+            canExtendTrial: false,
         });
     });
 
@@ -69,6 +72,7 @@ describe('entitlementsForState', () => {
             canInvite: false,
             projectCap: null,
             trialEndsAt: FUTURE.toISOString(),
+            canExtendTrial: false,
         });
     });
 
@@ -82,6 +86,19 @@ describe('entitlementsForState', () => {
             canInvite: true,
             projectCap: null,
             trialEndsAt: null,
+            canExtendTrial: false,
         });
+    });
+
+    it('canExtendTrial passes through on free…', () => {
+        expect(entitlementsForState('free', PAST, true)).toMatchObject({
+            state: 'free',
+            canExtendTrial: true,
+        });
+    });
+
+    it('…but never on trial or pro (Step 3: the offer is post-lapse only)', () => {
+        expect(entitlementsForState('trial', FUTURE, true).canExtendTrial).toBe(false);
+        expect(entitlementsForState('pro', null, true).canExtendTrial).toBe(false);
     });
 });

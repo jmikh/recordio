@@ -48,6 +48,7 @@ import { workspaceMemberUpdateRoleRoutes } from './routes/workspaces/workspaceMe
 import { userProfileGetRoutes } from './routes/userProfileGet.js';
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
+import { trialExtendRoutes } from './routes/billing/trialExtend.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -208,6 +209,9 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(userProfileGetRoutes);
     app.register(workspaceGetDefaultRoutes);
     app.register(subscriptionGetRoutes);
+
+    // Billing revamp Step 3 — self-serve trial extension
+    app.register(trialExtendRoutes);
 
     app.get('/health', {
         schema: {

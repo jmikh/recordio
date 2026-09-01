@@ -1,6 +1,10 @@
 # Step 3 — Trial Extension Flow
 
-**Status:** Planned 2026-09-01.
+**Status:** Implemented 2026-09-01 — 485 server tests green (14 new: trial-extend
+suite incl. a concurrency case, canExtendTrial derivation rows, subscription-get
+payload pins, share-link persistence), webapp + extension typecheck and dev
+builds pass. Divergences from this design are in §11 and mirrored in the parent
+doc's Step log.
 **Parent:** [`workspace-billing-revamp-tiered-plan.md`](workspace-billing-revamp-tiered-plan.md)
 (Step 3). Read that doc first — the entitlement matrix, decision log, and step
 ordering live there.
@@ -230,3 +234,39 @@ Extension: typecheck + dev build (no trial code there — expect no-op).
 - Step 5's download upsell surface — must include `TrialExtendLink` when it
   lands.
 - Physical column drops and remaining cleanup (Step 8).
+
+## 11. Implementation notes (2026-09-01)
+
+Shipped as designed, with these divergences:
+
+- **Route shape:** the guarded UPDATE runs FIRST (owner check folded into its
+  WHERE clause); the diagnostic SELECT runs only on the zero-rows path to
+  distinguish 404 / 403 / 409-with-reason. Same semantics as §4's
+  read-then-update, but one query on the happy path and the refusal reason can
+  never be stale under a race.
+- **Surface audit found two more upgrade CTAs** — both included:
+  `DashboardSidebar`'s at-cap "Upgrade to Pro for unlimited projects" upsell and
+  `DownloadModal`'s cloud-render card. **`MembersPage`'s "Upgrade to Pro →"
+  (invite gate) was deliberately skipped**: trials never unlock collaboration,
+  so an extend link there would be a misleading CTA.
+- **`TrialExtendedModal` is a global singleton** (`useTrialExtendedModal`
+  zustand store) mounted once in `App.tsx`, opened by the link on success. The
+  link's host surfaces are transient — ProGate's hover tooltip unmounts on
+  mouse-leave, ProUpgradeModal closes via `onExtended` — so a locally-owned
+  success modal would unmount with its trigger.
+- **Error path re-sync** uses `subscription-get` for the *current* workspace and
+  writes the store directly — not `AuthManager.refreshSubscription()`, which
+  reloads the DEFAULT workspace and could switch context.
+- Analytics shipped as four events mirroring the review-modal trio's naming:
+  `trial_extended` / `trial_extend_failed` (with `workspace_id`),
+  `trial_review_modal_review_clicked` / `trial_review_modal_dismissed`.
+- Share-link persistence: `/shared-video-get` confirmed entitlement-free
+  (resolves purely on `share_policy = 'public'`); pinned by a new regression
+  test with an expired-trial, spent-extension workspace.
+- Recorded in agent-suggestions (#5): ProGate's tooltip CTAs are likely
+  unreachable by mouse (tooltip hides on wrapper mouse-leave but floats 8px
+  above it) — pre-existing, affects the new link too, not fixed inline.
+
+Deploy checklist (not yet done): deploy server → webapp back-to-back. No
+migration, no env changes; old webapp bundles never show the link
+(`canExtendTrial` absent ⇒ falsy).

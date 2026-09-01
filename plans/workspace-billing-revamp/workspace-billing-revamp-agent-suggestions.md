@@ -61,3 +61,20 @@ matters, sketch of the fix.
 - **Sketch:** in Step 6, drop `viewer_seats` from the `workspace-get` payload +
   `WorkspaceDetails`, remove the constant and the copy, and gate viewer invites on
   the hidden internal ceiling with the "contact support" response.
+
+## From Step 3 (2026-09-01)
+
+### 5. ProGate tooltip CTAs are likely unreachable by mouse
+
+- **Where:** `webapp/src/pages/dashboard/ProGate.tsx` — the tooltip hides on the
+  wrapper's `onMouseLeave` (line ~31), but the portal tooltip renders 8px *above*
+  the wrapper (`top: pos.y - 8`, `-translate-y-full`).
+- **Why it matters:** moving the pointer from the gated element toward the tooltip
+  exits the wrapper, which unmounts the tooltip before the "Upgrade →" button (and
+  Step 3's new "or extend free trial" link) can be clicked. The CTAs are
+  effectively hover-display-only; conversion clicks from this surface probably
+  never happen.
+- **Sketch:** keep the tooltip open while the pointer is over the tooltip itself —
+  e.g. hang `onMouseEnter`/`onMouseLeave` on the portal div too with a small
+  close-delay timer, or drop the 8px gap and bridge with padding so the pointer
+  path stays inside a hover region.

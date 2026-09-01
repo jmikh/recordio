@@ -18,9 +18,11 @@ import { TEST_JWT_SECRET } from './helpers/tokens.js';
 import {
     createTestPool,
     deleteProjects,
+    deleteWorkspaces,
     hasTestDb,
     seedMuxVideo,
     seedProject,
+    seedWorkspace,
     SEEDED_USER_ID,
 } from './helpers/db.js';
 
@@ -64,6 +66,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
     // so the pool must not be created until the suite actually executes.
     let pool: pg.Pool;
     const createdProjects: string[] = [];
+    const createdWorkspaces: string[] = [];
 
     beforeAll(() => {
         pool = createTestPool();
@@ -72,6 +75,8 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
     afterEach(async () => {
         await deleteProjects(pool, createdProjects);
         createdProjects.length = 0;
+        await deleteWorkspaces(pool, createdWorkspaces);
+        createdWorkspaces.length = 0;
     });
     afterAll(async () => {
         await pool.end();
@@ -147,6 +152,25 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         const res = await post(app, { slug: project.slug });
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({ status: 'completed', muxPlaybackId: 'pb-new' });
+    });
+
+    it('a share link stays live after the workspace trial ends (revamp Step 3: existing links survive; only creating/updating is gated)', async () => {
+        const { app, deps } = testApp();
+        // Expired trial + spent extension: the free-est a never-pro
+        // workspace can get. The route must not consult entitlements.
+        const ws = await seedWorkspace(pool, {
+            ownerId: SEEDED_USER_ID,
+            trialEndsAt: '2020-01-01T00:00:00Z',
+            trialExtensionCount: 1,
+        });
+        createdWorkspaces.push(ws.id);
+        const project = await seed({ workspaceId: ws.id, sharePolicy: 'public' });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-1' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ status: 'completed', muxPlaybackId: 'pb-1' });
     });
 
     it('completed wins over a newer pending (edge-function priority)', async () => {

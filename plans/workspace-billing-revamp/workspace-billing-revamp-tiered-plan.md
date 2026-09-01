@@ -1,6 +1,6 @@
 # Workspace Permissions & Billing Revamp — High-Level Design
 
-**Status:** In progress — Steps 1–2 shipped 2026-09-01 (see Step log).
+**Status:** In progress — Steps 1–3 shipped 2026-09-01 (see Step log).
 **Purpose:** Umbrella reference for the billing/permissions revamp. Each step gets its own
 step doc in this folder (`workspace-billing-revamp-step-N.md`), created when that step
 starts — not upfront, since earlier steps' outcomes change later steps.
@@ -212,8 +212,8 @@ the trial attached.
 - Open for step doc: existing users who own multiple workspaces (lean: grandfather
   them, block new creation); signup-trigger vs lazy-bootstrap mechanics.
 
-### Step 3 — Trial extension flow
-*Doc: [`workspace-billing-revamp-step-3.md`](workspace-billing-revamp-step-3.md) — planned 2026-09-01.*
+### Step 3 — Trial extension flow ✅
+*Doc: [`workspace-billing-revamp-step-3.md`](workspace-billing-revamp-step-3.md) — **implemented 2026-09-01**.*
 
 **Goal:** One self-serve trial extension with post-grant review ask. No email
 path, no banner (both decided 2026-09-01 during step planning).
@@ -353,6 +353,25 @@ transfer-or-delete flow.
     --remote` together, then server → webapp.
   - `AuthManager.fetchProfile()` deleted (only synced the profile trial);
     `/user-profile-get` keeps returning `{ name }` with no current webapp caller.
+
+- **Step 3 — completed 2026-09-01** ([`workspace-billing-revamp-step-3.md`](workspace-billing-revamp-step-3.md)).
+  Verified: 485 server tests green (trial-extend suite incl. concurrency,
+  canExtendTrial derivation, share-link persistence pin), webapp + extension
+  typecheck and dev builds. Design changes made during planning/implementation
+  (propagated above):
+  - **No email path, no manual grant, no banner** (decided in planning): the one
+    self-serve extension is the only path; the CTA is an "extend trial" hyperlink
+    on upgrade surfaces, gated by a new `canExtendTrial` entitlements bool
+    (true ⇔ trial ended + count 0 + never-pro), and simply disappears afterward.
+    Extension offered only after lapse — no mid-trial extension (server-enforced).
+  - Surfaces shipped: ProUpgradeModal (Header + CaptionsSettings), ProGate
+    tooltip, BillingPage plan card, DashboardSidebar at-cap upsell, DownloadModal
+    cloud card. MembersPage's invite-gate CTA deliberately excluded — trials
+    never unlock collaboration, the link would mislead there.
+  - Post-grant success modal (global singleton — host surfaces are transient)
+    delivers the Chrome Web Store review ask; grant always precedes the ask.
+  - Share links confirmed to survive trial end (`/shared-video-get` is
+    entitlement-free) and pinned by a regression test — knob resolved (§7).
 
 ## 7. Global open knobs (tuning, not blockers)
 

@@ -159,7 +159,13 @@ export interface SeededWorkspace {
 
 export async function seedWorkspace(
     db: Db,
-    opts: { ownerId?: string; name?: string; deletedAt?: string | null; trialEndsAt?: string } = {},
+    opts: {
+        ownerId?: string;
+        name?: string;
+        deletedAt?: string | null;
+        trialEndsAt?: string;
+        trialExtensionCount?: number;
+    } = {},
 ): Promise<SeededWorkspace> {
     const id = randomUUID();
     const ownerId = opts.ownerId ?? SEEDED_USER_ID;
@@ -168,8 +174,8 @@ export async function seedWorkspace(
     // column default (now() + 7d) would grant every test workspace a
     // live trial. Trial-state tests pass an explicit trialEndsAt.
     await db.query(
-        'INSERT INTO workspaces (id, name, owner_id, deleted_at, trial_ends_at) VALUES ($1, $2, $3, $4, $5)',
-        [id, opts.name ?? 'Test workspace', ownerId, opts.deletedAt ?? null, opts.trialEndsAt ?? '2020-01-01T00:00:00Z'],
+        'INSERT INTO workspaces (id, name, owner_id, deleted_at, trial_ends_at, trial_extension_count) VALUES ($1, $2, $3, $4, $5, $6)',
+        [id, opts.name ?? 'Test workspace', ownerId, opts.deletedAt ?? null, opts.trialEndsAt ?? '2020-01-01T00:00:00Z', opts.trialExtensionCount ?? 0],
     );
     return { id, ownerId };
 }

@@ -74,3 +74,19 @@ export interface SubscriptionGetResponse {
     subscription: SubscriptionInfo | null;
     entitlements: WorkspaceEntitlements;
 }
+
+// ── POST /trial-extend ───────────────────────────────────────────
+
+/**
+ * The one self-serve trial extension (revamp Step 3): +7 days from the
+ * extension date, owner-only, only after the trial has ended (see
+ * entitlements.canExtendTrial). Ineligible → 409 { error, reason }.
+ */
+export const TrialExtendRequestSchema = Type.Object({
+    workspaceId: Type.String({ minLength: 1 }),
+});
+export type TrialExtendRequest = Static<typeof TrialExtendRequestSchema>;
+
+export interface TrialExtendResponse {
+    entitlements: WorkspaceEntitlements;
+}

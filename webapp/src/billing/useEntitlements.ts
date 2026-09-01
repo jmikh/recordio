@@ -11,6 +11,8 @@ const FREE_ENTITLEMENTS: WorkspaceEntitlements = {
     canInvite: false,
     projectCap: null,
     trialEndsAt: null,
+    // Never offer the extension before the real payload arrives
+    canExtendTrial: false,
 };
 
 /**

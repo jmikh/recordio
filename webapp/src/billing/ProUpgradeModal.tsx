@@ -1,5 +1,6 @@
 import { Modal, Button, LogoLink } from '@shared/components';
 import { navigate } from '../lib/navigate';
+import { TrialExtendLink } from './TrialExtendLink';
 
 interface ProUpgradeModalProps {
     isOpen: boolean;
@@ -38,6 +39,11 @@ export function ProUpgradeModal({ isOpen, onClose, feature }: ProUpgradeModalPro
                         Upgrade
                     </Button>
                 </div>
+                <TrialExtendLink
+                    label="or extend your free trial — 7 more days"
+                    className="self-center"
+                    onExtended={onClose}
+                />
             </div>
         </Modal>
     );

@@ -1,6 +1,7 @@
 import { useState, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { navigate } from '../../lib/navigate';
+import { TrialExtendLink } from '../../billing/TrialExtendLink';
 
 interface ProGateProps {
     /** The locked feature name shown in the tooltip, e.g. "shareable links" */
@@ -46,6 +47,7 @@ export function ProGate({ feature, children, className }: ProGateProps) {
                     >
                         Upgrade →
                     </button>
+                    <TrialExtendLink label="or extend free trial" className="mt-1" />
                 </div>,
                 document.body
             )}

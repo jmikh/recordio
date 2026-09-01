@@ -1,7 +1,7 @@
 /**
  * Server-side entitlements — the single source of truth for what a
- * workspace can do (billing revamp Steps 1–2,
- * plans/workspace-billing-revamp/workspace-billing-revamp-step-2.md).
+ * workspace can do (billing revamp Steps 1–3,
+ * plans/workspace-billing-revamp/workspace-billing-revamp-step-3.md).
  *
  * State machine: `pro` when the workspace subscription is
  * active|past_due|trialing (past_due = full access through Stripe's
@@ -11,6 +11,11 @@
  * has ever been pro never derives `trial` again (rows are retained on
  * cancellation, so a row's existence ⇔ ever-pro). Else `trial` while
  * workspaces.trial_ends_at is in the future, else `free`.
+ *
+ * canExtendTrial (Step 3) is true only when the trial ended unused
+ * (trial_extension_count 0) and no subscription row exists — it gates
+ * the "extend trial" link client-side; /trial-extend enforces the same
+ * predicate (plus owner-only) in its UPDATE guard.
  *
  * projectCap and canInvite are computed but not yet enforced anywhere
  * (revamp Steps 4 and 6) — the payload ships complete from day 1 so
@@ -45,6 +50,7 @@ export function deriveEntitlementsState(
 export function entitlementsForState(
     state: WorkspaceEntitlementsState,
     trialEndsAt: Date | null = null,
+    canExtendTrial = false,
 ): WorkspaceEntitlements {
     const paid = state !== 'free';
     return {
@@ -56,6 +62,7 @@ export function entitlementsForState(
         canInvite: state === 'pro',
         projectCap: paid ? null : FREE_PROJECT_CAP,
         trialEndsAt: state === 'trial' && trialEndsAt ? trialEndsAt.toISOString() : null,
+        canExtendTrial: state === 'free' && canExtendTrial,
     };
 }
 
@@ -69,18 +76,29 @@ export async function getWorkspaceEntitlements(
     workspaceId: string,
 ): Promise<WorkspaceEntitlements> {
     const { rows } = await db.query(
-        `SELECT s.status, w.trial_ends_at
+        `SELECT s.status, w.trial_ends_at, w.trial_extension_count
          FROM workspaces w
          LEFT JOIN subscriptions s ON s.workspace_id = w.id
          WHERE w.id = $1 AND w.deleted_at IS NULL`,
         [workspaceId],
     );
     const row = rows[0] as
-        | { status: string | null; trial_ends_at: Date | string | null }
+        | {
+              status: string | null;
+              trial_ends_at: Date | string | null;
+              trial_extension_count: number;
+          }
         | undefined;
     const trialEndsAt = row?.trial_ends_at ? new Date(row.trial_ends_at) : null;
+    const now = clock.now();
+    const canExtendTrial =
+        (row?.status ?? null) === null &&
+        trialEndsAt !== null &&
+        trialEndsAt <= now &&
+        row?.trial_extension_count === 0;
     return entitlementsForState(
-        deriveEntitlementsState(row?.status ?? null, trialEndsAt, clock.now()),
+        deriveEntitlementsState(row?.status ?? null, trialEndsAt, now),
         trialEndsAt,
+        canExtendTrial,
     );
 }

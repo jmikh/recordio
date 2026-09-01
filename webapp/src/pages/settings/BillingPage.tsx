@@ -6,6 +6,7 @@ import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useEntitlements } from '../../billing/useEntitlements';
+import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import { useToast } from '../../components/Toast';
 import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
 import type { BillingInterval } from './types';
@@ -212,6 +213,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                 Trial ends {new Date(entitlements.trialEndsAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                             </p>
                         )}
+                        <TrialExtendLink className="self-start" />
                         {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
                             <p className="text-xs text-text-muted">
                                 {subscription.cancelAt ? 'Access until' : 'Renews'}{' '}

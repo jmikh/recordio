@@ -4,6 +4,7 @@ import { Button } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
+import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 
 export type DashboardView = 'all' | 'published' | 'trash';
@@ -133,9 +134,12 @@ export function DashboardSidebar({
                             />
                         </div>
                         {projectCount >= FREE_PROJECT_LIMIT && (
-                            <p className="text-[11px] text-text-muted mt-1.5">
-                                Upgrade to Pro for unlimited projects
-                            </p>
+                            <>
+                                <p className="text-[11px] text-text-muted mt-1.5">
+                                    Upgrade to Pro for unlimited projects
+                                </p>
+                                <TrialExtendLink label="or extend free trial" className="mt-1 text-[11px]" />
+                            </>
                         )}
                     </div>
                 )}

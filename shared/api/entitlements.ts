@@ -26,7 +26,14 @@ export interface WorkspaceEntitlements {
     projectCap: number | null;
     /**
      * When the workspace trial ends (ISO); non-null only while
-     * state === 'trial'. Countdown/extension UX lands in revamp Step 3.
+     * state === 'trial'.
      */
     trialEndsAt: string | null;
+    /**
+     * True only when the trial has ended unused (extension count 0)
+     * and the workspace has never been pro — gates the "extend trial"
+     * link on upgrade surfaces (revamp Step 3). /trial-extend
+     * re-checks server-side (owner-only on top of this predicate).
+     */
+    canExtendTrial: boolean;
 }
